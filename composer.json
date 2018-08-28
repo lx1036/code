@@ -1,0 +1,23 @@
+{
+    "name": "lx1036/routing",
+    "description": "This is lx1036's custom routing.",
+    "type": "library",
+    "require": {
+        "php": "^7.2",
+        "symfony/http-foundation": "^4.1",
+        "illuminate/support": "^5.6"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Xiang Liu",
+            "email": "lx1036@126.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Next\\": "src/"
+        },
+        "files": []
+    }
+}
