@@ -6,7 +6,7 @@ namespace Next\Database\Orm\Query;
 
 use Next\Database\Orm\Query\Connection\ConnectionInterface;
 use Next\Database\Orm\Query\Grammar\GrammarInterface;
-use Next\Database\Orm\Query\Processor\ProcessorInterface;
+use Next\Database\Orm\Query\PostProcessor\ProcessorInterface;
 
 class Builder
 {
@@ -21,6 +21,8 @@ class Builder
     /** @var ProcessorInterface  */
     protected $processor;
 
+    protected $table;
+
     public function __construct(ConnectionInterface $connection, GrammarInterface $grammar, ProcessorInterface $processor)
     {
         $this->connection = $connection;
@@ -34,6 +36,13 @@ class Builder
         $type = 'Null';
 
         $this->wheres[] = compact('column', 'type');
+
+        return $this;
+    }
+
+    public function from(string $table)
+    {
+        $this->table = $table;
 
         return $this;
     }

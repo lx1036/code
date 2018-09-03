@@ -1,7 +1,7 @@
 <?php
 
 
-namespace Next\Database;
+namespace Next\Database\Orm;
 
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Carbon;
@@ -263,15 +263,15 @@ abstract class Model implements JsonSerializable, ArrayAccess
 
 
     /**
-     * @param string $related_model
+     * @param string $child
      * @param $foreign_key
      * @param $local_key
      * @return HasOne
      */
-    public function hasOne(string $related_model, $foreign_key, $local_key): HasOne
+    public function hasOne(string $child, $foreign_key, $local_key): HasOne
     {
         /** @var Model $related */
-        $related = new $related_model;
+        $related = new $child;
 
         return new HasOne($related->newQuery(), $this, $related->getTable() . '.' . $foreign_key, $local_key);
     }
@@ -281,9 +281,12 @@ abstract class Model implements JsonSerializable, ArrayAccess
 
     }
 
-    public function belongsTo(): BelongsTo
+    public function belongsTo(string $parent, $owner_key, $local_key): BelongsTo
     {
+        /** @var Model $related */
+        $related = new $parent;
 
+        return new BelongsTo($related->newQuery(), $this, $local_key, $owner_key);
     }
 
 
@@ -341,7 +344,6 @@ abstract class Model implements JsonSerializable, ArrayAccess
 
         return static::$dispatcher->fire($event . ':' . static::class, $this);
     }
-
 
 
     //endregion

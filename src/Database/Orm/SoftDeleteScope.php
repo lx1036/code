@@ -1,7 +1,7 @@
 <?php
 
 
-namespace Next\Database;
+namespace Next\Database\Orm;
 
 
 use Next\Database\Orm\Builder;

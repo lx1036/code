@@ -4,7 +4,7 @@
 namespace Next\Database\Orm\Query\Connection;
 
 
-class MySqlConnection
+class MySqlConnection extends Connection
 {
 
 }
