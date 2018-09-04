@@ -9,6 +9,8 @@ use ReflectionClass;
 
 
 /**
+ * Bind/Resolve
+ *
  * 1. bind abstract into Container, make concrete from Container(use ReflectionClass)
  * 2. alias abstract
  *
@@ -24,26 +26,41 @@ class Container implements ArrayAccess, ContainerInterface
     protected $instances = [];
 
     /**
+     * Bind singleton/or-not concrete
+     *
      * @param string $abstract
      * @param string|\Closure|null $concrete
+     * @param bool $singleton
      */
-    public function bind($abstract, $concrete = null)
+    public function bind($abstract, $concrete = null, bool $singleton = false)
     {
         if (is_null($concrete)) {
             $concrete = $abstract;
         }
 
-        // concrete is classname
+        // $concrete is classname, convert it into Closure
         if (! $concrete instanceof Closure) {
             $concrete = $this->getClosure($abstract, $concrete);
         }
 
-        $this->bindings[$abstract] = compact('concrete');
+        $this->bindings[$abstract] = compact('concrete', 'singleton');
 
 //        var_dump($this->bindings);
     }
 
-    public function make($abstract)
+    public function singleton($abstract, $concrete = null)
+    {
+        $this->bind($abstract, $concrete, true);
+    }
+
+    /**
+     * Resolve the given type from the container
+     *
+     * @param $abstract
+     * @return mixed
+     * @throws \Exception
+     */
+    public function resolve($abstract)
     {
         $abstract = $this->getAlias($abstract);
 
@@ -56,6 +73,8 @@ class Container implements ArrayAccess, ContainerInterface
 
         if ($concrete instanceof Closure) {
             return $this->instances[$abstract] = $concrete($this);
+        } else {
+            return $this->instantiate($concrete);
         }
 
 //        $object = $this->make($concrete);
@@ -65,10 +84,10 @@ class Container implements ArrayAccess, ContainerInterface
     {
         return function (Container $container) use ($abstract, $concrete) {
             if ($abstract === $concrete) {
-                return $this->build($concrete);
+                return $this->instantiate($concrete);
             }
 
-            return $container->make($concrete);
+            return $this->resolve($concrete);
         };
     }
 
@@ -82,13 +101,17 @@ class Container implements ArrayAccess, ContainerInterface
      *
      * @param $concrete
      *
-     * @throws \ReflectionException
-     *
      * @return mixed
+     * @throws \Exception
      */
-    private function build($concrete)
+    private function instantiate($concrete)
     {
-        $reflector = new ReflectionClass($concrete);
+        try {
+            $reflector = new ReflectionClass($concrete);
+        } catch (\ReflectionException $exception) {
+
+        }
+
 
         if (! $reflector->isInstantiable()) {
             throw new \Exception("class [$concrete] Can\'t be instantiated.");
@@ -110,7 +133,7 @@ class Container implements ArrayAccess, ContainerInterface
 
     private function resolveClass(\ReflectionParameter $dependency)
     {
-        return $this->make($dependency->getClass()->name);
+        return $this->resolve($dependency->getClass()->name);
     }
 
     private function resolveDependencies(array $dependencies): array
@@ -142,5 +165,9 @@ class Container implements ArrayAccess, ContainerInterface
     public function offsetUnset($offset)
     {
         // TODO: Implement offsetUnset() method.
+    }
+
+    public function instance(string $class, \AClass $aclass)
+    {
     }
 }

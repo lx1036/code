@@ -74,7 +74,8 @@ if ($results) {
 
 $app = new \Next\Foundation\Container\Application();
 $database_manager = new \Next\Database\DatabaseManager($app);
-$connection = $database_manager->connection();
+/** @var \Next\Database\Orm\Query\Connection\MySqlConnection $connection */
+$connection = $database_manager->connection('mysql');
 
 $query = 'select `users`.`name`, `users`.`password` from `users` where `users`.`email` = :email';
 

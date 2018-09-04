@@ -9,7 +9,7 @@ interface PipelineInterface {
     public function process($payload);
 }
 
-class Pipeline implements PipelineInterface
+class LeaguePipeline implements PipelineInterface
 {
     private $stages = [];
 
@@ -58,8 +58,8 @@ class BStage implements StageInterface {
     }
 }
 
-$pipeline1 = (new Pipeline)->pipe(new AStage)->pipe(new BStage);
-$pipeline2 = (new Pipeline)->pipe($pipeline1)->pipe(new BStage)->pipe(new AStage);
+$pipeline1 = (new LeaguePipeline)->pipe(new AStage)->pipe(new BStage);
+$pipeline2 = (new LeaguePipeline)->pipe($pipeline1)->pipe(new BStage)->pipe(new AStage);
 $response = $pipeline2->process(10);
 
 var_dump($response);

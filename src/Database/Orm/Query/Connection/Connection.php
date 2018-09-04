@@ -5,8 +5,11 @@ namespace Next\Database\Orm\Query\Connection;
 
 
 use Next\Database\Orm\Query\Grammar\Grammar;
+use Next\Database\Orm\Query\Grammar\GrammarInterface;
 use Next\Database\Orm\Query\PostProcessor\Processor;
 use Next\Database\Orm\Query\Builder as QueryBuilder;
+use PDO;
+use PDOStatement;
 
 class Connection implements ConnectionInterface
 {
@@ -24,7 +27,7 @@ class Connection implements ConnectionInterface
 
     protected $query_logs;
 
-    protected $fetch_mode;
+    protected $fetch_mode = PDO::FETCH_ASSOC;
 
     protected $records_changed = false;
 
@@ -50,8 +53,6 @@ class Connection implements ConnectionInterface
 
     public function select(string $query, array $bindings = []): array
     {
-        $start = microtime(true);
-
 
         /**
          * 1. set the fetch mode
@@ -61,6 +62,46 @@ class Connection implements ConnectionInterface
         /** @var \PDOStatement $statement */
         $statement = $this->getPdo()->prepare($query);
         $statement->setFetchMode($this->fetch_mode);
+
+        $this->bindValues($statement, $this->prepareBindings($bindings));
+
+        $statement->execute();
+
+        return $statement->fetchAll();
+    }
+
+
+    protected function bindValues(PDOStatement $statement,array $bindings)
+    {
+        foreach ($bindings as $binding => $value) {
+            $statement->bindValue(is_string($binding) ? $binding : $binding + 1, $value,is_int($value) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+        }
+    }
+
+    public function getQueryGrammar(): Grammar
+    {
+        return $this->grammar;
+    }
+
+    /**
+     * value is bool or DateTimeInterface
+     *
+     * @param array $bindings
+     * @return array
+     */
+    protected function prepareBindings(array $bindings): array
+    {
+        $date_format = $this->getQueryGrammar()->getDateFormat();
+
+        foreach ($bindings as $binding => $value) {
+            if (is_bool($value)) {
+                $bindings[$binding] = (int) $value;
+            } elseif ($value instanceof \DateTimeInterface) {
+                $bindings[$binding] = $value->format($date_format);
+            }
+        }
+
+        return $bindings;
     }
 
     public function insert(string $query, array $bindings = []): int
