@@ -19,5 +19,8 @@
             "Next\\": "src/"
         },
         "files": []
+    },
+    "require-dev": {
+        "symfony/dependency-injection": "^4.1"
     }
 }
