@@ -1,14 +1,14 @@
 <?php
 
 
-namespace Next;
+namespace Next\Routing;
 
 
-use Next\Validators\HostValidator;
-use Next\Validators\MethodValidator;
-use Next\Validators\RequestValidatorInterface;
-use Next\Validators\SchemaValidator;
-use Next\Validators\UriValidator;
+use Next\Routing\Validators\HostValidator;
+use Next\Routing\Validators\MethodValidator;
+use Next\Routing\Validators\RequestValidatorInterface;
+use Next\Routing\Validators\SchemaValidator;
+use Next\Routing\Validators\UriValidator;
 use Symfony\Component\HttpFoundation\Request;
 
 class Route

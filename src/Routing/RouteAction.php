@@ -1,7 +1,7 @@
 <?php
 
 
-namespace Next;
+namespace Next\Routing;
 
 
 class RouteAction

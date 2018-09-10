@@ -4,8 +4,7 @@
     "type": "library",
     "require": {
         "php": "^7.2",
-        "symfony/http-foundation": "^4.1",
-        "illuminate/support": "^5.6"
+        "symfony/http-foundation": "^4.1"
     },
     "license": "MIT",
     "authors": [
@@ -21,6 +20,7 @@
         "files": []
     },
     "require-dev": {
-        "symfony/dependency-injection": "^4.1"
+        "symfony/dependency-injection": "^4.1",
+        "illuminate/validation": "^5.7"
     }
 }

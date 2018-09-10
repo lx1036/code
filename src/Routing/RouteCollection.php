@@ -1,10 +1,10 @@
 <?php
 
 
-namespace Next;
+namespace Next\Routing;
 
+use Next\Routing\Exception\ResourceNotFoundException;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Traversable;
 
 /**
@@ -39,7 +39,7 @@ class RouteCollection implements \IteratorAggregate, \Countable
             return $route->bind($request);
         }
 
-        throw new NotFoundHttpException();
+        throw new ResourceNotFoundException();
     }
 
     /**

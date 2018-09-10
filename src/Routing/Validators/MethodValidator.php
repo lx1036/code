@@ -1,10 +1,10 @@
 <?php
 
 
-namespace Next\Validators;
+namespace Next\Routing\Validators;
 
 
-use Next\Route;
+use Next\Routing\Route;
 use Symfony\Component\HttpFoundation\Request;
 
 class MethodValidator implements RequestValidatorInterface
