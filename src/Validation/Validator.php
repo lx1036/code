@@ -10,4 +10,10 @@ class Validator
     {
         
     }
+
+
+    public function fails(): bool
+    {
+
+    }
 }

@@ -19,6 +19,7 @@ use ReflectionClass;
  */
 class Container implements ArrayAccess, ContainerInterface
 {
+    /** @var [abstract => ['concrete' => concrete, 'singleton' => singleton], ...]  */
     protected $bindings = [];
 
     protected $aliases = [];
@@ -34,6 +35,9 @@ class Container implements ArrayAccess, ContainerInterface
      */
     public function bind($abstract, $concrete = null, bool $singleton = false)
     {
+        // drop stale bindings
+        unset($this->bindings[$abstract], $this->aliases[$abstract]);
+
         if (is_null($concrete)) {
             $concrete = $abstract;
         }
@@ -44,8 +48,6 @@ class Container implements ArrayAccess, ContainerInterface
         }
 
         $this->bindings[$abstract] = compact('concrete', 'singleton');
-
-//        var_dump($this->bindings);
     }
 
     public function singleton($abstract, $concrete = null)
@@ -77,12 +79,16 @@ class Container implements ArrayAccess, ContainerInterface
             return $this->instantiate($concrete);
         }
 
-//        $object = $this->make($concrete);
+        $object = $this->make($concrete);
+
+        $this->fireAfterResolvingCallbacks($abstract, $object);
+
+        return $object;
     }
 
     private function getClosure($abstract, $concrete): Closure
     {
-        return function (Container $container) use ($abstract, $concrete) {
+        return function () use ($abstract, $concrete) {
             if ($abstract === $concrete) {
                 return $this->instantiate($concrete);
             }
@@ -169,5 +175,25 @@ class Container implements ArrayAccess, ContainerInterface
 
     public function instance(string $class, \AClass $aclass)
     {
+    }
+
+    protected $afterResolvingCallbacks = [];
+
+    public function afterResolving($abstract, \Closure $callback)
+    {
+        if (is_string($abstract)) {
+            $abstract = $this->getAlias($abstract);
+        }
+
+        $this->afterResolvingCallbacks[$abstract][] = $callback;
+    }
+
+    private function fireAfterResolvingCallbacks($abstract, $object)
+    {
+        $callbacks = $this->afterResolvingCallbacks[$abstract];
+
+        foreach ($callbacks as $callback) {
+            $callback($object);
+        }
     }
 }

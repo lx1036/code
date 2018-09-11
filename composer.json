@@ -21,6 +21,7 @@
     },
     "require-dev": {
         "symfony/dependency-injection": "^4.1",
-        "illuminate/validation": "^5.7"
+        "illuminate/validation": "^5.7",
+        "symfony/validator": "^4.1"
     }
 }

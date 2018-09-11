@@ -34,3 +34,22 @@ try {
 }
 
 var_dump(1);
+
+
+
+/**
+ * Symfony Validation: Constraints, Validator
+ */
+/** @var \Symfony\Component\Validator\Validator\RecursiveValidator $symfony_validator */
+$symfony_validator = \Symfony\Component\Validator\Validation::createValidator();
+/** @var \Symfony\Component\Validator\ConstraintViolationList $violations */
+$violations = $symfony_validator->validate('test', [
+    new \Symfony\Component\Validator\Constraints\Length(['min' => 5]),
+]);
+
+if ($violations->count() > 0) {
+    /** @var \Symfony\Component\Validator\ConstraintViolation $violation */
+    foreach ($violations as $violation) {
+        var_dump($violation->getMessage(), $violation->getCode());
+    }
+}
