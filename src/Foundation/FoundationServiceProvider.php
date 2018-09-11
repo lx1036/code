@@ -17,7 +17,7 @@ class FoundationServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->app->afterResolving(ValidatesWhenResolved::class, function (ValidatesWhenResolved $resolved) {
-            $resolved->validate();
+            $resolved->validateResolved();
         });
     }
 }

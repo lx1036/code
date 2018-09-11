@@ -3,8 +3,7 @@
     "description": "This is lx1036's custom routing.",
     "type": "library",
     "require": {
-        "php": "^7.2",
-        "symfony/http-foundation": "^4.1"
+        "php": "^7.2"
     },
     "license": "MIT",
     "authors": [
@@ -22,6 +21,7 @@
     "require-dev": {
         "symfony/dependency-injection": "^4.1",
         "illuminate/validation": "^5.7",
-        "symfony/validator": "^4.1"
+        "symfony/validator": "^4.1",
+        "symfony/http-foundation": "^4.1"
     }
 }

@@ -4,6 +4,7 @@
 namespace Next\Routing;
 
 
+use Illuminate\Support\Arr;
 use Next\Routing\Validators\HostValidator;
 use Next\Routing\Validators\MethodValidator;
 use Next\Routing\Validators\RequestValidatorInterface;
@@ -110,5 +111,25 @@ class Route
 
     public function run()
     {
+    }
+
+    protected $parameters = [];
+
+    /**
+     * @return array
+     */
+    public function getParameters(): array
+    {
+        return $this->parameters;
+    }
+
+    public function parameter($name, $default = null)
+    {
+        return Arr::get($this->getParameters(), $name, $default);
+    }
+
+    public function controller()
+    {
+
     }
 }

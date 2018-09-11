@@ -19,12 +19,26 @@ use ReflectionClass;
  */
 class Container implements ArrayAccess, ContainerInterface
 {
-    /** @var [abstract => ['concrete' => concrete, 'singleton' => singleton], ...]  */
+    protected static $instance;
+
+
+    /**
+     * @var [abstract => ['concrete' => concrete, 'singleton' => singleton], ...]
+     */
     protected $bindings = [];
 
     protected $aliases = [];
 
+    /**
+     * Container's shared instances
+     * @var array
+     */
     protected $instances = [];
+
+    protected static function setInstance(Container $container)
+    {
+        return static::$instance = $container;
+    }
 
     /**
      * Bind singleton/or-not concrete
@@ -48,6 +62,17 @@ class Container implements ArrayAccess, ContainerInterface
         }
 
         $this->bindings[$abstract] = compact('concrete', 'singleton');
+    }
+
+    /**
+     * Bind a existing instance as shared into container.
+     *
+     * @param $abstract
+     * @param $instance
+     */
+    public function instance($abstract, $instance)
+    {
+        $this->instances[$abstract] = $instance;
     }
 
     public function singleton($abstract, $concrete = null)
@@ -171,10 +196,6 @@ class Container implements ArrayAccess, ContainerInterface
     public function offsetUnset($offset)
     {
         // TODO: Implement offsetUnset() method.
-    }
-
-    public function instance(string $class, \AClass $aclass)
-    {
     }
 
     protected $afterResolvingCallbacks = [];

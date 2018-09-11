@@ -11,7 +11,7 @@ class JsonRequest extends FormRequest
      */
     public function rules(): array
     {
-        assert($this->getMethod(), [static::METHOD_POST, static::METHOD_PUT], true);
+        assert(in_array($this->getMethod(), [static::METHOD_POST, static::METHOD_PUT, static::METHOD_PATCH], true));
 
         $controller = $this->route()->getController();
 

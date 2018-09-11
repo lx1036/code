@@ -5,9 +5,10 @@ include __DIR__ . "/../vendor/autoload.php";
 
 $app = new \Next\Foundation\Container\Application();
 
-$app->register(\Next\Foundation\FoundationServiceProvider::class);
+//$app->register(\Next\Foundation\FoundationServiceProvider::class);
 
 $app->singleton(\Next\Foundation\Http\KernelInterface::class, \Next\Foundation\Http\Kernel::class);
+$app->singleton(\Next\Foundation\Exceptions\ExceptionHandlerInterface::class, \Next\Foundation\Exceptions\ExceptionHandler::class);
 
 
 /** @var \Next\Foundation\Http\Kernel $kernel */

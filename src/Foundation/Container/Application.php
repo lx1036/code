@@ -4,7 +4,10 @@
 namespace Next\Foundation\Container;
 
 
+use Next\Events\EventServiceProvider;
 use Next\Foundation\Support\ServiceProvider;
+use Next\Log\LogServiceProvider;
+use Next\Routing\RoutingServiceProvider;
 
 class Application extends Container
 {
@@ -20,7 +23,17 @@ class Application extends Container
          * e.g. 'router', 'log'
          */
 
+        static::setInstance($this);
 
+        $this->instance('app', $this);
+        $this->instance(Container::class, $this);
+
+        /**
+         * register basic service providers
+         */
+        $this->register(new EventServiceProvider($this));
+        $this->register(new LogServiceProvider($this));
+        $this->register(new RoutingServiceProvider($this));
     }
 
     /**
@@ -57,12 +70,10 @@ class Application extends Container
     {
         $name = is_string($provider) ? $provider : get_class($provider);
 
-        $providers =  array_filter($this->service_providers, function ($value) use ($name): bool {
+        $providers = array_filter($this->service_providers, function ($value) use ($name): bool {
             return $value instanceof $name;
         });
 
         return array_values($providers)[0];
     }
-
-
 }

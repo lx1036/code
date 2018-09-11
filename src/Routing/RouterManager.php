@@ -4,6 +4,8 @@
 namespace Next\Routing;
 
 
+use Next\Events\DispatcherInterface;
+use Next\Foundation\Container\Container;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -21,10 +23,15 @@ class RouterManager
      */
     protected $routes;
 
+    protected $dispatcher;
 
-    public function __construct()
+    protected $app;
+
+    public function __construct(DispatcherInterface $dispatcher, Container $container)
     {
         $this->routes = new RouteCollection();
+        $this->dispatcher = $dispatcher;
+        $this->app = $container;
     }
 
     public function dispatch(Request $request): Response
