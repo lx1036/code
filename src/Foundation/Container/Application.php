@@ -76,4 +76,9 @@ class Application extends Container
 
         return array_values($providers)[0];
     }
+
+    public function runInConsole(): bool
+    {
+        return php_sapi_name() === 'cli';
+    }
 }

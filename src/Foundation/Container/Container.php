@@ -111,6 +111,11 @@ class Container implements ArrayAccess, ContainerInterface
         return $object;
     }
 
+    public function make($abstract)
+    {
+        return $this->resolve($abstract);
+    }
+
     private function getClosure($abstract, $concrete): Closure
     {
         return function () use ($abstract, $concrete) {

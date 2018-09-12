@@ -16,6 +16,10 @@ class Request
     protected $files;
     protected $server;
 
+    const METHOD_POST = 'POST';
+    const METHOD_PUT = 'PUT';
+    const METHOD_PATCH = 'PATCH';
+
     /**
      * Request constructor.
      *
