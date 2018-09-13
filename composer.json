@@ -3,7 +3,8 @@
     "description": "This is lx1036's custom routing.",
     "type": "library",
     "require": {
-        "php": "^7.2"
+        "php": "^7.2",
+        "sentry/sentry": "^1.9"
     },
     "license": "MIT",
     "authors": [

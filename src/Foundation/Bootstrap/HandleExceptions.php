@@ -8,6 +8,10 @@ use Next\Foundation\Container\Application;
 use ErrorException;
 use Next\Foundation\Exceptions\ExceptionHandlerInterface;
 
+/**
+ * Register custom error and exception handler
+ *
+ */
 class HandleExceptions
 {
     protected $app;
@@ -33,6 +37,12 @@ class HandleExceptions
         }
     }
 
+    /**
+     * report exception to external service like Sentry,
+     * render the exception as response to send back to frontend
+     *
+     * @param \Throwable $e
+     */
     public function handleException(\Throwable $e)
     {
         try {
