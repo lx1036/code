@@ -34,6 +34,11 @@ class Request
     {
     }
 
+    public static function createFromGlobals()
+    {
+        $request = new static($_GET, $_POST, $_COOKIE, $_FILES, $_SERVER);
+    }
+
 
     public function setRouteResolver(Closure $callback)
     {
