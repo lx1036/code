@@ -12,6 +12,10 @@
         {
             "name": "Xiang Liu",
             "email": "lx1036@126.com"
+        },
+        {
+            "name": "Xiang Liu",
+            "email": "xiang.liu@rightcapital.com"
         }
     ],
     "autoload": {
@@ -26,6 +30,7 @@
         "symfony/validator": "^4.1",
         "symfony/http-foundation": "^4.1",
         "symfony/cache": "^4.1",
-        "doctrine/cache": "^1.8"
+        "doctrine/cache": "^1.8",
+        "phpunit/phpunit": "^8.0"
     }
 }
