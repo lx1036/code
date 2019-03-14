@@ -31,6 +31,7 @@
         "symfony/http-foundation": "^4.1",
         "symfony/cache": "^4.1",
         "doctrine/cache": "^1.8",
-        "phpunit/phpunit": "^8.0"
+        "phpunit/phpunit": "^8.0",
+        "symfony/var-dumper": "^4.2"
     }
 }
