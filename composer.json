@@ -20,7 +20,8 @@
     ],
     "autoload": {
         "psr-4": {
-            "Next\\": "src/"
+            "Next\\": "src/",
+            "Lib\\": "lib/"
         },
         "files": []
     },
@@ -28,10 +29,11 @@
         "symfony/dependency-injection": "^4.1",
         "illuminate/validation": "^5.7",
         "symfony/validator": "^4.1",
-        "symfony/http-foundation": "^4.1",
+        "symfony/http-foundation": "^4.2",
         "symfony/cache": "^4.1",
         "doctrine/cache": "^1.8",
         "phpunit/phpunit": "^8.0",
-        "symfony/var-dumper": "^4.2"
+        "symfony/var-dumper": "^4.2",
+        "illuminate/database": "5.7"
     }
 }
