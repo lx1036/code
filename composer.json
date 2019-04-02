@@ -21,7 +21,9 @@
     "autoload": {
         "psr-4": {
             "Next\\": "src/",
-            "Lib\\": "lib/"
+            "Lib\\": "lib/",
+            "League\\OAuth2\\Server\\": "lib/oauth2-server/src/",
+            "OAuth2ServerExamples\\": "lib/oauth2-server/examples/src/"
         },
         "files": []
     },
@@ -34,6 +36,8 @@
         "doctrine/cache": "^1.8",
         "phpunit/phpunit": "^8.0",
         "symfony/var-dumper": "^4.2",
-        "illuminate/database": "5.7"
+        "illuminate/database": "5.7",
+        "slim/slim": "^3.12",
+        "league/event": "^2.2"
     }
 }
