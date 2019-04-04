@@ -1,3 +1,9 @@
 [submodule "lib/php-saml"]
 	path = lib/php-saml
 	url = https://github.com/onelogin/php-saml.git
+[submodule "lib/jwt"]
+	path = lib/jwt
+	url = https://github.com/lcobucci/jwt.git
+[submodule "lib/oauth2-server"]
+	path = lib/oauth2-server
+	url = https://github.com/league/oauth2-server.git
