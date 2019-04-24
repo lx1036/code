@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8d55e029450e7415526cb6b8cb95adb5",
+    "content-hash": "4bc3bf5e0fcdca98295aab59cde21360",
     "packages": [
         {
             "name": "psr/simple-cache",
@@ -1997,6 +1997,71 @@
             "time": "2016-10-10T12:19:37+00:00"
         },
         {
+            "name": "rightcapital/laravel-stripe",
+            "version": "v3.1.0",
+            "source": {
+                "type": "git",
+                "url": "git@gitlab.rightcapital.io:php-libs/laravel-stripe.git",
+                "reference": "9cd31299c0b029bdc0e81929abc7e6909ae1c8ed"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://toran.rightcapital.io/repo/private/dists/rightcapital/laravel-stripe/3.1.0.0/9cd31299c0b029bdc0e81929abc7e6909ae1c8ed.zip",
+                "reference": "9cd31299c0b029bdc0e81929abc7e6909ae1c8ed",
+                "mirrors": [
+                    {
+                        "url": "https://toran.rightcapital.io/repo/private/dists/%package%/%version%/%reference%.%type%",
+                        "preferred": true
+                    }
+                ]
+            },
+            "require": {
+                "illuminate/support": "5.7.* || 5.8.*",
+                "nesbot/carbon": "^1.26.3 || ^2.0",
+                "php": ">=7.2.0",
+                "stripe/stripe-php": "^6.17"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "~2.14.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "RightCapital\\LaravelStripe\\LaravelStripeServiceProvider"
+                    ],
+                    "aliases": {
+                        "Stripe": "RightCapital\\LaravelStripe\\Stripe"
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "RightCapital\\LaravelStripe\\": "src"
+                }
+            },
+            "scripts": {
+                "phpcs": [
+                    "vendor/bin/php-cs-fixer fix"
+                ]
+            },
+            "license": [
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "Song Chen",
+                    "email": "song.chen@rightcapital.com"
+                }
+            ],
+            "description": "Stripe for Laravel",
+            "homepage": "https://gitlab.rightcapital.com/php-libs/laravel-stripe",
+            "support": {
+                "email": "backend-team@rightcapital.com"
+            },
+            "time": "2019-03-31T04:13:57+00:00"
+        },
+        {
             "name": "sebastian/code-unit-reverse-lookup",
             "version": "1.0.1",
             "source": {
@@ -2707,6 +2772,68 @@
                 "router"
             ],
             "time": "2019-01-15T13:21:25+00:00"
+        },
+        {
+            "name": "stripe/stripe-php",
+            "version": "v6.33.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/stripe/stripe-php.git",
+                "reference": "042acd0d1c956a51f447419075d1f23969b0f262"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/stripe/stripe-php/zipball/042acd0d1c956a51f447419075d1f23969b0f262",
+                "reference": "042acd0d1c956a51f447419075d1f23969b0f262",
+                "shasum": "",
+                "mirrors": [
+                    {
+                        "url": "https://dl.laravel-china.org/%package%/%reference%.%type%",
+                        "preferred": true
+                    }
+                ]
+            },
+            "require": {
+                "ext-curl": "*",
+                "ext-json": "*",
+                "ext-mbstring": "*",
+                "php": ">=5.4.0"
+            },
+            "require-dev": {
+                "php-coveralls/php-coveralls": "1.*",
+                "phpunit/phpunit": "~4.0",
+                "squizlabs/php_codesniffer": "~2.0",
+                "symfony/process": "~2.8"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "2.0-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Stripe\\": "lib/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Stripe and contributors",
+                    "homepage": "https://github.com/stripe/stripe-php/contributors"
+                }
+            ],
+            "description": "Stripe PHP Library",
+            "homepage": "https://stripe.com/",
+            "keywords": [
+                "api",
+                "payment processing",
+                "stripe"
+            ],
+            "time": "2019-04-22T23:29:54+00:00"
         },
         {
             "name": "symfony/cache",

@@ -38,6 +38,7 @@
         "symfony/var-dumper": "^4.2",
         "illuminate/database": "5.7",
         "slim/slim": "^3.12",
-        "league/event": "^2.2"
+        "league/event": "^2.2",
+        "rightcapital/laravel-stripe": "^3.1"
     }
 }
