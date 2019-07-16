@@ -75,6 +75,12 @@ class Container implements ArrayAccess, ContainerInterface
         $this->instances[$abstract] = $instance;
     }
 
+    /**
+     * 实现容器的单例模式
+     *
+     * @param      $abstract
+     * @param null $concrete
+     */
     public function singleton($abstract, $concrete = null)
     {
         $this->bind($abstract, $concrete, true);
