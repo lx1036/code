@@ -1,0 +1,33 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../out-tsc/spec",
+    "module": "commonjs",
+    "types": [
+      "jasmine",
+      "node"
+    ]
+  },
+  "files": [
+    "test.ts",
+    "polyfills.ts"
+  ],
+  "include": [
+    "app/demo/karma/*.spec.ts",
+    "**/*.d.ts"
+  ],
+  "exclude": [
+    "**/test/*",
+    "**/testing/*",
+    "**/__name@dasherize@if-flat__/**",
+    "**/__statePath__/*",
+    "**/*_spec.ts",
+    "app/packages/ngrx",
+    "app/packages/angular/cdk/*",
+    "app/packages/angular/material/*",
+    "app/packages/angular/compiler/*",
+    "app/packages/angular/compiler-cli/*",
+    "app/compiler/*",
+    "app/framework/*"
+  ]
+}

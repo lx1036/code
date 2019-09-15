@@ -1,0 +1,1 @@
+[{"__symbolic":"module","version":4,"metadata":{"NUMBER_FORMAT_REGEXP":{"__symbolic":"error","message":"Expression form not supported","line":10,"character":36},"formatCurrency":{"__symbolic":"function"},"formatPercent":{"__symbolic":"function"},"formatNumber":{"__symbolic":"function"},"parseIntAutoRadix":{"__symbolic":"function"}}}]

@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="4f7380d7-7d1e-4545-b93f-534ce6941968" name="Default" comment="" />
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ComposerSettings">
+    <execution>
+      <executable />
+    </execution>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="TypeScript File" />
+        <option value="JavaScript File" />
+        <option value="CSS File" />
+        <option value="SCSS File" />
+        <option value="Dart File" />
+        <option value="HTML File" />
+      </list>
+    </option>
+  </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>checkStable</find>
+      <find>resetTestingModule</find>
+      <find>_instantiated</find>
+      <find>TestBedRender3</find>
+      <find>_initIfNeeded</find>
+      <find>initialNavigation</find>
+      <find>_outer</find>
+      <find>karma-typescript</find>
+      <find>HostListener</find>
+      <find>onMouseup</find>
+      <find>navigate</find>
+      <find>NavigationTransition</find>
+      <find>ParamsInheritanceStrategy</find>
+      <find>always</find>
+      <find>inheritedParamsDataResolve</find>
+      <find>HttpInterceptingHandler</find>
+      <find>HttpInterceptorHandler</find>
+      <find>HttpInterceptor</find>
+      <find>HttpTestingController</find>
+      <find>exceptionHandler</find>
+      <find>processNavigations</find>
+      <find>root</find>
+      <find>strictPropertyInitialization</find>
+      <find>ASTElement</find>
+      <find>ASTNode</find>
+      <find>generate</find>
+      <find>traverse</find>
+      <find>dep</find>
+      <find>arrayMethods</find>
+      <find>val</find>
+    </findStrings>
+    <dirStrings>
+      <dir>$PROJECT_DIR$/src/app/packages/router/src</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/ngrx/router-store/src</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/ngrx/effects/src</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/angular/router</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/angular</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/ngrx</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/ngrx/store/src</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/ngrx/store-devtools/src</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/angular/cdk/drag-drop</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/angular/core/src/view</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/angular/core/src</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/angular/core/testing/src</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/angular/router/src</dir>
+      <dir>$PROJECT_DIR$/src/app/packages/angular/common/http/src</dir>
+      <dir>$PROJECT_DIR$/vue/vue/src</dir>
+      <dir>$PROJECT_DIR$/vue/vue/src/compiler</dir>
+    </dirStrings>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="PackageJsonUpdateNotifier">
+    <dismissed value="$PROJECT_DIR$/package.json" />
+    <dismissed value="$PROJECT_DIR$/vue/demo/package.json" />
+    <dismissed value="$PROJECT_DIR$/webpack/package.json" />
+  </component>
+  <component name="ProjectId" id="1QpymustJZ95eDls4uKWuetJ42M" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
+    <property name="DefaultHtmlFileTemplate" value="HTML File" />
+    <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
+    <property name="SearchEverywhereHistoryKey" value="pack&#9;FILE&#9;file:///Users/lx1036/rightcapital/rightcapital/router/package.json&#10;yar&#9;FILE&#9;file:///Users/lx1036/rightcapital/rightcapital/router/yarn.lock&#10;karmabuis&#9;null&#9;null&#10;router&#9;FILE&#9;file:///Users/lx1036/rightcapital/rightcapital/router/src/app/demo/router/router.ts&#10;drag&#9;FILE&#9;file:///Users/lx1036/rightcapital/rightcapital/router/src/app/packages/angular/cdk/drag-drop/drag.ts" />
+    <property name="WebServerToolWindowFactoryState" value="true" />
+    <property name="add_unversioned_files" value="$PROJECT_DIR$/src/app/compiler/dist/out-tsc/compiler/module.metadata.json" />
+    <property name="aspect.path.notification.shown" value="true" />
+    <property name="dart.analysis.tool.window.force.activate" value="false" />
+    <property name="editor.config.ad.shown" value="true" />
+    <property name="go.gopath.indexing.explicitly.defined" value="true" />
+    <property name="go.import.settings.migrated" value="true" />
+    <property name="javascript.karma.karma_node_package_dir" value="$PROJECT_DIR$/node_modules/karm" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="list.type.of.created.stylesheet" value="SCSS" />
+    <property name="node.js.detected.package.tslint" value="true" />
+    <property name="node.js.path.for.package.tslint" value="project" />
+    <property name="node.js.selected.package.tslint" value="$PROJECT_DIR$/node_modules/tslint" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="nodejs_npm_path_reset_for_default_project" value="true" />
+    <property name="nodejs_package_manager_path" value="yarn" />
+    <property name="settings.editor.selected.configurable" value="dart.settings" />
+    <property name="ts.external.directory.path" value="$PROJECT_DIR$/node_modules/typescript/lib" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/webpack/src" />
+      <recent name="$PROJECT_DIR$/src/app/demo/sourcemap" />
+      <recent name="$PROJECT_DIR$/src/app/demo/karma" />
+      <recent name="$PROJECT_DIR$/src/app/compiler" />
+      <recent name="$PROJECT_DIR$/node_modules/@angular/core" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/webpack/dist" />
+      <recent name="$PROJECT_DIR$/src/app/ant-design/divider" />
+      <recent name="$PROJECT_DIR$/src/app/demo/karma/substract" />
+      <recent name="$PROJECT_DIR$/tmp/comparison" />
+      <recent name="$PROJECT_DIR$/src/ssl" />
+    </key>
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="RunManager" selected="JavaScript Debug.test">
+    <configuration name="ApplicationInitStatus" type="JavaScriptTestRunnerKarma" temporary="true" nameIsGenerated="true">
+      <config-file value="$PROJECT_DIR$/src/app/demo/karma/karma.conf.js" />
+      <karma-package-dir value="$PROJECT_DIR$/node_modules/karma" />
+      <working-directory value="$PROJECT_DIR$" />
+      <node-interpreter value="project" />
+      <envs />
+      <scope-kind value="SUITE" />
+      <test-names>
+        <test-name value="ApplicationInitStatus" />
+      </test-names>
+      <method v="2" />
+    </configuration>
+    <configuration name="ApplicationInitStatus.decorator" type="JavaScriptTestRunnerKarma" temporary="true" nameIsGenerated="true">
+      <config-file value="$PROJECT_DIR$/src/app/demo/karma/karma.conf.js" />
+      <karma-package-dir value="$PROJECT_DIR$/node_modules/karma" />
+      <working-directory value="$PROJECT_DIR$" />
+      <node-interpreter value="project" />
+      <envs />
+      <scope-kind value="TEST" />
+      <test-names>
+        <test-name value="ApplicationInitStatus" />
+        <test-name value="decorator" />
+      </test-names>
+      <method v="2" />
+    </configuration>
+    <configuration name="ApplicationInitStatus.no initializers.should return true for `done`" type="JavaScriptTestRunnerKarma" temporary="true" nameIsGenerated="true">
+      <config-file value="$PROJECT_DIR$/src/app/demo/karma/karma.conf.js" />
+      <karma-package-dir value="$PROJECT_DIR$/node_modules/karma" />
+      <working-directory value="$PROJECT_DIR$" />
+      <node-interpreter value="project" />
+      <envs />
+      <scope-kind value="TEST" />
+      <test-names>
+        <test-name value="ApplicationInitStatus" />
+        <test-name value="no initializers" />
+        <test-name value="should return true for `done`" />
+      </test-names>
+      <method v="2" />
+    </configuration>
+    <configuration name="Router.resetConfig" type="JavaScriptTestRunnerKarma" temporary="true" nameIsGenerated="true">
+      <config-file value="$PROJECT_DIR$/src/app/packages/angular/router/karma.conf.js" />
+      <karma-package-dir value="$PROJECT_DIR$/node_modules/@angular/cli" />
+      <node-interpreter value="project" />
+      <envs />
+      <scope-kind value="SUITE" />
+      <test-names>
+        <test-name value="Router" />
+        <test-name value="resetConfig" />
+      </test-names>
+      <method v="2" />
+    </configuration>
+    <configuration name="my test" type="JavaScriptTestRunnerKarma" temporary="true" nameIsGenerated="true">
+      <config-file value="$PROJECT_DIR$/src/app/demo/karma/karma.conf.js" />
+      <karma-package-dir value="$PROJECT_DIR$/node_modules/karma" />
+      <working-directory value="$PROJECT_DIR$" />
+      <node-interpreter value="project" />
+      <envs />
+      <scope-kind value="SUITE" />
+      <test-names>
+        <test-name value="my test" />
+      </test-names>
+      <method v="2" />
+    </configuration>
+    <configuration name="test" type="JavascriptDebugType" uri="http://localhost:4200" useFirstLineBreakpoints="true">
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="JavaScript Debug.test" />
+      <item itemvalue="Karma.ApplicationInitStatus" />
+      <item itemvalue="Karma.ApplicationInitStatus.decorator" />
+      <item itemvalue="Karma.ApplicationInitStatus.no initializers.should return true for `done`" />
+      <item itemvalue="Karma.Router.resetConfig" />
+      <item itemvalue="Karma.my test" />
+    </list>
+  </component>
+  <component name="StructureViewFactory">
+    <option name="ACTIVE_ACTIONS" value=",ALPHA_COMPARATOR,SHOW_FIELDS,HIDE_INHERITED_FROM_OBJECT" />
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="4f7380d7-7d1e-4545-b93f-534ce6941968" name="Default" comment="" />
+      <created>1527787890183</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1527787890183</updated>
+      <workItem from="1527787891538" duration="44906000" />
+      <workItem from="1528896798585" duration="3859000" />
+      <workItem from="1529221090994" duration="793000" />
+      <workItem from="1529503648179" duration="12822000" />
+      <workItem from="1529589359108" duration="33522000" />
+      <workItem from="1530107211164" duration="619000" />
+      <workItem from="1530128189687" duration="10007000" />
+      <workItem from="1531231955372" duration="4203000" />
+      <workItem from="1531241548418" duration="21122000" />
+      <workItem from="1531844160511" duration="1539000" />
+      <workItem from="1531929757547" duration="27769000" />
+      <workItem from="1538732957327" duration="26069000" />
+      <workItem from="1540820684509" duration="10090000" />
+      <workItem from="1540906565683" duration="19032000" />
+      <workItem from="1541517494278" duration="4551000" />
+      <workItem from="1541849875623" duration="37097000" />
+      <workItem from="1568481921312" duration="5000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TestHistory">
+    <history-entry file="my_test - 2018.11.24 at 22h 27m 31s.xml">
+      <configuration name="my test" configurationId="JavaScriptTestRunnerKarma" />
+    </history-entry>
+    <history-entry file="my_test - 2018.11.24 at 22h 27m 44s.xml">
+      <configuration name="my test" configurationId="JavaScriptTestRunnerKarma" />
+    </history-entry>
+    <history-entry file="my_test - 2018.11.24 at 22h 30m 21s.xml">
+      <configuration name="my test" configurationId="JavaScriptTestRunnerKarma" />
+    </history-entry>
+    <history-entry file="my_test - 2018.11.24 at 22h 30m 41s.xml">
+      <configuration name="my test" configurationId="JavaScriptTestRunnerKarma" />
+    </history-entry>
+    <history-entry file="my_test - 2018.11.24 at 22h 31m 59s.xml">
+      <configuration name="my test" configurationId="JavaScriptTestRunnerKarma" />
+    </history-entry>
+    <history-entry file="my_test - 2018.11.24 at 22h 32m 52s.xml">
+      <configuration name="my test" configurationId="JavaScriptTestRunnerKarma" />
+    </history-entry>
+    <history-entry file="my_test - 2018.11.24 at 22h 33m 18s.xml">
+      <configuration name="my test" configurationId="JavaScriptTestRunnerKarma" />
+    </history-entry>
+    <history-entry file="my_test - 2018.11.24 at 22h 35m 01s.xml">
+      <configuration name="my test" configurationId="JavaScriptTestRunnerKarma" />
+    </history-entry>
+    <history-entry file="my_test - 2018.11.24 at 22h 35m 38s.xml">
+      <configuration name="my test" configurationId="JavaScriptTestRunnerKarma" />
+    </history-entry>
+    <history-entry file="my_test - 2018.11.24 at 22h 35m 58s.xml">
+      <configuration name="my test" configurationId="JavaScriptTestRunnerKarma" />
+    </history-entry>
+  </component>
+  <component name="TimeTrackingManager">
+    <option name="totallyTimeSpent" value="258005000" />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+    <option name="exactExcludedFiles">
+      <list>
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/metadata/directives.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/util/property.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/metadata/lifecycle_hooks.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/util/lang.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/util/decorators.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/services.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/refs.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/provider.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/metadata/view.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/reflective_injector.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/metadata/di.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/injectable.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/reflective_key.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/metadata/ng_module.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/i18n/tokens.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/ng_module.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/text.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/reflection/reflection.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/query.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/errors.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/reflection/types.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/reflection/platform_reflection_capabilities.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/pure_expression.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/ng_content.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/util.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/index.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/provider.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/zone/ng_zone.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/change_detection/constants.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/view.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/reflection/reflection_capabilities.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/types.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/reflection/reflector.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/entrypoint.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/testability/testability.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/element.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/view/view_attach.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/sanitization/security.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/change_detection/change_detector_ref.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/linker/view_container_ref.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/linker/component_factory_resolver.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/linker/view_ref.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/linker/compiler.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/change_detection/change_detection_util.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/debug/debug_node.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/change_detection/change_detection.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/linker/ng_module_factory.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/change_detection/pipe_transform.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/linker/template_ref.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/profile/wtf_impl.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/profile/profile.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/linker/query_list.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/linker/component_factory.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/linker/element_ref.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/render/api.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/scope.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/injector.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/forward_ref.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/reflective_errors.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/defs.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/injection_token.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/metadata.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/r3_injector.js" />
+        <option value="$PROJECT_DIR$/src/app/packages/angular/core/src/di/reflective_provider.js" />
+      </list>
+    </option>
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/app.module.ts</url>
+          <line>503</line>
+          <option name="timeStamp" value="6" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router_module.ts</url>
+          <line>313</line>
+          <option name="timeStamp" value="8" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/core/src/application_ref.ts</url>
+          <line>103</line>
+          <option name="timeStamp" value="9" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/main.ts</url>
+          <line>81</line>
+          <option name="timeStamp" value="12" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/forms/src/model.ts</url>
+          <line>216</line>
+          <option name="timeStamp" value="14" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/forms/src/model.ts</url>
+          <line>454</line>
+          <option name="timeStamp" value="15" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/forms/src/directives/validators.ts</url>
+          <line>221</line>
+          <option name="timeStamp" value="16" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router_module.ts</url>
+          <line>61</line>
+          <option name="timeStamp" value="17" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router.ts</url>
+          <line>362</line>
+          <option name="timeStamp" value="18" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/demo/router/router.ts</url>
+          <line>189</line>
+          <option name="timeStamp" value="19" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router_module.ts</url>
+          <line>461</line>
+          <option name="timeStamp" value="20" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router.ts</url>
+          <line>327</line>
+          <option name="timeStamp" value="21" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router.ts</url>
+          <line>336</line>
+          <option name="timeStamp" value="22" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router.ts</url>
+          <line>340</line>
+          <option name="timeStamp" value="23" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router.ts</url>
+          <line>388</line>
+          <option name="timeStamp" value="24" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router.ts</url>
+          <line>392</line>
+          <option name="timeStamp" value="25" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router.ts</url>
+          <line>500</line>
+          <option name="timeStamp" value="26" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router.ts</url>
+          <line>582</line>
+          <option name="timeStamp" value="27" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router.ts</url>
+          <line>608</line>
+          <option name="timeStamp" value="28" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router.ts</url>
+          <line>399</line>
+          <option name="timeStamp" value="29" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/pre_activation.ts</url>
+          <line>47</line>
+          <option name="timeStamp" value="30" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/pre_activation.ts</url>
+          <line>44</line>
+          <option name="timeStamp" value="31" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/operators/activate_routes.ts</url>
+          <line>36</line>
+          <option name="timeStamp" value="32" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/operators/activate_routes.ts</url>
+          <line>39</line>
+          <option name="timeStamp" value="33" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/operators/activate_routes.ts</url>
+          <line>41</line>
+          <option name="timeStamp" value="34" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/router.ts</url>
+          <line>441</line>
+          <option name="timeStamp" value="35" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/pre_activation.ts</url>
+          <line>51</line>
+          <option name="timeStamp" value="36" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/operators/activate_routes.ts</url>
+          <line>40</line>
+          <option name="timeStamp" value="37" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/router/src/operators/activate_routes.ts</url>
+          <line>131</line>
+          <option name="timeStamp" value="38" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/core/testing/src/test_bed.ts</url>
+          <line>320</line>
+          <option name="timeStamp" value="39" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/common/http/src/client.ts</url>
+          <line>380</line>
+          <option name="timeStamp" value="40" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/common/http/src/client.ts</url>
+          <line>379</line>
+          <option name="timeStamp" value="41" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/common/http/test/client_spec.ts</url>
+          <line>94</line>
+          <option name="timeStamp" value="43" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/src/app/packages/angular/core/src/application_ref.ts</url>
+          <line>228</line>
+          <option name="timeStamp" value="45" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/vue/vue/src/compiler/parser/index.js</url>
+          <line>947</line>
+          <option name="timeStamp" value="46" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>

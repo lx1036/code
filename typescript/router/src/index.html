@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Router</title>
+  <base href="/">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link href="https://cdn.bootcss.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <!--<app-root></app-root>-->
+  <!--<form-comp></form-comp>-->
+  <!--<bottom-sheet-demo></bottom-sheet-demo>-->
+  <!--<demo-http></demo-http>-->
+  <!--<demo-forms></demo-forms>-->
+  <!--<ng-zone-demo></ng-zone-demo>-->
+  <!--<demo-datatable></demo-datatable>-->
+  <!--<alter-form-validation></alter-form-validation>-->
+
+  <!--<demo-module-loader></demo-module-loader>-->
+  <!--<demo-test-content-projection></demo-test-content-projection>-->
+  <!--<demo-drag-drop></demo-drag-drop>-->
+  <!--<demo-template-ref></demo-template-ref>-->
+  <!--<demo-router></demo-router>-->
+<!--  <demo-affix></demo-affix>-->
+<!--  <router-outlet></router-outlet>-->
+
+  <breadcrumb-basic></breadcrumb-basic>
+  <router-outlet></router-outlet>
+  See the first: <a [routerLink]="'apple'">Apple</a><br>
+  See the second: <a [routerLink]="'apple/steve'">Steve</a><br>
+  See the third: <a [routerLink]="'apple/steve/jobs'">Jobs</a><br>
+</body>
+</html>

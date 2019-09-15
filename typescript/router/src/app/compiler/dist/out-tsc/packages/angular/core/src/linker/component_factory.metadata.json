@@ -1,0 +1,1 @@
+[{"__symbolic":"module","version":4,"metadata":{"ComponentRef":{"__symbolic":"class","arity":1,"members":{"destroy":[{"__symbolic":"method"}],"onDestroy":[{"__symbolic":"method"}]}},"ComponentFactory":{"__symbolic":"class","arity":1,"members":{"create":[{"__symbolic":"method"}]}}}}]

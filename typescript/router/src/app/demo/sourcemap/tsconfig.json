@@ -1,0 +1,34 @@
+{
+//  "extends": "../../../../tsconfig.json",
+  "compileOnSave": false,
+  "compilerOptions": {
+    "baseUrl": "./",
+    "paths": {
+      "@core/*": ["lib/*"]
+    },
+    "outDir": "./dist",
+    "mapRoot": "./dist/sourcemap",
+    "sourceMap": true,
+    "declaration": true,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "target": "es5",
+    "typeRoots": [
+      "node_modules/@types"
+    ],
+    "lib": [
+      "es2017",
+      "dom"
+    ],
+    "types": [
+      "jasmine"
+    ]
+  },
+  "include": [
+    "sourcemap.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

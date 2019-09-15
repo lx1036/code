@@ -1,0 +1,158 @@
+[
+  {
+    "name": "APP_ROOT"
+  },
+  {
+    "name": "CIRCULAR$2"
+  },
+  {
+    "name": "EMPTY_ARRAY$2"
+  },
+  {
+    "name": "EmptyErrorImpl"
+  },
+  {
+    "name": "INJECTOR"
+  },
+  {
+    "name": "Inject"
+  },
+  {
+    "name": "InjectionToken"
+  },
+  {
+    "name": "NG_INJECTABLE_DEF"
+  },
+  {
+    "name": "NG_INJECTOR_DEF"
+  },
+  {
+    "name": "NOT_YET"
+  },
+  {
+    "name": "NULL_INJECTOR$2"
+  },
+  {
+    "name": "NullInjector"
+  },
+  {
+    "name": "ObjectUnsubscribedErrorImpl"
+  },
+  {
+    "name": "Optional"
+  },
+  {
+    "name": "PARAMETERS"
+  },
+  {
+    "name": "R3Injector"
+  },
+  {
+    "name": "ScopedService"
+  },
+  {
+    "name": "Self"
+  },
+  {
+    "name": "SkipSelf"
+  },
+  {
+    "name": "THROW_IF_NOT_FOUND"
+  },
+  {
+    "name": "USE_VALUE"
+  },
+  {
+    "name": "UnsubscriptionErrorImpl"
+  },
+  {
+    "name": "_THROW_IF_NOT_FOUND"
+  },
+  {
+    "name": "__read"
+  },
+  {
+    "name": "__spread"
+  },
+  {
+    "name": "_currentInjector"
+  },
+  {
+    "name": "couldBeInjectableType"
+  },
+  {
+    "name": "createInjector"
+  },
+  {
+    "name": "deepForEach"
+  },
+  {
+    "name": "defineInjectable"
+  },
+  {
+    "name": "defineInjector"
+  },
+  {
+    "name": "forwardRef"
+  },
+  {
+    "name": "getClosureSafeProperty"
+  },
+  {
+    "name": "getInjectableDef"
+  },
+  {
+    "name": "getInjectorDef"
+  },
+  {
+    "name": "getNullInjector"
+  },
+  {
+    "name": "hasDeps"
+  },
+  {
+    "name": "hasOnDestroy"
+  },
+  {
+    "name": "inject"
+  },
+  {
+    "name": "injectArgs"
+  },
+  {
+    "name": "injectableDefRecord"
+  },
+  {
+    "name": "isExistingProvider"
+  },
+  {
+    "name": "isFactoryProvider"
+  },
+  {
+    "name": "isTypeProvider"
+  },
+  {
+    "name": "isValueProvider"
+  },
+  {
+    "name": "makeMetadataCtor"
+  },
+  {
+    "name": "makeParamDecorator"
+  },
+  {
+    "name": "makeRecord"
+  },
+  {
+    "name": "providerToRecord"
+  },
+  {
+    "name": "resolveForwardRef"
+  },
+  {
+    "name": "setCurrentInjector"
+  },
+  {
+    "name": "stringify"
+  }
+]

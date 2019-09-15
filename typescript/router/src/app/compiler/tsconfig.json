@@ -1,0 +1,58 @@
+// yarn ngc -p src/app/compiler/tsconfig.json
+// yarn ts-node -P src/app/compiler/tsconfig.json src/app/compiler/metadata.ts
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "baseUrl": "../../../",
+    "paths": {
+      "@angular/*": ["src/app/packages/angular/*"],
+      "@ngrx/*": ["src/app/packages/ngrx/*"]
+    },
+    "outDir": "./dist/out-tsc",
+    "sourceMap": true,
+    "declaration": true,
+    "module": "es2015",
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "target": "es5",
+    "typeRoots": [
+      "node_modules/@types"
+    ],
+    "types": [
+    ],
+    "lib": [
+      "es2018",
+      "es2017",
+      "es2015",
+      "dom"
+    ],
+    "sourceRoot": "."
+  },
+  "files": [
+    "module.ts",
+//    "metadata.ts",
+    "../packages/angular/types.d.ts"
+  ],
+  "angularCompilerOptions": {
+    // compiler-cli/src/transformers/api.ts#CompilerOptions
+    "diagnostics": true,
+    "basePath": ".",
+    "skipMetadataEmit": false,
+    "strictMetadataEmit": false,
+    "skipTemplateCodegen": false,
+    "strictInjectionParameters": true,
+    "generateCodeForLibraries": true,
+    "fullTemplateTypeCheck": true,
+    "annotationsAs": "static fields",
+    "trace": true,
+    "disableExpressionLowering": true,
+    "disableTypeScriptVersionCheck": false,
+    "preserveWhitespaces": false,
+    "allowEmptyCodegenFiles": false,
+    "enableSummariesForJit": true,
+    "enableResourceInlining": false,
+    "enableIvy": false,
+    "debug": true
+  }
+}

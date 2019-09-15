@@ -1,0 +1,43 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "baseUrl": "./",
+    "paths": {
+      "@angular/common": ["../src/app/packages/angular/common"],
+      "@angular/core": ["../src/app/packages/angular/core"],
+      "@angular/core/testing": ["../src/app/packages/angular/core/testing"],
+      "@angular/platform-browser": ["../src/app/packages/angular/platform-browser"],
+      "@angular/platform-browser/testing": ["../src/app/packages/angular/platform-browser/testing"],
+      "@angular/platform-browser-dynamic": ["../src/app/packages/angular/platform-browser-dynamic"],
+      "@angular/platform-browser-dynamic/testing": ["../src/app/packages/angular/platform-browser-dynamic/testing"],
+      "@angular/router": ["../src/app/packages/angular/router"],
+      "@ngrx/*": ["../src/app/packages/ngrx/*"]
+    },
+    "outDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "target": "es5",
+    "typeRoots": [
+      "node_modules/@types"
+    ],
+    "lib": [
+      "es2017",
+      "dom"
+    ]
+  },
+  "files": [
+    "../src/app/packages/angular/goog.d.ts",
+    "../src/app/packages/angular/es6-subset.d.ts",
+    "../src/app/packages/angular/system.d.ts",
+    "../src/app/packages/angular/types.d.ts"
+  ],
+  "angularCompilerOptions": {
+    "genDir": ".",
+    "debug": true,
+    "trace": true,
+    "skipTemplateCodegen": false
+  }
+}

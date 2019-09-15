@@ -1,0 +1,44 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "baseUrl": "./",
+    "paths": {
+      "@angular/animations": ["src/app/packages/angular/animations"],
+      "@angular/animations/browser": ["src/app/packages/angular/animations/browser"],
+      "@angular/common": ["src/app/packages/angular/common"],
+      "@angular/common/testing": ["src/app/packages/angular/common/testing"],
+      "@angular/common/http": ["src/app/packages/angular/common/http"],
+      "@angular/core": ["src/app/packages/angular/core"],
+      "@angular/core/testing": ["src/app/packages/angular/core/testing"],
+      "@angular/forms": ["src/app/packages/angular/forms"],
+      "@angular/platform-browser": ["src/app/packages/angular/platform-browser"],
+      "@angular/platform-browser/animations": ["src/app/packages/angular/platform-browser/animations"],
+      "@angular/platform-browser/testing": ["src/app/packages/angular/platform-browser/testing"],
+      "@angular/platform-browser-dynamic": ["src/app/packages/angular/platform-browser-dynamic"],
+      "@angular/platform-browser-dynamic/testing": ["src/app/packages/angular/platform-browser-dynamic/testing"],
+      "@angular/router": ["src/app/packages/angular/router"],
+      "@ngrx/*": ["src/app/packages/ngrx/*"],
+      "@angular/cdk/*": ["src/app/packages/angular/cdk/*"],
+      "@angular/material/*": ["src/app/packages/angular/material/*"]
+    },
+    "outDir": "./dist/out-tsc",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "target": "es5",
+    "typeRoots": [
+      "node_modules/@types"
+    ],
+    "lib": [
+      "es2017",
+      "dom"
+    ],
+    "allowJs": true
+  },
+  "angularCompilerOptions": {
+    "genDir": ".",
+    "debug": true
+  }
+}
