@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deplyment-my-nginx
+  labels:
+    k8s: deployment-nginx-test
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app-name: pod-my-nginx
+  template:
+    metadata:
+      labels:
+        app-name: pod-my-nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80

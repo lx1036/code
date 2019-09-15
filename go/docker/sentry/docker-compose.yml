@@ -1,0 +1,53 @@
+#https://github.com/getsentry/onpremise/blob/master/docker-compose.yml
+
+
+version: '3.7'
+
+x-shared: &shared
+  restart: unless-stopped
+  build: .
+  depends_on: # 解决容器的依赖、启动先后的问题。
+    - smtp
+    - redis
+    - memcached
+    - postgres
+  env_file: .env
+  environment:
+    SENTRY_MEMCACHED_HOST: memcached
+    SENTRY_REDIS_HOST: redis
+    SENTRY_POSTGRES_HOST: postgres
+    SENTRY_EMAIL_HOST: smtp
+  volumes:
+    - sentry-data:/var/lib/sentry/files
+
+services:
+  smtp:
+    image: tianon/exim4
+    restart: unless-stopped
+  redis:
+    image: redis:3.2-alpine
+    restart: unless-stopped
+  memcached:
+    image: memcached:1.5-alpine
+    restart: unless-stopped
+  postgres:
+    image: postgres:9.5
+    restart: unless-stopped
+    volumes:
+      - sentry-postgres:/var/lib/postgresql/data
+  web:
+    <<: *shared
+    ports:
+      - '9020:9000'
+  cron: # Sentry also needs a cron process
+    <<: *shared
+    command: run cron # Override the default command.
+  worker: # A large amount of Sentry’s work is managed via background workers
+    <<: *shared
+    command: run worker
+
+volumes:
+  sentry-data:
+    external: true
+  sentry-postgres:
+    external: true

@@ -1,0 +1,111 @@
+version: '3.6'
+
+# https://docs.docker.com/compose/compose-file/
+
+networks:
+  frontend:
+    driver: ${NETWORKS_DRIVER}
+  backend:
+    driver: ${NETWORKS_DRIVER}
+
+volumes:
+  redis:
+    driver: ${VOLUMES_DRIVER}
+  postgres:
+    driver: ${VOLUMES_DRIVER}
+services:
+### Gitlab ################################################
+  gitlab:
+    build:
+      context: ./gitlab
+    container_name: gitlab-lx1036
+    environment:
+      GITLAB_OMNIBUS_CONFIG: | # https://gitlab.com/gitlab-org/omnibus-gitlab/blob/master/files/gitlab-config-template/gitlab.rb.template
+        external_url '${GITLAB_DOMAIN_NAME}'
+        redis['enable'] = false
+        nginx['listen_https'] = false
+        nginx['listen_port'] = 80
+        postgresql['enable'] = false
+        gitlab_rails['trusted_proxies'] = ['caddy','nginx','apache2']
+        gitlab_rails['redis_host'] = 'redis'
+        gitlab_rails['redis_database'] = 8
+        gitlab_rails['db_host'] = 'postgres'
+        gitlab_rails['db_username'] = 'laradock_gitlab'
+        gitlab_rails['db_password'] = 'laradock_gitlab'
+        gitlab_rails['db_database'] = 'laradock_gitlab'
+        gitlab_rails['initial_root_password'] = '${GITLAB_ROOT_PASSWORD}'
+        gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_HOST_SSH_PORT}
+    volumes:
+    - ${DATA_PATH_HOST}/gitlab/config:/etc/gitlab
+    - ${DATA_PATH_HOST}/gitlab/data:/var/opt/gitlab
+    - ${GITLAB_HOST_LOG_PATH}:/var/log/gitlab
+    ports:
+    - ${GITLAB_HOST_HTTP_PORT}:80
+    - ${GITLAB_HOST_HTTPS_PORT}:443
+    - ${GITLAB_HOST_SSH_PORT}:22
+    networks:
+    - backend
+    depends_on:
+    - redis
+    - postgres
+
+  gitlab-runner:
+    image: gitlab/gitlab-runner:latest
+    container_name: gitlab-runner-lx1036
+    environment:
+    - CI_SERVER_URL=${GITLAB_DOMAIN_NAME}
+    volumes:
+    - ${DATA_PATH_HOST}/gitlab/runner:/etc/gitlab-runner
+    - /var/run/docker.sock:/var/run/docker.sock:rw
+    networks:
+    - backend
+    restart: always
+
+### Redis ################################################
+  redis:
+    build: ./redis
+    volumes:
+    - ${DATA_PATH_HOST}/redis:/data
+    ports:
+    - ${REDIS_PORT}:6379
+    networks:
+    - backend
+
+### PostgreSQL ###########################################
+  postgres:
+    build: ./postgres
+    volumes:
+    - ${DATA_PATH_HOST}/postgres:/var/lib/postgresql/data
+    - ${POSTGRES_ENTRYPOINT_INITDB}:/docker-entrypoint-initdb.d
+    ports:
+    - ${POSTGRES_PORT}:5432
+    environment:
+    - POSTGRES_DB=${POSTGRES_DB}
+    - POSTGRES_USER=${POSTGRES_USER}
+    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    networks:
+    - backend
+
+### Portainer ################################################
+  portainer:
+    build:
+      context: ./portainer
+    volumes:
+      - ${DATA_PATH_HOST}/portainer_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "dockerhost:${DOCKER_HOST_IP}"
+    ports:
+      - ${PORTAINER_PORT}:9000
+    networks:
+      - backend
+
+### Traefic ################################################
+  traefic:
+    build:
+      context: ./traefic
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - ${TRAEFIC_PORT}:8080
+      - ${TRAEFIC_PORT_DEFAULT}:80
