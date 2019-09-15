@@ -1,1 +1,0 @@
-[{"__symbolic":"module","version":4,"metadata":{"APP_ROOT":{"__symbolic":"new","expression":{"__symbolic":"reference","module":"./injection_token","name":"InjectionToken","line":17,"character":28},"arguments":["The presence of this token marks an injector as being the root injector."]}}}]

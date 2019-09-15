@@ -1,1 +1,0 @@
-{"moduleName":null,"summaries":[{"symbol":{"__symbol":0,"members":[]},"metadata":{"__symbolic":"new","expression":{"__symbol":1,"members":[]},"arguments":["The presence of this token marks an injector as being the root injector."]}}],"symbols":[{"__symbol":0,"name":"APP_ROOT","filePath":"./scope"},{"__symbol":1,"name":"InjectionToken","filePath":"./injection_token"}]}

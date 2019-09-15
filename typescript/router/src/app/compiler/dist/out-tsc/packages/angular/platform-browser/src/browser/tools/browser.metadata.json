@@ -1,1 +1,0 @@
-[{"__symbolic":"module","version":4,"metadata":{"window":{"__symbolic":"binop","operator":"||","left":{"__symbolic":"binop","operator":"&&","left":{"__symbolic":"binop","operator":"!==","left":{"__symbolic":"error","message":"Expression form not supported","line":8,"character":12},"right":"undefined"},"right":{"__symbolic":"reference","name":"window"}},"right":{}}}}]

@@ -1,1 +1,0 @@
-{"moduleName":null,"summaries":[{"symbol":{"__symbol":0,"members":[]},"metadata":{"__symbolic":"new","expression":{"__symbol":1,"members":[]},"arguments":["0.0.0-PLACEHOLDER"]}}],"symbols":[{"__symbol":0,"name":"VERSION","filePath":"./version"},{"__symbol":1,"name":"Version","filePath":"../../core/index"}]}

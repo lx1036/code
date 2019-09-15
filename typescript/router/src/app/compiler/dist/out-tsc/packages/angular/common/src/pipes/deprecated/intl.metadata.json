@@ -1,1 +1,0 @@
-[{"__symbolic":"module","version":4,"metadata":{"NumberFormatter":{"__symbolic":"class"},"DateFormatter":{"__symbolic":"class","statics":{"format":{"__symbolic":"function","parameters":["date","locale","pattern"],"value":{"__symbolic":"error","message":"Reference to a non-exported function","line":178,"character":9,"context":{"name":"dateFormatter"}}}}}}}]
