@@ -1,0 +1,6 @@
+hash: 3aaff7c8e176de0fb1126826f158d1141275ed9e7d00357ece66f319260e5057
+updated: 2019-08-12T01:32:44.138218+08:00
+imports:
+- name: github.com/coocood/freecache
+  version: 3c79a0a23c1940ab4479332fb3e0127265650ce3
+testImports: []
