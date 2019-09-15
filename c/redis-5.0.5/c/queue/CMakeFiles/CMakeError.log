@@ -1,0 +1,20 @@
+Detecting C [-std=c11] compiler features failed to compile with the following output:
+Change Dir: /Users/lx1036/Code/lx1036/c:c++/redis-5.0.5/c/queue/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_53d41/fast 
+/Library/Developer/CommandLineTools/usr/bin/make -f CMakeFiles/cmTC_53d41.dir/build.make CMakeFiles/cmTC_53d41.dir/build
+CMakeFiles/cmTC_53d41.dir/build.make:64: *** target pattern contains no `%'.  Stop.
+make: *** [cmTC_53d41/fast] Error 2
+
+
+
+Detecting CXX [-std=c++1z] compiler features failed to compile with the following output:
+Change Dir: /Users/lx1036/Code/lx1036/c:c++/redis-5.0.5/c/queue/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_a8f0c/fast 
+/Library/Developer/CommandLineTools/usr/bin/make -f CMakeFiles/cmTC_a8f0c.dir/build.make CMakeFiles/cmTC_a8f0c.dir/build
+CMakeFiles/cmTC_a8f0c.dir/build.make:64: *** target pattern contains no `%'.  Stop.
+make: *** [cmTC_a8f0c/fast] Error 2
+
+
+
