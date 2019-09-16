@@ -1,0 +1,26 @@
+load("//tools:defaults.bzl", "jasmine_node_test", "ts_library")
+
+ts_library(
+    name = "ngtsc_lib",
+    testonly = 1,
+    srcs = [
+        "ngtsc_spec.ts",
+    ],
+    deps = [
+        "//packages/compiler",
+        "//packages/compiler-cli",
+        "//packages/compiler-cli/test:test_utils",
+    ],
+)
+
+jasmine_node_test(
+    name = "ngtsc",
+    bootstrap = ["angular/tools/testing/init_node_no_angular_spec.js"],
+    data = [
+        "//packages/compiler-cli/test/ngtsc/fake_core:npm_package",
+    ],
+    deps = [
+        ":ngtsc_lib",
+        "//tools/testing:node_no_angular",
+    ],
+)

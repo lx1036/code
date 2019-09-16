@@ -1,0 +1,32 @@
+{
+  "name": "@ngrx/store-devtools",
+  "version": "0.0.0-PLACEHOLDER",
+  "description": "Developer tools for @ngrx/store",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngrx/platform.git"
+  },
+  "keywords": [
+    "RxJS",
+    "Angular",
+    "Redux",
+    "Store",
+    "@ngrx/store"
+  ],
+  "author": "NgRx",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ngrx/platform/issues"
+  },
+  "homepage": "https://github.com/ngrx/platform#readme",
+  "peerDependencies": {
+    "@ngrx/store": "0.0.0-PLACEHOLDER",
+    "rxjs": "RXJS_VERSION"
+  },
+  "schematics": "MODULE_SCHEMATICS_COLLECTION",
+  "ng-update": {
+    "packageGroup": "NG_UPDATE_PACKAGE_GROUP",
+    "migrations": "NG_UPDATE_MIGRATIONS"
+  },
+  "sideEffects": false
+}

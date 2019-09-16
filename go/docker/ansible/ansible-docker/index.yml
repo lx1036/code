@@ -1,0 +1,8 @@
+- name: Install nginx in some docker containers(mock hosts)
+  hosts: dockerhosts
+  become: yes
+  pre_tasks:
+    - name: Install Python 2.7
+      raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+  tasks:
+    - import_tasks: tasks/nginx.yml

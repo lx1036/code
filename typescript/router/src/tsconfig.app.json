@@ -1,0 +1,35 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../out-tsc/app",
+    "module": "es2015",
+    "types": []
+  },
+  "include": [
+    "main.ts",
+    "polyfills.ts",
+    "app/demo/module-loader",
+    "app/packages/angular/core",
+    "app/packages/angular/common",
+    "app/packages/angular/platform-browser",
+    "app/packages/angular/platform-browser-dynamic",
+    "app/packages/angular/forms",
+    "app/packages/angular/router",
+    "app/packages/angular/types.d.ts"
+  ],
+  "exclude": [
+    "test.ts",
+    "**/*.spec.ts",
+    "**/__name@dasherize@if-flat__/**",
+    "**/__statePath__/*",
+    "**/*_spec.ts",
+    "**/testing/*",
+    "**/test/*",
+    "app/packages/angular/cdk/*",
+    "app/packages/angular/material/*",
+    "app/packages/angular/compiler/*",
+    "app/packages/angular/compiler-cli/*",
+    "app/compiler/*",
+    "app/framework/*"
+  ]
+}
