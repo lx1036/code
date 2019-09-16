@@ -1,1 +1,1 @@
-https://github.com/uglide/RedisDesktopManager
+// https://github.com/uglide/RedisDesktopManager
