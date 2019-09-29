@@ -6,7 +6,9 @@ require (
 	github.com/codingsince1985/checksum v1.1.0
 	github.com/getsentry/sentry-go v0.3.0
 	github.com/gin-gonic/gin v1.4.0
+	github.com/google/uuid v1.1.1
 	github.com/julienschmidt/httprouter v1.2.0
+	github.com/klauspost/cpuid v1.2.0
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/mholt/certmagic v0.7.3
 	github.com/sirupsen/logrus v1.4.2

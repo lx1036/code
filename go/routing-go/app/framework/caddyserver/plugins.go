@@ -1,10 +1,18 @@
 package caddy
 
-import "sort"
+import (
+	"log"
+	"sort"
+	"sync"
+)
 
 var (
 	// serverTypes is a map of registered server types.
 	serverTypes = make(map[string]ServerType)
+
+	// eventHooks is a map of hook name to Hook. All hooks plugins
+	// must have a name.
+	eventHooks = &sync.Map{}
 )
 
 // DescribePlugins returns a string describing the registered plugins.
@@ -86,4 +94,17 @@ func ListPlugins() map[string][]string {
 	}
 
 	return p
+}
+
+// EmitEvent executes the different hooks passing the EventType as an
+// argument. This is a blocking function. Hook developers should
+// use 'go' keyword if they don't want to block Caddy.
+func EmitEvent(event EventName, info interface{}) {
+	eventHooks.Range(func(k, v interface{}) bool {
+		err := v.(EventHook)(event, info)
+		if err != nil {
+			log.Printf("error on '%s' hook: %v", k.(string), err)
+		}
+		return true
+	})
 }

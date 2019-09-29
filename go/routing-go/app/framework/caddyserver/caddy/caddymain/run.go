@@ -4,6 +4,7 @@ import (
     "bufio"
     "flag"
     "fmt"
+    "github.com/google/uuid"
     "github.com/klauspost/cpuid"
     "github.com/mholt/certmagic"
     lumberjack "gopkg.in/natefinch/lumberjack.v2"
@@ -355,4 +356,76 @@ func checkJSONCaddyfile() {
         fmt.Println(string(jsonBytes))
         os.Exit(0)
     }
+}
+
+// initTelemetry initializes the telemetry engine.
+func initTelemetry() error {
+    uuidFilename := filepath.Join(caddy.AssetsPath(), "uuid")
+    if customUUIDFile := os.Getenv("CADDY_UUID_FILE"); customUUIDFile != "" {
+        uuidFilename = customUUIDFile
+    }
+
+    newUUID := func() uuid.UUID {
+        id := uuid.New()
+        err := os.MkdirAll(caddy.AssetsPath(), 0700)
+        if err != nil {
+            log.Printf("[ERROR] Persisting instance UUID: %v", err)
+            return id
+        }
+        err = ioutil.WriteFile(uuidFilename, []byte(id.String()), 0600) // human-readable as a string
+        if err != nil {
+            log.Printf("[ERROR] Persisting instance UUID: %v", err)
+        }
+        return id
+    }
+
+    var id uuid.UUID
+
+    // load UUID from storage, or create one if we don't have one
+    if uuidFile, err := os.Open(uuidFilename); os.IsNotExist(err) {
+        // no UUID exists yet; create a new one and persist it
+        id = newUUID()
+    } else if err != nil {
+        log.Printf("[ERROR] Loading persistent UUID: %v", err)
+        id = newUUID()
+    } else {
+        defer uuidFile.Close()
+        uuidBytes, err := ioutil.ReadAll(uuidFile)
+        if err != nil {
+            log.Printf("[ERROR] Reading persistent UUID: %v", err)
+            id = newUUID()
+        } else {
+            id, err = uuid.ParseBytes(uuidBytes)
+            if err != nil {
+                log.Printf("[ERROR] Parsing UUID: %v", err)
+                id = newUUID()
+            }
+        }
+    }
+
+    // parse and check the list of disabled metrics
+    var disabledMetricsSlice []string
+    if len(disabledMetrics) > 0 {
+        if len(disabledMetrics) > 1024 {
+            // mitigate disk space exhaustion at the collection endpoint
+            return fmt.Errorf("too many metrics to disable")
+        }
+        disabledMetricsSlice = splitTrim(disabledMetrics, ",")
+        for _, metric := range disabledMetricsSlice {
+            if metric == "instance_id" || metric == "timestamp" || metric == "disabled_metrics" {
+                return fmt.Errorf("instance_id, timestamp, and disabled_metrics cannot be disabled")
+            }
+        }
+    }
+
+    // initialize telemetry
+    telemetry.Init(id, disabledMetricsSlice)
+
+    // if any metrics were disabled, report which ones (so we know how representative the data is)
+    if len(disabledMetricsSlice) > 0 {
+        telemetry.Set("disabled_metrics", disabledMetricsSlice)
+        log.Printf("[NOTICE] The following telemetry metrics are disabled: %s", disabledMetrics)
+    }
+
+    return nil
 }
