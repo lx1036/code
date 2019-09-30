@@ -13,6 +13,7 @@ import (
     "k8s-lx1036/wayne/backend/apikey"
     "k8s-lx1036/wayne/backend/bus"
     "k8s-lx1036/wayne/backend/client"
+    "k8s-lx1036/wayne/backend/util"
     "k8s.io/apimachinery/pkg/util/wait"
     "path/filepath"
     "strings"
@@ -70,7 +71,9 @@ func InitRsaKey() {
 }
 
 func InitKubeLabel() {
-
+    util.AppLabelKey = beego.AppConfig.DefaultString("AppLabelKey", "wayne-app")
+    util.NamespaceLabelKey = beego.AppConfig.DefaultString("NamespaceLabelKey", "wayne-ns")
+    util.PodAnnotationControllerKindLabelKey = beego.AppConfig.DefaultString("PodAnnotationControllerKindLabelKey", "wayne.cloud/controller-kind")
 }
 
 func ensureDatabase() error  {
