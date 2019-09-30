@@ -4,6 +4,9 @@ import (
     "github.com/streadway/amqp"
 )
 
+const (
+    RoutingKeyRequest = "request"
+)
 
 var DefaultBus *Bus
 
