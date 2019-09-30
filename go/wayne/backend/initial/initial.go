@@ -6,6 +6,7 @@ import (
     "github.com/astaxie/beego"
     "github.com/astaxie/beego/logs"
     "github.com/astaxie/beego/orm"
+    "k8s-lx1036/wayne/backend/bus"
     "k8s-lx1036/wayne/backend/client"
     "k8s.io/apimachinery/pkg/util/wait"
     "strings"
@@ -41,8 +42,13 @@ func InitClient() {
 	go wait.Forever(client.BuildApiserverClient, 5*time.Second)
 }
 
+// bus
 func InitBus() {
-
+    var err error
+    bus.DefaultBus, err = bus.NewBus(beego.AppConfig.String("BusRabbitMQURL"))
+    if err != nil {
+        panic(err)
+    }
 }
 
 func InitRsaKey() {
