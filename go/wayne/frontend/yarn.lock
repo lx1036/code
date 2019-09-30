@@ -854,6 +854,18 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
+"@clr/angular@^2.2.1":
+  version "2.2.1"
+  resolved "https://registry.npm.taobao.org/@clr/angular/download/@clr/angular-2.2.1.tgz#8c254e203673a3b969a188aaf7b25131027cdc01"
+  integrity sha1-jCVOIDZzo7lpoYiq97JRMQJ83AE=
+  dependencies:
+    tslib "^1.9.0"
+
+"@clr/icons@^2.2.1":
+  version "2.2.1"
+  resolved "https://registry.npm.taobao.org/@clr/icons/download/@clr/icons-2.2.1.tgz#56b22746d98e144cca6b44aa0d903b7fc594c712"
+  integrity sha1-VrInRtmOFEzKa0SqDZA7f8WUxxI=
+
 "@ngtools/webpack@8.3.6":
   version "8.3.6"
   resolved "https://registry.npm.taobao.org/@ngtools/webpack/download/@ngtools/webpack-8.3.6.tgz#780819b08088d665af937041de57c90e917a0da6"
