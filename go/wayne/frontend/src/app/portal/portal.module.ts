@@ -1,11 +1,16 @@
 import {NgModule} from '@angular/core';
 
 import {PortalComponent} from './portal.component';
+import {PortalRoutingModule} from "./portal-routing.module";
+import { AppComponent } from './app/app.component';
 
 @NgModule({
-  imports: [],
+  imports: [
+    PortalRoutingModule,
+    
+  ],
   exports: [],
-  declarations: [PortalComponent],
+  declarations: [PortalComponent, AppComponent],
   providers: [],
 })
 export class PortalModule {
