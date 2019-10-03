@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/plugins/cors"
+	"k8s-lx1036/wayne/backend/controllers/permission"
 	"path"
 )
 

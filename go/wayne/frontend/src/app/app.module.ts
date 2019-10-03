@@ -10,6 +10,9 @@ import {AdminModule} from "./admin/admin.module";
 import {HttpClient, HttpClientModule} from "@angular/common/http";
 import {TranslateLoader, TranslateModule} from "@ngx-translate/core";
 import {TranslateHttpLoader} from "@ngx-translate/http-loader";
+import { FilterBoxComponent } from './shared/filter-box/filter-box.component';
+import { CheckboxGroupComponent } from './shared/checkbox-group/checkbox-group.component';
+import { CheckboxComponent } from './shared/checkbox/checkbox.component';
 const packageJson = require('../../package.json');
 
 
@@ -19,7 +22,10 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
 
 @NgModule({
   declarations: [
-    AppComponent
+    AppComponent,
+    FilterBoxComponent,
+    CheckboxGroupComponent,
+    CheckboxComponent
   ],
   imports: [
     BrowserModule,
@@ -38,6 +44,10 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
     })
   ],
   providers: [],
+  exports: [
+    FilterBoxComponent,
+    CheckboxComponent
+  ],
   bootstrap: [AppComponent]
 })
 export class AppModule { }
