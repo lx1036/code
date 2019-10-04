@@ -8,7 +8,7 @@ import (
     "github.com/google/uuid"
     "github.com/klauspost/cpuid"
     "github.com/mholt/certmagic"
-    lumberjack "gopkg.in/natefinch/lumberjack.v2"
+    "gopkg.in/natefinch/lumberjack.v2"
     "io"
     "io/ioutil"
     "k8s-lx1036/routing-go/app/framework/caddyserver"
@@ -22,7 +22,10 @@ import (
     "strconv"
     "strings"
 
+    // built-in plugins
     _ "k8s-lx1036/routing-go/app/framework/caddyserver/caddyhttp"
+    // add custom plugins here:
+
 )
 
 var (

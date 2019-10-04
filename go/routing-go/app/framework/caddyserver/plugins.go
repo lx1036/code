@@ -2,6 +2,7 @@ package caddy
 
 import (
 	"fmt"
+	"k8s-lx1036/routing-go/app/framework/caddyserver/caddyfile"
 	"log"
 	"net"
 	"sort"
@@ -91,6 +92,56 @@ type Plugin struct {
 // execute a directive. It will be called once per key for
 // each server block it appears in.
 type SetupFunc func(c *Controller) error
+
+// ServerType contains information about a server type.
+type ServerType struct {
+	// Function that returns the list of directives, in
+	// execution order, that are valid for this server
+	// type. Directives should be one word if possible
+	// and lower-cased.
+	Directives func() []string
+
+	// DefaultInput returns a default config input if none
+	// is otherwise loaded. This is optional, but highly
+	// recommended, otherwise a blank Caddyfile will be
+	// used.
+	DefaultInput func() Input
+
+	// The function that produces a new server type context.
+	// This will be called when a new Caddyfile is being
+	// loaded, parsed, and executed independently of any
+	// startup phases before this one. It's a way to keep
+	// each set of server instances separate and to reduce
+	// the amount of global state you need.
+	NewContext func(inst *Instance) Context
+}
+
+// Context is a type which carries a server type through
+// the load and setup phase; it maintains the state
+// between loading the Caddyfile, then executing its
+// directives, then making the servers for Caddy to
+// manage. Typically, such state involves configuration
+// structs, etc.
+type Context interface {
+	// Called after the Caddyfile is parsed into server
+	// blocks but before the directives are executed,
+	// this method gives you an opportunity to inspect
+	// the server blocks and prepare for the execution
+	// of directives. Return the server blocks (which
+	// you may modify, if desired) and an error, if any.
+	// The first argument is the name or path to the
+	// configuration file (Caddyfile).
+	//
+	// This function can be a no-op and simply return its
+	// input if there is nothing to do here.
+	InspectServerBlocks(string, []caddyfile.ServerBlock) ([]caddyfile.ServerBlock, error)
+
+	// This is what Caddy calls to make server instances.
+	// By this time, all directives have been executed and,
+	// presumably, the context has enough state to produce
+	// server instances for Caddy to start.
+	MakeServers() ([]Server, error)
+}
 
 // DescribePlugins returns a string describing the registered plugins.
 func DescribePlugins() string {
@@ -244,4 +295,13 @@ func RegisterPlugin(name string, plugin Plugin) {
 		panic("plugin named " + name + " already registered for server type " + plugin.ServerType)
 	}
 	plugins[plugin.ServerType][name] = plugin
+}
+
+// RegisterServerType registers a server type srv by its
+// name, typeName.
+func RegisterServerType(typeName string, srv ServerType) {
+	if _, ok := serverTypes[typeName]; ok {
+		panic("server type already registered")
+	}
+	serverTypes[typeName] = srv
 }

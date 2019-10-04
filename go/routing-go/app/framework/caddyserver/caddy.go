@@ -167,6 +167,15 @@ type UDPServer interface {
 	ServePacket(net.PacketConn) error
 }
 
+// CaddyfileInput represents a Caddyfile as input
+// and is simply a convenient way to implement
+// the Input interface.
+type CaddyfileInput struct {
+	Filepath       string
+	Contents       []byte
+	ServerTypeName string
+}
+
 func init() {
 	OnProcessExit = append(OnProcessExit, func() {
 		if PidFile != "" {
@@ -174,6 +183,16 @@ func init() {
 		}
 	})
 }
+
+// Body returns c.Contents.
+func (c CaddyfileInput) Body() []byte { return c.Contents }
+
+// Path returns c.Filepath.
+func (c CaddyfileInput) Path() string { return c.Filepath }
+
+// ServerType returns c.ServerType.
+func (c CaddyfileInput) ServerType() string { return c.ServerTypeName }
+
 
 // Start starts Caddy with the given Caddyfile.
 //

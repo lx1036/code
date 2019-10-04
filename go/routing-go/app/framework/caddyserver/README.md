@@ -4,3 +4,8 @@
 **[Caddy Server](https://github.com/caddyserver/caddy)**: Fast, cross-platform HTTP/2 web server with automatic HTTPS
 
 **[CoreDNS](https://github.com/coredns/coredns)**: CoreDNS is a DNS server that chains plugins
+
+
+```shell script
+go run caddy/main.go
+```
