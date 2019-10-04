@@ -22,6 +22,14 @@ var (
 
 	defaultCaddyfileLoader caddyfileLoader // the default loader if all else fail
 	loaderUsed             caddyfileLoader // the loader that was used (relevant for reloads)
+
+	// plugins is a map of server type to map of plugin name to
+	// Plugin. These are the "general" plugins that may or may
+	// not be associated with a specific server type. If it's
+	// applicable to multiple server types or the server type is
+	// irrelevant, the key is empty string (""). But all plugins
+	// must have a name.
+	plugins = make(map[string]map[string]Plugin)
 )
 
 // Define names for the various events
@@ -66,6 +74,23 @@ type ServerListener struct {
 type Loader interface {
 	Load(serverType string) (Input, error)
 }
+
+// Plugin is a type which holds information about a plugin.
+type Plugin struct {
+	// ServerType is the type of server this plugin is for.
+	// Can be empty if not applicable, or if the plugin
+	// can associate with any server type.
+	ServerType string
+
+	// Action is the plugin's setup function, if associated
+	// with a directive in the Caddyfile.
+	Action SetupFunc
+}
+
+// SetupFunc is used to set up a plugin, or in other words,
+// execute a directive. It will be called once per key for
+// each server block it appears in.
+type SetupFunc func(c *Controller) error
 
 // DescribePlugins returns a string describing the registered plugins.
 func DescribePlugins() string {
@@ -196,4 +221,27 @@ func loadCaddyfileInput(serverType string) (Input, error) {
 	}
 
 	return caddyfileToUse, nil
+}
+
+// RegisterPlugin plugs in plugin. All plugins should register
+// themselves, even if they do not perform an action associated
+// with a directive. It is important for the process to know
+// which plugins are available.
+//
+// The plugin MUST have a name: lower case and one word.
+// If this plugin has an action, it must be the name of
+// the directive that invokes it. A name is always required
+// and must be unique for the server type.
+func RegisterPlugin(name string, plugin Plugin) {
+	if name == "" {
+		panic("plugin must have a name")
+	}
+
+	if _, ok := plugins[plugin.ServerType]; !ok {
+		plugins[plugin.ServerType] = make(map[string]Plugin)
+	}
+	if _, dup := plugins[plugin.ServerType][name]; dup {
+		panic("plugin named " + name + " already registered for server type " + plugin.ServerType)
+	}
+	plugins[plugin.ServerType][name] = plugin
 }

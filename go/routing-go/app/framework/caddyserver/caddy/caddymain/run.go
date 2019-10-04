@@ -21,6 +21,8 @@ import (
     "runtime/debug"
     "strconv"
     "strings"
+
+    _ "k8s-lx1036/routing-go/app/framework/caddyserver/caddyhttp"
 )
 
 var (
