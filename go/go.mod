@@ -13,6 +13,7 @@ require (
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/klauspost/cpuid v1.2.0
 	github.com/labstack/echo v3.3.10+incompatible
+	github.com/libp2p/go-reuseport v0.0.1
 	github.com/mholt/certmagic v0.7.3
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/sirupsen/logrus v1.4.2
