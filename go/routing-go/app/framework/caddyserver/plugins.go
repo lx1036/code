@@ -1,7 +1,9 @@
 package caddy
 
 import (
+	"fmt"
 	"log"
+	"net"
 	"sort"
 	"sync"
 )
@@ -13,7 +15,57 @@ var (
 	// eventHooks is a map of hook name to Hook. All hooks plugins
 	// must have a name.
 	eventHooks = &sync.Map{}
+
+	// caddyfileLoaders is the list of all Caddyfile loaders
+	// in registration order.
+	caddyfileLoaders []caddyfileLoader
+
+	defaultCaddyfileLoader caddyfileLoader // the default loader if all else fail
+	loaderUsed             caddyfileLoader // the loader that was used (relevant for reloads)
 )
+
+// Define names for the various events
+const (
+	StartupEvent         EventName = "startup"
+	ShutdownEvent                  = "shutdown"
+	CertRenewEvent                 = "certrenew"
+	InstanceStartupEvent           = "instancestartup"
+	InstanceRestartEvent           = "instancerestart"
+)
+
+// caddyfileLoader pairs the name of a loader to the loader.
+type caddyfileLoader struct {
+	name   string
+	loader Loader
+}
+
+// ServerListener pairs a server to its listener and/or packetconn.
+type ServerListener struct {
+	server   Server
+	listener net.Listener
+	packet   net.PacketConn
+}
+
+// Loader is a type that can load a Caddyfile.
+// It is passed the name of the server type.
+// It returns an error only if something went
+// wrong, not simply if there is no Caddyfile
+// for this loader to load.
+//
+// A Loader should only load the Caddyfile if
+// a certain condition or requirement is met,
+// as returning a non-nil Input value along with
+// another Loader will result in an error.
+// In other words, loading the Caddyfile must
+// be deliberate & deterministic, not haphazard.
+//
+// The exception is the default Caddyfile loader,
+// which will be called only if no other Caddyfile
+// loaders return a non-nil Input. The default
+// loader may always return an Input value.
+type Loader interface {
+	Load(serverType string) (Input, error)
+}
 
 // DescribePlugins returns a string describing the registered plugins.
 func DescribePlugins() string {
@@ -107,4 +159,41 @@ func EmitEvent(event EventName, info interface{}) {
 		}
 		return true
 	})
+}
+
+// loadCaddyfileInput iterates the registered Caddyfile loaders
+// and, if needed, calls the default loader, to load a Caddyfile.
+// It is an error if any of the loaders return an error or if
+// more than one loader returns a Caddyfile.
+func loadCaddyfileInput(serverType string) (Input, error) {
+	var loadedBy string
+	var caddyfileToUse Input
+
+	for _, l := range caddyfileLoaders {
+		cdyfile, err := l.loader.Load(serverType)
+		if err != nil {
+			return nil, fmt.Errorf("loading Caddyfile via %s: %v", l.name, err)
+		}
+		if cdyfile != nil {
+			if caddyfileToUse != nil {
+				return nil, fmt.Errorf("Caddyfile loaded multiple times; first by %s, then by %s", loadedBy, l.name)
+			}
+			loaderUsed = l
+			caddyfileToUse = cdyfile
+			loadedBy = l.name
+		}
+	}
+
+	if caddyfileToUse == nil && defaultCaddyfileLoader.loader != nil {
+		cdyfile, err := defaultCaddyfileLoader.loader.Load(serverType)
+		if err != nil {
+			return nil, err
+		}
+		if cdyfile != nil {
+			loaderUsed = defaultCaddyfileLoader
+			caddyfileToUse = cdyfile
+		}
+	}
+
+	return caddyfileToUse, nil
 }

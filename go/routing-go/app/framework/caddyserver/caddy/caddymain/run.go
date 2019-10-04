@@ -2,6 +2,7 @@ package caddymain
 
 import (
     "bufio"
+    "errors"
     "flag"
     "fmt"
     "github.com/google/uuid"
@@ -11,18 +12,16 @@ import (
     "io"
     "io/ioutil"
     "k8s-lx1036/routing-go/app/framework/caddyserver"
+    "k8s-lx1036/routing-go/app/framework/caddyserver/caddytls"
     "k8s-lx1036/routing-go/app/framework/caddyserver/telemetry"
     "log"
     "os"
     "path/filepath"
     "runtime"
     "runtime/debug"
+    "strconv"
     "strings"
 )
-
-/**
-https://github.com/caddyserver/caddy/blob/master/caddy/caddymain/run.go
- */
 
 var (
     disabledMetrics string
@@ -428,4 +427,60 @@ func initTelemetry() error {
     }
 
     return nil
+}
+
+
+// setCPU parses string cpu and sets GOMAXPROCS
+// according to its value. It accepts either
+// a number (e.g. 3) or a percent (e.g. 50%).
+// If the percent resolves to less than a single
+// GOMAXPROCS, it rounds it up to GOMAXPROCS=1.
+func setCPU(cpu string) error {
+    var numCPU int
+
+    availCPU := runtime.NumCPU()
+
+    if strings.HasSuffix(cpu, "%") {
+        // Percent
+        var percent float32
+        pctStr := cpu[:len(cpu)-1]
+        pctInt, err := strconv.Atoi(pctStr)
+        if err != nil || pctInt < 1 || pctInt > 100 {
+            return errors.New("invalid CPU value: percentage must be between 1-100")
+        }
+        percent = float32(pctInt) / 100
+        numCPU = int(float32(availCPU) * percent)
+        if numCPU < 1 {
+            numCPU = 1
+        }
+    } else {
+        // Number
+        num, err := strconv.Atoi(cpu)
+        if err != nil || num < 1 {
+            return errors.New("invalid CPU value: provide a number or percent greater than 0")
+        }
+        numCPU = num
+    }
+
+    if numCPU > availCPU {
+        numCPU = availCPU
+    }
+
+    runtime.GOMAXPROCS(numCPU)
+    return nil
+}
+
+// detectContainer attempts to determine whether the process is
+// being run inside a container. References:
+// https://tuhrig.de/how-to-know-you-are-inside-a-docker-container/
+// https://stackoverflow.com/a/20012536/1048862
+// https://gist.github.com/anantkamath/623ce7f5432680749e087cf8cfba9b69
+func detectContainer() bool {
+    if runtime.GOOS != "linux" {
+        return false
+    }
+
+
+
+    return false
 }
