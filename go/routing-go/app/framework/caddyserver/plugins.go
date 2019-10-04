@@ -305,3 +305,26 @@ func RegisterServerType(typeName string, srv ServerType) {
 	}
 	serverTypes[typeName] = srv
 }
+
+func RegisterCaddyfileLoader(name string, loader Loader)  {
+	caddyfileLoaders = append(caddyfileLoaders, caddyfileLoader{name: name, loader: loader})
+}
+
+// LoaderFunc is a convenience type similar to http.HandlerFunc
+// that allows you to use a plain function as a Load() method.
+type LoaderFunc func(serverType string) (Input, error)
+
+func (loaderFunc LoaderFunc) Load(serverType string) (Input, error) {
+	return loaderFunc(serverType)
+}
+
+// SetDefaultCaddyfileLoader registers loader by name
+// as the default Caddyfile loader if no others produce
+// a Caddyfile. If another Caddyfile loader has already
+// been set as the default, this replaces it.
+//
+// Do not call RegisterCaddyfileLoader on the same
+// loader; that would be redundant.
+func SetDefaultCaddyfileLoader(name string, loader Loader) {
+	defaultCaddyfileLoader = caddyfileLoader{name: name, loader: loader}
+}

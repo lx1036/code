@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"k8s-lx1036/routing-go/app/framework/caddyserver/telemetry"
 	"log"
 	"net"
@@ -307,4 +308,36 @@ func (i *Instance) Servers() []ServerListener {
 // Wait blocks until all of i's servers have stopped.
 func (i *Instance) Wait() {
 	i.wg.Wait()
+}
+
+
+// CaddyfileFromPipe loads the Caddyfile input from f if f is
+// not interactive input. f is assumed to be a pipe or stream,
+// such as os.Stdin. If f is not a pipe, no error is returned
+// but the Input value will be nil. An error is only returned
+// if there was an error reading the pipe, even if the length
+// of what was read is 0.
+func CaddyfileFromPipe(f *os.File, serverType string) (Input, error) {
+	fi, err := f.Stat()
+	if err == nil && fi.Mode()&os.ModeCharDevice == 0 {
+		// Note that a non-nil error is not a problem. Windows
+		// will not create a stdin if there is no pipe, which
+		// produces an error when calling Stat(). But Unix will
+		// make one either way, which is why we also check that
+		// bitmask.
+		// NOTE: Reading from stdin after this fails (e.g. for the let's encrypt email address) (OS X)
+		confBody, err := ioutil.ReadAll(f)
+		if err != nil {
+			return nil, err
+		}
+		return CaddyfileInput{
+			Contents:       confBody,
+			Filepath:       f.Name(),
+			ServerTypeName: serverType,
+		}, nil
+	}
+
+	// not having input from the pipe is not itself an error,
+	// just means no input to return.
+	return nil, nil
 }
