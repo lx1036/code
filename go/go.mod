@@ -24,6 +24,7 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/ugorji/go v1.1.7 // indirect
 	github.com/urfave/cli v1.22.1
+	golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.0.0-20191003035645-10e821c09743
