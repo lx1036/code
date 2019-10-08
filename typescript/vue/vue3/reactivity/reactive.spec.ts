@@ -1,6 +1,9 @@
 import {mockWarn} from "./jestUtils";
 import {reactive, isReactive} from './reactive';
 
+/**
+ * @see [Vue3响应式系统源码解析(上)](https://zhuanlan.zhihu.com/p/85678790)
+ */
 describe('reactive', () => {
   mockWarn()
   
@@ -33,6 +36,25 @@ describe('reactive', () => {
     // ownKeys
     expect(Object.keys(observed)).toEqual(['0'])
   })
+  
+  test('Nested array', () => {
+    const original: any[] = [{ foo: 1, a: {b: {c: 1}}, arr: [{d: {}}]}]
+    const observed = reactive(original)
+    expect(observed).not.toBe(original)
+    expect(isReactive(observed)).toBe(true)
+    expect(isReactive(original)).toBe(false)
+    expect(isReactive(observed[0])).toBe(true)
+    // observed.a.b 是reactive
+    expect(isReactive(observed[0].a.b)).toBe(true)
+    // observed[0].arr[0].d 是reactive
+    expect(isReactive(observed[0].arr[0].d)).toBe(true)
+    // get
+    expect(observed[0].foo).toBe(1)
+    // has
+    expect(0 in observed).toBe(true)
+    // ownKeys
+    expect(Object.keys(observed)).toEqual(['0'])
+  });
   
   test('cloned reactive Array should point to observed values', () => {
     const original = [{ foo: 1 }]
