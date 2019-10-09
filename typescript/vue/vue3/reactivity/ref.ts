@@ -7,3 +7,7 @@ export interface Ref<T> {
 export type UnwrapNestedRefs<T> = T extends Ref<any> ? T : UnwrapRef<T>
 
 export type UnwrapRef<T> = Array<T> // close
+
+export function ref<T>(raw: T): Ref<T> {
+
+}
