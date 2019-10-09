@@ -56,6 +56,9 @@ func (c *CronjobController) Get() {
         c.HandleError(err)
         return
     }
+
+    c.Success(cronjob)
+    return
 }
 
 
