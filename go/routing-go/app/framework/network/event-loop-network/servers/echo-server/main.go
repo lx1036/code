@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// telnet localhost 5000
 func main()  {
 	var port int
 	var loops int
@@ -15,7 +16,9 @@ func main()  {
 	var trace bool
 	var reuseport bool
 	var stdlib bool
+	var host string
 
+	flag.StringVar(&host, "host", "localhost", "server host")
 	flag.IntVar(&port, "port", 5000, "server port")
 	flag.BoolVar(&udp, "udp", false, "listen on udp")
 	flag.BoolVar(&reuseport, "reuseport", false, "reuseport (SO_REUSEPORT)")
@@ -29,10 +32,10 @@ func main()  {
 	events.Serving = func(server eventloop.Server) (action eventloop.Action) {
 		log.Printf("echo server started on port %d (loops: %d)", port, server.NumLoops)
 		if reuseport {
-			log.Printf("reuseport")
+			log.Println("reuseport")
 		}
 		if stdlib {
-			log.Printf("stdlib")
+			log.Println("stdlib")
 		}
 		return
 	}
@@ -51,5 +54,5 @@ func main()  {
 		scheme += "-net"
 	}
 
-	log.Fatal(eventloop.Serve(events, fmt.Sprintf("%s://:%d?reuseport=%t", scheme, port, reuseport)))
+	log.Fatal(eventloop.Serve(events, fmt.Sprintf("%s://%s:%d?reuseport=%t", scheme, host, port, reuseport)))
 }

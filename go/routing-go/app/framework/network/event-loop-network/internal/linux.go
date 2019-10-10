@@ -10,14 +10,22 @@ type Poll struct {
 }
 
 // AddRead ...
-func (p *Poll) AddRead(fd int) {
-	if err := syscall.EpollCtl(p.fd, syscall.EPOLL_CTL_ADD, fd,
+func (poll *Poll) AddRead(fd int) {
+	if err := syscall.EpollCtl(poll.fd, syscall.EPOLL_CTL_ADD, fd,
 		&syscall.EpollEvent{Fd: int32(fd),
 			Events: syscall.EPOLLIN,
 		},
 	); err != nil {
 		panic(err)
 	}
+}
+
+func (poll *Poll) Trigger(errClosing interface{}) {
+
+}
+
+func (poll *Poll) Close() {
+	
 }
 
 // OpenPoll ...

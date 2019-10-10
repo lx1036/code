@@ -6,6 +6,7 @@ import (
 	"net"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -16,7 +17,7 @@ type server struct {
 	lns      []*listener        // all the listeners
 	wg       sync.WaitGroup     // loop close waitgroup
 	cond     *sync.Cond         // shutdown signaler
-	balance  LoadBalance        // load balancing method
+	//balance  LoadBalance        // load balancing method
 	accepted uintptr            // accept counter
 	tch      chan time.Duration // ticker channel
 
@@ -36,6 +37,20 @@ type loop struct {
 	fdconns map[int]*conn  // loop connections fd -> conn
 	count   int32          // connection count
 }
+
+// LoadBalance sets the load balancing method.
+type LoadBalance int
+
+const (
+	// Random requests that connections are randomly distributed.
+	Random LoadBalance = iota
+	// RoundRobin requests that connections are distributed to a loop in a
+	// round-robin fashion.
+	RoundRobin
+	// LeastConnections assigns the next accepted connection to the loop with
+	// the least number of active connections.
+	LeastConnections
+)
 
 func reuseportListenPacket(proto, addr string) (l net.PacketConn, err error) {
 	return reuseport.ListenPacket(proto, addr)
@@ -71,6 +86,30 @@ type conn struct {
 	loop       *loop            // connected loop
 }
 
+func (c conn) Context() interface{} {
+	panic("implement me")
+}
+
+func (c conn) SetContext(interface{}) {
+	panic("implement me")
+}
+
+func (c conn) AddrIndex() int {
+	panic("implement me")
+}
+
+func (c conn) LocalAddr() net.Addr {
+	panic("implement me")
+}
+
+func (c conn) RemoteAddr() net.Addr {
+	panic("implement me")
+}
+
+func (c conn) Wake() {
+	panic("implement me")
+}
+
 func serve(events Events, listeners []*listener) error {
 	// figure out the correct number of loops/goroutines to use.
 	numLoops := events.NumLoops
@@ -86,7 +125,7 @@ func serve(events Events, listeners []*listener) error {
 	server.events = events
 	server.lns = listeners
 	server.cond = sync.NewCond(&sync.Mutex{})
-	server.balance = events.LoadBalance
+	//server.balance = events.LoadBalance
 	server.tch = make(chan time.Duration)
 
 	if server.events.Serving != nil {
@@ -109,19 +148,19 @@ func serve(events Events, listeners []*listener) error {
 		server.waitForShutdown()
 
 		// notify all loops to close by closing all listeners
-		for _, l := range server.loops {
-			l.poll.Trigger(errClosing)
+		for _, loop := range server.loops {
+			loop.poll.Trigger(errClosing)
 		}
 
 		// wait on all loops to complete reading events
 		server.wg.Wait()
 
 		// close loops and all outstanding connections
-		for _, l := range server.loops {
-			for _, c := range l.fdconns {
-				loopCloseConn(server, l, c, nil)
+		for _, loop := range server.loops {
+			for _, c := range loop.fdconns {
+				_ = loopCloseConn(server, loop, c, nil)
 			}
-			l.poll.Close()
+			loop.poll.Close()
 		}
 		//println("-- server stopped")
 	}()
@@ -146,5 +185,23 @@ func serve(events Events, listeners []*listener) error {
 		go loopRun(server, l)
 	}
 
+	return nil
+}
+
+func loopRun(s *server, l *loop) {
+
+}
+
+func loopCloseConn(s *server, l *loop, c *conn, err error) error {
+	atomic.AddInt32(&l.count, -1)
+	delete(l.fdconns, c.fd)
+	_ = syscall.Close(c.fd)
+	if s.events.Closed != nil {
+		switch s.events.Closed(c, err) {
+		case None:
+		case Shutdown:
+			return errClosing
+		}
+	}
 	return nil
 }

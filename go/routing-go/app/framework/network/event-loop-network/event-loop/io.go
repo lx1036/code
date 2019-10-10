@@ -170,7 +170,7 @@ func Serve(events Events, addr ...string) error {
 			stdlib = true
 		}
 		if ln.network == "unix" {
-			os.RemoveAll(ln.addr)
+			_ = os.RemoveAll(ln.addr)
 		}
 		var err error
 		if ln.network == "udp" {

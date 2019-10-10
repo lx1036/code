@@ -6,6 +6,10 @@
 #include "queue.h"
 #include <unistd.h>
 
+typedef struct lock_t {
+    int flag;
+} lock_t;
+
 int main(void) {
     Queue line;
     Item temp;
