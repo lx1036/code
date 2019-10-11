@@ -3,6 +3,8 @@ package routes
 import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/plugins/cors"
+	"k8s-lx1036/wayne/backend/controllers/cronjob"
+	"k8s-lx1036/wayne/backend/controllers/kubernetes"
 	"k8s-lx1036/wayne/backend/controllers/permission"
 	"path"
 )
@@ -131,6 +133,7 @@ func init()  {
 		),
 	))
 
+	// kubernetes resource
 	beego.AddNamespace(beego.NewNamespace("/api/v1",
 		beego.NSRouter("/kubernetes/pods/statistics", &kpod.KubePodController{}, "get:PodStatistics"),
 
@@ -146,7 +149,7 @@ func init()  {
 		),
 		beego.NSNamespace("/kubernetes/namespaces",
 			beego.NSInclude(
-				&knamespace.KubeNamespaceController{},
+				&kubernetes.KubernetesNamespaceController{},
 			),
 		),
 		beego.NSNamespace("/kubernetes/nodes",
