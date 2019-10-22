@@ -22,3 +22,4 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 
 #add_subdirectory(lib)
 add_subdirectory(chapter-4)
+add_subdirectory(test)
