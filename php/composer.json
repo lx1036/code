@@ -5,7 +5,8 @@
     "require": {
         "php": "^7.3",
         "psr/simple-cache": "^1.0",
-        "google/cloud-translate": "^1.4"
+        "google/cloud-translate": "^1.4",
+        "ext-rdkafka": "*"
     },
     "license": "MIT",
     "authors": [

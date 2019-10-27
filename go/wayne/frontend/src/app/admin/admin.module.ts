@@ -1,10 +1,11 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { CronjobComponent } from './cronjob/cronjob.component';
 
 
 
 @NgModule({
-  declarations: [],
+  declarations: [CronjobComponent],
   imports: [
     CommonModule
   ]
