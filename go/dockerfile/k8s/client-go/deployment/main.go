@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
+	"k8s-lx1036/dockerfile/k8s/client-go/util"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,7 +11,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/client-go/util/retry"
-	"os"
 	"path/filepath"
 )
 
@@ -145,7 +144,7 @@ func crudDeployment() {
 		fmt.Println("Created deployment: " + deployment.Name + " ...")
 	}
 
-	prompt()
+	util.Prompt()
 
 	// Update
 	fmt.Println("Updating deployment: " + newDeployment.Name + " ...")
@@ -160,7 +159,7 @@ func crudDeployment() {
 	}
 	fmt.Println("Updated deployment: " + newDeployment.Name + " ...")
 
-	prompt()
+	util.Prompt()
 
 	// List
 	fmt.Println("Listing deployment in namespace[" + apiv1.NamespaceDefault + "]:")
@@ -182,7 +181,7 @@ func crudDeployment() {
 		fmt.Printf("%s(%d replicas)\n", item.Name, *item.Spec.Replicas)
 	}
 
-	prompt()
+	util.Prompt()
 
 	// Delete
 	fmt.Println("Deleting deployment: " + newDeployment.Name + " ...")
@@ -199,18 +198,6 @@ func crudDeployment() {
 		panic(fmt.Errorf("deleted failed: %v", deleteErr))
 	}
 	fmt.Println("Deleted deployment: " + newDeployment.Name + " ...")
-}
-
-func prompt()  {
-	fmt.Println("Press Return key to continue...")
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		break
-	}
-	if err := scanner.Err(); err != nil {
-		panic(err)
-	}
-	fmt.Println()
 }
 
 func int32Ptr(i int32) *int32  {
