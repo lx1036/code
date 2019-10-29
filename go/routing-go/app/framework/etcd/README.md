@@ -8,7 +8,7 @@
 brew install goreman
 goreman -f Procfile start # 启动 etcd 集群
 
-etcdctl --endpoints=localhost:12379 member list # 获取集群 member 信息
+etcdctl --endpoints=localhost:12379 --write-out=table member list # 获取集群 member 信息
 etcdctl --endpoints=localhost:12379 put foo bar
 etcdctl --endpoints=localhost:22379 get foo
 
