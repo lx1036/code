@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/astaxie/beego v1.12.0
 	github.com/codingsince1985/checksum v1.1.0
+	github.com/coreos/etcd v3.3.17+incompatible
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/getsentry/sentry-go v0.3.0
 	github.com/gin-gonic/gin v1.4.0
@@ -26,7 +27,7 @@ require (
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271
 	github.com/stretchr/testify v1.4.0
 	github.com/tidwall/evio v1.0.2
-	github.com/ugorji/go v1.1.7 // indirect
+	github.com/ugorji/go/codec v1.1.7 // indirect
 	github.com/urfave/cli v1.22.1
 	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
 	gopkg.in/go-playground/validator.v8 v8.18.2
