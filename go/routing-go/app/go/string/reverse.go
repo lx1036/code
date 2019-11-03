@@ -1,5 +1,5 @@
 // stringutil 包含有用于处理字符串的工具函数。
-package stringutil
+package string
 
 // Reverse 将其实参字符串以符文为单位左右反转。
 func Reverse(s string) string {

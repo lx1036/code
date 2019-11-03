@@ -6,3 +6,5 @@
 minikube start
 minikube stop
 ```
+
+**[client-go demos](https://github.com/kubernetes/client-go/blob/master/examples/README.md)**
