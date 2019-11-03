@@ -13,6 +13,7 @@ import {TranslateHttpLoader} from "@ngx-translate/http-loader";
 import { FilterBoxComponent } from './shared/filter-box/filter-box.component';
 import { CheckboxGroupComponent } from './shared/checkbox-group/checkbox-group.component';
 import { CheckboxComponent } from './shared/checkbox/checkbox.component';
+import { ConfirmationDialogComponent } from './shared/confirmation-dialog/confirmation-dialog.component';
 const packageJson = require('../../package.json');
 
 
@@ -25,7 +26,8 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
     AppComponent,
     FilterBoxComponent,
     CheckboxGroupComponent,
-    CheckboxComponent
+    CheckboxComponent,
+    ConfirmationDialogComponent
   ],
   imports: [
     BrowserModule,

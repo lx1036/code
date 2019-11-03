@@ -1,0 +1,12 @@
+*.swp
+.idea/*
+cmake-build-debug/*
+build/*
+bin/*
+CMakeCache.txt
+CMakeFiles/*
+Makefile
+cmake_install.cmake
+.vscode/*
+**/CMakeFiles/*
+*.cbp

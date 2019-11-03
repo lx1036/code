@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/astaxie/beego"
+	_ "k8s-lx1036/routing-go/app/framework/beego/routers"
 )
 
 /*
@@ -19,5 +21,13 @@ func main() {
 
 	fmt.Println(array, slice, maps, makeSlice, makeSlice[1:3], makeSlice[1:])
 
-	//beego.Run()
+
+	beego.SetStaticPath("/md", "assets/md")
+	// 1. resolve /conf
+	// 2. user-defined hook func
+	// 3. start session
+	// 4. compile template
+	// 5. monitor serving in 8088
+	// 6. listen and serve 8081
+	beego.Run("localhost:8081")
 }

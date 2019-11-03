@@ -211,14 +211,15 @@ require rsc.io/quote v1.5.2
 
 
 ```
-   $ go mod init github.com/my/repo
+$ go mod init github.com/my/repo
 ```
 请注意，如果您的依赖项包括v2 +模块，或者正在初始化v2 +模块，则在运行`go mod init`之后，您可能还需要编辑`go.mod`和`.go`代码以添加`/ vN`。 导入路径和模块路径，如上文[“语义导入版本控制”]（https://github.com/golang/go/wiki/Modules#semantic-import-versioning）部分中所述。 即使`go mod init`自动从`dep`或其他依赖项管理器转换了您的依赖项信息，这也适用。 （因此，在运行`go mod init`之后，通常不应该运行`go mod tidy`，直到成功运行`go build。/ ...`或类似的东西，这是本节中显示的顺序）。
 
 3.构建模块。 当从模块的根目录执行时，。/ ...模式匹配当前模块内的所有软件包。 `go build`将根据需要自动添加缺少或未转换的依赖项，以满足对此特定build调用的导入：
+
 ```
-   $ go build ./...
-   ```
+$ go build ./...
+```
 4. Test the module as configured to ensure that it works with the selected versions:
 
    ```
@@ -266,8 +267,8 @@ go get foo将更新为foo的最新版本。 `go get foo`等同于`go get foo @ l
 升级或降级任何依赖项之后，您可能希望再次对构建中的所有软件包（包括直接和间接依赖项）运行测试，以检查不兼容性
 
 ```
-   $ go test all
-   ```
+$ go test all
+```
 
 ## How to Prepare for a Release
 
@@ -476,10 +477,9 @@ go.mod文件的module语句已淘汰了导入路径注释。
 
 ## FAQs
 ###如何将版本标记为不兼容？
+`require` 指令允许任何模块声明其依赖 D 模块的版本 >=x.y.z 来构建（这是因为其可能与模块 D 的版本 <x.y.z 不兼容）。经验数据表明[this is the dominant form of constraints used in dep and cargo](https://twitter.com/_rsc/status/1022590868967116800)。另外，构建中的顶层模块可以**排除**特定版本依赖，或者**替换**其他模块。请参阅完整提案[more details and rationale](https://github.com/golang/proposal/blob/master/design/24301-versioned-go.md)。
 
-`require`指令允许任何模块声明其应使用依赖项D的版本> = x.y.z构建（可能由于与模块D的版本<x.y.z不兼容而指定）。经验数据表明[这是'dep'和'cargo'中使用的约束的主要形式]（https://twitter.com/_rsc/status/1022590868967116800）。另外，构建中的顶层模块可以“排除”特定版本的依赖项，或者“替换”其他模块以不同的代码。请参阅完整的提案以获取[更多详细信息和原理]（https://github.com/golang/proposal/blob/master/design/24301-versioned-go.md）。
-
-版本模块建议的主要目标之一是为工具和开发人员在Go代码的版本周围添加通用词汇和语义。这为将来声明不兼容的其他形式奠定了基础，例如：
+模块设计的主要目标是为工具和开发者的 Go 代码添加通用语，这为将来声明不兼容的其他形式奠定了基础，例如：
 *在最初的`vgo`博客系列中将不推荐使用的版本声明为[描述]（https://research.swtch.com/vgo-module）
 *声明外部系统中模块之间的成对不兼容性，例如在提案过程中[例如] [https://github.com/golang/go/issues/24301#issuecomment-392111327）
 *发布版本后，声明模块的成对不兼容版本或不安全版本。例如，请参见[＃24031]（https://github.com/golang/go/issues/24031#issuecomment-407798552）和[＃26829]（https://github.com/golang/去/问题/ 26829）
