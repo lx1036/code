@@ -2,6 +2,7 @@ package main
 
 import (
     "context"
+    "flag"
     "fmt"
     "github.com/coreos/etcd/clientv3"
     "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
@@ -9,9 +10,15 @@ import (
     "time"
 )
 
+/**
+go run etcd.go --endpoint localhost:12379
+ */
 func main() {
+    endpoint := flag.String("endpoint", "localhost:2379", "talk with client")
+    flag.Parse()
+    
     client, err := clientv3.New(clientv3.Config{
-        Endpoints:            []string{"localhost:2379"},
+        Endpoints:            []string{*endpoint},
         AutoSyncInterval:     0,
         DialTimeout:          0,
         DialKeepAliveTime:    0,
