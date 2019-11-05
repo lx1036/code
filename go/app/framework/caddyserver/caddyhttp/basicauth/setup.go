@@ -1,8 +1,8 @@
 package basicauth
 
 import (
-	caddy "k8s-lx1036/routing-go/app/framework/caddyserver"
-	"k8s-lx1036/routing-go/app/framework/caddyserver/caddyhttp/httpserver"
+	caddy "k8s-lx1036/app/framework/caddyserver"
+	"k8s-lx1036/app/framework/caddyserver/caddyhttp/httpserver"
 )
 
 func init()  {

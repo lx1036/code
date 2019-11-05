@@ -3,9 +3,9 @@ package httpserver
 import (
 	"fmt"
 	"github.com/mholt/certmagic"
-	caddy "k8s-lx1036/routing-go/app/framework/caddyserver"
-	"k8s-lx1036/routing-go/app/framework/caddyserver/caddyfile"
-	"k8s-lx1036/routing-go/app/framework/caddyserver/caddytls"
+	caddy "k8s-lx1036/app/framework/caddyserver"
+	"k8s-lx1036/app/framework/caddyserver/caddyfile"
+	"k8s-lx1036/app/framework/caddyserver/caddytls"
 	"time"
 )
 

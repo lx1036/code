@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	eventloop "k8s-lx1036/routing-go/app/framework/network/event-loop-network/event-loop"
+	eventloop "k8s-lx1036/app/framework/network/event-loop-network/event-loop"
 	"log"
 	"strings"
 )

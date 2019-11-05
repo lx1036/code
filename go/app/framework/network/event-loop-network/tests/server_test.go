@@ -1,8 +1,8 @@
 package tests
 
 import (
-    event_loop "k8s-lx1036/routing-go/app/framework/network/event-loop-network/event-loop"
-    "k8s-lx1036/routing-go/app/framework/network/net"
+    event_loop "k8s-lx1036/app/framework/network/event-loop-network/event-loop"
+    "k8s-lx1036/app/framework/network/net"
     "os"
     "strings"
     "sync/atomic"

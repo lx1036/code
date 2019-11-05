@@ -1,6 +1,6 @@
 package net
 
-import "k8s-lx1036/routing-go/app/framework/network/netpoll"
+import "k8s-lx1036/app/framework/network/netpoll"
 
 type loop struct {
 	idx         int             // loop index in the server loops list

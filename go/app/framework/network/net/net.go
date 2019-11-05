@@ -1,7 +1,7 @@
 package net
 
 import (
-	"k8s-lx1036/routing-go/app/framework/network/netpoll"
+	"k8s-lx1036/app/framework/network/netpoll"
 	"log"
 	"net"
 	"os"

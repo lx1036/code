@@ -2,7 +2,7 @@ package caddy
 
 import (
 	"github.com/mholt/certmagic"
-	"k8s-lx1036/routing-go/app/framework/caddyserver/telemetry"
+	"k8s-lx1036/app/framework/caddyserver/telemetry"
 	"log"
 	"os"
 	"os/signal"

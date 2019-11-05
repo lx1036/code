@@ -1,6 +1,6 @@
 package netpoll
 
-import "k8s-lx1036/routing-go/app/framework/network/internal"
+import "k8s-lx1036/app/framework/network/internal"
 
 // Poller ...
 type Poller struct {
