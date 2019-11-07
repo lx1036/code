@@ -1,7 +1,7 @@
 package util
 
 var (
-    AppLabelKey                         = ""
-    NamespaceLabelKey                   = ""
-    PodAnnotationControllerKindLabelKey = ""
+	AppLabelKey                         = ""
+	NamespaceLabelKey                   = ""
+	PodAnnotationControllerKindLabelKey = ""
 )

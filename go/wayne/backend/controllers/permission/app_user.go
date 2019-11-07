@@ -8,7 +8,7 @@ type AppUserController struct {
 	base.APIController
 }
 
-func (c *AppUserController) URLMapping()  {
+func (c *AppUserController) URLMapping() {
 	c.Mapping("List", c.List)
 	c.Mapping("Create", c.Create)
 	c.Mapping("Get", c.Get)
@@ -16,6 +16,3 @@ func (c *AppUserController) URLMapping()  {
 	c.Mapping("Update", c.Update)
 	c.Mapping("Delete", c.Delete)
 }
-
-
-

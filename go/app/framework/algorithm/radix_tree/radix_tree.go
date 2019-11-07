@@ -2,7 +2,7 @@ package radix_tree
 
 type Node struct {
 	children [16]*Node
-	data []byte
+	data     []byte
 }
 
 type KVStore interface {
@@ -10,7 +10,7 @@ type KVStore interface {
 	Search(b []byte) []byte
 }
 
-func search(node *Node, data []byte) []byte  {
+func search(node *Node, data []byte) []byte {
 	if node == nil {
 		return nil
 	} else if len(data) == 0 {
@@ -24,7 +24,7 @@ func (node *Node) Search(data []byte) []byte {
 	return search(node, data)
 }
 
-func (node *Node)copy() *Node {
+func (node *Node) copy() *Node {
 	out := Node{
 		children: node.children,
 		data:     make([]byte, len(node.data)),
@@ -33,7 +33,7 @@ func (node *Node)copy() *Node {
 	return &out
 }
 
-func insert(node *Node, key []byte, value []byte) *Node  {
+func insert(node *Node, key []byte, value []byte) *Node {
 	if node == nil {
 		out := Node{}
 		return insert(&out, key, value)
@@ -48,11 +48,10 @@ func insert(node *Node, key []byte, value []byte) *Node  {
 	}
 }
 
-func (node *Node) Insert(key, value []byte) KVStore   {
+func (node *Node) Insert(key, value []byte) KVStore {
 	return insert(node, key, value)
 }
 
-func New() *Node  {
+func New() *Node {
 	return nil
 }
-

@@ -31,10 +31,10 @@ var VersionCmd = &cobra.Command{
 }
 
 var APIServerCmd = &cobra.Command{
-		Use:    "apiserver",
-		PreRun: preRun,
-		Run:    runApiServer,
-	}
+	Use:    "apiserver",
+	PreRun: preRun,
+	Run:    runApiServer,
+}
 
 func preRun(cmd *cobra.Command, args []string) {
 }

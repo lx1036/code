@@ -84,7 +84,6 @@ type Conn interface {
 	Wake()
 }
 
-
 type listener struct {
 	ln      net.Listener
 	lnaddr  net.Addr
@@ -95,6 +94,7 @@ type listener struct {
 	network string
 	addr    string
 }
+
 func (ln *listener) close() {
 	if ln.fd != 0 {
 		syscall.Close(ln.fd)
@@ -112,6 +112,7 @@ func (ln *listener) close() {
 		os.RemoveAll(ln.addr)
 	}
 }
+
 // system takes the net listener and detaches it from it's parent
 // event loop, grabs the file descriptor, and makes it non-blocking.
 func (ln *listener) system() error {
@@ -208,7 +209,6 @@ func Serve(events Events, addr ...string) error {
 
 	return serve(events, listeners)
 }
-
 
 func parseAddr(addr string) (network, address string, opts addrOpts, stdlib bool) {
 	network = "tcp"

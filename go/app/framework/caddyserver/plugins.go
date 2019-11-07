@@ -306,7 +306,7 @@ func RegisterServerType(typeName string, srv ServerType) {
 	serverTypes[typeName] = srv
 }
 
-func RegisterCaddyfileLoader(name string, loader Loader)  {
+func RegisterCaddyfileLoader(name string, loader Loader) {
 	caddyfileLoaders = append(caddyfileLoaders, caddyfileLoader{name: name, loader: loader})
 }
 

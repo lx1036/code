@@ -21,7 +21,6 @@ func main() {
 
 	fmt.Println(array, slice, maps, makeSlice, makeSlice[1:3], makeSlice[1:])
 
-
 	beego.SetStaticPath("/md", "assets/md")
 	// 1. resolve /conf
 	// 2. user-defined hook func

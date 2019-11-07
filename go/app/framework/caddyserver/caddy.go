@@ -1,4 +1,3 @@
-
 // Package caddy implements the Caddy server manager.
 //
 // To use this package:
@@ -194,7 +193,6 @@ func (c CaddyfileInput) Path() string { return c.Filepath }
 // ServerType returns c.ServerType.
 func (c CaddyfileInput) ServerType() string { return c.ServerTypeName }
 
-
 // Start starts Caddy with the given Caddyfile.
 //
 // This function blocks until all the servers are listening.
@@ -309,7 +307,6 @@ func (i *Instance) Servers() []ServerListener {
 func (i *Instance) Wait() {
 	i.wg.Wait()
 }
-
 
 // CaddyfileFromPipe loads the Caddyfile input from f if f is
 // not interactive input. f is assumed to be a pipe or stream,

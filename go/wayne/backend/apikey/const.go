@@ -3,6 +3,6 @@ package apikey
 import "crypto/rsa"
 
 var (
-    RsaPrivateKey *rsa.PrivateKey
-    RsaPublicKey  *rsa.PublicKey
+	RsaPrivateKey *rsa.PrivateKey
+	RsaPublicKey  *rsa.PublicKey
 )

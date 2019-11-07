@@ -42,4 +42,3 @@ type Controller struct {
 	// the keys on a server block.
 	ServerBlockStorage interface{}
 }
-

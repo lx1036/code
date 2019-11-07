@@ -7,4 +7,3 @@ type Poller struct {
 	fd            int
 	asyncJobQueue internal.AsyncJobQueue
 }
-

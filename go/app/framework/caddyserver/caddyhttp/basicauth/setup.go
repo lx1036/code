@@ -5,7 +5,7 @@ import (
 	"k8s-lx1036/app/framework/caddyserver/caddyhttp/httpserver"
 )
 
-func init()  {
+func init() {
 	caddy.RegisterPlugin("basicauth", caddy.Plugin{
 		ServerType: "http",
 		Action:     setup,

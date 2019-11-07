@@ -10,9 +10,8 @@ const (
 	PermissionRead   = "READ"
 	PermissionDelete = "DELETE"
 
-	PermissionTypeCronjob               = "CRONJOB"
-	PermissionBlank                     = "_"
-
+	PermissionTypeCronjob = "CRONJOB"
+	PermissionBlank       = "_"
 )
 
 type Permission struct {

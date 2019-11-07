@@ -53,6 +53,7 @@ var flagsBlacklist = map[string]struct{}{
 }
 
 var flagsToKeep []*flag.Flag
+
 // This is CoreDNS' ascii LOGO, nothing fancy. It's generated with:
 // figlet -f slant CoreDNS
 // We're printing the logo line by line, hence splitting it up.
@@ -66,7 +67,7 @@ var logo = []string{
 
 const marker = "~ "
 
-func init()  {
+func init() {
 	caddy.DefaultConfigFile = "Corefile"
 	caddy.Quiet = true // don't show init stuff from caddy
 	setVersion()
@@ -198,10 +199,12 @@ func showVersion() {
 	fmt.Println(logo[3])
 	fmt.Println(logo[4])
 }
+
 // versionString returns the CoreDNS version as a string.
 func versionString() string {
 	return fmt.Sprintf("%s\t%s%s-%s\n", logo[1], marker, caddy.AppName, caddy.AppVersion)
 }
+
 // releaseString returns the release information related to CoreDNS version:
 // <OS>/<ARCH>, <go version>, <commit>
 // e.g.,

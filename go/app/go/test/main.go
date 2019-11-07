@@ -5,9 +5,9 @@ func Fib(n int) int {
 		return n
 	}
 
-	return Fib(n - 1) + Fib(n - 2)
+	return Fib(n-1) + Fib(n-2)
 }
 
-func main()  {
+func main() {
 	Fib(7)
 }

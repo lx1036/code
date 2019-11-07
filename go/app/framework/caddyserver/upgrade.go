@@ -1,6 +1,5 @@
 package caddy
 
-
 // IsUpgrade returns true if this process is part of an upgrade
 // where a parent caddy process spawned this one to upgrade
 // the binary.

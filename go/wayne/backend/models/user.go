@@ -4,7 +4,6 @@ import "time"
 
 type UserType int
 
-
 type User struct {
 	Id        int64      `orm:"pk;auto" json:"id,omitempty"`
 	Name      string     `orm:"index;unique;size(200)" json:"name,omitempty"`
@@ -24,5 +23,3 @@ type User struct {
 
 	Namespaces []*Namespace `orm:"-" json:"namespaces,omitempty"`
 }
-
-

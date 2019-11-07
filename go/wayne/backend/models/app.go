@@ -26,5 +26,3 @@ type App struct {
 	// 关注的关联查询
 	AppStars []*AppStarred `orm:"reverse(many)" json:"-"`
 }
-
-

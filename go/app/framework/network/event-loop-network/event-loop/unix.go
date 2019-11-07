@@ -12,17 +12,18 @@ import (
 )
 
 type server struct {
-	events   Events             // user events
-	loops    []*loop            // all the loops
-	lns      []*listener        // all the listeners
-	wg       sync.WaitGroup     // loop close waitgroup
-	cond     *sync.Cond         // shutdown signaler
+	events Events         // user events
+	loops  []*loop        // all the loops
+	lns    []*listener    // all the listeners
+	wg     sync.WaitGroup // loop close waitgroup
+	cond   *sync.Cond     // shutdown signaler
 	//balance  LoadBalance        // load balancing method
 	accepted uintptr            // accept counter
 	tch      chan time.Duration // ticker channel
 
 	//ticktm   time.Time      // next tick time
 }
+
 // waitForShutdown waits for a signal to shutdown
 func (s *server) waitForShutdown() {
 	s.cond.L.Lock()

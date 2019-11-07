@@ -7,7 +7,7 @@ import (
 
 // namespace: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
 
-func init()  {
+func init() {
 	const controller = "k8s-lx1036/wayne/backend/controllers/kubernetes"
 	beego.GlobalControllerRouter[controller] = append(
 		beego.GlobalControllerRouter[controller],
@@ -42,9 +42,3 @@ func init()  {
 			MethodParams:     param.Make(),
 		})
 }
-
-
-
-
-
-

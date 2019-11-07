@@ -6,7 +6,7 @@ type edges []edge
 
 type edge struct {
 	label byte
-	node *node
+	node  *node
 }
 
 func (edges edges) Len() int {
@@ -21,6 +21,6 @@ func (edges edges) Swap(i, j int) {
 	edges[i], edges[j] = edges[j], edges[i]
 }
 
-func (edges edges)Sort()  {
+func (edges edges) Sort() {
 	sort.Sort(edges)
 }

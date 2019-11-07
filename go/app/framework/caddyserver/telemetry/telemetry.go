@@ -49,8 +49,6 @@ var (
 	// update happens at a time.
 	updating bool
 	updateMu sync.Mutex
-
-
 )
 
 // countingSet implements a set that counts how many
@@ -234,8 +232,3 @@ func emit(final bool) error {
 
 	return err
 }
-
-
-
-
-

@@ -25,7 +25,7 @@ func (poll *Poll) Trigger(errClosing interface{}) {
 }
 
 func (poll *Poll) Close() {
-	
+
 }
 
 // OpenPoll ...

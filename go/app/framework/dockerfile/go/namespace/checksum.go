@@ -12,4 +12,3 @@ func main() {
 	sha256, _ := checksum.SHA256sum(file)
 	fmt.Println(sha256)
 }
-

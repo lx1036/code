@@ -96,7 +96,6 @@ func (svr *server) stop() {
 
 }
 
-
 const (
 	// None indicates that no action should occur following an event.
 	None Action = iota
@@ -141,4 +140,3 @@ func serve(eventHandler EventHandler, listener *listener, options *Options) erro
 
 	return nil
 }
-

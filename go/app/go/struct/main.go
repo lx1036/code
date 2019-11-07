@@ -8,22 +8,22 @@ import (
 
 type Person struct {
 	Name string
-	Age int
-	Sex int
+	Age  int
+	Sex  int
 }
 
 type People struct {
 	Name string "Name"
-	Age int "Age"
-	Sex int "Sex"
+	Age  int    "Age"
+	Sex  int    "Sex"
 }
 
 type Household struct {
 	Name string
-	Age int
+	Age  int
 }
 
-func (household *Household) GetName() string  {
+func (household *Household) GetName() string {
 	return household.Name
 }
 
@@ -31,7 +31,7 @@ func (household *Household) GetAge() int {
 	return household.Age
 }
 
-func main()  {
+func main() {
 	household := new(Household)
 	household.Name = "household1"
 	household.Age = 12
@@ -51,12 +51,12 @@ func main()  {
 		Age:  0,
 		Sex:  0,
 	}
-	for i := 0; i < 3; i++  {
+	for i := 0; i < 3; i++ {
 		reflectTag(people, i)
 	}
 }
 
-func reflectTag(people People, i int)  {
+func reflectTag(people People, i int) {
 	peopleField := reflect.TypeOf(people).Field(i)
 
 	fmt.Println(peopleField.Tag, peopleField.Name)

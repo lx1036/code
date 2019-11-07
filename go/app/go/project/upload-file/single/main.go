@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func main()  {
+func main() {
 	router := gin.Default()
 	router.MaxMultipartMemory = 8 << 20 // 8MB
 	router.Static("/", "./public")
@@ -22,7 +22,7 @@ func main()  {
 		}
 
 		filename := filepath.Base(file.Filename)
-		if err := context.SaveUploadedFile(file, "assets/" + filename); err != nil {
+		if err := context.SaveUploadedFile(file, "assets/"+filename); err != nil {
 			context.String(http.StatusBadRequest, fmt.Sprintf("can't save uploaded file: %s", err.Error()))
 			return
 		}

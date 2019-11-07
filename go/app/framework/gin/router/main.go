@@ -7,9 +7,9 @@ import (
 	"net/http"
 )
 
-func BasicAuth(handle httprouter.Handle, requiredUsername string, requiredPassword string) httprouter.Handle  {
+func BasicAuth(handle httprouter.Handle, requiredUsername string, requiredPassword string) httprouter.Handle {
 	return func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		username, password, ok :=request.BasicAuth()
+		username, password, ok := request.BasicAuth()
 
 		if ok && username == requiredUsername && password == requiredPassword {
 			handle(writer, request, params)
@@ -20,8 +20,7 @@ func BasicAuth(handle httprouter.Handle, requiredUsername string, requiredPasswo
 	}
 }
 
-
-func main()  {
+func main() {
 	router := httprouter.New()
 	router2 := httprouter.New()
 	test := router == router2

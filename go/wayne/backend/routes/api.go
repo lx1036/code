@@ -9,8 +9,7 @@ import (
 	"path"
 )
 
-
-func init()  {
+func init() {
 	if beego.BConfig.RunMode == "dev" && path.Base(beego.AppPath) == "_build" {
 		beego.AppPath = path.Join(path.Dir(beego.AppPath), "src/backend")
 	}
@@ -22,7 +21,6 @@ func init()  {
 		ExposeHeaders:    []string{"Content-Length", "Access-Control-Allow-Origin", "Access-Control-Allow-Headers", "Content-Type"},
 		AllowCredentials: true,
 	}))
-
 
 	beego.AddNamespace(beego.NewNamespace("/api/v1",
 		// 路由中携带appid
@@ -264,7 +262,6 @@ func init()  {
 		),
 	))
 
-
 	beego.AddNamespace(beego.NewNamespace("/api/v1",
 		// 路由中不携带任何id
 		beego.NSNamespace("/configs",
@@ -358,12 +355,3 @@ func init()  {
 	))
 
 }
-
-
-
-
-
-
-
-
-

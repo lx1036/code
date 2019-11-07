@@ -6,9 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
+
 /*
 https://studygolang.gitbook.io/learn-go-with-tests/go-ji-chu/pointers-and-errors
- */
+*/
 type Bitcoin int
 
 func (bitcoin Bitcoin) String() string {
@@ -23,16 +24,16 @@ type Wallet struct {
 	balance Bitcoin
 }
 
-func (wallet *Wallet) Deposit(amount Bitcoin)  {
+func (wallet *Wallet) Deposit(amount Bitcoin) {
 	fmt.Println("address of balance in Deposit is", &wallet.balance)
 	wallet.balance += amount
 }
 
-func (wallet *Wallet) Balance() Bitcoin  {
+func (wallet *Wallet) Balance() Bitcoin {
 	return wallet.balance
 }
 
-func (wallet *Wallet) Withdraw(amount Bitcoin) error  {
+func (wallet *Wallet) Withdraw(amount Bitcoin) error {
 	if wallet.balance < amount {
 		return errors.New("not enough money")
 	}
@@ -42,7 +43,7 @@ func (wallet *Wallet) Withdraw(amount Bitcoin) error  {
 	return nil
 }
 
-func TestWallet(test *testing.T)  {
+func TestWallet(test *testing.T) {
 	assertBalance := func(test *testing.T, wallet Wallet, want Bitcoin) {
 		got := wallet.Balance()
 

@@ -45,18 +45,18 @@ type Shape interface {
 }
 
 type Triangle struct {
-	base float64
+	base   float64
 	height float64
 }
 
-func (triangle Triangle) Area() float64  {
+func (triangle Triangle) Area() float64 {
 	return triangle.base * triangle.height * 0.5
 }
 
 func TestArea(t *testing.T) {
-	tableDrivenTests := []struct{
+	tableDrivenTests := []struct {
 		shape Shape
-		want float64
+		want  float64
 	}{
 		{shape: Rectangle{width: 10.0, height: 10.0}, want: 100.0},
 		{Circle{10.0}, 314.1592653589793},

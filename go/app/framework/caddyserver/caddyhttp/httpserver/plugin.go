@@ -45,6 +45,7 @@ var (
 	// QUIC indicates whether QUIC is enabled or not.
 	QUIC bool
 )
+
 // directives is the list of all directives known to exist for the
 // http server type, including non-standard (3rd-party) directives.
 // The ordering of this list is important.
@@ -128,11 +129,11 @@ var directives = []string{
 	"dyndns",    // github.com/linkonoid/caddy-dyndns
 }
 
-func init()  {
+func init() {
 
 	// Write a Server Type Plugin: https://dengxiaolong.com/caddy/zh/wiki.Writing-a-Plugin%3A-Server-Type.html
 	caddy.RegisterServerType(serverType, caddy.ServerType{
-		Directives:   func() []string { return directives },
+		Directives: func() []string { return directives },
 		DefaultInput: func() caddy.Input {
 			if Port == DefaultPort && Host != "" {
 				// by leaving the port blank in this case we give auto HTTPS
@@ -142,17 +143,16 @@ func init()  {
 					ServerTypeName: serverType,
 				}
 			}
-			
+
 			return caddy.CaddyfileInput{
 				Contents:       []byte(fmt.Sprintf("%s:%s\nroot %s", Host, Port, Root)),
 				ServerTypeName: serverType,
 			}
 		},
-		NewContext:   newContext,
+		NewContext: newContext,
 	})
-	
-}
 
+}
 
 // GetConfig gets the SiteConfig that corresponds to c.
 // If none exist (should only happen in tests), then a

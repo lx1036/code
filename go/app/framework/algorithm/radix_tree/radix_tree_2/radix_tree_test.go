@@ -8,10 +8,10 @@ import (
 
 /**
 https://github.com/armon/go-radix/blob/master/radix_test.go
- */
+*/
 func TestRadix2(test *testing.T) {
 	dictionary := make(map[string]interface{})
-	for i := 0; i < 1000; i++  {
+	for i := 0; i < 1000; i++ {
 		id := generateUUID()
 		dictionary[id] = i
 	}

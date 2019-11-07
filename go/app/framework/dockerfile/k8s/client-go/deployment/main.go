@@ -43,17 +43,17 @@ func crudDeployment() {
 	deploymentsClient := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault)
 
 	deployment := &appsv1.Deployment{
-		TypeMeta:   metav1.TypeMeta{},
+		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: deploymentName,
 		},
-		Spec:       appsv1.DeploymentSpec{
-			Replicas:                int32Ptr(2),
-			Selector:                &metav1.LabelSelector{
+		Spec: appsv1.DeploymentSpec{
+			Replicas: int32Ptr(2),
+			Selector: &metav1.LabelSelector{
 				MatchLabels:      map[string]string{"app": "2019-10-26-deployment"},
 				MatchExpressions: nil,
 			},
-			Template:                apiv1.PodTemplateSpec{
+			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:                       "",
 					GenerateName:               "",
@@ -65,24 +65,24 @@ func crudDeployment() {
 					CreationTimestamp:          metav1.Time{},
 					DeletionTimestamp:          nil,
 					DeletionGracePeriodSeconds: nil,
-					Labels: map[string]string{"app": "2019-10-26-deployment"},
+					Labels:                     map[string]string{"app": "2019-10-26-deployment"},
 					Annotations:                nil,
 					OwnerReferences:            nil,
 					Finalizers:                 nil,
 					ClusterName:                "",
 					ManagedFields:              nil,
 				},
-				Spec:       apiv1.PodSpec{
-					Volumes:                       nil,
-					InitContainers:                nil,
-					Containers:                    []apiv1.Container{
+				Spec: apiv1.PodSpec{
+					Volumes:        nil,
+					InitContainers: nil,
+					Containers: []apiv1.Container{
 						{
-							Name: "web",
+							Name:  "web",
 							Image: "nginx:1.12",
 							Ports: []apiv1.ContainerPort{
 								{
-									Name: "http",
-									Protocol: apiv1.ProtocolTCP,
+									Name:          "http",
+									Protocol:      apiv1.ProtocolTCP,
 									ContainerPort: 80,
 								},
 							},
@@ -127,7 +127,7 @@ func crudDeployment() {
 			Paused:                  false,
 			ProgressDeadlineSeconds: nil,
 		},
-		Status:     appsv1.DeploymentStatus{},
+		Status: appsv1.DeploymentStatus{},
 	}
 
 	// Create
@@ -200,6 +200,6 @@ func crudDeployment() {
 	fmt.Println("Deleted deployment: " + newDeployment.Name + " ...")
 }
 
-func int32Ptr(i int32) *int32  {
+func int32Ptr(i int32) *int32 {
 	return &i
 }

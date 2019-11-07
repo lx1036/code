@@ -1,6 +1,6 @@
 package radix_tree_2
 
-func longestPrefix(k1 string, k2 string) int  {
+func longestPrefix(k1 string, k2 string) int {
 	max := len(k1)
 	if l := len(k2); l < max {
 		max = l
@@ -16,7 +16,6 @@ func longestPrefix(k1 string, k2 string) int  {
 	return i
 }
 
-
 /*func (tree *Tree) Min() (string, interface{}, bool)  {
 
 }
@@ -25,13 +24,11 @@ func (tree *Tree) Max() (string, interface{}, bool)  {
 
 }*/
 
-
-
-func New() *Tree  {
+func New() *Tree {
 	return NewFromMap(nil)
 }
 
-func NewFromMap(dictionary map[string]interface{}) *Tree  {
+func NewFromMap(dictionary map[string]interface{}) *Tree {
 	tree := &Tree{root: &node{}}
 	for key, value := range dictionary {
 		tree.Insert(key, value)
@@ -40,7 +37,7 @@ func NewFromMap(dictionary map[string]interface{}) *Tree  {
 	return tree
 }
 
-func recursiveWalk(node *node, fn WalkFn) bool  {
+func recursiveWalk(node *node, fn WalkFn) bool {
 	if node.leaf != nil && fn(node.leaf.key, node.leaf.value) {
 		return true
 	}

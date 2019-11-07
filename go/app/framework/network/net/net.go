@@ -12,8 +12,8 @@ import (
 type EventServer struct {
 }
 
-
 type Option func(opts *Options)
+
 // Options are set when the client opens.
 type Options struct {
 	// Multicore indicates whether the server will be effectively created with multi-cores, if so,
@@ -118,7 +118,6 @@ type EventHandler interface {
 	Tick() (delay time.Duration, action Action)
 }
 
-
 func sniffError(err error) {
 	if err != nil {
 		log.Println(err)
@@ -192,6 +191,3 @@ func Serve(eventHandler EventHandler, addr string, opts ...Option) error {
 	}
 	return serve(eventHandler, &ln, options)
 }
-
-
-

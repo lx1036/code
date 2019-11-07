@@ -7,4 +7,3 @@ type AsyncJobQueue struct {
 	mu   sync.Locker
 	jobs []func() error
 }
-

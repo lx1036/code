@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-func Prompt()  {
+func Prompt() {
 	fmt.Println("Press Return key to continue...")
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {

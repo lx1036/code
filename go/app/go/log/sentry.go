@@ -17,9 +17,9 @@ import (
 
 /*
 Gin Global Error Handler
- */
+*/
 
-func logGin()  {
+func logGin() {
 	gin.DisableConsoleColor()
 	file, _ := os.Create("gin.log")
 	stat, _ := file.Stat()
@@ -35,7 +35,7 @@ func logGin()  {
 	router.Run(":8080")
 }
 
-func pkgLog()  {
+func pkgLog() {
 	err := os.Chmod("./test.txt", 0777)
 	if err != nil {
 		fmt.Println("os chmod file failed")
@@ -68,15 +68,15 @@ func pkgLog()  {
 	fmt.Println(file.Name())
 }
 
-func pkgErrors()  {
+func pkgErrors() {
 	err := errors.New("Error/Exception")
 	fmt.Println(err)
 }
 
 /*
 SENTRY_DSN, SENTRY_RELEASE, SENTRY_ENVIRONMENT
- */
-func getSentryDsn() string  {
+*/
+func getSentryDsn() string {
 	viper.AddConfigPath(".")
 	viper.SetConfigFile("env.json")
 	err := viper.ReadInConfig()
@@ -88,7 +88,7 @@ func getSentryDsn() string  {
 	return cast.ToString(sentryDsn)
 }
 
-func sentryGo()  {
+func sentryGo() {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              getSentryDsn(),
 		Debug:            true,
@@ -118,14 +118,14 @@ func sentryGo()  {
 	if err != nil {
 		fmt.Printf("Open file failed: %v\n", err)
 		/*
-		https://sentry.io/organizations/leftcapital/issues/?project=1550933&query=is%3Aunresolved&statsPeriod=14d
-		 */
+			https://sentry.io/organizations/leftcapital/issues/?project=1550933&query=is%3Aunresolved&statsPeriod=14d
+		*/
 		sentry.CaptureException(err)
 		sentry.Flush(time.Second * 5)
 	}
 }
 
-func sentryGin()  {
+func sentryGin() {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              getSentryDsn(),
 		Debug:            true,
@@ -134,7 +134,7 @@ func sentryGin()  {
 		IgnoreErrors:     nil,
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			if hint.Context != nil {
-				if request, ok :=hint.Context.Value(sentry.RequestContextKey).(*http.Request); ok {
+				if request, ok := hint.Context.Value(sentry.RequestContextKey).(*http.Request); ok {
 					fmt.Println("request: ", request)
 				}
 			}
@@ -193,7 +193,7 @@ func sentryGin()  {
 	app.Run(":8080")
 }
 
-func debugHelloWorld()  {
+func debugHelloWorld() {
 	fmt.Println("Debug")
 }
 

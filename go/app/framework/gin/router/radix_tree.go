@@ -6,10 +6,10 @@ type Node struct {
 	priority uint32
 }
 
-func (node *Node)AddRoute()  {
+func (node *Node) AddRoute() {
 
 }
 
-func (node *Node) FindRoute()  {
+func (node *Node) FindRoute() {
 
 }

@@ -42,8 +42,6 @@ func AppendUnique(key string, value interface{}) {
 	bufferMu.Unlock()
 }
 
-
-
 // Set puts a value in the buffer to be included
 // in the next emission. It overwrites any
 // previous value.

@@ -9,12 +9,12 @@ type Tree struct {
 
 type WalkFn func(key string, value interface{}) bool
 
-func (tree *Tree) Insert(key string, value interface{}) (interface{}, bool)  {
+func (tree *Tree) Insert(key string, value interface{}) (interface{}, bool) {
 	var parent *node
 	search := key
 	rootNode := tree.root
 
-	for  {
+	for {
 		if len(search) == 0 {
 			if rootNode.isLeaf() {
 				old := rootNode.leaf.value
@@ -23,8 +23,8 @@ func (tree *Tree) Insert(key string, value interface{}) (interface{}, bool)  {
 			}
 
 			rootNode.leaf = &leafNode{
-				key:search,
-				value:value,
+				key:   search,
+				value: value,
 			}
 			tree.size++
 			return nil, false
@@ -34,11 +34,11 @@ func (tree *Tree) Insert(key string, value interface{}) (interface{}, bool)  {
 		rootNode = rootNode.getEdge(search[0])
 		if rootNode == nil { // No edge, create one
 			edge := edge{
-				label:search[0],
-				node:&node{
-					leaf:&leafNode{
-						key:search,
-						value:value,
+				label: search[0],
+				node: &node{
+					leaf: &leafNode{
+						key:   search,
+						value: value,
 					},
 					prefix: search,
 				},
@@ -57,21 +57,21 @@ func (tree *Tree) Insert(key string, value interface{}) (interface{}, bool)  {
 		// Split the node
 		tree.size++
 		child := &node{
-			prefix:search[:commonPrefix],
+			prefix: search[:commonPrefix],
 		}
 		parent.updateEdge(search[0], child)
 
 		// Restore the existing node
 		child.addEdge(edge{
-			label:rootNode.prefix[commonPrefix],
-			node:rootNode,
+			label: rootNode.prefix[commonPrefix],
+			node:  rootNode,
 		})
 		rootNode.prefix = rootNode.prefix[commonPrefix:]
 
 		// if the new key is a subnet, add it into this node
 		leaf := &leafNode{
-			key: search,
-			value:value,
+			key:   search,
+			value: value,
 		}
 		search = search[commonPrefix:]
 		if len(search) == 0 {
@@ -79,20 +79,20 @@ func (tree *Tree) Insert(key string, value interface{}) (interface{}, bool)  {
 			return nil, false
 		}
 		child.addEdge(edge{
-			label:search[0],
-			node:&node{
-				leaf:leaf,
-				prefix:search,
+			label: search[0],
+			node: &node{
+				leaf:   leaf,
+				prefix: search,
 			},
 		})
 		return nil, false
 	}
 }
 
-func (tree *Tree) Get(key string) (interface{}, bool)  {
+func (tree *Tree) Get(key string) (interface{}, bool) {
 	node := tree.root
 	search := key
-	for  {
+	for {
 		if len(search) == 0 {
 			if node.isLeaf() {
 				return node.leaf.value, true
@@ -139,30 +139,30 @@ func (tree *Tree) Delete(key string) (interface{}, bool) {
 
 	return nil, false
 
-	DELETE:
-		leaf := rootNode.leaf
-		rootNode.leaf = nil
-		tree.size--
-		if parent != nil && len(rootNode.edges) == 0 {
+DELETE:
+	leaf := rootNode.leaf
+	rootNode.leaf = nil
+	tree.size--
+	if parent != nil && len(rootNode.edges) == 0 {
 
-		}
+	}
 
-		// Check if delete this node from the parent
+	// Check if delete this node from the parent
 
-		// Check if merge this node
+	// Check if merge this node
 
-		// Check if merge the parent's other node
-		if parent != nil {
+	// Check if merge the parent's other node
+	if parent != nil {
 
-		}
+	}
 
-		return leaf.value, true
+	return leaf.value, true
 }
 
-func (tree *Tree) Len() int  {
+func (tree *Tree) Len() int {
 	return tree.size
 }
 
-func (tree *Tree) Walk(fn WalkFn)  {
+func (tree *Tree) Walk(fn WalkFn) {
 	recursiveWalk(tree.root, fn)
 }

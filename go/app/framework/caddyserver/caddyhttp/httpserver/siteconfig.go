@@ -1,7 +1,5 @@
 package httpserver
 
-
-
 // SiteConfig contains information about a site
 // (also known as a virtual host).
 type SiteConfig struct {
@@ -66,8 +64,3 @@ type SiteConfig struct {
 	// may be served by this site.
 	FallbackSite bool
 }
-
-
-
-
-

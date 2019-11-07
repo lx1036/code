@@ -26,12 +26,3 @@ func (c *ParamBuilderController) GetIntParamFromURL(param string) int64 {
 
 	return paramInt
 }
-
-
-
-
-
-
-
-
-

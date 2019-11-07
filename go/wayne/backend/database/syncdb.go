@@ -7,7 +7,7 @@ import (
 	_ "github.com/go-sql-driver/mysql" // import your used driver
 )
 
-func init()  {
+func init() {
 	err := beego.LoadAppConfig("ini", "backend/conf/app.conf")
 	if err != nil {
 		panic(err)
@@ -25,7 +25,7 @@ func main() {
 		beego.AppConfig.String("DBPasswd"),
 		beego.AppConfig.String("DBTns"),
 		beego.AppConfig.String("DBName"),
-		)
+	)
 
 	err = orm.RegisterDataBase("default", "mysql", dbUrl)
 	if err != nil {

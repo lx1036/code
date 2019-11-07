@@ -8,10 +8,10 @@ import (
 	"reflect"
 )
 
-func main()  {
+func main() {
 	route := gin.Default()
 
-	if v, ok := binding.Validator.Engine().(* validator.Validate); ok {
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterStructValidation(UserStructLevelValidation, User{})
 	}
 
@@ -21,11 +21,11 @@ func main()  {
 
 type User struct {
 	FirstName string `json:"first_name"`
-	LastName string `json:"last_name"`
-	Email string `binding:"required,email"`
+	LastName  string `json:"last_name"`
+	Email     string `binding:"required,email"`
 }
 
-func validateUser(context *gin.Context)  {
+func validateUser(context *gin.Context) {
 	var user User
 
 	if err := context.ShouldBindJSON(&user); err == nil {
@@ -34,13 +34,13 @@ func validateUser(context *gin.Context)  {
 		})
 	} else {
 		context.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
+			"error":   err.Error(),
 			"message": "User validated failed",
 		})
 	}
 }
 
-func UserStructLevelValidation(validator *validator.Validate, structLevel *validator.StructLevel)  {
+func UserStructLevelValidation(validator *validator.Validate, structLevel *validator.StructLevel) {
 	user := structLevel.CurrentStruct.Interface().(User)
 
 	if len(user.FirstName) == 0 && len(user.LastName) == 0 {

@@ -5,9 +5,10 @@ import (
 	"reflect"
 	"testing"
 )
+
 /*
 https://github.com/julienschmidt/httprouter/blob/master/router_test.go
- */
+*/
 func TestParams(test *testing.T) {
 	params := Params{
 		Param{"param1", "value1"},
@@ -27,14 +28,13 @@ func TestParams(test *testing.T) {
 }
 
 type mockResponseWriter struct {
-
 }
 
 func (mock *mockResponseWriter) Header() http.Header {
 	return http.Header{}
 }
 
-func (mock *mockResponseWriter) Write(response []byte) (int, error)  {
+func (mock *mockResponseWriter) Write(response []byte) (int, error) {
 	return len(response), nil
 }
 

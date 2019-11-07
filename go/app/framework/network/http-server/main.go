@@ -44,7 +44,7 @@ func (h httpServer) Tick() (delay time.Duration, action net.Action) {
 	panic("implement me")
 }
 
-func main()  {
+func main() {
 	var port int
 	var multicore bool
 	var aaaa bool

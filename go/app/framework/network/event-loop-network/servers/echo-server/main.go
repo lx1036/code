@@ -9,7 +9,7 @@ import (
 )
 
 // telnet localhost 5000
-func main()  {
+func main() {
 	var port int
 	var loops int
 	var udp bool
