@@ -25,5 +25,4 @@ func init() {
 	Auth
 	 */
 	beego.Include(&auth.AuthController{})
-
 }

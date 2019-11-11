@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"github.com/astaxie/beego"
 	"github.com/labstack/gommon/log"
 	"k8s-lx1036/wayne/backend/controllers/base"
@@ -29,7 +30,7 @@ type AuthController struct {
 func (auth *AuthController) URLMapping()  {
 	auth.Mapping("Login", auth.Login)
 	auth.Mapping("Logout", auth.Logout)
-	auth.Mapping("CurrentUser", auth.CurrentUser)
+	auth.Mapping("Me", auth.CurrentUser)
 }
 
 // @router /login/:type/?:name [get,post]
@@ -37,6 +38,8 @@ func (auth *AuthController) Login()  {
 	username := auth.Input().Get("username")
 	password := auth.Input().Get("password")
 	authType := auth.Ctx.Input.Param(":type")
+
+	fmt.Println(username, password)
 	//authName := auth.Ctx.Input.Param(":name")
 	//next := auth.Ctx.Input.Query("next")
 	if authType == "" || username == "admin" {
@@ -76,12 +79,15 @@ func (auth *AuthController) Login()  {
 
 // @router /logout [get]
 func (auth *AuthController) Logout()  {
+	fmt.Println("Logout")
 
+	auth.Data["json"] = base.Result{Data: "testtest"}
+	auth.ServeJSON()
 }
 
 // @router /me [get]
 func (auth *AuthController) CurrentUser()  {
-
+	fmt.Println("test")
 }
 
 func Register(name string, authenticator Authenticator)  {
