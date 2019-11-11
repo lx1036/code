@@ -11,6 +11,7 @@ var (
 
 	PermissionModel *permissionModel
 	CronjobModel    *cronjobModel
+	UserModel *userModel
 )
 
 // singleton init ormer ,only use for normal db operation

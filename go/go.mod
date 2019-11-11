@@ -17,6 +17,7 @@ require (
 	github.com/kavu/go_reuseport v1.4.0 // indirect
 	github.com/klauspost/cpuid v1.2.0
 	github.com/labstack/echo v3.3.10+incompatible
+	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
 	github.com/mholt/certmagic v0.7.3
 	github.com/olivere/elastic/v7 v7.0.9

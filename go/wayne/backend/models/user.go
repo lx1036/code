@@ -23,3 +23,27 @@ type User struct {
 
 	Namespaces []*Namespace `orm:"-" json:"namespaces,omitempty"`
 }
+
+type userModel struct{}
+
+func (model userModel) GetUserByName(name string) (user *User, err error) {
+	user = &User{
+		Id:         1,
+		Name:       name,
+		Password:   "",
+		Salt:       "",
+		Email:      "",
+		Display:    "",
+		Comment:    "",
+		Type:       0,
+		Admin:      false,
+		LastLogin:  nil,
+		LastIp:     "",
+		Deleted:    false,
+		CreateTime: nil,
+		UpdateTime: nil,
+		Namespaces: nil,
+	}
+
+	return user, nil
+}

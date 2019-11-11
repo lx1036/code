@@ -78,12 +78,12 @@ func checkDatabase() error {
 		if err != nil {
 			return err
 		}
-		for _, insertSql := range initial.InitialData {
-			_, err = orm.NewOrm().Raw(insertSql).Exec()
-			if err != nil {
-				return err
-			}
-		}
+		//for _, insertSql := range initial.InitialData {
+		//	_, err = orm.NewOrm().Raw(insertSql).Exec()
+		//	if err != nil {
+		//		return err
+		//	}
+		//}
 
 	}
 	return nil
