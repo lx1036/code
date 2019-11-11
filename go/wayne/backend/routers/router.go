@@ -4,6 +4,7 @@ import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/plugins/cors"
 	"k8s-lx1036/wayne/backend/controllers/auth"
+	"k8s-lx1036/wayne/backend/controllers/permission"
 	"path"
 )
 
@@ -19,10 +20,18 @@ func init() {
 		ExposeHeaders:    []string{"Content-Length", "Access-Control-Allow-Origin", "Access-Control-Allow-Headers", "Content-Type"},
 		AllowCredentials: true,
 	}))
-
-
 	/**
 	Auth
 	 */
 	beego.Include(&auth.AuthController{})
+
+	withApp := beego.NewNamespace("/api/v1",
+		beego.NSNamespace("/apps/:appid([0-9]+)/users",
+			beego.NSInclude(
+				&permission.AppUserController{},
+			),
+		),
+	)
+
+	beego.AddNamespace(withApp)
 }
