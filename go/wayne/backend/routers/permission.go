@@ -15,7 +15,7 @@ func init() {
 	beego.GlobalControllerRouter[AppUserController] = append(
 		beego.GlobalControllerRouter[AppUserController],
 		/**
-		localhost:8080/api/v1/apps/12/users/3
+		GET localhost:8080/api/v1/apps/12/users/3
 		 */
 		beego.ControllerComments{
 			Method: "Get",

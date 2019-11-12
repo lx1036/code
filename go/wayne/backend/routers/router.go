@@ -4,6 +4,7 @@ import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/plugins/cors"
 	"k8s-lx1036/wayne/backend/controllers/auth"
+	"k8s-lx1036/wayne/backend/controllers/deployment"
 	"k8s-lx1036/wayne/backend/controllers/permission"
 	"path"
 )
@@ -29,6 +30,12 @@ func init() {
 		beego.NSNamespace("/apps/:appid([0-9]+)/users",
 			beego.NSInclude(
 				&permission.AppUserController{},
+			),
+		),
+		
+		beego.NSNamespace("/apps/:appid([0-9]+)/deployments",
+			beego.NSInclude(
+				&deployment.DeploymentController{},
 			),
 		),
 	)
