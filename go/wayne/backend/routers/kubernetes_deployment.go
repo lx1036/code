@@ -17,5 +17,13 @@ func init() {
 			Filters: nil,
 			Params: nil,
 		},
+		beego.ControllerComments{
+			Method: "Get",
+			Router: `/:id([0-9]+)`,
+			AllowHTTPMethods: []string{"get"},
+			MethodParams: param.Make(),
+			Filters: nil,
+			Params: nil,
+		},
 	)
 }
