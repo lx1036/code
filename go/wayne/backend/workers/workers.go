@@ -1,27 +1,24 @@
 package workers
 
 import (
-    "fmt"
-    "k8s-lx1036/wayne/backend/bus"
-    "os"
-    "sync/atomic"
+	"k8s-lx1036/wayne/backend/bus"
 )
 
 type Worker interface {
-    Run() error
-    Stop() error
+	Run() error
+	Stop() error
 }
 
 type BaseMessageWorker struct {
-    Bus      *bus.Bus
-    queue    string
-    consumer string
-    stopChan chan struct{}
+	Bus      *bus.Bus
+	queue    string
+	consumer string
+	stopChan chan struct{}
 
-    MessageWorker
+	//MessageWorker
 }
 
-func NewBaseMessageWorker(b *bus.Bus, queue string) *BaseMessageWorker {
-    consumer := fmt.Sprintf("ctag-%s-%d", os.Args[0], atomic.AddUint64(&consumerSeq, 1))
-    return &BaseMessageWorker{b, queue, consumer, make(chan struct{}), nil}
-}
+//func NewBaseMessageWorker(b *bus.Bus, queue string) *BaseMessageWorker {
+//	consumer := fmt.Sprintf("ctag-%s-%d", os.Args[0], atomic.AddUint64(&consumerSeq, 1))
+//	return &BaseMessageWorker{b, queue, consumer, make(chan struct{}), nil}
+//}

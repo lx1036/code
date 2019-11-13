@@ -1,10 +1,1 @@
 package configmap
-
-
-
-
-
-
-
-
-

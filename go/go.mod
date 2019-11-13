@@ -17,8 +17,11 @@ require (
 	github.com/kavu/go_reuseport v1.4.0 // indirect
 	github.com/klauspost/cpuid v1.2.0
 	github.com/labstack/echo v3.3.10+incompatible
+	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
 	github.com/mholt/certmagic v0.7.3
+	github.com/olivere/elastic/v7 v7.0.9
+	github.com/prometheus/client_golang v0.9.3
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cast v1.3.0
@@ -27,11 +30,12 @@ require (
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271
 	github.com/stretchr/testify v1.4.0
 	github.com/tidwall/evio v1.0.2
-	github.com/ugorji/go/codec v1.1.7 // indirect
+	github.com/ugorji/go v1.1.7 // indirect
 	github.com/urfave/cli v1.22.1
 	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+	gopkg.in/sohlich/elogrus.v7 v7.0.0
 	k8s.io/api v0.0.0-20191003035645-10e821c09743
 	k8s.io/apimachinery v0.0.0-20191025225532-af6325b3a843
 	k8s.io/client-go v0.0.0-20190918160344-1fbdaa4c8d90

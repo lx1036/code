@@ -1,8 +1,6 @@
 package base
 
 import (
-	"k8s-lx1036/wayne/backend/models"
-	"net/http"
 )
 
 type APIController struct {
@@ -14,7 +12,7 @@ type APIController struct {
 
 // Abort stops controller handler and show the error data， e.g. Prepare
 func (c *APIController) AbortForbidden(msg string) {
-	c.publishRequestMessage(http.StatusForbidden, msg)
+	//c.publishRequestMessage(http.StatusForbidden, msg)
 
 	c.ResultHandlerController.AbortForbidden(msg)
 }
@@ -28,7 +26,7 @@ func (c *APIController) CheckPermission(perType string, perAction string) {
 		return
 	}
 
-	perName := models.PermissionModel.MergeName(perType, perAction)
+	//perName := models.PermissionModel.MergeName(perType, perAction)
 	if c.NamespaceId != 0 {
 
 	}

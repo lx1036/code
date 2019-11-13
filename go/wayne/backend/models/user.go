@@ -4,7 +4,6 @@ import "time"
 
 type UserType int
 
-
 type User struct {
 	Id        int64      `orm:"pk;auto" json:"id,omitempty"`
 	Name      string     `orm:"index;unique;size(200)" json:"name,omitempty"`
@@ -25,4 +24,26 @@ type User struct {
 	Namespaces []*Namespace `orm:"-" json:"namespaces,omitempty"`
 }
 
+type userModel struct{}
 
+func (model userModel) GetUserByName(name string) (user *User, err error) {
+	user = &User{
+		Id:         1,
+		Name:       name,
+		Password:   "",
+		Salt:       "",
+		Email:      "",
+		Display:    "",
+		Comment:    "",
+		Type:       0,
+		Admin:      false,
+		LastLogin:  nil,
+		LastIp:     "",
+		Deleted:    false,
+		CreateTime: nil,
+		UpdateTime: nil,
+		Namespaces: nil,
+	}
+
+	return user, nil
+}
