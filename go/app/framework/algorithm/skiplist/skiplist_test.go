@@ -1,6 +1,15 @@
 package skiplist
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+	"time"
+)
+
+func TestDate(test *testing.T) {
+	year, month, day := time.Now().Date()
+	fmt.Println(year, month, day)
+}
 
 func TestNewConcurrentSkipList(test *testing.T) {
 	type args struct {
