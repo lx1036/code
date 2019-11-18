@@ -2,7 +2,7 @@ package routers
 
 import (
 	"github.com/astaxie/beego"
-	"k8s-lx1036/app/framework/beego/controllers"
+	"k8s-lx1036/app/beego/controllers"
 )
 
 func init() {

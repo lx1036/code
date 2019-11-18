@@ -1,7 +1,7 @@
 package net
 
 import (
-	"k8s-lx1036/app/framework/network/netpoll"
+	"k8s-lx1036/app/network/netpoll"
 	"log"
 	"net"
 	"os"

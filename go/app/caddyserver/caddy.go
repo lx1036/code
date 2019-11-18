@@ -21,7 +21,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
-	"k8s-lx1036/app/framework/caddyserver/telemetry"
+	"k8s-lx1036/app/caddyserver/telemetry"
 	"log"
 	"net"
 	"os"

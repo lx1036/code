@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"k8s-lx1036/app/framework/network/net"
+	"k8s-lx1036/app/network/net"
 	"log"
 	"os"
 	"strings"

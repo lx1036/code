@@ -11,9 +11,9 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"io/ioutil"
-	"k8s-lx1036/app/framework/caddyserver"
-	"k8s-lx1036/app/framework/caddyserver/caddytls"
-	"k8s-lx1036/app/framework/caddyserver/telemetry"
+	"k8s-lx1036/app/caddyserver"
+	"k8s-lx1036/app/caddyserver/caddytls"
+	"k8s-lx1036/app/caddyserver/telemetry"
 	"log"
 	"os"
 	"path/filepath"
@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	// built-in plugins
-	_ "k8s-lx1036/app/framework/caddyserver/caddyhttp"
+	_ "k8s-lx1036/app/caddyserver/caddyhttp"
 	// add custom plugins here:
 )
 

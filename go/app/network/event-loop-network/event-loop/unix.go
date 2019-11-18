@@ -2,7 +2,7 @@ package event_loop
 
 import (
 	"github.com/libp2p/go-reuseport"
-	"k8s-lx1036/app/framework/network/event-loop-network/internal"
+	"k8s-lx1036/app/network/event-loop-network/internal"
 	"net"
 	"runtime"
 	"sync"
