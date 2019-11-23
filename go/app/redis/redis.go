@@ -1,11 +1,15 @@
 package main
 
-import "github.com/go-redis/redis/v7"
+import (
+	"fmt"
+	"github.com/go-redis/redis/v7"
+	"time"
+)
 
 func main() {
 	client := redis.NewClient(&redis.Options{
 		Network:            "tcp",
-		Addr:               "127.0.0.1:7000",
+		Addr:               "127.0.0.1:6379",
 		Dialer:             nil,
 		OnConnect:          nil,
 		Password:           "",
@@ -13,9 +17,9 @@ func main() {
 		MaxRetries:         0,
 		MinRetryBackoff:    0,
 		MaxRetryBackoff:    0,
-		DialTimeout:        5,
-		ReadTimeout:        1,
-		WriteTimeout:       0,
+		DialTimeout:        time.Millisecond * 200,
+		ReadTimeout:        time.Millisecond * 5000,
+		WriteTimeout:       time.Millisecond * 5000,
 		PoolSize:           0,
 		MinIdleConns:       0,
 		MaxConnAge:         0,
@@ -24,6 +28,10 @@ func main() {
 		IdleCheckFrequency: 0,
 		TLSConfig:          nil,
 	})
-	
-	client.Get("test").Val()
+
+	val1 := client.Incr("count_1").Val()
+	val2 := client.Incr("count_1").Val()
+	val3 := client.IncrBy("count_1", 2).Val()
+	count := client.Get("count_1").Val()
+	fmt.Println(val1, val2, val3, count)
 }
