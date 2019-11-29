@@ -7,4 +7,3 @@ type LoggedInController struct {
 
 	User *models.User
 }
-

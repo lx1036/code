@@ -9,6 +9,10 @@ import (
 	"net/http"
 )
 
+type Result struct {
+	Data interface{} `json:"data"`
+}
+
 type ResultHandlerController struct {
 	beego.Controller
 }
