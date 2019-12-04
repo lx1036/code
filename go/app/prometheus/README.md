@@ -14,3 +14,8 @@ mv prometheus /usr/local/bin/prometheus
 ```shell script
 prometheus --config.file="prometheus.yml"
 ```
+
+## Node Exporter
+```shell script
+wget https://github.com/prometheus/node_exporter/releases/download/v0.18.1/node_exporter-0.18.1.darwin-amd64.tar.gz
+```
