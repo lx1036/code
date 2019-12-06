@@ -37,26 +37,25 @@ type ExporterOptions struct {
 // Exporter implements the prometheus.Exporter interface, and exports Redis metrics.
 /**
 @see
- */
+*/
 type Exporter struct {
 	sync.Mutex
 	redisAddr string
 	namespace string
-	
+
 	totalScrapes              prometheus.Counter
 	scrapeDuration            prometheus.Summary
 	targetScrapeRequestErrors prometheus.Counter
-	
+
 	metricDescriptions map[string]*prometheus.Desc
-	
+
 	options ExporterOptions
-	
+
 	metricMapCounters map[string]string
 	metricMapGauges   map[string]string
-	
+
 	mux *http.ServeMux
 }
-
 
 var (
 	// BuildVersion, BuildDate, BuildCommitSha are filled in by the build script
@@ -89,14 +88,14 @@ func main() {
 		skipTLSVerification = flag.Bool("skip-tls-verification", getEnvBool("REDIS_EXPORTER_SKIP_TLS_VERIFICATION"), "Whether to to skip TLS verification")
 	)
 	flag.Parse()
-	
+
 	switch *logFormat {
 	case "json":
 		log.SetFormatter(&log.JSONFormatter{})
 	default:
 		log.SetFormatter(&log.TextFormatter{})
 	}
-	
+
 	log.Printf("Redis Metrics Exporter %s    build date: %s    sha1: %s    Go: %s    GOOS: %s    GOARCH: %s",
 		BuildVersion,
 		BuildDate,
@@ -162,7 +161,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	log.Infof("Providing metrics at %s%s", *listenAddress, *metricPath)
 	log.Debugf("Configured redis addr: %#v", *redisAddr)
 	log.Fatal(http.ListenAndServe(*listenAddress, exporter))
@@ -182,17 +181,16 @@ func getEnvBool(key string) (res bool) {
 	return res
 }
 
-
 func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error) {
 	exporter := &Exporter{
-		redisAddr:                 redisAddr,
-		namespace:                 opts.Namespace,
-		totalScrapes:              prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace:opts.Namespace,
-			Name:"exporter_scrapes_total",
-			Help:"Current total redis scrapes.",
+		redisAddr: redisAddr,
+		namespace: opts.Namespace,
+		totalScrapes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: opts.Namespace,
+			Name:      "exporter_scrapes_total",
+			Help:      "Current total redis scrapes.",
 		}),
-		scrapeDuration:            prometheus.NewSummary(prometheus.SummaryOpts{
+		scrapeDuration: prometheus.NewSummary(prometheus.SummaryOpts{
 			Namespace:   opts.Namespace,
 			Subsystem:   "",
 			Name:        "exporter_scrape_duration_seconds",
@@ -204,25 +202,25 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 			BufCap:      0,
 		}),
 		targetScrapeRequestErrors: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace:opts.Namespace,
-			Name:"target_scrape_request_errors_total",
-			Help:"Errors in requests to the exporter",
+			Namespace: opts.Namespace,
+			Name:      "target_scrape_request_errors_total",
+			Help:      "Errors in requests to the exporter",
 		}),
-		metricDescriptions:        nil,
-		options:                   ExporterOptions{},
+		metricDescriptions: nil,
+		options:            ExporterOptions{},
 		metricMapCounters: map[string]string{
 			"total_connections_received": "connections_received_total",
 			"total_commands_processed":   "commands_processed_total",
-			
+
 			"rejected_connections":   "rejected_connections_total",
 			"total_net_input_bytes":  "net_input_bytes_total",
 			"total_net_output_bytes": "net_output_bytes_total",
-			
+
 			"expired_keys":    "expired_keys_total",
 			"evicted_keys":    "evicted_keys_total",
 			"keyspace_hits":   "keyspace_hits_total",
 			"keyspace_misses": "keyspace_misses_total",
-			
+
 			"used_cpu_sys":           "cpu_sys_seconds_total",
 			"used_cpu_user":          "cpu_user_seconds_total",
 			"used_cpu_sys_children":  "cpu_sys_children_seconds_total",
@@ -232,14 +230,14 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 			// # Server
 			"uptime_in_seconds": "uptime_in_seconds",
 			"process_id":        "process_id",
-			
+
 			// # Clients
 			"connected_clients": "connected_clients",
 			"blocked_clients":   "blocked_clients",
-			
+
 			"client_recent_max_output_buffer": "client_recent_max_output_buffer_bytes",
 			"client_recent_max_input_buffer":  "client_recent_max_input_buffer_bytes",
-			
+
 			// # Memory
 			"allocator_active":    "allocator_active_bytes",
 			"allocator_allocated": "allocator_allocated_bytes",
@@ -249,7 +247,7 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 			"used_memory_peak":    "memory_used_peak_bytes",
 			"used_memory_lua":     "memory_used_lua_bytes",
 			"maxmemory":           "memory_max_bytes",
-			
+
 			// # Persistence
 			"rdb_changes_since_last_save":  "rdb_changes_since_last_save",
 			"rdb_bgsave_in_progress":       "rdb_bgsave_in_progress",
@@ -273,23 +271,23 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 			"aof_delayed_fsync":            "aof_delayed_fsync",
 			"aof_last_bgrewrite_status":    "aof_last_bgrewrite_status",
 			"aof_last_write_status":        "aof_last_write_status",
-			
+
 			// # Stats
 			"pubsub_channels":  "pubsub_channels",
 			"pubsub_patterns":  "pubsub_patterns",
 			"latest_fork_usec": "latest_fork_usec",
-			
+
 			// # Replication
 			"loading":                    "loading_dump_file",
 			"connected_slaves":           "connected_slaves",
 			"repl_backlog_size":          "replication_backlog_bytes",
 			"master_last_io_seconds_ago": "master_last_io_seconds",
 			"master_repl_offset":         "master_repl_offset",
-			
+
 			// # Cluster
 			"cluster_stats_messages_sent":     "cluster_messages_sent_total",
 			"cluster_stats_messages_received": "cluster_messages_received_total",
-			
+
 			// # Tile38
 			// based on https://tile38.com/commands/server/
 			"tile38_aof_size":        "tile38_aof_size_bytes",
@@ -309,9 +307,9 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 			"tile38_read_only":       "tile38_read_only",
 			"tile38_threads":         "tile38_threads_total",
 		},
-		mux:                       nil,
+		mux: nil,
 	}
-	
+
 	if exporter.options.ConfigCommandName == "" {
 		exporter.options.ConfigCommandName = "CONFIG"
 	}
@@ -325,11 +323,11 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 	} else {
 		log.Debugf("singleKeys: %#v", singleKeys)
 	}
-	
+
 	if opts.InclSystemMetrics {
 		exporter.metricMapGauges["total_system_memory"] = "total_system_memory_bytes"
 	}
-	
+
 	for key, desc := range map[string]struct {
 		txt  string
 		lbls []string
@@ -359,18 +357,18 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 	} {
 		exporter.metricDescriptions[key] = newMetricDescr(opts.Namespace, key, desc.txt, desc.lbls)
 	}
-	
+
 	if exporter.options.MetricsPath == "" {
 		exporter.options.MetricsPath = "/metrics"
 	}
-	
+
 	exporter.mux = http.NewServeMux()
 	if exporter.options.Registry != nil {
 		exporter.options.Registry.MustRegister(exporter)
 		exporter.mux.Handle(exporter.options.MetricsPath, promhttp.HandlerFor(
 			exporter.options.Registry, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError},
 		))
-		
+
 		if !exporter.options.RedisMetricsOnly {
 			buildInfo := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 				Namespace: opts.Namespace,
@@ -381,7 +379,7 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 			exporter.options.Registry.MustRegister(buildInfo)
 		}
 	}
-	
+
 	exporter.mux.HandleFunc("/scrape", exporter.ScrapeHandler)
 	exporter.mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`ok`))
@@ -396,13 +394,14 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 </html>
 `))
 	})
-	
+
 	return exporter, nil
 }
 
-func (exporter *Exporter)ScrapeHandler(w http.ResponseWriter, r *http.Request)  {
+func (exporter *Exporter) ScrapeHandler(w http.ResponseWriter, r *http.Request) {
 
 }
+
 // Describe outputs Redis metric descriptions.
 func (exporter *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
@@ -413,10 +412,9 @@ func (exporter *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 }
 
-func (exporter *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request)  {
+func (exporter *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	exporter.mux.ServeHTTP(w, r)
 }
-
 
 func newMetricDescr(namespace string, metricName string, docString string, labels []string) *prometheus.Desc {
 	return prometheus.NewDesc(prometheus.BuildFQName(namespace, "", metricName), docString, labels, nil)

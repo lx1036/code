@@ -11,5 +11,5 @@ const (
 )
 
 func main() {
-	fmt.Println(debugLevel, infoLevel,time.Now().Unix())
+	fmt.Println(debugLevel, infoLevel, time.Now().Unix())
 }

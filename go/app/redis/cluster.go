@@ -16,7 +16,7 @@ func main() {
 	fmt.Println(rdb.Ping().Val())
 }
 
-func manualSetup()  {
+func manualSetup() {
 	// clusterSlots returns cluster slots information.
 	// It can use service like ZooKeeper to maintain configuration information
 	// and Cluster.ReloadState to manually trigger state reloading.
