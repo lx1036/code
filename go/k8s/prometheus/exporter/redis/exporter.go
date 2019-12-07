@@ -430,7 +430,7 @@ func (exporter *Exporter) registerConstMetricGauge(ch chan<- prometheus.Metric, 
 func (exporter *Exporter) registerConstMetric(ch chan<- prometheus.Metric, metric string, val float64, valType prometheus.ValueType, labelValues ...string) {
 	descr := exporter.metricDescriptions[metric]
 	if descr == nil {
-		descr = newMetricDescr(exporter.options.Namespace, metric, metric + " metric", nil)
+		descr = newMetricDescr(exporter.options.Namespace, metric, metric+" metric", nil)
 	}
 	if m, err := prometheus.NewConstMetric(descr, valType, val, labelValues...); err == nil {
 		ch <- m

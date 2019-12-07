@@ -200,7 +200,7 @@ func TestHTTPScrapeMetricsEndpoints(test *testing.T) {
 		{pwd: "", target: os.Getenv("TEST_REDIS_URI"), ck: csk},
 		{pwd: "", target: os.Getenv("TEST_REDIS_URI"), csk: csk},
 		{pwd: "redis-password", target: os.Getenv("TEST_PWD_REDIS_URI"), csk: csk},
-	}{
+	} {
 		name := fmt.Sprintf("addr:[%s]___target:[%s]___pwd:[%s]", tst.addr, tst.target, tst.pwd)
 		test.Run(name, func(test *testing.T) {
 			options := ExporterOptions{
