@@ -3,7 +3,7 @@
 ```shell script
 brew install openresty
 ln -s /usr/local/Cellar/openresty/1.15.8.2/nginx/sbin/nginx /usr/local/bin/nginx
-nginx -c /Users/liuxiang/Code/lx1036/code/go/app/prometheus/lua/nginx.conf
+nginx -p "$(pwd)" -c nginx.conf
 ```
 
 # Docs

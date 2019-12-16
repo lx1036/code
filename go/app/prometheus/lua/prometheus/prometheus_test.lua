@@ -1,6 +1,6 @@
 
-luaunit = require("luaunit")
-prometheus = require("prometheus")
+local luaunit = require("luaunit")
+local prometheus = require("prometheus")
 
 
 local SimpleDict = {}
@@ -44,22 +44,20 @@ TestPrometheus = {}
 function TestPrometheus:setUp()
     self.dict = setmetatable({}, SimpleDict)
     ngx = setmetatable({shared={metrics=self.dict}}, Nginx)
-    self.p = prometheus.init("metrics")
---    self.counter1 = self.p:counter("metric1", "Metric 1")
---    self.counter2 = self.p:counter("metric2", "Metric 2", {"f1", "f2"})
---    self.gauge1 = self.p:gauge("gauge1", "Gauge 1")
---    self.gauge2 = self.p:gauge("gauge2", "Gauge 2", {"f1", "f2"})
---    self.histogram1 = self.p:histogram("l1", "Histogram 1")
---    self.histogram2 = self.p:histogram("l2", "Histogram 2", {"var", "site"})
+    self.prometheus = prometheus.init("metrics")
+    self.counter1 = self.prometheus:counter("metric1", "Metric 1")
+    self.counter2 = self.prometheus:counter("metric2", "Metric 2", {"f1", "f2"})
+    self.gauge1 = self.prometheus:gauge("gauge1", "Gauge 1")
+    self.gauge2 = self.prometheus:gauge("gauge2", "Gauge 2", {"f1", "f2"})
+    self.histogram1 = self.prometheus:histogram("l1", "Histogram 1")
+    self.histogram2 = self.prometheus:histogram("l2", "Histogram 2", {"var", "site"})
 end
 
 function TestPrometheus:testInit()
-    luaunit:assertEquals(self.dict:get("nginx_metric_errors_total"), 0)
-    luaunit:assertEquals(ngx.logs, nil)
+    print(luaunit.prettystr(ngx), luaunit.prettystr(self.dict), luaunit.prettystr(self.dict:get("nginx_metric_errors_total")))
+    luaunit.assertEquals(self.dict:get("nginx_metric_errors_total"), 0)
+    luaunit.assertEquals(ngx.logs, nil)
 end
-
-
-
 
 
 
