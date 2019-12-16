@@ -1,18 +1,2 @@
-
-# C
-
-
-# Dart
-
-
-# Go
-
-
-# Lua
-
-
-# PHP
-
-
-# TypeScript/JavaScript
-
+# 目标
+让我早点发财吧！！！我的简历 **[lx1036](https://lx1036.github.io/)**
