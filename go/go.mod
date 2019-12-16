@@ -12,6 +12,7 @@ require (
 	github.com/gin-gonic/gin v1.4.0
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.4.1
+	github.com/golang/protobuf v1.3.2
 	github.com/google/uuid v1.1.1
 	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/jinzhu/gorm v1.9.11
@@ -34,6 +35,7 @@ require (
 	github.com/tidwall/evio v1.0.2
 	github.com/ugorji/go v1.1.7 // indirect
 	github.com/urfave/cli v1.22.1
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0

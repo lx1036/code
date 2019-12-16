@@ -36,7 +36,7 @@ func checkDatabase() error {
 	needInit := false
 	dbName := beego.AppConfig.String("DBName")
 	dbURL := fmt.Sprintf("%s:%s@%s/", beego.AppConfig.String("DBUser"),
-		beego.AppConfig.String("DBPasswd"), beego.AppConfig.String("DBTns"))
+		beego.AppConfig.String("DBPassword"), beego.AppConfig.String("DBTns"))
 	db, err := sql.Open(DbDriverName, fmt.Sprintf("%s%s", dbURL, dbName))
 	if err != nil {
 		return err

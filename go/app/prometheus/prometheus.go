@@ -33,9 +33,9 @@ func init() {
 
 func main() {
 	cpuTemp.Set(65.3)
-	
+
 	go func() {
-		for  {
+		for {
 			hdFailures.With(prometheus.Labels{"device": "/dev/sda"}).Inc()
 			time.Sleep(time.Second * 3)
 		}

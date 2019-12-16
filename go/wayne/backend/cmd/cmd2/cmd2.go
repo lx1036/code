@@ -7,6 +7,9 @@ import (
 )
 
 func Run()  {
+	initial.InitDb()
+
+
 	if beego.BConfig.RunMode == "dev" {
 
 	}

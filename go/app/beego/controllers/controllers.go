@@ -14,7 +14,6 @@ type MainController struct {
 //	this.Ctx.WriteString("hello world")
 //}
 
-
 // @router /block [post]
 func (ma *MainController) DealConsumeRecord() {
 	ma.Ctx.WriteString("please")
