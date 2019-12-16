@@ -40,7 +40,17 @@ function Metric:new(config)
 end
 
 function Metric:check_label_values(label_values)
-
+    if label_values == nil and self.label_names == nil then
+        return
+    elseif label_values == nil and self.label_names ~= nil then
+        return "Expected " .. #self.label_names .. "labels for " .. self.name .. ", get none"
+    else
+        for k, v in ipairs(self.label_names) do
+            if label_values[k] == nil then
+                return ""
+            end
+        end
+    end
 end
 
 local Gauge = Metric:new()
@@ -51,8 +61,16 @@ end
 
 local Counter = Metric:new()
 
+-- Args: {value: 1, label_values: {value1, value2}}
 function Counter:inc(value, label_values)
     local err = self:check_label_values(label_values)
+    if err ~= nil then
+        self.prometheus:log_error(err)
+    end
+
+    if value ~= nil and value < 0 then
+        self.prometheus:log_error_kv(self.name, value, "value can't be negative")
+    end
 
     self.prometheus:inc(self.name, self.label_names, label_values, value or 1)
 end
@@ -72,6 +90,11 @@ function Prometheus.init(dict_name, prefix)
     local self = setmetatable({}, Prometheus)
     -- https://github.com/openresty/lua-nginx-module#ngxshareddict
     self.dict = ngx.shared[dict_name or "prometheus_metrics"]
+    if self.dict == nil then
+        ngx.log(ngx.ERR, "Dictionary ", dict_name, "does not exist, define it using `lua_shared_dict` directive.")
+        return self
+    end
+
     if prefix then
         self.prefix = prefix
     else
@@ -84,6 +107,7 @@ function Prometheus.init(dict_name, prefix)
 
     self.buckets = {}
     self.bucket_format = {}
+    self.initialized = true
 
     self:counter("nginx_metric_errors_total", "Number of nginx-lua-prometheus errors")
     -- https://github.com/openresty/lua-nginx-module#ngxshareddictset
@@ -106,6 +130,8 @@ function Prometheus:gauge(name, description, label_names)
 end
 
 -- Register a Counter object
+-- Args:
+-- {name: "name1", label_names: {"label1", "label2"}, description: "description1"}
 -- Return: Counter
 function Prometheus:counter(name, description, label_names)
     if self.registered[name] then
@@ -136,6 +162,18 @@ function Prometheus:histogram(name, description, label_names, buckets)
     self.buckets[name] = buckets or DEFAULT_BUCKETS
 
     return Histogram:new{name=name, label_names=label_names, prometheus=self}
+end
+
+function Prometheus:metric_data()
+    if not self.initialized then
+        ngx.log(ngx.ERR, "Prometheus module has not been initialized")
+    end
+
+    print(self.dict)
+    local keys = self.dict:get_keys(0)
+    table.sort(keys)
+
+    print(keys)
 end
 
 function Prometheus.log_error(...)

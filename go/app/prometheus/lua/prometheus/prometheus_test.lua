@@ -1,6 +1,6 @@
 
-local luaunit = require("luaunit")
-local prometheus = require("prometheus")
+luaunit = require("luaunit")
+prometheus = require("prometheus")
 
 
 local SimpleDict = {}
@@ -19,6 +19,15 @@ function SimpleDict:get(k)
         return nil, 0
     end
     return self.dict[k], 0 -- value, flags
+end
+
+function SimpleDict:get_keys(k)
+    local keys = {}
+    for key, _ in pairs(self.dict) do
+        table.insert(keys, key)
+    end
+
+    return keys[k]
 end
 
 local Nginx = {}
@@ -59,6 +68,33 @@ function TestPrometheus:testInit()
     luaunit.assertEquals(ngx.logs, nil)
 end
 
+function TestPrometheus:testErrorInitialized()
+--    local p = prometheus
+--    p:counter("metric1")
+--    p:histogram("metric2")
+--    p:gauge("metric3")
+--    p:metric_data()
+--    luaunit.assertEquals(#ngx.logs, 4)
+end
+
+function TestPrometheus:testErrorUnknownDict()
+    local p = prometheus.init("nonexist-dict")
+    luaunit.assertEquals(p.initialized, false)
+    luaunit.assertEquals(#ngx.logs, 1)
+    print(luaunit.prettystr(ngx.logs))
+    luaunit.assertStrContains(ngx.logs[1], "does not exist")
+end
+
+function TestPrometheus:testErrorNoMemory()
+    local counter = self.prometheus:counter("notfit")
+    self.counter1.inc(5)
+    counter:inc(1)
+
+    luaunit.assertEquals(self.dict:get("metric1"), 5)
+    luaunit.assertEquals(self.dict:get("nginx_metric_errors_total"), 1)
+    luaunit.assertEquals(self.dict:get("willnotfit"), nil)
+    luaunit.assertEquals(#ngx.logs, 1)
+end
 
 
 os.exit(luaunit.LuaUnit.run())
