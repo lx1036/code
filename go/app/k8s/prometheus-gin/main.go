@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
-	"k8s-lx1036/app/gin/prometheus"
+	"k8s-lx1036/app/k8s/prometheus-gin/prometheus"
 	"net/http"
 	"net/url"
 	"sort"
