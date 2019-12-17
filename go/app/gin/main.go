@@ -4,13 +4,26 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
+	"k8s-lx1036/app/gin/prometheus"
 	"net/http"
 	"net/url"
 	"sort"
+	"time"
 )
 
 func ginDemo() {
 	app := gin.Default()
+
+	prometheus.Init(prometheus.Options{
+		AppName: "Prometheus-Gin",
+		Idc:     "beijing",
+		WatchPath: map[string]struct{}{
+			"/hello": {},
+		},
+		HistogramBuckets: []float64{0.001, 0.05, 0.1, 1},
+	})
+	prometheus.MetricsServerStart("/metrics", 18081)
+	app.Use(prometheus.MiddlewarePrometheusAccessLogger())
 
 	app.POST("/person", func(context *gin.Context) {
 		id := context.PostForm("id")
@@ -27,6 +40,7 @@ func ginDemo() {
 	})
 
 	iRoutes.GET("/hello", func(context *gin.Context) {
+		time.Sleep(time.Millisecond)
 		context.JSON(http.StatusOK, gin.H{
 			"data": "world",
 		})
