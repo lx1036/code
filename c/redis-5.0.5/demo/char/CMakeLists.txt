@@ -1,5 +1,0 @@
-cmake_minimum_required(VERSION 2.6)
-project (Char)
-add_executable(Char echo.c)
-add_executable(Pointer pointer.c)
-add_executable(SizeOf sizeof.c)
