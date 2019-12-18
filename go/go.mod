@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/astaxie/beego v1.12.0
+	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
 	github.com/coreos/etcd v3.3.17+incompatible
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -12,7 +13,6 @@ require (
 	github.com/gin-gonic/gin v1.4.0
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.4.1
-	github.com/golang/protobuf v1.3.2
 	github.com/google/uuid v1.1.1
 	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/jinzhu/gorm v1.9.11
@@ -22,9 +22,10 @@ require (
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
-	github.com/mholt/certmagic v0.7.3
+	github.com/mholt/certmagic v0.8.3
+	github.com/miekg/dns v1.1.15
 	github.com/olivere/elastic/v7 v7.0.9
-	github.com/prometheus/client_golang v0.9.3
+	github.com/prometheus/client_golang v1.1.0
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cast v1.3.0
@@ -35,8 +36,7 @@ require (
 	github.com/tidwall/evio v1.0.2
 	github.com/ugorji/go v1.1.7 // indirect
 	github.com/urfave/cli v1.22.1
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58
-	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
+	golang.org/x/sys v0.0.0-20190904154756-749cb33beabd
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/sohlich/elogrus.v7 v7.0.0
