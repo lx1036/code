@@ -1,2 +1,0 @@
-
-double mysqrt(double x);
