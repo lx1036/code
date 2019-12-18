@@ -2,7 +2,7 @@ package caddy
 
 import (
 	"github.com/mholt/certmagic"
-	"k8s-lx1036/app/caddyserver/telemetry"
+	"k8s-lx1036/app/k8s/dns/caddyserver/telemetry"
 	"log"
 	"os"
 	"os/signal"

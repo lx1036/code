@@ -3,9 +3,8 @@ package httpserver
 import (
 	"fmt"
 	"github.com/mholt/certmagic"
-	caddy "k8s-lx1036/app/caddyserver"
-	"k8s-lx1036/app/caddyserver/caddyfile"
-	"k8s-lx1036/app/caddyserver/caddytls"
+	caddy "k8s-lx1036/app/k8s/dns/caddyserver"
+	"k8s-lx1036/app/k8s/dns/caddyserver/caddyfile"
 	"time"
 )
 

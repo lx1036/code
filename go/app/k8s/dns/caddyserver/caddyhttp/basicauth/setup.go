@@ -1,8 +1,8 @@
 package basicauth
 
 import (
-	caddy "k8s-lx1036/app/caddyserver"
-	"k8s-lx1036/app/caddyserver/caddyhttp/httpserver"
+	caddy "k8s-lx1036/app/k8s/dns/caddyserver"
+	"k8s-lx1036/app/k8s/dns/caddyserver/caddyhttp/httpserver"
 )
 
 func init() {
