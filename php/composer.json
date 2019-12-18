@@ -6,17 +6,15 @@
         "php": "^7.3",
         "psr/simple-cache": "^1.0",
         "google/cloud-translate": "^1.4",
-        "ext-rdkafka": "*"
+        "ext-rdkafka": "*",
+      "ext-apcu": "*",
+      "ext-json": "*"
     },
     "license": "MIT",
     "authors": [
         {
             "name": "Xiang Liu",
             "email": "lx1036@126.com"
-        },
-        {
-            "name": "Xiang Liu",
-            "email": "xiang.liu@rightcapital.com"
         }
     ],
     "autoload": {
@@ -42,6 +40,10 @@
         "league/event": "^2.2",
         "sentry/sentry-laravel": "1.0.2",
         "phpseclib/phpseclib": "^2.0",
-        "illuminate/http": "^5.7"
+        "illuminate/http": "^5.7",
+        "friendsofphp/php-cs-fixer": "^2.16"
+    },
+    "scripts": {
+        "phpcs": "vendor/bin/php-cs-fixer fix"
     }
 }

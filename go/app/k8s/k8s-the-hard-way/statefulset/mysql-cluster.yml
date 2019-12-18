@@ -1,0 +1,196 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+data:
+  #log-bin 使用二进制日志文件进行主从复制
+  master.cnf: |
+    [mysqld]
+    log-bin
+  #super-read-only 只读，除非来自主节点的写操作
+  slave.cnf: |
+    [mysqld]
+    super-read-only
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  labels:
+    app: mysql #匹配label为app=mysql的pod
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+      name: mysql
+  clusterIP: None #headless service,通过为pod分配dns来固定拓扑结构
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-read
+  labels:
+    app: mysql
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+      name: mysql
+
+---
+apiVersion: apps/v1
+kind: StatefulSet #https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#statefulset-v1-apps
+metadata:
+  name: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  serviceName: mysql #使用名为mysql的headless service
+  replicas: 3 # 一主两副本
+  template: #pod资源定义
+    metadata:
+      labels:
+        app: mysql #必须是app=mysql
+    spec:
+      initContainers:
+        - name: init-mysql
+          image: mysql:5.7
+          command:
+            - bash
+            - "-c"
+            - |
+              set -ex
+              [[ `hostname` =~ -([0-9]+)$ ]] || exit 1
+              ordinal=${BASH_REMATCH[1]}
+              echo [mysqld] > /mnt/conf.d/server-id.cnf
+              echo server-id=$((100 + $ordinal)) >> /mnt/conf.d/server-id.cnf
+              if [[ $ordinal -eq 0 ]];
+                then cp /mnt/config-map/master.cnf /mnt/conf.d/
+              else
+                cp /mnt/config-map/slave.cnf /mnt/conf.d/
+              fi
+          volumeMounts:
+            - mountPath: /mnt/conf.d
+              name: conf
+            - mountPath: /mnt/config-map
+              name: config-map #名为config-map的volume挂载在/mnt/config-map,由于来源于ConfigMap资源，所以/mnt/config-map目录下有两个文件master.cnf/slave.cnf
+        # 在 Slave Pod 启动前，从 Master 或者其他 Slave Pod 里拷贝数据库数据到自己的目录下
+        - name: clone-mysql
+          image: gcr.io/google-samples/xtrabackup:1.0
+          command:
+            - bash
+            - "-c"
+            - |
+              set -ex
+              [[ -d /var/lib/mysql/mysql ]] && exit 0
+              [[ `hostname` =~ -([0-9]+)$ ]] || exit 1
+              ordinal=${BASH_REMATCH[1]}
+              [[ $ordinal -eq 0 ]] && exit 0
+              # Clone data from previous peer.
+              ncat --recv-only mysql-$(($ordinal-1)).mysql 3307 | xbstream -x -C /var/lib/mysql
+              # Prepare the backup.
+              xtrabackup --prepare --target-dir=/var/lib/mysql
+          volumeMounts:
+            - mountPath: /var/lib/mysql
+              name: data #volumeClaimTemplates里申明的数据盘，映射到当前容器的/var/lib/mysql
+              subPath: mysql
+            - name: conf
+              mountPath: /etc/mysql/conf.d
+      containers:
+        - name: xtrabackup #定义一个sidecar容器，来给slave节点首次启动初始化sql数据
+          image: gcr.io/google-samples/xtrabackup:1.0
+          ports:
+            - containerPort: 3307
+              name: xtrabackup
+          command:
+            - bash
+            - "-c"
+            - |
+              set -ex
+              cd /var/lib/mysql
+              # 如果xtrabackup_slave_info文件存在，说明这个备份数据来自于另一个Slave节点。这种情况下，XtraBackup工具在备份的时候，就已经在这个文件里自动生成了"CHANGE MASTER TO" SQL语句。所以，我们只需要把这个文件重命名为change_master_to.sql.in，后面直接使用即可
+              if [[ -f xtrabackup_slave_info ]]; then
+                mv xtrabackup_slave_info change_master_to.sql.in # 所以，也就用不着xtrabackup_binlog_info了
+                rm -f xtrabackup_binlog_info
+              elif [[ -f xtrabackup_binlog_info ]]; then
+                [[ `cat xtrabackup_binlog_info` =~ ^(.*?)[[:space:]]+(.*?)$ ]] || exit 1
+                rm xtrabackup_binlog_info
+                echo "CHANGE MASTER TO MASTER_LOG_FILE='${BASH_REMATCH[1]}',\ MASTER_LOG_POS=${BASH_REMATCH[2]}" > change_master_to.sql.in
+              fi
+              # 如果change_master_to.sql.in，就意味着需要做集群初始化工作
+              if [[ -f change_master_to.sql.in ]]; then
+                echo "Waiting for mysqld to be ready (accepting connections)"
+                until mysql -h 127.0.0.1 -e "SELECT 1"; do sleep 1; done
+                echo "Initializing replication from clone position"
+                mv change_master_to.sql.in change_master_to.sql.orig
+                mysql -h 127.0.0.1 <<EOF
+                $(<change_master_to.sql.orig),
+                  MASTER_HOST='mysql-0.mysql',
+                  MASTER_USER='root',
+                  MASTER_PASSWORD='',
+                  MASTER_CONNECT_RETRY=10;
+                START SLAVE;
+                EOF
+              fi
+
+              exec ncat --listen --keep-open --send-only --max-conns=1 3307 -c \
+                "xtrabackup --backup --slave-info --stream=xbstream --host=127.0.0.1 --user=root"
+          volumeMounts:
+            - mountPath: /var/lib/mysql
+              name: data # volumeClaimTemplates 里申明的数据盘
+              subPath: mysql
+            - name: conf
+              mountPath: /etc/mysql/conf.d
+        - name: mysql
+          image: mysql:5.7
+          env:
+            - name: MYSQL_ALLOW_EMPTY_PASSWORD
+              value: "1"
+          ports:
+            - containerPort: 3306
+              name: mysql
+          volumeMounts:
+            - mountPath: /var/lib/mysql
+              name: data # volumeClaimTemplates 里申明的数据盘
+              subPath: mysql
+            - name: conf
+              mountPath: /etc/mysql/conf.d
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command: ["mysql", "-h", "127.0.0.1", "-e", "SELECT 1"]
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            timeoutSeconds: 1
+      volumes:
+        - name: conf
+          emptyDir: {}
+        - name: config-map
+          configMap:
+            name: mysql
+  volumeClaimTemplates: #pvc接口定义
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"] #可读写
+        resources:
+          requests:
+            storage: 10Gi #大小10G
+---
+# PV
