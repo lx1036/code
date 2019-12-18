@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: k8s-simple-ingress-controller
+  labels:
+    app: k8s-simple-ingress-controller
+spec:
+  selector:
+    matchLabels:
+      app: k8s-simple-ingress-controller
+  template:
+    metadata:
+      labels:
+        app: k8s-simple-ingress-controller
+    spec:
+      serviceAccountName: k8s-simple-ingress-controller
+      containers:
+        - name: k8s-simple-ingress-controller
+          image: lx1036/k8s-simple-ingress-controller
+          ports:
+            - containerPort: 80
+              protocol: TCP
+              name: http
+            - containerPort: 443
+              protocol: TCP
+              name: https
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k8s-simple-ingress-controller
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8s-simple-ingress-controller
+rules:
+  - verbs: ["get", "list", "watch"]
+    apiGroups: ["extensions"]
+    resources: ["ingresses"]
+  - verbs: ["get", "list", "watch"]
+    apiGroups: [""]
+    resources: ["services", "endpoints", "secrets"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8s-simple-ingress-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k8s-simple-ingress-controller
+subjects:
+  - kind: ServiceAccount
+    name:  k8s-simple-ingress-controller
+    namespace: default
+---

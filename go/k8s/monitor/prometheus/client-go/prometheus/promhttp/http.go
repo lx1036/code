@@ -1,7 +1,6 @@
 package promhttp
 
 import (
-	"k8s-lx1036/app/prometheus/client-go/prometheus"
 	"net/http"
 	"time"
 )

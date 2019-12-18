@@ -1,8 +1,6 @@
 package promhttp
 
 import (
-	"k8s-lx1036/app/prometheus/client-go/prometheus"
-	"k8s-lx1036/app/prometheus/client-go/prometheus/metrics"
 	"net/http"
 )
 

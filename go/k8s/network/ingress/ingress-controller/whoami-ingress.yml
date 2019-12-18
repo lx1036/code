@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami
+  labels:
+    app: whoami
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: whoami
+      labels:
+        app: whoami
+    spec:
+      containers:
+        - name: whoami
+          image: cnych/whoami
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app: whoami
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami
+spec:
+  selector:
+    app: whoami
+  ports:
+    - port: 8080
+      protocol: TCP
+      targetPort: 80
+  type: NodePort
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: whoami
+spec:
+  tls:
+    - hosts:
+        - "*.whoami.com"
+      secretName: whoami-tls
+  rules:
+    - host: www.whoami.com
+      http:
+        paths:
+          - backend:
+              serviceName: whoami
+              servicePort: 8080

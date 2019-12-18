@@ -1,6 +1,6 @@
 package prometheus
 
-import "k8s-lx1036/app/prometheus/client-go/prometheus/metrics"
+import "k8s-lx1036/k8s/monitor/prometheus/client-go/prometheus/metrics"
 
 type Gauge interface {
 	Metric

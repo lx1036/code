@@ -1,7 +1,5 @@
 package prometheus
 
-import "k8s-lx1036/app/prometheus/client-go/prometheus/metrics"
-
 type Metric interface {
 	Desc() *Desc
 	Write(pair *metrics.Metric) error

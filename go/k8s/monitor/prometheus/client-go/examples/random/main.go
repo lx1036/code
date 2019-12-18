@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"k8s-lx1036/app/prometheus/client-go/prometheus"
 	"time"
 )
 

@@ -7,6 +7,7 @@ require (
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/Shopify/sarama v1.19.0
 	github.com/astaxie/beego v1.12.1
+	github.com/bep/debounce v1.2.0
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
 	github.com/containerd/containerd v1.3.2

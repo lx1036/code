@@ -1,6 +1,6 @@
 package prometheus
 
-import "k8s-lx1036/app/k8s/prometheus/client-go/prometheus/metrics"
+import "k8s-lx1036/k8s/monitor/prometheus/client-go/prometheus/metrics"
 
 type Desc struct {
 	// fqName has been built from Namespace, Subsystem, and Name.
