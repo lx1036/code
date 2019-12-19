@@ -18,7 +18,7 @@ func (deployment *DeploymentController) Prepare() {
 // @Param name query string false "name filter"
 // @router / [get]
 func (deployment *DeploymentController) List() {
-	params = deployment.BuildQueryParams()
+	//params = deployment.BuildQueryParams()
 	deployment.Input().Get("name")
 }
 

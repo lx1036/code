@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/astaxie/beego"
 	"k8s-lx1036/wayne/backend/initial"
+	_ "k8s-lx1036/wayne/backend/routers"
 )
 
 func Run()  {
@@ -15,7 +16,7 @@ func Run()  {
 	}
 
 	// 初始化 rsa key
-	initial.InitRsaKey()
+	//initial.InitRsaKey()
 
 
 	fmt.Println(beego.BConfig.RunMode)
