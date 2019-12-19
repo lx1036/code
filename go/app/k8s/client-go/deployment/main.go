@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"k8s-lx1036/app/dockerfile/k8s/client-go/util"
+	"k8s-lx1036/app/k8s/client-go/util"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
