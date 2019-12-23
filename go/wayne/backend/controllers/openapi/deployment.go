@@ -57,32 +57,32 @@ type UpgradeDeploymentParam struct {
 //       401: responseState
 //       500: responseState
 // @router /upgrade_deployment [get]
-func (c *OpenAPIController)UpgradeDeployment()  {
+func (controller *OpenAPIController)UpgradeDeployment()  {
 	param := UpgradeDeploymentParam{
-		Deployment:   c.GetString("deployment"),
-		Namespace:    c.GetString("namespace"),
-		Cluster:      c.GetString("cluster"),
+		Deployment:   controller.GetString("deployment"),
+		Namespace:    controller.GetString("namespace"),
+		Cluster:      controller.GetString("cluster"),
 		clusters:     nil,
 		TemplateId:   0,
 		Publish:      false,
-		Description:  c.GetString("description"),
-		Images:       c.GetString("images"),
+		Description:  controller.GetString("description"),
+		Images:       controller.GetString("images"),
 		imageMap:     nil,
-		Environments: c.GetString("environments"),
+		Environments: controller.GetString("environments"),
 		envMap:       nil,
 	}
 	
-	if !c.CheckoutRoutePermission(UpgradeDeploymentAction) || !c.CheckDeploymentPermission(param.Deployment) || !c.CheckNamespacePermission(param.Namespace) {
+	if !controller.CheckoutRoutePermission(UpgradeDeploymentAction) || !controller.CheckDeploymentPermission(param.Deployment) || !controller.CheckNamespacePermission(param.Namespace) {
 		return
 	}
 	
 	param.clusters = strings.Split(param.Cluster, ",")
 	var err error
-	param.Publish, err = c.GetBool("publish", true)
+	param.Publish, err = controller.GetBool("publish", true)
 	if err != nil {
 	
 	}
-	param.TemplateId, err = c.GetInt("template_id", 0)
+	param.TemplateId, err = controller.GetInt("template_id", 0)
 	if err != nil {
 	
 	}
@@ -130,14 +130,14 @@ func (c *OpenAPIController)UpgradeDeployment()  {
 	
 	for _, deployInfos := range deployInfoMap {
 		for _, deployInfo := range deployInfos {
-			err := publishDeployment(deployInfo, c.APIKey.String())
+			err := publishDeployment(deployInfo, controller.APIKey.String())
 			if err != nil {
 			
 			}
 		}
 	}
 	
-	c.HandleResponse(nil)
+	controller.HandleResponse(nil)
 }
 
 type DeploymentInfo struct {
