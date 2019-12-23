@@ -11,19 +11,19 @@ type OpenAPIController struct {
 	base.APIKeyController
 }
 
-func (c *OpenAPIController) Prepare() {
-	c.APIKeyController.Prepare()
+func (controller *OpenAPIController) Prepare() {
+	controller.APIKeyController.Prepare()
 }
 
-func (c *OpenAPIController) CheckoutRoutePermission(action string) bool  {
+func (controller *OpenAPIController) CheckoutRoutePermission(action string) bool  {
 	return true
 }
 
 
-func (c *OpenAPIController) CheckDeploymentPermission(deployment string) bool  {
+func (controller *OpenAPIController) CheckDeploymentPermission(deployment string) bool  {
 	return true
 }
 
-func (c *OpenAPIController) CheckNamespacePermission(namespace string) bool  {
+func (controller *OpenAPIController) CheckNamespacePermission(namespace string) bool  {
 	return true
 }

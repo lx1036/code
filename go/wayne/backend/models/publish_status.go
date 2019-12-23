@@ -1,5 +1,8 @@
 package models
 
+const (
+	PublishTypeDeployment PublishType = iota
+)
 
 type PublishType int32
 
@@ -13,6 +16,15 @@ type PublishStatus struct {
 }
 
 
+type publishStatusModel struct{}
 
-
+func (*publishStatusModel) GetByCluster(publishType PublishType, resourceId int64, cluster string) (publishStatus PublishStatus, err error) {
+	err = Ormer().
+		QueryTable(new(PublishStatus)).
+		Filter("ResourceId", resourceId).
+		Filter("Type", publishType).
+		Filter("Cluster", cluster).
+		One(&publishStatus)
+	return
+}
 

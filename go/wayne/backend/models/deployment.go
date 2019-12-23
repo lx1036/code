@@ -30,3 +30,28 @@ type Deployment struct {
 	
 	AppId int64 `orm:"-" json:"appId,omitempty"`
 }
+
+type deploymentModel struct{}
+
+func (*deploymentModel) GetByName(name string) (deployment *Deployment, err error)  {
+	deployment = &Deployment{
+		Id:          0,
+		Name:        name,
+		MetaData:    "",
+		MetaDataObj: DeploymentMetaData{},
+		App:         nil,
+		Description: "",
+		OrderId:     0,
+		CreateTime:  nil,
+		UpdateTime:  nil,
+		User:        "",
+		Deleted:     false,
+		AppId:       0,
+	}
+	if err := Ormer().Read(deployment, "name"); err == nil {
+		deployment.Id = deployment.App.Id
+		return deployment, nil
+	}
+
+	return nil, err
+}

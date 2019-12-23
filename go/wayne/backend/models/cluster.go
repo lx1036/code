@@ -1,6 +1,8 @@
 package models
 
 import (
+	"encoding/json"
+	"k8s-lx1036/wayne/backend/util/hack"
 	v1 "k8s.io/api/core/v1"
 	"time"
 )
@@ -50,4 +52,22 @@ type ClusterRobinMetaData struct {
 	Url            string `json:"url"`
 	SftpPort       int    `json:"sftpPort"`
 	PasswordDesKey string `json:"passwordDesKey"`
+}
+
+type clusterModel struct{}
+
+func (model *clusterModel) GetParsedMetaDataByName(name string) (v *Cluster, err error) {
+	v = &Cluster{Name: name}
+	if err = Ormer().Read(v, "Name"); err == nil {
+		if v.MetaData != "" {
+			err := json.Unmarshal(hack.Slice(v.MetaData), &v.MetaDataObj)
+			if err != nil {
+
+			}
+		}
+
+		return v, nil
+	}
+
+	return nil, err
 }

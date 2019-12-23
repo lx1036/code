@@ -26,3 +26,18 @@ type App struct {
 	// 关注的关联查询
 	AppStars []*AppStarred `orm:"reverse(many)" json:"-"`
 }
+
+type appModel struct{}
+
+func (model *appModel) GetById(id int64) (v *App, err error) {
+	v = &App{Id: id}
+
+	if err = Ormer().Read(v); err != nil {
+		return nil, err
+	}
+	_, err = Ormer().LoadRelated(v, "namespace")
+	if err == nil {
+		return v, nil
+	}
+	return nil, err
+}

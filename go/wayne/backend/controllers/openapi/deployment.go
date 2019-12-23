@@ -6,6 +6,7 @@ import (
 	"k8s-lx1036/wayne/backend/client"
 	"k8s-lx1036/wayne/backend/models"
 	resdeployment "k8s-lx1036/wayne/backend/resources/deployment"
+	"k8s-lx1036/wayne/backend/util/hack"
 	"k8s.io/api/apps/v1beta1"
 	"strings"
 	"time"
@@ -86,6 +87,7 @@ func (controller *OpenAPIController)UpgradeDeployment()  {
 	if err != nil {
 	
 	}
+	// publish 表示立即发布 deployment 模板
 	if param.TemplateId != 0 && param.Publish {
 	
 	}
@@ -149,11 +151,57 @@ type DeploymentInfo struct {
 }
 
 // 主要用于从数据库中查找、拼凑出用于更新的模板资源，资源主要用于 k8s 数据更新和 数据库存储更新记录等
-func getOnlineDeploymenetInfo(deployment, namespace, cluster string, templateId int64) (deployInfo *DeploymentInfo, err error) {
-	deployInfo = new(DeploymentInfo)
-	
+func getOnlineDeploymenetInfo(name, namespace, cluster string, templateId int64) (deployInfo *DeploymentInfo, err error) {
+	deployment, err := models.DeploymentModel.GetByName(name)
+	if err != nil {
+
+	}
+
+	deployInfo = &DeploymentInfo{}
+
+	if templateId != 0 {
+
+	} else {
+		status, err := models.PublishStatusModel.GetByCluster(models.PublishTypeDeployment, deployment.Id, cluster)
+		if err != nil {
+
+		}
+		deployInfo.DeploymentTemplete, err = models.DeploymentTplModel.GetById(status.TemplateId)
+		if err != nil {
+
+		}
+	}
+
+	deployObj := v1beta1.Deployment{}
+	err = json.Unmarshal(hack.Slice(deployInfo.DeploymentTemplete.Template), &deployObj)
+	if err != nil {
+
+	}
+
+	app, _ := models.AppModel.GetById(deployment.AppId)
+	err = json.Unmarshal([]byte(app.Namespace.MetaData), &app.Namespace.MetaDataObj)
+	if err != nil {
+
+	}
+
+	deployObj.Namespace = app.Namespace.KubeNamespace
+	err = json.Unmarshal([]byte(deployment.MetaData), &deployment.MetaDataObj)
+	if err != nil {
+
+	}
+
+	rp := deployment.MetaDataObj.Replicas[cluster]
+	deployObj.Spec.Replicas = &rp
+	deployInfo.DeploymentObject = &deployObj
+	deployInfo.Deployment = deployment
+	deployInfo.Namespace = app.Namespace
+
+	deployInfo.Cluster, err = models.ClusterModel.GetParsedMetaDataByName(cluster)
+	if err != nil {
+
+	}
+
 	return deployInfo, nil
-	
 }
 
 // 通过给定模板资源把业务发布到k8s集群中，并在数据库中更新发布记录

@@ -20,3 +20,18 @@ type DeploymentTemplate struct {
 	DeploymentId int64            `orm:"-" json:"deploymentId,omitempty"`
 	Status       []*PublishStatus `orm:"-" json:"status,omitempty"`
 }
+
+type deploymentTplModel struct{}
+
+func (*deploymentTplModel) GetById(id int64) (deploymentTpl *DeploymentTemplate, err error) {
+	deploymentTpl = &DeploymentTemplate{Id: id}
+	if err = Ormer().Read(deploymentTpl); err == nil {
+		_, err = Ormer().LoadRelated(deploymentTpl, "Deployment")
+		if err == nil {
+			deploymentTpl.DeploymentId = deploymentTpl.Deployment.Id
+			return deploymentTpl, nil
+		}
+	}
+
+	return nil, err
+}
