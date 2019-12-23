@@ -17,6 +17,7 @@ var (
 	DeploymentTplModel            *deploymentTplModel
 	AppModel                      *appModel
 	ClusterModel                  *clusterModel
+	NamespaceModel                *namespaceModel
 )
 
 // singleton init ormer ,only use for normal db operation

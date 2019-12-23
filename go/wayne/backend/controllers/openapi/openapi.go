@@ -5,6 +5,8 @@ import "k8s-lx1036/wayne/backend/controllers/base"
 
 const (
 	UpgradeDeploymentAction      = "UPGRADE_DEPLOYMENT"
+	GetPodListAction             = "GET_POD_LIST"
+
 )
 
 type OpenAPIController struct {

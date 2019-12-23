@@ -17,5 +17,13 @@ func init() {
 			Filters: nil,
 			Params: nil,
 		},
+		beego.ControllerComments{
+			Method: "GetPodList",
+			Router: `/get_pod_list`,
+			AllowHTTPMethods: []string{"get"},
+			MethodParams: param.Make(),
+			Filters: nil,
+			Params: nil,
+		},
 	)
 }

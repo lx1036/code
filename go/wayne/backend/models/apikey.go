@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+const (
+	GlobalAPIKey      APIKeyType = 0
+)
+
 type APIKeyType int32
 
 type APIKey struct {

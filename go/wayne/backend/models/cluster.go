@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+const (
+	ClusterStatusNormal      ClusterStatus = 0
+)
+
 type ClusterStatus int32
 
 
@@ -71,3 +75,19 @@ func (model *clusterModel) GetParsedMetaDataByName(name string) (v *Cluster, err
 
 	return nil, err
 }
+
+func (model *clusterModel) GetAllNormal() ([]Cluster, error) {
+	clusters := []Cluster{}
+	_, err := Ormer().
+		QueryTable(new(Cluster)).
+		Filter("Status", ClusterStatusNormal).
+		Filter("Deleted", false).
+		All(&clusters)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return clusters, nil
+}
+
