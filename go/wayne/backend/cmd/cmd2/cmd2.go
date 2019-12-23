@@ -15,6 +15,9 @@ func Run()  {
 
 	}
 
+	// K8S Client
+	initial.InitClient()
+
 	// 初始化 rsa key
 	//initial.InitRsaKey()
 
