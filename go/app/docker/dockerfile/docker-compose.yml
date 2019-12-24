@@ -17,7 +17,7 @@ services:
 ### Gitlab ################################################
   gitlab:
     build:
-      context: ./gitlab
+      context: gitlab
     container_name: gitlab-lx1036
     environment:
       GITLAB_OMNIBUS_CONFIG: | # https://gitlab.com/gitlab-org/omnibus-gitlab/blob/master/files/gitlab-config-template/gitlab.rb.template
@@ -63,7 +63,7 @@ services:
 
 ### Redis ################################################
   redis:
-    build: ./redis
+    build: redis
     volumes:
     - ${DATA_PATH_HOST}/redis:/data
     ports:
@@ -73,7 +73,7 @@ services:
 
 ### PostgreSQL ###########################################
   postgres:
-    build: ./postgres
+    build: postgres
     volumes:
     - ${DATA_PATH_HOST}/postgres:/var/lib/postgresql/data
     - ${POSTGRES_ENTRYPOINT_INITDB}:/docker-entrypoint-initdb.d
@@ -89,7 +89,7 @@ services:
 ### Portainer ################################################
   portainer:
     build:
-      context: ./portainer
+      context: portainer
     volumes:
       - ${DATA_PATH_HOST}/portainer_data:/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -103,7 +103,7 @@ services:
 ### Traefic ################################################
   traefic:
     build:
-      context: ./traefic
+      context: traefic
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:

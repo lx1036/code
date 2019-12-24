@@ -7,7 +7,7 @@ networks:
 services:
   portainer:
     build:
-      context: .
+      context: ""
     volumes:
       - ${DATA_PATH_HOST}/portainer_data:/data
       - /var/run/docker.sock:/var/run/docker.sock

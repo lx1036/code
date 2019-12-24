@@ -6,7 +6,7 @@ https://github.com/xianlubird/mydocker/blob/master/main.go
 import (
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"k8s-lx1036/app/write-my-docker/container"
+	container2 "k8s-lx1036/app/docker/write-my-docker/container"
 	"os"
 )
 
@@ -44,7 +44,7 @@ var initCommand = cli.Command{
 	Usage: "Init container process run user's process in container. Do not call it outside",
 	Action: func(context *cli.Context) error {
 		log.Infof("init come on")
-		err := container.RunContainerInitProcess()
+		err := container2.RunContainerInitProcess()
 		return err
 	},
 }

@@ -144,7 +144,7 @@ data "aws_ami" "ec2-ami" {
 }
 
 module "securityGroupModule" {
-  source = "./terraform/securityGroup"
+  source = "terraform\/securityGroup"
   access_key = "${var.AccessKeyID_lx20081036}"
   secret_key = "${var.AccessKeySecret_lx20081036}"
   region = "${var.region}"
@@ -153,7 +153,7 @@ module "securityGroupModule" {
 }
 
 module "instanceModule" {
-  source = "./terraform/instance"
+  source = "terraform\/instance"
   access_key = "${var.AccessKeyID_lx20081036}"
   secret_key = "${var.AccessKeySecret_lx20081036}"
   region = "${var.region}"

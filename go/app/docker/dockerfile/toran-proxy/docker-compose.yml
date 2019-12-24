@@ -8,7 +8,7 @@ networks:
 services:
   toran-proxy:
     build:
-      context: .
+      context: ""
     ports:
       - "8080:80"
     networks:
