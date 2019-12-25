@@ -21,14 +21,29 @@ type resourceHandler struct {
 	cacheFactory *CacheFactory
 }
 
+func (handler *resourceHandler) Create(kind string, namespace string, object *runtime.Unknown) (*runtime.Unknown, error) {
+	panic("implement me")
+}
 
-func (h *resourceHandler) Get(kind string, namespace string, name string) (runtime.Object, error) {
+func (handler *resourceHandler) Update(kind string, namespace string, name string, object *runtime.Unknown) (*runtime.Unknown, error) {
+	panic("implement me")
+}
+
+func (handler *resourceHandler) List(kind string, namespace string, labelSelector string) ([]runtime.Object, error) {
+	panic("implement me")
+}
+
+func (handler *resourceHandler) Delete(kind string, namespace string, name string, options *meta_v1.DeleteOptions) error {
+	panic("implement me")
+}
+
+func (handler *resourceHandler) Get(kind string, namespace string, name string) (runtime.Object, error) {
 	resource, ok := api.KindToResourceMap[kind]
 	if !ok {
 
 	}
 
-	genericInformer, err := h.cacheFactory.sharedInformerFactory.ForResource(resource.GroupVersionResourceKind.GroupVersionResource)
+	genericInformer, err := handler.cacheFactory.sharedInformerFactory.ForResource(resource.GroupVersionResourceKind.GroupVersionResource)
 	if err != nil {
 		return nil, err
 	}
@@ -54,4 +69,11 @@ func (h *resourceHandler) Get(kind string, namespace string, name string) (runti
 	})
 
 	return result, nil
+}
+
+func NewResourceHandler(kubeClient *kubernetes.Clientset, cacheFactory *CacheFactory) ResourceHandler {
+	return &resourceHandler{
+		client:       kubeClient,
+		cacheFactory: cacheFactory,
+	}
 }

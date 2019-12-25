@@ -58,7 +58,7 @@ type UpgradeDeploymentParam struct {
 //       401: responseState
 //       500: responseState
 // @router /upgrade_deployment [get]
-func (controller *OpenAPIController)UpgradeDeployment()  {
+func (controller *OpenAPIController)UpgradeDeployment() {
 	param := UpgradeDeploymentParam{
 		Deployment:   controller.GetString("deployment"),
 		Namespace:    controller.GetString("namespace"),

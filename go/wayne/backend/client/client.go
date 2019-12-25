@@ -1,10 +1,15 @@
 package client
 
 import (
+	"encoding/json"
 	"github.com/astaxie/beego/logs"
 	"k8s-lx1036/wayne/backend/models"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
+	clientcmdapiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sync"
 )
 
@@ -39,6 +44,7 @@ func BuildApiServerClient() {
 
 			}
 
+			cacheFactory, err := buildCacheController(clientSet)
 
 			clusterManager := &ClusterManager{
 				Client:       clientSet,
@@ -91,7 +97,40 @@ func clusterChanged(clusters []models.Cluster) bool {
 }
 
 func buildClient(master string, kubeconfig string) (*kubernetes.Clientset, *rest.Config, error) {
+	configV1 := clientcmdapiv1.Config{
+		Kind:           "",
+		APIVersion:     "",
+		Preferences:    clientcmdapiv1.Preferences{},
+		Clusters:       nil,
+		AuthInfos:      nil,
+		Contexts:       nil,
+		CurrentContext: "",
+		Extensions:     nil,
+	}
+	err := json.Unmarshal([]byte(kubeconfig), configV1)
+	if err != nil {
 
+	}
+	configObject, err := clientcmdlatest.Scheme.ConvertToVersion(&configV1, clientcmdapiv1.SchemeGroupVersion)
+	configInternal := configObject.(*clientcmdapi.Config)
+	clientConfig, err := clientcmd.NewDefaultClientConfig(*configInternal, &clientcmd.ConfigOverrides{
+		AuthInfo:        clientcmdapi.AuthInfo{},
+		ClusterDefaults: clientcmdapi.Cluster{Server:master},
+		ClusterInfo:     clientcmdapi.Cluster{},
+		Context:         clientcmdapi.Context{},
+		CurrentContext:  "",
+		Timeout:         "",
+	}).ClientConfig()
+	if err != nil {
+
+	}
+
+	clientSet, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+
+	}
+
+	return clientSet, clientConfig, nil
 }
 
 
