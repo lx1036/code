@@ -63,10 +63,10 @@ var runCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
-		
+
 		cmd := context.Args().Get(0)
 		tty := context.Bool("ti")
-		
+
 		Run(tty, cmd)
 		return nil
 	},
@@ -85,12 +85,11 @@ func ListContainers() {
 
 }
 
-
 var logCommand = cli.Command{
 	Name:  "logs",
 	Usage: "print logs of a container",
 	Action: func(context *cli.Context) error {
-		
+
 		return nil
 	},
 }
@@ -111,7 +110,6 @@ var stopCommand = cli.Command{
 	},
 }
 
-
 var removeCommand = cli.Command{
 	Name:  "rm",
 	Usage: "remove unused containers",
@@ -119,7 +117,6 @@ var removeCommand = cli.Command{
 		return nil
 	},
 }
-
 
 var commitCommand = cli.Command{
 	Name:  "commit",
@@ -132,7 +129,7 @@ var commitCommand = cli.Command{
 var networkCommand = cli.Command{
 	Name:  "network",
 	Usage: "container network commands",
-	Subcommands: []cli.Command {
+	Subcommands: []cli.Command{
 		{
 			Name:  "create",
 			Usage: "create a container network",

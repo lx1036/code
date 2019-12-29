@@ -12,13 +12,14 @@ import (
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/client-go/util/retry"
 	"path/filepath"
+	"strconv"
 )
 
 func main() {
-	crudDeployment()
+	deployment()
 }
 
-func crudDeployment() {
+func deployment() {
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "absolute path to kubeconfig file")
@@ -39,8 +40,9 @@ func crudDeployment() {
 		panic(err)
 	}
 
-	const deploymentName = "2019-10-26-deployment"
 	deploymentsClient := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault)
+
+	const deploymentName = "deployment-123"
 
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{},
@@ -50,12 +52,12 @@ func crudDeployment() {
 		Spec: appsv1.DeploymentSpec{
 			Replicas: int32Ptr(2),
 			Selector: &metav1.LabelSelector{
-				MatchLabels:      map[string]string{"app": "2019-10-26-deployment"},
+				MatchLabels:      map[string]string{"app": "deployment-abc"},
 				MatchExpressions: nil,
 			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:                       "",
+					Name:                       "pod-123",
 					GenerateName:               "",
 					Namespace:                  "",
 					SelfLink:                   "",
@@ -65,7 +67,7 @@ func crudDeployment() {
 					CreationTimestamp:          metav1.Time{},
 					DeletionTimestamp:          nil,
 					DeletionGracePeriodSeconds: nil,
-					Labels:                     map[string]string{"app": "2019-10-26-deployment"},
+					Labels:                     map[string]string{"app": "deployment-abc"},
 					Annotations:                nil,
 					OwnerReferences:            nil,
 					Finalizers:                 nil,
@@ -143,6 +145,28 @@ func crudDeployment() {
 		}
 		fmt.Println("Created deployment: " + deployment.Name + " ...")
 	}
+
+	util.Prompt()
+
+	pods, err := clientSet.CoreV1().Pods(apiv1.NamespaceDefault).List(metav1.ListOptions{
+		//LabelSelector: "deployment-abc",
+	})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Println("numbers of pods: " + strconv.Itoa(len(pods.Items)))
+
+	mapPodContainer := map[string][]string{}
+	for _, pod := range pods.Items {
+		podName := pod.Name
+		containers := pod.Spec.Containers
+		for _, container := range containers {
+			mapPodContainer[podName] = append(mapPodContainer[podName], container.Name)
+		}
+	}
+
+	fmt.Println(fmt.Sprintf("%#v", mapPodContainer))
 
 	util.Prompt()
 

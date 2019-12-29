@@ -7,34 +7,34 @@ import (
 	"testing"
 )
 
-func mockConfig(transport string, handler plugin.Handler) *Config  {
+func mockConfig(transport string, handler plugin.Handler) *Config {
 	config := &Config{
 		Plugin:      nil,
 		ListenHosts: []string{"127.0.0.1"},
 		Port:        "53",
 		Transport:   "",
-		registry: map[string]plugin.Handler{},
+		registry:    map[string]plugin.Handler{},
 	}
 	config.AddPlugin(func(next plugin.Handler) plugin.Handler {
 		return handler
 	})
-	
+
 	return config
 }
 
-type MockPlugin struct {}
+type MockPlugin struct{}
 
 func (plugin MockPlugin) Name() string {
 	return "mockPlugin"
 }
-func (plugin MockPlugin) ServeDNS(ctx context.Context, writer dns.ResponseWriter, msg *dns.Msg) (int, error)  {
+func (plugin MockPlugin) ServeDNS(ctx context.Context, writer dns.ResponseWriter, msg *dns.Msg) (int, error) {
 	return 0, nil
 }
 
 func TestHandler(test *testing.T) {
 	mockPlugin := MockPlugin{}
 	config := mockConfig("dns", mockPlugin)
-	if _, err := NewServer("127.0.0.1:53", []*Config{config}); err!=nil {
+	if _, err := NewServer("127.0.0.1:53", []*Config{config}); err != nil {
 		test.Errorf("Expected no error, got %s", err.Error())
 	}
 	if handler := config.Handler("mockPlugin"); handler != mockPlugin {
@@ -48,7 +48,7 @@ func TestHandler(test *testing.T) {
 func TestHandlers(test *testing.T) {
 	mockPlugin := MockPlugin{}
 	config := mockConfig("dns", mockPlugin)
-	if _, err := NewServer("127.0.0.1:53", []*Config{config}); err!=nil {
+	if _, err := NewServer("127.0.0.1:53", []*Config{config}); err != nil {
 		test.Errorf("Expected no error, got %s", err.Error())
 	}
 	handlers := config.Handlers()

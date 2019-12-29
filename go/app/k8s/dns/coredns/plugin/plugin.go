@@ -12,9 +12,7 @@ type Handler interface {
 	Name() string
 }
 
-
-
-func Register(name string, action caddy.SetupFunc)  {
+func Register(name string, action caddy.SetupFunc) {
 	caddy.RegisterPlugin(name, caddy.Plugin{
 		ServerType: "dns",
 		Action:     action,
