@@ -166,7 +166,7 @@ func deployment() {
 		}
 	}
 
-	fmt.Println(fmt.Sprintf("%#v", mapPodContainer))
+	fmt.Printf("%#v\n", mapPodContainer)
 
 	util.Prompt()
 
