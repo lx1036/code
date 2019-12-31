@@ -12,7 +12,7 @@ import (
 
 func InitClient() {
 	// 定期更新client
-	go wait.Forever(client.BuildApiserverClient, 5*time.Second)
+	go wait.Forever(client.BuildApiServerClient, 5*time.Second)
 }
 
 // bus
