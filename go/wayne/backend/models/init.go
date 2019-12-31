@@ -12,6 +12,12 @@ var (
 	PermissionModel *permissionModel
 	CronjobModel    *cronjobModel
 	UserModel *userModel
+	DeploymentModel *deploymentModel
+	PublishStatusModel            *publishStatusModel
+	DeploymentTplModel            *deploymentTplModel
+	AppModel                      *appModel
+	ClusterModel                  *clusterModel
+	NamespaceModel                *namespaceModel
 )
 
 // singleton init ormer ,only use for normal db operation

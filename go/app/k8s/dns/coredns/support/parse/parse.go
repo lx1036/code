@@ -1,5 +1,5 @@
 package parse
 
-func Transport(s string) (trans string, addr string)  {
+func Transport(s string) (trans string, addr string) {
 
 }

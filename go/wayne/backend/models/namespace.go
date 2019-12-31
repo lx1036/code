@@ -44,3 +44,16 @@ type ResourcesLimit struct {
 	// unit G
 	Memory int64 `json:"memory,omitempty"`
 }
+
+
+type namespaceModel struct{}
+
+func (model *namespaceModel) GetByName(name string) (namespace *Namespace, err error) {
+	namespace = &Namespace{Name: name}
+	if err = Ormer().Read(namespace, "name"); err == nil {
+		return namespace, nil
+	}
+
+	return nil, err
+}
+
