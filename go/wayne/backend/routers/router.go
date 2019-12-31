@@ -5,6 +5,7 @@ import (
 	"github.com/astaxie/beego/plugins/cors"
 	"k8s-lx1036/wayne/backend/controllers/auth"
 	"k8s-lx1036/wayne/backend/controllers/deployment"
+	"k8s-lx1036/wayne/backend/controllers/openapi"
 	"k8s-lx1036/wayne/backend/controllers/permission"
 	"path"
 )
@@ -39,6 +40,14 @@ func init() {
 			),
 		),
 	)
+	
+	nsWithOpenAPI := beego.NewNamespace("/openapi/v1",
+		beego.NSNamespace("/gateway/action",
+			beego.NSInclude(
+				&openapi.OpenAPIController{}),
+		),
+	)
 
 	beego.AddNamespace(withApp)
+	beego.AddNamespace(nsWithOpenAPI)
 }

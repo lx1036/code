@@ -3,13 +3,11 @@ package coremain
 import (
 	"flag"
 	"fmt"
+	"github.com/caddyserver/caddy"
 	"io/ioutil"
-	caddy "k8s-lx1036/app/caddyserver"
-	"k8s-lx1036/app/coredns/core/dnsserver"
+	"k8s-lx1036/app/k8s/dns/coredns/core/dnsserver"
 	"log"
 	"os"
-	"runtime"
-	"strings"
 )
 
 // Various CoreDNS constants.
@@ -54,23 +52,9 @@ var flagsBlacklist = map[string]struct{}{
 
 var flagsToKeep []*flag.Flag
 
-// This is CoreDNS' ascii LOGO, nothing fancy. It's generated with:
-// figlet -f slant CoreDNS
-// We're printing the logo line by line, hence splitting it up.
-var logo = []string{
-	`   ______                ____  _   _______`,
-	`  / ____/___  ________  / __ \/ | / / ___/`,
-	` / /   / __ \/ ___/ _ \/ / / /  |/ /\__ \ `,
-	`/ /___/ /_/ / /  /  __/ /_/ / /|  /___/ / `,
-	`\____/\____/_/   \___/_____/_/ |_//____/  `,
-}
-
-const marker = "~ "
-
 func init() {
 	caddy.DefaultConfigFile = "Corefile"
 	caddy.Quiet = true // don't show init stuff from caddy
-	setVersion()
 
 	flag.StringVar(&conf, "conf", "", "Corefile to load (default \""+caddy.DefaultConfigFile+"\")")
 	flag.BoolVar(&plugins, "plugins", false, "List installed plugins")
@@ -109,10 +93,6 @@ func Run() {
 	log.SetOutput(os.Stdout)
 	log.SetFlags(0) // Set to 0 because we're doing our own time, with timezone
 
-	if version {
-		showVersion()
-		os.Exit(0)
-	}
 	if plugins {
 		fmt.Println(caddy.DescribePlugins())
 		os.Exit(0)
@@ -126,9 +106,6 @@ func Run() {
 	instance, err := caddy.Start(corefile)
 	if err != nil {
 		mustLogFatal(err)
-	}
-	if !dnsserver.Quiet {
-		showVersion()
 	}
 
 	instance.Wait()
@@ -172,53 +149,6 @@ func defaultLoader(serverType string) (caddy.Input, error) {
 	}, nil
 }
 
-// setVersion figures out the version information
-// based on variables set by -ldflags.
-func setVersion() {
-	// A development build is one that's not at a tag or has uncommitted changes
-	devBuild = gitTag == "" || gitShortStat != ""
-
-	// Only set the appVersion if -ldflags was used
-	if gitNearestTag != "" || gitTag != "" {
-		if devBuild && gitNearestTag != "" {
-			appVersion = fmt.Sprintf("%s (+%s %s)", strings.TrimPrefix(gitNearestTag, "v"), GitCommit, buildDate)
-		} else if gitTag != "" {
-			appVersion = strings.TrimPrefix(gitTag, "v")
-		}
-	}
-}
-
-// showVersion prints the version that is starting. We print our logo on the left.
-func showVersion() {
-	fmt.Println(logo[0])
-	fmt.Print(versionString())
-	fmt.Print(releaseString())
-	if devBuild && gitShortStat != "" {
-		fmt.Printf("%s\n%s\n", gitShortStat, gitFilesModified)
-	}
-	fmt.Println(logo[3])
-	fmt.Println(logo[4])
-}
-
-// versionString returns the CoreDNS version as a string.
-func versionString() string {
-	return fmt.Sprintf("%s\t%s%s-%s\n", logo[1], marker, caddy.AppName, caddy.AppVersion)
-}
-
-// releaseString returns the release information related to CoreDNS version:
-// <OS>/<ARCH>, <go version>, <commit>
-// e.g.,
-// linux/amd64, go1.8.3, a6d2d7b5
-func releaseString() string {
-	return fmt.Sprintf("%s\t%s%s/%s, %s, %s\n", logo[2], marker, runtime.GOOS, runtime.GOARCH, runtime.Version(), GitCommit)
-}
-
-// mustLogFatal wraps log.Fatal() in a way that ensures the
-// output is always printed to stderr so the user can see it
-// if the user is still there, even if the process log was not
-// enabled. If this process is an upgrade, however, and the user
-// might not be there anymore, this just logs to the process
-// log and exits.
 func mustLogFatal(args ...interface{}) {
 	if !caddy.IsUpgrade() {
 		log.SetOutput(os.Stderr)

@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	err := beego.LoadAppConfig("ini", "backend/conf/app.conf")
+	err := beego.LoadAppConfig("ini", "conf/app.conf")
 	if err != nil {
 		panic(err)
 	}
@@ -34,6 +34,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	
+	orm.RegisterModel()
 
 	orm.RunCommand()
 }
