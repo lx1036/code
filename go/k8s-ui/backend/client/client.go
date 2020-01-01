@@ -7,9 +7,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	clientcmdapiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sync"
 )
 
@@ -23,7 +23,6 @@ type ClusterManager struct {
 	KubeClient   ResourceHandler
 }
 
-
 func BuildApiServerClient() {
 	newClusters, err := models.ClusterModel.GetAllNormal()
 	if err != nil {
@@ -33,7 +32,6 @@ func BuildApiServerClient() {
 	changed := clusterChanged(newClusters)
 	if changed {
 		logs.Info("cluster changed, so resync info...")
-
 
 		// build new clientManager
 		for i := 0; i < len(newClusters); i++ {
@@ -115,7 +113,7 @@ func buildClient(master string, kubeconfig string) (*kubernetes.Clientset, *rest
 	configInternal := configObject.(*clientcmdapi.Config)
 	clientConfig, err := clientcmd.NewDefaultClientConfig(*configInternal, &clientcmd.ConfigOverrides{
 		AuthInfo:        clientcmdapi.AuthInfo{},
-		ClusterDefaults: clientcmdapi.Cluster{Server:master},
+		ClusterDefaults: clientcmdapi.Cluster{Server: master},
 		ClusterInfo:     clientcmdapi.Cluster{},
 		Context:         clientcmdapi.Context{},
 		CurrentContext:  "",
@@ -133,7 +131,6 @@ func buildClient(master string, kubeconfig string) (*kubernetes.Clientset, *rest
 	return clientSet, clientConfig, nil
 }
 
-
 func Client(cluster string) (*kubernetes.Clientset, error) {
 	manager, err := Manager(cluster)
 	if err != nil {
@@ -145,19 +142,18 @@ func Client(cluster string) (*kubernetes.Clientset, error) {
 var (
 	clusterManagerSets = &sync.Map{}
 )
+
 func Manager(cluster string) (*ClusterManager, error) {
 	managerInterface, exist := clusterManagerSets.Load(cluster)
 	if !exist {
-	
+
 	}
-	
+
 	manager := managerInterface.(*ClusterManager)
-	
+
 	return manager, nil
 }
 
 func Managers() *sync.Map {
 	return clusterManagerSets
 }
-
-

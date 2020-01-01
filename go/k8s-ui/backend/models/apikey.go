@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	GlobalAPIKey      APIKeyType = 0
+	GlobalAPIKey APIKeyType = 0
 )
 
 type APIKeyType int32

@@ -22,17 +22,17 @@ var InitialData = []string{
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('55', 'DEPLOYMENT_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('56', 'DEPLOYMENT_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('57', 'DEPLOYMENT_DELETE', '', now(), now());`,
-	
+
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('59', 'SERVICE_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('60', 'SERVICE_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('61', 'SERVICE_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('62', 'SERVICE_DELETE', '', now(), now());`,
-	
+
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('64', 'CONFIGMAP_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('65', 'CONFIGMAP_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('66', 'CONFIGMAP_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('67', 'CONFIGMAP_DELETE', '', now(), now());`,
-	
+
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('69', 'PVC_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('70', 'PVC_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('71', 'PVC_READ', '', now(), now());`,
@@ -45,22 +45,22 @@ var InitialData = []string{
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('80', 'SECRET_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('81', 'SECRET_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('82', 'SECRET_DELETE', '', now(), now());`,
-	
+
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('84', 'NAMESPACE_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('85', 'NAMESPACE_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('86', 'NAMESPACE_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('87', 'NAMESPACE_DELETE', '', now(), now());`,
-	
+
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('90', 'CRONJOB_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('91', 'CRONJOB_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('92', 'CRONJOB_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('93', 'CRONJOB_DELETE', '', now(), now());`,
-	
+
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('95', 'WEBHOOK_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('96', 'WEBHOOK_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('97', 'WEBHOOK_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('98', 'WEBHOOK_DELETE', '', now(), now());`,
-	
+
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('100', 'APIKEY_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('101', 'APIKEY_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('102', 'APIKEY_UPDATE', '', now(), now());`,
@@ -69,22 +69,22 @@ var InitialData = []string{
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('105', 'STATEFULSET_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('106', 'STATEFULSET_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('107', 'STATEFULSET_DELETE', '', now(), now());`,
-	
+
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('109', 'DAEMONSET_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('110', 'DAEMONSET_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('111', 'DAEMONSET_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('112', 'DAEMONSET_DELETE', '', now(), now());`,
-	
+
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('122', 'INGRESS_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('123', 'INGRESS_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('124', 'INGRESS_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('125', 'INGRESS_DELETE', '', now(), now());`,
-	
+
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('127', 'HPA_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('128', 'HPA_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('129', 'HPA_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('130', 'HPA_DELETE', '', now(), now());`,
-	
+
 	// Kubernetes resource permission
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('132', 'KUBECONFIGMAP_CREATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('133', 'KUBECONFIGMAP_UPDATE', '', now(), now());`,
@@ -182,7 +182,7 @@ var InitialData = []string{
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('225', 'KUBESERVICEACCOUNT_UPDATE', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('226', 'KUBESERVICEACCOUNT_READ', '', now(), now());`,
 	`INSERT INTO  permission  ( id,  name,  comment,  create_time,  update_time ) VALUES ('227', 'KUBESERVICEACCOUNT_DELETE', '', now(), now());`,
-	
+
 	// -- group
 	// group 名称前加点可以解决group与mysql内置对象重名的问题
 	`INSERT INTO  .group  ( id,  name,  comment,  type,  create_time,  update_time ) VALUES ('1', '访客', '访客', '1', now(), now());`,
@@ -193,7 +193,7 @@ var InitialData = []string{
 	`INSERT INTO  .group  ( id,  name,  comment,  type,  create_time,  update_time ) VALUES ('12', '项目测试', '项目测试', '0', now(), now());`,
 	`INSERT INTO  .group  ( id,  name,  comment,  type,  create_time,  update_time ) VALUES ('21', 'API_VIEWER', 'API只读权限', '2', now(), now());`,
 	`INSERT INTO  .group  ( id,  name,  comment,  type,  create_time,  update_time ) VALUES ('22', 'API_EDITOR', 'API读写权限', '2', now(), now());`,
-	
+
 	// 项目负责人 -- group_permissions
 	// APPUSER
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('10', '46');`,
@@ -255,7 +255,7 @@ var InitialData = []string{
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('10', '128');`,
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('10', '129');`,
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('10', '130');`,
-	
+
 	// Kubernetes resource
 	// Deployment
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('10', '140');`,
@@ -298,11 +298,11 @@ var InitialData = []string{
 	// POD
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('10', '182');`,
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('10', '183');`,
-	
+
 	// 项目开发 -- group_permissions
 	// APPUSER
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('11', '48');`,
-	
+
 	// DEPLOYMENT
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('11', '54');`,
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('11', '55');`,
@@ -352,7 +352,7 @@ var InitialData = []string{
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('11', '128');`,
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('11', '129');`,
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('11', '130');`,
-	
+
 	// Kubernetes resource
 	// Deployment
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('11', '140');`,
@@ -395,11 +395,11 @@ var InitialData = []string{
 	// POD
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('11', '182');`,
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('11', '183');`,
-	
+
 	// 项目测试 -- group_permissions
 	// APPUSER
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('12', '48');`,
-	
+
 	// DEPLOYMENT
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('12', '56');`,
 	// SERVICE
@@ -422,7 +422,7 @@ var InitialData = []string{
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('12', '124');`,
 	// HPA
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('12', '129');`,
-	
+
 	// Kubernetes resource
 	// Deployment
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('12', '142');`,
@@ -446,7 +446,7 @@ var InitialData = []string{
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('12', '174');`,
 	// POD
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('12', '182');`,
-	
+
 	// 访客 -- group_permissions
 	// APP
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('1', '76');`,
@@ -470,7 +470,7 @@ var InitialData = []string{
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('1', '124');`,
 	// HPA
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('1', '129');`,
-	
+
 	// Kubernetes resource
 	// Deployment
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('1', '142');`,
@@ -494,7 +494,7 @@ var InitialData = []string{
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('1', '174');`,
 	// POD
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('1', '182');`,
-	
+
 	// 组管理员
 	// APPUSER
 	`INSERT INTO  group_permissions  ( group_id,  permission_id ) VALUES ('8', '46');`,

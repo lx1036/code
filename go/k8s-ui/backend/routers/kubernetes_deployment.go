@@ -10,20 +10,20 @@ func init() {
 	beego.GlobalControllerRouter[DeploymentController] = append(
 		beego.GlobalControllerRouter[DeploymentController],
 		beego.ControllerComments{
-			Method: "List",
-			Router: `/`,
+			Method:           "List",
+			Router:           `/`,
 			AllowHTTPMethods: []string{"get"},
-			MethodParams: param.Make(),
-			Filters: nil,
-			Params: nil,
+			MethodParams:     param.Make(),
+			Filters:          nil,
+			Params:           nil,
 		},
 		beego.ControllerComments{
-			Method: "Get",
-			Router: `/:id([0-9]+)`,
+			Method:           "Get",
+			Router:           `/:id([0-9]+)`,
 			AllowHTTPMethods: []string{"get"},
-			MethodParams: param.Make(),
-			Filters: nil,
-			Params: nil,
+			MethodParams:     param.Make(),
+			Filters:          nil,
+			Params:           nil,
 		},
 	)
 }

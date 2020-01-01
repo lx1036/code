@@ -11,9 +11,9 @@ import (
 )
 
 type PodListParam struct {
-	Namespace string `json:"namespace"`
-	Name string `json:"name"`
-	Type api.ResourceName `json:"type"`
+	Namespace string           `json:"namespace"`
+	Name      string           `json:"name"`
+	Type      api.ResourceName `json:"type"`
 }
 
 type respPodInfoList struct {

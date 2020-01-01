@@ -14,7 +14,6 @@ func (c ClusterManager) Close() {
 	close(c.CacheFactory.stopChan)
 }
 
-
 func buildCacheController(client *kubernetes.Clientset) (*CacheFactory, error) {
-
+	return &CacheFactory{}, nil
 }

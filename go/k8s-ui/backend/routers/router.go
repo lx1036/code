@@ -24,7 +24,7 @@ func init() {
 	}))
 	/**
 	Auth
-	 */
+	*/
 	beego.Include(&auth.AuthController{})
 
 	withApp := beego.NewNamespace("/api/v1",
@@ -33,14 +33,14 @@ func init() {
 				&permission.AppUserController{},
 			),
 		),
-		
+
 		beego.NSNamespace("/apps/:appid([0-9]+)/deployments",
 			beego.NSInclude(
 				&deployment.DeploymentController{},
 			),
 		),
 	)
-	
+
 	nsWithOpenAPI := beego.NewNamespace("/openapi/v1",
 		beego.NSNamespace("/gateway/action",
 			beego.NSInclude(

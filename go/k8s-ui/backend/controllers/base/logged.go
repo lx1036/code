@@ -7,3 +7,7 @@ type LoggedInController struct {
 
 	User *models.User
 }
+
+func (c *LoggedInController) publishRequestMessage(code int, data interface{}) {
+
+}

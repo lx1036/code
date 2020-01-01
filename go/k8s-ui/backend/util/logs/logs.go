@@ -13,8 +13,6 @@ var (
 	sentryLogLevel = logs.LevelInfo
 )
 
-
-
 func init() {
 	logLevel := beego.AppConfig.DefaultInt("LogLevel", 4)
 	logger.SetLogger(logs.AdapterConsole, fmt.Sprintf(`{"level":%d}`, logLevel))

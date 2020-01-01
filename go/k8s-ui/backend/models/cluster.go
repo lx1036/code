@@ -8,16 +8,15 @@ import (
 )
 
 const (
-	ClusterStatusNormal      ClusterStatus = 0
+	ClusterStatusNormal ClusterStatus = 0
 )
 
 type ClusterStatus int32
 
-
 type Cluster struct {
-	Id          int64  `orm:"auto" json:"id,omitempty"`
-	Name        string `orm:"unique;index;size(128)" json:"name,omitempty"`
-	DisplayName string `orm:"size(512);column(displayname);null" json:"displayname,omitempty"`
+	Id          int64      `orm:"auto" json:"id,omitempty"`
+	Name        string     `orm:"unique;index;size(128)" json:"name,omitempty"`
+	DisplayName string     `orm:"size(512);column(displayname);null" json:"displayname,omitempty"`
 	MetaData    string     `orm:"null;type(text)" json:"metaData,omitempty"`
 	Master      string     `orm:"size(128)" json:"master,omitempty"` // apiserver地址，示例： https://10.172.189.140
 	KubeConfig  string     `orm:"null;type(text)" json:"kubeConfig,omitempty"`
@@ -28,7 +27,7 @@ type Cluster struct {
 	Deleted     bool       `orm:"default(false)" json:"deleted,omitempty"`
 	// the cluster status
 	Status ClusterStatus `orm:"default(0)" json:"status"`
-	
+
 	MetaDataObj ClusterMetaData `orm:"-" json:"-"`
 }
 
@@ -90,4 +89,3 @@ func (model *clusterModel) GetAllNormal() ([]Cluster, error) {
 
 	return clusters, nil
 }
-

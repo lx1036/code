@@ -24,12 +24,8 @@ func InitBus() {
 	}
 }
 
-
-
 func InitKubeLabel() {
 	util.AppLabelKey = beego.AppConfig.DefaultString("AppLabelKey", "k8s-ui-app")
 	util.NamespaceLabelKey = beego.AppConfig.DefaultString("NamespaceLabelKey", "k8s-ui-ns")
 	util.PodAnnotationControllerKindLabelKey = beego.AppConfig.DefaultString("PodAnnotationControllerKindLabelKey", "k8s-ui.cloud/controller-kind")
 }
-
-

@@ -1,25 +1,25 @@
 package api
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type ResourceName = string
 
 const (
-	ResourceNameDeployment              ResourceName = "deployments"
-	ResourceNamePod                     ResourceName = "pods"
-	ResourceNameCronJob                 ResourceName = "cronjobs"
-	ResourceNameDaemonSet               ResourceName = "daemonsets"
-	ResourceNameStatefulSet             ResourceName = "statefulsets"
-	ResourceNameJob                     ResourceName = "jobs"
-
+	ResourceNameDeployment  ResourceName = "deployments"
+	ResourceNamePod         ResourceName = "pods"
+	ResourceNameCronJob     ResourceName = "cronjobs"
+	ResourceNameDaemonSet   ResourceName = "daemonsets"
+	ResourceNameStatefulSet ResourceName = "statefulsets"
+	ResourceNameJob         ResourceName = "jobs"
 )
 
 type KindName = string
+
 const (
-	KindNamePod                     KindName = "Pod"
+	KindNamePod KindName = "Pod"
 )
 
 type ResourceMap struct {
@@ -31,7 +31,6 @@ type GroupVersionResourceKind struct {
 	schema.GroupVersionResource
 	Kind string
 }
-
 
 var KindToResourceMap = map[string]ResourceMap{
 	ResourceNamePod: {

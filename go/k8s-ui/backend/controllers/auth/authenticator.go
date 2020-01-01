@@ -3,11 +3,11 @@ package auth
 import (
 	"fmt"
 	"github.com/astaxie/beego"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/gommon/log"
+	rsakey "k8s-lx1036/k8s-ui/backend/apikey"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
 	"k8s-lx1036/k8s-ui/backend/models"
-	rsakey "k8s-lx1036/k8s-ui/backend/apikey"
-	"github.com/dgrijalva/jwt-go"
 	"time"
 )
 
@@ -27,14 +27,14 @@ type AuthController struct {
 	beego.Controller
 }
 
-func (auth *AuthController) URLMapping()  {
+func (auth *AuthController) URLMapping() {
 	auth.Mapping("Login", auth.Login)
 	auth.Mapping("Logout", auth.Logout)
 	auth.Mapping("Me", auth.CurrentUser)
 }
 
 // @router /login/:type/?:name [get,post]
-func (auth *AuthController) Login()  {
+func (auth *AuthController) Login() {
 	username := auth.Input().Get("username")
 	password := auth.Input().Get("password")
 	authType := auth.Ctx.Input.Param(":type")
@@ -78,7 +78,7 @@ func (auth *AuthController) Login()  {
 }
 
 // @router /logout [get]
-func (auth *AuthController) Logout()  {
+func (auth *AuthController) Logout() {
 	fmt.Println("Logout")
 
 	auth.Data["json"] = base.Result{Data: "testtest"}
@@ -86,11 +86,11 @@ func (auth *AuthController) Logout()  {
 }
 
 // @router /me [get]
-func (auth *AuthController) CurrentUser()  {
+func (auth *AuthController) CurrentUser() {
 	fmt.Println("test")
 }
 
-func Register(name string, authenticator Authenticator)  {
+func Register(name string, authenticator Authenticator) {
 	if _, ok := registry[name]; ok {
 		log.Infof("authenticator [%s] has been registered", name)
 		return

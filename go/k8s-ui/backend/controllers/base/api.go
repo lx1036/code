@@ -1,6 +1,7 @@
 package base
 
 import (
+	"net/http"
 )
 
 type APIController struct {
@@ -11,26 +12,31 @@ type APIController struct {
 }
 
 // Abort stops controller handler and show the error data， e.g. Prepare
-func (c *APIController) AbortForbidden(msg string) {
+func (controller *APIController) AbortForbidden(msg string) {
 	//c.publishRequestMessage(http.StatusForbidden, msg)
 
-	c.ResultHandlerController.AbortForbidden(msg)
+	controller.ResultHandlerController.AbortForbidden(msg)
 }
 
 /*
  * 检查资源权限
  */
-func (c *APIController) CheckPermission(perType string, perAction string) {
+func (controller *APIController) CheckPermission(perType string, perAction string) {
 	// 如果用户是admin，跳过permission检查
-	if c.User.Admin {
+	if controller.User.Admin {
 		return
 	}
 
 	//perName := models.PermissionModel.MergeName(perType, perAction)
-	if c.NamespaceId != 0 {
+	if controller.NamespaceId != 0 {
 
 	}
 
-	c.AbortForbidden("Permission error")
+	controller.AbortForbidden("Permission error")
 
+}
+
+func (controller *APIController) Success(data interface{}) {
+	controller.publishRequestMessage(http.StatusOK, data)
+	controller.ResultHandlerController.Success(data)
 }

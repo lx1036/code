@@ -5,6 +5,7 @@ import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"
 	_ "github.com/go-sql-driver/mysql" // import your used driver
+	"k8s-lx1036/k8s-ui/backend/util/logs"
 )
 
 func init() {
@@ -23,18 +24,21 @@ func main() {
 		panic(err)
 	}
 
-	dbUrl := fmt.Sprintf("%s:%s@%s/%s?charset=utf8mb4&",
+	dbUrl := fmt.Sprintf("%s:%s@%s/%s?charset=utf8mb4&%s",
 		beego.AppConfig.String("DBUser"),
-		beego.AppConfig.String("DBPasswd"),
+		beego.AppConfig.String("DBPassword"),
 		beego.AppConfig.String("DBTns"),
 		beego.AppConfig.String("DBName"),
+		beego.AppConfig.String("DBLoc"),
 	)
+
+	logs.Info("db url: %s", dbUrl)
 
 	err = orm.RegisterDataBase("default", "mysql", dbUrl)
 	if err != nil {
 		panic(err)
 	}
-	
+
 	orm.RegisterModel()
 
 	orm.RunCommand()

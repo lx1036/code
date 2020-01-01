@@ -8,7 +8,7 @@ type ParamBuilderController struct {
 	ResultHandlerController
 }
 
-func (c *ParamBuilderController) GetIDFromURL() int64 {
+func (c *ParamBuilderController) GetIdFromURL() int64 {
 	return c.GetIntParamFromURL(":id")
 }
 

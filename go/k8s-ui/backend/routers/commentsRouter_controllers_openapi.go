@@ -10,20 +10,20 @@ func init() {
 	beego.GlobalControllerRouter[OpenAPIController] = append(
 		beego.GlobalControllerRouter[OpenAPIController],
 		beego.ControllerComments{
-			Method: "UpgradeDeployment",
-			Router: `/upgrade_deployment`,
+			Method:           "UpgradeDeployment",
+			Router:           `/upgrade_deployment`,
 			AllowHTTPMethods: []string{"get"},
-			MethodParams: param.Make(),
-			Filters: nil,
-			Params: nil,
+			MethodParams:     param.Make(),
+			Filters:          nil,
+			Params:           nil,
 		},
 		beego.ControllerComments{
-			Method: "GetPodList",
-			Router: `/get_pod_list`,
+			Method:           "GetPodList",
+			Router:           `/get_pod_list`,
 			AllowHTTPMethods: []string{"get"},
-			MethodParams: param.Make(),
-			Filters: nil,
-			Params: nil,
+			MethodParams:     param.Make(),
+			Filters:          nil,
+			Params:           nil,
 		},
 	)
 }

@@ -7,9 +7,8 @@ import (
 	_ "k8s-lx1036/k8s-ui/backend/routers"
 )
 
-func Run()  {
+func Run() {
 	initial.InitDb()
-
 
 	if beego.BConfig.RunMode == "dev" {
 
@@ -20,7 +19,6 @@ func Run()  {
 
 	// 初始化 rsa key
 	//initial.InitRsaKey()
-
 
 	fmt.Println(beego.BConfig.RunMode)
 

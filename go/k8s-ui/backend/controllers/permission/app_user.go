@@ -23,7 +23,7 @@ func (c *AppUserController) URLMapping() {
 // @Param	id		path 	int	true		"the id you want to get"
 // @Success 200 {object} models.AppUser success
 // @router /:id [get]
-func (c *AppUserController) Get()  {
+func (c *AppUserController) Get() {
 	c.Ctx.Output.SetStatus(http.StatusOK)
 	c.Data["json"] = base.Result{Data: "asdf"}
 	c.ServeJSON()

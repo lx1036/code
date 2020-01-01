@@ -1,27 +1,40 @@
 package deployment
 
-import "k8s-lx1036/k8s-ui/backend/controllers/base"
+import (
+	"github.com/astaxie/beego/logs"
+	"k8s-lx1036/k8s-ui/backend/controllers/base"
+	"k8s-lx1036/k8s-ui/backend/models"
+)
 
 type DeploymentController struct {
 	base.APIController
 }
 
-func (deployment *DeploymentController) URLMapping()  {
-	deployment.Mapping("List", deployment.List)
-	deployment.Mapping("Get", deployment.Get)
+func (controller *DeploymentController) URLMapping() {
+	controller.Mapping("List", controller.List)
+	controller.Mapping("Get", controller.Get)
 }
 
-func (deployment *DeploymentController) Prepare() {
+func (controller *DeploymentController) Prepare() {
 
 }
 
 // @Param name query string false "name filter"
 // @router / [get]
-func (deployment *DeploymentController) List() {
+func (controller *DeploymentController) List() {
 	//params = deployment.BuildQueryParams()
-	deployment.Input().Get("name")
+	controller.Input().Get("name")
 }
 
-func (deployment *DeploymentController) Get() {
+// @Title Get
+// @router /:id([0-9]+) [get]
+func (controller *DeploymentController) Get() {
+	id := controller.GetIdFromURL()
+	deployment, err := models.DeploymentModel.GetById(id)
+	if err != nil {
+		logs.Error("get deployment by id [%d], error: %v", id, err)
+		return
+	}
 
+	controller.Success(deployment)
 }

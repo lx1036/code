@@ -18,12 +18,12 @@ type ResultHandlerController struct {
 }
 
 // Abort stops controller handler and show the error data， e.g. Prepare
-func (c *ResultHandlerController) AbortForbidden(msg string) {
+func (controller *ResultHandlerController) AbortForbidden(msg string) {
 	logs.Info("Abort Forbidden error. %s", msg)
-	c.CustomAbort(http.StatusForbidden, hack.String(c.errorResult(http.StatusForbidden, msg)))
+	controller.CustomAbort(http.StatusForbidden, hack.String(controller.errorResult(http.StatusForbidden, msg)))
 }
 
-func (c *ResultHandlerController) errorResult(code int, msg string) []byte {
+func (controller *ResultHandlerController) errorResult(code int, msg string) []byte {
 	errorResult := errors.ErrorResult{
 		Code: code,
 		Msg:  msg,
@@ -31,7 +31,13 @@ func (c *ResultHandlerController) errorResult(code int, msg string) []byte {
 	body, err := json.Marshal(errorResult)
 	if err != nil {
 		logs.Error("Json Marshal error. %v", err)
-		c.CustomAbort(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+		controller.CustomAbort(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 	}
 	return body
+}
+
+func (controller *ResultHandlerController) Success(data interface{}) {
+	controller.Ctx.Output.SetStatus(http.StatusOK)
+	controller.Data["json"] = Result{Data: data}
+	controller.ServeJSON()
 }

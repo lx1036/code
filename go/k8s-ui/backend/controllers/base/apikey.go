@@ -9,13 +9,12 @@ import (
 
 type APIKeyController struct {
 	beego.Controller
-	
+
 	APIKey  *models.APIKey
 	Action  string
 	Success response.Success
 	Failure response.Failure
 }
-
 
 // 用于负责 get 数据的接口，当 error 列表不为空的时候，返回 error 列表
 // 当 参数为 nil 的时候，返回 "200"

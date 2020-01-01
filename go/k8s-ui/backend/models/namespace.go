@@ -45,7 +45,6 @@ type ResourcesLimit struct {
 	Memory int64 `json:"memory,omitempty"`
 }
 
-
 type namespaceModel struct{}
 
 func (model *namespaceModel) GetByName(name string) (namespace *Namespace, err error) {
@@ -56,4 +55,3 @@ func (model *namespaceModel) GetByName(name string) (namespace *Namespace, err e
 
 	return nil, err
 }
-

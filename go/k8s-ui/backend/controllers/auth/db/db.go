@@ -16,5 +16,3 @@ func (auth DBAuth) Authenticate(model models.AuthModel) (*models.User, error) {
 func init() {
 	auth.Register(models.AuthTypeDB, &DBAuth{})
 }
-
-

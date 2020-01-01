@@ -15,7 +15,6 @@ type PublishStatus struct {
 	Cluster    string      `orm:"size(128);column(cluster)" json:"cluster,omitempty"`
 }
 
-
 type publishStatusModel struct{}
 
 func (*publishStatusModel) GetByCluster(publishType PublishType, resourceId int64, cluster string) (publishStatus PublishStatus, err error) {
@@ -27,4 +26,3 @@ func (*publishStatusModel) GetByCluster(publishType PublishType, resourceId int6
 		One(&publishStatus)
 	return
 }
-

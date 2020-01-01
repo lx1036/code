@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 )
 
-
 func InitRsaKey() {
 	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(readKey("RsaPrivateKey"))
 	if err != nil {

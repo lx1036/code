@@ -18,7 +18,6 @@ func String(b []byte) (s string) {
 	return
 }
 
-
 // Slice converts string to slice without copy.
 // Use at your own risk.
 func Slice(s string) (b []byte) {

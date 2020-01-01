@@ -58,7 +58,7 @@ type UpgradeDeploymentParam struct {
 //       401: responseState
 //       500: responseState
 // @router /upgrade_deployment [get]
-func (controller *OpenAPIController)UpgradeDeployment() {
+func (controller *OpenAPIController) UpgradeDeployment() {
 	param := UpgradeDeploymentParam{
 		Deployment:   controller.GetString("deployment"),
 		Namespace:    controller.GetString("namespace"),
@@ -72,26 +72,26 @@ func (controller *OpenAPIController)UpgradeDeployment() {
 		Environments: controller.GetString("environments"),
 		envMap:       nil,
 	}
-	
+
 	if !controller.CheckoutRoutePermission(UpgradeDeploymentAction) || !controller.CheckDeploymentPermission(param.Deployment) || !controller.CheckNamespacePermission(param.Namespace) {
 		return
 	}
-	
+
 	param.clusters = strings.Split(param.Cluster, ",")
 	var err error
 	param.Publish, err = controller.GetBool("publish", true)
 	if err != nil {
-	
+
 	}
 	param.TemplateId, err = controller.GetInt("template_id", 0)
 	if err != nil {
-	
+
 	}
 	// publish 表示立即发布 deployment 模板
 	if param.TemplateId != 0 && param.Publish {
-	
+
 	}
-	
+
 	images := strings.Split(param.Images, ",")
 	for _, image := range images {
 		arr := strings.Split(image, "=")
@@ -99,46 +99,45 @@ func (controller *OpenAPIController)UpgradeDeployment() {
 			param.imageMap[arr[0]] = arr[1]
 		}
 	}
-	
+
 	deployInfoMap := make(map[int64]([]*DeploymentInfo))
 	for _, cluster := range param.clusters {
 		deployInfo, err := getOnlineDeploymenetInfo(param.Deployment, param.Namespace, cluster, 0)
 		if err != nil {
-		
+
 		}
-		
+
 		tmplId := deployInfo.DeploymentTemplete.Id
-		
+
 		deployInfoMap[tmplId] = append(deployInfoMap[tmplId], deployInfo)
 	}
-	
-	
+
 	for _, deployInfos := range deployInfoMap {
 		deployInfo := deployInfos[0]
 		newTpl, err := json.Marshal(deployInfo.DeploymentObject)
 		if err != nil {
-			
+
 			continue
 		}
 		deployInfo.DeploymentTemplete.Template = string(newTpl)
 		//更新deploymentTpl中的CreateTime和UpdateTime,数据库中不会自动更新
 		deployInfo.DeploymentTemplete.CreateTime = time.Now()
 		deployInfo.DeploymentTemplete.UpdateTime = time.Now()
-		
+
 		for _, _ = range deployInfos {
-		
+
 		}
 	}
-	
+
 	for _, deployInfos := range deployInfoMap {
 		for _, deployInfo := range deployInfos {
 			err := publishDeployment(deployInfo, controller.APIKey.String())
 			if err != nil {
-			
+
 			}
 		}
 	}
-	
+
 	controller.HandleResponse(nil)
 }
 
@@ -209,9 +208,9 @@ func publishDeployment(deployInfo *DeploymentInfo, username string) error {
 	// 操作 kubernetes api，实现升级部署
 	cli, err := client.Client(deployInfo.Cluster.Name)
 	if err == nil {
-		
+
 		_, err = resdeployment.CreateOrUpdateDeployment(cli, deployInfo.DeploymentObject)
-		
+
 		return nil
 	} else {
 		return fmt.Errorf("Failed to get k8s client(cluster: %s): %v", deployInfo.Cluster.Name, err)
