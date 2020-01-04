@@ -1,8 +1,9 @@
 
+# dump tables ddl into k8s.sql file
 sqlall:
 	go run database/syncdb.go orm sqlall > _dev/k8s.sql
 
-# create tables
+# create tables in mysql instance
 syncdb:
 	go run database/syncdb.go orm syncdb
 

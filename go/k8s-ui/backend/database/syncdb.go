@@ -40,7 +40,5 @@ func main() {
 		panic(err)
 	}
 
-	orm.RegisterModel()
-
 	orm.RunCommand()
 }
