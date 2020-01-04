@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	GlobalAPIKey APIKeyType = 0
+	GlobalAPIKey    APIKeyType = 0
+	TableNameApiKey            = "api_key"
 )
 
 type APIKeyType int32
@@ -31,3 +32,8 @@ type APIKey struct {
 func (k *APIKey) String() string {
 	return fmt.Sprintf("[APIKey %d] %s", k.Id, k.Name)
 }
+func (k *APIKey) TableName() string {
+	return TableNameApiKey
+}
+
+type apiKeyModel struct{}

@@ -14,3 +14,5 @@ type NamespaceUser struct {
 	Groups     []*Group `orm:"-" json:"groups,omitempty"`
 	GroupsName string   `orm:"-" json:"groupsName,omitempty"`
 }
+
+type namespaceUserModel struct{}

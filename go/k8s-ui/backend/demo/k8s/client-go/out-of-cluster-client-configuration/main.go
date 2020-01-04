@@ -20,11 +20,11 @@ import (
 )
 
 var (
-	clientSet *kubernetes.Clientset
+	clientSet     *kubernetes.Clientset
 	labelSelector *string
 	fieldSelector *string
-	namespace *string
-	maxClaims *string
+	namespace     *string
+	maxClaims     *string
 )
 
 func main() {
@@ -57,11 +57,11 @@ func main() {
 	deployment()
 }
 
-func pvc()  {
+func pvc() {
 	options := metav1.ListOptions{
-		LabelSelector:       *labelSelector,
-		FieldSelector:       *fieldSelector,
-	} 
+		LabelSelector: *labelSelector,
+		FieldSelector: *fieldSelector,
+	}
 	pvcs, err := clientSet.CoreV1().PersistentVolumeClaims(*namespace).List(options)
 	if err != nil {
 		panic(err)

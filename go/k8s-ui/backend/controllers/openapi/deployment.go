@@ -100,7 +100,7 @@ func (controller *OpenAPIController) UpgradeDeployment() {
 		}
 	}
 
-	deployInfoMap := make(map[int64]([]*DeploymentInfo))
+	deployInfoMap := make(map[int64][]*DeploymentInfo)
 	for _, cluster := range param.clusters {
 		deployInfo, err := getOnlineDeploymenetInfo(param.Deployment, param.Namespace, cluster, 0)
 		if err != nil {
@@ -149,7 +149,7 @@ type DeploymentInfo struct {
 	Namespace          *models.Namespace
 }
 
-// 主要用于从数据库中查找、拼凑出用于更新的模板资源，资源主要用于 k8s 数据更新和 数据库存储更新记录等
+// 主要用于从数据库中查找、拼凑出用于更新的模板资源，资源主要用于 k8s 数据更新和数据库存储更新记录等
 func getOnlineDeploymenetInfo(name, namespace, cluster string, templateId int64) (deployInfo *DeploymentInfo, err error) {
 	deployment, err := models.DeploymentModel.GetByName(name)
 	if err != nil {
@@ -161,6 +161,7 @@ func getOnlineDeploymenetInfo(name, namespace, cluster string, templateId int64)
 	if templateId != 0 {
 
 	} else {
+		// 从 mysql 中获取线上模板数据
 		status, err := models.PublishStatusModel.GetByCluster(models.PublishTypeDeployment, deployment.Id, cluster)
 		if err != nil {
 

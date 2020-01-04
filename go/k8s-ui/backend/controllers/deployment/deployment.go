@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"fmt"
 	"github.com/astaxie/beego/logs"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
 	"k8s-lx1036/k8s-ui/backend/models"
@@ -23,7 +24,10 @@ func (controller *DeploymentController) Prepare() {
 // @router / [get]
 func (controller *DeploymentController) List() {
 	//params = deployment.BuildQueryParams()
-	controller.Input().Get("name")
+	appid := controller.Ctx.Input.Param("appid")
+	fmt.Println(appid)
+	//controller.Success()
+	return
 }
 
 // @Title Get
@@ -35,6 +39,6 @@ func (controller *DeploymentController) Get() {
 		logs.Error("get deployment by id [%d], error: %v", id, err)
 		return
 	}
-
 	controller.Success(deployment)
+	return
 }

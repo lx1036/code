@@ -18,3 +18,5 @@ type Group struct {
 	AppUsers       []*AppUser       `orm:"reverse(many)" json:"appUsers,omitempty"`
 	NamespaceUsers []*NamespaceUser `orm:"reverse(many)" json:"namespaceUsers,omitempty"`
 }
+
+type groupModel struct{}

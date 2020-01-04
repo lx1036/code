@@ -14,3 +14,5 @@ type AppUser struct {
 	Groups     []*Group `orm:"-" json:"groups,omitempty"`
 	GroupsName string   `orm:"-" json:"groupsName,omitempty"`
 }
+
+type appUserModel struct{}
