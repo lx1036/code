@@ -6,20 +6,28 @@ import (
 	"k8s-lx1036/k8s-ui/backend/demo/k8s/client-go/util"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/client-go/util/retry"
+	"log"
+	"os"
 	"path/filepath"
 	"strconv"
 )
 
-func main() {
-	deployment()
-}
+var (
+	clientSet *kubernetes.Clientset
+	labelSelector *string
+	fieldSelector *string
+	namespace *string
+	maxClaims *string
+)
 
-func deployment() {
+func main() {
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "absolute path to kubeconfig file")
@@ -29,17 +37,79 @@ func deployment() {
 
 	fmt.Println("kube config path: " + *kubeconfig)
 
+	labelSelector = flag.String("label", "", "label selector")
+	fieldSelector = flag.String("field", "", "field selector")
+	namespace = flag.String("namespace", "", "namespace")
+	maxClaims = flag.String("max-claims", "1Gi", "max quantity of storage resource")
+
 	flag.Parse()
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err)
 	}
-	clientSet, err := kubernetes.NewForConfig(config)
+	clientSet, err = kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 
+	pvc()
+	deployment()
+}
+
+func pvc()  {
+	options := metav1.ListOptions{
+		LabelSelector:       *labelSelector,
+		FieldSelector:       *fieldSelector,
+	} 
+	pvcs, err := clientSet.CoreV1().PersistentVolumeClaims(*namespace).List(options)
+	if err != nil {
+		panic(err)
+	}
+	var currentQuantity = &resource.Quantity{}
+	maxClaimsQuantity := resource.MustParse(*maxClaims)
+	for _, pvc := range pvcs.Items {
+		log.Printf("pvc name: [%s]\n", pvc.Name)
+		storage := pvc.Spec.Resources.Requests[apiv1.ResourceStorage]
+		currentQuantity.Add(storage)
+	}
+	log.Printf("current storage quantity: %s\n", currentQuantity.String())
+
+	watcher, err := clientSet.CoreV1().PersistentVolumeClaims(*namespace).Watch(options)
+	if err != nil {
+		panic(err)
+	}
+	events := watcher.ResultChan()
+	for event := range events {
+		pvc, ok := event.Object.(*apiv1.PersistentVolumeClaim)
+		if !ok {
+			log.Fatal("unexpected type\n")
+		}
+		storage := pvc.Spec.Resources.Requests[apiv1.ResourceStorage]
+		switch event.Type {
+		case watch.Added:
+			currentQuantity.Add(storage)
+			if currentQuantity.Cmp(maxClaimsQuantity) == 1 { // current > max
+				log.Printf("max %s, current %s, current > max, crash!!!\n", maxClaimsQuantity.String(), currentQuantity.String())
+			} else {
+				log.Printf("max %s, current %s, current <= max, happy!!!\n", maxClaimsQuantity.String(), currentQuantity.String())
+			}
+		case watch.Deleted:
+			currentQuantity.Sub(storage)
+			if currentQuantity.Cmp(maxClaimsQuantity) <= 0 { // current <= max
+				log.Printf("max %s, current %s\n", maxClaimsQuantity.String(), currentQuantity.String())
+			}
+		case watch.Modified:
+		case watch.Error:
+		}
+
+		log.Printf("current storage quantity: %s\n", currentQuantity.String())
+	}
+
+	os.Exit(0)
+}
+
+func deployment() {
 	deploymentsClient := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault)
 
 	const deploymentName = "deployment-123"
@@ -138,6 +208,7 @@ func deployment() {
 		TypeMeta:        metav1.TypeMeta{},
 		ResourceVersion: "",
 	})
+	var err error
 	if getErr != nil {
 		newDeployment, err = deploymentsClient.Create(deployment)
 		if err != nil {
@@ -222,6 +293,8 @@ func deployment() {
 		panic(fmt.Errorf("deleted failed: %v", deleteErr))
 	}
 	fmt.Println("Deleted deployment: " + newDeployment.Name + " ...")
+
+	os.Exit(0)
 }
 
 func int32Ptr(i int32) *int32 {
