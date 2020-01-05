@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import {PodTerminalComponent} from "./pod-terminal.component";
+import {SharedModule} from "../../shared/shared.module";
 
 
 
@@ -9,7 +9,7 @@ import {PodTerminalComponent} from "./pod-terminal.component";
     PodTerminalComponent
   ],
   imports: [
-    CommonModule
+    SharedModule,
   ]
 })
 export class PodTerminalModule { }

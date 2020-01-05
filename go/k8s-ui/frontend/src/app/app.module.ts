@@ -24,13 +24,12 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
 @NgModule({
   declarations: [
     AppComponent,
-    FilterBoxComponent,
-    CheckboxGroupComponent,
-    CheckboxComponent,
-    ConfirmationDialogComponent
+    // FilterBoxComponent,
+    // CheckboxGroupComponent,
+    // CheckboxComponent,
+    // ConfirmationDialogComponent
   ],
   imports: [
-    BrowserModule,
     PodTerminalModule,
     AuthModule,
     PortalModule,
@@ -47,8 +46,8 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
   ],
   providers: [],
   exports: [
-    FilterBoxComponent,
-    CheckboxComponent
+    // FilterBoxComponent,
+    // CheckboxComponent
   ],
   bootstrap: [AppComponent]
 })
