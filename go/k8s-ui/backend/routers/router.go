@@ -48,6 +48,15 @@ func init() {
 		),
 	)
 
+	nsWithNamespace := beego.NewNamespace("/api/v1",
+		beego.NSNamespace("/namespaces/:namespaceid([0-9]+)/users",
+			beego.NSInclude(
+				&permission.NamespaceUserController{},
+			),
+		),
+	)
+
 	beego.AddNamespace(withApp)
+	beego.AddNamespace(nsWithNamespace)
 	beego.AddNamespace(nsWithOpenAPI)
 }

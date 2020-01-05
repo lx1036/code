@@ -16,3 +16,14 @@ type NamespaceUser struct {
 }
 
 type namespaceUserModel struct{}
+
+func (namespaceUser *namespaceUserModel) GetAllPermissions(permissionId int64, userId int64) (permissions []Permission, err error) {
+	qs := Ormer().QueryTable(&Permission{}).Filter("Groups__Group__Type__exact", NamespaceGroupType).
+		Filter("Groups__Group__NamespaceUsers__Namespace__Id__exact", permissionId).
+		Filter("Groups__Group__NamespaceUsers__User__Id__exact", userId)
+	permissions = []Permission{}
+	if _, err = qs.All(permissions); err != nil {
+		return
+	}
+	return
+}

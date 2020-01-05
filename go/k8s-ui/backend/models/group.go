@@ -4,6 +4,12 @@ import "time"
 
 type GroupType int
 
+const (
+	AppGroupType GroupType = iota
+	NamespaceGroupType
+	TableNameGroup = "group"
+)
+
 type Group struct {
 	Id      int64     `orm:"pk;auto" json:"id,omitempty"`
 	Name    string    `orm:"index;size(200)" json:"name,omitempty"`
@@ -17,6 +23,10 @@ type Group struct {
 	Permissions    []*Permission    `orm:"rel(m2m);rel_table(group_permissions)" json:"permissions,omitempty"`
 	AppUsers       []*AppUser       `orm:"reverse(many)" json:"appUsers,omitempty"`
 	NamespaceUsers []*NamespaceUser `orm:"reverse(many)" json:"namespaceUsers,omitempty"`
+}
+
+func (*Group) TableName() string {
+	return TableNameGroup
 }
 
 type groupModel struct{}

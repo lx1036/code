@@ -55,7 +55,7 @@ func (controller *OpenAPIController) GetPodList() {
 		return
 	}
 	if controller.APIKey.Type != models.GlobalAPIKey {
-
+		return
 	}
 
 	podList := respPodInfoList{}
@@ -79,9 +79,8 @@ func (controller *OpenAPIController) GetPodList() {
 	managers := client.Managers()
 	managers.Range(func(key, value interface{}) bool {
 		manager := value.(*client.ClusterManager)
-		// if Name and Namespace empty,return all pods
 		if params.Name == "" && params.Namespace == "" {
-			// return all pods
+			// if Name and Namespace empty,return all pods
 		}
 
 		podListResp, err := buildPodListResp(manager, params.Namespace, namespace.KubeNamespace, params.Name, params.Type)
