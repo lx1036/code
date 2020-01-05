@@ -7,11 +7,11 @@ export const enum AlertType {
 }
 
 export const httpStatusCode = {
-  'NoContent': 204,
-  'Unauthorized': 401,
-  'Forbidden': 403,
-  'NotFound': 404,
-  'StatusInternalServerError': 500
+  NoContent: 204,
+  Unauthorized: 401,
+  Forbidden: 403,
+  NotFound: 404,
+  StatusInternalServerError: 500
 };
 
 

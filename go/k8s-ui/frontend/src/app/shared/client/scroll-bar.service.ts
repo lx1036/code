@@ -1,5 +1,5 @@
 import {Inject, Injectable, Renderer2, RendererFactory2} from '@angular/core';
-import {DOCUMENT} from "@angular/common";
+import {DOCUMENT} from '@angular/common';
 
 @Injectable({
   providedIn: 'root'
@@ -7,11 +7,11 @@ import {DOCUMENT} from "@angular/common";
 export class ScrollBarService {
   render: Renderer2;
   scrollBarWidth: number;
-  
+
   constructor(rendererFactory: RendererFactory2, @Inject(DOCUMENT) private document: HTMLElement) {
     this.render = rendererFactory.createRenderer(null, null);
   }
-  
+
   init() {
     const div = this.render.createElement('div');
     div.style.cssText = 'position: absolute; left: -1000px; width: 100px; height: 100px;';

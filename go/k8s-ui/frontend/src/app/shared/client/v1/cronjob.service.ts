@@ -1,14 +1,14 @@
 import {Injectable} from '@angular/core';
-import {Observable, throwError} from "rxjs";
-import {HttpClient, HttpParams} from "@angular/common/http";
+import {Observable, throwError} from 'rxjs';
+import {HttpClient, HttpParams} from '@angular/common/http';
 
 @Injectable()
 export class CronjobService {
-  
+
   constructor(private http: HttpClient) {
   }
-  
-  
+
+
   deleteById(id: number, appId: number, logical?: boolean): Observable<any> {
     const options: any = {};
     if (logical != null) {
@@ -16,17 +16,17 @@ export class CronjobService {
       params = params.set('logical', logical + '');
       options.params = params;
     }
-  
+
     return this.http
       .delete(`/api/v1/apps/${appId}/cronjobs/${id}`, options)
-    
+
       .catch(error => throwError(error));
   }
-  
+
   getById(id: number, appId: number): Observable<any> {
     return this.http
       .get(`/api/v1/apps/${appId}/cronjobs/${id}`)
-      
+
       .catch(error => throwError(error));
   }
 }

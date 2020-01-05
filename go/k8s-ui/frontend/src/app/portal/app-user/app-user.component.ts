@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import {AppUserService} from "../../shared/client/v1/app-user.service";
+import {AppUserService} from '../../shared/client/v1/app-user.service';
 
 @Component({
   selector: 'wayne-app-user',
@@ -25,8 +25,8 @@ import {AppUserService} from "../../shared/client/v1/app-user.service";
   `,
 })
 export class AppUserComponent implements OnInit {
-  constructor(private appUserService: AppUserService,) {
-  
+  constructor(private appUserService: AppUserService, ) {
+
   }
 
   ngOnInit() {

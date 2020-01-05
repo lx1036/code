@@ -1,5 +1,5 @@
 import {Component, Inject, OnDestroy, OnInit} from '@angular/core';
-import {DOCUMENT} from "@angular/common";
+import {DOCUMENT} from '@angular/common';
 
 const defaultInterval = 1000;
 const defaultLeftTime = 1;
@@ -21,7 +21,7 @@ const defaultLeftTime = 1;
   styleUrls: ['./unauthorized.component.scss']
 })
 export class UnauthorizedComponent implements OnInit, OnDestroy {
-  
+
   leftSeconds: number = defaultLeftTime;
   timeInterval: any = null;
   constructor(@Inject(DOCUMENT) private document: any) { }
@@ -42,7 +42,7 @@ export class UnauthorizedComponent implements OnInit, OnDestroy {
       }, defaultInterval);
     }
   }
-  
+
   ngOnDestroy(): void {
   }
 }

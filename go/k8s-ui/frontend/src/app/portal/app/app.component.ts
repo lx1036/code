@@ -1,15 +1,15 @@
 import {AfterViewInit, Component, ElementRef, Inject, OnDestroy, OnInit} from '@angular/core';
-import {NamespaceClient} from "../../shared/client/kubernetes/namespace";
-import {CacheService} from "../../shared/auth/cache.service";
-import {DOCUMENT} from "@angular/common";
-import {MessageHandlerService} from "../../shared/message-handler/message-handler.service";
+import {NamespaceClient} from '../../shared/client/kubernetes/namespace';
+import {CacheService} from '../../shared/auth/cache.service';
+import {DOCUMENT} from '@angular/common';
+import {MessageHandlerService} from '../../shared/message-handler/message-handler.service';
 
 const showState = {
-  'name': {hidden: false},
-  'description': {hidden: false},
-  'create_time': {hidden: false},
-  'create_user': {hidden: false},
-  'action': {hidden: false}
+  name: {hidden: false},
+  description: {hidden: false},
+  create_time: {hidden: false},
+  create_user: {hidden: false},
+  action: {hidden: false}
 };
 
 interface ClusterCard {
@@ -22,7 +22,7 @@ interface ClusterCard {
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
   animations: [
-  
+
   ]
 })
 export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
@@ -30,17 +30,17 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   showState: object = showState;
   starredFilter: boolean;
   starredInherit: boolean; // starredInherit 用来传递给list
-  
+
   constructor(private namespaceClient: NamespaceClient,
               private cacheService: CacheService,
               @Inject(DOCUMENT) private document: any,
               private element: ElementRef,
               private messageHandlerService: MessageHandlerService) { }
-  
+
   resources: object = {};
   clusters: ClusterCard[] = [];
   allowNumber = 10;
-  
+
   ngOnInit() {
     this.initShow();
     this.starredFilter = localStorage.getItem('starred') === 'true';
@@ -50,7 +50,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       Object.getOwnPropertyNames(this.resources).forEach(cluster => {
         this.clusters.push({name: cluster, state: false});
       });
-  
+
       this.allowNumber = this.getClusterMaxNumber();
       for (let i = 0; i < this.allowNumber - 1; i++) {
         setTimeout(((idx) => {
@@ -61,11 +61,11 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     }, error => this.messageHandlerService.handleError(error));
   }
-  
+
   getClusterMaxNumber() {
     return Math.floor(this.element.nativeElement.querySelector('.cluster-outline').offsetWidth / 255);
   }
-  
+
   initShow() {
     this.showList = [];
     Object.keys(this.showState).forEach(key => {
@@ -74,10 +74,10 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
   }
-  
+
   ngAfterViewInit(): void {
   }
-  
+
   ngOnDestroy(): void {
   }
 }

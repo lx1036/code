@@ -1,5 +1,5 @@
 import {AfterViewInit, Component} from '@angular/core';
-import {ScrollBarService} from "./shared/client/scroll-bar.service";
+import {ScrollBarService} from './shared/client/scroll-bar.service';
 
 @Component({
   selector: 'app-root',
@@ -8,10 +8,10 @@ import {ScrollBarService} from "./shared/client/scroll-bar.service";
   `,
 })
 export class AppComponent implements AfterViewInit {
-  constructor(private scrollBar: ScrollBarService,) {
-  
+  constructor(private scrollBar: ScrollBarService, ) {
+
   }
-  
+
   ngAfterViewInit(): void {
     this.scrollBar.init(); // calculate scroll-bar width
   }

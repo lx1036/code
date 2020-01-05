@@ -1,4 +1,4 @@
-import {ConfirmationState, ConfirmationTargets} from "../shared.const";
+import {ConfirmationState, ConfirmationTargets} from '../shared.const';
 
 
 export class ConfirmationAcknowledgement {
@@ -7,7 +7,7 @@ export class ConfirmationAcknowledgement {
     this.data = data;
     this.source = source;
   }
-  
+
   state: ConfirmationState = ConfirmationState.NA;
   data: any = {};
   source: any = ConfirmationTargets.EMPTY;
