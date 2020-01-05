@@ -18,7 +18,7 @@ func Run() {
 	initial.InitClient()
 
 	// 初始化 rsa key
-	//initial.InitRsaKey()
+	initial.InitRsaKey()
 
 	fmt.Println(beego.BConfig.RunMode)
 

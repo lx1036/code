@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"github.com/astaxie/beego/orm"
+	"time"
+)
 
 type UserType int
 
@@ -26,7 +29,7 @@ type User struct {
 
 type userModel struct{}
 
-func (model userModel) GetUserByName(name string) (user *User, err error) {
+func (model *userModel) GetUserByName(name string) (user *User, err error) {
 	user = &User{
 		Id:         1,
 		Name:       name,
@@ -43,6 +46,38 @@ func (model userModel) GetUserByName(name string) (user *User, err error) {
 		CreateTime: nil,
 		UpdateTime: nil,
 		Namespaces: nil,
+	}
+
+	return user, nil
+}
+
+func (model *userModel) GetUserDetail(name string) (user *User, err error) {
+	user = &User{Name: name}
+	err = Ormer().Read(user, "Name")
+	if err != nil {
+		return nil, err
+	}
+	if user.Admin {
+		namespaces, err := NamespaceModel.GetAll(false)
+		if err != nil {
+			return nil, err
+		}
+		user.Namespaces = namespaces
+	} else {
+		var namespaceUsers []NamespaceUser
+		condNS := (orm.NewCondition()).And("User__Id__exact", user.Id)
+		_, err = Ormer().QueryTable(TableNameNamespaceUser).
+			SetCond(condNS).
+			RelatedSel("Namespace").
+			GroupBy("Namespace").
+			OrderBy("Namespace__Name").
+			All(&namespaceUsers)
+		if err != nil {
+			return nil, err
+		}
+		for _, namespaceUser := range namespaceUsers {
+			user.Namespaces = append(user.Namespaces, namespaceUser.Namespace)
+		}
 	}
 
 	return user, nil

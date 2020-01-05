@@ -1,9 +1,9 @@
 package models
 
 import (
+	"errors"
 	"strings"
 	"time"
-	"errors"
 )
 
 const (

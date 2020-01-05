@@ -2,6 +2,10 @@ package models
 
 import "time"
 
+const (
+	TableNameNamespaceUser = "namespace_user"
+)
+
 type NamespaceUser struct {
 	Id        int64      `orm:"auto" json:"id,omitempty"`
 	Namespace *Namespace `orm:"index;rel(fk);column(namespace_id)" json:"namespace,omitempty"`

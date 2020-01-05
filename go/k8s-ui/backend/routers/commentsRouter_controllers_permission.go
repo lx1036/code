@@ -10,12 +10,12 @@ func init() {
 	beego.GlobalControllerRouter[NamespaceUserController] = append(
 		beego.GlobalControllerRouter[NamespaceUserController],
 		beego.ControllerComments{
-			Method: "GetPermissionByNS",
-			Router: `/permissions/:id`,
+			Method:           "GetPermissionByNS",
+			Router:           `/permissions/:id`,
 			AllowHTTPMethods: []string{"get"},
-			MethodParams: param.Make(),
-			Filters: nil,
-			Params: nil,
+			MethodParams:     param.Make(),
+			Filters:          nil,
+			Params:           nil,
 		},
 	)
 }

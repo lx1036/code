@@ -10,7 +10,6 @@ type NamespaceUserController struct {
 	base.APIController
 }
 
-
 func (controller *NamespaceUserController) URLMapping() {
 	controller.Mapping("GetPermissionByNS", controller.GetPermissionByNS)
 }
@@ -20,7 +19,7 @@ func (controller *NamespaceUserController) URLMapping() {
 // @Param	id		path 	int	true		"the ns id"
 // @Success 200 {object} models.TypeApp success
 // @router /permissions/:id [get]
-func (controller *NamespaceUserController) GetPermissionByNS()  {
+func (controller *NamespaceUserController) GetPermissionByNS() {
 	id := controller.GetIdFromURL()
 	permissions, err := models.NamespaceUserModel.GetAllPermissions(id, controller.User.Id)
 	if err != nil {

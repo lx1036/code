@@ -55,3 +55,13 @@ func (model *namespaceModel) GetByName(name string) (namespace *Namespace, err e
 
 	return nil, err
 }
+
+func (model *namespaceModel) GetAll(deleted bool) ([]*Namespace, error) {
+	var namespaces []*Namespace
+	_, err := Ormer().QueryTable(new(Namespace)).Filter("Deleted", deleted).OrderBy("Name").All(&namespaces)
+	if err != nil {
+		return nil, err
+	}
+
+	return namespaces, nil
+}
