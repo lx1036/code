@@ -2,6 +2,7 @@ import {Component, OnInit} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {AuthService} from '../../auth/auth.service';
 import {AuthoriseService} from '../../client/v1/auth.service';
+import {NgForm} from '@angular/forms';
 
 @Component({
   selector: 'sign-in',
@@ -72,12 +73,31 @@ import {AuthoriseService} from '../../client/v1/auth.service';
   ]
 })
 export class SignInComponent implements OnInit {
+  version = require('../../../../../package.json').version;
+  ngForm: NgForm;
+  errMsg: string;
+  username: string;
+  password: string;
+  currentForm: NgForm;
+  isSubmitOnGoing: boolean;
+  
   constructor(private authoriseService: AuthoriseService,
               private route: ActivatedRoute,
               public authService: AuthService) {
   }
   
   ngOnInit() {
+  }
+  
+  public get isValid(): boolean {
+    return this.currentForm &&
+      this.currentForm.valid &&
+      !this.isSubmitOnGoing;
+  }
+  
+  getTitle() {
+    const imagePrefix = this.authService.config['system.title'];
+    return imagePrefix ? imagePrefix : 'Wayne';
   }
   
   getOAuth2Title() {

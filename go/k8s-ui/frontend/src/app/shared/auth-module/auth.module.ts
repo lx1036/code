@@ -18,7 +18,9 @@ export class AuthRoutingModule {
 
 
 @NgModule({
-  declarations: [],
+  declarations: [
+    SignInComponent,
+  ],
   imports: [
     SharedModule,
     AuthRoutingModule

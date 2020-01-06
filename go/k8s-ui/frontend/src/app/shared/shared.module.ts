@@ -14,11 +14,11 @@ import {TranslateModule} from '@ngx-translate/core';
     TranslateModule,
     BrowserModule,
     FormsModule,
-    ResourceLimitModule,
+    // ResourceLimitModule,
     HttpClientModule,
-    EchartsModule,
-    ClarityModule,
-    CollapseModule
+    // EchartsModule,
+    // ClarityModule,
+    // CollapseModule
   ],
   exports: [],
   declarations: [],
