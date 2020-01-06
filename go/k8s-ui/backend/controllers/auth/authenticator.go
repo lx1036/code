@@ -15,7 +15,6 @@ var registry = make(map[string]Authenticator)
 
 // Authenticator provides interface to authenticate user credentials.
 type Authenticator interface {
-	// Authenticate ...
 	Authenticate(model models.AuthModel) (*models.User, error)
 }
 
