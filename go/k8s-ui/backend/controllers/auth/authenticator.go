@@ -8,6 +8,10 @@ import (
 	rsakey "k8s-lx1036/k8s-ui/backend/apikey"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
 	"k8s-lx1036/k8s-ui/backend/models"
+	"k8s-lx1036/k8s-ui/backend/models/response/errors"
+	"k8s-lx1036/k8s-ui/backend/util/logs"
+	"net/http"
+	"strings"
 	"time"
 )
 
@@ -33,10 +37,10 @@ func (auth *AuthController) URLMapping() {
 }
 
 // @router /login/:type/?:name [get,post]
-func (auth *AuthController) Login() {
-	username := auth.Input().Get("username")
-	password := auth.Input().Get("password")
-	authType := auth.Ctx.Input.Param(":type")
+func (controller *AuthController) Login() {
+	username := controller.Input().Get("username")
+	password := controller.Input().Get("password")
+	authType := controller.Ctx.Input.Param(":type")
 
 	fmt.Println(username, password)
 	//authName := auth.Ctx.Input.Param(":name")
@@ -72,21 +76,61 @@ func (auth *AuthController) Login() {
 	}
 
 	loginResult := LoginResult{Token: signedToken}
-	auth.Data["json"] = base.Result{Data: loginResult}
-	auth.ServeJSON()
+	controller.Data["json"] = base.Result{Data: loginResult}
+	controller.ServeJSON()
 }
 
 // @router /logout [get]
-func (auth *AuthController) Logout() {
+func (controller *AuthController) Logout() {
 	fmt.Println("Logout")
-
-	auth.Data["json"] = base.Result{Data: "testtest"}
-	auth.ServeJSON()
+	
+	controller.Data["json"] = base.Result{Data: "testtest"}
+	controller.ServeJSON()
 }
 
-// @router /me [get]
-func (auth *AuthController) CurrentUser() {
-	fmt.Println("test")
+// @router /currentuser [get]
+func (controller *AuthController) CurrentUser() {
+	controller.Controller.Prepare()
+	authString := controller.Ctx.Input.Header("Authorization")
+	kv := strings.Split(authString, " ")
+	if len(kv) != 2 || kv[0] != "Bearer" {
+		logs.Info("AuthString invalid:", authString)
+		controller.CustomAbort(http.StatusUnauthorized, "Token Invalid ! ")
+	}
+	
+	tokenString := kv[1]
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// since we only use the one private key to sign the tokens,
+		// we also only use its public counter part to verify
+		return rsakey.RsaPublicKey, nil
+	})
+	errResult := errors.ErrorResult{}
+	switch err.(type) {
+	case nil: // no error
+		if !token.Valid { // but may still be invalid
+			errResult.Code = http.StatusUnauthorized
+			errResult.Msg = "token is invalid"
+		}
+	case *jwt.ValidationError:
+		errResult.Code = http.StatusUnauthorized
+		errResult.Msg = err.Error()
+	default:
+		errResult.Code = http.StatusInternalServerError
+		errResult.Msg = err.Error()
+	}
+	if err != nil {
+		controller.CustomAbort(errResult.Code, errResult.Msg)
+	}
+	
+	claim := token.Claims.(jwt.MapClaims)
+	aud := claim["aud"].(string)
+	user, err := models.UserModel.GetUserDetail(aud)
+	if err != nil {
+		controller.CustomAbort(http.StatusInternalServerError, err.Error())
+	}
+	
+	controller.Data["json"] = base.Result{Data: user}
+	controller.ServeJSON()
 }
 
 func Register(name string, authenticator Authenticator) {
