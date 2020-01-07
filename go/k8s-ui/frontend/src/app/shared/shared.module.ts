@@ -5,6 +5,8 @@ import {BrowserModule} from '@angular/platform-browser';
 import {FormsModule} from '@angular/forms';
 import {HttpClientModule} from '@angular/common/http';
 import {TranslateModule} from '@ngx-translate/core';
+import {MessageService} from "./message.service";
+import {CacheService} from "./cache.service";
 
 
 @NgModule({
@@ -22,7 +24,10 @@ import {TranslateModule} from '@ngx-translate/core';
   ],
   exports: [],
   declarations: [],
-  providers: [],
+  providers: [
+    MessageService,
+    CacheService,
+  ],
 })
 export class SharedModule {
 }

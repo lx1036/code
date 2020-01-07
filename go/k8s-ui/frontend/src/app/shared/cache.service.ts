@@ -5,6 +5,7 @@ import {MessageHandlerService} from "./message-handler.service";
 @Injectable()
 export class CacheService {
   namespace: Namespace;
+  namespaces: Namespace[];
 
   constructor(private messageHandlerService: MessageHandlerService) {
   }
@@ -16,5 +17,8 @@ export class CacheService {
       this.messageHandlerService.error('当前用户无任何命名空间权限，请联系管理员添加！');
     }
   }
-
+  
+  setNamespaces(namespaces: Namespace[]) {
+    this.namespaces = namespaces;
+  }
 }

@@ -10,6 +10,7 @@ import {Component, OnInit} from '@angular/core';
 <!--          <router-outlet></router-outlet>-->
 <!--      </clr-main-container>-->
 <!--      <confiramtion-dialog style="display: flex"></confiramtion-dialog>-->
+    <router-outlet></router-outlet>
   `
 })
 

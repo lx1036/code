@@ -18,8 +18,9 @@ interface ClusterCard {
 }
 
 @Component({
-  selector: 'wayne-app',
+  selector: 'app-portal-app',
   template: `
+    <div>app-portal-app</div>
 <!--      <div class="content-area" style="position: relative">-->
 <!--          <div class="clr-row">-->
 <!--              <div class="clr-col-lg-12 clr-col-md-12 clr-col-sm-12 clr-col-xs-12">-->
@@ -55,7 +56,8 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   starredFilter: boolean;
   starredInherit: boolean; // starredInherit 用来传递给list
 
-  constructor(private namespaceClient: NamespaceClient,
+  
+  /*constructor(private namespaceClient: NamespaceClient,
               private cacheService: CacheService,
               @Inject(DOCUMENT) private document: any,
               private element: ElementRef,
@@ -97,11 +99,14 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
         this.showList.push(key);
       }
     });
-  }
+  }*/
 
   ngAfterViewInit(): void {
   }
 
   ngOnDestroy(): void {
+  }
+  
+  ngOnInit(): void {
   }
 }

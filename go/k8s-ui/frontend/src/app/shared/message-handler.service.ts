@@ -1,5 +1,5 @@
 import {Injectable, Injector} from '@angular/core';
-import {HttpClient} from '@angular/common/http';
+import {HttpClient, HttpErrorResponse} from '@angular/common/http';
 import {Router} from '@angular/router';
 import {MessageService} from "./message.service";
 import {AlertType, httpStatusCode} from "./shared.const";
@@ -29,12 +29,9 @@ export class MessageHandlerService {
 
   }
 
-  handleError(error: any) {
-    if (!error) {
-      return;
-    }
-    const code = error.statusCode || error.status;
-
+  handleError(error: HttpErrorResponse) {
+    const code = error.status;
+    console.log("code: ", code, "error: ", error);
     if (code === httpStatusCode.Unauthorized) {
       const currentUrl = document.location.origin;
       if (document.location.pathname !== '/sign-in') {

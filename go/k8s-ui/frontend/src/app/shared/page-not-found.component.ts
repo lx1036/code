@@ -8,6 +8,7 @@ const defaultLeftTime = 3;
 @Component({
   selector: 'app-not-found',
   template: `
+    <div>not found</div>
 <!--      <div class="wrapper-back">-->
 <!--          <div>-->
 <!--              <clr-icon shape="warning" class="is-warning" size="96"></clr-icon>-->

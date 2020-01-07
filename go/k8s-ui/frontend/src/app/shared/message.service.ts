@@ -6,7 +6,7 @@ export class MessageService {
   constructor() {
   }
 
-  announceMessage(number: number, message: string, DANGER: any) {
-
+  announceMessage(code: number, message: string, alertType: any) {
+  
   }
 }

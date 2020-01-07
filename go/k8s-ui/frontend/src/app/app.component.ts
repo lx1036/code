@@ -13,6 +13,6 @@ export class AppComponent implements AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    this.scrollBar.init(); // calculate scroll-bar width
+    // this.scrollBar.init(); // calculate scroll-bar width
   }
 }
