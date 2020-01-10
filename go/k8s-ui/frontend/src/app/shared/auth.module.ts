@@ -1,7 +1,7 @@
 import { NgModule } from '@angular/core';
 import {RouterModule, Routes} from '@angular/router';
-import {SignInComponent} from "./sign-in.component";
-import {SharedModule} from "./shared.module";
+import {SignInComponent} from './sign-in.component';
+import {SharedModule} from './shared.module';
 
 const routes: Routes = [
   {

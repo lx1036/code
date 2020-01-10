@@ -14,15 +14,15 @@ import {
 } from '@angular/common/http';
 import {TranslateLoader, TranslateModule} from '@ngx-translate/core';
 import {TranslateHttpLoader} from '@ngx-translate/http-loader';
-import {PodTerminalModule} from "./portal/pod-terminal.module";
-import {AuthModule} from "./shared/auth.module";
+import {PodTerminalModule} from './portal/pod-terminal.module';
+import {AuthModule} from './shared/auth.module';
 import {AuthService} from './shared/auth.service';
 import {httpStatusCode} from './shared/shared.const';
 import {Router} from '@angular/router';
 import {Observable} from 'rxjs';
 import {Location} from '@angular/common';
 const packageJson = require('../../package.json');
-import { environment}from "../environments/environment";
+import { environment} from '../environments/environment';
 
 export function HttpLoaderFactory(httpClient: HttpClient) {
   return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json?v=' + packageJson.version);
@@ -31,28 +31,28 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
 
 function initUser(authService: AuthService, injector: Injector) {
   return () => authService.retrieveUser().then(user => {}).catch((error: HttpErrorResponse) => {
-    console.log("error status: " + error.status);
+    console.log('error status: ' + error.status);
     if (error.status ===  httpStatusCode.Unauthorized) {
-      injector.get(Router).navigateByUrl("sign-in")
-      .then(() => console.log("navigate to sign-in page"))
-      .catch((error: HttpErrorResponse) => console.log("can't navigate to sign-in page because of:"  + error.message ));
+      injector.get(Router).navigateByUrl('sign-in')
+      .then(() => console.log('navigate to sign-in page'))
+      .catch((err: HttpErrorResponse) => console.log('can\'t navigate to sign-in page because of:'  + err.message ));
     }
-  })
+  });
 }
 
 function initConfig(authService: AuthService) {
-  return () => {}
+  return () => {};
 }
 
 
 @Injectable()
 class AuthInterceptor implements HttpInterceptor {
   constructor(private location: Location) {}
-  
+
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     const url = this.location.normalize(environment.api) + this.location.prepareExternalUrl(request.url);
-    const req = request.clone({url: url});
-    
+    const req = request.clone({url});
+
     return next.handle(req).pipe();
   }
 }

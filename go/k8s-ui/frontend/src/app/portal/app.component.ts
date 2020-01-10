@@ -1,8 +1,8 @@
 import {AfterViewInit, Component, ElementRef, Inject, OnDestroy, OnInit} from '@angular/core';
 import {DOCUMENT} from '@angular/common';
-import {NamespaceClient} from "../shared/client/v1/kubernetes/namespace";
-import {CacheService} from "../shared/cache.service";
-import {MessageHandlerService} from "../shared/message-handler.service";
+import {NamespaceClient} from '../shared/client/v1/kubernetes/namespace';
+import {CacheService} from '../shared/cache.service';
+import {MessageHandlerService} from '../shared/message-handler.service';
 
 const showState = {
   name: {hidden: false},
@@ -56,7 +56,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   starredFilter: boolean;
   starredInherit: boolean; // starredInherit 用来传递给list
 
-  
+
   /*constructor(private namespaceClient: NamespaceClient,
               private cacheService: CacheService,
               @Inject(DOCUMENT) private document: any,
@@ -106,7 +106,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnDestroy(): void {
   }
-  
+
   ngOnInit(): void {
   }
 }

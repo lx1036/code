@@ -7,6 +7,6 @@ export class MessageService {
   }
 
   announceMessage(code: number, message: string, alertType: any) {
-  
+
   }
 }

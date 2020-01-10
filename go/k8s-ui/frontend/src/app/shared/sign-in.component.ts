@@ -1,11 +1,11 @@
 import {Component, OnInit} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {NgForm} from '@angular/forms';
-import {AuthoriseService} from "./client/v1/auth.service";
-import {AuthService} from "./auth.service";
+import {AuthoriseService} from './client/v1/auth.service';
+import {AuthService} from './auth.service';
 
 @Component({
-  selector: 'sign-in',
+  selector: 'app-sign-in',
   template: `
     <div class="container">
       Sign-in
@@ -81,26 +81,26 @@ export class SignInComponent implements OnInit {
   password: string;
   currentForm: NgForm;
   isSubmitOnGoing: boolean;
-  
+
   constructor(private authoriseService: AuthoriseService,
               private route: ActivatedRoute,
               public authService: AuthService) {
   }
-  
+
   ngOnInit() {
   }
-  
+
   public get isValid(): boolean {
     return this.currentForm &&
       this.currentForm.valid &&
       !this.isSubmitOnGoing;
   }
-  
+
   getTitle() {
     const imagePrefix = this.authService.config['system.title'];
     return imagePrefix ? imagePrefix : 'Wayne';
   }
-  
+
   getOAuth2Title() {
     const oauth2Title = this.authService.config['system.oauth2-title'];
     return oauth2Title ? oauth2Title : 'OAuth 2.0 Login';

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  selector: 'wayne-filter-box',
+  selector: 'app-filter-box',
   template: `
   `,
 })

@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 import {PodTerminalComponent} from './pod-terminal.component';
-import {SharedModule} from "../shared/shared.module";
+import {SharedModule} from '../shared/shared.module';
 
 
 

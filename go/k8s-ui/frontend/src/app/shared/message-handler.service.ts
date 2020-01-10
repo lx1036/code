@@ -1,8 +1,8 @@
 import {Injectable, Injector} from '@angular/core';
 import {HttpClient, HttpErrorResponse} from '@angular/common/http';
 import {Router} from '@angular/router';
-import {MessageService} from "./message.service";
-import {AlertType, httpStatusCode} from "./shared.const";
+import {MessageService} from './message.service';
+import {AlertType, httpStatusCode} from './shared.const';
 
 @Injectable({
   providedIn: 'root'
@@ -16,7 +16,7 @@ export class MessageHandlerService {
       this.msgService.announceMessage(500, message, AlertType.DANGER);
     }
   }
-  
+
   public showSuccess(message: string): void {
     if (message && message.trim() !== '') {
       this.msgService.announceMessage(200, message, AlertType.SUCCESS);

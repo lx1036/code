@@ -1,6 +1,6 @@
 import {Injectable} from '@angular/core';
-import {Namespace} from "./model/v1/namespace";
-import {MessageHandlerService} from "./message-handler.service";
+import {Namespace} from './model/v1/namespace';
+import {MessageHandlerService} from './message-handler.service';
 
 @Injectable()
 export class CacheService {
@@ -17,7 +17,7 @@ export class CacheService {
       this.messageHandlerService.error('当前用户无任何命名空间权限，请联系管理员添加！');
     }
   }
-  
+
   setNamespaces(namespaces: Namespace[]) {
     this.namespaces = namespaces;
   }

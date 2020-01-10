@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  selector: 'wayne-checkbox',
+  selector: 'app-checkbox',
   template: ``,
 })
 export class CheckboxComponent implements OnInit {

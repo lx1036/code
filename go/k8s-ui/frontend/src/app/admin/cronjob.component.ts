@@ -1,14 +1,14 @@
 import {Component, OnDestroy, OnInit} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {Subscription} from 'rxjs';
-import {ClrDatagridStateInterface} from "@clr/angular";
-import {ConfirmationDialogService} from "../shared/confirmation-dialog.service";
-import {CronjobService} from "../shared/client/v1/cronjob.service";
-import {MessageHandlerService} from "../shared/message-handler.service";
-import {ConfirmationState, ConfirmationTargets} from "../shared/shared.const";
+import {ClrDatagridStateInterface} from '@clr/angular';
+import {ConfirmationDialogService} from '../shared/confirmation-dialog.service';
+import {CronjobService} from '../shared/client/v1/cronjob.service';
+import {MessageHandlerService} from '../shared/message-handler.service';
+import {ConfirmationState, ConfirmationTargets} from '../shared/shared.const';
 
 @Component({
-  selector: 'wayne-cronjob',
+  selector: 'app-cronjob',
   template: ``,
 })
 export class CronjobComponent implements OnInit, OnDestroy {
@@ -19,7 +19,7 @@ export class CronjobComponent implements OnInit, OnDestroy {
   constructor(private route: ActivatedRoute,
               private deletionDialogService: ConfirmationDialogService,
               private cronjobService: CronjobService,
-              private messageHandlerService: MessageHandlerService,) {
+              private messageHandlerService: MessageHandlerService, ) {
     this.subscription = deletionDialogService.confirmationConfirm$.subscribe(message => {
       if (message && message.state === ConfirmationState.CONFIRMED && message.source === ConfirmationTargets.CRONJOB) {
         const id = message.data;
@@ -36,12 +36,12 @@ export class CronjobComponent implements OnInit, OnDestroy {
     });
 
   }
-  
+
   retrieve(state?: ClrDatagridStateInterface): void {
-  
+
   }
-    
-    
+
+
     ngOnInit() {
     this.route.params.subscribe(params => {
       this.appId = params.aid;

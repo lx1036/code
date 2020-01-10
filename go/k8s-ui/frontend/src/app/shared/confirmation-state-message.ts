@@ -1,4 +1,4 @@
-import {ConfirmationState, ConfirmationTargets} from "./shared.const";
+import {ConfirmationState, ConfirmationTargets} from './shared.const';
 
 
 export class ConfirmationAcknowledgement {

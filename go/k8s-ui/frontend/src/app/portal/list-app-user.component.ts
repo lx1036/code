@@ -1,7 +1,7 @@
 import {Component, OnInit} from '@angular/core';
 
 @Component({
-  selector: 'list-app-user',
+  selector: 'app-list-app-user',
   template: `
 
   `

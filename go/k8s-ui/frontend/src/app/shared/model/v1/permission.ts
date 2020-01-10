@@ -25,7 +25,7 @@ export class TypePermission {
   apiKey = new ActionPermission();
   daemonSet = new ActionPermission();
   hpa = new ActionPermission();
-  
+
   // Kubernetes resource permission
   kubeConfigMap = new ActionPermission();
   kubeDaemonSet = new ActionPermission();
@@ -51,5 +51,5 @@ export class TypePermission {
   kubeClusterRole = new ActionPermission();
   kubeClusterRoleBinding = new ActionPermission();
   kubeServiceAccount = new ActionPermission();
-  
+
 }

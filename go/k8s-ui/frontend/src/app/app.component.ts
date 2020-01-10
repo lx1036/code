@@ -1,5 +1,5 @@
 import {AfterViewInit, Component} from '@angular/core';
-import {ScrollBarService} from "./shared/client/v1/scroll-bar.service";
+import {ScrollBarService} from './shared/client/v1/scroll-bar.service';
 
 @Component({
   selector: 'app-root',

@@ -1,7 +1,7 @@
 import {Component, OnInit} from '@angular/core';
 
 @Component({
-  selector: 'portal',
+  selector: 'app-portal',
   template: `
 <!--      <clr-main-container class="main-container">-->
 <!--          <global-message></global-message>-->

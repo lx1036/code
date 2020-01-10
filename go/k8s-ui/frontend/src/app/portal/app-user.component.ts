@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import {AppUserService} from "../shared/client/v1/app-user.service";
+import {AppUserService} from '../shared/client/v1/app-user.service';
 
 @Component({
-  selector: 'wayne-app-user',
+  selector: 'app-user',
   template: `
 <!--    <div class="clr-row">-->
 <!--      <div class="clr-col-lg-12 clr-col-md-12 clr-col-sm-12 clr-col-xs-12">-->
