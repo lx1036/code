@@ -15,7 +15,6 @@ import {
 import {TranslateLoader, TranslateModule} from '@ngx-translate/core';
 import {TranslateHttpLoader} from '@ngx-translate/http-loader';
 import {PodTerminalModule} from './portal/pod-terminal.module';
-import {AuthModule} from './shared/auth.module';
 import {AuthService} from './shared/auth.service';
 import {httpStatusCode} from './shared/shared.const';
 import {Router} from '@angular/router';
@@ -30,7 +29,7 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
 
 
 function initUser(authService: AuthService, injector: Injector) {
-  return () => authService.retrieveUser().then(user => {}).catch((error: HttpErrorResponse) => {
+  return () => authService.retrieveUser().catch((error: HttpErrorResponse) => {
     console.log('error status: ' + error.status);
     if (error.status ===  httpStatusCode.Unauthorized) {
       injector.get(Router).navigateByUrl('sign-in')
@@ -41,7 +40,7 @@ function initUser(authService: AuthService, injector: Injector) {
 }
 
 function initConfig(authService: AuthService) {
-  return () => {};
+  return () => authService.initConfig();
 }
 
 
@@ -68,7 +67,6 @@ class AuthInterceptor implements HttpInterceptor {
   ],
   imports: [
     PodTerminalModule,
-    AuthModule,
     PortalModule,
     AdminModule,
     RoutingModule,

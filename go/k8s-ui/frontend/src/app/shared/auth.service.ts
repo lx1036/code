@@ -1,14 +1,22 @@
 import {Injectable} from '@angular/core';
-import {HttpClient} from '@angular/common/http';
+import {HttpClient, HttpErrorResponse} from '@angular/common/http';
 import {CacheService} from './cache.service';
 import {MessageHandlerService} from './message-handler.service';
 import {TypePermission} from './model/v1/permission';
 import {User} from './model/v1/user';
 
+interface BaseConfig {
+  appLabelKey: string;
+  enableApiKeys: boolean;
+  enableDBLogin: boolean;
+  enableRobin: boolean;
+  ldapLogin: boolean;
+  oauth2Login: boolean;
+}
 
 @Injectable()
 export class AuthService {
-  config: any;
+  config: BaseConfig;
   currentNamespacePermission: TypePermission = null;
   currentAppPermission: TypePermission = null;
   currentUser: User = null;
@@ -21,25 +29,21 @@ export class AuthService {
   }
 
   retrieveUser(): Promise<User> {
-    return this.http.get(`/currentuser`).toPromise().then((response: any) => {
+    return this.http.get(`/currentuser`).toPromise().then((response: {data: User}) => {
       this.currentUser = response.data;
       this.cacheService.setNamespaces(this.currentUser.namespaces);
       return response.data;
-    }).catch((error) => {
-      this.messageHandlerService.handleError(error);
-      return Promise.resolve();
     });
   }
 
-  initConfig(): Promise<any> {
+  initConfig(): Promise<BaseConfig> {
     return this.http
     .get(`/api/v1/configs/base`)
-    .toPromise().then((response: any) => {
+    .toPromise().then((response: {data: BaseConfig}) => {
         this.config = response.data;
         return response.data;
       }
-    ).catch(error =>
-      this.handleError(error));
+    );
   }
 
   // Handle the related exceptions

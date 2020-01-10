@@ -8,39 +8,38 @@ import {AuthService} from './auth.service';
   selector: 'app-sign-in',
   template: `
     <div class="container">
-      Sign-in
-<!--      <form class="login" #ngForm="ngForm">-->
-<!--        <div>-->
-<!--          <div style="padding-bottom:5px;text-align:center;">-->
-<!--            <img src="assets/images/wayne-logo.blue.svg" width="200px" alt=""><br>-->
-<!--            <strong>{{getTitle()}} {{version}}</strong>-->
-<!--          </div>-->
-<!--        </div>-->
-<!--        -->
-<!--        <div *ngIf="authService.config?.enableDBLogin || authService.config?.ldapLogin"-->
-<!--             style="padding-bottom:5px;text-align:center;">-->
-<!--          <div>-->
-<!--            <wayne-input style="margin-top: 20px;height: 35px;font-size: 14px;" required [(ngModel)]="username" type="text"-->
-<!--                         name="login_username" id="login_username" placeholder="请输入用户名"></wayne-input>-->
-<!--            <wayne-input style="margin-top: 20px;height: 35px;font-size: 14px;" required [(ngModel)]="password"-->
-<!--                         type="password" name="login_password" id="login_password" placeholder="请输入密码"></wayne-input>-->
-<!--          </div>-->
-<!--          <div *ngIf="errMsg" class="error">{{errMsg}}</div>-->
-<!--          <div>-->
-<!--            <button style="margin-top: 20px; width:240px;height: 40px;font-size: 16px;" type="submit" class="wayne-button"-->
-<!--                    [class.normal]="isValid" [class.invalid]="!isValid" (click)="onSubmit()">立即登录-->
-<!--            </button>-->
-<!--          </div>-->
-<!--        </div>-->
-<!--        -->
-<!--        <div *ngIf="authService.config?.oauth2Login" style="padding-bottom:5px;text-align:center;">-->
-<!--          <hr style="width: 240px;"/>-->
-<!--          <button style="margin-top: 10px; width:240px;height: 40px;font-size: 16px;" type="submit" (click)="oauth2Login()"-->
-<!--                  class="wayne-button normal">{{getOAuth2Title()}}</button>-->
-<!--        </div>-->
-<!--      </form>-->
+      <form class="login" #ngForm="ngForm">
+        <div>
+          <div style="padding-bottom:5px;text-align:center;">
+            <img src="assets/images/wayne-logo.blue.svg" width="200px" alt=""><br>
+            <strong>{{getTitle()}} {{version}}</strong>
+          </div>
+        </div>
+
+        <div *ngIf="authService.config?.enableDBLogin || authService.config?.ldapLogin"
+             style="padding-bottom:5px;text-align:center;">
+          <div>
+            <app-input style="margin-top: 20px;height: 35px;font-size: 14px;" required [(ngModel)]="username" type="text"
+                         name="login_username" id="login_username" placeholder="请输入用户名"></app-input>
+            <app-input style="margin-top: 20px;height: 35px;font-size: 14px;" required [(ngModel)]="password"
+                         type="password" name="login_password" id="login_password" placeholder="请输入密码"></app-input>
+          </div>
+          <div *ngIf="errMsg" class="error">{{errMsg}}</div>
+          <div>
+            <button style="margin-top: 20px; width:240px;height: 40px;font-size: 16px;" type="submit" class="wayne-button"
+                    [class.normal]="isValid" [class.invalid]="!isValid" (click)="onSubmit()">立即登录
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="authService.config?.oauth2Login" style="padding-bottom:5px;text-align:center;">
+          <hr style="width: 240px;"/>
+          <button style="margin-top: 10px; width:240px;height: 40px;font-size: 16px;" type="submit" (click)="oauth2Login()"
+                  class="wayne-button normal">{{getOAuth2Title()}}</button>
+        </div>
+      </form>
     </div>
-<!--    <canvas class="background"></canvas>-->
+    <canvas class="background"></canvas>
   `,
   styles: [
     `
@@ -104,5 +103,13 @@ export class SignInComponent implements OnInit {
   getOAuth2Title() {
     const oauth2Title = this.authService.config['system.oauth2-title'];
     return oauth2Title ? oauth2Title : 'OAuth 2.0 Login';
+  }
+
+  onSubmit() {
+
+  }
+
+  oauth2Login() {
+
   }
 }
