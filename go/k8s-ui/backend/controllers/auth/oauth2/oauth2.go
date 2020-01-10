@@ -1,5 +1,3 @@
 package oauth2
 
-
-
-type OAuth2Auth struct {}
+type OAuth2Auth struct{}

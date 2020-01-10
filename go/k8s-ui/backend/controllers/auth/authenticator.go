@@ -83,7 +83,7 @@ func (controller *AuthController) Login() {
 // @router /logout [get]
 func (controller *AuthController) Logout() {
 	fmt.Println("Logout")
-	
+
 	controller.Data["json"] = base.Result{Data: "testtest"}
 	controller.ServeJSON()
 }
@@ -97,7 +97,7 @@ func (controller *AuthController) CurrentUser() {
 		logs.Info("AuthString invalid:", authString)
 		controller.CustomAbort(http.StatusUnauthorized, "Token Invalid ! ")
 	}
-	
+
 	tokenString := kv[1]
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// since we only use the one private key to sign the tokens,
@@ -121,14 +121,14 @@ func (controller *AuthController) CurrentUser() {
 	if err != nil {
 		controller.CustomAbort(errResult.Code, errResult.Msg)
 	}
-	
+
 	claim := token.Claims.(jwt.MapClaims)
 	aud := claim["aud"].(string)
 	user, err := models.UserModel.GetUserDetail(aud)
 	if err != nil {
 		controller.CustomAbort(http.StatusInternalServerError, err.Error())
 	}
-	
+
 	controller.Data["json"] = base.Result{Data: user}
 	controller.ServeJSON()
 }
