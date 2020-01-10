@@ -33,7 +33,7 @@ type AuthController struct {
 func (auth *AuthController) URLMapping() {
 	auth.Mapping("Login", auth.Login)
 	auth.Mapping("Logout", auth.Logout)
-	auth.Mapping("Me", auth.CurrentUser)
+	auth.Mapping("CurrentUser", auth.CurrentUser)
 }
 
 // @router /login/:type/?:name [get,post]

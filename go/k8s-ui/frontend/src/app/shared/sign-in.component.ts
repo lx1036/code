@@ -7,7 +7,8 @@ import {AuthService} from "./auth.service";
 @Component({
   selector: 'sign-in',
   template: `
-<!--    <div class="container">-->
+    <div class="container">
+      Sign-in
 <!--      <form class="login" #ngForm="ngForm">-->
 <!--        <div>-->
 <!--          <div style="padding-bottom:5px;text-align:center;">-->
@@ -38,7 +39,7 @@ import {AuthService} from "./auth.service";
 <!--                  class="wayne-button normal">{{getOAuth2Title()}}</button>-->
 <!--        </div>-->
 <!--      </form>-->
-<!--    </div>-->
+    </div>
 <!--    <canvas class="background"></canvas>-->
   `,
   styles: [

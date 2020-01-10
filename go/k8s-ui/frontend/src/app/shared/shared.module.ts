@@ -7,6 +7,7 @@ import {HttpClientModule} from '@angular/common/http';
 import {TranslateModule} from '@ngx-translate/core';
 import {MessageService} from "./message.service";
 import {CacheService} from "./cache.service";
+import {AuthoriseService} from './client/v1/auth.service';
 
 
 @NgModule({
@@ -27,6 +28,7 @@ import {CacheService} from "./cache.service";
   providers: [
     MessageService,
     CacheService,
+    AuthoriseService
   ],
 })
 export class SharedModule {

@@ -31,7 +31,6 @@ export class MessageHandlerService {
 
   handleError(error: HttpErrorResponse) {
     const code = error.status;
-    console.log("code: ", code, "error: ", error);
     if (code === httpStatusCode.Unauthorized) {
       const currentUrl = document.location.origin;
       if (document.location.pathname !== '/sign-in') {

@@ -44,7 +44,6 @@ export class AuthService {
   
   // Handle the related exceptions
   handleError(error: any): Promise<any> {
-    // messageHandlerService
     return Promise.reject(error);
   }
 }
