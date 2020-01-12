@@ -1,0 +1,136 @@
+# https://github.com/galexrt/kubernetes-manifests/blob/master/gitlab-ci-runner/README.md
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitlab-ci-runner-configmap
+  namespace: kube-ops
+  labels:
+    app: gitlab-ci-runner
+data:
+  REGISTER_NON_INTERACTIVE: "true"
+  REGISTER_LOCKED: "false"
+  METRICS_SERVER: "0.0.0.0:9100"
+  CI_SERVER_URL: "http://gitlab.kube-ops.svc.cluster.local/ci"
+  RUNNER_REQUEST_CONCURRENCY: "4"
+  RUNNER_EXECUTOR: "kubernetes"
+  KUBERNETES_NAMESPACE: "kube-ops"
+  KUBERNETES_PRIVILEGED: "true"
+  KUBERNETES_CPU_LIMIT: "1"
+  KUBERNETES_MEMORY_LIMIT: "1Gi"
+  KUBERNETES_SERVICE_CPU_LIMIT: "1"
+  KUBERNETES_SERVICE_MEMORY_LIMIT: "1Gi"
+  KUBERNETES_HELPER_CPU_LIMIT: "500m"
+  KUBERNETES_HELPER_MEMORY_LIMIT: "100Mi"
+  KUBERNETES_PULL_POLICY: "if-not-present"
+  KUBERNETES_TERMINATIONGRACEPERIODSECONDS: "10"
+  KUBERNETES_POLL_INTERVAL: "5"
+  KUBERNETES_POLL_TIMEOUT: "360"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitlab-ci-runner-scripts
+  namespace: kube-ops
+  labels:
+    name: gitlab-ci-runner
+data:
+  run.sh: |
+    #!/bin/bash
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitlab-ci-runner
+  namespace: kube-ops
+  labels:
+    app: gitlab-ci-runner
+spec:
+  selector:
+    matchLabels:
+      app: gitlab-ci-runner
+  updateStrategy:
+    type: RollingUpdate
+  serviceName: gitlab-ci-runner
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: gitlab-ci-runner
+    spec:
+      serviceAccountName: gitlab-ci
+      containers:
+        - name: gitlab-ci-runner
+          image: gitlab/gitlab-runner:v10.4.0
+          command:
+            - /scripts/run.sh
+          envFrom:
+            - configMapRef:
+                name: gitlab-ci-runner-configmap
+            - secretRef:
+                name: gitlab-ci-token
+          env:
+            - name: RUNNER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          ports:
+            - containerPort: 9100
+              name: http-metrics
+              protocol: TCP
+          volumeMounts:
+            - mountPath: "/scripts"
+              name: gitlab-ci-runner-scripts
+              readOnly: true
+      volumes:
+        - name: gitlab-ci-runner-scripts
+          projected:
+            sources:
+              - configMap:
+                  name: gitlab-ci-runner-scripts
+                  items:
+                    - key: run.sh
+                      path: run.sh
+                      mode: 0755
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-ci-runner
+  namespace: kube-ops
+spec:
+  selector:
+    app: gitlab-ci-runner
+  ports:
+    - port: 8080
+  type: NodePort
+---
+#RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitlab-ci
+  namespace: kube-ops
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: kube-ops
+  name: gitlab-ci
+rules:
+  - verbs: ["*"]
+    resources: ["*"]
+    apiGroups: [""]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: kube-ops
+  name: gitlab-ci
+subjects:
+  - kind: ServiceAccount
+    name: gitlab-ci
+    namespace: kube-ops
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gitlab-ci

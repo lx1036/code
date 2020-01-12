@@ -201,11 +201,11 @@ func (cors *Cors) HandleActualRequest(response http.ResponseWriter, request *htt
 	} else {
 		headers.Set("Access-Control-Allow-Origin", origin)
 	}
-	
+
 	if len(cors.exposedHeaders) > 0 {
 		headers.Set("Access-Control-Expose-Headers", strings.Join(cors.exposedHeaders, ", "))
 	}
-	
+
 	if cors.allowCredentials {
 		headers.Set("Access-Control-Allow-Credentials", "true")
 	}
