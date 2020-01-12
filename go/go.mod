@@ -24,6 +24,7 @@ require (
 	github.com/libp2p/go-reuseport v0.0.1
 	github.com/mholt/certmagic v0.8.3
 	github.com/miekg/dns v1.1.15
+	github.com/mitchellh/mapstructure v1.1.2
 	github.com/olivere/elastic/v7 v7.0.9
 	github.com/prometheus/client_golang v1.1.0
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
