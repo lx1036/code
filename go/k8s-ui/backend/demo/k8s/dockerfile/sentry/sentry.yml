@@ -1,0 +1,192 @@
+# https://github.com/cnych/kubeapp/blob/master/sentry/README.md
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentry
+  labels:
+    app: sentry
+  namespace: kube-ops
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: sentry
+      labels:
+        app: sentry
+    spec:
+      containers:
+        - name: sentry
+          image: sentry:9.1-onbuild
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: C_FORCE_ROOT
+              value: "true"
+            - name: SENTRY_REDIS_HOST
+              value: "redis"
+            - name: SENTRY_REDIS_PORT
+              value: "6379"
+            - name: SENTRY_REDIS_DB
+              value: "2"
+            - name: SENTRY_RABBITMQ_HOST
+              value: "rabbitmq:5672"
+            - name: SENTRY_RABBITMQ_USERNAME
+              value: "xxxx"
+            - name: SENTRY_RABBITMQ_PASSWORD
+              value: "xxxx"
+            - name: SENTRY_SECRET_KEY
+              value: "xxxxxxxxxxxxxxxxxxxxxxxxx"
+            - name: SENTRY_POSTGRES_HOST
+              value: "postgresql"
+            - name: SENTRY_POSTGRES_PORT
+              value: "5432"
+            - name: SENTRY_DB_NAME
+              value: "sentry"
+            - name: SENTRY_DB_USER
+              value: "postgres"
+            - name: SENTRY_DB_PASSWORD
+              value: "postgres321"
+            - name: SENTRY_EMAIL_HOST
+              value: "xxxxxxxxxxxxx"
+            - name: SENTRY_EMAIL_PORT
+              value: "xxxxxxxxx"
+            - name: SENTRY_EMAIL_USE_TLS
+              value: "xxxxxxxxx"
+            - name: SENTRY_EMAIL_USER
+              value: "xxxxxxxxxxxxxx"
+            - name: SENTRY_EMAIL_PASSWORD
+              value: "xxxxxxxxxxxx"
+            - name: SENTRY_SERVER_EMAIL
+              value: "xxxxxxxxxxxxxx"
+          ports:
+            - containerPort: 9000
+              name: web
+          resources:
+            limits:
+              cpu: 200m
+              memory: 400Mi
+            requests:
+              cpu: 50m
+              memory: 100Mi
+          volumeMounts:
+            - mountPath: /var/lib/sentry/files
+              name: storage
+              subPath: sentry
+          livenessProbe:
+            httpGet:
+              port: 80
+              path: /
+            initialDelaySeconds: 180
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              port: 80
+              path: /
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+        - name: sentry-worker
+          image: sentry:9.1-onbuild
+          imagePullPolicy: IfNotPresent
+          command: ["sentry", "run", "worker"]
+          env:
+            - name: C_FORCE_ROOT
+              value: "true"
+            - name: SENTRY_REDIS_HOST
+              value: "redis"
+            - name: SENTRY_REDIS_PORT
+              value: "6379"
+            - name: SENTRY_REDIS_DB
+              value: "2"
+            - name: SENTRY_RABBITMQ_HOST
+              value: "rabbitmq:5672"
+            - name: SENTRY_RABBITMQ_USERNAME
+              value: "xxxx"
+            - name: SENTRY_RABBITMQ_PASSWORD
+              value: "xxxx"
+            - name: SENTRY_SECRET_KEY
+              value: "xxxxxxxxxxxxxxxxxxxxxxxxx"
+            - name: SENTRY_POSTGRES_HOST
+              value: "postgresql"
+            - name: SENTRY_POSTGRES_PORT
+              value: "5432"
+            - name: SENTRY_DB_NAME
+              value: "sentry"
+            - name: SENTRY_DB_USER
+              value: "postgres"
+            - name: SENTRY_DB_PASSWORD
+              value: "postgres321"
+            - name: SENTRY_EMAIL_HOST
+              value: "xxxxxxxxxxxxx"
+            - name: SENTRY_EMAIL_PORT
+              value: "xxxxxxxxx"
+            - name: SENTRY_EMAIL_USE_TLS
+              value: "xxxxxxxxx"
+            - name: SENTRY_EMAIL_USER
+              value: "xxxxxxxxxxxxxx"
+            - name: SENTRY_EMAIL_PASSWORD
+              value: "xxxxxxxxxxxx"
+            - name: SENTRY_SERVER_EMAIL
+              value: "xxxxxxxxxxxxxx"
+        - name: sentry-cron
+          image: sentry:9.1-onbuild
+          imagePullPolicy: IfNotPresent
+          command: ["sentry", "run", "cron"]
+          env:
+            - name: C_FORCE_ROOT
+              value: "true"
+            - name: SENTRY_REDIS_HOST
+              value: "redis"
+            - name: SENTRY_REDIS_PORT
+              value: "6379"
+            - name: SENTRY_REDIS_DB
+              value: "2"
+            - name: SENTRY_RABBITMQ_HOST
+              value: "rabbitmq:5672"
+            - name: SENTRY_RABBITMQ_USERNAME
+              value: "xxxx"
+            - name: SENTRY_RABBITMQ_PASSWORD
+              value: "xxxx"
+            - name: SENTRY_SECRET_KEY
+              value: "xxxxxxxxxxxxxxxxxxxxxxxxx"
+            - name: SENTRY_POSTGRES_HOST
+              value: "postgresql"
+            - name: SENTRY_POSTGRES_PORT
+              value: "5432"
+            - name: SENTRY_DB_NAME
+              value: "sentry"
+            - name: SENTRY_DB_USER
+              value: "postgres"
+            - name: SENTRY_DB_PASSWORD
+              value: "postgres321"
+            - name: SENTRY_EMAIL_HOST
+              value: "xxxxxxxxxxxxx"
+            - name: SENTRY_EMAIL_PORT
+              value: "xxxxxxxxx"
+            - name: SENTRY_EMAIL_USE_TLS
+              value: "xxxxxxxxx"
+            - name: SENTRY_EMAIL_USER
+              value: "xxxxxxxxxxxxxx"
+            - name: SENTRY_EMAIL_PASSWORD
+              value: "xxxxxxxxxxxx"
+            - name: SENTRY_SERVER_EMAIL
+              value: "xxxxxxxxxxxxxx"
+      volumes:
+        - name: storage
+          emptyDir: {}
+  selector:
+    matchLabels:
+      app: 
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentry
+  namespace: kube-ops
+  labels:
+    app: sentry
+spec:
+  selector:
+    app: sentry
+  ports:
+    - port: 9000
+      targetPort: web
+  type: NodePort
