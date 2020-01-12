@@ -19,7 +19,6 @@ type User struct {
 	Admin     bool       `orm:"default(False)" json:"admin"`
 	LastLogin *time.Time `orm:"auto_now_add;type(datetime)" json:"lastLogin,omitempty"`
 	LastIp    string     `orm:"size(200)" json:"lastIp,omitempty"`
-
 	Deleted    bool       `orm:"default(false)" json:"deleted,omitempty"`
 	CreateTime *time.Time `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
 	UpdateTime *time.Time `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`

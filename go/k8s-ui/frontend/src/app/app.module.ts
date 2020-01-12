@@ -1,5 +1,4 @@
 import {APP_INITIALIZER, Injectable, Injector, NgModule} from '@angular/core';
-import {RoutingModule} from './app-routing.module';
 import { AppComponent } from './app.component';
 import {PortalModule} from './portal/portal.module';
 import {AdminModule} from './admin/admin.module';
@@ -17,16 +16,17 @@ import {TranslateHttpLoader} from '@ngx-translate/http-loader';
 import {PodTerminalModule} from './portal/pod-terminal.module';
 import {AuthService} from './shared/auth.service';
 import {httpStatusCode, LoginTokenKey} from './shared/shared.const';
-import {Router} from '@angular/router';
+import {Router, RouterModule, Routes} from '@angular/router';
 import {Observable} from 'rxjs';
 import {Location} from '@angular/common';
 const packageJson = require('../../package.json');
 import { environment} from '../environments/environment';
+import {UnauthorizedComponent} from './shared/unauthorized.component';
+import {PageNotFoundComponent} from './shared/page-not-found.component';
 
 export function HttpLoaderFactory(httpClient: HttpClient) {
   return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json?v=' + packageJson.version);
 }
-
 
 function initUser(authService: AuthService, injector: Injector) {
   return () => authService.retrieveUser().catch((error: HttpErrorResponse) => {
@@ -42,7 +42,6 @@ function initUser(authService: AuthService, injector: Injector) {
 function initConfig(authService: AuthService) {
   return () => authService.initConfig();
 }
-
 
 @Injectable()
 class AuthInterceptor implements HttpInterceptor {
@@ -65,6 +64,21 @@ class AuthInterceptor implements HttpInterceptor {
   }
 }
 
+const routes: Routes = [
+  {path: '', redirectTo: 'portal/namespace/0/app', pathMatch: 'full'},
+  {path: 'unauthorized', component: UnauthorizedComponent},
+  {path: '**', component: PageNotFoundComponent},
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule],
+  declarations: [
+    UnauthorizedComponent,
+    PageNotFoundComponent,
+  ]
+})
+export class RoutingModule { }
 
 @NgModule({
   declarations: [
