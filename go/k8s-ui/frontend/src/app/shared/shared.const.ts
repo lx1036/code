@@ -14,6 +14,11 @@ export const httpStatusCode = {
   StatusInternalServerError: 500
 };
 
+export const AuthType = {
+  DB: "db",
+  OAuth2: "oauth2",
+  Ldap: "ldap",
+};
 
 export const enum ConfirmationState {
   NA, CONFIRMED, CANCEL

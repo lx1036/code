@@ -4,6 +4,7 @@ import {NgForm} from '@angular/forms';
 import {AuthoriseService} from './client/v1/auth.service';
 import {AuthService} from './auth.service';
 import * as particlesJS from 'particlesjs/dist/particles';
+import {AuthType} from './shared.const';
 
 @Component({
   selector: 'app-sign-in',
@@ -112,7 +113,18 @@ export class SignInComponent implements OnInit {
   }
 
   onSubmit() {
-
+    let type = AuthType.DB;
+    if (this.authService.config && this.authService.config.ldapLogin) {
+      type = AuthType.Ldap;
+    }
+    
+    this.authoriseService.login(this.username, this.password, type).subscribe(
+      (response) => {
+        const refer = this.route.snapshot.queryParams['ref'] ? this.route.snapshot.queryParams['ref'] : '/';
+        
+      },
+      (error) => {}
+    )
   }
 
   oauth2Login() {
