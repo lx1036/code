@@ -84,9 +84,9 @@ func (controller *AuthController) Login() {
 	now := time.Now()
 	exp := beego.AppConfig.DefaultInt64("TokenLifeTime", 86400)
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-		"iss": "k8s-ui", // 签发者
-		"iat": now.Unix(), // 签发时间
-		"exp": now.Add(time.Duration(exp) * time.Second).Unix(), // 过期时间
+		"iss": beego.AppConfig.DefaultString("appname", "k8s-ui"), // 签发者
+		"iat": now.Unix(),                                         // 签发时间
+		"exp": now.Add(time.Duration(exp) * time.Second).Unix(),   // 过期时间
 		"aud": user.Name,
 	})
 	signedToken, err := token.SignedString(rsakey.RsaPrivateKey)

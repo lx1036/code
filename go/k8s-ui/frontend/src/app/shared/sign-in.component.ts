@@ -1,10 +1,14 @@
-import {Component, OnInit} from '@angular/core';
-import {ActivatedRoute} from '@angular/router';
+import {Component, Injector, OnInit} from '@angular/core';
+import {ActivatedRoute, Router} from '@angular/router';
 import {NgForm} from '@angular/forms';
 import {AuthoriseService} from './client/v1/auth.service';
 import {AuthService} from './auth.service';
 import * as particlesJS from 'particlesjs/dist/particles';
-import {AuthType} from './shared.const';
+import {AuthType, LoginTokenKey} from './shared.const';
+
+interface Token {
+  token: string;
+}
 
 @Component({
   selector: 'app-sign-in',
@@ -85,8 +89,7 @@ export class SignInComponent implements OnInit {
 
   constructor(private authoriseService: AuthoriseService,
               private route: ActivatedRoute,
-              public authService: AuthService) {
-  }
+              public authService: AuthService, private injector: Injector) {}
 
   ngOnInit() {
     particlesJS.init({ // add particles in background, beautiful!
@@ -117,14 +120,15 @@ export class SignInComponent implements OnInit {
     if (this.authService.config && this.authService.config.ldapLogin) {
       type = AuthType.Ldap;
     }
-    
+
     this.authoriseService.login(this.username, this.password, type).subscribe(
-      (response) => {
-        const refer = this.route.snapshot.queryParams['ref'] ? this.route.snapshot.queryParams['ref'] : '/';
-        
+      (response: {data: Token}) => {
+        const ref = this.route.snapshot.queryParams.ref ? this.route.snapshot.queryParams.ref : '/';
+        localStorage.setItem(LoginTokenKey, response.data.token);
+        this.injector.get(Router).navigateByUrl(ref).then();
       },
       (error) => {}
-    )
+    );
   }
 
   oauth2Login() {

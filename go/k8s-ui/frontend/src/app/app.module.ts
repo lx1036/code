@@ -8,7 +8,7 @@ import {
   HttpClient,
   HttpClientModule,
   HttpErrorResponse, HttpEvent,
-  HttpHandler,
+  HttpHandler, HttpHeaders,
   HttpInterceptor,
   HttpRequest
 } from '@angular/common/http';
@@ -16,7 +16,7 @@ import {TranslateLoader, TranslateModule} from '@ngx-translate/core';
 import {TranslateHttpLoader} from '@ngx-translate/http-loader';
 import {PodTerminalModule} from './portal/pod-terminal.module';
 import {AuthService} from './shared/auth.service';
-import {httpStatusCode} from './shared/shared.const';
+import {httpStatusCode, LoginTokenKey} from './shared/shared.const';
 import {Router} from '@angular/router';
 import {Observable} from 'rxjs';
 import {Location} from '@angular/common';
@@ -49,8 +49,17 @@ class AuthInterceptor implements HttpInterceptor {
   constructor(private location: Location) {}
 
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    const token = localStorage.getItem(LoginTokenKey);
+    const headers: {[name: string]: string|string[]} = {};
+    for (const key of request.headers.keys()) {
+      headers[key] = request.headers.getAll(key);
+    }
+    headers['Content-Type'] = 'application/json';
+    if (token) { // if logged in
+      headers.Authorization = 'Bearer ' + token;
+    }
     const url = this.location.normalize(environment.api) + this.location.prepareExternalUrl(request.url);
-    const req = request.clone({url});
+    const req = request.clone({url, headers: new HttpHeaders(headers)});
 
     return next.handle(req).pipe();
   }
