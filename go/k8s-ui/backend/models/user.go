@@ -30,22 +30,9 @@ type User struct {
 type userModel struct{}
 
 func (model *userModel) GetUserByName(name string) (user *User, err error) {
-	user = &User{
-		Id:         1,
-		Name:       name,
-		Password:   "",
-		Salt:       "",
-		Email:      "",
-		Display:    "",
-		Comment:    "",
-		Type:       0,
-		Admin:      false,
-		LastLogin:  nil,
-		LastIp:     "",
-		Deleted:    false,
-		CreateTime: nil,
-		UpdateTime: nil,
-		Namespaces: nil,
+	user = &User{Name: name}
+	if err = Ormer().Read(user, "Name"); err != nil {
+		return nil, err
 	}
 
 	return user, nil
