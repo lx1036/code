@@ -10,6 +10,10 @@ import {CacheService} from './cache.service';
 import {AuthoriseService} from './client/v1/auth.service';
 import {SignInComponent} from './sign-in.component';
 import {InputComponent} from './input.component';
+import {ClarityModule} from '@clr/angular';
+import {MessageComponent} from './message.component';
+import {DiffComponent} from './diff.component';
+import {ConfirmationDialogComponent} from './confirmation-dialog.component';
 
 const routes: Routes = [
   {
@@ -35,16 +39,24 @@ export class AuthRoutingModule {
     // ResourceLimitModule,
     HttpClientModule,
     // EchartsModule,
-    // ClarityModule,
+    ClarityModule,
     // CollapseModule
 
     AuthRoutingModule,
   ],
-  exports: [],
+  exports: [
+    ClarityModule,
+
+    MessageComponent,
+    DiffComponent,
+    ConfirmationDialogComponent,
+  ],
   declarations: [
     SignInComponent,
     InputComponent,
-
+    MessageComponent,
+    DiffComponent,
+    ConfirmationDialogComponent,
   ],
   providers: [
     MessageService,

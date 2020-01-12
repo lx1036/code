@@ -7,6 +7,8 @@ import {ListAppUserComponent} from './list-app-user.component';
 import {AuthCheckGuard} from '../shared/auth-check-guard.service';
 import {AuthService} from '../shared/auth.service';
 import {RouterModule, Routes} from '@angular/router';
+import {SharedModule} from '../shared/shared.module';
+import {NavComponent} from './nav.component';
 
 const routes: Routes = [
   {
@@ -24,7 +26,7 @@ const routes: Routes = [
 
 @NgModule({
   imports: [
-    RouterModule.forChild(routes)
+    RouterModule.forChild(routes),
   ],
   exports: [
     RouterModule
@@ -40,6 +42,7 @@ export class PortalRoutingModule {
 @NgModule({
   imports: [
     PortalRoutingModule,
+    SharedModule,
   ],
   exports: [
     PortalRoutingModule,
@@ -49,6 +52,7 @@ export class PortalRoutingModule {
     AppComponent,
     AppUserComponent,
     ListAppUserComponent,
+    NavComponent,
   ],
   providers: [
     AuthCheckGuard,
