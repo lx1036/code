@@ -3,6 +3,7 @@ import {ActivatedRoute} from '@angular/router';
 import {NgForm} from '@angular/forms';
 import {AuthoriseService} from './client/v1/auth.service';
 import {AuthService} from './auth.service';
+import * as particlesJS from 'particlesjs/dist/particles';
 
 @Component({
   selector: 'app-sign-in',
@@ -87,6 +88,11 @@ export class SignInComponent implements OnInit {
   }
 
   ngOnInit() {
+    particlesJS.init({ // add particles in background, beautiful!
+      selector: '.background',
+      color: ['#DA0463', '#404B69', '#DBEDF3'],
+      connectParticles: true
+    });
   }
 
   public get isValid(): boolean {
@@ -97,7 +103,7 @@ export class SignInComponent implements OnInit {
 
   getTitle() {
     const imagePrefix = this.authService.config['system.title'];
-    return imagePrefix ? imagePrefix : 'Wayne';
+    return imagePrefix ? imagePrefix : 'Kubernetes-UI';
   }
 
   getOAuth2Title() {
