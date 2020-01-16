@@ -65,3 +65,16 @@ func (model *deploymentModel) GetById(id int64) (deployment *Deployment, err err
 
 	return nil, err
 }
+
+func (model *deploymentModel) UpdateById(deployment *Deployment) (err error) {
+	v := Deployment{Id: deployment.Id}
+	// ascertain id exists in the database
+	if err = Ormer().Read(&v); err == nil {
+		deployment.App = &App{Id: deployment.AppId}
+		deployment.UpdateTime = nil
+		_, err = Ormer().Update(deployment)
+		return err
+	}
+
+	return nil
+}
