@@ -39,8 +39,7 @@ func main() {
 				log.Println(query)
 				log.Fatal(err)
 			}
-			rowsAffected, _ := result.RowsAffected()
-			fmt.Println(rowsAffected)
+			_, _ = result.RowsAffected()
 		}
 	}
 

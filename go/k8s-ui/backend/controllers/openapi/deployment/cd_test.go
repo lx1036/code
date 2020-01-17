@@ -21,11 +21,11 @@ func TestHttp(test *testing.T) {
 			Get("/bar").
 			Reply(200).
 			JSON(map[string]string{"foo": "bar"})
-		
+
 		res, err := http.Get("http://foo.com/bar?query1=value1")
 		st.Expect(test, err, nil)
 		st.Expect(test, res.StatusCode, 200)
-		
+
 		body, _ := ioutil.ReadAll(res.Body)
 		st.Expect(test, string(body)[:13], `{"foo":"bar"}`)
 		// Verify that we don't have pending mocks
