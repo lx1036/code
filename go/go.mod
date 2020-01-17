@@ -26,6 +26,7 @@ require (
 	github.com/mholt/certmagic v0.8.3
 	github.com/miekg/dns v1.1.15
 	github.com/mitchellh/mapstructure v1.1.2
+	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/olivere/elastic/v7 v7.0.9
 	github.com/prometheus/client_golang v1.1.0
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
@@ -40,6 +41,7 @@ require (
 	github.com/urfave/cli v1.22.1
 	golang.org/x/sys v0.0.0-20190904154756-749cb33beabd
 	gopkg.in/go-playground/validator.v8 v8.18.2
+	gopkg.in/h2non/gock.v1 v1.0.15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/sohlich/elogrus.v7 v7.0.0
 	k8s.io/api v0.0.0-20191003035645-10e821c09743
