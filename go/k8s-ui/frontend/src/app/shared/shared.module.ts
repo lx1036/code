@@ -16,6 +16,7 @@ import {DiffComponent} from './diff.component';
 import {ConfirmationDialogComponent} from './confirmation-dialog.component';
 import {DropdownComponent, DropdownItemComponent} from './dropdown.component';
 import {StorageService} from './storage.service';
+import {NotificationService} from './notification.service';
 
 const routes: Routes = [
   {
@@ -68,6 +69,7 @@ export class AuthRoutingModule {
     CacheService,
     AuthoriseService,
     StorageService,
+    NotificationService,
   ],
 })
 export class SharedModule {

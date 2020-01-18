@@ -5,6 +5,9 @@ import {Notification, NotificationLog} from '../shared/model/v1/notification';
 import {TranslateService} from '@ngx-translate/core';
 import {Namespace} from '../shared/model/v1/namespace';
 import {Router} from '@angular/router';
+import {NotificationService} from '../shared/notification.service';
+import {PageState} from '../shared/page-state';
+import {HttpErrorResponse} from '@angular/common/http';
 
 @Component({
   selector: 'app-nav',
@@ -79,21 +82,34 @@ import {Router} from '@angular/router';
     </clr-modal>
   `
 })
-
 export class NavComponent implements OnInit {
   notificationLogs: NotificationLog[];
   mind = false;
   currentLang: string;
   notificationModal = false;
   notification: Notification = new Notification();
+  pageState: PageState = new PageState();
 
   constructor(private router: Router,
               public cacheService: CacheService,
               public authService: AuthService,
-              public translate: TranslateService) {
+              public translate: TranslateService,
+              private notificationService: NotificationService, ) {
   }
 
   ngOnInit() {
+    this.pullNotification();
+  }
+
+  pullNotification() {
+    this.notificationService.subscribe(this.pageState).subscribe((response: {data: NotificationLog[]}) => {
+      this.notificationLogs = response.data;
+      if (this.notificationLogs.length >= 0) {
+        this.mind = true;
+      }
+    }, (error: HttpErrorResponse) => {
+
+    });
   }
 
   getTitle() {
