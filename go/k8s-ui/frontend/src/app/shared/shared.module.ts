@@ -15,6 +15,7 @@ import {MessageComponent} from './message.component';
 import {DiffComponent} from './diff.component';
 import {ConfirmationDialogComponent} from './confirmation-dialog.component';
 import {DropdownComponent, DropdownItemComponent} from './dropdown.component';
+import {StorageService} from './storage.service';
 
 const routes: Routes = [
   {
@@ -34,7 +35,6 @@ export class AuthRoutingModule {
   imports: [
     BrowserAnimationsModule,
     RouterModule,
-    TranslateModule,
     BrowserModule,
     FormsModule,
     // ResourceLimitModule,
@@ -42,7 +42,7 @@ export class AuthRoutingModule {
     // EchartsModule,
     ClarityModule, // https://clarity.design/documentation/get-started
     // CollapseModule
-
+    TranslateModule,
     AuthRoutingModule,
   ],
   exports: [
@@ -66,7 +66,8 @@ export class AuthRoutingModule {
   providers: [
     MessageService,
     CacheService,
-    AuthoriseService
+    AuthoriseService,
+    StorageService,
   ],
 })
 export class SharedModule {

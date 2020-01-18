@@ -19,13 +19,12 @@ import {httpStatusCode, LoginTokenKey} from './shared/shared.const';
 import {Router, RouterModule, Routes} from '@angular/router';
 import {Observable} from 'rxjs';
 import {Location} from '@angular/common';
-const packageJson = require('../../package.json');
 import { environment} from '../environments/environment';
 import {UnauthorizedComponent} from './shared/unauthorized.component';
 import {PageNotFoundComponent} from './shared/page-not-found.component';
 
 export function HttpLoaderFactory(httpClient: HttpClient) {
-  return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json?v=' + packageJson.version);
+  return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json');
 }
 
 function initUser(authService: AuthService, injector: Injector) {
@@ -57,7 +56,12 @@ class AuthInterceptor implements HttpInterceptor {
     if (token) { // if logged in
       headers.Authorization = 'Bearer ' + token;
     }
-    const url = this.location.normalize(environment.api) + this.location.prepareExternalUrl(request.url);
+
+    let url = request.url;
+    if (request.url.indexOf('assets') === -1) {
+      url = this.location.normalize(environment.api) + this.location.prepareExternalUrl(request.url);
+    }
+
     const req = request.clone({url, headers: new HttpHeaders(headers)});
 
     return next.handle(req).pipe();
