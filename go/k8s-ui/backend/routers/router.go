@@ -6,6 +6,7 @@ import (
 	"k8s-lx1036/k8s-ui/backend/controllers/auth"
 	"k8s-lx1036/k8s-ui/backend/controllers/config"
 	"k8s-lx1036/k8s-ui/backend/controllers/deployment"
+	"k8s-lx1036/k8s-ui/backend/controllers/notification"
 	"k8s-lx1036/k8s-ui/backend/controllers/openapi"
 	"k8s-lx1036/k8s-ui/backend/controllers/permission"
 	"path"
@@ -46,6 +47,11 @@ func init() {
 		beego.NSNamespace("/configs/base",
 			beego.NSInclude(
 				&config.BaseConfigController{},
+			),
+		),
+		beego.NSNamespace("/notifications",
+			beego.NSInclude(
+				&notification.NotificationController{},
 			),
 		),
 	)
