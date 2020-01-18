@@ -1,5 +1,10 @@
 import {Component, OnInit} from '@angular/core';
 import {Router} from '@angular/router';
+import {combineLatest} from 'rxjs';
+import {AppService} from '../shared/app.service';
+import {UserService} from '../shared/user.service';
+import {PodClient} from '../shared/client/v1/kubernetes/pod.service';
+import {NodeClient} from '../shared/client/v1/kubernetes/node.service';
 
 interface Summary {
   appTotal: number;
@@ -90,9 +95,26 @@ export class OverviewComponent implements OnInit {
     podTotal: 0,
   };
 
-  constructor(private router: Router) {}
+  constructor(private router: Router,
+              private appService: AppService,
+              private userService: UserService,
+              private podClient: PodClient,
+              private nodeClient: NodeClient) {}
 
   ngOnInit() {
+    combineLatest([
+      this.appService.getStatistics(),
+      this.userService.getStatistics(),
+      this.nodeClient.getStatistics(),
+      this.podClient.getStatistics()]
+    ).subscribe(([app, user, node, pod]) => {
+      this.summary.appTotal = app.data.total || 0;
+      this.summary.userTotal = user.data.total || 0;
+      this.summary.nodeTotal = node.data.total || 0;
+      this.summary.podTotal = pod.data.total || 0;
+    }, error => {
+
+    });
   }
 
   goToLink(url: string) {
