@@ -47,7 +47,6 @@ export class PortalRoutingModule {
     CommonModule,
     PortalRoutingModule,
     SharedModule,
-    TranslateModule,
     MarkdownModule.forRoot(),
   ],
   exports: [],

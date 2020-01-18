@@ -2,6 +2,7 @@ import {Injectable} from '@angular/core';
 import {PageState} from './page-state';
 import {HttpClient, HttpParams} from '@angular/common/http';
 import {Observable} from 'rxjs';
+import {Notification} from './model/v1/notification';
 
 
 export type NotificationType = string;
@@ -49,5 +50,9 @@ export class NotificationService {
     params.set('pageSize', pageState.page.pageSize + '');
     params.set('sortBy', '-id');
     return this.http.get(`/api/v1/notifications/subscribe`, {params});
+  }
+
+  create(notify: Notification) {
+    return this.http.post(`/api/v1/notifications`, notify);
   }
 }

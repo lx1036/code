@@ -17,6 +17,8 @@ import {ConfirmationDialogComponent} from './confirmation-dialog.component';
 import {DropdownComponent, DropdownItemComponent} from './dropdown.component';
 import {StorageService} from './storage.service';
 import {NotificationService} from './notification.service';
+import {PaginateComponent} from './paginate.component';
+import {CardComponent} from './card.component';
 
 const routes: Routes = [
   {
@@ -48,12 +50,18 @@ export class AuthRoutingModule {
   ],
   exports: [
     ClarityModule,
+    RouterModule,
+    BrowserModule,
+    TranslateModule,
+    FormsModule,
 
     MessageComponent,
     DiffComponent,
     ConfirmationDialogComponent,
     DropdownItemComponent,
     DropdownComponent,
+    PaginateComponent,
+    CardComponent,
   ],
   declarations: [
     SignInComponent,
@@ -63,6 +71,8 @@ export class AuthRoutingModule {
     ConfirmationDialogComponent,
     DropdownComponent,
     DropdownItemComponent,
+    PaginateComponent,
+    CardComponent,
   ],
   providers: [
     MessageService,
