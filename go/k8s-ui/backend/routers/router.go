@@ -3,9 +3,11 @@ package routers
 import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/plugins/cors"
+	"k8s-lx1036/k8s-ui/backend/controllers/app"
 	"k8s-lx1036/k8s-ui/backend/controllers/auth"
 	"k8s-lx1036/k8s-ui/backend/controllers/config"
 	"k8s-lx1036/k8s-ui/backend/controllers/deployment"
+	kpod "k8s-lx1036/k8s-ui/backend/controllers/kubernetes/pod"
 	"k8s-lx1036/k8s-ui/backend/controllers/notification"
 	"k8s-lx1036/k8s-ui/backend/controllers/openapi"
 	"k8s-lx1036/k8s-ui/backend/controllers/permission"
@@ -54,6 +56,7 @@ func init() {
 				&notification.NotificationController{},
 			),
 		),
+		beego.NSRouter("/apps/statistics", &app.AppController{}, "get:AppStatistics"),
 	)
 
 	nsWithOpenAPI := beego.NewNamespace("/openapi/v1",
@@ -71,8 +74,13 @@ func init() {
 		),
 	)
 
+	nsWithKubernetes := beego.NewNamespace("/api/v1",
+		beego.NSRouter("/kubernetes/pods/statistics", &kpod.KubePodController{}, "get:PodStatistics"),
+	)
+
 	beego.AddNamespace(withApp)
 	beego.AddNamespace(nsWithoutApp)
 	beego.AddNamespace(nsWithNamespace)
 	beego.AddNamespace(nsWithOpenAPI)
+	beego.AddNamespace(nsWithKubernetes)
 }
