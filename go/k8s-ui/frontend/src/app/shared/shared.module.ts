@@ -14,6 +14,7 @@ import {ClarityModule} from '@clr/angular';
 import {MessageComponent} from './message.component';
 import {DiffComponent} from './diff.component';
 import {ConfirmationDialogComponent} from './confirmation-dialog.component';
+import {DropdownComponent, DropdownItemComponent} from './dropdown.component';
 
 const routes: Routes = [
   {
@@ -39,7 +40,7 @@ export class AuthRoutingModule {
     // ResourceLimitModule,
     HttpClientModule,
     // EchartsModule,
-    ClarityModule,
+    ClarityModule, // https://clarity.design/documentation/get-started
     // CollapseModule
 
     AuthRoutingModule,
@@ -50,6 +51,8 @@ export class AuthRoutingModule {
     MessageComponent,
     DiffComponent,
     ConfirmationDialogComponent,
+    DropdownItemComponent,
+    DropdownComponent,
   ],
   declarations: [
     SignInComponent,
@@ -57,6 +60,8 @@ export class AuthRoutingModule {
     MessageComponent,
     DiffComponent,
     ConfirmationDialogComponent,
+    DropdownComponent,
+    DropdownItemComponent,
   ],
   providers: [
     MessageService,

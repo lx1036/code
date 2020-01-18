@@ -9,6 +9,9 @@ import {AuthService} from '../shared/auth.service';
 import {RouterModule, Routes} from '@angular/router';
 import {SharedModule} from '../shared/shared.module';
 import {NavComponent} from './nav.component';
+import {CommonModule} from '@angular/common';
+import {TranslateModule} from '@ngx-translate/core';
+import {MarkdownModule} from 'ngx-markdown';
 
 const routes: Routes = [
   {
@@ -41,12 +44,13 @@ export class PortalRoutingModule {
 
 @NgModule({
   imports: [
+    CommonModule,
     PortalRoutingModule,
     SharedModule,
+    TranslateModule,
+    MarkdownModule.forRoot(),
   ],
-  exports: [
-    PortalRoutingModule,
-  ],
+  exports: [],
   declarations: [
     PortalComponent,
     AppComponent,
