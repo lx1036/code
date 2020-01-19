@@ -26,6 +26,10 @@ type User struct {
 	Namespaces []*Namespace `orm:"-" json:"namespaces,omitempty"`
 }
 
+type UserStatistics struct {
+	Total int64 `json:"total,omitempty"`
+}
+
 type userModel struct{}
 
 func (model *userModel) GetUserByName(name string) (user *User, err error) {

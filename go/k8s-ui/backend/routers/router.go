@@ -56,6 +56,11 @@ func init() {
 				&notification.NotificationController{},
 			),
 		),
+		beego.NSNamespace("/users",
+			beego.NSInclude(
+				&permission.UserController{},
+			),
+		),
 		beego.NSRouter("/apps/statistics", &app.AppController{}, "get:AppStatistics"),
 	)
 
