@@ -30,7 +30,8 @@ func main() {
 	file, _ := filepath.Abs("k8s-data.sql")
 	fmt.Println(file)
 	data, _ := ioutil.ReadFile(file)
-	seeds := strings.Split(string(data), ";")
+	sqls := strings.Trim(string(data), "\n")
+	seeds := strings.Split(sqls, ";")
 	fmt.Println(len(seeds))
 	for _, query := range seeds {
 		if len(query) != 0 {
