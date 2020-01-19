@@ -11,13 +11,13 @@ import {StorageService} from './shared/storage.service';
 })
 export class AppComponent implements AfterViewInit {
   constructor(private scrollBar: ScrollBarService, public translate: TranslateService, private storage: StorageService) {
-    translate.addLangs(['en', 'zh-Hans']);
-    translate.setDefaultLang('en');
-    const lang = storage.get('lang');
+    this.translate.addLangs(['en', 'zh-Hans']);
+    this.translate.setDefaultLang('en');
+    const lang = this.storage.get('lang');
     if (lang) {
-      translate.use(lang);
+      this.translate.use(lang);
     } else {
-      translate.use('en');
+      this.translate.use('en');
     }
   }
 

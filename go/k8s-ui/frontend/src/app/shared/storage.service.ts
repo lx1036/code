@@ -6,6 +6,10 @@ export class StorageService {
 
   get(key: string) {
     const value = localStorage.getItem(key);
+    if (value === null) {
+      return;
+    }
+
     if (value.length === 0) {
       return this.getCookie(key);
     }
