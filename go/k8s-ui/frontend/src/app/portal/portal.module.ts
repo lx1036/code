@@ -12,6 +12,11 @@ import {NavComponent} from './nav.component';
 import {CommonModule} from '@angular/common';
 import {TranslateModule} from '@ngx-translate/core';
 import {MarkdownModule} from 'ngx-markdown';
+import {NamespaceReportComponent} from './namespace-report.component';
+import {SidenavNamespaceComponent} from './sidenav-namespace.component';
+import {OverviewComponent} from './overview.component';
+import {ResourceReportComponent} from './resource.component';
+import {HistoryComponent} from './history.component';
 
 const routes: Routes = [
   {
@@ -19,10 +24,8 @@ const routes: Routes = [
     canActivateChild: [AuthCheckGuard],
     component: PortalComponent,
     children: [
-      {
-        path: 'app',
-        component: AppComponent
-      }
+      {path: 'app', component: AppComponent},
+      {path: 'overview', component: NamespaceReportComponent},
     ],
   }
 ];
@@ -56,6 +59,11 @@ export class PortalRoutingModule {
     AppUserComponent,
     ListAppUserComponent,
     NavComponent,
+    NamespaceReportComponent,
+    SidenavNamespaceComponent,
+    OverviewComponent,
+    ResourceReportComponent,
+    HistoryComponent,
   ],
   providers: [
     AuthCheckGuard,

@@ -19,6 +19,7 @@ import {StorageService} from './storage.service';
 import {NotificationService} from './notification.service';
 import {PaginateComponent} from './paginate.component';
 import {CardComponent} from './card.component';
+import {BoxComponent} from './box.component';
 
 const routes: Routes = [
   {
@@ -62,6 +63,7 @@ export class AuthRoutingModule {
     DropdownComponent,
     PaginateComponent,
     CardComponent,
+    BoxComponent,
   ],
   declarations: [
     SignInComponent,
@@ -73,6 +75,7 @@ export class AuthRoutingModule {
     DropdownItemComponent,
     PaginateComponent,
     CardComponent,
+    BoxComponent,
   ],
   providers: [
     MessageService,
