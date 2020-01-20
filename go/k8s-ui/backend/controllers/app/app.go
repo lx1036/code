@@ -9,6 +9,10 @@ type AppController struct {
 	base.APIController
 }
 
+func (controller *AppController) URLMapping() {
+	controller.Mapping("AppStatistics", controller.AppStatistics)
+}
+
 func (controller *AppController) AppStatistics() {
 	param := controller.BuildQueryParam()
 	totalCount, err := models.GetTotalCount(new(models.App), param)

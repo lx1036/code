@@ -7,5 +7,5 @@ import (
 
 // ResourcesUsageByNamespace Count resource usage for a namespace
 func ResourcesUsageByNamespace(cli client.ResourceHandler, namespace, selector string) (*common.ResourceList, error) {
-
+	return &common.ResourceList{}, nil
 }

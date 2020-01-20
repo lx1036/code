@@ -8,7 +8,6 @@ import (
 	"k8s-lx1036/k8s-ui/backend/resources/common"
 	"k8s-lx1036/k8s-ui/backend/resources/namespace"
 	"k8s-lx1036/k8s-ui/backend/util"
-	"k8s-lx1036/k8s-ui/backend/util/hack"
 	"k8s.io/apimachinery/pkg/labels"
 	"sync"
 )
@@ -22,6 +21,7 @@ func (controller *KubeNamespaceController) URLMapping() {
 }
 
 // `/api/v1/kubernetes/namespaces/${namespaceId}/resources?app=${appName}`
+// @router /:namespaceid([0-9]+)/resources [get]
 func (controller *KubeNamespaceController) Resources() {
 	appName := controller.Input().Get("app")
 	namespaceId := controller.GetIntParamFromURL("namespaceId")
@@ -43,10 +43,10 @@ func (controller *KubeNamespaceController) Resources() {
 		wg.Add(1)
 		go func(cm *client.ClusterManager) {
 			defer wg.Done()
-			clusterMetas, ok := namespaceMetaData.ClusterMetas[cm.Cluster.Name]
-			if !ok { // can't use current cluster
-				return
-			}
+			//clusterMetas, ok := namespaceMetaData.ClusterMetas[cm.Cluster.Name]
+			//if !ok { // can't use current cluster
+			//	return
+			//}
 			selectorMap := map[string]string{
 				util.NamespaceLabelKey: namespaceModel.Name,
 			}
