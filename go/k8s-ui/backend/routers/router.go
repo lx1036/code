@@ -7,6 +7,7 @@ import (
 	"k8s-lx1036/k8s-ui/backend/controllers/auth"
 	"k8s-lx1036/k8s-ui/backend/controllers/config"
 	"k8s-lx1036/k8s-ui/backend/controllers/deployment"
+	knamespace "k8s-lx1036/k8s-ui/backend/controllers/kubernetes/namespace"
 	kpod "k8s-lx1036/k8s-ui/backend/controllers/kubernetes/pod"
 	"k8s-lx1036/k8s-ui/backend/controllers/notification"
 	"k8s-lx1036/k8s-ui/backend/controllers/openapi"
@@ -81,6 +82,11 @@ func init() {
 
 	nsWithKubernetes := beego.NewNamespace("/api/v1",
 		beego.NSRouter("/kubernetes/pods/statistics", &kpod.KubePodController{}, "get:PodStatistics"),
+		beego.NSNamespace("/kubernetes/namespaces",
+			beego.NSInclude(
+				&knamespace.KubeNamespaceController{},
+			),
+		),
 	)
 
 	beego.AddNamespace(withApp)
