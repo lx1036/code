@@ -13,7 +13,7 @@ export class AuthCheckGuard implements CanActivate, CanActivateChild {
       if (!this.authService.currentUser) {
         this.authService.retrieveUser().then(user => {
           console.log(user);
-
+          this.setCache(state);
           resolve(true);
         }).catch((error) => {
           return resolve(false);
@@ -27,5 +27,11 @@ export class AuthCheckGuard implements CanActivate, CanActivateChild {
 
   canActivateChild(childRoute: ActivatedRouteSnapshot, state: RouterStateSnapshot): Promise<boolean> | boolean {
     return this.canActivate(childRoute, state);
+  }
+
+  setCache(state: RouterStateSnapshot) {
+    if (state.url.indexOf('/portal/namespace/') > -1) {
+
+    }
   }
 }

@@ -3,7 +3,9 @@ package openapi
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/astaxie/beego/validation"
 	"k8s-lx1036/k8s-ui/backend/client"
+	"k8s-lx1036/k8s-ui/backend/controllers/common"
 	"k8s-lx1036/k8s-ui/backend/models"
 	resdeployment "k8s-lx1036/k8s-ui/backend/resources/deployment"
 	"k8s-lx1036/k8s-ui/backend/util/hack"
@@ -16,29 +18,37 @@ import (
 type UpgradeDeploymentParam struct {
 	// in: query
 	// Required: true
-	Deployment string `json:"deployment"`
+	DeploymentName string `valid:"Required"`
 	// Required: true
-	Namespace string `json:"namespace"`
+	Namespace string `valid:"Required"`
 	// 支持同时填写多个 Cluster，只需要在 cluster 之间使用英文半角的逗号分隔即可
 	// Required: true
-	Cluster  string `json:"cluster"`
+	Cluster  string `valid:"Required"`
 	clusters []string
 	// Required: false
-	TemplateId int `json:"template_id"`
+	TemplateId int
 	// 该字段为 true 的时候，会自动使用新生成的配置模板上线，否则会只创建对应的模板，并且将模板 ID 返回（用于敏感的需要手动操作的上线环境）
 	// Required: false
-	Publish bool `json:"publish"`
+	Publish bool
 	// 升级的描述
 	// Required: false
-	Description string `json:"description"`
+	Description string
 	// 该字段为扁平化为字符串的 key-value 字典，填写格式为 容器名1=镜像名1,容器名2=镜像名2 (即:多个容器之间使用英文半角的逗号分隔）
 	// Required: false
-	Images   string `json:"images"`
+	Images   string
 	imageMap map[string]string
 	// 该字段为扁平化为字符串的 key-value 字典，填写格式为 环境变量1=值1,环境变量2=值2 (即:多个环境变量之间使用英文半角的逗号分隔）
 	// Required: false
-	Environments string `json:"environments"`
+	Environments string
 	envMap       map[string]string
+}
+
+type DeploymentInfo struct {
+	Deployment         *models.Deployment
+	DeploymentTemplate *models.DeploymentTemplate
+	DeploymentObject   *v1beta1.Deployment
+	Cluster            *models.Cluster
+	Namespace          *models.Namespace
 }
 
 // swagger:route GET /upgrade_deployment deploy UpgradeDeploymentParam
@@ -59,26 +69,31 @@ type UpgradeDeploymentParam struct {
 //       500: responseState
 // @router /upgrade_deployment [get]
 func (controller *OpenAPIController) UpgradeDeployment() {
+	var err error
 	param := UpgradeDeploymentParam{
-		Deployment:   controller.GetString("deployment"),
-		Namespace:    controller.GetString("namespace"),
-		Cluster:      controller.GetString("cluster"),
-		clusters:     nil,
-		TemplateId:   0,
-		Publish:      false,
-		Description:  controller.GetString("description"),
-		Images:       controller.GetString("images"),
-		imageMap:     nil,
-		Environments: controller.GetString("environments"),
-		envMap:       nil,
+		DeploymentName: controller.GetString("deployment_name"), // deployment name, e.g. "fanyi-so-com-stage"
+		Namespace:      controller.GetString("namespace"),
+		Cluster:        controller.GetString("cluster"), // "SHBT,ZZZC"
+		Description:    controller.GetString("description"),
+		Images:         controller.GetString("images"),
+		Environments:   controller.GetString("environments"),
+	}
+	valid := validation.Validation{}
+	b, err := valid.Valid(param)
+	if err != nil { // Validate request params
+		controller.HandleResponse(nil)
+		return
+	}
+	if !b {
+		controller.HandleResponse(nil)
+		return
 	}
 
-	if !controller.CheckoutRoutePermission(UpgradeDeploymentAction) || !controller.CheckDeploymentPermission(param.Deployment) || !controller.CheckNamespacePermission(param.Namespace) {
+	if !controller.CheckoutRoutePermission(UpgradeDeploymentAction) || !controller.CheckDeploymentPermission(param.DeploymentName) || !controller.CheckNamespacePermission(param.Namespace) {
 		return
 	}
 
 	param.clusters = strings.Split(param.Cluster, ",")
-	var err error
 	param.Publish, err = controller.GetBool("publish", true)
 	if err != nil {
 
@@ -89,47 +104,102 @@ func (controller *OpenAPIController) UpgradeDeployment() {
 	}
 	// publish 表示立即发布 deployment 模板
 	if param.TemplateId != 0 && param.Publish {
+		for _, cluster := range param.clusters {
+			deploymentInfo, err := getOnlineDeploymenetInfo(param.DeploymentName, param.Namespace, cluster, int64(param.TemplateId))
+			if err != nil {
 
+				continue
+			}
+
+			common.DeploymentPreDeploy(deploymentInfo.DeploymentObject, deploymentInfo.Deployment, deploymentInfo.Cluster, deploymentInfo.Namespace)
+			err = publishDeployment(deploymentInfo, controller.APIKey.String())
+			if err != nil {
+
+			}
+		}
+
+		controller.HandleResponse(nil)
+		return
 	}
 
+	// merge images
+	// "golang=aliyun.cloud/golang:1.0.0,openresty=aliyun.cloud/openresty:1.0.0"
 	images := strings.Split(param.Images, ",")
 	for _, image := range images {
-		arr := strings.Split(image, "=")
-		if len(arr) == 2 && arr[1] != "" {
-			param.imageMap[arr[0]] = arr[1]
+		items := strings.Split(image, "=") // golang=aliyun.cloud/golang
+		if len(items) == 2 && items[1] != "" {
+			param.imageMap[items[0]] = items[1]
 		}
 	}
 
-	deployInfoMap := make(map[int64][]*DeploymentInfo)
+	// merge envMap
+	if param.Environments != "" { // environments e.g. "key1=value1,key2=value2"
+		environments := strings.Split(param.Environments, ",")
+		for _, environment := range environments {
+			items := strings.Split(environment, "=")
+			if len(items) == 2 && items[1] != "" {
+				param.envMap[items[0]] = items[1]
+			}
+		}
+	}
+
+	deploymentInfoMap := make(map[int64][]*DeploymentInfo)
 	for _, cluster := range param.clusters {
-		deployInfo, err := getOnlineDeploymenetInfo(param.Deployment, param.Namespace, cluster, 0)
+		deployInfo, err := getOnlineDeploymenetInfo(param.DeploymentName, param.Namespace, cluster, 0)
 		if err != nil {
 
 		}
 
-		tmplId := deployInfo.DeploymentTemplete.Id
+		// 率先把强制指定的环境变量，如和系统环境变量冲突，后面会覆盖
+		for key, container := range deployInfo.DeploymentObject.Spec.Template.Spec.Containers {
+			for index, value := range container.Env {
+				if param.envMap[value.Name] != "" {
+					deployInfo.DeploymentObject.Spec.Template.Spec.Containers[key].Env[index].Value = param.envMap[value.Name]
+				}
+			}
+		}
 
-		deployInfoMap[tmplId] = append(deployInfoMap[tmplId], deployInfo)
+		common.DeploymentPreDeploy(deployInfo.DeploymentObject, deployInfo.Deployment, deployInfo.Cluster, deployInfo.Namespace)
+
+		tmplId := deployInfo.DeploymentTemplate.Id
+		deployInfo.DeploymentTemplate.Id = 0
+		deployInfo.DeploymentTemplate.User = controller.APIKey.String()
+		deployInfo.DeploymentTemplate.Description = "[APIKey] " + controller.GetString("description")
+
+		for k, v := range deployInfo.DeploymentObject.Spec.Template.Spec.Containers {
+			if param.imageMap[v.Name] != "" {
+				deployInfo.DeploymentObject.Spec.Template.Spec.Containers[k].Image = param.imageMap[v.Name]
+			}
+		}
+
+		deploymentInfoMap[tmplId] = append(deploymentInfoMap[tmplId], deployInfo)
 	}
 
-	for _, deployInfos := range deployInfoMap {
-		deployInfo := deployInfos[0]
-		newTpl, err := json.Marshal(deployInfo.DeploymentObject)
+	for id, deploymentInfos := range deploymentInfoMap {
+		deploymentInfo := deploymentInfos[0]
+		newTpl, err := json.Marshal(deploymentInfo.DeploymentObject)
 		if err != nil {
 
 			continue
 		}
-		deployInfo.DeploymentTemplete.Template = string(newTpl)
+		deploymentInfo.DeploymentTemplate.Template = string(newTpl)
 		//更新deploymentTpl中的CreateTime和UpdateTime,数据库中不会自动更新
-		deployInfo.DeploymentTemplete.CreateTime = time.Now()
-		deployInfo.DeploymentTemplete.UpdateTime = time.Now()
-
-		for _, _ = range deployInfos {
-
+		deploymentInfo.DeploymentTemplate.CreateTime = time.Now()
+		deploymentInfo.DeploymentTemplate.UpdateTime = time.Now()
+		newTplId, err := models.DeploymentTplModel.Add(deploymentInfo.DeploymentTemplate)
+		if err != nil {
+			continue
+		}
+		for k, info := range deploymentInfos {
+			err := models.DeploymentModel.UpdateById(info.Deployment)
+			if err != nil {
+				continue
+			}
+			deploymentInfoMap[id][k].DeploymentTemplate.Id = newTplId
 		}
 	}
 
-	for _, deployInfos := range deployInfoMap {
+	for _, deployInfos := range deploymentInfoMap {
 		for _, deployInfo := range deployInfos {
 			err := publishDeployment(deployInfo, controller.APIKey.String())
 			if err != nil {
@@ -139,14 +209,6 @@ func (controller *OpenAPIController) UpgradeDeployment() {
 	}
 
 	controller.HandleResponse(nil)
-}
-
-type DeploymentInfo struct {
-	Deployment         *models.Deployment
-	DeploymentTemplete *models.DeploymentTemplate
-	DeploymentObject   *v1beta1.Deployment
-	Cluster            *models.Cluster
-	Namespace          *models.Namespace
 }
 
 // 主要用于从数据库中查找、拼凑出用于更新的模板资源，资源主要用于 k8s 数据更新和数据库存储更新记录等
@@ -166,14 +228,14 @@ func getOnlineDeploymenetInfo(name, namespace, cluster string, templateId int64)
 		if err != nil {
 
 		}
-		deployInfo.DeploymentTemplete, err = models.DeploymentTplModel.GetById(status.TemplateId)
+		deployInfo.DeploymentTemplate, err = models.DeploymentTplModel.GetById(status.TemplateId)
 		if err != nil {
 
 		}
 	}
 
 	deployObj := v1beta1.Deployment{}
-	err = json.Unmarshal(hack.Slice(deployInfo.DeploymentTemplete.Template), &deployObj)
+	err = json.Unmarshal(hack.Slice(deployInfo.DeploymentTemplate.Template), &deployObj)
 	if err != nil {
 
 	}

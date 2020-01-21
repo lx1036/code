@@ -10,6 +10,16 @@ import {CacheService} from './cache.service';
 import {AuthoriseService} from './client/v1/auth.service';
 import {SignInComponent} from './sign-in.component';
 import {InputComponent} from './input.component';
+import {ClarityModule} from '@clr/angular';
+import {MessageComponent} from './message.component';
+import {DiffComponent} from './diff.component';
+import {ConfirmationDialogComponent} from './confirmation-dialog.component';
+import {DropdownComponent, DropdownItemComponent} from './dropdown.component';
+import {StorageService} from './storage.service';
+import {NotificationService} from './notification.service';
+import {PaginateComponent} from './paginate.component';
+import {CardComponent} from './card.component';
+import {BoxComponent} from './box.component';
 
 const routes: Routes = [
   {
@@ -29,27 +39,50 @@ export class AuthRoutingModule {
   imports: [
     BrowserAnimationsModule,
     RouterModule,
-    TranslateModule,
     BrowserModule,
     FormsModule,
     // ResourceLimitModule,
     HttpClientModule,
     // EchartsModule,
-    // ClarityModule,
+    ClarityModule, // https://clarity.design/documentation/get-started
     // CollapseModule
-
+    TranslateModule,
     AuthRoutingModule,
   ],
-  exports: [],
+  exports: [
+    ClarityModule,
+    RouterModule,
+    BrowserModule,
+    TranslateModule,
+    FormsModule,
+
+    MessageComponent,
+    DiffComponent,
+    ConfirmationDialogComponent,
+    DropdownItemComponent,
+    DropdownComponent,
+    PaginateComponent,
+    CardComponent,
+    BoxComponent,
+  ],
   declarations: [
     SignInComponent,
     InputComponent,
-
+    MessageComponent,
+    DiffComponent,
+    ConfirmationDialogComponent,
+    DropdownComponent,
+    DropdownItemComponent,
+    PaginateComponent,
+    CardComponent,
+    BoxComponent,
   ],
   providers: [
     MessageService,
     CacheService,
-    AuthoriseService
+    AuthoriseService,
+    StorageService,
+    NotificationService,
   ],
 })
 export class SharedModule {

@@ -33,20 +33,7 @@ type Deployment struct {
 type deploymentModel struct{}
 
 func (*deploymentModel) GetByName(name string) (deployment *Deployment, err error) {
-	deployment = &Deployment{
-		Id:          0,
-		Name:        name,
-		MetaData:    "",
-		MetaDataObj: DeploymentMetaData{},
-		App:         nil,
-		Description: "",
-		OrderId:     0,
-		CreateTime:  nil,
-		UpdateTime:  nil,
-		User:        "",
-		Deleted:     false,
-		AppId:       0,
-	}
+	deployment = &Deployment{Name: name}
 	if err := Ormer().Read(deployment, "name"); err == nil {
 		deployment.Id = deployment.App.Id
 		return deployment, nil
@@ -64,4 +51,17 @@ func (model *deploymentModel) GetById(id int64) (deployment *Deployment, err err
 	}
 
 	return nil, err
+}
+
+func (model *deploymentModel) UpdateById(deployment *Deployment) (err error) {
+	v := Deployment{Id: deployment.Id}
+	// ascertain id exists in the database
+	if err = Ormer().Read(&v); err == nil {
+		deployment.App = &App{Id: deployment.AppId}
+		deployment.UpdateTime = nil
+		_, err = Ormer().Update(deployment)
+		return err
+	}
+
+	return nil
 }

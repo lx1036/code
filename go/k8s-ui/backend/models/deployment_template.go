@@ -35,3 +35,12 @@ func (*deploymentTplModel) GetById(id int64) (deploymentTpl *DeploymentTemplate,
 
 	return nil, err
 }
+
+func (*deploymentTplModel) Add(template *DeploymentTemplate) (id int64, err error) {
+	template.Deployment = &Deployment{Id: template.DeploymentId}
+	now := time.Now()
+	template.CreateTime = now
+	template.UpdateTime = now
+	id, err = Ormer().Insert(template)
+	return
+}

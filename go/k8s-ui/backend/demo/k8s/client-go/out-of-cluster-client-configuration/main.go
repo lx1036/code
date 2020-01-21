@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 	"k8s.io/client-go/util/retry"
 	"log"
 	"os"
@@ -29,7 +28,7 @@ var (
 
 func main() {
 	var kubeconfig *string
-	if home := homedir.HomeDir(); home != "" {
+	if home, _ := os.UserHomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "absolute path to kubeconfig file")
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to kubeconfig file")

@@ -3,14 +3,13 @@ import {Component, OnInit} from '@angular/core';
 @Component({
   selector: 'app-portal',
   template: `
-<!--      <clr-main-container class="main-container">-->
-<!--          <global-message></global-message>-->
-<!--          <diff></diff>-->
-<!--          <wayne-nav></wayne-nav>-->
-<!--          <router-outlet></router-outlet>-->
-<!--      </clr-main-container>-->
-<!--      <confiramtion-dialog style="display: flex"></confiramtion-dialog>-->
-    <router-outlet></router-outlet>
+    <clr-main-container class="main-container">
+      <app-global-message></app-global-message>
+      <app-diff></app-diff>
+      <app-nav></app-nav>
+      <router-outlet></router-outlet>
+    </clr-main-container>
+    <app-confirmation-dialog style="display: flex"></app-confirmation-dialog>
   `
 })
 

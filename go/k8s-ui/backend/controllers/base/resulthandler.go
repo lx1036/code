@@ -41,3 +41,8 @@ func (controller *ResultHandlerController) Success(data interface{}) {
 	controller.Data["json"] = Result{Data: data}
 	controller.ServeJSON()
 }
+
+func (controller *ResultHandlerController) AbortBadRequest(msg string) {
+	logs.Info("Abort BadRequest error. %s", msg)
+	controller.CustomAbort(http.StatusBadRequest, hack.String(controller.errorResult(http.StatusBadRequest, msg)))
+}
