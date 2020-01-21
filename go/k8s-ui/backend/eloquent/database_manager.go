@@ -16,28 +16,34 @@ type DBConfig struct {
 	Prefix          string
 }
 
-func (manager *DatabaseManager) Open(config DBConfig) {
+func (manager *DatabaseManager) Open(config DBConfig) *DatabaseManager {
 	db, err := sql.Open(config.Driver, config.Dsn)
 	if err != nil {
-		return
+		return nil
 	}
 
 	err = db.Ping()
 	if err != nil {
-		return
+		return nil
 	}
 
 	db.SetMaxOpenConns(config.SetMaxOpenConns)
 	db.SetMaxIdleConns(config.SetMaxIdleConns)
 
 	manager.db = db
+
+	return manager
 }
 
-func (manager *DatabaseManager) Connection(name string) Connection {
-
-	return manager.connectionFactory.Make(config, name)
+func (manager *DatabaseManager) Connection( /*name string*/ ) *Connection {
+	connection := Connection{DB: manager.db}
+	return &connection
+	//return &Connection{
+	//	DB: manager.db,
+	//}
+	//return manager.connectionFactory.Make(config, name)
 }
 
-func New() *Manager {
-	return &Manager{}
+func New() *DatabaseManager {
+	return &DatabaseManager{}
 }

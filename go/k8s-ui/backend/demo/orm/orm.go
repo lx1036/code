@@ -75,12 +75,12 @@ func gormDemo() {
 	defer db.Close()
 
 	//db.Set()
-	//db.AutoMigrate(&Product{})
-	//db.Create(&Product{Code: "L1212", Price: 1000})
+	db.AutoMigrate(&Product{})
+	db.Create(&Product{Code: "L1212", Price: 1000})
 	var product Product
 	db.First(&product, 1)
-	//db.First(&product, "code = ?", "L1212")
-	//db.Model(&product).Update("Price", 2000)
+	db.First(&product, "code = ?", "L1212")
+	db.Model(&product).Update("Price", 2000)
 
 	fmt.Println(product.Code)
 }
@@ -100,9 +100,9 @@ func init() {
 
 // `create database orm default character set utf8mb4 default collate utf8mb4_general_ci;`
 func main() {
-	//gormDemo()
+	gormDemo()
 
-	DBDemo()
+	//DBDemo()
 }
 
 var once sync.Once
