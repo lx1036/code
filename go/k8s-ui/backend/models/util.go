@@ -36,11 +36,11 @@ func BuildFilter(querySeter orm.QuerySeter, query map[string]interface{}) orm.Qu
 	return querySeter
 }
 
-func GetTotalCount(queryTable interface{}, q *common.QueryParam) (int64, error) {
+func GetTotalCount(queryTable interface{}, params *common.QueryParam) (int64, error) {
 	qs := Ormer().QueryTable(queryTable)
-	qs = BuildFilter(qs, q.Query)
-	if len(q.Groupby) != 0 {
-		qs = qs.GroupBy(q.Groupby...)
+	qs = BuildFilter(qs, params.Query)
+	if len(params.Groupby) != 0 {
+		qs = qs.GroupBy(params.Groupby...)
 	}
 	return qs.Count()
 }
