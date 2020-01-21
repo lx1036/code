@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+const (
+	TableNameDeployment = "deployment"
+)
+
 type DeploymentMetaData struct {
 	Replicas  map[string]int32  `json:"replicas"`
 	Resources map[string]string `json:"resources,omitempty"`

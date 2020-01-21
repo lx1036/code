@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+const (
+	TableNameCronjob = "cronjob"
+)
+
 type cronjobModel struct{}
 
 type CronjobMetaData struct {

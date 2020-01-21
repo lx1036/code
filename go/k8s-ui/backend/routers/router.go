@@ -9,6 +9,7 @@ import (
 	"k8s-lx1036/k8s-ui/backend/controllers/deployment"
 	knamespace "k8s-lx1036/k8s-ui/backend/controllers/kubernetes/namespace"
 	kpod "k8s-lx1036/k8s-ui/backend/controllers/kubernetes/pod"
+	"k8s-lx1036/k8s-ui/backend/controllers/namespace"
 	"k8s-lx1036/k8s-ui/backend/controllers/notification"
 	"k8s-lx1036/k8s-ui/backend/controllers/openapi"
 	"k8s-lx1036/k8s-ui/backend/controllers/permission"
@@ -63,6 +64,11 @@ func init() {
 			),
 		),
 		beego.NSRouter("/apps/statistics", &app.AppController{}, "get:AppStatistics"),
+		beego.NSNamespace("/namespaces",
+			beego.NSInclude(
+				&namespace.NamespaceController{},
+			),
+		),
 	)
 
 	nsWithOpenAPI := beego.NewNamespace("/openapi/v1",
