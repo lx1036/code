@@ -85,7 +85,7 @@
     "PRODUCT": "App",
     "PROJECT_REPORT": "Project Report",
     "PV": "PersistentVolume",
-    "PVC": "PVC",
+    "PVC": "PersistentVolumeClaim",
     "PVC_LIST": "PVC List",
     "RECYCLED": "Recycled",
     "RELEASE_RECORD": "Release Record",

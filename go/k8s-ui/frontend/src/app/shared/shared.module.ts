@@ -20,6 +20,7 @@ import {NotificationService} from './notification.service';
 import {PaginateComponent} from './paginate.component';
 import {CardComponent} from './card.component';
 import {BoxComponent} from './box.component';
+import {NamespaceClient} from './client/v1/kubernetes/namespace';
 
 const routes: Routes = [
   {
@@ -83,6 +84,7 @@ export class AuthRoutingModule {
     AuthoriseService,
     StorageService,
     NotificationService,
+    NamespaceClient,
   ],
 })
 export class SharedModule {

@@ -270,7 +270,7 @@
     "PLATFORM_OVERVIEW": "平台概览",
     "PRODUCT": "项目列表",
     "PROJECT_REPORT": "项目报表",
-    "PV": "持久化存储",
+    "PV": "持久化卷",
     "PVC": "PVC",
     "PVC_LIST": "PVC 列表",
     "HPA_LIST": "自动水平伸缩列表",

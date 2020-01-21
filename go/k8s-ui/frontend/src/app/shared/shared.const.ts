@@ -97,3 +97,15 @@ export const enum ConfirmationTargets {
   HPA,
   ENDPOINT
 }
+
+
+export const KubeApiTypeDeployment = 'Deployment';
+export const KubeApiTypeCronJob = 'CronJob';
+export const KubeApiTypeStatefulSet = 'StatefulSet';
+export const KubeApiTypeDaemonSet = 'DaemonSet';
+export const KubeApiTypeService = 'Service';
+export const KubeApiTypeIngress = 'Ingress';
+export const KubeApiTypeConfigMap = 'ConfigMap';
+export const KubeApiTypeSecret = 'Secret';
+export const KubeApiTypePersistentVolumeClaim = 'PersistentVolumeClaim';
+export const KubeApiTypeAutoscale = 'Autoscale';

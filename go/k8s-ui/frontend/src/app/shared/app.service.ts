@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import {HttpClient} from '@angular/common/http';
+import {HttpClient, HttpParams} from '@angular/common/http';
 import {Observable} from 'rxjs';
 
 @Injectable()
@@ -9,5 +9,14 @@ export class AppService {
 
   getStatistics(): Observable<any> {
     return this.http.get(`/api/v1/apps/statistics`);
+  }
+
+  listResourceCount(namespaceId: number, appId?: number) {
+    const params = new HttpParams();
+    if (appId != null) {
+      params.set('appId', appId + '');
+    }
+
+    return this.http.get(`/api/v1/namespaces/${namespaceId}/statistics`, {params});
   }
 }
