@@ -8,7 +8,7 @@ export class ScrollBarService {
   render: Renderer2;
   scrollBarWidth: number;
 
-  constructor(rendererFactory: RendererFactory2, @Inject(DOCUMENT) private document: HTMLElement) {
+  constructor(rendererFactory: RendererFactory2, @Inject(DOCUMENT) private document: Document) {
     this.render = rendererFactory.createRenderer(null, null);
   }
 
