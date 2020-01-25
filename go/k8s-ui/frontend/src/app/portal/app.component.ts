@@ -58,7 +58,8 @@ interface ClusterCard {
         </div>
       </div>
     </div>
-<!--    <app-sidenav-namespace style="display: flex; order: -1"></app-sidenav-namespace>-->
+
+    <app-sidenav-namespace style="display: flex; order: -1"></app-sidenav-namespace>
 <!--    <create-edit-app (create)="createApp($event)"></create-edit-app>-->
   `,
 })

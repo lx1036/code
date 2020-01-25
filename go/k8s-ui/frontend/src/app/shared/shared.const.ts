@@ -109,3 +109,6 @@ export const KubeApiTypeConfigMap = 'ConfigMap';
 export const KubeApiTypeSecret = 'Secret';
 export const KubeApiTypePersistentVolumeClaim = 'PersistentVolumeClaim';
 export const KubeApiTypeAutoscale = 'Autoscale';
+
+
+export const SideNavCollapseStorage = 'nav-collapse';
