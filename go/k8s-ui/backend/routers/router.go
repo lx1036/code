@@ -79,7 +79,12 @@ func init() {
 	)
 
 	nsWithNamespace := beego.NewNamespace("/api/v1",
-		beego.NSNamespace("/namespaces/:namespaceid([0-9]+)/users",
+		beego.NSNamespace("/namespaces/:namespaceId([0-9]+)/apps",
+			beego.NSInclude(
+				&app.AppController{},
+			),
+		),
+		beego.NSNamespace("/namespaces/:namespaceId([0-9]+)/users",
 			beego.NSInclude(
 				&permission.NamespaceUserController{},
 			),

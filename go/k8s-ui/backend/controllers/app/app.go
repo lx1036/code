@@ -10,7 +10,12 @@ type AppController struct {
 }
 
 func (controller *AppController) URLMapping() {
+	controller.Mapping("List", controller.List)
 	controller.Mapping("AppStatistics", controller.AppStatistics)
+}
+
+func (controller *AppController) Prepare() {
+
 }
 
 func (controller *AppController) AppStatistics() {
@@ -25,4 +30,23 @@ func (controller *AppController) AppStatistics() {
 	}
 
 	controller.Success(models.AppStatistics{Total: totalCount, Details: details})
+}
+
+func (controller *AppController) List() {
+	param := controller.BuildQueryParam()
+
+	starred := controller.GetBoolParamFromQueryWithDefault("starred", false)
+
+	total, err := models.AppModel.Count(param, starred, controller.User.Id)
+	if err != nil {
+
+	}
+
+	apps, err := models.AppModel.List(param, starred, controller.User.Id)
+	if err != nil {
+
+	}
+
+	controller.Success(param.NewPage(total, apps))
+	return
 }

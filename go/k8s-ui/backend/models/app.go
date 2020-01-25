@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"k8s-lx1036/k8s-ui/backend/common"
+	"time"
+)
 
 type App struct {
 	Id        int64      `orm:"auto" json:"id,omitempty"`
@@ -25,6 +28,15 @@ type App struct {
 
 	// 关注的关联查询
 	AppStars []*AppStarred `orm:"reverse(many)" json:"-"`
+}
+
+type AppStar struct {
+	App
+
+	CreateTime    time.Time `json:"createTime"`
+	NamespaceId   int64     `json:"namespaceId"`
+	NamespaceName string    `json:"namespaceName"`
+	Starred       bool      `json:"starred"`
 }
 
 type AppStatistics struct {
@@ -59,4 +71,12 @@ func (model *appModel) GetAppCountGroupByNamespace() (*[]NamespaceDetail, error)
 	_, err := Ormer().Raw(sql).QueryRows(&details)
 
 	return &details, err
+}
+
+func (model *appModel) Count(param *common.QueryParam, b bool, i int64) (total int64, err error) {
+	return 0, nil
+}
+
+func (model *appModel) List(param *common.QueryParam, b bool, i int64) (apps []AppStar, err error) {
+	return nil, nil
 }
