@@ -54,16 +54,9 @@ export class SidenavNamespaceComponent implements OnInit {
               public storage: StorageService) {
   }
 
-  _collapsed = false;
-  get collapsed() {
-    return this._collapsed;
-  }
-  set collapsed(value: boolean) {
-    this._collapsed = value;
-    this.storage.save(SideNavCollapseStorage, value);
-  }
+  collapsed = false;
 
   ngOnInit() {
-    this._collapsed = this.storage.get(SideNavCollapseStorage) !== 'false';
+    this.collapsed = this.storage.get(SideNavCollapseStorage) !== 'false';
   }
 }

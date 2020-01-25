@@ -17,6 +17,7 @@ import {SidenavNamespaceComponent} from './sidenav-namespace.component';
 import {OverviewComponent} from './overview.component';
 import {ResourceReportComponent} from './resource.component';
 import {HistoryComponent} from './history.component';
+import {ListAppsComponent} from './list-apps.component';
 
 const routes: Routes = [
   {
@@ -64,6 +65,7 @@ export class PortalRoutingModule {
     OverviewComponent,
     ResourceReportComponent,
     HistoryComponent,
+    ListAppsComponent,
   ],
   providers: [
     AuthCheckGuard,

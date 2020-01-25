@@ -4,6 +4,7 @@ import {NamespaceClient} from '../shared/client/v1/kubernetes/namespace';
 import {CacheService} from '../shared/cache.service';
 import {MessageHandlerService} from '../shared/message-handler.service';
 import {AuthService} from '../shared/auth.service';
+import {App} from '../shared/model/v1/app';
 
 const showState = {
   name: {hidden: false},
@@ -53,6 +54,8 @@ interface ClusterCard {
 
                     </div>
                 </div>
+
+                <app-list-apps [apps]="changedApps"></app-list-apps>
             </app-box>
           </div>
         </div>
@@ -71,6 +74,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   resources: object = {};
   clusters: ClusterCard[] = [];
   allowNumber = 10;
+  changedApps: App[];
 
   constructor(private namespaceClient: NamespaceClient,
               private cacheService: CacheService,
