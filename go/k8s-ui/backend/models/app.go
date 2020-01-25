@@ -27,6 +27,15 @@ type App struct {
 	AppStars []*AppStarred `orm:"reverse(many)" json:"-"`
 }
 
+type AppStatistics struct {
+	Total   int64              `json:"total,omitempty"`
+	Details *[]NamespaceDetail `json:"details,omitempty"`
+}
+type NamespaceDetail struct {
+	Name  string `json:"name"`
+	Count int64  `json:"count"`
+}
+
 type appModel struct{}
 
 func (model *appModel) GetById(id int64) (v *App, err error) {
@@ -40,4 +49,14 @@ func (model *appModel) GetById(id int64) (v *App, err error) {
 		return v, nil
 	}
 	return nil, err
+}
+
+func (model *appModel) GetAppCountGroupByNamespace() (*[]NamespaceDetail, error) {
+	sql := `SELECT namespace.name as name, count(*) as count FROM
+			app inner join namespace on app.namespace_id=namespace.id
+             group by app.namespace_id;`
+	var details []NamespaceDetail
+	_, err := Ormer().Raw(sql).QueryRows(&details)
+
+	return &details, err
 }

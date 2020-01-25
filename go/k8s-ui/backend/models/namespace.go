@@ -65,3 +65,12 @@ func (model *namespaceModel) GetAll(deleted bool) ([]*Namespace, error) {
 
 	return namespaces, nil
 }
+
+func (model *namespaceModel) GetById(id int64) (v *Namespace, err error) {
+	v = &Namespace{Id: id}
+
+	if err = Ormer().Read(v); err == nil {
+		return v, nil
+	}
+	return nil, err
+}

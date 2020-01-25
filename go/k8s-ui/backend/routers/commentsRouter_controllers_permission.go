@@ -18,4 +18,17 @@ func init() {
 			Params:           nil,
 		},
 	)
+
+	const UserController = "k8s-lx1036/k8s-ui/backend/controllers/permission:UserController"
+	beego.GlobalControllerRouter[UserController] = append(
+		beego.GlobalControllerRouter[UserController],
+		beego.ControllerComments{
+			Method:           "UserStatistics",
+			Router:           `/statistics`,
+			AllowHTTPMethods: []string{"get"},
+			MethodParams:     param.Make(),
+			Filters:          nil,
+			Params:           nil,
+		},
+	)
 }

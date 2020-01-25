@@ -5,6 +5,7 @@ import (
 	"github.com/astaxie/beego"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/gommon/log"
+	"github.com/sirupsen/logrus"
 	rsakey "k8s-lx1036/k8s-ui/backend/apikey"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
 	"k8s-lx1036/k8s-ui/backend/models"
@@ -41,38 +42,59 @@ func (controller *AuthController) Login() {
 	username := controller.Input().Get("username")
 	password := controller.Input().Get("password")
 	authType := controller.Ctx.Input.Param(":type")
+	//oauthName := controller.Ctx.Input.Param(":name")
 
-	fmt.Println(username, password)
+	logrus.WithFields(logrus.Fields{
+		"username": username,
+		"password": password,
+	}).Info("login")
+
 	//authName := auth.Ctx.Input.Param(":name")
 	//next := auth.Ctx.Input.Query("next")
 	if authType == "" || username == "admin" {
 		authType = models.AuthTypeDB
 	}
+
+	logs.Info("auth type is ", authType)
+
 	authenticator, ok := registry[authType]
 	if !ok {
-
+		controller.Ctx.Output.SetStatus(http.StatusBadRequest)
+		controller.Data["json"] = base.Result{Data: fmt.Sprintf("auth type[%s] is not supported", authType)}
+		controller.ServeJSON()
+		return
 	}
 	authModel := models.AuthModel{
 		Username: username,
 		Password: password,
 	}
 
+	if authType == models.AuthTypeOAuth2 { // login with oauth2
+
+	}
+
 	user, err := authenticator.Authenticate(authModel)
 	if err != nil {
-
+		controller.Ctx.Output.SetStatus(http.StatusBadRequest)
+		controller.Data["json"] = base.Result{Data: fmt.Sprintf("try to login in with user [%s] error: %v", authModel.Username, err)}
+		controller.ServeJSON()
+		return
 	}
 
 	now := time.Now()
 	exp := beego.AppConfig.DefaultInt64("TokenLifeTime", 86400)
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-		"iss": "k8s-ui",
-		"iat": now.Unix(),
-		"exp": now.Add(time.Duration(exp) * time.Second).Unix(),
+		"iss": beego.AppConfig.DefaultString("appname", "k8s-ui"), // 签发者
+		"iat": now.Unix(),                                         // 签发时间
+		"exp": now.Add(time.Duration(exp) * time.Second).Unix(),   // 过期时间
 		"aud": user.Name,
 	})
 	signedToken, err := token.SignedString(rsakey.RsaPrivateKey)
 	if err != nil {
-
+		controller.Ctx.Output.SetStatus(http.StatusInternalServerError)
+		controller.Data["json"] = base.Result{Data: fmt.Sprintf("try to create token, error: %v", err)}
+		controller.ServeJSON()
+		return
 	}
 
 	loginResult := LoginResult{Token: signedToken}

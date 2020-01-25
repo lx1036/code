@@ -11,7 +11,8 @@ func Run() {
 	initial.InitDb()
 
 	if beego.BConfig.RunMode == "dev" {
-
+		beego.BConfig.WebConfig.DirectoryIndex = true
+		beego.BConfig.WebConfig.StaticDir["/swagger"] = "swagger"
 	}
 
 	// K8S Client

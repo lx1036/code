@@ -2,6 +2,8 @@
 
 export const defaultRoutingUrl = 'portal/namespace/0/app';
 
+export const LoginTokenKey = 'jwt_token';
+
 export const enum AlertType {
   DANGER, WARNING, INFO, SUCCESS
 }
@@ -14,6 +16,11 @@ export const httpStatusCode = {
   StatusInternalServerError: 500
 };
 
+export const AuthType = {
+  DB: 'db',
+  OAuth2: 'oauth2',
+  Ldap: 'ldap',
+};
 
 export const enum ConfirmationState {
   NA, CONFIRMED, CANCEL
@@ -90,3 +97,15 @@ export const enum ConfirmationTargets {
   HPA,
   ENDPOINT
 }
+
+
+export const KubeApiTypeDeployment = 'Deployment';
+export const KubeApiTypeCronJob = 'CronJob';
+export const KubeApiTypeStatefulSet = 'StatefulSet';
+export const KubeApiTypeDaemonSet = 'DaemonSet';
+export const KubeApiTypeService = 'Service';
+export const KubeApiTypeIngress = 'Ingress';
+export const KubeApiTypeConfigMap = 'ConfigMap';
+export const KubeApiTypeSecret = 'Secret';
+export const KubeApiTypePersistentVolumeClaim = 'PersistentVolumeClaim';
+export const KubeApiTypeAutoscale = 'Autoscale';
