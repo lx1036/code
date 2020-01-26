@@ -15,6 +15,8 @@ import {CacheService} from '../shared/cache.service';
 import {MessageHandlerService} from '../shared/message-handler.service';
 import {AuthService} from '../shared/auth.service';
 import {App} from '../shared/model/v1/app';
+import {AppService} from '../shared/app.service';
+import {NgForm} from '@angular/forms';
 
 const showState = {
   name: {hidden: false},
@@ -29,6 +31,9 @@ interface ClusterCard {
   state: boolean;
 }
 
+export const enum ActionType {
+  ADD_NEW, EDIT
+}
 
 @Component({
   selector: 'app-create-edit-app',
@@ -65,26 +70,51 @@ interface ClusterCard {
     </clr-modal>
   `
 })
-
 export class CreateEditAppComponent implements OnInit {
   createAppOpened: boolean;
   @Output() create = new EventEmitter<boolean>();
   appTitle: string;
   isNameValid: boolean;
   app: App = new App();
-  
-  constructor() {
-  }
-  
+  actionType: ActionType;
+  @ViewChild('appForm', { static: true }) currentForm: NgForm;
+  checkOnGoing = false;
+  isSubmitOnGoing = false;
+
+  constructor(private appService: AppService, ) {}
+
   ngOnInit() {
   }
-  
-  newOrEditApp(id?: number) {
-  
+
+  public get isValid(): boolean {
+    return this.currentForm &&
+      this.currentForm.valid &&
+      !this.isSubmitOnGoing &&
+      this.isNameValid &&
+      !this.checkOnGoing;
   }
-  
+
+  newOrEditApp(id?: number) {
+
+  }
+
   onCancel() {
-  
+
+  }
+
+  handleValidation() {
+
+  }
+
+  onSubmit() {
+    switch (this.actionType) {
+      case ActionType.ADD_NEW:
+        this.appService.create(this.app).subscribe(response => {}, err => {});
+        break;
+      case ActionType.EDIT:
+        this.appService.update(this.app).subscribe(response => {}, err => {});
+        break;
+    }
   }
 }
 
@@ -146,7 +176,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   allowNumber = 10;
   changedApps: App[];
   @ViewChild(CreateEditAppComponent, { static: false }) createEditApp: CreateEditAppComponent;
-  
+
   constructor(private namespaceClient: NamespaceClient,
               private cacheService: CacheService,
               @Inject(DOCUMENT) private document: any,
@@ -195,15 +225,15 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnDestroy(): void {
   }
-  
+
   openModal() {
     this.createEditApp.newOrEditApp();
   }
-  
+
   createApp($event) {
-  
+
   }
-  
+
   editApp(app: App) {
     this.createEditApp.newOrEditApp(app.id);
   }
