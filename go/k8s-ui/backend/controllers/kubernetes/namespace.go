@@ -1,4 +1,4 @@
-package namespace
+package kubernetes
 
 import (
 	"encoding/json"

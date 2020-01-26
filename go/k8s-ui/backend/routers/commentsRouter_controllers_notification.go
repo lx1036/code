@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	const NotificationController = "k8s-lx1036/k8s-ui/backend/controllers/notification:NotificationController"
+	const NotificationController = "k8s-lx1036/k8s-ui/backend/controllers:NotificationController"
 	beego.GlobalControllerRouter[NotificationController] = append(
 		beego.GlobalControllerRouter[NotificationController],
 		beego.ControllerComments{

@@ -63,6 +63,15 @@ func (model *appModel) GetById(id int64) (v *App, err error) {
 	return nil, err
 }
 
+func (*appModel) UpdateById(m *App) (err error) {
+	v := App{Id: m.Id}
+	if err = Ormer().Read(&v); err == nil {
+		_, err = Ormer().Update(m)
+		return err
+	}
+	return
+}
+
 func (model *appModel) GetAppCountGroupByNamespace() (*[]NamespaceDetail, error) {
 	sql := `SELECT namespace.name as name, count(*) as count FROM
 			app inner join namespace on app.namespace_id=namespace.id

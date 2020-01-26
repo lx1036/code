@@ -73,7 +73,7 @@ func checkDatabase() error {
 	if err != nil {
 		return err
 	}
-	if needInit {
+	if needInit { // create tables
 		err = orm.RunSyncdb("default", false, true)
 		if err != nil {
 			return err

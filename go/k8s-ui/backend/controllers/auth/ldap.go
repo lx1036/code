@@ -1,3 +1,3 @@
-package ldap
+package auth
 
 type LDAPAuth struct{}

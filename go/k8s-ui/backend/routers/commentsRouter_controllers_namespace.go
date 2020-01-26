@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	const NamespaceController = "k8s-lx1036/k8s-ui/backend/controllers/namespace:NamespaceController"
+	const NamespaceController = "k8s-lx1036/k8s-ui/backend/controllers:NamespaceController"
 	beego.GlobalControllerRouter[NamespaceController] = append(
 		beego.GlobalControllerRouter[NamespaceController],
 		beego.ControllerComments{

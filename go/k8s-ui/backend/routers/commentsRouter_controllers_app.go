@@ -6,13 +6,21 @@ import (
 )
 
 func init() {
-	const AppController = "k8s-lx1036/k8s-ui/backend/controllers/app:AppController"
+	const AppController = "k8s-lx1036/k8s-ui/backend/controllers:AppController"
 	beego.GlobalControllerRouter[AppController] = append(
 		beego.GlobalControllerRouter[AppController],
 		beego.ControllerComments{
 			Method:           "List",
 			Router:           `/`,
 			AllowHTTPMethods: []string{"get"},
+			MethodParams:     param.Make(),
+			Filters:          nil,
+			Params:           nil,
+		},
+		beego.ControllerComments{
+			Method:           "Update",
+			Router:           `/:id`,
+			AllowHTTPMethods: []string{"put"},
 			MethodParams:     param.Make(),
 			Filters:          nil,
 			Params:           nil,

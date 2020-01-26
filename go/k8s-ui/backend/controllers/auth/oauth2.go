@@ -1,3 +1,3 @@
-package oauth2
+package auth
 
 type OAuth2Auth struct{}

@@ -1,6 +1,7 @@
-package app
+package controllers
 
 import (
+	"encoding/json"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
 	"k8s-lx1036/k8s-ui/backend/models"
 )
@@ -12,9 +13,22 @@ type AppController struct {
 func (controller *AppController) URLMapping() {
 	controller.Mapping("List", controller.List)
 	controller.Mapping("AppStatistics", controller.AppStatistics)
+	controller.Mapping("Update", controller.Update)
+	controller.Mapping("GetNames", controller.GetNames)
+	controller.Mapping("Create", controller.Create)
+	controller.Mapping("Get", controller.Get)
+	controller.Mapping("Delete", controller.Delete)
 }
 
 func (controller *AppController) Prepare() {
+	controller.APIController.Prepare()
+}
+
+func (controller *AppController) Create() {
+
+}
+
+func (controller *AppController) GetNames() {
 
 }
 
@@ -49,4 +63,22 @@ func (controller *AppController) List() {
 
 	controller.Success(param.NewPage(total, apps))
 	return
+}
+
+// @router /:id [put]
+func (controller *AppController) Update() {
+	id := controller.GetIdFromURL()
+	var app models.App
+	err := json.Unmarshal(controller.Ctx.Input.RequestBody, &app)
+	if err != nil {
+
+	}
+
+	app.Id = id
+	err = models.AppModel.UpdateById(&app)
+	if err != nil {
+
+	}
+
+	controller.Success(app)
 }
