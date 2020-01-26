@@ -1,7 +1,7 @@
 import {NgModule} from '@angular/core';
 
 import {PortalComponent} from './portal.component';
-import {AppComponent} from './app.component';
+import {AppComponent, CreateEditAppComponent} from './app.component';
 import {AppUserComponent} from './app-user.component';
 import {ListAppUserComponent} from './list-app-user.component';
 import {AuthCheckGuard} from '../shared/auth-check-guard.service';
@@ -66,6 +66,7 @@ export class PortalRoutingModule {
     ResourceReportComponent,
     HistoryComponent,
     ListAppsComponent,
+    CreateEditAppComponent,
   ],
   providers: [
     AuthCheckGuard,
