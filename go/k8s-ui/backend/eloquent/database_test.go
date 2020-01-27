@@ -36,7 +36,7 @@ type Product struct {
 func TestBasic(test *testing.T) {
 	config := DBConfig{
 		Driver:          "mysql",
-		Dsn:             "root:root@/orm?charset=utf8mb4&parseTime=True&loc=Local",
+		Dsn:             "root:root@tcp(127.0.0.1:3306)/orm?charset=utf8mb4&parseTime=True&loc=Local",
 		SetMaxOpenConns: 10,
 		SetMaxIdleConns: 1,
 		Prefix:          "",

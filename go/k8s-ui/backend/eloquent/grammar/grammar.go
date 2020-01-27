@@ -1,12 +1,29 @@
 package grammar
 
+import (
+	"k8s-lx1036/k8s-ui/backend/eloquent/query"
+	"strings"
+)
+
 type Grammar interface {
-	CompileSelect() string
+	CompileSelect(*query.Query) string
 }
 
 type MysqlGrammar struct {
 }
 
-func (grammar *MysqlGrammar) CompileSelect() string {
-	return ""
+// compile *query.Query to sql string
+func (grammar *MysqlGrammar) CompileSelect(query *query.Query) string {
+	
+	sql := strings.TrimSpace(grammar.concatenate(grammar.compileComponent(query)))
+	
+	return sql
+}
+
+func (grammar *MysqlGrammar) concatenate(component interface{}) string {
+	
+}
+
+func (grammar *MysqlGrammar) compileComponent(query2 *query.Query) []string {
+	
 }
