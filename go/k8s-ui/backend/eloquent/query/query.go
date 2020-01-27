@@ -1,8 +1,10 @@
 package query
 
 type Query struct {
-	From string
-	Wheres []*Where
+	From       string
+	Wheres     []*Where
+	Columns    []string
+	JoinClause bool
 }
 
 type Where struct {
