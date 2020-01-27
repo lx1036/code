@@ -2,6 +2,7 @@ package eloquent
 
 import (
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	"testing"
 	"time"
 )
@@ -23,38 +24,42 @@ func TestManager(test *testing.T) {
 	}*/
 }
 
-var DB *Connection
+var connection *Connection
 
 func init() {
-	DB = initDb()
+	connection = initDb()
 }
 
 func initDb() *Connection {
+	database := "orm"
 	dsn := "root:root@tcp(127.0.0.1:3306)/"
 	driver := "mysql"
-	db, err := Open(DBConfig{
+	connection, err := Open(DBConfig{
 		Driver: driver,
 		Dsn:    dsn + "?charset=utf8&parseTime=true",
 	})
 	if err != nil {
 		panic(err)
 	}
-	err = db.Statement(`CREATE DATABASE IF NOT EXISTS orm`)
+	err = connection.Statement(fmt.Sprintf(`CREATE DATABASE IF NOT EXISTS %s;`, database))
 
 	if err != nil {
 		panic(err)
 	}
 
-	db, err = Open(DBConfig{
+	connection, err = Open(DBConfig{
 		Driver: driver,
-		Dsn:    dsn + "orm?charset=utf8&parseTime=true",
+		Dsn:    dsn + fmt.Sprintf("%s?charset=utf8&parseTime=true", database),
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	_ = db.Statement(`DROP TABLE IF EXISTS users;`)
-	_ = db.Statement(`
+	err = connection.Statement(`DROP TABLE IF EXISTS users;`)
+	if err != nil {
+		panic(err)
+	}
+	err = connection.Statement(`
 CREATE TABLE users (
   id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
   name varchar(255) DEFAULT NULL,
@@ -66,8 +71,11 @@ CREATE TABLE users (
   updated_at timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
 ) ENGINE=InnoDB;
 `)
+	if err != nil {
+		panic(err)
+	}
 
-	return db
+	return connection
 }
 
 type User struct {
@@ -87,12 +95,12 @@ func (user *User) TableName() string {
 
 func TestConnectionSelectOne(t *testing.T) {
 	var user User
-	_, _, err := DB.Insert("insert into users (name, gender) values (?, ?)", "Andrew", "M")
+	_, _, err := connection.Insert("insert into users (name, gender) values (?, ?)", "Andrew", "M")
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = DB.SelectOne("select * from users where gender = ?", []interface{}{"M"}, &user)
+	err = connection.SelectOne("select * from users where gender = ?", []interface{}{"M"}, &user)
 	if err != nil {
 		t.Error(err)
 	}

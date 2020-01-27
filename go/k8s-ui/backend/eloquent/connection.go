@@ -97,7 +97,7 @@ func (connection *Connection) Select(query string, bindings []interface{}, dest 
 	return nil
 }
 
-func (connection *Connection) SelectOne(query string, bindings []interface{}, dest interface{}) interface{} {
+func (connection *Connection) SelectOne(query string, bindings []interface{}, dest interface{}) error {
 	return connection.Select(query, bindings, dest)
 }
 
