@@ -3,6 +3,7 @@ module k8s-lx1036
 go 1.13
 
 require (
+	bou.ke/monkey v1.0.2
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/astaxie/beego v1.12.0
 	github.com/caddyserver/caddy v1.0.4
