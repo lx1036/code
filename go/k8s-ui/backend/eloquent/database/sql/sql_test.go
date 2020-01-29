@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// https://github.com/go-gorp/gorp
 // http://go-database-sql.org/index.html
 func TestGoSqlDriverMysql(test *testing.T) {
 	dsn := "root:root@tcp(127.0.0.1)/orm"
