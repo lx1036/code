@@ -1,0 +1,22 @@
+
+---
+
+- name: install kubectl
+  copy:
+    src: "{{ var_src_k8s/kubectl }}"
+    dest: "{{ var_default_install_bin }}"
+    mode: "{{ var_default_bin_mode }}"
+  tags: #https://docs.ansible.com/ansible/latest/user_guide/playbooks_tags.html
+    - "install"
+
+- name: install cfssl tools
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_default_install_bin }}"
+    mode: "{{ var_default_bin_mode }}"
+  with_items: # https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#with-items
+    - "{{ var_src_cfssl }}/cfssl"
+    - "{{ var_src_cfssl }}/cfssljson"
+    - "{{ var_src_cfssl }}/cfssl-certinfo"
+  tags:
+    - "install"

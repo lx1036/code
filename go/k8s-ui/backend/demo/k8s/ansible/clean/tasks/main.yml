@@ -1,0 +1,12 @@
+---
+
+- name: stop services
+  shell: "(! chkconfig kube-scheduler || systemctl stop kube-scheduler) \
+        && (! chkconfig kube-controller-manager || systemctl stop kube-controller-manager) \
+        && (! chkconfig kube-apiserver || systemctl stop kube-apiserver) \
+        && (! chkconfig etcd || systemctl stop etcd) \
+        && (! chkconfig flanneld || systemctl stop flanneld) \
+        && (! chkconfig kubelet || systemctl stop kubelet) \
+        && (! chkconfig docker || systemctl stop docker)"
+
+
