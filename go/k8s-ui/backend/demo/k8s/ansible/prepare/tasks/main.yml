@@ -20,3 +20,19 @@
     - "{{ var_src_cfssl }}/cfssl-certinfo"
   tags:
     - "install"
+
+- name: install etcd and etcdctl
+
+
+
+## firewall setting
+- name: firewall setting
+  shell: "systemctl stop firewalld \
+          && systemctl disable firewalld \
+          && iptables -F \
+          && iptables -X \
+          && iptables -F -t nat \
+          && iptables -X -t nat \
+          && iptables -P FORWARD ACCEPT"
+
+
