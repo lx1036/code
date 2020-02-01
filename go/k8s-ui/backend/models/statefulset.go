@@ -55,21 +55,21 @@ type StatefulsetMetaData struct {
 }
 
 type Statefulset struct {
-	Id   int64  `orm:"auto" json:"id,omitempty"`
-	Name string `orm:"unique;index;size(128)" json:"name,omitempty"`
+	Id   int64  `gorm:"auto" json:"id,omitempty"`
+	Name string `gorm:"unique;index;size(128)" json:"name,omitempty"`
 
-	MetaData    string              `orm:"type(text)" json:"metaData,omitempty"`
-	MetaDataObj StatefulsetMetaData `orm:"-" json:"-"`
-	App         *App                `orm:"index;rel(fk)" json:"app,omitempty"`
-	Description string              `orm:"null;size(512)" json:"description,omitempty"`
-	OrderId     int64               `orm:"index;default(0)" json:"order"`
+	MetaData    string              `gorm:"type(text)" json:"metaData,omitempty"`
+	MetaDataObj StatefulsetMetaData `gorm:"-" json:"-"`
+	App         *App                `gorm:"index;rel(fk)" json:"app,omitempty"`
+	Description string              `gorm:"null;size(512)" json:"description,omitempty"`
+	OrderId     int64               `gorm:"index;default(0)" json:"order"`
 
-	CreateTime time.Time `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime time.Time `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
-	User       string    `orm:"size(128)" json:"user,omitempty"`
-	Deleted    bool      `orm:"default(false)" json:"deleted,omitempty"`
+	CreateTime time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
+	UpdateTime time.Time `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	User       string    `gorm:"size(128)" json:"user,omitempty"`
+	Deleted    bool      `gorm:"default(false)" json:"deleted,omitempty"`
 
-	AppId int64 `orm:"-" json:"appId,omitempty"`
+	AppId int64 `gorm:"-" json:"appId,omitempty"`
 }
 
 func (*Statefulset) TableName() string {

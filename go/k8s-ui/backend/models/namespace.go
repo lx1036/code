@@ -6,18 +6,18 @@ import (
 )
 
 type Namespace struct {
-	Id            int64             `orm:"auto" json:"id,omitempty"`
-	Name          string            `orm:"index;unique;size(128)" json:"name,omitempty"`
-	KubeNamespace string            `orm:"index;size(128)" json:"kubeNamespace,omitempty"`
-	MetaData      string            `orm:"type(text)" json:"metaData,omitempty"`
-	MetaDataObj   NamespaceMetaData `orm:"-" json:"-"`
-	CreateTime    *time.Time        `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime    *time.Time        `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
-	User          string            `orm:"size(128)" json:"user,omitempty"`
-	Deleted       bool              `orm:"default(false)" json:"deleted,omitempty"`
+	Id            int64             `gorm:"auto" json:"id,omitempty"`
+	Name          string            `gorm:"index;unique;size(128)" json:"name,omitempty"`
+	KubeNamespace string            `gorm:"index;size(128)" json:"kubeNamespace,omitempty"`
+	MetaData      string            `gorm:"type(text)" json:"metaData,omitempty"`
+	MetaDataObj   NamespaceMetaData `gorm:"-" json:"-"`
+	CreateTime    *time.Time        `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
+	UpdateTime    *time.Time        `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	User          string            `gorm:"size(128)" json:"user,omitempty"`
+	Deleted       bool              `gorm:"default(false)" json:"deleted,omitempty"`
 
 	// 用于权限的关联查询
-	NamespaceUsers []*NamespaceUser `orm:"reverse(many)" json:"-"`
+	NamespaceUsers []*NamespaceUser `gorm:"reverse(many)" json:"-"`
 }
 
 type NamespaceMetaData struct {

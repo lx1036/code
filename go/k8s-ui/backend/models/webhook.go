@@ -14,19 +14,19 @@ const (
 type webHookModel struct{}
 
 type WebHook struct {
-	Id       int64        `orm:"auto" json:"id"`
-	Name     string       `orm:"index;size(128)" json:"name"`
+	Id       int64        `gorm:"auto" json:"id"`
+	Name     string       `gorm:"index;size(128)" json:"name"`
 	Scope    WebHookScope `json:"scope"`
 	ObjectId int64        `json:"objectId"`
 
-	Url    string `orm:"null;size(512)" json:"url"`
-	Secret string `orm:"null;size(512)" json:"secret"`
-	Events string `orm:"type(text)" json:"events"`
+	Url    string `gorm:"null;size(512)" json:"url"`
+	Secret string `gorm:"null;size(512)" json:"secret"`
+	Events string `gorm:"type(text)" json:"events"`
 
-	CreateTime *time.Time `orm:"auto_now_add;type(datetime)" json:"createTime"`
-	UpdateTime *time.Time `orm:"auto_now;type(datetime)" json:"updateTime"`
-	User       string     `orm:"size(128)" json:"user"`
-	Enabled    bool       `orm:"default(false)" json:"enabled"`
+	CreateTime *time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime"`
+	UpdateTime *time.Time `gorm:"auto_now;type(datetime)" json:"updateTime"`
+	User       string     `gorm:"size(128)" json:"user"`
+	Enabled    bool       `gorm:"default(false)" json:"enabled"`
 }
 
 func (*WebHook) TableName() string {

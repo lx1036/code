@@ -14,21 +14,21 @@ const (
 type ClusterStatus int32
 
 type Cluster struct {
-	Id          int64      `orm:"auto" json:"id,omitempty"`
-	Name        string     `orm:"unique;index;size(128)" json:"name,omitempty"`
-	DisplayName string     `orm:"size(512);column(displayname);null" json:"displayname,omitempty"`
-	MetaData    string     `orm:"null;type(text)" json:"metaData,omitempty"`
-	Master      string     `orm:"size(128)" json:"master,omitempty"` // apiserver地址，示例： https://10.172.189.140
-	KubeConfig  string     `orm:"null;type(text)" json:"kubeConfig,omitempty"`
-	Description string     `orm:"null;size(512)" json:"description,omitempty"`
-	CreateTime  *time.Time `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime  *time.Time `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
-	User        string     `orm:"size(128)" json:"user,omitempty"`
-	Deleted     bool       `orm:"default(false)" json:"deleted,omitempty"`
+	Id          int64      `gorm:"auto" json:"id,omitempty"`
+	Name        string     `gorm:"unique;index;size(128)" json:"name,omitempty"`
+	DisplayName string     `gorm:"size(512);column(displayname);null" json:"displayname,omitempty"`
+	MetaData    string     `gorm:"null;type(text)" json:"metaData,omitempty"`
+	Master      string     `gorm:"size(128)" json:"master,omitempty"` // apiserver地址，示例： https://10.172.189.140
+	KubeConfig  string     `gorm:"null;type(text)" json:"kubeConfig,omitempty"`
+	Description string     `gorm:"null;size(512)" json:"description,omitempty"`
+	CreateTime  *time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
+	UpdateTime  *time.Time `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	User        string     `gorm:"size(128)" json:"user,omitempty"`
+	Deleted     bool       `gorm:"default(false)" json:"deleted,omitempty"`
 	// the cluster status
-	Status ClusterStatus `orm:"default(0)" json:"status"`
+	Status ClusterStatus `gorm:"default(0)" json:"status"`
 
-	MetaDataObj ClusterMetaData `orm:"-" json:"-"`
+	MetaDataObj ClusterMetaData `gorm:"-" json:"-"`
 }
 
 type ClusterMetaData struct {

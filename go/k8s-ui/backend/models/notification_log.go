@@ -7,11 +7,11 @@ const (
 )
 
 type NotificationLog struct {
-	Id           int64         `orm:"auto" json:"id,omitempty"`
-	UserId       int64         `orm:"default(0)" json:"user_id,omitempty"`
-	CreateTime   *time.Time    `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	IsReaded     bool          `orm:"default(false)" json:"is_readed"`
-	Notification *Notification `orm:"index;column(notification_id);rel(fk)" json:"notification"`
+	Id           int64         `gorm:"auto" json:"id,omitempty"`
+	UserId       int64         `gorm:"default(0)" json:"user_id,omitempty"`
+	CreateTime   *time.Time    `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
+	IsReaded     bool          `gorm:"default(false)" json:"is_readed"`
+	Notification *Notification `gorm:"index;column(notification_id);rel(fk)" json:"notification"`
 }
 
 func (*NotificationLog) TableName() string {

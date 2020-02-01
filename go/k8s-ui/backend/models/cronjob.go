@@ -20,8 +20,8 @@ type CronjobMetaData struct {
 }
 
 type Cronjob struct {
-	Id   int64  `orm:"auto" json:"id,omitempty"`
-	Name string `orm:"unique;size(128)" json:"name,omitempty"`
+	Id   int64  `gorm:"auto" json:"id,omitempty"`
+	Name string `gorm:"unique;size(128)" json:"name,omitempty"`
 	// 存储模版可上线机房，已挂起的机房
 	/*
 		{
@@ -30,18 +30,18 @@ type Cronjob struct {
 		  },
 		}
 	*/
-	MetaData    string          `orm:"type(text)" json:"metaData,omitempty"`
-	MetaDataObj CronjobMetaData `orm:"-" json:"-"`
-	App         *App            `orm:"index;rel(fk)" json:"app,omitempty"`
-	Description string          `orm:"null;size(512)" json:"description,omitempty"`
-	OrderId     int64           `orm:"index;default(0)" json:"order"`
+	MetaData    string          `gorm:"type(text)" json:"metaData,omitempty"`
+	MetaDataObj CronjobMetaData `gorm:"-" json:"-"`
+	App         *App            `gorm:"index;rel(fk)" json:"app,omitempty"`
+	Description string          `gorm:"null;size(512)" json:"description,omitempty"`
+	OrderId     int64           `gorm:"index;default(0)" json:"order"`
 
-	CreateTime *time.Time `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime *time.Time `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
-	User       string     `orm:"size(128)" json:"user,omitempty"`
-	Deleted    bool       `orm:"default(false)" json:"deleted,omitempty"`
+	CreateTime *time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
+	UpdateTime *time.Time `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	User       string     `gorm:"size(128)" json:"user,omitempty"`
+	Deleted    bool       `gorm:"default(false)" json:"deleted,omitempty"`
 
-	AppId int64 `orm:"-" json:"appId,omitempty"`
+	AppId int64 `gorm:"-" json:"appId,omitempty"`
 }
 
 func (*cronjobModel) GetById(id int64) (v *Cronjob, err error) {
