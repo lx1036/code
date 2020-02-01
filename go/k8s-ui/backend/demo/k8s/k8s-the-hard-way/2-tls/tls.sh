@@ -1,3 +1,5 @@
+# Docs: https://kubernetes.io/zh/docs/tasks/tls/managing-tls-in-a-cluster/
+
 # Certificate Authority
 ## cfssl: https://github.com/cloudflare/cfssl
 cat > ca-config.json <<EOF
