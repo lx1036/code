@@ -1,9 +1,22 @@
-import {AfterViewInit, Component, ElementRef, Inject, OnDestroy, OnInit} from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Inject,
+  OnDestroy,
+  OnInit,
+  Output,
+  ViewChild
+} from '@angular/core';
 import {DOCUMENT} from '@angular/common';
 import {NamespaceClient} from '../shared/client/v1/kubernetes/namespace';
 import {CacheService} from '../shared/cache.service';
 import {MessageHandlerService} from '../shared/message-handler.service';
 import {AuthService} from '../shared/auth.service';
+import {App} from '../shared/model/v1/app';
+import {AppService} from '../shared/app.service';
+import {NgForm} from '@angular/forms';
 
 const showState = {
   name: {hidden: false},
@@ -17,6 +30,94 @@ interface ClusterCard {
   name: string;
   state: boolean;
 }
+
+export const enum ActionType {
+  ADD_NEW, EDIT
+}
+
+@Component({
+  selector: 'app-create-edit-app',
+  template: `
+    <clr-modal [(clrModalOpen)]="createAppOpened">
+      <h3 class="modal-title">{{appTitle}}</h3>
+      <div class="modal-body">
+        <form #appForm="ngForm" clrForm clrLayout="horizontal">
+          <section class="form-block">
+            <clr-input-container>
+              <label class="required">{{'TITLE.NAME' | translate}}</label>
+              <input clrInput type="text" id="app_name" [(ngModel)]="app.name" name="app_name" size="32" required
+                     [placeholder]="'PLACEHOLDER.APP_NAME' | translate" [readonly]="actionType==1" pattern="[a-z]([-a-z0-9]*[a-z0-9])?" maxlength="32" (keyup)='handleValidation()'>
+              <clr-control-helper>
+                <span style="color: red;" *ngIf="!isNameValid">{{'RULE.REGEXT' | translate}}[a-z]([-a-z0-9]*[a-z0-9])?</span>
+              </clr-control-helper>
+              <clr-control-error>{{'RULE.REGEXT' | translate}}[a-z]([-a-z0-9]*[a-z0-9])?</clr-control-error>
+            </clr-input-container>
+            <div hidden class="form-group" style="padding-left: 135px;">
+              <label for="app_metadata" class="clr-col-md-3 form-group-label-override">{{'TITLE.METADATA' | translate}}</label>
+              <textarea id="app_metadata" [(ngModel)]="app.metaData" name="app_metadata" rows="3"></textarea>
+            </div>
+            <clr-textarea-container>
+              <label>{{'TITLE.DESCRIPTION' | translate}}</label>
+              <textarea clrTextarea id="app_description" [(ngModel)]="app.description" name="app_description" rows="3"> </textarea>
+            </clr-textarea-container>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline" (click)="onCancel()">{{'BUTTON.CANCEL' | translate}}</button>
+              <button type="button" class="btn btn-primary" [disabled]="!isValid" (click)="onSubmit()">{{'BUTTON.CONFIRM' | translate}}</button>
+            </div>
+          </section>
+        </form>
+      </div>
+    </clr-modal>
+  `
+})
+export class CreateEditAppComponent implements OnInit {
+  createAppOpened: boolean;
+  @Output() create = new EventEmitter<boolean>();
+  appTitle: string;
+  isNameValid: boolean;
+  app: App = new App();
+  actionType: ActionType;
+  @ViewChild('appForm', { static: true }) currentForm: NgForm;
+  checkOnGoing = false;
+  isSubmitOnGoing = false;
+
+  constructor(private appService: AppService, ) {}
+
+  ngOnInit() {
+  }
+
+  public get isValid(): boolean {
+    return this.currentForm &&
+      this.currentForm.valid &&
+      !this.isSubmitOnGoing &&
+      this.isNameValid &&
+      !this.checkOnGoing;
+  }
+
+  newOrEditApp(id?: number) {
+
+  }
+
+  onCancel() {
+
+  }
+
+  handleValidation() {
+
+  }
+
+  onSubmit() {
+    switch (this.actionType) {
+      case ActionType.ADD_NEW:
+        this.appService.create(this.app).subscribe(response => {}, err => {});
+        break;
+      case ActionType.EDIT:
+        this.appService.update(this.app).subscribe(response => {}, err => {});
+        break;
+    }
+  }
+}
+
 
 @Component({
   selector: 'app-portal-app',
@@ -53,13 +154,16 @@ interface ClusterCard {
 
                     </div>
                 </div>
+
+                <app-list-apps [apps]="changedApps"></app-list-apps>
             </app-box>
           </div>
         </div>
       </div>
     </div>
-<!--    <app-sidenav-namespace style="display: flex; order: -1"></app-sidenav-namespace>-->
-<!--    <create-edit-app (create)="createApp($event)"></create-edit-app>-->
+
+    <app-sidenav-namespace style="display: flex; order: -1"></app-sidenav-namespace>
+    <app-create-edit-app (create)="createApp($event)"></app-create-edit-app>
   `,
 })
 export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
@@ -70,6 +174,8 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   resources: object = {};
   clusters: ClusterCard[] = [];
   allowNumber = 10;
+  changedApps: App[];
+  @ViewChild(CreateEditAppComponent, { static: false }) createEditApp: CreateEditAppComponent;
 
   constructor(private namespaceClient: NamespaceClient,
               private cacheService: CacheService,
@@ -118,5 +224,17 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy(): void {
+  }
+
+  openModal() {
+    this.createEditApp.newOrEditApp();
+  }
+
+  createApp($event) {
+
+  }
+
+  editApp(app: App) {
+    this.createEditApp.newOrEditApp(app.id);
   }
 }

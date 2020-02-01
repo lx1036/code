@@ -3,14 +3,9 @@ package routers
 import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/plugins/cors"
-	"k8s-lx1036/k8s-ui/backend/controllers/app"
+	"k8s-lx1036/k8s-ui/backend/controllers"
 	"k8s-lx1036/k8s-ui/backend/controllers/auth"
-	"k8s-lx1036/k8s-ui/backend/controllers/config"
-	"k8s-lx1036/k8s-ui/backend/controllers/deployment"
-	knamespace "k8s-lx1036/k8s-ui/backend/controllers/kubernetes/namespace"
-	kpod "k8s-lx1036/k8s-ui/backend/controllers/kubernetes/pod"
-	"k8s-lx1036/k8s-ui/backend/controllers/namespace"
-	"k8s-lx1036/k8s-ui/backend/controllers/notification"
+	"k8s-lx1036/k8s-ui/backend/controllers/kubernetes"
 	"k8s-lx1036/k8s-ui/backend/controllers/openapi"
 	"k8s-lx1036/k8s-ui/backend/controllers/permission"
 	"path"
@@ -42,7 +37,7 @@ func init() {
 
 		beego.NSNamespace("/apps/:appid([0-9]+)/deployments",
 			beego.NSInclude(
-				&deployment.DeploymentController{},
+				&controllers.DeploymentController{},
 			),
 		),
 	)
@@ -50,12 +45,12 @@ func init() {
 	nsWithoutApp := beego.NewNamespace("/api/v1",
 		beego.NSNamespace("/configs/base",
 			beego.NSInclude(
-				&config.BaseConfigController{},
+				&controllers.BaseConfigController{},
 			),
 		),
 		beego.NSNamespace("/notifications",
 			beego.NSInclude(
-				&notification.NotificationController{},
+				&controllers.NotificationController{},
 			),
 		),
 		beego.NSNamespace("/users",
@@ -63,10 +58,10 @@ func init() {
 				&permission.UserController{},
 			),
 		),
-		beego.NSRouter("/apps/statistics", &app.AppController{}, "get:AppStatistics"),
+		beego.NSRouter("/apps/statistics", &controllers.AppController{}, "get:AppStatistics"),
 		beego.NSNamespace("/namespaces",
 			beego.NSInclude(
-				&namespace.NamespaceController{},
+				&controllers.NamespaceController{},
 			),
 		),
 	)
@@ -79,7 +74,12 @@ func init() {
 	)
 
 	nsWithNamespace := beego.NewNamespace("/api/v1",
-		beego.NSNamespace("/namespaces/:namespaceid([0-9]+)/users",
+		beego.NSNamespace("/namespaces/:namespaceId([0-9]+)/apps",
+			beego.NSInclude(
+				&controllers.AppController{},
+			),
+		),
+		beego.NSNamespace("/namespaces/:namespaceId([0-9]+)/users",
 			beego.NSInclude(
 				&permission.NamespaceUserController{},
 			),
@@ -87,10 +87,10 @@ func init() {
 	)
 
 	nsWithKubernetes := beego.NewNamespace("/api/v1",
-		beego.NSRouter("/kubernetes/pods/statistics", &kpod.KubePodController{}, "get:PodStatistics"),
+		beego.NSRouter("/kubernetes/pods/statistics", &kubernetes.KubePodController{}, "get:PodStatistics"),
 		beego.NSNamespace("/kubernetes/namespaces",
 			beego.NSInclude(
-				&knamespace.KubeNamespaceController{},
+				&kubernetes.KubeNamespaceController{},
 			),
 		),
 	)

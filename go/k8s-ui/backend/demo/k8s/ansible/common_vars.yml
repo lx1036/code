@@ -1,0 +1,7 @@
+---
+#######SETTING: BASIC#########
+var_src_binary: "/tmp/k8s/binary"
+var_src_k8s: "{{var_src_binary}}/kubernetes"
+var_src_cfssl: "{{var_src_binary}}/cfssl"
+var_default_install_bin: "/usr/local/bin"
+var_default_bin_mode: "0755"

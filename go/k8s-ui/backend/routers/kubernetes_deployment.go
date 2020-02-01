@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	const DeploymentController = "k8s-lx1036/k8s-ui/backend/controllers/deployment:DeploymentController"
+	const DeploymentController = "k8s-lx1036/k8s-ui/backend/controllers:DeploymentController"
 	beego.GlobalControllerRouter[DeploymentController] = append(
 		beego.GlobalControllerRouter[DeploymentController],
 		beego.ControllerComments{

@@ -1,0 +1,74 @@
+# basic
+var_download_base_dir: "/tmp/k8s/binary"
+
+var_version_k8s: "v1.17.2"
+var_type_os: "linux"
+var_arch: "amd64"
+var_download_save_mode: "0644"
+var_download_save_mode_bin: "0755"
+var_ver_cni: "v0.8.5"
+var_ver_docker: ""
+
+# k8s
+var_download_save_dir_k8s: "{{var_download_base_dir}}/kubernetes"
+var_download_url_k8s: "https://dl.k8s.io/{{var_version_k8s}}/kubernetes-server-{{var_type_os}}-{{var_arch}}.tar.gz"
+var_download_dest_k8s: "{{var_download_base_dir/kubernetes.tar.gz}}"
+var_download_tmp_relative_dir_k8s: "kubernetes/server/bin"
+var_download_extra_files_k8s:
+  - --add-file
+  - "{{var_download_tmp_relative_dir_k8s/kubectl}}"
+  - "{{var_download_tmp_relative_dir_k8s/kube-apiserver}}"
+  - "{{var_download_tmp_relative_dir_k8s/kube-controller-manager}}"
+  - "{{var_download_tmp_relative_dir_k8s/kube-scheduler}}"
+  - "{{var_download_tmp_relative_dir_k8s/kube-proxy}}"
+  - "{{var_download_tmp_relative_dir_k8s/kubelet}}"
+var_download_tmp_dir_k8s: "{{var_download_base_dir}}/{{var_download_tmp_relative_dir_k8s}}"
+
+# cfssl
+var_download_save_dir_cfssl: "{{var_download_base_dir}}/cfssl"
+var_download_url_cfssl: "https://pkg.cfssl.org/{{var_ver_cfssl}}/cfssl_{{var_type_os}}-{{var_arch}}"
+var_download_file_cfssl: "{{var_download_save_dir_cfssl}}/cfssl"
+var_download_url_cfssljson: "https://pkg.cfssl.org/{{var_ver_cfssl}}/cfssljson_{{var_type_os}}-{{var_arch}}"
+var_download_file_cfssljson: "{{var_download_save_dir_cfssl}}/cfssljson"
+var_download_url_cfsslcertinfo: "https://pkg.cfssl.org/{{var_ver_cfssl}}/cfssl-certinfo_{{var_type_os}}-{{var_arch}}"
+var_download_file_cfsslcertinfo: "{{var_download_save_dir_cfssl}}/cfssl-certinfo"
+
+# flannel
+var_download_save_dir_flannel: "{{var_download_base_dir}}/flannel"
+var_download_url_flannel: "https://github.com/coreos/flannel/releases/download/{{var_ver_flannel}}/flannel-{{var_ver_flannel}}-{{var_type_os}}-{{var_arch}}.tar.gz"
+var_download_file_flannel: "{{var_download_save_dir_flannel}}/flannel-{{var_ver_flannel}}-{{var_type_os}}-{{var_arch}}.tar.gz"
+var_download_unarchive_extras_files_flannel:
+  - --add-file
+  - flanneld
+  - mk-docker-opts.sh
+
+# etcd
+var_download_save_dir_etcd: "{{var_download_base_dir}}/etcd"
+var_download_url_etcd: "https://github.com/coreos/etcd/releases/download/{{var_ver_etcd}}/etcd-{{var_ver_etcd}}-{{var_type_os}}-{{var_arch}}.tar.gz"
+var_download_file_etcd: "{{var_download_save_dir_etcd}}/etcd-{{var_ver_etcd}}-{{var_type_os}}-{{var_arch}}.tar.gz"
+var_download_tmp_relative_dir_etcd: "etcd-{{var_ver_etcd}}-{{var_type_os}}-{{var_arch}}"
+var_download_tmp_dir_etcd: "{{var_download_save_dir_etcd}}/etcd-{{var_ver_etcd}}-{{var_type_os}}-{{var_arch}}"
+var_download_unarchive_extras_files_etcd:
+  - --add-file
+  - "{{var_download_tmp_relative_dir_etcd}}/etcd"
+  - "{{var_download_tmp_relative_dir_etcd}}/etcdctl"
+
+# cni
+var_download_save_dir_cni: "{{var_download_base_dir}}/cni"
+var_download_url_cni: "https://github.com/containernetworking/plugins/releases/download/{{var_ver_cni}}/cni-plugins-{{var_arch}}-{{var_ver_cni}}.tgz"
+var_download_file_cni:  "{{var_download_save_dir_cni}}/cni-plugins-{{var_arch}}-{{var_ver_cni}}.tgz"
+
+# docker
+var_download_save_dir_docker: "{{var_download_base_dir}}/docker"
+var_download_tmp_dir_docker: "{{var_download_base_dir}}/docker/docker"
+var_download_url_docker: "https://download.docker.com/{{var_type_os}}/static/stable/x86_64/docker-{{var_ver_docker}}.tgz"
+var_download_file_docker:  "{{var_download_save_dir_docker}}/docker-{{var_ver_docker}}.tgz"
+
+# images
+var_download_save_dir_images: "{{ var_download_base_dir }}/images"
+var_image_pause_full_name: "gcr.io/google_containers/pause-amd64:{{ var_ver_pause }}"
+var_image_coredns_full_name: "k8s.gcr.io/coredns:{{ var_ver_coredns }}"
+var_image_dashboard_full_name: "k8s.gcr.io/kubernetes-dashboard-amd64:{{ var_ver_dashboard }}"
+var_download_save_pause: pause.tar
+var_download_save_coredns: coredns.tar
+var_download_save_dashboard: dashboard.tar

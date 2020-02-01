@@ -11,6 +11,10 @@ type APIController struct {
 	AppId       int64
 }
 
+func (controller *APIController) Prepare() {
+	controller.LoggedInController.Prepare()
+}
+
 // Abort stops controller handler and show the error data， e.g. Prepare
 func (controller *APIController) AbortForbidden(msg string) {
 	//c.publishRequestMessage(http.StatusForbidden, msg)

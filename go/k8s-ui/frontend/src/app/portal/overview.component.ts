@@ -168,5 +168,9 @@ export class OverviewComponent implements OnInit {
 
     return 0;
   }
+
+  showMoreCluster() {
+
+  }
 }
 
