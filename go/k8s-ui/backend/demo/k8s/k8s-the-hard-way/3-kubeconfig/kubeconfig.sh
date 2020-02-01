@@ -1,15 +1,16 @@
+
 # 查询 kubernetes-the-hard-way 的静态 IP 地址
 KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
   --region $(gcloud config get-value compute/region) \
   --format 'value(address)')
 
-
-# 为每个 worker 节点创建 kubeconfig 配置
+# kubeconfig kubelet, 为每个 worker 节点创建 kubeconfig 配置
+# -> worker-0.kubeconfig,worker-1.kubeconfig,worker-2.kubeconfig
 for instance in worker-0 worker-1 worker-2; do
   kubectl config set-cluster kubernetes-the-hard-way \
     --certificate-authority=ca.pem \
     --embed-certs=true \
-    --server=https://${KUBERNETES_PUBLIC_ADDRESS}:6443 \
+    --server=https://"${KUBERNETES_PUBLIC_ADDRESS}":6443 \
     --kubeconfig=${instance}.kubeconfig
 
   kubectl config set-credentials system:node:${instance} \
@@ -26,12 +27,13 @@ for instance in worker-0 worker-1 worker-2; do
   kubectl config use-context default --kubeconfig=${instance}.kubeconfig
 done
 
-# 为 kube-proxy 服务生成 kubeconfig 配置文件
+# kubeconfig kube-proxy, 为 kube-proxy 服务生成 kubeconfig 配置文件
+# -> kube-proxy.kubeconfig
 {
   kubectl config set-cluster kubernetes-the-hard-way \
     --certificate-authority=ca.pem \
     --embed-certs=true \
-    --server=https://${KUBERNETES_PUBLIC_ADDRESS}:6443 \
+    --server=https://"${KUBERNETES_PUBLIC_ADDRESS}":6443 \
     --kubeconfig=kube-proxy.kubeconfig
 
   kubectl config set-credentials system:kube-proxy \
@@ -48,7 +50,8 @@ done
   kubectl config use-context default --kubeconfig=kube-proxy.kubeconfig
 }
 
-# kube-controller-manager 配置文件
+# kubeconfig kube-controller-manager 配置文件
+# -> kube-controller-manager.kubeconfig
 {
   kubectl config set-cluster kubernetes-the-hard-way \
     --certificate-authority=ca.pem \
@@ -70,7 +73,8 @@ done
   kubectl config use-context default --kubeconfig=kube-controller-manager.kubeconfig
 }
 
-# kube-scheduler 配置文件
+# kubeconfig kube-scheduler 配置文件
+# -> kube-scheduler.kubeconfig
 {
   kubectl config set-cluster kubernetes-the-hard-way \
     --certificate-authority=ca.pem \
@@ -119,7 +123,7 @@ for instance in worker-0 worker-1 worker-2; do
   gcloud compute scp ${instance}.kubeconfig kube-proxy.kubeconfig ${instance}:~/
 done
 
-# 将 admin、kube-controller-manager 与 kube-scheduler kubeconfig 配置文件复制到每个 controller 节点上
-for instance in controller-0 controller-1 controller-2; do
+# 将 admin、kube-controller-manager 与 kube-scheduler kubeconfig 配置文件复制到每个 master 节点上
+for instance in master-0 master-1 master-2; do
   gcloud compute scp admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig ${instance}:~/
 done

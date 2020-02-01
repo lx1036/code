@@ -1,4 +1,7 @@
+# Docs: https://kubernetes.io/zh/docs/tasks/tls/managing-tls-in-a-cluster/
+
 # Certificate Authority
+## cfssl: https://github.com/cloudflare/cfssl
 cat > ca-config.json <<EOF
 {
   "signing": {
@@ -14,6 +17,10 @@ cat > ca-config.json <<EOF
   }
 }
 EOF
+####
+# CN: Common Name
+# https://blog.cloudflare.com/introducing-cfssl/
+####
 cat > ca-csr.json <<EOF
 {
   "CN": "Kubernetes",
@@ -32,8 +39,7 @@ cat > ca-csr.json <<EOF
   ]
 }
 EOF
-
-## ca pem and private key(凭证和私钥)
+## ca pem and private key(凭证和私钥), generating self-signed root CA certificate and private key
 cfssl gencert -initca ca-csr.json | cfssljson -bare ca # -> ca-key.pem, ca.pem
 
 # Client Credential
@@ -139,4 +145,84 @@ EOF
 cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json \
   -profile=kubernetes kube-proxy-csr.json | cfssljson -bare kube-proxy # -> kube-proxy-key.pem, kube-proxy.pem
 
+## Kube-scheduler Client Credential
+cat > kube-scheduler-csr.json <<EOF
+{
+  "CN": "system:kube-scheduler",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "US",
+      "L": "Portland",
+      "O": "system:node-scheduler",
+      "OU": "Kubernetes The Hard Way",
+      "ST": "Oregon"
+    }
+  ]
+}
+EOF
+cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json \
+  -profile=kubernetes kube-scheduler-csr.json | cfssljson -bare kube-scheduler # -> kube-scheduler-key.pem, kube-scheduler.pem
+
+## Service-Account Client Credential
+cat > service-account-csr.json <<EOF
+{
+  "CN": "service-accounts",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "US",
+      "L": "Portland",
+      "O": "Kubernetes",
+      "OU": "Kubernetes The Hard Way",
+      "ST": "Oregon"
+    }
+  ]
+}
+EOF
+cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json \
+  -profile=kubernetes service-account-csr.json | cfssljson -bare service-account # -> service-account-key.pem, service-account.pem
+
 # Server Credential
+## Kube-API-Server Server Credential
+KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
+  --region $(gcloud config get-value compute/region) \
+  --format 'value(address)')
+cat > kubernetes-csr.json <<EOF
+{
+  "CN": "kubernetes",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "US",
+      "L": "Portland",
+      "O": "Kubernetes",
+      "OU": "Kubernetes The Hard Way",
+      "ST": "Oregon"
+    }
+  ]
+}
+EOF
+cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json \
+  -hostname=10.32.0.1,10.240.0.10,10.240.0.11,10.240.0.12,"${KUBERNETES_PUBLIC_ADDRESS}",127.0.0.1,kubernetes.default \
+  -profile=kubernetes kubernetes-csr.json | cfssljson -bare kubernetes # -> kubernetes-key.pem, kubernetes.pem
+
+# Destribute client/server credentials
+## sync *-key.pem/*.pem to instance(worker nodes)
+for instance in worker-0 worker-1 worker-2; do
+  gcloud compute scp ca.pem ${instance}-key.pem ${instance}.pem ${instance}:~/
+done
+## sync *-key.pem/*.pem to instance(master nodes)
+for instance in master-0 master-1 master-2; do
+  gcloud compute scp ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem \
+    service-account-key.pem service-account.pem ${instance}:~/
+done
