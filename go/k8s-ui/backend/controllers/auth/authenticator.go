@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/astaxie/beego"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
 	"github.com/labstack/gommon/log"
-	"github.com/sirupsen/logrus"
 	rsakey "k8s-lx1036/k8s-ui/backend/apikey"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
 	"k8s-lx1036/k8s-ui/backend/models"
@@ -28,131 +28,141 @@ type LoginResult struct {
 }
 
 type AuthController struct {
-	beego.Controller
 }
 
-func (auth *AuthController) URLMapping() {
-	auth.Mapping("Login", auth.Login)
-	auth.Mapping("Logout", auth.Logout)
-	auth.Mapping("CurrentUser", auth.CurrentUser)
+func (controller *AuthController) Init() {
+
 }
 
-// @router /login/:type/?:name [get,post]
-func (controller *AuthController) Login() {
-	username := controller.Input().Get("username")
-	password := controller.Input().Get("password")
-	authType := controller.Ctx.Input.Param(":type")
-	//oauthName := controller.Ctx.Input.Param(":name")
-
-	logrus.WithFields(logrus.Fields{
-		"username": username,
-		"password": password,
-	}).Info("login")
-
-	//authName := auth.Ctx.Input.Param(":name")
-	//next := auth.Ctx.Input.Query("next")
-	if authType == "" || username == "admin" {
-		authType = models.AuthTypeDB
-	}
-
-	logs.Info("auth type is ", authType)
-
-	authenticator, ok := registry[authType]
-	if !ok {
-		controller.Ctx.Output.SetStatus(http.StatusBadRequest)
-		controller.Data["json"] = base.Result{Data: fmt.Sprintf("auth type[%s] is not supported", authType)}
-		controller.ServeJSON()
-		return
-	}
-	authModel := models.AuthModel{
-		Username: username,
-		Password: password,
-	}
-
-	if authType == models.AuthTypeOAuth2 { // login with oauth2
-
-	}
-
-	user, err := authenticator.Authenticate(authModel)
-	if err != nil {
-		controller.Ctx.Output.SetStatus(http.StatusBadRequest)
-		controller.Data["json"] = base.Result{Data: fmt.Sprintf("try to login in with user [%s] error: %v", authModel.Username, err)}
-		controller.ServeJSON()
-		return
-	}
-
-	now := time.Now()
-	exp := beego.AppConfig.DefaultInt64("TokenLifeTime", 86400)
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-		"iss": beego.AppConfig.DefaultString("appname", "k8s-ui"), // 签发者
-		"iat": now.Unix(),                                         // 签发时间
-		"exp": now.Add(time.Duration(exp) * time.Second).Unix(),   // 过期时间
-		"aud": user.Name,
-	})
-	signedToken, err := token.SignedString(rsakey.RsaPrivateKey)
-	if err != nil {
-		controller.Ctx.Output.SetStatus(http.StatusInternalServerError)
-		controller.Data["json"] = base.Result{Data: fmt.Sprintf("try to create token, error: %v", err)}
-		controller.ServeJSON()
-		return
-	}
-
-	loginResult := LoginResult{Token: signedToken}
-	controller.Data["json"] = base.Result{Data: loginResult}
-	controller.ServeJSON()
-}
-
-// @router /logout [get]
-func (controller *AuthController) Logout() {
-	fmt.Println("Logout")
-
-	controller.Data["json"] = base.Result{Data: "testtest"}
-	controller.ServeJSON()
-}
-
-// @router /currentuser [get]
-func (controller *AuthController) CurrentUser() {
-	controller.Controller.Prepare()
-	authString := controller.Ctx.Input.Header("Authorization")
-	kv := strings.Split(authString, " ")
-	if len(kv) != 2 || kv[0] != "Bearer" {
-		logs.Info("AuthString invalid:", authString)
-		controller.CustomAbort(http.StatusUnauthorized, "Token Invalid ! ")
-	}
-
-	tokenString := kv[1]
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// since we only use the one private key to sign the tokens,
-		// we also only use its public counter part to verify
-		return rsakey.RsaPublicKey, nil
-	})
-	errResult := errors.ErrorResult{}
-	switch err.(type) {
-	case nil: // no error
-		if !token.Valid { // but may still be invalid
-			errResult.Code = http.StatusUnauthorized
-			errResult.Msg = "token is invalid"
+func (controller *AuthController) Login() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		username := context.PostForm("username")
+		password := context.PostForm("password")
+		authType := context.Query("type")
+		//authName := context.Query("name")
+		if authType == "" || username == "admin" {
+			authType = models.AuthTypeDB
 		}
-	case *jwt.ValidationError:
-		errResult.Code = http.StatusUnauthorized
-		errResult.Msg = err.Error()
-	default:
-		errResult.Code = http.StatusInternalServerError
-		errResult.Msg = err.Error()
-	}
-	if err != nil {
-		controller.CustomAbort(errResult.Code, errResult.Msg)
-	}
+		authenticator, ok := registry[authType]
+		if !ok {
+			context.JSON(http.StatusBadRequest, base.JsonResponse{
+				Errno:  -1,
+				Errmsg: fmt.Sprintf("failed: auth type[%s] is not supported", authType),
+				Data:   nil,
+			})
+			return
+		}
 
-	claim := token.Claims.(jwt.MapClaims)
-	aud := claim["aud"].(string)
-	user, err := models.UserModel.GetUserDetail(aud)
-	if err != nil {
-		controller.CustomAbort(http.StatusInternalServerError, err.Error())
-	}
+		authModel := models.AuthModel{
+			Username: username,
+			Password: password,
+		}
+		if authType == models.AuthTypeOAuth2 { // login with oauth2
 
-	controller.Data["json"] = base.Result{Data: user}
-	controller.ServeJSON()
+		}
+		user, err := authenticator.Authenticate(authModel)
+		if err != nil {
+			context.JSON(http.StatusBadRequest, base.JsonResponse{
+				Errno:  -1,
+				Errmsg: fmt.Sprintf("try to login in with user [%s] error: %v", authModel.Username, err),
+				Data:   nil,
+			})
+			return
+		}
+
+		now := time.Now()
+		exp := beego.AppConfig.DefaultInt64("TokenLifeTime", 86400)
+		token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+			"iss": beego.AppConfig.DefaultString("appname", "k8s-ui"), // 签发者
+			"iat": now.Unix(),                                         // 签发时间
+			"exp": now.Add(time.Duration(exp) * time.Second).Unix(),   // 过期时间
+			"aud": user.Name,
+		})
+		signedToken, err := token.SignedString(rsakey.RsaPrivateKey)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, base.JsonResponse{
+				Errno:  -1,
+				Errmsg: fmt.Sprintf("try to create token, error: %v", err),
+				Data:   nil,
+			})
+			return
+		}
+
+		context.JSON(http.StatusOK, base.JsonResponse{
+			Errno:  0,
+			Errmsg: "success",
+			Data:   LoginResult{Token: signedToken},
+		})
+	}
+}
+
+func (controller *AuthController) Logout() gin.HandlerFunc {
+	return func(context *gin.Context) {
+
+	}
+}
+
+func (controller *AuthController) CurrentUser() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		authorization := context.GetHeader("Authorization")
+		authorizations := strings.Split(authorization, " ")
+		if len(authorizations) != 2 || authorizations[0] != "Bearer" {
+			logs.Info("AuthString invalid:", authorization)
+			context.JSON(http.StatusUnauthorized, base.JsonResponse{
+				Errno:  -1,
+				Errmsg: "failed: Token Invalid!",
+				Data:   nil,
+			})
+			return
+		}
+
+		tokenString := authorizations[1]
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			// since we only use the one private key to sign the tokens,
+			// we also only use its public counter part to verify
+			return rsakey.RsaPublicKey, nil
+		})
+		errResult := errors.ErrorResult{}
+		switch err.(type) {
+		case nil: // no error
+			if !token.Valid { // but may still be invalid
+				errResult.Code = http.StatusUnauthorized
+				errResult.Msg = "token is invalid"
+			}
+		case *jwt.ValidationError:
+			errResult.Code = http.StatusUnauthorized
+			errResult.Msg = err.Error()
+		default:
+			errResult.Code = http.StatusInternalServerError
+			errResult.Msg = err.Error()
+		}
+		if err != nil {
+			context.JSON(errResult.Code, base.JsonResponse{
+				Errno:  errResult.Code,
+				Errmsg: fmt.Sprintf("failed: %s", errResult.Msg),
+				Data:   nil,
+			})
+			return
+		}
+
+		claim := token.Claims.(jwt.MapClaims)
+		aud := claim["aud"].(string)
+		user, err := models.UserModel.GetUserDetail(aud)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, base.JsonResponse{
+				Errno:  -1,
+				Errmsg: fmt.Sprintf("failed: %s", err.Error()),
+				Data:   nil,
+			})
+			return
+		}
+
+		context.JSON(http.StatusOK, base.JsonResponse{
+			Errno:  0,
+			Errmsg: "success",
+			Data:   user,
+		})
+	}
 }
 
 func Register(name string, authenticator Authenticator) {

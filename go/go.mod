@@ -22,7 +22,7 @@ require (
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/kavu/go_reuseport v1.4.0 // indirect
 	github.com/klauspost/cpuid v1.2.0
-	github.com/labstack/echo v3.3.10+incompatible
+	github.com/labstack/echo v3.3.10+incompatible // indirect
 	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
 	github.com/mholt/certmagic v0.8.3
@@ -31,6 +31,7 @@ require (
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/olivere/elastic/v7 v7.0.9
 	github.com/prometheus/client_golang v1.1.0
+	github.com/rs/cors v1.7.0
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cast v1.3.0
