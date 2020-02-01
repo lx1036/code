@@ -2,7 +2,6 @@ package auth
 
 import (
 	"fmt"
-	"github.com/astaxie/beego"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/labstack/gommon/log"
@@ -21,10 +20,6 @@ var registry = make(map[string]Authenticator)
 // Authenticator provides interface to authenticate user credentials.
 type Authenticator interface {
 	Authenticate(model models.AuthModel) (*models.User, error)
-}
-
-type LoginResult struct {
-	Token string `json:"token"`
 }
 
 type AuthController struct {
@@ -71,9 +66,11 @@ func (controller *AuthController) Login() gin.HandlerFunc {
 		}
 
 		now := time.Now()
-		exp := beego.AppConfig.DefaultInt64("TokenLifeTime", 86400)
+		//exp := beego.AppConfig.DefaultInt64("TokenLifeTime", 86400)
+		exp := 86400
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-			"iss": beego.AppConfig.DefaultString("appname", "k8s-ui"), // 签发者
+			//"iss": beego.AppConfig.DefaultString("appname", "k8s-ui"), // 签发者
+			"iss": "k8s-ui", // 签发者
 			"iat": now.Unix(),                                         // 签发时间
 			"exp": now.Add(time.Duration(exp) * time.Second).Unix(),   // 过期时间
 			"aud": user.Name,
@@ -88,10 +85,14 @@ func (controller *AuthController) Login() gin.HandlerFunc {
 			return
 		}
 
+		var data struct{
+			Token string `json:"token"`
+		}
+		data.Token = signedToken
 		context.JSON(http.StatusOK, base.JsonResponse{
 			Errno:  0,
 			Errmsg: "success",
-			Data:   LoginResult{Token: signedToken},
+			Data:   data,
 		})
 	}
 }
@@ -147,7 +148,8 @@ func (controller *AuthController) CurrentUser() gin.HandlerFunc {
 
 		claim := token.Claims.(jwt.MapClaims)
 		aud := claim["aud"].(string)
-		user, err := models.UserModel.GetUserDetail(aud)
+		user, err := models.UserModel.GetUserByName(aud)
+		//user, err := models.UserModel.GetUserDetail(aud)
 		if err != nil {
 			context.JSON(http.StatusInternalServerError, base.JsonResponse{
 				Errno:  -1,

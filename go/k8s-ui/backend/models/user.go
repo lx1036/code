@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/astaxie/beego/orm"
+	"k8s-lx1036/k8s-ui/backend/database/lorm"
 	"time"
 )
 
@@ -42,11 +43,14 @@ func (model *userModel) GetUserByName(name string) (user *User, err error) {
 }
 
 func (model *userModel) GetUserDetail(name string) (user *User, err error) {
-	user = &User{Name: name}
+	lorm.DB.Where("name = ?", name).First(&user)
+
+
+	/*user = &User{Name: name}
 	err = Ormer().Read(user, "Name")
 	if err != nil {
 		return nil, err
-	}
+	}*/
 	if user.Admin {
 		namespaces, err := NamespaceModel.GetAll(false)
 		if err != nil {
