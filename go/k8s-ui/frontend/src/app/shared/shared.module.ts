@@ -21,6 +21,8 @@ import {PaginateComponent} from './paginate.component';
 import {CardComponent} from './card.component';
 import {BoxComponent} from './box.component';
 import {NamespaceClient} from './client/v1/kubernetes/namespace';
+import {ProgressComponent} from './progress.component';
+import {SideNavFooterComponent} from './sidenav-footer.component';
 
 const routes: Routes = [
   {
@@ -65,6 +67,8 @@ export class AuthRoutingModule {
     PaginateComponent,
     CardComponent,
     BoxComponent,
+    ProgressComponent,
+    SideNavFooterComponent,
   ],
   declarations: [
     SignInComponent,
@@ -77,6 +81,8 @@ export class AuthRoutingModule {
     PaginateComponent,
     CardComponent,
     BoxComponent,
+    ProgressComponent,
+    SideNavFooterComponent,
   ],
   providers: [
     MessageService,

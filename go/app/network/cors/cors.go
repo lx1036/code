@@ -220,7 +220,7 @@ func (cors *Cors) logf(format string, v ...interface{}) {
 type converter func(string) string
 
 func convert(s []string, c converter) []string {
-	out := []string{}
+	var out []string
 	for _, i := range s {
 		out = append(out, c(i))
 	}

@@ -1,6 +1,7 @@
 package base
 
 import (
+	"fmt"
 	"k8s-lx1036/k8s-ui/backend/common"
 	"strconv"
 )
@@ -25,6 +26,20 @@ func (controller *ParamBuilderController) GetIntParamFromURL(param string) int64
 	}
 
 	return paramInt
+}
+
+func (controller *ParamBuilderController) GetBoolParamFromQueryWithDefault(param string, defaultValue bool) bool {
+	paramStr := controller.Input().Get(param)
+	if len(paramStr) == 0 {
+		return defaultValue
+	}
+
+	paramBool, err := strconv.ParseBool(paramStr)
+	if err != nil {
+		controller.AbortBadRequest(fmt.Sprintf("Invalid %s in Query", param))
+	}
+
+	return paramBool
 }
 
 func (controller *ParamBuilderController) BuildQueryParam() *common.QueryParam {

@@ -1,0 +1,143 @@
+---
+- name: create download directory
+  file:
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - "{{ var_download_base_dir }}"
+    - "{{ var_download_save_dir_k8s }}"
+    - "{{ var_download_save_dir_cfssl }}"
+    - "{{ var_download_save_dir_flannel }}"
+    - "{{ var_download_save_dir_etcd }}"
+    - "{{ var_download_save_dir_cni }}"
+    - "{{ var_download_save_dir_docker }}"
+    - "{{ var_download_save_dir_images }}"
+  tags:
+    - "dir"
+
+- name: configure k8s apt-key
+  apt_key:
+    url: "https://mirrors.aliyun.com/kubernetes/apt/doc/apt-key.gpg"
+    state: present
+
+- name: configure k8s mirror(ubuntu/debian)
+  apt_repository: # https://docs.ansible.com/ansible/latest/modules/apt_repository_module.html
+    repo: deb https://mirrors.aliyun.com/kubernetes/apt/ kubernetes-xenial main
+    state: present
+  tags:
+    - "k8s"
+
+- name: download k8s
+  get_url: # https://docs.ansible.com/ansible/latest/modules/get_url_module.html
+    url: "{{ var_download_url_k8s }}"
+    dest: "{{ var_download_dest_k8s }}"
+    mode: "{{ var_download_save_mode }}"
+  tags:
+    - "k8s"
+
+- name: extract binary files of k8s
+  unarchive: # https://docs.ansible.com/ansible/latest/modules/unarchive_module.html#examples
+    src: "{{ var_download_dest_k8s }}"
+    dest: "{{ var_download_base_dir }}"
+    copy: "no"
+    extra_ops: "{{ var_download_extra_files_k8s }}"
+  tags:
+    - "k8s"
+
+- name: create k8s directory
+  synchronize: # https://docs.ansible.com/ansible/latest/modules/synchronize_module.html
+    src: "{{ var_download_tmp_dir_k8s }}/"
+    dest: "{{ var_download_save_dir_k8s }}"
+  tags:
+    - "k8s"
+
+- name: download binary cfssl
+  get_url:
+    url: "{{ var_download_url_cfssl }}"
+    dest: "{{ var_download_file_cfssl }}"
+    mode: "{{ var_download_save_mode_bin }}"
+
+- name: download binary cfssljson
+  get_url:
+    url: "{{ var_download_url_cfssljson }}"
+    dest: "{{ var_download_file_cfssljson }}"
+    mode: "{{ var_download_save_mode_bin }}"
+
+- name: download flannel
+  get_url:
+    url: "{{ var_download_url_flannel }}"
+    dest: "{{ var_download_file_flannel }}"
+    mode: "{{ var_download_save_mode_bin }}"
+
+- name: extract binary files of flannel
+  unarchive:
+    src: "{{ var_download_file_flannel }}"
+    dest: "{{ var_download_save_dir_flannel }}"
+    copy: "no"
+    extra_ops: "{{ var_download_unarchive_extras_files_flannel }}"
+
+- name: download etcd
+  get_url:
+    url:  "{{ var_download_url_etcd }}"
+    dest: "{{ var_download_file_etcd }}"
+    mode: "{{ var_download_save_mode }}"
+
+- name: extract binary files of etcd
+  unarchive:
+    src: "{{ var_download_file_etcd }}"
+    dest: "{{ var_download_save_dir_etcd }}"
+    copy: "no"
+    extra_ops: "{{ var_download_unarchive_extras_files_etcd }}"
+
+- name: create docker dir
+  synchronize:
+    src: "{{ var_download_tmp_dir_etcd }}/"
+    dest: "{{ var_download_save_dir_etcd }}"
+
+- name: download binary cni
+  get_url:
+    url: "{{ var_download_url_cni }}"
+    dest: "{{ var_download_file_cni }}"
+    mode: "{{ var_download_save_mode }}"
+
+- name: extract binary files of cni
+  unarchive:
+    src: "{{ var_download_file_cni }}"
+    dest: "{{ var_download_save_dir_cni }}"
+    mode: "{{ var_download_save_mode }}"
+
+- name: configure docker apt-key
+  apt_key:
+    url: "http://mirrors.aliyuncs.com/docker-ce/linux/ubuntu/gpg"
+    state: present
+
+- name: configure docker mirror(ubuntu/debian)
+  apt_repository: # https://docs.ansible.com/ansible/latest/modules/apt_repository_module.html
+    repo: "deb [arch=amd64] http://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable"
+    state: present
+  tags:
+    - "docker"
+
+- name: download binary :docker
+  get_url:
+    url:  '{{ var_download_url_docker }}'
+    dest: '{{ var_download_file_docker }}'
+    mode: '{{ var_download_save_mode }}'
+
+- name: extract binary files of docker
+  unarchive:
+    copy: no
+    src: "{{ var_download_file_docker }}"
+    dest: "{{ var_download_save_dir_docker }}"
+
+- name: download pause image
+  shell: docker pull {{ var_image_pause_full_name }} \
+        && docker save {{ var_image_pause_full_name }} > {{}}/{{}}
+
+
+- name: delete tmp files
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - "{{  }}"

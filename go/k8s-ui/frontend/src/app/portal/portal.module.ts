@@ -1,7 +1,7 @@
 import {NgModule} from '@angular/core';
 
 import {PortalComponent} from './portal.component';
-import {AppComponent} from './app.component';
+import {AppComponent, CreateEditAppComponent} from './app.component';
 import {AppUserComponent} from './app-user.component';
 import {ListAppUserComponent} from './list-app-user.component';
 import {AuthCheckGuard} from '../shared/auth-check-guard.service';
@@ -17,6 +17,7 @@ import {SidenavNamespaceComponent} from './sidenav-namespace.component';
 import {OverviewComponent} from './overview.component';
 import {ResourceReportComponent} from './resource.component';
 import {HistoryComponent} from './history.component';
+import {ListAppsComponent} from './list-apps.component';
 
 const routes: Routes = [
   {
@@ -64,6 +65,8 @@ export class PortalRoutingModule {
     OverviewComponent,
     ResourceReportComponent,
     HistoryComponent,
+    ListAppsComponent,
+    CreateEditAppComponent,
   ],
   providers: [
     AuthCheckGuard,

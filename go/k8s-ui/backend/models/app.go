@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"k8s-lx1036/k8s-ui/backend/common"
+	"time"
+)
 
 type App struct {
 	Id        int64      `orm:"auto" json:"id,omitempty"`
@@ -27,6 +30,15 @@ type App struct {
 	AppStars []*AppStarred `orm:"reverse(many)" json:"-"`
 }
 
+type AppStar struct {
+	App
+
+	CreateTime    time.Time `json:"createTime"`
+	NamespaceId   int64     `json:"namespaceId"`
+	NamespaceName string    `json:"namespaceName"`
+	Starred       bool      `json:"starred"`
+}
+
 type AppStatistics struct {
 	Total   int64              `json:"total,omitempty"`
 	Details *[]NamespaceDetail `json:"details,omitempty"`
@@ -51,6 +63,15 @@ func (model *appModel) GetById(id int64) (v *App, err error) {
 	return nil, err
 }
 
+func (*appModel) UpdateById(m *App) (err error) {
+	v := App{Id: m.Id}
+	if err = Ormer().Read(&v); err == nil {
+		_, err = Ormer().Update(m)
+		return err
+	}
+	return
+}
+
 func (model *appModel) GetAppCountGroupByNamespace() (*[]NamespaceDetail, error) {
 	sql := `SELECT namespace.name as name, count(*) as count FROM
 			app inner join namespace on app.namespace_id=namespace.id
@@ -59,4 +80,12 @@ func (model *appModel) GetAppCountGroupByNamespace() (*[]NamespaceDetail, error)
 	_, err := Ormer().Raw(sql).QueryRows(&details)
 
 	return &details, err
+}
+
+func (model *appModel) Count(param *common.QueryParam, b bool, i int64) (total int64, err error) {
+	return 0, nil
+}
+
+func (model *appModel) List(param *common.QueryParam, b bool, i int64) (apps []AppStar, err error) {
+	return nil, nil
 }

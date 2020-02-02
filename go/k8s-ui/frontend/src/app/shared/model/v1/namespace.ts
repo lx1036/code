@@ -14,4 +14,8 @@ export class Namespace {
   user: string;
   createTime: Date;
   updateTime: Date;
+
+  static emptyObject() {
+    return undefined;
+  }
 }
