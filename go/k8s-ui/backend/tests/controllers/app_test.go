@@ -24,7 +24,7 @@ func (appSuite *AppSuite) TeardownTest() {
 
 }
 
-func TestExampleTestSuite(test *testing.T) {
+func TestAppSuite(test *testing.T) {
 	suite.Run(test, new(AppSuite))
 }
 

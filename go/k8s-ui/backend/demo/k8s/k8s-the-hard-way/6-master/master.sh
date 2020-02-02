@@ -1,22 +1,26 @@
+# Docs: https://kubernetes.feisky.xyz/setup/k8s-hard-way/08-bootstrapping-kubernetes-controllers
+
+# ssh
+gcloud compute ssh master-0
+gcloud compute ssh master-1
+gcloud compute ssh master-2
+
+# download kube-apiserver kube-controller-manager kube-scheduler kubectl
 sudo mkdir -p /etc/kubernetes/config
-
-
-# 下载并安装 Kubernetes Controller 二进制文件
 wget -q --show-progress --https-only --timestamping \
   "https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kube-apiserver" \
   "https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kube-controller-manager" \
   "https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kube-scheduler" \
   "https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kubectl"
+
 chmod +x kube-apiserver kube-controller-manager kube-scheduler kubectl
 sudo mv kube-apiserver kube-controller-manager kube-scheduler kubectl /usr/local/bin/
 
-
-# 配置 Kubernetes API Server
+# configure kube-api-server
 sudo mkdir -p /var/lib/kubernetes/
 sudo mv ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem \
   service-account-key.pem service-account.pem \
   encryption-config.yaml /var/lib/kubernetes/
-
 
 # 生成 kube-apiserver.service systemd 配置文件
 INTERNAL_IP=$(curl -s -H "Metadata-Flavor: Google" \
@@ -65,7 +69,6 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-
 # 生成 kube-controller-manager.service systemd 配置文件
 sudo mv kube-controller-manager.kubeconfig /var/lib/kubernetes/
 
@@ -95,7 +98,6 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-
 # 生成 kube-scheduler.service systemd 配置文件
 sudo mv kube-scheduler.kubeconfig /var/lib/kubernetes/
 
@@ -124,7 +126,117 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-
+# 启动 kube-apiserver kube-controller-manager kube-scheduler
 sudo systemctl daemon-reload
 sudo systemctl enable kube-apiserver kube-controller-manager kube-scheduler
 sudo systemctl start kube-apiserver kube-controller-manager kube-scheduler
+
+# health check
+sudo apt-get update
+sudo apt-get install -y nginx
+
+cat > kubernetes.default.svc.cluster.local <<EOF
+server {
+  listen      80;
+  server_name kubernetes.default.svc.cluster.local;
+
+  location /healthz {
+     proxy_pass                    https://127.0.0.1:6443/healthz;
+     proxy_ssl_trusted_certificate /var/lib/kubernetes/ca.pem;
+  }
+}
+EOF
+
+sudo mv kubernetes.default.svc.cluster.local \
+    /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
+sudo ln -s /etc/nginx/sites-available/kubernetes.default.svc.cluster.local /etc/nginx/sites-enabled/
+
+sudo systemctl restart nginx
+sudo systemctl enable nginx
+
+kubectl get componentstatuses --kubeconfig admin.kubeconfig
+curl -H "Host: kubernetes.default.svc.cluster.local" -i http://127.0.0.1/healthz
+
+# RBAC
+cat <<EOF | kubectl apply --kubeconfig admin.kubeconfig -f -
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: system:kube-apiserver-to-kubelet
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/proxy
+      - nodes/stats
+      - nodes/log
+      - nodes/spec
+      - nodes/metrics
+    verbs:
+      - "*"
+EOF
+
+cat <<EOF | kubectl apply --kubeconfig admin.kubeconfig -f -
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: system:kube-apiserver
+  namespace: ""
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:kube-apiserver-to-kubelet
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: kubernetes
+EOF
+
+# HA master load balancer
+KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
+  --region $(gcloud config get-value compute/region) \
+  --format 'value(address)')
+
+gcloud compute http-health-checks create kubernetes \
+  --description "Kubernetes Health Check" \
+  --host "kubernetes.default.svc.cluster.local" \
+  --request-path "/healthz"
+
+gcloud compute firewall-rules create kubernetes-the-hard-way-allow-health-check \
+  --network kubernetes-the-hard-way \
+  --source-ranges 209.85.152.0/22,209.85.204.0/22,35.191.0.0/16 \
+  --allow tcp
+
+gcloud compute target-pools create kubernetes-target-pool \
+  --http-health-check kubernetes
+
+gcloud compute target-pools add-instances kubernetes-target-pool \
+  --instances controller-0,controller-1,controller-2
+
+gcloud compute forwarding-rules create kubernetes-forwarding-rule \
+  --address "${KUBERNETES_PUBLIC_ADDRESS}" \
+  --ports 6443 \
+  --region $(gcloud config get-value compute/region) \
+  --target-pool kubernetes-target-pool
+
+## check
+KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
+  --region $(gcloud config get-value compute/region) \
+  --format 'value(address)')
+
+curl --cacert ca.pem https://"${KUBERNETES_PUBLIC_ADDRESS}":6443/version
+{
+  "major": "1",
+  "minor": "12",
+  "gitVersion": "v1.12.0",
+  "gitCommit": "0ed33881dc4355495f623c6f22e7dd0b7632b7c0",
+  "gitTreeState": "clean",
+  "buildDate": "2018-09-27T16:55:41Z",
+  "goVersion": "go1.10.4",
+  "compiler": "gc",
+  "platform": "linux/amd64"
+}

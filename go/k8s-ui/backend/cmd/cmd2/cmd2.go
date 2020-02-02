@@ -2,6 +2,7 @@ package cmd2
 
 import (
 	"github.com/astaxie/beego"
+	database "k8s-lx1036/k8s-ui/backend/database/initial"
 	"k8s-lx1036/k8s-ui/backend/initial"
 	_ "k8s-lx1036/k8s-ui/backend/routers"
 )
@@ -12,7 +13,7 @@ func Run() {
 		beego.BConfig.WebConfig.StaticDir["/swagger"] = "swagger"
 	}
 
-	initial.InitDb()
+	database.InitDb()
 
 	// K8S Client
 	initial.InitClient()

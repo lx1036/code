@@ -1,7 +1,6 @@
 package controllers
 
-import "k8s-lx1036/k8s-ui/backend/initial"
+import ()
 
 func init() {
-	initial.InitDb()
 }
