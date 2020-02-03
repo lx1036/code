@@ -1,9 +1,9 @@
 package main
 
 import (
+	_ "k8s-lx1036/k8s-ui/backend/database/lorm"
 	"k8s-lx1036/k8s-ui/backend/initial"
 	routers_gin "k8s-lx1036/k8s-ui/backend/routers-gin"
-	_ "k8s-lx1036/k8s-ui/backend/database/lorm"
 )
 
 const Version = "1.6.1"

@@ -70,9 +70,9 @@ func (controller *AuthController) Login() gin.HandlerFunc {
 		exp := 86400
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 			//"iss": beego.AppConfig.DefaultString("appname", "k8s-ui"), // 签发者
-			"iss": "k8s-ui", // 签发者
-			"iat": now.Unix(),                                         // 签发时间
-			"exp": now.Add(time.Duration(exp) * time.Second).Unix(),   // 过期时间
+			"iss": "k8s-ui",                                         // 签发者
+			"iat": now.Unix(),                                       // 签发时间
+			"exp": now.Add(time.Duration(exp) * time.Second).Unix(), // 过期时间
 			"aud": user.Name,
 		})
 		signedToken, err := token.SignedString(rsakey.RsaPrivateKey)
@@ -85,7 +85,7 @@ func (controller *AuthController) Login() gin.HandlerFunc {
 			return
 		}
 
-		var data struct{
+		var data struct {
 			Token string `json:"token"`
 		}
 		data.Token = signedToken
