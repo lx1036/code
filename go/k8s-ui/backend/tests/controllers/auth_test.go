@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	_ "k8s-lx1036/k8s-ui/backend/controllers/auth"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
-	"k8s-lx1036/k8s-ui/backend/database/initial"
 	routers_gin "k8s-lx1036/k8s-ui/backend/routers-gin"
 	"net/http"
 	"net/http/httptest"
@@ -22,7 +21,7 @@ type AuthSuite struct {
 }
 
 func (suite *AuthSuite) SetupTest() {
-	initial.InitDb()
+	//initial.InitDb()
 }
 
 func (suite *AuthSuite) TeardownTest() {

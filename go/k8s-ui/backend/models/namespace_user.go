@@ -7,7 +7,7 @@ const (
 )
 
 type NamespaceUser struct {
-	Id          uint      `gorm:"column:id;primary_key;"`
+	//ID          uint      `gorm:"column:id;primary_key;"`
 	NamespaceID uint      `gorm:"column:namespace_id;"`
 	UserID      uint      `gorm:"column:user_id;"`
 	GroupID     uint      `gorm:"column:group_id;"`

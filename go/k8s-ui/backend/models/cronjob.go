@@ -47,7 +47,7 @@ type Cronjob struct {
 func (*cronjobModel) GetById(id int64) (v *Cronjob, err error) {
 	v = &Cronjob{Id: id}
 	if err = Ormer().Read(v); err == nil {
-		v.AppId = v.App.Id
+		v.AppId = int64(v.App.ID)
 		return v, nil
 	}
 	return nil, err

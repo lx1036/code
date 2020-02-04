@@ -11,9 +11,9 @@ var (
 
 func init() {
 	var err error
-	DB, err = gorm.Open("mysql", "root:root@tcp(127.0.0.1:3306)/k8s_ui?charset=utf8mb4&parseTime=True&loc=Local")
+	DB, err = gorm.Open("mysql", "root:root@tcp(127.0.0.1:3306)/demo_k8s?charset=utf8mb4&parseTime=True&loc=Local")
 	if err != nil {
 		panic(err)
 	}
-	defer DB.Close()
+	//defer DB.Close()
 }

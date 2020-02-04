@@ -13,7 +13,7 @@ type AuditLogLevel string
 type AuditLogType string
 
 type AuditLog struct {
-	Id         int64         `gorm:"auto" json:"id,omitempty"`
+	Id         int64         `gorm:"column:id;primary_key;"`
 	SubjectId  int64         `gorm:"type(bigint)" json:"subjectId,omitempty"`
 	LogType    AuditLogType  `gorm:"index;size(128)" json:"logType,omitempty"`
 	LogLevel   AuditLogLevel `gorm:"index;size(128)" json:"logLevel,omitempty"`

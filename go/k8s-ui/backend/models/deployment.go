@@ -39,7 +39,7 @@ type deploymentModel struct{}
 func (*deploymentModel) GetByName(name string) (deployment *Deployment, err error) {
 	deployment = &Deployment{Name: name}
 	if err := Ormer().Read(deployment, "name"); err == nil {
-		deployment.Id = deployment.App.Id
+		deployment.Id = int64(deployment.App.ID)
 		return deployment, nil
 	}
 
@@ -50,7 +50,7 @@ func (model *deploymentModel) GetById(id int64) (deployment *Deployment, err err
 	deployment = &Deployment{Id: id}
 
 	if err = Ormer().Read(deployment); err == nil {
-		deployment.AppId = deployment.App.Id
+		deployment.AppId = int64(deployment.App.ID)
 		return deployment, nil
 	}
 
@@ -61,7 +61,7 @@ func (model *deploymentModel) UpdateById(deployment *Deployment) (err error) {
 	v := Deployment{Id: deployment.Id}
 	// ascertain id exists in the database
 	if err = Ormer().Read(&v); err == nil {
-		deployment.App = &App{Id: deployment.AppId}
+		deployment.App = &App{ID: uint(deployment.AppId)}
 		deployment.UpdateTime = nil
 		_, err = Ormer().Update(deployment)
 		return err

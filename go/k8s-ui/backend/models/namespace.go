@@ -10,7 +10,7 @@ const (
 )
 
 type Namespace struct {
-	Id            uint      `gorm:"column:id;primary_key;"`
+	ID            uint      `gorm:"column:id;primary_key;"`
 	Name          string    `gorm:"column:name;size:128;not null;unique;default:'';"`
 	KubeNamespace string    `gorm:"column:kube_namespace;size:128;not null;default:'';"`
 	MetaData      string    `gorm:"column:meta_data;type:longtext;not null;"`
@@ -80,7 +80,7 @@ func (model *namespaceModel) GetAll(deleted bool) ([]*Namespace, error) {
 }
 
 func (model *namespaceModel) GetById(id int64) (v *Namespace, err error) {
-	v = &Namespace{Id: id}
+	v = &Namespace{ID: uint(id)}
 
 	if err = Ormer().Read(v); err == nil {
 		return v, nil

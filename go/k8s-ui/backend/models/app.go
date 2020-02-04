@@ -10,7 +10,7 @@ const (
 )
 
 type App struct {
-	Id          uint      `gorm:"column:id;primary_key;"`
+	ID          uint      `gorm:"column:id;primary_key;"`
 	Name        string    `gorm:"column:name;size:128;not null;index:app_name;default:'';"`
 	NamespaceID uint      `gorm:"column:namespace_id;"`
 	MetaData    string    `gorm:"column:meta_data;type:longtext;not null;"`
@@ -67,7 +67,7 @@ type NamespaceDetail struct {
 type appModel struct{}
 
 func (model *appModel) GetById(id int64) (v *App, err error) {
-	v = &App{Id: id}
+	v = &App{ID: uint(id)}
 
 	if err = Ormer().Read(v); err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ func (model *appModel) GetById(id int64) (v *App, err error) {
 }
 
 func (*appModel) UpdateById(m *App) (err error) {
-	v := App{Id: m.Id}
+	v := App{ID: uint(m.ID)}
 	if err = Ormer().Read(&v); err == nil {
 		_, err = Ormer().Update(m)
 		return err
