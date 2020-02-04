@@ -27,7 +27,7 @@ type User struct {
 	UpdatedAt time.Time `gorm:"column:updated_at"`
 	DeletedAt time.Time `gorm:"column:deleted_at;default:null"`
 
-	ApiKeys []APIKey `gorm:"foreignkey:UserID;AssociationForeignKey:ID"`
+	ApiKeys []APIKey `gorm:"foreignkey:UserID;association_foreignkey:ID"`
 	//Namespaces []*Namespace `gorm:"-" json:"namespaces,omitempty"`
 }
 

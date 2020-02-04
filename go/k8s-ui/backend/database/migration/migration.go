@@ -37,14 +37,13 @@ func main() {
 	db.Exec("")*/
 
 	db, _ = gorm.Open("mysql", fmt.Sprintf("root:root@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName))
-
 	db.Set("gorm:table_options", "ENGINE=InnoDB").AutoMigrate(
-		&models.User{},
-		&models.Group{},
 		&models.APIKey{},
+		&models.Group{},
+		&models.User{},
 	)
 
-	db.Model(&models.APIKey{}).AddForeignKey("user_id", "users(id)", "RESTRICT", "RESTRICT").
-		AddForeignKey("group_id", "groups(id)", "RESTRICT", "RESTRICT")
-	//db.Model(&models.APIKey{}).AddForeignKey("group_id", "groups(id)", "RESTRICT", "RESTRICT")
+	db.Debug()
+	db.Model(&models.APIKey{}).AddForeignKey("`group_id`", "`groups`(`id`)", "RESTRICT", "RESTRICT"). // use `group` quote identifier(preserved words)
+														AddForeignKey("`user_id`", "`users`(`id`)", "RESTRICT", "RESTRICT")
 }

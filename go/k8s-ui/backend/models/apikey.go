@@ -18,10 +18,12 @@ type APIKey struct {
 	Token      string `gorm:"column:token;type:longtext;not null"`
 	Type       uint   `gorm:"column:type;type:int;size:11;not null;default:0"` // 0：全局 1：命名空间 2：项目
 	ResourceId uint64 `gorm:"column:resource_id;type:bigint;size:20;default:null"`
-	GroupID    uint   `gorm:"column:group_id;"`
 	//Group       *Group     `gorm:"null;rel(fk);on_delete(set_null)" json:"group,omitempty"`
 	Description string    `gorm:"column:description;size:512;default:null"`
 	UserID      uint      `gorm:"column:user_id;"`
+	User        User      `gorm:"foreignkey:UserID;association_foreignkey:ID"`
+	GroupID     uint      `gorm:"column:group_id;"`
+	Group       Group     `gorm:"foreignkey:GroupID;association_foreignkey:ID"`
 	ExpireIn    uint64    `gorm:"column:expire_in;type:bigint;not null;default:0"` // 过期时间，单位：秒
 	CreatedAt   time.Time `gorm:"column:created_at"`
 	UpdatedAt   time.Time `gorm:"column:updated_at"`

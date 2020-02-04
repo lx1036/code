@@ -20,7 +20,8 @@ type Group struct {
 	DeletedAt time.Time `gorm:"column:deleted_at;default:null"`
 
 	//ApiKeys []APIKey `gorm:"foreignkey:GroupId"`
-	ApiKeys []APIKey `gorm:"foreignkey:GroupID;AssociationForeignKey:ID"`
+	//ApiKeys []APIKey `gorm:"foreignkey:GroupID;AssociationForeignKey:ID"`
+	ApiKeys []APIKey `gorm:"foreignkey:GroupID;association_foreignkey:ID"`
 
 	// 用于权限的关联查询
 	//Permissions    []*Permission    `gorm:"rel(m2m);rel_table(group_permissions)" json:"permissions,omitempty"`
