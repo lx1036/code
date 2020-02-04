@@ -5,29 +5,45 @@ import (
 	"time"
 )
 
+const (
+	TableNameApp = "apps"
+)
+
 type App struct {
-	Id        int64      `gorm:"auto" json:"id,omitempty"`
-	Name      string     `gorm:"index;size(128)" json:"name,omitempty"`
-	Namespace *Namespace `gorm:"index;column(namespace_id);rel(fk)" json:"namespace"`
+	Id          uint      `gorm:"column:id;primary_key;"`
+	Name        string    `gorm:"column:name;size:128;not null;index:app_name;default:'';"`
+	NamespaceID uint      `gorm:"column:namespace_id;"`
+	MetaData    string    `gorm:"column:meta_data;type:longtext;not null;"`
+	Description string    `gorm:"column:description;size:512;default:null;"`
+	UserID      uint      `gorm:"column:user_id;"`
+	CreatedAt   time.Time `gorm:"column:created_at;"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;"`
+	DeletedAt   time.Time `gorm:"column:deleted_at;default:null;"`
+
+	User      User      `gorm:"foreignkey:UserID;association_foreignkey:ID;"`
+	Namespace Namespace `gorm:"foreignkey:NamespaceID;association_foreignkey:ID;"`
+	//Namespace *Namespace `gorm:"index;column(namespace_id);rel(fk)" json:"namespace"`
 	/*
 		{
 		    "mode": "beta",
 		    "system.api-name-generate-rule":"none" // refers to models.Config ConfigKeyApiNameGenerateRule
 		}
 	*/
-	MetaData    string `gorm:"type(text)" json:"metaData,omitempty"`
-	Description string `gorm:"null;size(512)" json:"description,omitempty"`
 
-	CreateTime *time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime *time.Time `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
-	User       string     `gorm:"size(128)" json:"user,omitempty"`
-	Deleted    bool       `gorm:"default(false)" json:"deleted,omitempty"`
+	//CreateTime *time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
+	//UpdateTime *time.Time `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	//User       string     `gorm:"size(128)" json:"user,omitempty"`
+	//Deleted    bool       `gorm:"default(false)" json:"deleted,omitempty"`
 
 	// 用于权限的关联查询
-	AppUsers []*AppUser `gorm:"reverse(many)" json:"-"`
+	//AppUsers []*AppUser `gorm:"reverse(many)" json:"-"`
 
 	// 关注的关联查询
-	AppStars []*AppStarred `gorm:"reverse(many)" json:"-"`
+	//AppStars []*AppStarred `gorm:"reverse(many)" json:"-"`
+}
+
+func (App) TableName() string {
+	return TableNameApp
 }
 
 type AppStar struct {

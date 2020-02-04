@@ -39,11 +39,19 @@ func main() {
 	db, _ = gorm.Open("mysql", fmt.Sprintf("root:root@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName))
 	db.Set("gorm:table_options", "ENGINE=InnoDB").AutoMigrate(
 		&models.APIKey{},
+		&models.App{},
 		&models.Group{},
+		&models.Namespace{},
+		&models.NamespaceUser{},
 		&models.User{},
 	)
 
 	db.Debug()
-	db.Model(&models.APIKey{}).AddForeignKey("`group_id`", "`groups`(`id`)", "RESTRICT", "RESTRICT"). // use `group` quote identifier(preserved words)
-														AddForeignKey("`user_id`", "`users`(`id`)", "RESTRICT", "RESTRICT")
+
+	db.Model(&models.APIKey{}).AddForeignKey("`group_id`", "`groups`(`id`)", "RESTRICT", "RESTRICT").
+		AddForeignKey("`user_id`", "`users`(`id`)", "RESTRICT", "RESTRICT") // use `group` quote identifier(preserved words)
+	db.Model(&models.App{}).AddForeignKey("`user_id`", "`users`(`id`)", "RESTRICT", "RESTRICT").
+		AddForeignKey("`namespace_id`", "`namespaces`(`id`)", "RESTRICT", "RESTRICT")
+	db.Model(&models.NamespaceUser{}).AddForeignKey("`user_id`", "`users`(`id`)", "RESTRICT", "RESTRICT").
+		AddForeignKey("`namespace_id`", "`namespaces`(`id`)", "RESTRICT", "RESTRICT")
 }

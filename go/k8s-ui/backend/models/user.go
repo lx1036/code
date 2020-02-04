@@ -12,23 +12,24 @@ const (
 )
 
 type User struct {
-	ID        uint      `gorm:"column:id;primary_key"`
-	Name      string    `gorm:"column:name;size:200;not null;unique;default:''"`
-	Password  string    `gorm:"column:password;size:255;not null;default:''"`
-	Salt      string    `gorm:"column:salt;size:32;not null;default:''"`
-	Email     string    `gorm:"column:email;size:200;not null;default:''"`
-	Display   string    `gorm:"column:display;size:200;not null;default:''"`
-	Comment   string    `gorm:"column:comment;type:longtext;not null"`
-	Type      uint      `gorm:"column:type;size:11;not null;default:0"`
-	Admin     bool      `gorm:"column:admin;not null;default:0"`
-	LastLogin time.Time `gorm:"column:last_login;not null"`
-	LastIp    string    `gorm:"column:last_ip;size:200;not null;default:''"`
-	CreatedAt time.Time `gorm:"column:created_at"`
-	UpdatedAt time.Time `gorm:"column:updated_at"`
-	DeletedAt time.Time `gorm:"column:deleted_at;default:null"`
+	ID        uint      `gorm:"column:id;primary_key;"`
+	Name      string    `gorm:"column:name;size:200;not null;unique;default:'';"`
+	Password  string    `gorm:"column:password;size:255;not null;default:'';"`
+	Salt      string    `gorm:"column:salt;size:32;not null;default:'';"`
+	Email     string    `gorm:"column:email;size:200;not null;default:'';"`
+	Display   string    `gorm:"column:display;size:200;not null;default:'';"`
+	Comment   string    `gorm:"column:comment;type:longtext;not null;"`
+	Type      uint      `gorm:"column:type;size:11;not null;default:0;"`
+	Admin     bool      `gorm:"column:admin;not null;default:0;"`
+	LastLogin time.Time `gorm:"column:last_login;not null;"`
+	LastIp    string    `gorm:"column:last_ip;size:200;not null;default:'';"`
+	CreatedAt time.Time `gorm:"column:created_at;"`
+	UpdatedAt time.Time `gorm:"column:updated_at;"`
+	DeletedAt time.Time `gorm:"column:deleted_at;default:null;"`
 
-	ApiKeys []APIKey `gorm:"foreignkey:UserID;association_foreignkey:ID"`
-	//Namespaces []*Namespace `gorm:"-" json:"namespaces,omitempty"`
+	ApiKeys []APIKey `gorm:"foreignkey:UserID;association_foreignkey:ID;"`
+	//Namespace  Namespace      `gorm:"foreignkey:UserID;association_foreignkey:ID;"`
+	Namespaces []*Namespace `gorm:"many2many:namespace_users;"`
 }
 
 func (User) TableName() string {
