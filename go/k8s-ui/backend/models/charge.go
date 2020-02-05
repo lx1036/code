@@ -3,13 +3,13 @@ package models
 import "time"
 
 const (
-	TableNameCharge = "charge"
+	TableNameCharge = "charges"
 )
 
 type ResourceName string
 
 type Charge struct {
-	Id        int64  `gorm:"auto" json:"id,omitempty"`
+	ID        int64  `gorm:"auto" json:"id,omitempty"`
 	Namespace string `gorm:"size(1024)" json:"namespace,omitempty"`
 	App       string `gorm:"index;size(128)" json:"app,omitempty"`
 	Name      string `gorm:"size(1024)" json:"name,omitempty"`
@@ -24,7 +24,7 @@ type Charge struct {
 	CreateTime   *time.Time   `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
 }
 
-func (*Charge) TableName() string {
+func (Charge) TableName() string {
 	return TableNameCharge
 }
 
