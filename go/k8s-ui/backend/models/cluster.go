@@ -1,8 +1,6 @@
 package models
 
 import (
-	"encoding/json"
-	"k8s-lx1036/k8s-ui/backend/util/hack"
 	v1 "k8s.io/api/core/v1"
 	"time"
 )
@@ -70,10 +68,10 @@ func (model *clusterModel) GetParsedMetaDataByName(name string) (v *Cluster, err
 	v = &Cluster{Name: name}
 	if err = Ormer().Read(v, "Name"); err == nil {
 		if v.MetaData != "" {
-			err := json.Unmarshal(hack.Slice(v.MetaData), &v.MetaDataObj)
-			if err != nil {
-
-			}
+			//err := json.Unmarshal(hack.Slice(v.MetaData), &v.MetaDataObj)
+			//if err != nil {
+			//
+			//}
 		}
 
 		return v, nil

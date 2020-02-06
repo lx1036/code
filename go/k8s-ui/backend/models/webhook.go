@@ -6,7 +6,7 @@ type WebHookScope int64
 
 const (
 	WebHookScopeNamespace WebHookScope = iota
-	TableNameWebHook = "web_hooks"
+	TableNameWebHook                   = "web_hooks"
 )
 
 type webHookModel struct{}
