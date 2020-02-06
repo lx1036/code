@@ -1,18 +1,18 @@
 package models
 
 const (
-	TableNameConfig = "config"
+	TableNameConfig = "configs"
 )
 
 type ConfigKey string
 
 type Config struct {
-	Id    int64     `gorm:"auto" json:"id,omitempty"`
-	Name  ConfigKey `gorm:"size(256)" json:"name,omitempty"`
-	Value string    `gorm:"type(text)" json:"value,omitempty"`
+	ID    uint      `gorm:"column:id;primary_key;"`
+	Name  ConfigKey `gorm:"column:name;size:256;not null;default:'';"`
+	Value string    `gorm:"column:value;type:longtext;not null;"`
 }
 
-func (*Config) TableName() string {
+func (Config) TableName() string {
 	return TableNameConfig
 }
 

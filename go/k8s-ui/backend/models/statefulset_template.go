@@ -3,27 +3,23 @@ package models
 import "time"
 
 const (
-	TableNameStatefulsetTemplate = "statefulset_template"
+	TableNameStatefulSetTemplate = "stateful_set_templates"
 )
 
 type statefulsetTplModel struct{}
 
-type StatefulsetTemplate struct {
-	Id          int64        `gorm:"auto" json:"id,omitempty"`
-	Name        string       `gorm:"size(128)" json:"name,omitempty"`
-	Template    string       `gorm:"type(text)" json:"template,omitempty"`
-	Statefulset *Statefulset `gorm:"index;rel(fk);column(statefulset_id)" json:"statefulset,omitempty"`
-	Description string       `gorm:"size(512)" json:"description,omitempty"`
-
-	CreateTime time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime time.Time `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
-	User       string    `gorm:"size(128)" json:"user,omitempty"`
-	Deleted    bool      `gorm:"default(false)" json:"deleted,omitempty"`
-
-	StatefulsetId int64            `gorm:"-" json:"statefulsetId,omitempty"`
-	Status        []*PublishStatus `gorm:"-" json:"status,omitempty"`
+type StatefulSetTemplate struct {
+	ID            uint      `gorm:"column:id;primary_key;"`
+	Name          string    `gorm:"column:name;size:128;not null;default:'';"`
+	Template      string    `gorm:"column:template;type:longtext;not null;"`
+	StatefulSetId uint      `gorm:"column:stateful_set_id"`
+	MetaData      string    `gorm:"column:meta_data;type:longtext;not null;"`
+	Description   string    `gorm:"column:description;size:512;not null;default:'';"`
+	CreatedAt     time.Time `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt     time.Time `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
+	DeletedAt     time.Time `gorm:"column:deleted_at;default:null;"`
 }
 
-func (*StatefulsetTemplate) TableName() string {
-	return TableNameStatefulsetTemplate
+func (StatefulSetTemplate) TableName() string {
+	return TableNameStatefulSetTemplate
 }

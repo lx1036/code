@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	TableNamePermission = "permission"
+	TableNamePermission = "permissions"
 
 	PermissionCreate = "CREATE"
 	PermissionUpdate = "UPDATE"
@@ -19,14 +19,20 @@ const (
 )
 
 type Permission struct {
-	Id      int64  `gorm:"auto" json:"id,omitempty"`
-	Name    string `gorm:"index;size(200)" json:"name,omitempty"`
-	Comment string `gorm:"type(text)" json:"comment,omitempty"`
+	ID        int64     `gorm:"column:id;primary_key;"`
+	Name      string    `gorm:"column:name;size:200;not null;default:'';"`
+	Comment   string    `gorm:"column:comment;type:longtext;not null;"`
+	CreatedAt time.Time `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt time.Time `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
+	DeletedAt time.Time `gorm:"column:deleted_at;default:null;"`
+	//CreateTime *time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
+	//UpdateTime *time.Time `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
 
-	CreateTime *time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime *time.Time `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	//Groups []*Group `gorm:"reverse(many)" json:"groups,omitempty"`
+}
 
-	Groups []*Group `gorm:"reverse(many)" json:"groups,omitempty"`
+func (Permission) TableName() string {
+	return TableNamePermission
 }
 
 type ActionPermission struct {

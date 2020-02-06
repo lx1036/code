@@ -1,26 +1,26 @@
 package models
 
+import "time"
+
 const (
-	TableNameCustomLink = "custom_link"
+	TableNameCustomLink = "custom_links"
 )
 
 type CustomLink struct {
-	Id int64 `gorm:"auto" json:"id,omitempty"`
+	Id int64 `gorm:"column:id;primary_key;"`
 	// namespace name
-	Namespace string `gorm:"index;namespace;" json:"namespace"`
-	// LinkType typeName
-	LinkType string `gorm:"size(255)" json:"linkType,omitempty"`
-	Url      string `gorm:"size(255)" json:"url,omitempty"`
-	AddParam bool   `gorm:"default(false)" json:"addParam,omitempty"`
-	Params   string `gorm:"size(255);null" json:"params,omitempty"`
-	Deleted  bool   `gorm:"default(false)" json:"deleted,omitempty"`
-	//链接状态，默认启用，false为禁用
-	Status bool `gorm:"default(true)" json:"status,omitempty"`
-
-	Displayname string `gorm:"-" json:"displayname,omitempty"`
+	Namespace string    `gorm:"column:namespace;size:255;not null;default:'';"`
+	LinkType  string    `gorm:"column:link_type;size:255;not null;default:'';"`
+	Url       string    `gorm:"column:url;size:255;not null;default:'';"`
+	AddParam  bool      `gorm:"column:add_param;not null;default:0;"`
+	Params    string    `gorm:"column:params;size:255;default:null;"`
+	Status    bool      `gorm:"column:status;not null;default:1;"`
+	CreatedAt time.Time `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt time.Time `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
+	DeletedAt time.Time `gorm:"column:deleted_at;default:null;"`
 }
 
-func (*CustomLink) TableName() string {
+func (CustomLink) TableName() string {
 	return TableNameCustomLink
 }
 

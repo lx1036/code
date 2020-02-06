@@ -3,18 +3,20 @@ package models
 import "time"
 
 const (
-	TableNameNotificationLog = "notification_log"
+	TableNameNotificationLog = "notification_logs"
 )
 
 type NotificationLog struct {
-	Id           int64         `gorm:"auto" json:"id,omitempty"`
-	UserId       int64         `gorm:"default(0)" json:"user_id,omitempty"`
-	CreateTime   *time.Time    `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	IsReaded     bool          `gorm:"default(false)" json:"is_readed"`
-	Notification *Notification `gorm:"index;column(notification_id);rel(fk)" json:"notification"`
+	Id             uint      `gorm:"column:id;primary_key;"`
+	UserId         uint      `gorm:"column:user_id;"`
+	NotificationId uint      `gorm:"column:notification_id;"`
+	IsReaded       bool      `gorm:"column:is_readed;not null;default:0;"`
+	CreatedAt      time.Time `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt      time.Time `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
+	DeletedAt      time.Time `gorm:"column:deleted_at;default:null;"`
 }
 
-func (*NotificationLog) TableName() string {
+func (NotificationLog) TableName() string {
 	return TableNameNotificationLog
 }
 

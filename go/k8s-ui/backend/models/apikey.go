@@ -23,8 +23,8 @@ type APIKey struct {
 	UserID      uint      `gorm:"column:user_id;"`
 	GroupID     uint      `gorm:"column:group_id;"`
 	ExpireIn    uint64    `gorm:"column:expire_in;type:bigint;not null;default:0;"` // 过期时间，单位：秒
-	CreatedAt   time.Time `gorm:"column:created_at;"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;"`
+	CreatedAt   time.Time `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
 	DeletedAt   time.Time `gorm:"column:deleted_at;default:null;"`
 
 	User  User  `gorm:"foreignkey:UserID;association_foreignkey:ID;"`

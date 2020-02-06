@@ -16,8 +16,8 @@ type App struct {
 	MetaData    string    `gorm:"column:meta_data;type:longtext;not null;"`
 	Description string    `gorm:"column:description;size:512;default:null;"`
 	UserID      uint      `gorm:"column:user_id;"`
-	CreatedAt   time.Time `gorm:"column:created_at;"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;"`
+	CreatedAt   time.Time `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
 	DeletedAt   time.Time `gorm:"column:deleted_at;default:null;"`
 
 	User      User      `gorm:"foreignkey:UserID;association_foreignkey:ID;"`

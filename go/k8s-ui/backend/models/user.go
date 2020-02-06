@@ -23,8 +23,8 @@ type User struct {
 	Admin     bool      `gorm:"column:admin;not null;default:0;"`
 	LastLogin time.Time `gorm:"column:last_login;not null;"`
 	LastIp    string    `gorm:"column:last_ip;size:200;not null;default:'';"`
-	CreatedAt time.Time `gorm:"column:created_at;"`
-	UpdatedAt time.Time `gorm:"column:updated_at;"`
+	CreatedAt time.Time `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt time.Time `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
 	DeletedAt time.Time `gorm:"column:deleted_at;default:null;"`
 
 	ApiKeys []APIKey `gorm:"foreignkey:UserID;association_foreignkey:ID;"`
