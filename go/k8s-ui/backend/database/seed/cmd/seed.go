@@ -4,13 +4,25 @@ import (
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
+	"github.com/romanyx/polluter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
 )
 
+// go run main.go seed --data=database.yml
+
+// Docs: https://medium.com/@romanyx90/testing-database-interactions-using-go-d9512b6bb449
+// https://github.com/go-testfixtures/testfixtures
+// https://github.com/khaiql/dbcleaner
+// https://github.com/DATA-DOG/go-txdb
+// https://github.com/romanyx/polluter
 var (
 	DB       *gorm.DB
 	dataFile string
+	content  string
 	seedCmd  = &cobra.Command{
 		Use:   "seed",
 		Short: "seed data to db",
@@ -25,37 +37,51 @@ var (
 					panic(err)
 				}
 			}
+			defer db.Close()
 
-			DB = db
+			p := polluter.New(polluter.MySQLEngine(db.DB()))
 
-			tables := viper.AllKeys()
+			if err := p.Pollute(strings.NewReader(content)); err != nil {
+				panic(err)
+			}
+
+			/*tables := viper.AllKeys()
 			fmt.Println(tables)
 
 			for _, table := range tables {
 				DB = DB.Table(table)
 
-				for _, value := range viper.Get(table).([]interface{}) {
-					fmt.Println(value)
+				values := viper.Get(table)
+				fmt.Println(values, reflect.TypeOf(values))
+				for _, value := range values.([]interface{}) {
+					tmp, err := json.Marshal(value)
+					if err != nil {
+						panic(err)
+					}
+					fmt.Println(string(tmp))
 				}
-			}
+			}*/
 		},
 	}
 )
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	seedCmd.PersistentFlags().StringVar(&dataFile, "config", "", "config file (default is $HOME/.cobra.yaml)")
-	_ = seedCmd.MarkFlagRequired("config")
-
+	seedCmd.PersistentFlags().StringVar(&dataFile, "data", "", "data yaml file path")
+	_ = seedCmd.MarkFlagRequired("data")
 }
 
 func initConfig() {
 	if dataFile != "" {
+		filename, _ := filepath.Abs("./database.yml")
+		data, _ := ioutil.ReadFile(filename)
+
+		content = string(data)
 		// Use config file from the flag.
 		viper.SetConfigFile(dataFile)
 	}
-	viper.AutomaticEnv()
 
+	viper.AutomaticEnv()
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}

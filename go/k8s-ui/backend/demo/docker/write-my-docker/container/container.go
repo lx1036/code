@@ -47,5 +47,5 @@ func setupMount() {
 }
 
 func pivotRoot(root string) error {
-
+	return nil
 }
