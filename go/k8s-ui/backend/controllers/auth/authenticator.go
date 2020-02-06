@@ -148,7 +148,7 @@ func (controller *AuthController) CurrentUser() gin.HandlerFunc {
 
 		claim := token.Claims.(jwt.MapClaims)
 		aud := claim["aud"].(string)
-		user, err := models.UserModel.GetUserByName(aud)
+		user, err := models.GetUserByName(aud)
 		//user, err := models.UserModel.GetUserDetail(aud)
 		if err != nil {
 			context.JSON(http.StatusInternalServerError, base.JsonResponse{

@@ -42,11 +42,17 @@ type UserStatistics struct {
 
 type userModel struct{}
 
-func (model *userModel) GetUserByName(name string) (user *User, err error) {
-	user = &User{Name: name}
+func GetUserByName(name string) (user User, err error) {
+	//user = &User{Name: name}
 	//if err = Ormer().Read(user, "Name"); err != nil {
 	//	return nil, err
 	//}
+	//var user models.User
+
+	err = lorm.DB.Where("name=?", name).First(&user).Error
+	if err != nil {
+		return User{}, err
+	}
 
 	return user, nil
 }
