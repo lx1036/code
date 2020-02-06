@@ -241,10 +241,10 @@ func getOnlineDeploymenetInfo(name, namespace, cluster string, templateId int64)
 	}
 
 	app, _ := models.AppModel.GetById(deployment.AppId)
-	err = json.Unmarshal([]byte(app.Namespace.MetaData), &app.Namespace.MetaDataObj)
-	if err != nil {
-
-	}
+	//err = json.Unmarshal([]byte(app.Namespace.MetaData), &app.Namespace.MetaDataObj)
+	//if err != nil {
+	//
+	//}
 
 	deployObj.Namespace = app.Namespace.KubeNamespace
 	err = json.Unmarshal([]byte(deployment.MetaData), &deployment.MetaDataObj)
@@ -256,7 +256,7 @@ func getOnlineDeploymenetInfo(name, namespace, cluster string, templateId int64)
 	deployObj.Spec.Replicas = &rp
 	deployInfo.DeploymentObject = &deployObj
 	deployInfo.Deployment = deployment
-	deployInfo.Namespace = app.Namespace
+	//deployInfo.Namespace = app.Namespace
 
 	deployInfo.Cluster, err = models.ClusterModel.GetParsedMetaDataByName(cluster)
 	if err != nil {

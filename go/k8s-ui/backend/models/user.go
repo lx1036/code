@@ -1,29 +1,39 @@
 package models
 
 import (
-	"github.com/astaxie/beego/orm"
+	"k8s-lx1036/k8s-ui/backend/database/lorm"
 	"time"
 )
 
 type UserType int
 
-type User struct {
-	Id         int64      `orm:"pk;auto" json:"id,omitempty"`
-	Name       string     `orm:"index;unique;size(200)" json:"name,omitempty"`
-	Password   string     `orm:"size(255)" json:"-"`
-	Salt       string     `orm:"size(32)" json:"-"`
-	Email      string     `orm:"size(200)" json:"email,omitempty"`
-	Display    string     `orm:"size(200)" json:"display,omitempty"`
-	Comment    string     `orm:"type(text)" json:"comment,omitempty"`
-	Type       UserType   `orm:"type(integer)" json:"type"`
-	Admin      bool       `orm:"default(False)" json:"admin"`
-	LastLogin  *time.Time `orm:"auto_now_add;type(datetime)" json:"lastLogin,omitempty"`
-	LastIp     string     `orm:"size(200)" json:"lastIp,omitempty"`
-	Deleted    bool       `orm:"default(false)" json:"deleted,omitempty"`
-	CreateTime *time.Time `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime *time.Time `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+const (
+	TableNameUser = "users"
+)
 
-	Namespaces []*Namespace `orm:"-" json:"namespaces,omitempty"`
+type User struct {
+	ID        uint      `gorm:"column:id;primary_key;"`
+	Name      string    `gorm:"column:name;size:200;not null;unique;default:'';"`
+	Password  string    `gorm:"column:password;size:255;not null;default:'';"`
+	Salt      string    `gorm:"column:salt;size:32;not null;default:'';"`
+	Email     string    `gorm:"column:email;size:200;not null;default:'';"`
+	Display   string    `gorm:"column:display;size:200;not null;default:'';"`
+	Comment   string    `gorm:"column:comment;type:longtext;not null;"`
+	Type      uint      `gorm:"column:type;size:11;not null;default:0;"`
+	Admin     bool      `gorm:"column:admin;not null;default:0;"`
+	LastLogin time.Time `gorm:"column:last_login;not null;"`
+	LastIp    string    `gorm:"column:last_ip;size:200;not null;default:'';"`
+	CreatedAt time.Time `gorm:"column:created_at;"`
+	UpdatedAt time.Time `gorm:"column:updated_at;"`
+	DeletedAt time.Time `gorm:"column:deleted_at;default:null;"`
+
+	ApiKeys []APIKey `gorm:"foreignkey:UserID;association_foreignkey:ID;"`
+	//Namespace  Namespace      `gorm:"foreignkey:UserID;association_foreignkey:ID;"`
+	Namespaces []*Namespace `gorm:"many2many:namespace_users;"`
+}
+
+func (User) TableName() string {
+	return TableNameUser
 }
 
 type UserStatistics struct {
@@ -34,41 +44,38 @@ type userModel struct{}
 
 func (model *userModel) GetUserByName(name string) (user *User, err error) {
 	user = &User{Name: name}
-	if err = Ormer().Read(user, "Name"); err != nil {
-		return nil, err
-	}
+	//if err = Ormer().Read(user, "Name"); err != nil {
+	//	return nil, err
+	//}
 
 	return user, nil
 }
 
 func (model *userModel) GetUserDetail(name string) (user *User, err error) {
-	user = &User{Name: name}
-	err = Ormer().Read(user, "Name")
-	if err != nil {
-		return nil, err
-	}
-	if user.Admin {
-		namespaces, err := NamespaceModel.GetAll(false)
-		if err != nil {
-			return nil, err
-		}
-		user.Namespaces = namespaces
-	} else {
-		var namespaceUsers []NamespaceUser
-		condNS := (orm.NewCondition()).And("User__Id__exact", user.Id)
-		_, err = Ormer().QueryTable(TableNameNamespaceUser).
-			SetCond(condNS).
-			RelatedSel("Namespace").
-			GroupBy("Namespace").
-			OrderBy("Namespace__Name").
-			All(&namespaceUsers)
-		if err != nil {
-			return nil, err
-		}
-		for _, namespaceUser := range namespaceUsers {
-			user.Namespaces = append(user.Namespaces, namespaceUser.Namespace)
-		}
-	}
+	lorm.DB.Where("name = ?", name).First(&user)
+
+	//if user.Admin {
+	//	namespaces, err := NamespaceModel.GetAll(false)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	user.Namespaces = namespaces
+	//} else {
+	//	var namespaceUsers []NamespaceUser
+	//	condNS := (orm.NewCondition()).And("User__Id__exact", user.Id)
+	//	_, err = Ormer().QueryTable(TableNameNamespaceUser).
+	//		SetCond(condNS).
+	//		RelatedSel("Namespace").
+	//		GroupBy("Namespace").
+	//		OrderBy("Namespace__Name").
+	//		All(&namespaceUsers)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	for _, namespaceUser := range namespaceUsers {
+	//		user.Namespaces = append(user.Namespaces, namespaceUser.Namespace)
+	//	}
+	//}
 
 	return user, nil
 }

@@ -5,19 +5,32 @@ import (
 	"time"
 )
 
-type Namespace struct {
-	Id            int64             `orm:"auto" json:"id,omitempty"`
-	Name          string            `orm:"index;unique;size(128)" json:"name,omitempty"`
-	KubeNamespace string            `orm:"index;size(128)" json:"kubeNamespace,omitempty"`
-	MetaData      string            `orm:"type(text)" json:"metaData,omitempty"`
-	MetaDataObj   NamespaceMetaData `orm:"-" json:"-"`
-	CreateTime    *time.Time        `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime    *time.Time        `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
-	User          string            `orm:"size(128)" json:"user,omitempty"`
-	Deleted       bool              `orm:"default(false)" json:"deleted,omitempty"`
+const (
+	TableNameNamespace = "namespaces"
+)
 
-	// 用于权限的关联查询
-	NamespaceUsers []*NamespaceUser `orm:"reverse(many)" json:"-"`
+type Namespace struct {
+	ID            uint      `gorm:"column:id;primary_key;"`
+	Name          string    `gorm:"column:name;size:128;not null;unique;default:'';"`
+	KubeNamespace string    `gorm:"column:kube_namespace;size:128;not null;default:'';"`
+	MetaData      string    `gorm:"column:meta_data;type:longtext;not null;"`
+	CreatedAt     time.Time `gorm:"column:created_at;"`
+	UpdatedAt     time.Time `gorm:"column:updated_at;"`
+	DeletedAt     time.Time `gorm:"column:deleted_at;default:null;"`
+
+	Users []*User `gorm:"many2many:namespace_users;"`
+	//MetaDataObj   NamespaceMetaData `gorm:"-" json:"-"`
+	//CreateTime    *time.Time        `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
+	//UpdateTime    *time.Time        `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	//User          string            `gorm:"size(128)" json:"user,omitempty"`
+	//Deleted       bool              `gorm:"default(false)" json:"deleted,omitempty"`
+	//
+	//// 用于权限的关联查询
+	//NamespaceUsers []*NamespaceUser `gorm:"reverse(many)" json:"-"`
+}
+
+func (Namespace) TableName() string {
+	return TableNameNamespace
 }
 
 type NamespaceMetaData struct {
@@ -67,7 +80,7 @@ func (model *namespaceModel) GetAll(deleted bool) ([]*Namespace, error) {
 }
 
 func (model *namespaceModel) GetById(id int64) (v *Namespace, err error) {
-	v = &Namespace{Id: id}
+	v = &Namespace{ID: uint(id)}
 
 	if err = Ormer().Read(v); err == nil {
 		return v, nil

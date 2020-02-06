@@ -8,8 +8,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -135,6 +137,31 @@ func TestDoRequest(test *testing.T) {
 	//assert.Equal(test, 200, response.StatusCode)
 }
 
+func TestName(test *testing.T) {
+	monkey.Patch(fmt.Println, func(a ...interface{}) (n int, err error) {
+		s := make([]interface{}, len(a))
+		for i, v := range a {
+			s[i] = strings.Replace(fmt.Sprint(v), "hell", "*bleep*", -1)
+		}
+		fmt.Printf("%s asdf", "asdfsdaf")
+		return fmt.Fprintln(os.Stdout, s...)
+	})
+	defer monkey.Unpatch(fmt.Println)
+
+	fmt.Println("what the hell?")
+}
+
+func TestHttp(test *testing.T) {
+	var d *net.Dialer // Has to be a pointer to because `Dial` has a pointer receiver
+	monkey.PatchInstanceMethod(reflect.TypeOf(d), "Dial", func(_ *net.Dialer, _, _ string) (net.Conn, error) {
+		return nil, fmt.Errorf("no dialing allowed")
+	})
+	_, err := http.Get("http://google.com")
+
+	fmt.Println(err) // Get http://google.com: no dialing allowed
+}
+
+// Fail
 func TestMockGin(test *testing.T) {
 	gin.SetMode(gin.TestMode)
 	//req := GetRequest().GetRequest()

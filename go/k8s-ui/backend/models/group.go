@@ -7,25 +7,29 @@ type GroupType int
 const (
 	AppGroupType GroupType = iota
 	NamespaceGroupType
-	TableNameGroup = "group"
+	TableNameGroup = "groups"
 )
 
 type Group struct {
-	Id      int64     `orm:"pk;auto" json:"id,omitempty"`
-	Name    string    `orm:"index;size(200)" json:"name,omitempty"`
-	Comment string    `orm:"type(text)" json:"comment,omitempty"`
-	Type    GroupType `orm:"type(integer)" json:"type"`
+	ID        uint      `gorm:"column:id;primary_key;"`
+	Name      string    `gorm:"column:name;size:200;not null;default:'';"`
+	Comment   string    `gorm:"column:comment;type:longtext;not null;"`
+	Type      uint      `gorm:"column:type;size:11;not null;default:0;"`
+	CreatedAt time.Time `gorm:"column:created_at;"`
+	UpdatedAt time.Time `gorm:"column:updated_at;"`
+	DeletedAt time.Time `gorm:"column:deleted_at;default:null;"`
 
-	CreateTime *time.Time `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime *time.Time `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	//ApiKeys []APIKey `gorm:"foreignkey:GroupId"`
+	//ApiKeys []APIKey `gorm:"foreignkey:GroupID;AssociationForeignKey:ID"`
+	ApiKeys []APIKey `gorm:"foreignkey:GroupID;association_foreignkey:ID;"`
 
 	// 用于权限的关联查询
-	Permissions    []*Permission    `orm:"rel(m2m);rel_table(group_permissions)" json:"permissions,omitempty"`
-	AppUsers       []*AppUser       `orm:"reverse(many)" json:"appUsers,omitempty"`
-	NamespaceUsers []*NamespaceUser `orm:"reverse(many)" json:"namespaceUsers,omitempty"`
+	//Permissions    []*Permission    `gorm:"rel(m2m);rel_table(group_permissions)" json:"permissions,omitempty"`
+	//AppUsers       []*AppUser       `gorm:"reverse(many)" json:"appUsers,omitempty"`
+	//NamespaceUsers []*NamespaceUser `gorm:"reverse(many)" json:"namespaceUsers,omitempty"`
 }
 
-func (*Group) TableName() string {
+func (Group) TableName() string {
 	return TableNameGroup
 }
 

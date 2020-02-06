@@ -18,20 +18,20 @@ type DeploymentMetaData struct {
 }
 
 type Deployment struct {
-	Id          int64              `orm:"auto" json:"id,omitempty"`
-	Name        string             `orm:"unique;index;size(128)" json:"name,omitempty"`
-	MetaData    string             `orm:"type(text)" json:"metaData,omitempty"`
-	MetaDataObj DeploymentMetaData `orm:"-" json:"-"`
-	App         *App               `orm:"index;rel(fk)" json:"app,omitempty"`
-	Description string             `orm:"null;size(512)" json:"description,omitempty"`
-	OrderId     int64              `orm:"index;default(0)" json:"order"`
+	Id          int64              `gorm:"auto" json:"id,omitempty"`
+	Name        string             `gorm:"unique;index;size(128)" json:"name,omitempty"`
+	MetaData    string             `gorm:"type(text)" json:"metaData,omitempty"`
+	MetaDataObj DeploymentMetaData `gorm:"-" json:"-"`
+	App         *App               `gorm:"index;rel(fk)" json:"app,omitempty"`
+	Description string             `gorm:"null;size(512)" json:"description,omitempty"`
+	OrderId     int64              `gorm:"index;default(0)" json:"order"`
 
-	CreateTime *time.Time `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime *time.Time `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
-	User       string     `orm:"size(128)" json:"user,omitempty"`
-	Deleted    bool       `orm:"default(false)" json:"deleted,omitempty"`
+	CreateTime *time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
+	UpdateTime *time.Time `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	User       string     `gorm:"size(128)" json:"user,omitempty"`
+	Deleted    bool       `gorm:"default(false)" json:"deleted,omitempty"`
 
-	AppId int64 `orm:"-" json:"appId,omitempty"`
+	AppId int64 `gorm:"-" json:"appId,omitempty"`
 }
 
 type deploymentModel struct{}
@@ -39,7 +39,7 @@ type deploymentModel struct{}
 func (*deploymentModel) GetByName(name string) (deployment *Deployment, err error) {
 	deployment = &Deployment{Name: name}
 	if err := Ormer().Read(deployment, "name"); err == nil {
-		deployment.Id = deployment.App.Id
+		deployment.Id = int64(deployment.App.ID)
 		return deployment, nil
 	}
 
@@ -50,7 +50,7 @@ func (model *deploymentModel) GetById(id int64) (deployment *Deployment, err err
 	deployment = &Deployment{Id: id}
 
 	if err = Ormer().Read(deployment); err == nil {
-		deployment.AppId = deployment.App.Id
+		deployment.AppId = int64(deployment.App.ID)
 		return deployment, nil
 	}
 
@@ -61,7 +61,7 @@ func (model *deploymentModel) UpdateById(deployment *Deployment) (err error) {
 	v := Deployment{Id: deployment.Id}
 	// ascertain id exists in the database
 	if err = Ormer().Read(&v); err == nil {
-		deployment.App = &App{Id: deployment.AppId}
+		deployment.App = &App{ID: uint(deployment.AppId)}
 		deployment.UpdateTime = nil
 		_, err = Ormer().Update(deployment)
 		return err

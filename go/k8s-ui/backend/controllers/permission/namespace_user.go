@@ -21,7 +21,7 @@ func (controller *NamespaceUserController) URLMapping() {
 // @router /permissions/:id [get]
 func (controller *NamespaceUserController) GetPermissionByNS() {
 	id := controller.GetIdFromURL()
-	permissions, err := models.NamespaceUserModel.GetAllPermissions(id, controller.User.Id)
+	permissions, err := models.NamespaceUserModel.GetAllPermissions(id, int64(controller.User.ID))
 	if err != nil {
 
 	}

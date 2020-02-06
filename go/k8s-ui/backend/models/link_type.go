@@ -7,12 +7,12 @@ const (
 type linkTypeModel struct{}
 
 type LinkType struct {
-	Id          int64  `orm:"auto" json:"id,omitempty"`
-	TypeName    string `orm:"index;unique;size(255)" json:"typeName,omitempty"`
-	Displayname string `orm:"size(255)" json:"displayname,omitempty"`
-	DefaultUrl  string `orm:"size(255)" json:"defaultUrl,omitempty"`
-	ParamList   string `orm:"size(255);null" json:"paramList,omitempty"`
-	Deleted     bool   `orm:"default(false)" json:"deleted,omitempty"`
+	Id          int64  `gorm:"auto" json:"id,omitempty"`
+	TypeName    string `gorm:"index;unique;size(255)" json:"typeName,omitempty"`
+	Displayname string `gorm:"size(255)" json:"displayname,omitempty"`
+	DefaultUrl  string `gorm:"size(255)" json:"defaultUrl,omitempty"`
+	ParamList   string `gorm:"size(255);null" json:"paramList,omitempty"`
+	Deleted     bool   `gorm:"default(false)" json:"deleted,omitempty"`
 }
 
 func (*LinkType) TableName() string {

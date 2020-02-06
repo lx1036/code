@@ -10,15 +10,15 @@ type NotificationType string
 type NotificationLevel int
 
 type Notification struct {
-	Id          int64             `orm:"auto" json:"id,omitempty"`
-	Type        NotificationType  `orm:"index;size(128)" json:"type,omitempty"`
-	Title       string            `orm:"size(2000)" json:"title,omitempty"`
-	Message     string            `orm:"type(text)" json:"message,omitempty"`
-	FromUser    *User             `orm:"index;rel(fk)" json:"from,omitempty"`
-	Level       NotificationLevel `orm:"default(0)" json:"level,omitempty"`
-	IsPublished bool              `orm:"default(false)" json:"is_published"`
-	CreateTime  *time.Time        `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime  *time.Time        `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	Id          int64             `gorm:"auto" json:"id,omitempty"`
+	Type        NotificationType  `gorm:"index;size(128)" json:"type,omitempty"`
+	Title       string            `gorm:"size(2000)" json:"title,omitempty"`
+	Message     string            `gorm:"type(text)" json:"message,omitempty"`
+	FromUser    *User             `gorm:"index;rel(fk)" json:"from,omitempty"`
+	Level       NotificationLevel `gorm:"default(0)" json:"level,omitempty"`
+	IsPublished bool              `gorm:"default(false)" json:"is_published"`
+	CreateTime  *time.Time        `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
+	UpdateTime  *time.Time        `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
 }
 
 func (*Notification) TableName() string {

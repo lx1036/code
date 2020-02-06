@@ -51,7 +51,7 @@ var (
 )
 
 func init() {
-	orm.RegisterModel( // 41 tables
+	/*orm.RegisterModel( // 41 tables
 		new(App),
 		new(APIKey),
 		new(AppStarred),
@@ -93,7 +93,7 @@ func init() {
 		new(StatefulsetTemplate),
 		new(User),
 		new(WebHook),
-	)
+	)*/
 
 	// init models
 	ApiKeyModel = &apiKeyModel{}

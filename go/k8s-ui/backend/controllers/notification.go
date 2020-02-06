@@ -57,7 +57,7 @@ func (controller *NotificationController) Publish() {
 
 func (controller *NotificationController) Subscribe() {
 	param := controller.BuildQueryParam()
-	param.Query["user_id"] = controller.User.Id
+	param.Query["user_id"] = controller.User.ID
 	IsReaded := controller.Input().Get("is_readed")
 	if IsReaded != "" {
 

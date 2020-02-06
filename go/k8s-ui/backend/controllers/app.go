@@ -51,12 +51,12 @@ func (controller *AppController) List() {
 
 	starred := controller.GetBoolParamFromQueryWithDefault("starred", false)
 
-	total, err := models.AppModel.Count(param, starred, controller.User.Id)
+	total, err := models.AppModel.Count(param, starred, int64(controller.User.ID))
 	if err != nil {
 
 	}
 
-	apps, err := models.AppModel.List(param, starred, controller.User.Id)
+	apps, err := models.AppModel.List(param, starred, int64(controller.User.ID))
 	if err != nil {
 
 	}
@@ -74,7 +74,7 @@ func (controller *AppController) Update() {
 
 	}
 
-	app.Id = id
+	app.ID = uint(id)
 	err = models.AppModel.UpdateById(&app)
 	if err != nil {
 
