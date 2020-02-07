@@ -29,7 +29,7 @@ export class AuthService {
   }
 
   retrieveUser(): Promise<User> {
-    return this.http.get(`/currentuser`).toPromise().then((response: {data: User}) => {
+    return this.http.get(`/me`).toPromise().then((response: {data: User}) => {
       this.currentUser = response.data;
       this.cacheService.setNamespaces(this.currentUser.namespaces);
       return response.data;
