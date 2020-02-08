@@ -12,74 +12,80 @@ import {HttpErrorResponse} from '@angular/common/http';
 @Component({
   selector: 'app-nav',
   template: `
-    <header style="background-color: #1D2143" class="header">
-      <div class="branding" style="min-width: auto">
-        <a routerLink="/portal/namespace/{{cacheService.currentNamespace?.id}}/app" class="nav-link">
-          <img src="assets/images/wayne-logo.svg" width="60px" alt="">
-          <span class="title">{{getTitle()}}</span>
-        </a>
-      </div>
+    <div *ngFor="let langt of translateService.getLangs()">
+      {{langt}}
+    </div>
+    
+<!--    <header style="background-color: #1D2143" class="header">-->
+<!--      <div class="branding" style="min-width: auto">-->
+<!--        <a routerLink="/portal/namespace/{{cacheService.currentNamespace?.id}}/app" class="nav-link">-->
+<!--          <img src="assets/images/wayne-logo.svg" width="60px" alt="">-->
+<!--          <span class="title">{{getTitle()}}</span>-->
+<!--        </a>-->
+<!--      </div>-->
 
-      <div class="header-actions">
-        <app-dropdown size="small">
-          <clr-icon ref="javascript:void(0)" shape="bell" [class.has-badge]="mind" style="margin-right: 5px"></clr-icon>
-          <app-dropdown-item>
-            <ng-container *ngIf="notificationLogs && notificationLogs.length > 0">
-              <div *ngFor="let notificationLog of notificationLogs" ref="javascript:void(0)"
-                   (click)="showNotification(notificationLog)" style="white-space: nowrap;">
-                <label class="label label-info" [class.label-info]="notificationLog.isReaded"
-                       [class.label-warning]="!notificationLog.isReaded">{{(notificationLog.isReaded ? 'MESSAGE.READED' : 'MESSAGE.UNREAD') | translate}}</label>
-                {{notificationLog.notification.from.name}} {{'MESSAGE.SEND' | translate}}《{{notificationLog.notification.title}}
-                》{{'OF' | translate}}{{notificationLog.notification.type}}
-              </div>
-            </ng-container>
-            <span *ngIf="!notificationLogs || notificationLogs.length === 0">{{'MESSAGE.NONE' | translate}}</span>
-          </app-dropdown-item>
-        </app-dropdown>
+<!--      <div class="header-actions">-->
+<!--        <app-dropdown size="small">-->
+<!--          <clr-icon ref="javascript:void(0)" shape="bell" [class.has-badge]="mind" style="margin-right: 5px"></clr-icon>-->
+<!--          <app-dropdown-item>-->
+<!--            <ng-container *ngIf="notificationLogs && notificationLogs.length > 0">-->
+<!--              <div *ngFor="let notificationLog of notificationLogs" ref="javascript:void(0)"-->
+<!--                   (click)="showNotification(notificationLog)" style="white-space: nowrap;">-->
+<!--                <label class="label label-info" [class.label-info]="notificationLog.isRead"-->
+<!--                       [class.label-warning]="!notificationLog.isRead">{{(notificationLog.isRead ? 'MESSAGE.READED' : 'MESSAGE.UNREAD') | translate}}</label>-->
+<!--                {{notificationLog.notification.from.name}} {{'MESSAGE.SEND' | translate}}《{{notificationLog.notification.title}}-->
+<!--                》{{'OF' | translate}}{{notificationLog.notification.type}}-->
+<!--              </div>-->
+<!--            </ng-container>-->
+<!--            <span *ngIf="!notificationLogs || notificationLogs.length === 0">{{'MESSAGE.NONE' | translate}}</span>-->
+<!--          </app-dropdown-item>-->
+<!--        </app-dropdown>-->
+<!--        -->
+<!--        -->
 
-        <app-dropdown size="small">
-          <clr-icon shape="world" style="margin-right: 5px"></clr-icon>
-          {{showLang(currentLang)}}
-          <clr-icon shape="caret down" size="12" style="margin-left: 5px;"></clr-icon>
-          <app-dropdown-item>
-            <ng-container *ngFor="let lang of translate.getLangs()">
-              <span (click)="changeLang(lang)">{{showLang(lang)}}</span>
-            </ng-container>
-          </app-dropdown-item>
-        </app-dropdown>
+<!--        <app-dropdown size="small">-->
+<!--          <clr-icon shape="world" style="margin-right: 5px"></clr-icon>-->
+<!--          {{showLang(currentLang)}}-->
+<!--          <clr-icon shape="caret down" size="12" style="margin-left: 5px;"></clr-icon>-->
+<!--          <app-dropdown-item>-->
+<!--            <ng-container *ngFor="let lang of langs">-->
+<!--              <span (click)="changeLang(lang)">{{showLang(lang)}}</span>-->
+<!--            </ng-container>-->
+<!--          </app-dropdown-item>-->
+<!--        </app-dropdown>-->
 
-        <app-dropdown [size]="authService.currentUser?.namespaces.length > 10 ? 'middle' : 'small'">
-          <clr-icon shape="organization" style="margin-right: 5px"></clr-icon>
-          {{cacheService.currentNamespace?.name}}
-          <clr-icon shape="caret down" size="12" style="margin-left: 5px;"></clr-icon>
-          <app-dropdown-item [title]="authService.currentUser?.namespaces.length > 10 ? '部门' : ''">
-            <span style="white-space: nowrap;" *ngFor="let n of authService.currentUser?.namespaces"
-                  (click)='switchNamespace(n)'>{{n.name}}</span>
-          </app-dropdown-item>
-        </app-dropdown>
+<!--        <app-dropdown [size]="authService.currentUser?.namespaces.length > 10 ? 'middle' : 'small'">-->
+<!--          <clr-icon shape="organization" style="margin-right: 5px"></clr-icon>-->
+<!--          {{cacheService.currentNamespace?.name}}-->
+<!--          <clr-icon shape="caret down" size="12" style="margin-left: 5px;"></clr-icon>-->
+<!--          <app-dropdown-item [title]="authService.currentUser?.namespaces.length > 10 ? '部门' : ''">-->
+<!--            <span style="white-space: nowrap;" *ngFor="let n of authService.currentUser?.namespaces"-->
+<!--                  (click)='switchNamespace(n)'>{{n.name}}</span>-->
+<!--          </app-dropdown-item>-->
+<!--        </app-dropdown>-->
 
-        <app-dropdown size="small" last>
-          <clr-icon shape="user" style="margin-right: 5px"></clr-icon>
-          {{authService.currentUser?.display}}
-          <clr-icon shape="caret down" size="12" style="margin-left: 5px;"></clr-icon>
-          <app-dropdown-item>
-            <span (click)="goBack()" *ngIf="authService.currentUser.admin">{{'ACCOUNT.GO_BACK' | translate}}</span>
-            <span (click)="logout()">{{'ACCOUNT.LOGOUT' | translate}}</span>
-          </app-dropdown-item>
-        </app-dropdown>
-      </div>
-    </header>
+<!--        <app-dropdown size="small" last>-->
+<!--          <clr-icon shape="user" style="margin-right: 5px"></clr-icon>-->
+<!--          {{authService.currentUser?.display}}-->
+<!--          <clr-icon shape="caret down" size="12" style="margin-left: 5px;"></clr-icon>-->
+<!--          <app-dropdown-item>-->
+<!--            <span (click)="goBack()" *ngIf="authService.currentUser.admin">{{'ACCOUNT.GO_BACK' | translate}}</span>-->
+<!--            <span (click)="logout()">{{'ACCOUNT.LOGOUT' | translate}}</span>-->
+<!--          </app-dropdown-item>-->
+<!--        </app-dropdown>-->
+<!--      </div>-->
+<!--    </header>-->
 
-    <clr-modal [(clrModalOpen)]="notificationModal" [clrModalSize]="'xl'" [clrModalClosable]="false">
-      <a class="modal-title"><span class="label label-info">{{notification.type}}</span> {{notification.title}}</a>
-      <div class="modal-body">
-        <markdown [data]="notification.message"></markdown>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-primary"
-                (click)="closeNotification()">{{'BUTTON.CONFIRM' | translate}}</button>
-      </div>
-    </clr-modal>
+<!--    <clr-modal [(clrModalOpen)]="notificationModal" [clrModalSize]="'xl'" [clrModalClosable]="false">-->
+<!--      <a class="modal-title"><span class="label label-info">{{notification.type}}</span> {{notification.title}}</a>-->
+<!--      <div class="modal-body">-->
+<!--        <markdown [data]="notification.message"></markdown>-->
+<!--      </div>-->
+<!--      <div class="modal-footer">-->
+<!--        <button type="button" class="btn btn-primary"-->
+<!--                (click)="closeNotification()">{{'BUTTON.CONFIRM' | translate}}</button>-->
+<!--      </div>-->
+<!--    </clr-modal>-->
   `
 })
 export class NavComponent implements OnInit {
@@ -89,11 +95,12 @@ export class NavComponent implements OnInit {
   notificationModal = false;
   notification: Notification = new Notification();
   pageState: PageState = new PageState();
-
+  public langs: string[];
+  
   constructor(private router: Router,
               public cacheService: CacheService,
               public authService: AuthService,
-              public translate: TranslateService,
+              public translateService: TranslateService,
               private notificationService: NotificationService, ) {
   }
 
