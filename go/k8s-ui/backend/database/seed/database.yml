@@ -37,3 +37,16 @@ configs:
   - id: 5
     name: "system.title"
     value: "K8S-UI"
+notifications:
+  - id: 1
+    type: "info"
+    title: "this is a notification from admin"
+    message: "this is a message from admin, this is a message from admin"
+    from_user_id: 1
+    level: 1
+    is_published: true
+notification_logs:
+  - id: 1
+    user_id: 1
+    notification_id: 1
+    is_read: false

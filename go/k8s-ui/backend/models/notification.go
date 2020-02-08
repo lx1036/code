@@ -20,7 +20,7 @@ type Notification struct {
 	IsPublished bool              `gorm:"column:is_published;not null;default:'0';"`
 	CreatedAt   time.Time         `gorm:"column:created_at;not null;default:current_timestamp;"`
 	UpdatedAt   time.Time         `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
-	DeletedAt   time.Time         `gorm:"column:deleted_at;default:null;"`
+	DeletedAt   *time.Time        `gorm:"column:deleted_at;default:null;"`
 	//CreateTime  *time.Time        `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
 	//UpdateTime  *time.Time        `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
 }

@@ -23,7 +23,7 @@ type AuditLog struct {
 	User      string        `gorm:"column:user;size:128;not null;default:'';"`
 	CreatedAt time.Time     `gorm:"column:created_at;not null;default:current_timestamp;"`
 	UpdatedAt time.Time     `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
-	DeletedAt time.Time     `gorm:"column:deleted_at;default:null;"`
+	DeletedAt *time.Time    `gorm:"column:deleted_at;default:null;"`
 }
 
 func (AuditLog) TableName() string {

@@ -13,17 +13,17 @@ const (
 type ClusterStatus int32
 
 type Cluster struct {
-	ID          uint      `gorm:"column:id;primary_key;"`
-	Name        string    `gorm:"column:name;size:128;not null;unique;default:'';"`
-	DisplayName string    `gorm:"column:display_name;size:512;default:null;"`
-	MetaData    string    `gorm:"column:meta_data;type:longtext;default:null;"`
-	Master      string    `gorm:"column:master;size:128;not null;default:'';"` // apiserver地址，示例： https://10.172.189.140
-	KubeConfig  string    `gorm:"column:kube_config;type:longtext;default:null;"`
-	Description string    `gorm:"column:description;size:512;default:null;"`
-	Status      int       `gorm:"column:status;size:11;not null;default:0;"`
-	CreatedAt   time.Time `gorm:"column:created_at;not null;default:current_timestamp;"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
-	DeletedAt   time.Time `gorm:"column:deleted_at;default:null;"`
+	ID          uint       `gorm:"column:id;primary_key;"`
+	Name        string     `gorm:"column:name;size:128;not null;unique;default:'';"`
+	DisplayName string     `gorm:"column:display_name;size:512;default:null;"`
+	MetaData    string     `gorm:"column:meta_data;type:longtext;default:null;"`
+	Master      string     `gorm:"column:master;size:128;not null;default:'';"` // apiserver地址，示例： https://10.172.189.140
+	KubeConfig  string     `gorm:"column:kube_config;type:longtext;default:null;"`
+	Description string     `gorm:"column:description;size:512;default:null;"`
+	Status      int        `gorm:"column:status;size:11;not null;default:0;"`
+	CreatedAt   time.Time  `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt   time.Time  `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
+	DeletedAt   *time.Time `gorm:"column:deleted_at;default:null;"`
 
 	//User        string     `gorm:"size(128)" json:"user,omitempty"`
 

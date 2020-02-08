@@ -11,13 +11,13 @@ const (
 )
 
 type Group struct {
-	ID        uint      `gorm:"column:id;primary_key;"`
-	Name      string    `gorm:"column:name;size:200;not null;default:'';"`
-	Comment   string    `gorm:"column:comment;type:longtext;not null;"`
-	Type      uint      `gorm:"column:type;size:11;not null;default:0;"`
-	CreatedAt time.Time `gorm:"column:created_at;"`
-	UpdatedAt time.Time `gorm:"column:updated_at;"`
-	DeletedAt time.Time `gorm:"column:deleted_at;default:null;"`
+	ID        uint       `gorm:"column:id;primary_key;"`
+	Name      string     `gorm:"column:name;size:200;not null;default:'';"`
+	Comment   string     `gorm:"column:comment;type:longtext;not null;"`
+	Type      uint       `gorm:"column:type;size:11;not null;default:0;"`
+	CreatedAt time.Time  `gorm:"column:created_at;"`
+	UpdatedAt time.Time  `gorm:"column:updated_at;"`
+	DeletedAt *time.Time `gorm:"column:deleted_at;default:null;"`
 
 	//ApiKeys []APIKey `gorm:"foreignkey:GroupId"`
 	//ApiKeys []APIKey `gorm:"foreignkey:GroupID;AssociationForeignKey:ID"`

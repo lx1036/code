@@ -44,6 +44,8 @@ func main() {
 		&models.Group{},
 		&models.Namespace{},
 		&models.NamespaceUser{},
+		&models.Notification{},
+		&models.NotificationLog{},
 		&models.User{},
 	)
 
