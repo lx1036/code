@@ -34,7 +34,7 @@ func (controller *NamespaceController) Statistics() {
 
 	resources := []string{
 		models.TableNameDeployment,
-		models.TableNameStatefulset,
+		models.TableNameStatefulSet,
 		models.TableNameDaemonSet,
 		models.TableNameCronjob,
 		models.TableNameService,

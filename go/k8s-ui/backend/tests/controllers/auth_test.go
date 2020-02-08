@@ -28,6 +28,30 @@ func (suite *AuthSuite) TeardownTest() {
 
 }
 
+func (suite *AuthSuite) TestCors()  {
+	routers := routers_gin.SetupRouter()
+	data := url.Values{}
+	data.Set("username", "admin")
+	data.Set("password", "password")
+	request := httptest.NewRequest("OPTIONS", "/login/db", strings.NewReader(data.Encode()))
+	request.Header.Add("Access-Control-Request-Method", http.MethodPost)
+	request.Header.Add("Access-Control-Request-Headers", "authorization")
+	request.Header.Add("Access-Control-Request-Headers", "content-type")
+	request.Header.Add("Origin", "http://localhost:4200")
+	response := httptest.NewRecorder()
+	routers.ServeHTTP(response, request)
+	//response := recorder.Result()
+	headers := response.Header()
+	for key, value := range headers {
+		fmt.Println(key, value)
+	}
+
+	assert.Equal(suite.T(), http.StatusOK, response.Code)
+	assert.Equal(suite.T(), "*", response.Header().Get("Access-Control-Allow-Origin"))
+	assert.Equal(suite.T(), http.MethodPost, response.Header().Get("Access-Control-Allow-Methods"))
+	assert.Equal(suite.T(), "Authorization", response.Header().Get("Access-Control-Allow-Headers"))
+}
+
 func (suite *AuthSuite) TestLogin() {
 	routers := routers_gin.SetupRouter()
 	data := url.Values{}

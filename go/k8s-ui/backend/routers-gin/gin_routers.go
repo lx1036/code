@@ -10,7 +10,7 @@ func SetupRouter() *gin.Engine {
 	router := gin.Default()
 
 	// application's global HTTP middleware stack
-	router.Use(cors.Default()) // cors
+	router.Use(cors.AllowAll()) // cors
 
 	controllerRegistry := New(router)
 

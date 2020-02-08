@@ -198,6 +198,8 @@ github.com/gogo/protobuf v1.2.0/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7a
 github.com/gogo/protobuf v1.2.1/go.mod h1:hp+jE20tsWTFYpLwKvXlhS1hjn+gTNwPg2I6zVXpSg4=
 github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d h1:3PaI8p3seN09VjbTYC/QWlUZdZ1qS1zGjy7LH2Wt07I=
 github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d/go.mod h1:SlYgWuQ5SjCEi6WLHjHCa1yvBfUnHcTbrrZtXPKa29o=
+github.com/gogo/protobuf v1.3.1 h1:DqDEcV5aeaTmdFBePNpYsp3FlcVH/2ISVVM9Qf8PSls=
+github.com/gogo/protobuf v1.3.1/go.mod h1:SlYgWuQ5SjCEi6WLHjHCa1yvBfUnHcTbrrZtXPKa29o=
 github.com/gohouse/gocar v0.0.2 h1:pzf7zhDSuWa7GpSszi6mEQslp+Pthypn5yi8c+zomK0=
 github.com/gohouse/gocar v0.0.2/go.mod h1:zE2+ip1u8MKvLyqTKxQIeZEI4lN1XPXK7AZdbikD6RE=
 github.com/gohouse/gorose v1.0.5 h1:Iescp+mt88bkIXqmTF2ixM4nlLjo6D9CXX6hRWCz2lc=
