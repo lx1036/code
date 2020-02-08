@@ -40,6 +40,7 @@ func main() {
 	db.Set("gorm:table_options", "ENGINE=InnoDB").AutoMigrate(
 		&models.APIKey{},
 		&models.App{},
+		&models.Config{},
 		&models.Group{},
 		&models.Namespace{},
 		&models.NamespaceUser{},

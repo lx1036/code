@@ -44,7 +44,7 @@ func init() {
 	nsWithoutApp := beego.NewNamespace("/api/v1",
 		beego.NSNamespace("/configs/base",
 			beego.NSInclude(
-				&controllers.BaseConfigController{},
+			//&controllers.BaseConfigController{},
 			),
 		),
 		beego.NSNamespace("/notifications",

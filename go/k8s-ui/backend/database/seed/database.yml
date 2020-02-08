@@ -21,3 +21,19 @@ users:
     admin: 0
     last_login: "2020-02-03 00:00:00"
     last_ip: "127.0.0.1"
+configs:
+  - id: 1
+    name: "system.api-name-generate-rule"
+    value: "join"
+  - id: 2
+    name: "system.external-ip"
+    value: "true"
+  - id: 3
+    name: "system.monitor-uri"
+    value: "https://prometheus.lx1036.cloud"
+  - id: 4
+    name: "system.oauth2-title"
+    value: "域账号登录"
+  - id: 5
+    name: "system.title"
+    value: "K8S-UI"
