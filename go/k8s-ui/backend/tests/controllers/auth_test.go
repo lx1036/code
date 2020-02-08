@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"io/ioutil"
@@ -18,10 +19,13 @@ import (
 
 type AuthSuite struct {
 	suite.Suite
+	Token string
+	routers *gin.Engine
 }
 
 func (suite *AuthSuite) SetupTest() {
 	//initial.InitDb()
+	//suite.routers = routers_gin.SetupRouter()
 }
 
 func (suite *AuthSuite) TeardownTest() {
@@ -38,18 +42,27 @@ func (suite *AuthSuite) TestCors()  {
 	request.Header.Add("Access-Control-Request-Headers", "authorization")
 	request.Header.Add("Access-Control-Request-Headers", "content-type")
 	request.Header.Add("Origin", "http://localhost:4200")
-	response := httptest.NewRecorder()
-	routers.ServeHTTP(response, request)
+	recorder := httptest.NewRecorder()
+	routers.ServeHTTP(recorder, request)
 	//response := recorder.Result()
-	headers := response.Header()
+	headers := recorder.Header()
 	for key, value := range headers {
 		fmt.Println(key, value)
 	}
+	var token struct{
+		Data struct{
+			Token string `json:"token"`
+		} `json:"data"`
+	}
 
-	assert.Equal(suite.T(), http.StatusOK, response.Code)
-	assert.Equal(suite.T(), "*", response.Header().Get("Access-Control-Allow-Origin"))
-	assert.Equal(suite.T(), http.MethodPost, response.Header().Get("Access-Control-Allow-Methods"))
-	assert.Equal(suite.T(), "Authorization", response.Header().Get("Access-Control-Allow-Headers"))
+	_ =json.Unmarshal(recorder.Body.Bytes(), &token)
+
+	suite.Token = token.Data.Token
+
+	assert.Equal(suite.T(), http.StatusOK, recorder.Code)
+	assert.Equal(suite.T(), "*", recorder.Header().Get("Access-Control-Allow-Origin"))
+	assert.Equal(suite.T(), http.MethodPost, recorder.Header().Get("Access-Control-Allow-Methods"))
+	assert.Equal(suite.T(), "Authorization", recorder.Header().Get("Access-Control-Allow-Headers"))
 }
 
 func (suite *AuthSuite) TestLogin() {
@@ -64,13 +77,33 @@ func (suite *AuthSuite) TestLogin() {
 	response := recorder.Result()
 	body, _ := ioutil.ReadAll(response.Body)
 
-	fmt.Println(string(body))
 	var token base.JsonResponse
 	_ = json.Unmarshal(body, &token)
 
 	fmt.Println(response.Header)
 	fmt.Println(token)
 	assert.Equal(suite.T(), http.StatusOK, response.StatusCode)
+}
+
+func (suite *AuthSuite) TestCurrentUser()  {
+	request := httptest.NewRequest("GET", "/me", nil)
+	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", suite.Token))
+	recorder := httptest.NewRecorder()
+	suite.routers.ServeHTTP(recorder, request)
+	response := recorder.Result()
+	body, _ := ioutil.ReadAll(response.Body)
+
+	var me struct{
+		Errno int `json:"errno"`
+		Errmsg string `json:"errmsg"`
+		Data struct{
+			ID int `json:"ID"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(body, &me)
+
+	assert.Equal(suite.T(), http.StatusOK, response.StatusCode)
+	assert.Equal(suite.T(), 1, me.Data.ID)
 }
 
 func TestAuthSuite(test *testing.T) {

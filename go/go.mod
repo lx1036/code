@@ -28,6 +28,7 @@ require (
 	github.com/labstack/echo v3.3.10+incompatible // indirect
 	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
+	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mholt/certmagic v0.8.3
 	github.com/miekg/dns v1.1.15
 	github.com/mitchellh/mapstructure v1.1.2
@@ -46,7 +47,7 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/tidwall/evio v1.0.2
 	github.com/urfave/cli v1.22.1
-	golang.org/x/sys v0.0.0-20190904154756-749cb33beabd
+	golang.org/x/sys v0.0.0-20200116001909-b77594299b42
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -54,7 +55,7 @@ require (
 	k8s.io/api v0.0.0-20191003035645-10e821c09743
 	k8s.io/apimachinery v0.0.0-20191025225532-af6325b3a843
 	k8s.io/client-go v11.0.0+incompatible
-	k8s.io/utils v0.0.0-20191010214722-8d271d903fe4 // indirect
+	k8s.io/utils v0.0.0-20200124190032-861946025e34 // indirect
 )
 
 replace (
