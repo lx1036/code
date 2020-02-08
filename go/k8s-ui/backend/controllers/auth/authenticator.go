@@ -31,11 +31,15 @@ func (controller *AuthController) Init() {
 
 func (controller *AuthController) Login() gin.HandlerFunc {
 	return func(context *gin.Context) {
-		username := context.PostForm("username")
-		password := context.PostForm("password")
+		var body struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}
+		_ = context.BindJSON(&body)
+
 		authType := context.Query("type")
 		//authName := context.Query("name")
-		if authType == "" || username == "admin" {
+		if authType == "" || body.Username == "admin" {
 			authType = models.AuthTypeDB
 		}
 		authenticator, ok := registry[authType]
@@ -49,8 +53,8 @@ func (controller *AuthController) Login() gin.HandlerFunc {
 		}
 
 		authModel := models.AuthModel{
-			Username: username,
-			Password: password,
+			Username: body.Username,
+			Password: body.Password,
 		}
 		if authType == models.AuthTypeOAuth2 { // login with oauth2
 
