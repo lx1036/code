@@ -52,7 +52,9 @@ class AuthInterceptor implements HttpInterceptor {
     for (const key of request.headers.keys()) {
       headers[key] = request.headers.getAll(key);
     }
-    headers['Content-Type'] = 'application/json';
+
+    // headers['Content-Type'] = 'application/json';
+
     if (token) { // if logged in
       headers.Authorization = 'Bearer ' + token;
     }
