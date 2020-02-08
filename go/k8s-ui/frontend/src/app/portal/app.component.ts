@@ -155,7 +155,7 @@ export class CreateEditAppComponent implements OnInit {
                     </div>
                 </div>
 
-                <app-list-apps [apps]="changedApps"></app-list-apps>
+<!--                <app-list-apps [apps]="changedApps"></app-list-apps>-->
             </app-box>
           </div>
         </div>
@@ -163,7 +163,7 @@ export class CreateEditAppComponent implements OnInit {
     </div>
 
     <app-sidenav-namespace style="display: flex; order: -1"></app-sidenav-namespace>
-    <app-create-edit-app (create)="createApp($event)"></app-create-edit-app>
+<!--    <app-create-edit-app (create)="createApp($event)"></app-create-edit-app>-->
   `,
 })
 export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
