@@ -57,4 +57,6 @@ func main() {
 		AddForeignKey("`namespace_id`", "`namespaces`(`id`)", "RESTRICT", "RESTRICT")
 	db.Model(&models.NamespaceUser{}).AddForeignKey("`user_id`", "`users`(`id`)", "RESTRICT", "RESTRICT").
 		AddForeignKey("`namespace_id`", "`namespaces`(`id`)", "RESTRICT", "RESTRICT")
+	db.Model(&models.NotificationLog{}).AddForeignKey("`notification_id`", "`notifications`(`id`)", "RESTRICT", "RESTRICT").
+		AddForeignKey("`user_id`", "`users`(`id`)", "RESTRICT", "RESTRICT")
 }

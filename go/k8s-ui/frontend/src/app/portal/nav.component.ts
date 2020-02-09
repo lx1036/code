@@ -16,7 +16,7 @@ import {HttpErrorResponse} from '@angular/common/http';
       {{langt}}
     </div>
     
-<!--    <header style="background-color: #1D2143" class="header">-->
+    <header style="background-color: #1D2143" class="header">
 <!--      <div class="branding" style="min-width: auto">-->
 <!--        <a routerLink="/portal/namespace/{{cacheService.currentNamespace?.id}}/app" class="nav-link">-->
 <!--          <img src="assets/images/wayne-logo.svg" width="60px" alt="">-->
@@ -24,35 +24,30 @@ import {HttpErrorResponse} from '@angular/common/http';
 <!--        </a>-->
 <!--      </div>-->
 
-<!--      <div class="header-actions">-->
-<!--        <app-dropdown size="small">-->
-<!--          <clr-icon ref="javascript:void(0)" shape="bell" [class.has-badge]="mind" style="margin-right: 5px"></clr-icon>-->
-<!--          <app-dropdown-item>-->
-<!--            <ng-container *ngIf="notificationLogs && notificationLogs.length > 0">-->
-<!--              <div *ngFor="let notificationLog of notificationLogs" ref="javascript:void(0)"-->
-<!--                   (click)="showNotification(notificationLog)" style="white-space: nowrap;">-->
-<!--                <label class="label label-info" [class.label-info]="notificationLog.isRead"-->
-<!--                       [class.label-warning]="!notificationLog.isRead">{{(notificationLog.isRead ? 'MESSAGE.READED' : 'MESSAGE.UNREAD') | translate}}</label>-->
-<!--                {{notificationLog.notification.from.name}} {{'MESSAGE.SEND' | translate}}《{{notificationLog.notification.title}}-->
-<!--                》{{'OF' | translate}}{{notificationLog.notification.type}}-->
-<!--              </div>-->
-<!--            </ng-container>-->
-<!--            <span *ngIf="!notificationLogs || notificationLogs.length === 0">{{'MESSAGE.NONE' | translate}}</span>-->
-<!--          </app-dropdown-item>-->
-<!--        </app-dropdown>-->
-<!--        -->
-<!--        -->
+      <div class="header-actions">
+        <app-dropdown size="small">
+          <clr-icon ref="javascript:void(0)" shape="bell" [class.has-badge]="mind" style="margin-right: 5px"></clr-icon>
+          <app-dropdown-item>
+            <ng-container *ngIf="notificationLogs && notificationLogs.length > 0">
+              <div *ngFor="let notificationLog of notificationLogs" ref="javascript:void(0)" (click)="showNotification(notificationLog)" style="white-space: nowrap;">
+                <label class="label label-info" [class.label-info]="notificationLog.isRead" [class.label-warning]="!notificationLog.isRead">{{(notificationLog.isRead ? 'MESSAGE.READED' : 'MESSAGE.UNREAD') | translate}}</label>
+                {{notificationLog.notification.from.name}} {{'MESSAGE.SEND' | translate}}《{{notificationLog.notification.title}}》{{'OF' | translate}}{{notificationLog.notification.type}}
+              </div>
+            </ng-container>
+            <span *ngIf="!notificationLogs || notificationLogs.length === 0">{{'MESSAGE.NONE' | translate}}</span>
+          </app-dropdown-item>
+        </app-dropdown>
 
-<!--        <app-dropdown size="small">-->
-<!--          <clr-icon shape="world" style="margin-right: 5px"></clr-icon>-->
-<!--          {{showLang(currentLang)}}-->
-<!--          <clr-icon shape="caret down" size="12" style="margin-left: 5px;"></clr-icon>-->
-<!--          <app-dropdown-item>-->
-<!--            <ng-container *ngFor="let lang of langs">-->
-<!--              <span (click)="changeLang(lang)">{{showLang(lang)}}</span>-->
-<!--            </ng-container>-->
-<!--          </app-dropdown-item>-->
-<!--        </app-dropdown>-->
+        <app-dropdown size="small">
+          <clr-icon shape="world" style="margin-right: 5px"></clr-icon>
+          {{showLang(currentLang)}}
+          <clr-icon shape="caret down" size="12" style="margin-left: 5px;"></clr-icon>
+          <app-dropdown-item>
+            <ng-container *ngFor="let lang of translateService.getLangs()">
+              <span (click)="changeLang(lang)">{{showLang(lang)}}</span>
+            </ng-container>
+          </app-dropdown-item>
+        </app-dropdown>
 
 <!--        <app-dropdown [size]="authService.currentUser?.namespaces.length > 10 ? 'middle' : 'small'">-->
 <!--          <clr-icon shape="organization" style="margin-right: 5px"></clr-icon>-->
@@ -73,8 +68,8 @@ import {HttpErrorResponse} from '@angular/common/http';
 <!--            <span (click)="logout()">{{'ACCOUNT.LOGOUT' | translate}}</span>-->
 <!--          </app-dropdown-item>-->
 <!--        </app-dropdown>-->
-<!--      </div>-->
-<!--    </header>-->
+      </div>
+    </header>
 
 <!--    <clr-modal [(clrModalOpen)]="notificationModal" [clrModalSize]="'xl'" [clrModalClosable]="false">-->
 <!--      <a class="modal-title"><span class="label label-info">{{notification.type}}</span> {{notification.title}}</a>-->
