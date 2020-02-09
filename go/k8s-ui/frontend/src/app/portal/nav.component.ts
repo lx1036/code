@@ -13,9 +13,9 @@ import {HttpErrorResponse} from '@angular/common/http';
   selector: 'app-nav',
   template: `
     <div *ngFor="let langt of translateService.getLangs()">
-      {{langt}}
+      {{langt}} {{'MESSAGE.UNREAD'|translate}}
     </div>
-    
+
     <header style="background-color: #1D2143" class="header">
 <!--      <div class="branding" style="min-width: auto">-->
 <!--        <a routerLink="/portal/namespace/{{cacheService.currentNamespace?.id}}/app" class="nav-link">-->
@@ -30,8 +30,10 @@ import {HttpErrorResponse} from '@angular/common/http';
           <app-dropdown-item>
             <ng-container *ngIf="notificationLogs && notificationLogs.length > 0">
               <div *ngFor="let notificationLog of notificationLogs" ref="javascript:void(0)" (click)="showNotification(notificationLog)" style="white-space: nowrap;">
-                <label class="label label-info" [class.label-info]="notificationLog.isRead" [class.label-warning]="!notificationLog.isRead">{{(notificationLog.isRead ? 'MESSAGE.READED' : 'MESSAGE.UNREAD') | translate}}</label>
-                {{notificationLog.notification.from.name}} {{'MESSAGE.SEND' | translate}}《{{notificationLog.notification.title}}》{{'OF' | translate}}{{notificationLog.notification.type}}
+                <label class="label label-info" [class.label-info]="notificationLog.is_read" [class.label-warning]="!notificationLog.is_read">
+                  {{(notificationLog.is_read ? 'MESSAGE.READED' : 'MESSAGE.UNREAD') | translate}}
+                </label>
+<!--                {{notificationLog.notification.from.name}} {{'MESSAGE.SEND' | translate}}《{{notificationLog.notification.title}}》{{'OF' | translate}}{{notificationLog.notification.type}}-->
               </div>
             </ng-container>
             <span *ngIf="!notificationLogs || notificationLogs.length === 0">{{'MESSAGE.NONE' | translate}}</span>
@@ -91,7 +93,7 @@ export class NavComponent implements OnInit {
   notification: Notification = new Notification();
   pageState: PageState = new PageState();
   public langs: string[];
-  
+
   constructor(private router: Router,
               public cacheService: CacheService,
               public authService: AuthService,

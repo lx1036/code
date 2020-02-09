@@ -19,13 +19,13 @@ import (
 
 type AuthSuite struct {
 	suite.Suite
-	Token   string
+	//Token   string
 	routers *gin.Engine
 }
 
 func (suite *AuthSuite) SetupTest() {
 	//initial.InitDb()
-	//suite.routers = routers_gin.SetupRouter()
+	suite.routers = routers_gin.SetupRouter()
 }
 
 func (suite *AuthSuite) TeardownTest() {
@@ -33,7 +33,7 @@ func (suite *AuthSuite) TeardownTest() {
 }
 
 func (suite *AuthSuite) TestCors() {
-	routers := routers_gin.SetupRouter()
+	//routers := routers_gin.SetupRouter()
 	data := url.Values{}
 	data.Add("username", "admin")
 	data.Add("password", "password")
@@ -44,7 +44,7 @@ func (suite *AuthSuite) TestCors() {
 	request.Header.Add("Origin", "http://localhost:4200")
 	request.Header.Add("Host", "localhost:8080")
 	recorder := httptest.NewRecorder()
-	routers.ServeHTTP(recorder, request)
+	suite.routers.ServeHTTP(recorder, request)
 	//response := recorder.Result()
 	headers := recorder.Header()
 	for key, value := range headers {
@@ -58,7 +58,7 @@ func (suite *AuthSuite) TestCors() {
 }
 
 func (suite *AuthSuite) TestLogin() {
-	routers := routers_gin.SetupRouter()
+	//routers := routers_gin.SetupRouter()
 	body := struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -70,7 +70,7 @@ func (suite *AuthSuite) TestLogin() {
 	request := httptest.NewRequest("POST", "/login/db", bytes.NewBuffer(requestBody))
 	request.Header.Set("content-type", "application/json")
 	recorder := httptest.NewRecorder()
-	routers.ServeHTTP(recorder, request)
+	suite.routers.ServeHTTP(recorder, request)
 	response := recorder.Result()
 	responseBody, _ := ioutil.ReadAll(response.Body)
 
@@ -81,14 +81,15 @@ func (suite *AuthSuite) TestLogin() {
 	}
 
 	_ = json.Unmarshal(responseBody, &token)
-	suite.Token = token.Data.Token
+	//suite.Token = token.Data.Token
 
 	assert.Equal(suite.T(), http.StatusOK, response.StatusCode)
 }
 
 func (suite *AuthSuite) TestCurrentUser() {
+	//routers := routers_gin.SetupRouter()
 	request := httptest.NewRequest("GET", "/me", nil)
-	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", suite.Token))
+	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", Token))
 	recorder := httptest.NewRecorder()
 	suite.routers.ServeHTTP(recorder, request)
 	response := recorder.Result()
@@ -105,6 +106,31 @@ func (suite *AuthSuite) TestCurrentUser() {
 
 	assert.Equal(suite.T(), http.StatusOK, response.StatusCode)
 	assert.Equal(suite.T(), 1, me.Data.ID)
+}
+
+func (suite *AuthSuite) TestNotificationSubscribe() {
+	request := httptest.NewRequest("GET", "/api/v1/notifications/subscribe", nil)
+	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", Token))
+	recorder := httptest.NewRecorder()
+	suite.routers.ServeHTTP(recorder, request)
+	response := recorder.Result()
+
+	// Assert(response)
+
+	body, _ := ioutil.ReadAll(response.Body)
+
+	fmt.Println(string(body))
+}
+
+func (suite *AuthSuite) TestNotificationList() {
+	request := httptest.NewRequest("GET", "/api/v1/notifications", nil)
+	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", Token))
+	recorder := httptest.NewRecorder()
+	suite.routers.ServeHTTP(recorder, request)
+	response := recorder.Result()
+	body, _ := ioutil.ReadAll(response.Body)
+
+	fmt.Println(string(body))
 }
 
 func TestAuthSuite(test *testing.T) {

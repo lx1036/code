@@ -1,9 +1,9 @@
 import {Component, EventEmitter, Input, OnInit, Output, ViewChild} from '@angular/core';
 import {ClrDatagridStateInterface} from '@clr/angular';
-import {PageState} from '../shared/page-state';
-import {Notification} from '../shared/model/v1/notification';
-import {NotificationService} from '../shared/notification.service';
-import {MessageHandlerService} from '../shared/message-handler.service';
+import {PageState} from '../../shared/page-state';
+import {Notification} from '../../shared/model/v1/notification';
+import {NotificationService} from '../../shared/notification.service';
+import {MessageHandlerService} from '../../shared/message-handler.service';
 
 
 @Component({
@@ -32,20 +32,15 @@ import {MessageHandlerService} from '../shared/message-handler.service';
           </section>
         </form>
         <textarea [(ngModel)]="notify.message"></textarea>
-
         <markdown [data]="notify.message"></markdown>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline" type="button"
-                (click)="cancelCreateNotification()">{{'BUTTON.CANCEL' | translate}}</button>
-        <button type="button" class="btn btn-primary" [disabled]="!isValid()" (click)="doCreateNotification()">
-          创建
-        </button>
+        <button class="btn btn-outline" type="button" (click)="cancelCreateNotification()">{{'BUTTON.CANCEL' | translate}}</button>
+        <button type="button" class="btn btn-primary" [disabled]="!isValid()" (click)="createNotification()">创建</button>
       </div>
     </clr-modal>
   `
 })
-
 export class CreateNotificationComponent implements OnInit {
   opened = false;
   notify: Notification = new Notification();
@@ -67,7 +62,7 @@ export class CreateNotificationComponent implements OnInit {
     this.notify = new Notification();
   }
 
-  doCreateNotification() {
+  createNotification() {
     this.notificationService.create(this.notify)
     .subscribe(
       response => {
@@ -185,10 +180,7 @@ export class ListNotificationComponent implements OnInit {
 
             <div class="clr-row flex-items-xs-between" style="height:32px;">
               <div class="option-left">
-                <button class="btn btn-link" (click)="openCreateModal()">
-                  <clr-icon shape="add"></clr-icon>
-                  创建通知
-                </button>
+                <button class="btn btn-link" (click)="openCreateModal()"><clr-icon shape="add"></clr-icon>创建通知</button>
                 <app-create-notification (create)="createNotification($event)"></app-create-notification>
               </div>
 
@@ -205,7 +197,6 @@ export class ListNotificationComponent implements OnInit {
     </div>
   `
 })
-
 export class NotificationComponent implements OnInit {
   resourceLabel = '通知';
   notifications: Notification[];
@@ -215,7 +206,7 @@ export class NotificationComponent implements OnInit {
   @ViewChild(CreateNotificationComponent, { static: false })
   createNotificationComponent: CreateNotificationComponent;
 
-  constructor() {
+  constructor(private notificationService: NotificationService, ) {
   }
 
   ngOnInit() {
@@ -226,13 +217,19 @@ export class NotificationComponent implements OnInit {
   }
 
   createNotification(created: boolean) {
+    if (created) {
+      this.retrieve();
+    }
   }
 
   updateNotification(updated: boolean) {
   }
 
   retrieve(state?: ClrDatagridStateInterface): void {
+    this.notificationService.query().subscribe(
+      response => {
 
+      }, error => {});
   }
 
 }

@@ -49,7 +49,7 @@ func init() {
 		),
 		beego.NSNamespace("/notifications",
 			beego.NSInclude(
-				&controllers.NotificationController{},
+			//&controllers.NotificationController{},
 			),
 		),
 		beego.NSNamespace("/users",

@@ -34,25 +34,62 @@ func (controller *NotificationController) Prepare() {
 	//}
 }
 
-// @router / [get]
-func (controller *NotificationController) List() {
-	//param := controller.BuildQueryParam()
-	//
-	//totalCount, err := models.GetTotalCount(new(models.Notification), param)
-	//if err != nil {
-	//
-	//}
-	//var notifications []models.Notification
-	//err = models.GetAll(new(models.Notification), &notifications, param)
-	//if err != nil {
-	//
-	//}
-	//
-	//controller.Success(param.NewPage(totalCount, notifications))
+func (controller *NotificationController) List() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		var notifications []models.Notification
+		err := lorm.DB.Debug().Preload("User").Find(&notifications).Error
+		if err != nil {
+			context.JSON(http.StatusNoContent, base.JsonResponse{
+				Errno:  -1,
+				Errmsg: fmt.Sprintf("failed: empty content [%s]", err.Error()),
+				Data:   nil,
+			})
+			return
+		}
+
+		context.JSON(http.StatusOK, base.JsonResponse{
+			Errno:  0,
+			Errmsg: "success",
+			Data:   notifications,
+		})
+	}
 }
 
-func (controller *NotificationController) Create() {
+func (controller *NotificationController) Create() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		var body struct {
+			Type    models.NotificationType  `json:"type"`
+			Level   models.NotificationLevel `json:"level"`
+			Title   string                   `json:"title"`
+			Message string                   `json:"message"`
+		}
+		_ = context.BindJSON(&body)
 
+		notification := &models.Notification{
+			Type:        body.Type,
+			Title:       body.Title,
+			Message:     body.Message,
+			FromUserId:  middlewares.User.ID,
+			Level:       body.Level,
+			IsPublished: false,
+		}
+
+		err := lorm.DB.Table(models.Notification{}.TableName()).Create(&notification).Error
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, base.JsonResponse{
+				Errno:  -1,
+				Errmsg: fmt.Sprintf("failed: can't create notification [%s]", err.Error()),
+				Data:   nil,
+			})
+			return
+		}
+
+		context.JSON(http.StatusOK, base.JsonResponse{
+			Errno:  0,
+			Errmsg: "success",
+			Data:   notification,
+		})
+	}
 }
 
 func (controller *NotificationController) Publish() {
@@ -62,14 +99,14 @@ func (controller *NotificationController) Publish() {
 func (controller *NotificationController) Subscribe() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		user := middlewares.User
-		db := lorm.DB.Debug().Where("user_id=?", user.ID)
+		db := lorm.DB.Debug().Where("user_id=?", user.ID) //.Table(models.NotificationLog{}.TableName()).Where("user_id=?", user.ID)
 		isRead := context.Query("is_read")
 		if isRead != "" {
 			db.Where("is_read=?", isRead)
 		}
 
 		var notificationLogs []models.NotificationLog
-		err := db.Limit(100).Find(&notificationLogs).Error
+		err := db.Preload("Notification").Find(&notificationLogs).Error
 		if err != nil {
 			context.JSON(http.StatusNoContent, base.JsonResponse{
 				Errno:  -1,

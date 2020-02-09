@@ -5,6 +5,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/labstack/gommon/log"
+	"github.com/spf13/viper"
 	rsakey "k8s-lx1036/k8s-ui/backend/apikey"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
 	"k8s-lx1036/k8s-ui/backend/models"
@@ -71,12 +72,11 @@ func (controller *AuthController) Login() gin.HandlerFunc {
 
 		now := time.Now()
 		//exp := beego.AppConfig.DefaultInt64("TokenLifeTime", 86400)
-		exp := 86400
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 			//"iss": beego.AppConfig.DefaultString("appname", "k8s-ui"), // 签发者
-			"iss": "k8s-ui",                                         // 签发者
-			"iat": now.Unix(),                                       // 签发时间
-			"exp": now.Add(time.Duration(exp) * time.Second).Unix(), // 过期时间
+			"iss": viper.Get("default.appname"),                                                     // 签发者
+			"iat": now.Unix(),                                                                       // 签发时间
+			"exp": now.Add(time.Duration(viper.GetInt("default.TokenLifeTime")) * time.Hour).Unix(), // 过期时间
 			"aud": user.Name,
 		})
 		signedToken, err := token.SignedString(rsakey.RsaPrivateKey)

@@ -17,7 +17,7 @@ type NotificationLog struct {
 	UpdatedAt      time.Time  `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;" json:"updated_at"`
 	DeletedAt      *time.Time `gorm:"column:deleted_at;default:null;" json:"deleted_at"`
 
-	Notification Notification `gorm:"foreignkey:NotificationID;association_foreignkey:Refer"`
+	Notification Notification `gorm:"column:notification;foreignkey:NotificationID;association_foreignkey:ID;" json:"notification,omitempty"`
 }
 
 func (NotificationLog) TableName() string {

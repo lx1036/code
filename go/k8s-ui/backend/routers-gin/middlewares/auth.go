@@ -25,7 +25,7 @@ func AuthRequired() gin.HandlerFunc {
 			logs.Info("AuthString invalid:", authorization)
 			context.AbortWithStatusJSON(http.StatusUnauthorized, base.JsonResponse{
 				Errno:  -1,
-				Errmsg: "failed: Token Invalid!",
+				Errmsg: "failed: need authorization token!",
 				Data:   nil,
 			})
 		}

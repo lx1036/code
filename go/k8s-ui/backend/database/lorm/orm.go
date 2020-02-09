@@ -15,5 +15,5 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	//defer DB.Close()
+	//defer DB.Close() // open it, has errors, not know why
 }

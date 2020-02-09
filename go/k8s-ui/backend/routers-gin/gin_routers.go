@@ -25,6 +25,8 @@ func SetupRouter() *gin.Engine {
 		apiV1Router.GET("/configs/base", (&controllers.BaseConfigController{}).ListBase())
 
 		apiV1Router.GET("/notifications/subscribe", (&controllers.NotificationController{}).Subscribe())
+		apiV1Router.POST("/notifications", (&controllers.NotificationController{}).Create())
+		apiV1Router.GET("/notifications", (&controllers.NotificationController{}).List())
 	}
 
 	return router

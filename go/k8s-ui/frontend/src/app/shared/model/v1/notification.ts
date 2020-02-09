@@ -21,7 +21,7 @@ export class Notification {
 
 export class NotificationLog {
   id: number;
-  isRead: boolean;
-  notification: Notification;
+  is_read: boolean;
+  // notification: Notification;
 }
 

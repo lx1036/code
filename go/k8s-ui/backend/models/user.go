@@ -27,9 +27,9 @@ type User struct {
 	UpdatedAt time.Time  `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;" json:"updated_at"`
 	DeletedAt *time.Time `gorm:"column:deleted_at;default:null;" json:"deleted_at"`
 
-	ApiKeys []APIKey `gorm:"foreignkey:UserID;association_foreignkey:ID;" json:"api_keys"`
-	//Namespace  Namespace      `gorm:"foreignkey:UserID;association_foreignkey:ID;"`
-	Namespaces []*Namespace `gorm:"many2many:namespace_users;" json:"namespaces"`
+	ApiKeys       []APIKey       `gorm:"foreignkey:UserID;association_foreignkey:ID;" json:"api_keys,omitempty"`
+	Namespaces    []Namespace    `gorm:"many2many:namespace_users;" json:"namespaces,omitempty"`
+	Notifications []Notification `gorm:"column:notifications;foreignkey:FromUserId;" json:"notifications,omitempty"`
 }
 
 func (User) TableName() string {
