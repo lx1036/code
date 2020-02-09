@@ -6,29 +6,25 @@ type WebHookScope int64
 
 const (
 	WebHookScopeNamespace WebHookScope = iota
-	WebHookScopeApp
-
-	TableNameWebHook = "web_hook"
+	TableNameWebHook                   = "web_hooks"
 )
 
 type webHookModel struct{}
 
 type WebHook struct {
-	Id       int64        `gorm:"auto" json:"id"`
-	Name     string       `gorm:"index;size(128)" json:"name"`
-	Scope    WebHookScope `json:"scope"`
-	ObjectId int64        `json:"objectId"`
-
-	Url    string `gorm:"null;size(512)" json:"url"`
-	Secret string `gorm:"null;size(512)" json:"secret"`
-	Events string `gorm:"type(text)" json:"events"`
-
-	CreateTime *time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime"`
-	UpdateTime *time.Time `gorm:"auto_now;type(datetime)" json:"updateTime"`
-	User       string     `gorm:"size(128)" json:"user"`
-	Enabled    bool       `gorm:"default(false)" json:"enabled"`
+	ID        uint       `gorm:"column:id;primary_key;"`
+	Name      string     `gorm:"column:name;size:128;not null;default:'';"`
+	Scope     int        `gorm:"column:scope;not null;default:'0';"`
+	ObjectId  uint       `gorm:"column:object_id"`
+	Url       string     `gorm:"column:url;size:512;default:null;"`
+	Secret    string     `gorm:"column:secret;size:512;default:null;"`
+	Events    string     `gorm:"column:events;type:longtext;not null;"`
+	Enabled   bool       `gorm:"column:enabled;not null;default:0;"`
+	CreatedAt time.Time  `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt time.Time  `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
+	DeletedAt *time.Time `gorm:"column:deleted_at;default:null;"`
 }
 
-func (*WebHook) TableName() string {
+func (WebHook) TableName() string {
 	return TableNameWebHook
 }

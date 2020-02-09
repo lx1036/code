@@ -10,13 +10,13 @@ const (
 )
 
 type Namespace struct {
-	ID            uint      `gorm:"column:id;primary_key;"`
-	Name          string    `gorm:"column:name;size:128;not null;unique;default:'';"`
-	KubeNamespace string    `gorm:"column:kube_namespace;size:128;not null;default:'';"`
-	MetaData      string    `gorm:"column:meta_data;type:longtext;not null;"`
-	CreatedAt     time.Time `gorm:"column:created_at;"`
-	UpdatedAt     time.Time `gorm:"column:updated_at;"`
-	DeletedAt     time.Time `gorm:"column:deleted_at;default:null;"`
+	ID            uint       `gorm:"column:id;primary_key;"`
+	Name          string     `gorm:"column:name;size:128;not null;unique;default:'';"`
+	KubeNamespace string     `gorm:"column:kube_namespace;size:128;not null;default:'';"`
+	MetaData      string     `gorm:"column:meta_data;type:longtext;not null;"`
+	CreatedAt     time.Time  `gorm:"column:created_at;"`
+	UpdatedAt     time.Time  `gorm:"column:updated_at;"`
+	DeletedAt     *time.Time `gorm:"column:deleted_at;default:null;"`
 
 	Users []*User `gorm:"many2many:namespace_users;"`
 	//MetaDataObj   NamespaceMetaData `gorm:"-" json:"-"`

@@ -8,12 +8,12 @@ const (
 
 type NamespaceUser struct {
 	//ID          uint      `gorm:"column:id;primary_key;"`
-	NamespaceID uint      `gorm:"column:namespace_id;"`
-	UserID      uint      `gorm:"column:user_id;"`
-	GroupID     uint      `gorm:"column:group_id;"`
-	CreatedAt   time.Time `gorm:"column:created_at;"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;"`
-	DeletedAt   time.Time `gorm:"column:deleted_at;default:null;"`
+	NamespaceID uint       `gorm:"column:namespace_id;"`
+	UserID      uint       `gorm:"column:user_id;"`
+	GroupID     uint       `gorm:"column:group_id;"`
+	CreatedAt   time.Time  `gorm:"column:created_at;"`
+	UpdatedAt   time.Time  `gorm:"column:updated_at;"`
+	DeletedAt   *time.Time `gorm:"column:deleted_at;default:null;"`
 
 	//User        User      `gorm:"foreignkey:UserID;association_foreignkey:ID;"`
 	//Namespace       Group     `gorm:"foreignkey:GroupID;association_foreignkey:ID;"`

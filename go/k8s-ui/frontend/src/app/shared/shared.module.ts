@@ -23,6 +23,7 @@ import {BoxComponent} from './box.component';
 import {NamespaceClient} from './client/v1/kubernetes/namespace';
 import {ProgressComponent} from './progress.component';
 import {SideNavFooterComponent} from './sidenav-footer.component';
+import {AppService} from './app.service';
 
 const routes: Routes = [
   {
@@ -85,6 +86,7 @@ export class AuthRoutingModule {
     SideNavFooterComponent,
   ],
   providers: [
+    AppService,
     MessageService,
     CacheService,
     AuthoriseService,

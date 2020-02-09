@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 import {CronjobComponent} from './cronjob.component';
-import {CreateNotificationComponent, ListNotificationComponent, NotificationComponent} from './notification.component';
+import {CreateNotificationComponent, ListNotificationComponent, NotificationComponent} from './notification/notification.component';
 import {SharedModule} from '../shared/shared.module';
 import {RouterModule, Routes} from '@angular/router';
 import {AdminComponent} from './admin.component';

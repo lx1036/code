@@ -10,15 +10,15 @@ const (
 )
 
 type App struct {
-	ID          uint      `gorm:"column:id;primary_key;"`
-	Name        string    `gorm:"column:name;size:128;not null;index:app_name;default:'';"`
-	NamespaceID uint      `gorm:"column:namespace_id;"`
-	MetaData    string    `gorm:"column:meta_data;type:longtext;not null;"`
-	Description string    `gorm:"column:description;size:512;default:null;"`
-	UserID      uint      `gorm:"column:user_id;"`
-	CreatedAt   time.Time `gorm:"column:created_at;"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;"`
-	DeletedAt   time.Time `gorm:"column:deleted_at;default:null;"`
+	ID          uint       `gorm:"column:id;primary_key;"`
+	Name        string     `gorm:"column:name;size:128;not null;index:app_name;default:'';"`
+	NamespaceID uint       `gorm:"column:namespace_id;"`
+	MetaData    string     `gorm:"column:meta_data;type:longtext;not null;"`
+	Description string     `gorm:"column:description;size:512;default:null;"`
+	UserID      uint       `gorm:"column:user_id;"`
+	CreatedAt   time.Time  `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt   time.Time  `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
+	DeletedAt   *time.Time `gorm:"column:deleted_at;default:null;"`
 
 	User      User      `gorm:"foreignkey:UserID;association_foreignkey:ID;"`
 	Namespace Namespace `gorm:"foreignkey:NamespaceID;association_foreignkey:ID;"`

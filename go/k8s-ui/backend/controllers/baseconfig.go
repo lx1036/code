@@ -1,67 +1,59 @@
 package controllers
 
 import (
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/logs"
-	"k8s-lx1036/k8s-ui/backend/common"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
+	"k8s-lx1036/k8s-ui/backend/database/lorm"
 	"k8s-lx1036/k8s-ui/backend/models"
 	"k8s-lx1036/k8s-ui/backend/util"
 	"net/http"
-	"strconv"
 )
 
 type BaseConfigController struct {
-	beego.Controller
 }
 
-func (controller *BaseConfigController) URLMapping() {
-	controller.Mapping("ListBase", controller.ListBase)
+//func (controller *BaseConfigController) URLMapping() {
+//	controller.Mapping("ListBase", controller.ListBase)
+//}
+
+func (controller *BaseConfigController) Init() {
+
 }
 
-// @router / [get]
-func (controller *BaseConfigController) ListBase() {
-	configMap := make(map[string]interface{})
-	configMap["appUrl"] = beego.AppConfig.String("AppUrl")
-	configMap["betaUrl"] = beego.AppConfig.String("BetaUrl")
-	configMap["enableDBLogin"] = beego.AppConfig.DefaultBool("EnableDBLogin", false)
-	configMap["appLabelKey"] = util.AppLabelKey
-	configMap["namespaceLabelKey"] = util.NamespaceLabelKey
-	configMap["enableRobin"] = beego.AppConfig.DefaultBool("EnableRobin", false)
-	configMap["ldapLogin"] = parseAuthEnabled("auth.ldap")
-	configMap["oauth2Login"] = parseAuthEnabled("auth.oauth2")
-	configMap["enableApiKeys"] = beego.AppConfig.DefaultBool("EnableApiKeys", false)
+func (controller *BaseConfigController) ListBase() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		configMap := make(map[string]interface{})
+		configMap["appUrl"] = viper.GetString("default.AppUrl")
+		configMap["betaUrl"] = viper.GetString("default.BetaUrl")
+		configMap["enableDBLogin"] = viper.GetBool("default.EnableDBLogin")
+		configMap["appLabelKey"] = util.AppLabelKey
+		configMap["namespaceLabelKey"] = util.NamespaceLabelKey
+		configMap["enableRobin"] = viper.GetBool("default.EnableRobin")
+		configMap["ldapLogin"] = viper.GetBool("auth.ldap.enabled")
+		configMap["oauth2Login"] = viper.GetBool("auth.oauth2.enabled")
+		configMap["enableApiKeys"] = viper.GetBool("default.EnableApiKeys")
 
-	var configs []models.Config
-	err := models.GetAll(new(models.Config), &configs, &common.QueryParam{
-		PageNo:   1,
-		PageSize: 1000,
-	})
-	if err != nil {
-		logs.Error("list base configs error: %v", err)
-		controller.Ctx.Output.SetStatus(http.StatusInternalServerError)
-		return
+		var configs []models.Config
+		err := lorm.DB.Limit(100).Find(&configs).Error
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, base.JsonResponse{
+				Errno:  -1,
+				Errmsg: fmt.Sprintf("failed: list base configs error: %s", err.Error()),
+				Data:   nil,
+			})
+			return
+		}
+
+		for _, config := range configs {
+			configMap[string(config.Name)] = config.Value
+		}
+
+		context.JSON(http.StatusOK, base.JsonResponse{
+			Errno:  0,
+			Errmsg: "success",
+			Data:   configMap,
+		})
 	}
-
-	for _, config := range configs {
-		configMap[string(config.Name)] = config.Value
-	}
-
-	controller.Ctx.Output.SetStatus(http.StatusOK)
-	controller.Data["json"] = base.Result{Data: configMap}
-	controller.ServeJSON()
-}
-
-func parseAuthEnabled(name string) bool {
-	enabledSection, err := beego.AppConfig.GetSection(name)
-	if err != nil {
-		return false
-	}
-
-	enabled, err := strconv.ParseBool(enabledSection["enabled"])
-	if err != nil {
-		return false
-	}
-
-	return enabled
 }

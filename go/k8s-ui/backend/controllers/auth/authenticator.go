@@ -5,6 +5,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/labstack/gommon/log"
+	"github.com/spf13/viper"
 	rsakey "k8s-lx1036/k8s-ui/backend/apikey"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
 	"k8s-lx1036/k8s-ui/backend/models"
@@ -31,11 +32,15 @@ func (controller *AuthController) Init() {
 
 func (controller *AuthController) Login() gin.HandlerFunc {
 	return func(context *gin.Context) {
-		username := context.PostForm("username")
-		password := context.PostForm("password")
+		var body struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}
+		_ = context.BindJSON(&body)
+
 		authType := context.Query("type")
 		//authName := context.Query("name")
-		if authType == "" || username == "admin" {
+		if authType == "" || body.Username == "admin" {
 			authType = models.AuthTypeDB
 		}
 		authenticator, ok := registry[authType]
@@ -49,8 +54,8 @@ func (controller *AuthController) Login() gin.HandlerFunc {
 		}
 
 		authModel := models.AuthModel{
-			Username: username,
-			Password: password,
+			Username: body.Username,
+			Password: body.Password,
 		}
 		if authType == models.AuthTypeOAuth2 { // login with oauth2
 
@@ -67,12 +72,11 @@ func (controller *AuthController) Login() gin.HandlerFunc {
 
 		now := time.Now()
 		//exp := beego.AppConfig.DefaultInt64("TokenLifeTime", 86400)
-		exp := 86400
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 			//"iss": beego.AppConfig.DefaultString("appname", "k8s-ui"), // 签发者
-			"iss": "k8s-ui",                                         // 签发者
-			"iat": now.Unix(),                                       // 签发时间
-			"exp": now.Add(time.Duration(exp) * time.Second).Unix(), // 过期时间
+			"iss": viper.Get("default.appname"),                                                     // 签发者
+			"iat": now.Unix(),                                                                       // 签发时间
+			"exp": now.Add(time.Duration(viper.GetInt("default.TokenLifeTime")) * time.Hour).Unix(), // 过期时间
 			"aud": user.Name,
 		})
 		signedToken, err := token.SignedString(rsakey.RsaPrivateKey)
@@ -148,7 +152,7 @@ func (controller *AuthController) CurrentUser() gin.HandlerFunc {
 
 		claim := token.Claims.(jwt.MapClaims)
 		aud := claim["aud"].(string)
-		user, err := models.UserModel.GetUserByName(aud)
+		user, err := models.GetUserByName(aud)
 		//user, err := models.UserModel.GetUserDetail(aud)
 		if err != nil {
 			context.JSON(http.StatusInternalServerError, base.JsonResponse{

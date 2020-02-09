@@ -21,3 +21,43 @@ users:
     admin: 0
     last_login: "2020-02-03 00:00:00"
     last_ip: "127.0.0.1"
+configs:
+  - id: 1
+    name: "system.api-name-generate-rule"
+    value: "join"
+  - id: 2
+    name: "system.external-ip"
+    value: "true"
+  - id: 3
+    name: "system.monitor-uri"
+    value: "https://prometheus.lx1036.cloud"
+  - id: 4
+    name: "system.oauth2-title"
+    value: "域账号登录"
+  - id: 5
+    name: "system.title"
+    value: "K8S-UI"
+notifications:
+  - id: 1
+    type: "info"
+    title: "this is a notification from admin"
+    message: "this is a message from admin, this is a message from admin"
+    from_user_id: 1
+    level: 1
+    is_published: true
+  - id: 2
+    type: "danger"
+    title: "this is another notification from admin"
+    message: "this is another message from admin, this is another message from admin"
+    from_user_id: 1
+    level: 1
+    is_published: true
+notification_logs:
+  - id: 1
+    user_id: 1
+    notification_id: 1
+    is_read: false
+  - id: 2
+    user_id: 1
+    notification_id: 2
+    is_read: false
