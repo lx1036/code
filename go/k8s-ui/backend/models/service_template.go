@@ -3,25 +3,21 @@ package models
 import "time"
 
 const (
-	TableNameServiceTemplate = "service_template"
+	TableNameServiceTemplate = "service_templates"
 )
 
 type ServiceTemplate struct {
-	Id          int64    `orm:"auto" json:"id,omitempty"`
-	Name        string   `orm:"size(128)" json:"name,omitempty"`
-	Template    string   `orm:"type(text)" json:"template,omitempty"`
-	Service     *Service `orm:"index;rel(fk);column(service_id)" json:"service,omitempty"`
-	Description string   `orm:"size(512)" json:"description,omitempty"`
-
-	CreateTime time.Time `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime time.Time `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
-	User       string    `orm:"size(128)" json:"user,omitempty"`
-	Deleted    bool      `orm:"default(false)" json:"deleted,omitempty"`
-
-	Status    []*PublishStatus `orm:"-" json:"status,omitempty"`
-	ServiceId int64            `orm:"-" json:"serviceId,omitempty"`
+	ID          uint       `gorm:"column:id;primary_key;"`
+	Name        string     `gorm:"column:name;size:128;not null;default:'';"`
+	Template    string     `gorm:"column:template;type:longtext;not null;"`
+	ServiceId   uint       `gorm:"column:service_id"`
+	MetaData    string     `gorm:"column:meta_data;type:longtext;not null;"`
+	Description string     `gorm:"column:description;size:512;not null;default:'';"`
+	CreatedAt   time.Time  `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt   time.Time  `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
+	DeletedAt   *time.Time `gorm:"column:deleted_at;default:null;"`
 }
 
-func (*ServiceTemplate) TableName() string {
+func (ServiceTemplate) TableName() string {
 	return TableNameServiceTemplate
 }

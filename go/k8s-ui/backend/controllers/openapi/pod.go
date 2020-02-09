@@ -54,9 +54,9 @@ func (controller *OpenAPIController) GetPodList() {
 	if !controller.CheckoutRoutePermission(GetPodListAction) {
 		return
 	}
-	if controller.APIKey.Type != models.GlobalAPIKey {
-		return
-	}
+	//if controller.APIKey.Type != models.GlobalAPIKey {
+	//	return
+	//}
 
 	podList := respPodInfoList{}
 	podList.Body.Code = http.StatusOK

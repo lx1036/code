@@ -11,7 +11,6 @@ import (
 	"k8s-lx1036/k8s-ui/backend/util/hack"
 	"k8s.io/api/apps/v1beta1"
 	"strings"
-	"time"
 )
 
 // swagger:parameters UpgradeDeploymentParam
@@ -161,9 +160,9 @@ func (controller *OpenAPIController) UpgradeDeployment() {
 
 		common.DeploymentPreDeploy(deployInfo.DeploymentObject, deployInfo.Deployment, deployInfo.Cluster, deployInfo.Namespace)
 
-		tmplId := deployInfo.DeploymentTemplate.Id
-		deployInfo.DeploymentTemplate.Id = 0
-		deployInfo.DeploymentTemplate.User = controller.APIKey.String()
+		//tmplId := deployInfo.DeploymentTemplate.ID
+		//deployInfo.DeploymentTemplate.Id = 0
+		//deployInfo.DeploymentTemplate.User = controller.APIKey.String()
 		deployInfo.DeploymentTemplate.Description = "[APIKey] " + controller.GetString("description")
 
 		for k, v := range deployInfo.DeploymentObject.Spec.Template.Spec.Containers {
@@ -172,32 +171,32 @@ func (controller *OpenAPIController) UpgradeDeployment() {
 			}
 		}
 
-		deploymentInfoMap[tmplId] = append(deploymentInfoMap[tmplId], deployInfo)
+		//deploymentInfoMap[tmplId] = append(deploymentInfoMap[tmplId], deployInfo)
 	}
 
-	for id, deploymentInfos := range deploymentInfoMap {
-		deploymentInfo := deploymentInfos[0]
-		newTpl, err := json.Marshal(deploymentInfo.DeploymentObject)
-		if err != nil {
-
-			continue
-		}
-		deploymentInfo.DeploymentTemplate.Template = string(newTpl)
-		//更新deploymentTpl中的CreateTime和UpdateTime,数据库中不会自动更新
-		deploymentInfo.DeploymentTemplate.CreateTime = time.Now()
-		deploymentInfo.DeploymentTemplate.UpdateTime = time.Now()
-		newTplId, err := models.DeploymentTplModel.Add(deploymentInfo.DeploymentTemplate)
-		if err != nil {
-			continue
-		}
-		for k, info := range deploymentInfos {
-			err := models.DeploymentModel.UpdateById(info.Deployment)
-			if err != nil {
-				continue
-			}
-			deploymentInfoMap[id][k].DeploymentTemplate.Id = newTplId
-		}
-	}
+	//for id, deploymentInfos := range deploymentInfoMap {
+	//	deploymentInfo := deploymentInfos[0]
+	//	newTpl, err := json.Marshal(deploymentInfo.DeploymentObject)
+	//	if err != nil {
+	//
+	//		continue
+	//	}
+	//	deploymentInfo.DeploymentTemplate.Template = string(newTpl)
+	//	//更新deploymentTpl中的CreateTime和UpdateTime,数据库中不会自动更新
+	//	//deploymentInfo.DeploymentTemplate.CreateTime = time.Now()
+	//	//deploymentInfo.DeploymentTemplate.UpdateTime = time.Now()
+	//	//newTplId, err := models.DeploymentTplModel.Add(deploymentInfo.DeploymentTemplate)
+	//	//if err != nil {
+	//	//	continue
+	//	//}
+	//	//for k, info := range deploymentInfos {
+	//	//	err := models.DeploymentModel.UpdateById(info.Deployment)
+	//	//	if err != nil {
+	//	//		continue
+	//	//	}
+	//	//	//deploymentInfoMap[id][k].DeploymentTemplate.Id = newTplId
+	//	//}
+	//}
 
 	for _, deployInfos := range deploymentInfoMap {
 		for _, deployInfo := range deployInfos {
@@ -224,14 +223,14 @@ func getOnlineDeploymenetInfo(name, namespace, cluster string, templateId int64)
 
 	} else {
 		// 从 mysql 中获取线上模板数据
-		status, err := models.PublishStatusModel.GetByCluster(models.PublishTypeDeployment, deployment.Id, cluster)
-		if err != nil {
-
-		}
-		deployInfo.DeploymentTemplate, err = models.DeploymentTplModel.GetById(status.TemplateId)
-		if err != nil {
-
-		}
+		//status, err := models.PublishStatusModel.GetByCluster(models.PublishTypeDeployment, deployment.Id, cluster)
+		//if err != nil {
+		//
+		//}
+		//deployInfo.DeploymentTemplate, err = models.DeploymentTplModel.GetById(status.TemplateId)
+		//if err != nil {
+		//
+		//}
 	}
 
 	deployObj := v1beta1.Deployment{}
@@ -240,23 +239,23 @@ func getOnlineDeploymenetInfo(name, namespace, cluster string, templateId int64)
 
 	}
 
-	app, _ := models.AppModel.GetById(deployment.AppId)
-	err = json.Unmarshal([]byte(app.Namespace.MetaData), &app.Namespace.MetaDataObj)
-	if err != nil {
+	//app, _ := models.AppModel.GetById(deployment.AppId)
+	//err = json.Unmarshal([]byte(app.Namespace.MetaData), &app.Namespace.MetaDataObj)
+	//if err != nil {
+	//
+	//}
 
-	}
-
-	deployObj.Namespace = app.Namespace.KubeNamespace
-	err = json.Unmarshal([]byte(deployment.MetaData), &deployment.MetaDataObj)
-	if err != nil {
-
-	}
-
-	rp := deployment.MetaDataObj.Replicas[cluster]
-	deployObj.Spec.Replicas = &rp
+	//deployObj.Namespace = app.Namespace.KubeNamespace
+	//err = json.Unmarshal([]byte(deployment.MetaData), &deployment.MetaDataObj)
+	//if err != nil {
+	//
+	//}
+	//
+	//rp := deployment.MetaDataObj.Replicas[cluster]
+	//deployObj.Spec.Replicas = &rp
 	deployInfo.DeploymentObject = &deployObj
 	deployInfo.Deployment = deployment
-	deployInfo.Namespace = app.Namespace
+	//deployInfo.Namespace = app.Namespace
 
 	deployInfo.Cluster, err = models.ClusterModel.GetParsedMetaDataByName(cluster)
 	if err != nil {

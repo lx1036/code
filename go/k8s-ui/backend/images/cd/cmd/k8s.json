@@ -1,0 +1,41 @@
+{
+  "debug": false,
+  "app_name": "app name",
+  "git": {
+    "compare_url": "https://lx1036.gitlab.com/web/demo/compare/%s...%s"
+  },
+  "wayne": {
+    "namespace": "namespace",
+    "api_key": "${K8S_API_KEY}",
+    "deployments": [
+      {
+        "name": "demo-stage",
+        "publish": true,
+        "clusters": [
+          "ZZZC",
+          "ZZDT",
+          "SHYC",
+          "SHBT"
+        ],
+        "images": [
+          "golang=example.cloud/web/demo-go",
+          "nginx=example.cloud/web/demo-openresty"
+        ]
+      },
+      {
+        "name": "demo-production",
+        "publish": false,
+        "clusters": [
+          "ZZZC",
+          "ZZDT",
+          "SHYC",
+          "SHBT"
+        ],
+        "images": [
+          "golang=example.cloud/web/demo-go",
+          "nginx=example.cloud/web/demo-openresty",
+        ]
+      }
+    ]
+  }
+}

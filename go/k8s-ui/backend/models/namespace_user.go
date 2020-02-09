@@ -3,20 +3,34 @@ package models
 import "time"
 
 const (
-	TableNameNamespaceUser = "namespace_user"
+	TableNameNamespaceUser = "namespace_users"
 )
 
 type NamespaceUser struct {
-	Id        int64      `orm:"auto" json:"id,omitempty"`
-	Namespace *Namespace `orm:"index;rel(fk);column(namespace_id)" json:"namespace,omitempty"`
-	User      *User      `orm:"index;rel(fk);column(user_id)" json:"user,omitempty"`
-	Group     *Group     `orm:"index;rel(fk)" json:"group,omitempty"`
+	//ID          uint      `gorm:"column:id;primary_key;"`
+	NamespaceID uint       `gorm:"column:namespace_id;"`
+	UserID      uint       `gorm:"column:user_id;"`
+	GroupID     uint       `gorm:"column:group_id;"`
+	CreatedAt   time.Time  `gorm:"column:created_at;"`
+	UpdatedAt   time.Time  `gorm:"column:updated_at;"`
+	DeletedAt   *time.Time `gorm:"column:deleted_at;default:null;"`
 
-	CreateTime *time.Time `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime *time.Time `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	//User        User      `gorm:"foreignkey:UserID;association_foreignkey:ID;"`
+	//Namespace       Group     `gorm:"foreignkey:GroupID;association_foreignkey:ID;"`
 
-	Groups     []*Group `orm:"-" json:"groups,omitempty"`
-	GroupsName string   `orm:"-" json:"groupsName,omitempty"`
+	//Namespace *Namespace `gorm:"index;rel(fk);column(namespace_id)" json:"namespace,omitempty"`
+	//User      *User      `gorm:"index;rel(fk);column(user_id)" json:"user,omitempty"`
+	//Group     *Group     `gorm:"index;rel(fk)" json:"group,omitempty"`
+
+	//CreateTime *time.Time `gorm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
+	//UpdateTime *time.Time `gorm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+
+	//Groups     []*Group `gorm:"-" json:"groups,omitempty"`
+	//GroupsName string   `gorm:"-" json:"groupsName,omitempty"`
+}
+
+func (NamespaceUser) TableName() string {
+	return TableNameNamespaceUser
 }
 
 type namespaceUserModel struct{}

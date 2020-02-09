@@ -7,33 +7,42 @@ import (
 
 const (
 	GlobalAPIKey    APIKeyType = 0
-	TableNameApiKey            = "api_key"
+	TableNameApiKey            = "api_keys"
 )
 
 type APIKeyType int32
 
 type APIKey struct {
-	Id    int64  `orm:"auto" json:"id,omitempty"`
-	Name  string `orm:"index;size(128)" json:"name,omitempty"`
-	Token string `orm:"type(text)" json:"token,omitempty"`
-	// 0：全局 1：命名空间 2：项目
-	Type       APIKeyType `orm:"type(integer)" json:"type"`
-	ResourceId int64      `orm:"null;type(bigint)" json:"resourceId,omitempty"`
-	// TODO beego 默认删除规则为级联删除，可选项 do_nothing on_delete
-	Group       *Group     `orm:"null;rel(fk);on_delete(set_null)" json:"group,omitempty"`
-	Description string     `orm:"null;size(512)" json:"description,omitempty"`
-	User        string     `orm:"size(128)" json:"user,omitempty"`
-	ExpireIn    int64      `orm:"type(bigint)" json:"expireIn"`            // 过期时间，单位：秒
-	Deleted     bool       `orm:"default(false)" json:"deleted,omitempty"` // 是否生效
-	CreateTime  *time.Time `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime  *time.Time `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
+	ID         uint   `gorm:"column:id;primary_key;"`
+	Name       string `gorm:"column:name;size:128;not null;index:api_key_name;default:'';"`
+	Token      string `gorm:"column:token;type:longtext;not null;"`
+	Type       uint   `gorm:"column:type;type:int;size:11;not null;default:0;"` // 0：全局 1：命名空间 2：项目
+	ResourceId uint64 `gorm:"column:resource_id;type:bigint;size:20;default:null;"`
+	//Group       *Group     `gorm:"null;rel(fk);on_delete(set_null)" json:"group,omitempty"`
+	Description string     `gorm:"column:description;size:512;default:null;"`
+	UserID      uint       `gorm:"column:user_id;"`
+	GroupID     uint       `gorm:"column:group_id;"`
+	ExpireIn    uint64     `gorm:"column:expire_in;type:bigint;not null;default:0;"` // 过期时间，单位：秒
+	CreatedAt   time.Time  `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt   time.Time  `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
+	DeletedAt   *time.Time `gorm:"column:deleted_at;default:null;"`
+
+	User  User  `gorm:"foreignkey:UserID;association_foreignkey:ID;"`
+	Group Group `gorm:"foreignkey:GroupID;association_foreignkey:ID;"`
+	//Group Group `gorm:"foreignkey:GroupId;AssociationForeignKey:Id"`
+	//User        User     `gorm:"foreignkey:UserId;AssociationForeignKey:Id"`
+}
+
+func (APIKey) TableName() string {
+	return TableNameApiKey
 }
 
 func (k *APIKey) String() string {
-	return fmt.Sprintf("[APIKey %d] %s", k.Id, k.Name)
+	return fmt.Sprintf("[APIKey %d] %s", k.ID, k.Name)
 }
-func (k *APIKey) TableName() string {
+
+/*func (k *APIKey) TableName() string {
 	return TableNameApiKey
-}
+}*/
 
 type apiKeyModel struct{}

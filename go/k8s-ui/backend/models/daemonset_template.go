@@ -3,26 +3,22 @@ package models
 import "time"
 
 const (
-	TableNameDaemonSetTemplate = "daemon_set_template"
+	TableNameDaemonSetTemplate = "daemon_set_templates"
 )
 
 type DaemonSetTemplate struct {
-	Id          int64      `orm:"auto" json:"id,omitempty"`
-	Name        string     `orm:"size(128)" json:"name,omitempty"`
-	Template    string     `orm:"type(text)" json:"template,omitempty"`
-	DaemonSet   *DaemonSet `orm:"index;rel(fk)" json:"daemonSet,omitempty"`
-	Description string     `orm:"size(512)" json:"description,omitempty"`
-
-	CreateTime time.Time `orm:"auto_now_add;type(datetime)" json:"createTime,omitempty"`
-	UpdateTime time.Time `orm:"auto_now;type(datetime)" json:"updateTime,omitempty"`
-	User       string    `orm:"size(128)" json:"user,omitempty"`
-	Deleted    bool      `orm:"default(false)" json:"deleted,omitempty"`
-
-	DaemonSetId int64            `orm:"-" json:"daemonSetId,omitempty"`
-	Status      []*PublishStatus `orm:"-" json:"status,omitempty"`
+	ID          uint       `gorm:"column:id;primary_key;"`
+	Name        string     `gorm:"column:name;size:128;not null;default:'';"`
+	Template    string     `gorm:"column:template;type:longtext;not null;"`
+	DaemonSetId uint       `gorm:"column:daemon_set_id"`
+	MetaData    string     `gorm:"column:meta_data;type:longtext;not null;"`
+	Description string     `gorm:"column:description;size:512;not null;default:'';"`
+	CreatedAt   time.Time  `gorm:"column:created_at;not null;default:current_timestamp;"`
+	UpdatedAt   time.Time  `gorm:"column:updated_at;not null;default:current_timestamp on update current_timestamp;"`
+	DeletedAt   *time.Time `gorm:"column:deleted_at;default:null;"`
 }
 
-func (*DaemonSetTemplate) TableName() string {
+func (DaemonSetTemplate) TableName() string {
 	return TableNameDaemonSetTemplate
 }
 

@@ -20,7 +20,7 @@ const (
 var TableToKubeApiTypeMap = map[string]KubeApiType{
 	TableNameDeployment:            KubeApiTypeDeployment,
 	TableNameCronjob:               KubeApiTypeCronJob,
-	TableNameStatefulset:           KubeApiTypeStatefulSet,
+	TableNameStatefulSet:           KubeApiTypeStatefulSet,
 	TableNameDaemonSet:             KubeApiTypeDaemonSet,
 	TableNameService:               KubeApiTypeService,
 	TableNameConfigMap:             KubeApiTypeConfigMap,

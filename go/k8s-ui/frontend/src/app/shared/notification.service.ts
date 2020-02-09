@@ -27,7 +27,7 @@ export interface Page {
 export interface NotificationLog {
   id: number;
   user_id: number;
-  is_readed: boolean;
+  is_read: boolean;
   notification: NotificationMessage[];
 }
 
@@ -36,19 +36,19 @@ export class NotificationService {
 
   constructor(private http: HttpClient) {}
 
-  query(pageState: PageState): Observable<any> {
+  query(pageState?: PageState): Observable<any> {
     const params = new HttpParams();
-    params.set('pageNo', pageState.page.pageNo + '');
-    params.set('pageSize', pageState.page.pageSize + '');
-    params.set('sortBy', '-id');
+    // params.set('pageNo', pageState.page.pageNo + '');
+    // params.set('pageSize', pageState.page.pageSize + '');
+    // params.set('sortBy', '-id');
     return this.http.get(`/api/v1/notifications`, {params});
   }
 
   subscribe(pageState: PageState): Observable<any> {
     const params = new HttpParams();
-    params.set('pageNo', pageState.page.pageNo + '');
-    params.set('pageSize', pageState.page.pageSize + '');
-    params.set('sortBy', '-id');
+    // params.set('pageNo', pageState.page.pageNo + '');
+    // params.set('pageSize', pageState.page.pageSize + '');
+    // params.set('sortBy', '-id');
     return this.http.get(`/api/v1/notifications/subscribe`, {params});
   }
 
