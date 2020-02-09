@@ -85,34 +85,22 @@ export class CreateNotificationComponent implements OnInit {
   template: `
     <clr-datagrid (clrDgRefresh)="refresh($event)">
       <clr-dg-column>
-        <ng-container *clrDgHideableColumn="{hidden: false}">
-          ID
-        </ng-container>
+        <ng-container *clrDgHideableColumn="{hidden: false}">ID</ng-container>
       </clr-dg-column>
       <clr-dg-column style="min-width: 206px;">
-        <ng-container *clrDgHideableColumn="{hidden: false}">
-          类型
-        </ng-container>
+        <ng-container *clrDgHideableColumn="{hidden: false}">类型</ng-container>
       </clr-dg-column>
       <clr-dg-column style="min-width: 206px;">
-        <ng-container *clrDgHideableColumn="{hidden: false}">
-          标题
-        </ng-container>
+        <ng-container *clrDgHideableColumn="{hidden: false}">标题</ng-container>
       </clr-dg-column>
       <clr-dg-column style="min-width: 206px;">
-        <ng-container *clrDgHideableColumn="{hidden: false}">
-          创建人
-        </ng-container>
+        <ng-container *clrDgHideableColumn="{hidden: false}">创建人</ng-container>
       </clr-dg-column>
       <clr-dg-column style="min-width: 206px;">
-        <ng-container *clrDgHideableColumn="{hidden: false}">
-          状态
-        </ng-container>
+        <ng-container *clrDgHideableColumn="{hidden: false}">状态</ng-container>
       </clr-dg-column>
       <clr-dg-column style="min-width: 206px;">
-        <ng-container *clrDgHideableColumn="{hidden: false}">
-          {{'TITLE.CREATE_TIME' | translate}}
-        </ng-container>
+        <ng-container *clrDgHideableColumn="{hidden: false}">{{'TITLE.CREATE_TIME' | translate}}</ng-container>
       </clr-dg-column>
 
       <clr-dg-row *ngFor="let n of notifications; let i = index" [clrDgItem]="notification">
@@ -122,7 +110,7 @@ export class CreateNotificationComponent implements OnInit {
         <clr-dg-cell>{{n.id}}</clr-dg-cell>
         <clr-dg-cell class="copy">{{n.type}}</clr-dg-cell>
         <clr-dg-cell class="copy">{{n.title}}</clr-dg-cell>
-        <clr-dg-cell class="copy">{{n.from.name}}</clr-dg-cell>
+        <clr-dg-cell class="copy">{{n.user.name}}</clr-dg-cell>
         <clr-dg-cell class="copy">
           <div *ngIf="n.isPublished">已广播</div>
           <div *ngIf="!n.isPublished">未广播</div>
@@ -138,6 +126,17 @@ export class CreateNotificationComponent implements OnInit {
 <!--          (sizeChange)="pageSizeChange($event)"></app-paginate>-->
       </clr-dg-footer>
     </clr-datagrid>
+
+    <clr-modal [(clrModalOpen)]="notificationModal" [clrModalSize]="'xl'">
+      <h3 class="modal-title">是否广播如下内容:</h3>
+      <div class="modal-body">
+        <markdown ngPreserveWhitespaces [data]="notification.message"></markdown>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" (click)="cancelPushNotify()">{{'BUTTON.CANCEL' | translate}}</button>
+        <button type="button" class="btn btn-primary" (click)="pushNotify()">广播</button>
+      </div>
+    </clr-modal>
   `
 })
 export class ListNotificationComponent implements OnInit {
@@ -163,6 +162,14 @@ export class ListNotificationComponent implements OnInit {
     this.state = state;
     this.paginate.emit(state);
   }
+  
+  pushNotify() {
+  
+  }
+  
+  cancelPushNotify() {
+  
+  }
 }
 
 
@@ -184,12 +191,7 @@ export class ListNotificationComponent implements OnInit {
                 <app-create-notification (create)="createNotification($event)"></app-create-notification>
               </div>
 
-<!--              <app-list-notification-->
-<!--                (updated)="updateNotification($event)"-->
-<!--                [notifications]="notifications"-->
-<!--                (paginate)="retrieve($event)"-->
-<!--                [page]="pageState.page"-->
-<!--              ></app-list-notification>-->
+              <app-list-notification [notifications]="notifications" (updated)="updateNotification($event)" (paginate)="retrieve($event)"></app-list-notification>
             </div>
           </div>
         </div>
@@ -227,8 +229,8 @@ export class NotificationComponent implements OnInit {
 
   retrieve(state?: ClrDatagridStateInterface): void {
     this.notificationService.query().subscribe(
-      response => {
-
+      (response: {data: Notification[]}) => {
+        this.notifications = response.data;
       }, error => {});
   }
 
