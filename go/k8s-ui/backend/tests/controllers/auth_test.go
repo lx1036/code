@@ -24,12 +24,10 @@ import (
 
 type AuthSuite struct {
 	suite.Suite
-	//Token   string
 	routers *gin.Engine
 }
 
 func (suite *AuthSuite) SetupTest() {
-	//initial.InitDb()
 	suite.routers = routers_gin.SetupRouter()
 }
 
@@ -119,9 +117,12 @@ func (suite *AuthSuite) TestNotificationSubscribe() {
 	defer response.Body.Close()
 	body, _ := ioutil.ReadAll(response.Body)
 
-	var notificationLogs struct {
+	type NotificationLogs struct {
+		Errno int `json:"errno"`
+		Errmsg string `json:"errmsg"`
 		Data []models.NotificationLog `json:"data"`
 	}
+	var notificationLogs NotificationLogs
 	_ = json.Unmarshal(body, &notificationLogs)
 
 	//Assert(response.StatusCode)
@@ -131,20 +132,14 @@ func (suite *AuthSuite) TestNotificationSubscribe() {
 	var slices []interface{}
 	slices = append(slices, response.StatusCode)
 	slices = append(slices, response.Header)
-	slices = append(slices, notificationLogs.Data)
+	slices = append(slices, notificationLogs)
 
 	path := getBaselineDataFile()
-	if _, err := os.Stat(path); os.IsNotExist(err) { // create baseline use first actual as next expected
+	if !assert.FileExists(suite.T(), path) || rebase { // create baseline use first actual as next expected
 		body2, _ := json.Marshal(slices)
 		var buffer = new(bytes.Buffer)
-		err = json.Indent(buffer, body2, "", "  ")
-		if err != nil {
-			panic(err)
-		}
-		err = ioutil.WriteFile(path, buffer.Bytes(), 0666)
-		if err != nil {
-			panic(err)
-		}
+		_ = json.Indent(buffer, body2, "", "  ")
+		_ = ioutil.WriteFile(path, buffer.Bytes(), 0666)
 	} else if rebase { // new actual override baseline as next expected
 
 	} else {
@@ -163,11 +158,12 @@ func (suite *AuthSuite) TestNotificationSubscribe() {
 		_ = json.Unmarshal(decoded[1], &header)
 		assert.EqualValues(suite.T(), header, response.Header)
 
-		var content []models.NotificationLog
-		_ = json.Unmarshal(decoded[2], &content)
-		assert.EqualValues(suite.T(), content, notificationLogs.Data)
-	}
+		assert.EqualValues(suite.T(), strings.ReplaceAll(strings.ReplaceAll(string(decoded[2]), "\n", ""), " ", "") , strings.ReplaceAll(strings.ReplaceAll(string(body), "\n", ""), " ", ""))
 
+		var content NotificationLogs
+		_ = json.Unmarshal(decoded[2], &content)
+		assert.EqualValues(suite.T(), content, notificationLogs)
+	}
 }
 
 var rebase bool = false
@@ -190,16 +186,6 @@ func Assert(actual interface{}) {
 		}
 	}
 
-}
-
-func TestName(test *testing.T) {
-	var a = map[string]string{}
-	a["Hello"] = "World"
-	var b = map[string]string{}
-	b["Hello"] = "World"
-
-	//assert.Contains(test, a, "Hello")
-	assert.EqualValues(test, a, b)
 }
 
 func (suite *AuthSuite) TestNotificationList() {
