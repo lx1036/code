@@ -16,6 +16,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -117,25 +119,23 @@ func (suite *AuthSuite) TestNotificationSubscribe() {
 	defer response.Body.Close()
 	body, _ := ioutil.ReadAll(response.Body)
 
-	var notificationLogs struct{
+	var notificationLogs struct {
 		Data []models.NotificationLog `json:"data"`
 	}
-
 	_ = json.Unmarshal(body, &notificationLogs)
+
+	//Assert(response.StatusCode)
+	//Assert(response.Header)
+	//Assert(notificationLogs.Data)
 
 	var slices []interface{}
 	slices = append(slices, response.StatusCode)
 	slices = append(slices, response.Header)
 	slices = append(slices, notificationLogs.Data)
 
-	body2, _ := json.Marshal(slices)
-
-	path, err := filepath.Abs("./baseline/auth.json")
-	if err != nil {
-		panic(err)
-	}
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-
+	path := getBaselineDataFile()
+	if _, err := os.Stat(path); os.IsNotExist(err) { // create baseline use first actual as next expected
+		body2, _ := json.Marshal(slices)
 		var buffer = new(bytes.Buffer)
 		err = json.Indent(buffer, body2, "", "  ")
 		if err != nil {
@@ -145,9 +145,61 @@ func (suite *AuthSuite) TestNotificationSubscribe() {
 		if err != nil {
 			panic(err)
 		}
+	} else if rebase { // new actual override baseline as next expected
+
+	} else {
+		var decoded []json.RawMessage
+		baseline, _ := ioutil.ReadFile(path)
+		err := json.Unmarshal(baseline, &decoded)
+		if err != nil {
+			panic(err)
+		}
+
+		var code int
+		_ = json.Unmarshal(decoded[0], &code)
+		assert.EqualValues(suite.T(), code, response.StatusCode)
+
+		var header http.Header
+		_ = json.Unmarshal(decoded[1], &header)
+		assert.EqualValues(suite.T(), header, response.Header)
+
+		var content []models.NotificationLog
+		_ = json.Unmarshal(decoded[2], &content)
+		assert.EqualValues(suite.T(), content, notificationLogs.Data)
 	}
 
+}
 
+var rebase bool = false
+
+func Assert(actual interface{}) {
+	var baselines = map[string]map[int]interface{}{}
+	pc, _, _, _ := runtime.Caller(1)
+	pkgFunctionName := runtime.FuncForPC(pc).Name() // e.g. k8s-lx1036/k8s-ui/backend/tests/controllers.(*AuthSuite).TestNotificationSubscribe
+	functionNames := strings.Split(pkgFunctionName, ".")
+	signature := SnakeCase(functionNames[len(functionNames)-1]) // TestNotificationSubscribe
+
+	path := getBaselineDataFile()
+	_, ok := baselines[signature]
+	if !ok {
+		if _, err := os.Stat(path); os.IsExist(err) {
+			baseline, _ := ioutil.ReadFile(path)
+			fmt.Println(string(baseline))
+		} else {
+			baselines[signature] = map[int]interface{}{}
+		}
+	}
+
+}
+
+func TestName(test *testing.T) {
+	var a = map[string]string{}
+	a["Hello"] = "World"
+	var b = map[string]string{}
+	b["Hello"] = "World"
+
+	//assert.Contains(test, a, "Hello")
+	assert.EqualValues(test, a, b)
 }
 
 func (suite *AuthSuite) TestNotificationList() {
@@ -165,9 +217,13 @@ func TestAuthSuite(test *testing.T) {
 	suite.Run(test, new(AuthSuite))
 }
 
-func getBaselineDataFile(function string) string  {
-	baselineDir := ""
-
+func getBaselineDataFile() string {
+	pc, file, _, _ := runtime.Caller(1)
+	baselineDir := filepath.Dir(file)
+	pkgFunctionName := runtime.FuncForPC(pc).Name() // e.g. k8s-lx1036/k8s-ui/backend/tests/controllers.(*AuthSuite).TestNotificationSubscribe
+	functionNames := strings.Split(pkgFunctionName, ".")
+	functionName := strings.TrimPrefix(functionNames[len(functionNames)-1], "Test")
+	baselineDir = getBaselinePath(baselineDir)
 	if _, err := os.Stat(baselineDir); os.IsNotExist(err) {
 		err = os.MkdirAll(baselineDir, 0755)
 		if err != nil {
@@ -175,76 +231,16 @@ func getBaselineDataFile(function string) string  {
 		}
 	}
 
-	return fmt.Sprintf("%s/%s.json", baselineDir, function)
+	return fmt.Sprintf("%s/%s.json", baselineDir, functionName)
 }
 
-func Assert(any interface{}) {
-	//fmt.Println("StatusCode", response.StatusCode)
-	//
-	//body2, _ := ioutil.ReadAll(response.Body)
-	//
-	//
-	header := http.Header{}
-	header.Add("Auth", "123")
+func SnakeCase(str string) string {
+	snake := regexp.MustCompile("([a-z0-9])([A-Z])").ReplaceAllString(str, "${1}_${2}")
+	return strings.ToLower(snake)
+}
 
-	//slices := make([]interface{})
+const DataSet = "simple"
 
-	var slices []interface{}
-	//slices[0] = struct {
-	//	Code int `json:"code"`
-	//}{
-	//	Code: 200,
-	//}
-	//slices[1] = struct {
-	//	Header http.Header `json:"header"`
-	//}{
-	//	Header: header,
-	//}
-
-
-	slices = append(slices, 200)
-	slices = append(slices, header)
-
-	var body2 struct{
-		Name string `json:"name"`
-	}
-	body2.Name = "lx1036"
-	slices = append(slices, body2)
-
-	//slices[2] = struct {
-	//	Content string `json:"content"`
-	//}{
-	//	Content: string(body2),
-	//}
-
-
-
-
-	//signature := fmt.Sprintf("%s:%s", )
-
-	//code := response.StatusCode
-	//
-	//var content struct{
-	//	Code int `json:"code"`
-	//	Header http.Header `json:"header"`
-	//
-	//}
-
-	body, _ := json.Marshal(slices)
-
-	path, err := filepath.Abs("./baseline/auth.json")
-	if err != nil {
-		panic(err)
-	}
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		var buffer = new(bytes.Buffer)
-		err = json.Indent(buffer, body, "", "  ")
-		if err != nil {
-			panic(err)
-		}
-		err = ioutil.WriteFile(path, buffer.Bytes(), 0666)
-		if err != nil {
-			panic(err)
-		}
-	}
+func getBaselinePath(path string) string {
+	return fmt.Sprintf("%s/%s/%s", path, "_baseline", DataSet)
 }
