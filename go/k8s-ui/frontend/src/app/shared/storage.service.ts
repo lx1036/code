@@ -19,7 +19,11 @@ export class StorageService {
     return '';
   }
 
-  save(SideNavCollapseStorage: string, value: boolean) {
-    localStorage.setItem(SideNavCollapseStorage, JSON.stringify(value));
+  save(key: string, value: any) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  remove(key: string) {
+    localStorage.removeItem(key);
   }
 }

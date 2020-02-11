@@ -2,7 +2,7 @@ import {Component, OnInit} from '@angular/core';
 
 @Component({
   selector: 'app-deploy',
-  templateUrl: 'deploy.component.html'
+  template: ``
 })
 
 export class DeployComponent implements OnInit {

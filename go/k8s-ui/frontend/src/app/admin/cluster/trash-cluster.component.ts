@@ -2,7 +2,7 @@ import {Component, OnInit} from '@angular/core';
 
 @Component({
   selector: 'app-trash-cluster',
-  templateUrl: 'trash-cluster.component.html'
+  template: ``
 })
 
 export class TrashClusterComponent implements OnInit {

@@ -5,6 +5,7 @@ import {AuthoriseService} from './client/v1/auth.service';
 import {AuthService} from './auth.service';
 import * as particlesJS from 'particlesjs/dist/particles';
 import {AuthType, LoginTokenKey} from './shared.const';
+import {StorageService} from "./storage.service";
 
 interface Token {
   token: string;
@@ -89,7 +90,9 @@ export class SignInComponent implements OnInit {
 
   constructor(private authoriseService: AuthoriseService,
               private route: ActivatedRoute,
-              public authService: AuthService, private injector: Injector) {}
+              public authService: AuthService,
+              private storage: StorageService,
+              private injector: Injector) {}
 
   ngOnInit() {
     particlesJS.init({ // add particles in background, beautiful!
@@ -124,7 +127,8 @@ export class SignInComponent implements OnInit {
     this.authoriseService.login(this.username, this.password, type).subscribe(
       (response: {data: Token}) => {
         const ref = this.route.snapshot.queryParams.ref ? this.route.snapshot.queryParams.ref : '/';
-        localStorage.setItem(LoginTokenKey, response.data.token);
+
+        this.storage.save(LoginTokenKey, response.data.token);
         this.injector.get(Router).navigateByUrl(ref).then();
       },
       (error) => {}
