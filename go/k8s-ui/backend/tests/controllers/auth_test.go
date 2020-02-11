@@ -9,22 +9,25 @@ import (
 	"github.com/stretchr/testify/suite"
 	"io/ioutil"
 	_ "k8s-lx1036/k8s-ui/backend/controllers/auth"
+	"k8s-lx1036/k8s-ui/backend/models"
 	routers_gin "k8s-lx1036/k8s-ui/backend/routers-gin"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 type AuthSuite struct {
 	suite.Suite
-	//Token   string
 	routers *gin.Engine
 }
 
 func (suite *AuthSuite) SetupTest() {
-	//initial.InitDb()
 	suite.routers = routers_gin.SetupRouter()
 }
 
@@ -58,7 +61,6 @@ func (suite *AuthSuite) TestCors() {
 }
 
 func (suite *AuthSuite) TestLogin() {
-	//routers := routers_gin.SetupRouter()
 	body := struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -81,13 +83,11 @@ func (suite *AuthSuite) TestLogin() {
 	}
 
 	_ = json.Unmarshal(responseBody, &token)
-	//suite.Token = token.Data.Token
 
 	assert.Equal(suite.T(), http.StatusOK, response.StatusCode)
 }
 
 func (suite *AuthSuite) TestCurrentUser() {
-	//routers := routers_gin.SetupRouter()
 	request := httptest.NewRequest("GET", "/me", nil)
 	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", Token))
 	recorder := httptest.NewRecorder()
@@ -114,12 +114,78 @@ func (suite *AuthSuite) TestNotificationSubscribe() {
 	recorder := httptest.NewRecorder()
 	suite.routers.ServeHTTP(recorder, request)
 	response := recorder.Result()
-
-	// Assert(response)
-
+	defer response.Body.Close()
 	body, _ := ioutil.ReadAll(response.Body)
 
-	fmt.Println(string(body))
+	type NotificationLogs struct {
+		Errno int `json:"errno"`
+		Errmsg string `json:"errmsg"`
+		Data []models.NotificationLog `json:"data"`
+	}
+	var notificationLogs NotificationLogs
+	_ = json.Unmarshal(body, &notificationLogs)
+
+	//Assert(response.StatusCode)
+	//Assert(response.Header)
+	//Assert(notificationLogs.Data)
+
+	var slices []interface{}
+	slices = append(slices, response.StatusCode)
+	slices = append(slices, response.Header)
+	slices = append(slices, notificationLogs)
+
+	path := getBaselineDataFile()
+	if !assert.FileExists(suite.T(), path) || rebase { // create baseline use first actual as next expected
+		body2, _ := json.Marshal(slices)
+		var buffer = new(bytes.Buffer)
+		_ = json.Indent(buffer, body2, "", "  ")
+		_ = ioutil.WriteFile(path, buffer.Bytes(), 0666)
+	} else if rebase { // new actual override baseline as next expected
+
+	} else {
+		var decoded []json.RawMessage
+		baseline, _ := ioutil.ReadFile(path)
+		err := json.Unmarshal(baseline, &decoded)
+		if err != nil {
+			panic(err)
+		}
+
+		var code int
+		_ = json.Unmarshal(decoded[0], &code)
+		assert.EqualValues(suite.T(), code, response.StatusCode)
+
+		var header http.Header
+		_ = json.Unmarshal(decoded[1], &header)
+		assert.EqualValues(suite.T(), header, response.Header)
+
+		assert.EqualValues(suite.T(), strings.ReplaceAll(strings.ReplaceAll(string(decoded[2]), "\n", ""), " ", "") , strings.ReplaceAll(strings.ReplaceAll(string(body), "\n", ""), " ", ""))
+
+		var content NotificationLogs
+		_ = json.Unmarshal(decoded[2], &content)
+		assert.EqualValues(suite.T(), content, notificationLogs)
+	}
+}
+
+var rebase bool = false
+
+func Assert(actual interface{}) {
+	var baselines = map[string]map[int]interface{}{}
+	pc, _, _, _ := runtime.Caller(1)
+	pkgFunctionName := runtime.FuncForPC(pc).Name() // e.g. k8s-lx1036/k8s-ui/backend/tests/controllers.(*AuthSuite).TestNotificationSubscribe
+	functionNames := strings.Split(pkgFunctionName, ".")
+	signature := SnakeCase(functionNames[len(functionNames)-1]) // TestNotificationSubscribe
+
+	path := getBaselineDataFile()
+	_, ok := baselines[signature]
+	if !ok {
+		if _, err := os.Stat(path); os.IsExist(err) {
+			baseline, _ := ioutil.ReadFile(path)
+			fmt.Println(string(baseline))
+		} else {
+			baselines[signature] = map[int]interface{}{}
+		}
+	}
+
 }
 
 func (suite *AuthSuite) TestNotificationList() {
@@ -135,4 +201,32 @@ func (suite *AuthSuite) TestNotificationList() {
 
 func TestAuthSuite(test *testing.T) {
 	suite.Run(test, new(AuthSuite))
+}
+
+func getBaselineDataFile() string {
+	pc, file, _, _ := runtime.Caller(1)
+	baselineDir := filepath.Dir(file)
+	pkgFunctionName := runtime.FuncForPC(pc).Name() // e.g. k8s-lx1036/k8s-ui/backend/tests/controllers.(*AuthSuite).TestNotificationSubscribe
+	functionNames := strings.Split(pkgFunctionName, ".")
+	functionName := strings.TrimPrefix(functionNames[len(functionNames)-1], "Test")
+	baselineDir = getBaselinePath(baselineDir)
+	if _, err := os.Stat(baselineDir); os.IsNotExist(err) {
+		err = os.MkdirAll(baselineDir, 0755)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return fmt.Sprintf("%s/%s.json", baselineDir, functionName)
+}
+
+func SnakeCase(str string) string {
+	snake := regexp.MustCompile("([a-z0-9])([A-Z])").ReplaceAllString(str, "${1}_${2}")
+	return strings.ToLower(snake)
+}
+
+const DataSet = "simple"
+
+func getBaselinePath(path string) string {
+	return fmt.Sprintf("%s/%s/%s", path, "_baseline", DataSet)
 }
