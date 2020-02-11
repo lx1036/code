@@ -16,14 +16,14 @@ func SetupRouter() *gin.Engine {
 
 	router.POST("/login/:type", (&auth.AuthController{}).Login())
 	router.GET("/logout", (&auth.AuthController{}).Logout())
+	router.GET("/api/v1/configs/base", (&controllers.BaseConfigController{}).ListBase())
 
 	authorizedRouter := router.Group("/")
 	authorizedRouter.Use(middlewares.AuthRequired())
 	{
 		authorizedRouter.GET(`/me`, (&auth.AuthController{}).CurrentUser())
-		apiV1Router := authorizedRouter.Group("/api/v1")
-		apiV1Router.GET("/configs/base", (&controllers.BaseConfigController{}).ListBase())
 
+		apiV1Router := authorizedRouter.Group("/api/v1")
 		apiV1Router.GET("/notifications/subscribe", (&controllers.NotificationController{}).Subscribe())
 		apiV1Router.POST("/notifications", (&controllers.NotificationController{}).Create())
 		apiV1Router.GET("/notifications", (&controllers.NotificationController{}).List())

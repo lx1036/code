@@ -162,13 +162,13 @@ export class ListNotificationComponent implements OnInit {
     this.state = state;
     this.paginate.emit(state);
   }
-  
+
   pushNotify() {
-  
+
   }
-  
+
   cancelPushNotify() {
-  
+
   }
 }
 

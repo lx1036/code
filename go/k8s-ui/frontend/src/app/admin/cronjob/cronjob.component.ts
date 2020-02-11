@@ -2,10 +2,10 @@ import {Component, OnDestroy, OnInit} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {Subscription} from 'rxjs';
 import {ClrDatagridStateInterface} from '@clr/angular';
-import {ConfirmationDialogService} from '../shared/confirmation-dialog.service';
-import {CronjobService} from '../shared/client/v1/cronjob.service';
-import {MessageHandlerService} from '../shared/message-handler.service';
-import {ConfirmationState, ConfirmationTargets} from '../shared/shared.const';
+import {ConfirmationDialogService} from '../../shared/confirmation-dialog.service';
+import {CronjobService} from '../../shared/client/v1/cronjob.service';
+import {MessageHandlerService} from '../../shared/message-handler.service';
+import {ConfirmationState, ConfirmationTargets} from '../../shared/shared.const';
 
 @Component({
   selector: 'app-cronjob',
