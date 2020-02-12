@@ -43,6 +43,7 @@ const (
 func init() {
 	_ = os.Setenv("TEST_PWD_REDIS_URI", "redis://localhost:6379")
 	_ = os.Setenv("TEST_REDIS_CLUSTER_SLAVE_URI", "redis://localhost:6379")
+	_ = os.Setenv("TEST_PWD_REDIS_URI", "redis://localhost:6380 -a redis-password")
 
 	ll := strings.ToLower(os.Getenv("LOG_LEVEL"))
 	if pl, err := log.ParseLevel(ll); err == nil {
@@ -172,6 +173,10 @@ func TestPasswordInvalid(t *testing.T) {
 	if !strings.Contains(body, want) {
 		t.Errorf(`error, expected string "%s" in body, got body: \n\n%s`, want, body)
 	}
+}
+
+func TestHTTPScrapeMetricsEndpoints(t *testing.T) {
+
 }
 
 func downloadURL(t *testing.T, url string) string {

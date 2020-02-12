@@ -2,16 +2,14 @@ package main
 
 import (
 	"crypto/tls"
-	"flag"
 	"fmt"
 	"github.com/gomodule/redigo/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	prom_strutil "github.com/prometheus/prometheus/util/strutil"
 	log "github.com/sirupsen/logrus"
-	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -281,7 +279,37 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 }
 
 func (exporter *Exporter) ScrapeHandler(w http.ResponseWriter, r *http.Request) {
+	target := r.URL.Query().Get("target")
+	if target == "" {
+		http.Error(w, "'target' parameter must be specified", 400)
+		exporter.targetScrapeRequestErrors.Inc()
+		return
+	}
+	if !strings.Contains(target, "://") {
+		target = "redis://" + target
+	}
+	u, err := url.Parse(target)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid 'target' parameter, parse err: %ck ", err), 400)
+		exporter.targetScrapeRequestErrors.Inc()
+		return
+	}
+	u.User = nil
+	target = u.String()
+	opts := exporter.options
 
+	registry := prometheus.NewRegistry()
+	opts.Registry = registry
+
+	_, err = NewRedisExporter(target, opts)
+	if err != nil {
+		http.Error(w, "NewRedisExporter() err: err", 400)
+		exporter.targetScrapeRequestErrors.Inc()
+		return
+	}
+	promhttp.HandlerFor(
+		registry, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError},
+	).ServeHTTP(w, r)
 }
 
 // Describe outputs Redis metric descriptions.
@@ -321,7 +349,7 @@ func (exporter *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (exporter *Exporter) scrapeRedisHost(ch chan<- prometheus.Metric) error {
 	conn, err := exporter.connectToRedis()
 	if err != nil {
-
+		return err
 	}
 	defer conn.Close()
 
@@ -399,8 +427,16 @@ func (exporter *Exporter) registerConstMetricGauge(ch chan<- prometheus.Metric, 
 	exporter.registerConstMetric(ch, metric, val, prometheus.GaugeValue, labels...)
 }
 
-func (exporter *Exporter) registerConstMetric(ch chan<- prometheus.Metric, metric string, val float64, value prometheus.ValueType, labels ...string) {
-
+func (exporter *Exporter) registerConstMetric(ch chan<- prometheus.Metric, metric string, val float64, valType prometheus.ValueType, labelValues ...string) {
+	descr := exporter.metricDescriptions[metric]
+	if descr == nil {
+		descr = newMetricDescr(exporter.options.Namespace, metric, metric + " metric", nil)
+	}
+	if m, err := prometheus.NewConstMetric(descr, valType, val, labelValues...); err == nil {
+		ch <- m
+	} else {
+		log.Debugf("NewConstMetric() err: %s", err)
+	}
 }
 
 func (exporter *Exporter) connectToRedis() (redis.Conn, error) {
@@ -464,6 +500,102 @@ func (exporter *Exporter) extractConfigMetrics(ch chan<- prometheus.Metric, conf
 	}
 
 	return
+}
+
+func (exporter *Exporter) extractClusterInfoMetrics(ch chan<- prometheus.Metric, info string) {
+	lines := strings.Split(info, "\r\n")
+	for _, line := range lines {
+		split := strings.Split(line, ":")
+		if len(split) != 2 {
+			continue
+		}
+		fieldKey := split[0]
+		fieldValue := split[1]
+		if !exporter.includeMetric(fieldKey) {
+			continue
+		}
+		exporter.parseAndRegisterConstMetric(ch, fieldKey, fieldValue)
+	}
+}
+
+func (exporter *Exporter) includeMetric(str string) bool {
+	if strings.HasPrefix(str, "db") || strings.HasPrefix(str, "cmdstat_") || strings.HasPrefix(str, "cluster_") {
+		return true
+	}
+	if _, ok := exporter.metricMapGauges[str]; ok {
+		return true
+	}
+	_, ok := exporter.metricMapCounters[str]
+	return ok
+}
+
+func sanitizeMetricName(n string) string {
+	return prom_strutil.SanitizeLabelName(n)
+}
+
+func (exporter *Exporter) parseAndRegisterConstMetric(ch chan<- prometheus.Metric, fieldKey string, fieldValue string) {
+	orgMetricName := sanitizeMetricName(fieldKey)
+	metricName := orgMetricName
+	if newName, ok := exporter.metricMapGauges[metricName]; ok {
+		metricName = newName
+	} else {
+		if newName, ok := exporter.metricMapCounters[metricName]; ok {
+			metricName = newName
+		}
+	}
+	var err error
+	var val float64
+	switch fieldValue {
+	case "ok", "true":
+		val = 1
+	case "err", "fail", "false":
+		val = 0
+	default:
+		val, err = strconv.ParseFloat(fieldValue, 64)
+	}
+	if err != nil {
+		log.Debugf("couldn't parse %s, err: %s", fieldValue, err)
+	}
+	t := prometheus.GaugeValue
+	if exporter.metricMapCounters[orgMetricName] != "" {
+		t = prometheus.CounterValue
+	}
+
+	switch metricName {
+	case "latest_fork_usec":
+		metricName = "latest_fork_seconds"
+		val = val / 1e6
+	}
+	exporter.registerConstMetric(ch, metricName, val, t)
+}
+
+func (exporter *Exporter) extractInfoMetrics(ch chan<- prometheus.Metric, all string, count int) {
+
+}
+
+func (exporter *Exporter) extractLatencyMetrics(ch chan<- prometheus.Metric, conn redis.Conn) {
+
+}
+
+func (exporter *Exporter) extractCheckKeyMetrics(ch chan<- prometheus.Metric, conn redis.Conn) {
+
+}
+
+func (exporter *Exporter) extractLuaScriptMetrics(ch chan<- prometheus.Metric, conn redis.Conn) error {
+
+	return nil
+}
+
+func (exporter *Exporter) extractSlowLogMetrics(ch chan<- prometheus.Metric, conn redis.Conn) {
+
+}
+
+func (exporter *Exporter) extractConnectedClientMetrics(ch chan<- prometheus.Metric, conn redis.Conn) {
+
+}
+
+func (exporter *Exporter) extractTile38Metrics(ch chan<- prometheus.Metric, conn redis.Conn) {
+
 }
 
 func newMetricDescr(namespace string, metricName string, docString string, labels []string) *prometheus.Desc {

@@ -33,6 +33,7 @@ require (
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/olivere/elastic/v7 v7.0.9
 	github.com/prometheus/client_golang v1.1.0
+	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/romanyx/polluter v1.2.2
 	github.com/rs/cors v1.7.0
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
