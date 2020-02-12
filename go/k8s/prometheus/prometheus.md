@@ -12,10 +12,7 @@ mv prometheus /usr/local/bin/prometheus
 
 # 运行
 ```shell script
-prometheus --config.file="prometheus.yml"
+prometheus --config.file="prometheus.yml" # http://localhost:9090,http://localhost:9090/metrics
 ```
 
-## Node Exporter
-```shell script
-wget https://github.com/prometheus/node_exporter/releases/download/v0.18.1/node_exporter-0.18.1.darwin-amd64.tar.gz
-```
+# PromQL
