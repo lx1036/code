@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"github.com/gomodule/redigo/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
@@ -28,6 +29,7 @@ type ExporterOptions struct {
 	ClientCertificates  []tls.Certificate
 	InclSystemMetrics   bool
 	SkipTLSVerification bool
+	SetClientName       bool // can set redis client name
 	IsTile38            bool
 	ExportClientList    bool
 	ConnectionTimeouts  time.Duration
@@ -57,130 +59,6 @@ type Exporter struct {
 	metricMapGauges   map[string]string
 
 	mux *http.ServeMux
-}
-
-var (
-	// BuildVersion, BuildDate, BuildCommitSha are filled in by the build script
-	BuildVersion   = "<<< filled in by build >>>"
-	BuildDate      = "<<< filled in by build >>>"
-	BuildCommitSha = "<<< filled in by build >>>"
-)
-
-func main() {
-	var (
-		redisAddr           = flag.String("redis.addr", getEnv("REDIS_ADDR", "redis://localhost:6379"), "Address of the Redis instance to scrape")
-		redisPwd            = flag.String("redis.password", getEnv("REDIS_PASSWORD", ""), "Password of the Redis instance to scrape")
-		namespace           = flag.String("namespace", getEnv("REDIS_EXPORTER_NAMESPACE", "redis"), "Namespace for metrics")
-		checkKeys           = flag.String("check-keys", getEnv("REDIS_EXPORTER_CHECK_KEYS", ""), "Comma separated list of key-patterns to export value and length/size, searched for with SCAN")
-		checkSingleKeys     = flag.String("check-single-keys", getEnv("REDIS_EXPORTER_CHECK_SINGLE_KEYS", ""), "Comma separated list of single keys to export value and length/size")
-		scriptPath          = flag.String("script", getEnv("REDIS_EXPORTER_SCRIPT", ""), "Path to Lua Redis script for collecting extra metrics")
-		listenAddress       = flag.String("web.listen-address", getEnv("REDIS_EXPORTER_WEB_LISTEN_ADDRESS", ":9121"), "Address to listen on for web interface and telemetry.")
-		metricPath          = flag.String("web.telemetry-path", getEnv("REDIS_EXPORTER_WEB_TELEMETRY_PATH", "/metrics"), "Path under which to expose metrics.")
-		logFormat           = flag.String("log-format", getEnv("REDIS_EXPORTER_LOG_FORMAT", "txt"), "Log format, valid options are txt and json")
-		configCommand       = flag.String("config-command", getEnv("REDIS_EXPORTER_CONFIG_COMMAND", "CONFIG"), "What to use for the CONFIG command")
-		connectionTimeout   = flag.String("connection-timeout", getEnv("REDIS_EXPORTER_CONNECTION_TIMEOUT", "15s"), "Timeout for connection to Redis instance")
-		tlsClientKeyFile    = flag.String("tls-client-key-file", getEnv("REDIS_EXPORTER_TLS_CLIENT_KEY_FILE", ""), "Name of the client key file (including full path) if the server requires TLS client authentication")
-		tlsClientCertFile   = flag.String("tls-client-cert-file", getEnv("REDIS_EXPORTER_TLS_CLIENT_CERT_FILE", ""), "Name of the client certificate file (including full path) if the server requires TLS client authentication")
-		isDebug             = flag.Bool("debug", getEnvBool("REDIS_EXPORTER_DEBUG"), "Output verbose debug information")
-		isTile38            = flag.Bool("is-tile38", getEnvBool("REDIS_EXPORTER_IS_TILE38"), "Whether to scrape Tile38 specific metrics")
-		exportClientList    = flag.Bool("export-client-list", getEnvBool("REDIS_EXPORTER_EXPORT_CLIENT_LIST"), "Whether to scrape Client List specific metrics")
-		showVersion         = flag.Bool("version", false, "Show version information and exit")
-		redisMetricsOnly    = flag.Bool("redis-only-metrics", getEnvBool("REDIS_EXPORTER_REDIS_ONLY_METRICS"), "Whether to also export go runtime metrics")
-		inclSystemMetrics   = flag.Bool("include-system-metrics", getEnvBool("REDIS_EXPORTER_INCL_SYSTEM_METRICS"), "Whether to include system metrics like e.g. redis_total_system_memory_bytes")
-		skipTLSVerification = flag.Bool("skip-tls-verification", getEnvBool("REDIS_EXPORTER_SKIP_TLS_VERIFICATION"), "Whether to to skip TLS verification")
-	)
-	flag.Parse()
-
-	switch *logFormat {
-	case "json":
-		log.SetFormatter(&log.JSONFormatter{})
-	default:
-		log.SetFormatter(&log.TextFormatter{})
-	}
-
-	log.Printf("Redis Metrics Exporter %s    build date: %s    sha1: %s    Go: %s    GOOS: %s    GOARCH: %s",
-		BuildVersion,
-		BuildDate,
-		BuildCommitSha,
-		runtime.Version(),
-		runtime.GOOS,
-		runtime.GOARCH,
-	)
-	if *isDebug {
-		log.SetLevel(log.DebugLevel)
-		log.Debugln("Enabling debug output")
-	} else {
-		log.SetLevel(log.InfoLevel)
-	}
-	if *showVersion {
-		return
-	}
-	to, err := time.ParseDuration(*connectionTimeout)
-	if err != nil {
-		log.Fatalf("Couldn't parse connection timeout duration, err: %s", err)
-	}
-	var tlsClientCertificates []tls.Certificate
-	if (*tlsClientKeyFile != "") != (*tlsClientCertFile != "") {
-		log.Fatal("TLS client key file and cert file should both be present")
-	}
-	if *tlsClientKeyFile != "" && *tlsClientCertFile != "" {
-		cert, err := tls.LoadX509KeyPair(*tlsClientCertFile, *tlsClientKeyFile)
-		if err != nil {
-			log.Fatalf("Couldn't load TLS client key pair, err: %s", err)
-		}
-		tlsClientCertificates = append(tlsClientCertificates, cert)
-	}
-	var ls []byte
-	if *scriptPath != "" {
-		if ls, err = ioutil.ReadFile(*scriptPath); err != nil {
-			log.Fatalf("Error loading script file %s    err: %s", *scriptPath, err)
-		}
-	}
-	registry := prometheus.NewRegistry()
-	if !*redisMetricsOnly {
-		registry = prometheus.DefaultRegisterer.(*prometheus.Registry)
-	}
-	exporter, err := NewRedisExporter(
-		*redisAddr,
-		ExporterOptions{
-			Password:            *redisPwd,
-			Namespace:           *namespace,
-			ConfigCommandName:   *configCommand,
-			CheckKeys:           *checkKeys,
-			CheckSingleKeys:     *checkSingleKeys,
-			LuaScript:           ls,
-			InclSystemMetrics:   *inclSystemMetrics,
-			IsTile38:            *isTile38,
-			ExportClientList:    *exportClientList,
-			SkipTLSVerification: *skipTLSVerification,
-			ClientCertificates:  tlsClientCertificates,
-			ConnectionTimeouts:  to,
-			MetricsPath:         *metricPath,
-			RedisMetricsOnly:    *redisMetricsOnly,
-			Registry:            registry,
-		},
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Infof("Providing metrics at %s%s", *listenAddress, *metricPath)
-	log.Debugf("Configured redis addr: %#v", *redisAddr)
-	log.Fatal(http.ListenAndServe(*listenAddress, exporter))
-}
-
-func getEnv(key string, defaultVal string) string {
-	if envVal, ok := os.LookupEnv(key); ok {
-		return envVal
-	}
-	return defaultVal
-}
-
-func getEnvBool(key string) (res bool) {
-	if envVal, ok := os.LookupEnv(key); ok {
-		res, _ = strconv.ParseBool(envVal)
-	}
-	return res
 }
 
 func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error) {
@@ -332,7 +210,7 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 
 	exporter.metricDescriptions = map[string]*prometheus.Desc{}
 	for key, desc := range map[string]struct {
-		txt  string
+		txt    string
 		labels []string
 	}{
 		"commands_duration_seconds_total":      {txt: `Total amount of time in seconds spent per command`, labels: []string{"cmd"}},
@@ -441,7 +319,80 @@ func (exporter *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (exporter *Exporter) scrapeRedisHost(ch chan<- prometheus.Metric) error {
-	
+	conn, err := exporter.connectToRedis()
+	if err != nil {
+
+	}
+	defer conn.Close()
+
+	if exporter.options.SetClientName {
+		if _, err := doRedisCmd(conn, "CLIENT", "SETNAME", "redis_exporter"); err != nil {
+			log.Errorf("Couldn't set client name, err: %s", err)
+		}
+	}
+	dbCount := 0
+	if config, err := redis.Strings(doRedisCmd(conn, exporter.options.ConfigCommandName, "GET", "*")); err == nil {
+		dbCount, err = exporter.extractConfigMetrics(ch, config)
+		if err != nil {
+			log.Errorf("Redis CONFIG err: %s", err)
+			return err
+		}
+	} else {
+		log.Debugf("Redis CONFIG err: %s", err)
+	}
+	infoAll, err := redis.String(doRedisCmd(conn, "INFO", "ALL"))
+	if err != nil {
+		infoAll, err = redis.String(doRedisCmd(conn, "INFO"))
+		if err != nil {
+			log.Errorf("Redis INFO err: %s", err)
+			return err
+		}
+	}
+	if strings.Contains(infoAll, "cluster_enabled:1") {
+		if clusterInfo, err := redis.String(doRedisCmd(conn, "CLUSTER", "INFO")); err == nil {
+			exporter.extractClusterInfoMetrics(ch, clusterInfo)
+			// in cluster mode Redis only supports one database so no extra padding beyond that needed
+			dbCount = 1
+		} else {
+			log.Errorf("Redis CLUSTER INFO err: %s", err)
+		}
+	} else {
+		// in non-cluster mode, if dbCount is zero then "CONFIG" failed to retrieve a valid
+		// number of databases and we use the Redis config default which is 16
+		if dbCount == 0 {
+			dbCount = 16
+		}
+	}
+	exporter.extractInfoMetrics(ch, infoAll, dbCount)
+	exporter.extractLatencyMetrics(ch, conn)
+	exporter.extractCheckKeyMetrics(ch, conn)
+	exporter.extractSlowLogMetrics(ch, conn)
+	if exporter.options.LuaScript != nil && len(exporter.options.LuaScript) > 0 {
+		if err := exporter.extractLuaScriptMetrics(ch, conn); err != nil {
+			return err
+		}
+	}
+	if exporter.options.ExportClientList {
+		exporter.extractConnectedClientMetrics(ch, conn)
+	}
+
+	if exporter.options.IsTile38 {
+		exporter.extractTile38Metrics(ch, conn)
+	}
+
+	log.Debugf("scrapeRedisHost() done")
+	return nil
+}
+
+func doRedisCmd(conn redis.Conn, cmd string, args ...interface{}) (reply interface{}, err error) {
+	log.Debugf("c.Do() - running command: %s %s", cmd, args)
+	defer log.Debugf("c.Do() - done")
+
+	reply, err = conn.Do(cmd, args)
+	if err != nil {
+		log.Debugf("c.Do() err: %s", err)
+	}
+	return reply, err
 }
 
 func (exporter *Exporter) registerConstMetricGauge(ch chan<- prometheus.Metric, metric string, val float64, labels ...string) {
@@ -449,7 +400,70 @@ func (exporter *Exporter) registerConstMetricGauge(ch chan<- prometheus.Metric, 
 }
 
 func (exporter *Exporter) registerConstMetric(ch chan<- prometheus.Metric, metric string, val float64, value prometheus.ValueType, labels ...string) {
-	
+
+}
+
+func (exporter *Exporter) connectToRedis() (redis.Conn, error) {
+	options := []redis.DialOption{
+		redis.DialConnectTimeout(exporter.options.ConnectionTimeouts),
+		redis.DialReadTimeout(exporter.options.ConnectionTimeouts),
+		redis.DialWriteTimeout(exporter.options.ConnectionTimeouts),
+		redis.DialTLSConfig(&tls.Config{
+			InsecureSkipVerify: exporter.options.SkipTLSVerification,
+			Certificates:       exporter.options.ClientCertificates,
+		}),
+	}
+	if exporter.options.Password != "" {
+		options = append(options, redis.DialPassword(exporter.options.Password))
+	}
+	uri := exporter.redisAddr
+	if !strings.Contains(uri, "://") {
+		uri = "redis://" + uri
+	}
+	log.Debugf("redis DialURL:%s", uri)
+	conn, err := redis.DialURL(uri, options...)
+	if err != nil {
+		log.Debugf("DialURL() failed, err: %s", err)
+		if frags := strings.Split(exporter.redisAddr, "://"); len(frags) == 2 {
+			log.Debugf("Trying: Dial(): %s %s", frags[0], frags[1])
+			conn, err = redis.Dial(frags[0], frags[1], options...)
+		} else {
+			log.Debugf("Trying: Dial(): tcp %s", exporter.redisAddr)
+			conn, err = redis.Dial("tcp", exporter.redisAddr, options...)
+		}
+
+	}
+
+	return conn, nil
+}
+
+//
+func (exporter *Exporter) extractConfigMetrics(ch chan<- prometheus.Metric, config []string) (dbCount int, err error) {
+	if len(config)%2 != 0 {
+		return 0, fmt.Errorf("invalid config: %#v", config)
+	}
+	for pos := 0; pos < len(config)/2; pos++ {
+		strKey := config[pos*2]
+		strVal := config[pos*2+1]
+
+		if strKey == "databases" {
+			if dbCount, err = strconv.Atoi(strVal); err != nil {
+				return 0, fmt.Errorf("invalid config value for key databases: %#v", strVal)
+			}
+		}
+		if !map[string]bool{
+			"maxmemory":  true,
+			"maxclients": true,
+		}[strKey] {
+			continue
+		}
+
+		if val, err := strconv.ParseFloat(strVal, 64); err == nil {
+			exporter.registerConstMetricGauge(ch, fmt.Sprintf("config_%s", config[pos*2]), val)
+		}
+	}
+
+	return
 }
 
 func newMetricDescr(namespace string, metricName string, docString string, labels []string) *prometheus.Desc {

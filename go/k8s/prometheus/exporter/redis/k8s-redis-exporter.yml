@@ -1,0 +1,33 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redis
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: redis
+  name: redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: redis
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:5.0.7
+          imagePullPolicy: IfNotPresent
+        - name: redis_exporter
+          image: lx1036/redis_exporter:latest
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app: redis

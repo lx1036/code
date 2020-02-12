@@ -95,7 +95,7 @@ func TestHTTPHTMLPages(t *testing.T) {
 	}
 }
 
-func TestCheckKeys(test *testing.T)  {
+func TestCheckKeys(test *testing.T) {
 	for _, tst := range []struct {
 		SingleCheckKey string
 		CheckKeys      string
@@ -147,6 +147,30 @@ func TestClusterSlave(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("Did not find key [%s] \nbody: %s", want, body)
 		}
+	}
+}
+
+func TestPasswordInvalid(t *testing.T) {
+	if os.Getenv("TEST_PWD_REDIS_URI") == "" {
+		t.Skipf("TEST_PWD_REDIS_URI not set - skipping")
+	}
+	testPwd := "redis-password"
+	uri := strings.Replace(os.Getenv("TEST_PWD_REDIS_URI"), testPwd, "wrong-pwd", -1)
+
+	exporter, _ := NewRedisExporter(uri, ExporterOptions{Namespace: "test", Registry: prometheus.NewRegistry()})
+	ts := httptest.NewServer(exporter)
+	defer ts.Close()
+
+	chM := make(chan prometheus.Metric, 10000)
+	go func() {
+		exporter.Collect(chM)
+		close(chM)
+	}()
+
+	want := `test_exporter_last_scrape_error{err="dial redis: unknown network redis"} 1`
+	body := downloadURL(t, ts.URL+"/metrics")
+	if !strings.Contains(body, want) {
+		t.Errorf(`error, expected string "%s" in body, got body: \n\n%s`, want, body)
 	}
 }
 
