@@ -9,9 +9,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -328,34 +330,36 @@ func NewRedisExporter(redisAddr string, opts ExporterOptions) (*Exporter, error)
 		exporter.metricMapGauges["total_system_memory"] = "total_system_memory_bytes"
 	}
 
+	exporter.metricDescriptions = map[string]*prometheus.Desc{}
 	for key, desc := range map[string]struct {
 		txt  string
-		lbls []string
+		labels []string
 	}{
-		"commands_duration_seconds_total":      {txt: `Total amount of time in seconds spent per command`, lbls: []string{"cmd"}},
-		"commands_total":                       {txt: `Total number of calls per command`, lbls: []string{"cmd"}},
-		"connected_slave_lag_seconds":          {txt: "Lag of connected slave", lbls: []string{"slave_ip", "slave_port", "slave_state"}},
-		"connected_slave_offset_bytes":         {txt: "Offset of connected slave", lbls: []string{"slave_ip", "slave_port", "slave_state"}},
-		"db_avg_ttl_seconds":                   {txt: "Avg TTL in seconds", lbls: []string{"db"}},
-		"db_keys":                              {txt: "Total number of keys by DB", lbls: []string{"db"}},
-		"db_keys_expiring":                     {txt: "Total number of expiring keys by DB", lbls: []string{"db"}},
-		"exporter_last_scrape_error":           {txt: "The last scrape error status.", lbls: []string{"err"}},
-		"instance_info":                        {txt: "Information about the Redis instance", lbls: []string{"role", "redis_version", "redis_build_id", "redis_mode", "os"}},
-		"key_size":                             {txt: `The length or size of "key"`, lbls: []string{"db", "key"}},
-		"key_value":                            {txt: `The value of "key"`, lbls: []string{"db", "key"}},
+		"commands_duration_seconds_total":      {txt: `Total amount of time in seconds spent per command`, labels: []string{"cmd"}},
+		"commands_total":                       {txt: `Total number of calls per command`, labels: []string{"cmd"}},
+		"connected_slave_lag_seconds":          {txt: "Lag of connected slave", labels: []string{"slave_ip", "slave_port", "slave_state"}},
+		"connected_slave_offset_bytes":         {txt: "Offset of connected slave", labels: []string{"slave_ip", "slave_port", "slave_state"}},
+		"db_avg_ttl_seconds":                   {txt: "Avg TTL in seconds", labels: []string{"db"}},
+		"db_keys":                              {txt: "Total number of keys by DB", labels: []string{"db"}},
+		"db_keys_expiring":                     {txt: "Total number of expiring keys by DB", labels: []string{"db"}},
+		"exporter_last_scrape_error":           {txt: "The last scrape error status.", labels: []string{"err"}},
+		"instance_info":                        {txt: "Information about the Redis instance", labels: []string{"role", "redis_version", "redis_build_id", "redis_mode", "os"}},
+		"key_size":                             {txt: `The length or size of "key"`, labels: []string{"db", "key"}},
+		"key_value":                            {txt: `The value of "key"`, labels: []string{"db", "key"}},
 		"last_slow_execution_duration_seconds": {txt: `The amount of time needed for last slow execution, in seconds`},
-		"latency_spike_last":                   {txt: `When the latency spike last occurred`, lbls: []string{"event_name"}},
-		"latency_spike_duration_seconds":       {txt: `Length of the last latency spike in seconds`, lbls: []string{"event_name"}},
+		"latency_spike_last":                   {txt: `When the latency spike last occurred`, labels: []string{"event_name"}},
+		"latency_spike_duration_seconds":       {txt: `Length of the last latency spike in seconds`, labels: []string{"event_name"}},
 		"master_link_up":                       {txt: "Master link status on Redis slave"},
-		"script_values":                        {txt: "Values returned by the collect script", lbls: []string{"key"}},
-		"slave_info":                           {txt: "Information about the Redis slave", lbls: []string{"master_host", "master_port", "read_only"}},
+		"script_values":                        {txt: "Values returned by the collect script", labels: []string{"key"}},
+		"slave_info":                           {txt: "Information about the Redis slave", labels: []string{"master_host", "master_port", "read_only"}},
 		"slowlog_last_id":                      {txt: `Last id of slowlog`},
 		"slowlog_length":                       {txt: `Total slowlog`},
 		"start_time_seconds":                   {txt: "Start time of the Redis instance since unix epoch in seconds."},
 		"up":                                   {txt: "Information about the Redis instance"},
-		"connected_clients_details":            {txt: "Details about connected clients", lbls: []string{"host", "port", "name", "age", "idle", "flags", "db", "cmd"}},
+		"connected_clients_details":            {txt: "Details about connected clients", labels: []string{"host", "port", "name", "age", "idle", "flags", "db", "cmd"}},
 	} {
-		exporter.metricDescriptions[key] = newMetricDescr(opts.Namespace, key, desc.txt, desc.lbls)
+		tmp := newMetricDescr(opts.Namespace, key, desc.txt, desc.labels)
+		exporter.metricDescriptions[key] = tmp
 	}
 
 	if exporter.options.MetricsPath == "" {
@@ -426,5 +430,31 @@ type dbKeyPair struct {
 
 // splitKeyArgs splits a command-line supplied argument into a slice of dbKeyPairs.
 func parseKeyArg(keysArgString string) (keys []dbKeyPair, err error) {
-	return nil, nil
+	if keysArgString == "" {
+		return keys, err
+	}
+	for _, k := range strings.Split(keysArgString, ",") {
+		db := "0"
+		key := ""
+		frags := strings.Split(k, "=")
+		switch len(frags) {
+		case 1:
+			db = "0"
+			key, err = url.QueryUnescape(strings.TrimSpace(frags[0]))
+		case 2:
+			db = strings.Replace(strings.TrimSpace(frags[0]), "db", "", -1)
+			key, err = url.QueryUnescape(strings.TrimSpace(frags[1]))
+		default:
+			return keys, fmt.Errorf("invalid key list argument: %s", k)
+		}
+		if err != nil {
+			return keys, fmt.Errorf("couldn't parse db/key string: %s", k)
+		}
+		keys = append(keys, dbKeyPair{
+			db:  db,
+			key: key,
+		})
+	}
+
+	return keys, err
 }
