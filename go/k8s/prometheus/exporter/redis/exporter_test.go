@@ -42,6 +42,7 @@ const (
 
 func init() {
 	_ = os.Setenv("TEST_PWD_REDIS_URI", "redis://localhost:6379")
+	_ = os.Setenv("TEST_REDIS_CLUSTER_SLAVE_URI", "redis://localhost:6379")
 
 	ll := strings.ToLower(os.Getenv("LOG_LEVEL"))
 	if pl, err := log.ParseLevel(ll); err == nil {

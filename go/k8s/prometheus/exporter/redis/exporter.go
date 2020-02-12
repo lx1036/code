@@ -413,11 +413,43 @@ func (exporter *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect fetches new metrics from the RedisHost and updates the appropriate metrics.
 func (exporter *Exporter) Collect(ch chan<- prometheus.Metric) {
+	exporter.Lock()
+	defer exporter.Unlock()
+	exporter.totalScrapes.Inc()
 
+	if exporter.redisAddr != "" {
+		start := time.Now().UnixNano()
+		var up float64 = 1
+		if err := exporter.scrapeRedisHost(ch); err != nil {
+			up = 0
+			exporter.registerConstMetricGauge(ch, "exporter_last_scrape_error", 1.0, fmt.Sprintf("%s", err))
+		} else {
+			exporter.registerConstMetricGauge(ch, "exporter_last_scrape_error", 0, "")
+		}
+
+		exporter.registerConstMetricGauge(ch, "up", up)
+		exporter.registerConstMetricGauge(ch, "exporter_last_scrape_duration_seconds", float64(time.Now().UnixNano()-start)/1000000000)
+	}
+
+	ch <- exporter.totalScrapes
+	ch <- exporter.scrapeDuration
+	ch <- exporter.targetScrapeRequestErrors
 }
 
 func (exporter *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	exporter.mux.ServeHTTP(w, r)
+}
+
+func (exporter *Exporter) scrapeRedisHost(ch chan<- prometheus.Metric) error {
+	
+}
+
+func (exporter *Exporter) registerConstMetricGauge(ch chan<- prometheus.Metric, metric string, val float64, labels ...string) {
+	exporter.registerConstMetric(ch, metric, val, prometheus.GaugeValue, labels...)
+}
+
+func (exporter *Exporter) registerConstMetric(ch chan<- prometheus.Metric, metric string, val float64, value prometheus.ValueType, labels ...string) {
+	
 }
 
 func newMetricDescr(namespace string, metricName string, docString string, labels []string) *prometheus.Desc {
