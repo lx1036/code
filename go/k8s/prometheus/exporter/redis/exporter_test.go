@@ -9,11 +9,13 @@ package main
 
 import (
 	"fmt"
+	"github.com/gomodule/redigo/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -41,7 +43,7 @@ const (
 )
 
 func init() {
-	_ = os.Setenv("TEST_PWD_REDIS_URI", "redis://localhost:6379")
+	_ = os.Setenv("TEST_REDIS_URI", "redis://localhost:6379")
 	_ = os.Setenv("TEST_REDIS_CLUSTER_SLAVE_URI", "redis://localhost:6379")
 	_ = os.Setenv("TEST_PWD_REDIS_URI", "redis://localhost:6380 -a redis-password")
 
@@ -175,8 +177,171 @@ func TestPasswordInvalid(t *testing.T) {
 	}
 }
 
-func TestHTTPScrapeMetricsEndpoints(t *testing.T) {
+func TestHTTPScrapeMetricsEndpoints(test *testing.T) {
+	_ = setupDBKeys(test, os.Getenv("TEST_REDIS_URI"))
+	defer deleteKeysFromDB(test, os.Getenv("TEST_REDIS_URI"))
+	_ = setupDBKeys(test, os.Getenv("TEST_REDIS_URI"))
+	defer deleteKeysFromDB(test, os.Getenv("TEST_REDIS_URI"))
 
+	csk := dbNumStrFull + "=" + url.QueryEscape(keys[0])
+	testRedisIPAddress := ""
+	testRedisHostname := ""
+	for _, tst := range []struct {
+		addr   string
+		ck     string
+		csk    string
+		pwd    string
+		target string
+	}{
+		{addr: os.Getenv("TEST_REDIS_URI"), csk: csk},
+		{addr: testRedisIPAddress, csk: csk},
+		{addr: testRedisHostname, csk: csk},
+		{addr: os.Getenv("TEST_REDIS_URI"), ck: csk},
+		{pwd: "", target: os.Getenv("TEST_REDIS_URI"), ck: csk},
+		{pwd: "", target: os.Getenv("TEST_REDIS_URI"), csk: csk},
+		{pwd: "redis-password", target: os.Getenv("TEST_PWD_REDIS_URI"), csk: csk},
+	}{
+		name := fmt.Sprintf("addr:[%s]___target:[%s]___pwd:[%s]", tst.addr, tst.target, tst.pwd)
+		test.Run(name, func(test *testing.T) {
+			options := ExporterOptions{
+				Namespace: "test",
+				Password:  tst.pwd,
+				LuaScript: []byte(`return {"a", "11", "b", "12", "c", "13"}`),
+				Registry:  prometheus.NewRegistry(),
+			}
+			if tst.target == "" {
+				options.CheckSingleKeys = tst.csk
+				options.CheckKeys = tst.ck
+			}
+
+			exporter, _ := NewRedisExporter(tst.addr, options)
+			ts := httptest.NewServer(exporter)
+			uri := ts.URL
+			if tst.target != "" {
+				uri += "/scrape"
+				v := url.Values{}
+				v.Add("target", tst.target)
+				v.Add("check-single-keys", tst.csk)
+				v.Add("check-keys", tst.ck)
+
+				up, _ := url.Parse(uri)
+				up.RawQuery = v.Encode()
+				uri = up.String()
+			} else {
+				uri += "/metrics"
+			}
+			wants := []string{
+				// metrics
+				`test_connected_clients`,
+				`test_commands_processed_total`,
+				`test_instance_info`,
+
+				"db_keys",
+				"db_avg_ttl_seconds",
+				"cpu_sys_seconds_total",
+				"loading_dump_file", // testing renames
+				"config_maxmemory",  // testing config extraction
+				"config_maxclients", // testing config extraction
+				"slowlog_length",
+				"slowlog_last_id",
+				"start_time_seconds",
+				"uptime_in_seconds",
+
+				// labels and label values
+				`redis_mode`,
+				`standalone`,
+				`cmd="config`,
+				`test_script_value`, // lua script
+				`test_key_size{db="db11",key="` + keys[0] + `"} 7`,
+				`test_key_value{db="db11",key="` + keys[0] + `"} 1234.56`,
+
+				`test_db_keys{db="db11"} `,
+				`test_db_keys_expiring{db="db11"} `,
+			}
+			body := downloadURL(test, uri)
+			for _, want := range wants {
+				if !strings.Contains(body, want) {
+					test.Errorf("url: %s    want metrics to include %q, have:\n%s", uri, want, body)
+					break
+				}
+			}
+			ts.Close()
+		})
+	}
+}
+
+func deleteKeysFromDB(t *testing.T, addr string) error {
+	c, err := redis.DialURL(addr)
+	if err != nil {
+		t.Errorf("couldn't setup redis, err: %s ", err)
+		return err
+	}
+	defer c.Close()
+
+	if _, err := c.Do("SELECT", dbNumStr); err != nil {
+		log.Printf("deleteKeysFromDB() - couldn't setup redis, err: %s ", err)
+		// not failing on this one - cluster doesn't allow for SELECT so we log and ignore the error
+	}
+
+	for _, key := range keys {
+		_, _ = c.Do("DEL", key)
+	}
+
+	for _, key := range keysExpiring {
+		_, _ = c.Do("DEL", key)
+	}
+
+	for _, key := range listKeys {
+		_, _ = c.Do("DEL", key)
+	}
+
+	_, _ = c.Do("DEL", TestSetName)
+	return nil
+}
+
+func setupDBKeys(t *testing.T, uri string) error {
+	c, err := redis.DialURL(uri)
+	if err != nil {
+		t.Errorf("couldn't setup redis for uri %s, err: %s ", uri, err)
+		return err
+	}
+	defer c.Close()
+
+	if _, err := c.Do("SELECT", dbNumStr); err != nil {
+		log.Printf("setupDBKeys() - couldn't setup redis, err: %s ", err)
+		// not failing on this one - cluster doesn't allow for SELECT so we log and ignore the error
+	}
+	for _, key := range keys {
+		_, err = c.Do("SET", key, TestValue)
+		if err != nil {
+			t.Errorf("couldn't setup redis, err: %s ", err)
+			return err
+		}
+	}
+	// setting to expire in 300 seconds, should be plenty for a test run
+	for _, key := range keysExpiring {
+		_, err = c.Do("SETEX", key, "300", TestValue)
+		if err != nil {
+			t.Errorf("couldn't setup redis, err: %s ", err)
+			return err
+		}
+	}
+	for _, key := range listKeys {
+		for _, val := range keys {
+			_, err = c.Do("LPUSH", key, val)
+			if err != nil {
+				t.Errorf("couldn't setup redis, err: %s ", err)
+				return err
+			}
+		}
+	}
+
+	_, _ = c.Do("SADD", TestSetName, "test-val-1")
+	_, _ = c.Do("SADD", TestSetName, "test-val-2")
+
+	time.Sleep(time.Millisecond * 50)
+
+	return nil
 }
 
 func downloadURL(t *testing.T, url string) string {

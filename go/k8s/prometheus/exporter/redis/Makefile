@@ -9,7 +9,7 @@ USERID := $(shell id -u)
 GROUP := $(shell id -g)
 
 dev:
-	docker-compose -f ./docker-compose.yml up
+	docker-compose -f ./docker-compose.yml up -d
 
 build:
 	docker build -f Dockerfile -t lx1036/redis_exporter:COMMIT .
