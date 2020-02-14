@@ -4,7 +4,7 @@ services:
     image: openresty/openresty
     container_name: php-fpm-exporter-openresty
     volumes:
-      - "./openresty/nginx.conf:/etc/nginx/nginx.conf"
+      - "./openresty/nginx.conf:/etc/openresty/nginx.conf"
       - "./openresty/conf.d/default.conf:/etc/nginx/conf.d/default.conf"
     links:
       - php-fpm:php-fpm-proxy
@@ -13,10 +13,13 @@ services:
     networks:
       - default
   php-fpm:
-    image: lx1036/php-fpm-exporter/php-fpm:7.4
+    image: php:7.4.2-fpm
     container_name: php-fpm-exporter-php-fpm
+    volumes:
+      - "./php/php-fpm.conf:/usr/local/etc/php-fpm.conf"
+      - "./php/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf"
     expose:
-      - "9090"
+      - "9000"
     networks:
       - default
 
@@ -24,3 +27,50 @@ networks:
   default:
     external:
       name: ${DEV_USER}
+
+# Run
+# http://localhost:8080/status?full or http://localhost:8080/status :
+#  pool:                 www
+#  process manager:      dynamic
+#  start time:           14/Feb/2020:10:21:23 +0000
+#  start since:          85
+#  accepted conn:        4
+#  listen queue:         0
+#  max listen queue:     0
+#  listen queue len:     128
+#  idle processes:       1
+#  active processes:     1
+#  total processes:      2
+#  max active processes: 2
+#  max children reached: 0
+#  slow requests:        0
+#
+#    ************************
+#  pid:                  6
+#  state:                Idle
+#  start time:           14/Feb/2020:10:21:23 +0000
+#  start since:          85
+#  requests:             2
+#  request duration:     711
+#  request method:       -
+#  request URI:          -
+#  content length:       0
+#  user:                 -
+#  script:               -
+#  last request cpu:     0.00
+#  last request memory:  2097152
+#
+#    ************************
+#  pid:                  7
+#  state:                Running
+#  start time:           14/Feb/2020:10:21:23 +0000
+#  start since:          85
+#  requests:             2
+#  request duration:     9242285
+#  request method:       GET
+#  request URI:          /status?full
+#  content length:       0
+#  user:                 -
+#  script:               -
+#  last request cpu:     0.00
+#  last request memory:  0
