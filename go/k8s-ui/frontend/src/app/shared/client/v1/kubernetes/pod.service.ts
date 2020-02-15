@@ -3,7 +3,7 @@ import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 
 @Injectable()
-export class PodClient {
+export class PodClientService {
   constructor(private http: HttpClient) {}
 
   getStatistics(): Observable<any> {

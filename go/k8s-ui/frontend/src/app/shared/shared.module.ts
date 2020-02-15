@@ -26,6 +26,9 @@ import {SideNavFooterComponent} from './sidenav-footer.component';
 import {AppService} from './app.service';
 import {BreadcrumbComponent} from "./breadcrumb.component";
 import {BreadcrumbService} from "./breadcrumb.service";
+import {UserService} from "./user.service";
+import {PodClientService} from "./client/v1/kubernetes/pod.service";
+import {NodeClientService} from "./client/v1/kubernetes/node.service";
 
 const routes: Routes = [
   {
@@ -90,13 +93,16 @@ export class AuthRoutingModule {
   ],
   providers: [
     AppService,
-    BreadcrumbService,
-    MessageService,
-    CacheService,
     AuthoriseService,
-    StorageService,
+    BreadcrumbService,
+    CacheService,
+    MessageService,
     NotificationService,
     NamespaceClient,
+    NodeClientService,
+    PodClientService,
+    StorageService,
+    UserService,
   ],
 })
 export class SharedModule {
