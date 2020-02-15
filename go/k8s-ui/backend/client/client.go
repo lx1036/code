@@ -3,7 +3,9 @@ package client
 import (
 	"encoding/json"
 	"github.com/astaxie/beego/logs"
+	"k8s-lx1036/k8s-ui/backend/database/lorm"
 	"k8s-lx1036/k8s-ui/backend/models"
+	"k8s-lx1036/k8s-ui/backend/util"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -24,9 +26,11 @@ type ClusterManager struct {
 }
 
 func BuildApiServerClient() {
-	newClusters, err := models.ClusterModel.GetAllNormal()
+	var newClusters []models.Cluster
+	err := lorm.DB.Where("status=?", models.ClusterStatusNormal).Find(&newClusters).Error
 	if err != nil {
-
+		logs.Error("empty clusters.")
+		return
 	}
 
 	changed := clusterChanged(newClusters)
@@ -36,7 +40,10 @@ func BuildApiServerClient() {
 		// build new clientManager
 		for i := 0; i < len(newClusters); i++ {
 			cluster := newClusters[i]
-
+			if cluster.Master == "" {
+				logs.Warning("cluster's master is null:%s", cluster.Name)
+				continue
+			}
 			clientSet, config, err := buildClient(cluster.Master, cluster.KubeConfig)
 			if err != nil {
 
@@ -59,7 +66,6 @@ func BuildApiServerClient() {
 			}
 
 			clusterManagerSets.Store(cluster.Name, clusterManager)
-
 		}
 
 		logs.Info("resync cluster finished! ")
@@ -67,6 +73,10 @@ func BuildApiServerClient() {
 }
 
 func clusterChanged(clusters []models.Cluster) bool {
+	if util.SyncMapLen(clusterManagerSets) != len(clusters) {
+		logs.Info("cluster length (%d) changed to (%d).", util.SyncMapLen(clusterManagerSets), len(clusters))
+		return true
+	}
 
 	for _, cluster := range clusters {
 		managerInterface, ok := clusterManagerSets.Load(cluster.Name)
@@ -105,7 +115,7 @@ func buildClient(master string, kubeconfig string) (*kubernetes.Clientset, *rest
 		CurrentContext: "",
 		Extensions:     nil,
 	}
-	err := json.Unmarshal([]byte(kubeconfig), configV1)
+	err := json.Unmarshal([]byte(kubeconfig), &configV1)
 	if err != nil {
 
 	}

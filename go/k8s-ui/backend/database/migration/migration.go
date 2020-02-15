@@ -41,6 +41,7 @@ func main() {
 		&models.APIKey{},
 		&models.App{},
 		&models.Config{},
+		&models.Cluster{},
 		&models.Group{},
 		&models.Namespace{},
 		&models.NamespaceUser{},
