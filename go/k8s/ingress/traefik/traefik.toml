@@ -135,7 +135,7 @@
   # Required
   # Default: "unix:///var/run/docker.sock"
   #
-  # endpoint = "tcp://10.10.10.10:2375"
+#   endpoint = "unix:///var/run/docker.sock"
 
   # Default host rule.
   #

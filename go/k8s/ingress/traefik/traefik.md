@@ -11,3 +11,6 @@ mv traefik /usr/local/bin/traefik
 brew install traefik #mac
 traefik --configFile=traefik.sample.toml
 ```
+
+
+# How does Traefik discover the services?
