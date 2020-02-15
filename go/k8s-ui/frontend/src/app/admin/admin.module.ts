@@ -84,7 +84,8 @@ import {KubeClusterroleComponent} from './kubernetes/clusterrole/kube-clusterrol
 import {KubeClusterrolebindingComponent} from './kubernetes/clusterrolebinding/kube-clusterrolebinding.component';
 import {KubeCrdComponent} from './kubernetes/crd/kube-crd.component';
 import {CronjobComponent} from './cronjob/cronjob.component';
-import {SidenavComponent} from "./sidenav.component";
+import {SidenavComponent} from "./sidenav/sidenav.component";
+import {SideNavService} from "./sidenav/sidenav.service";
 
 
 const routes: Routes = [
@@ -322,6 +323,7 @@ export class AdminRoutingModule {
   ],
   providers: [
     AdminAuthCheckGuard,
+    SideNavService,
   ]
 })
 export class AdminModule { }
