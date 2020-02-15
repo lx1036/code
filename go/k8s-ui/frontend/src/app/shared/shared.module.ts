@@ -24,6 +24,8 @@ import {NamespaceClient} from './client/v1/kubernetes/namespace';
 import {ProgressComponent} from './progress.component';
 import {SideNavFooterComponent} from './sidenav-footer.component';
 import {AppService} from './app.service';
+import {BreadcrumbComponent} from "./breadcrumb.component";
+import {BreadcrumbService} from "./breadcrumb.service";
 
 const routes: Routes = [
   {
@@ -37,7 +39,6 @@ const routes: Routes = [
 })
 export class AuthRoutingModule {
 }
-
 
 @NgModule({
   imports: [
@@ -60,33 +61,36 @@ export class AuthRoutingModule {
     TranslateModule,
     FormsModule,
 
-    MessageComponent,
-    DiffComponent,
+    BoxComponent,
+    BreadcrumbComponent,
+    CardComponent,
     ConfirmationDialogComponent,
+    DiffComponent,
     DropdownItemComponent,
     DropdownComponent,
+    MessageComponent,
     PaginateComponent,
-    CardComponent,
-    BoxComponent,
     ProgressComponent,
     SideNavFooterComponent,
   ],
   declarations: [
-    SignInComponent,
-    InputComponent,
-    MessageComponent,
-    DiffComponent,
+    BoxComponent,
+    BreadcrumbComponent,
+    CardComponent,
     ConfirmationDialogComponent,
+    DiffComponent,
     DropdownComponent,
     DropdownItemComponent,
+    InputComponent,
+    MessageComponent,
     PaginateComponent,
-    CardComponent,
-    BoxComponent,
     ProgressComponent,
     SideNavFooterComponent,
+    SignInComponent,
   ],
   providers: [
     AppService,
+    BreadcrumbService,
     MessageService,
     CacheService,
     AuthoriseService,
