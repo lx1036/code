@@ -88,25 +88,40 @@ clusters:
     display_name: "minikube"
     meta_data: "meta_data"
     master: "minikube"
-    kube_config: |
-      apiVersion: v1
-      clusters:
-      - cluster:
-          certificate-authority: /Users/lx1036/.minikube/ca.crt
-          server: https://192.168.64.15:8443
-        name: minikube
-      contexts:
-      - context:
-          cluster: minikube
-          user: minikube
-        name: minikube
-      current-context: minikube
-      kind: Config
-      preferences: {}
-      users:
-      - name: minikube
-        user:
-          client-certificate: /Users/lx1036/.minikube/client.crt
-          client-key: /Users/lx1036/.minikube/client.key
+    kube_config: '
+      {
+        \"apiVersion\":\"v1\",
+        \"clusters\":[
+          {
+            \"name\":\"minikube\",
+            \"cluster\":{
+              \"server\":\"https://192.168.64.15:8443\",
+              \"certificate-authority\":\"/Users/lx1036/.minikube/ca.crt\"
+            }
+          }
+        ],
+        \"contexts\":[
+          {
+            \"name\":\"minikube\",
+            \"context\":{
+              \"cluster\":\"minikube\",
+              \"user\":\"minikube\"
+            }
+          }
+        ],
+        \"current-context\":\"minikube\",
+        \"kind\":\"Config\",
+        \"preferences\":{},
+        \"users\": [
+          {
+            \"name\": \"minikube\",
+            \"user\": {
+              \"client-certificate\": \"/Users/lx1036/.minikube/client.crt\",
+              \"client-key\": \"/Users/lx1036/.minikube/client.key\"
+            }
+          }
+        ]
+      }
+    '
     description: "minikube for test"
     status: 0
