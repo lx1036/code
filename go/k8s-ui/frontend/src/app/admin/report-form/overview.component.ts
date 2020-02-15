@@ -3,8 +3,8 @@ import {Router} from '@angular/router';
 import {combineLatest} from 'rxjs';
 import {AppService} from '../../shared/app.service';
 import {UserService} from '../../shared/user.service';
-import {PodClient} from '../../shared/client/v1/kubernetes/pod.service';
-import {NodeClient} from '../../shared/client/v1/kubernetes/node.service';
+import {PodClientService} from '../../shared/client/v1/kubernetes/pod.service';
+import {NodeClientService} from '../../shared/client/v1/kubernetes/node.service';
 
 interface Summary {
   appTotal: number;
@@ -98,8 +98,8 @@ export class OverviewComponent implements OnInit {
   constructor(private router: Router,
               private appService: AppService,
               private userService: UserService,
-              private podClient: PodClient,
-              private nodeClient: NodeClient) {}
+              private podClient: PodClientService,
+              private nodeClient: NodeClientService) {}
 
   ngOnInit() {
     combineLatest([

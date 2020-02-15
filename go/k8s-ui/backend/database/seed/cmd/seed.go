@@ -20,7 +20,6 @@ import (
 // https://github.com/DATA-DOG/go-txdb
 // https://github.com/romanyx/polluter
 var (
-	DB       *gorm.DB
 	dataFile string
 	content  string
 	seedCmd  = &cobra.Command{
@@ -38,6 +37,20 @@ var (
 				}
 			}
 			defer db.Close()
+
+			// auto truncate all tables
+			/*db = db.Exec(`SET FOREIGN_KEY_CHECKS=0;`)
+			rows, err := db.Exec(fmt.Sprintf(`select concat('truncate table ', TABLE_NAME) from INFORMATION_SCHEMA.TABLES WHERE table_schema = '%s';`, dbName)).Rows()
+			if err != nil {
+				panic(err)
+			}
+			defer rows.Close()
+			var result string
+			for rows.Next()  {
+				rows.Scan(&result)
+				fmt.Println(result)
+			}
+			db = db.Exec(`SET FOREIGN_KEY_CHECKS=1;`)*/
 
 			p := polluter.New(polluter.MySQLEngine(db.DB()))
 

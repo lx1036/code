@@ -38,7 +38,7 @@ func main() {
 	//database.InitDb()
 
 	// K8S Client
-	//initial.InitClient()
+	initial.InitClient()
 
 	// 初始化 rsa key
 	_ = rootCmd.Execute()
@@ -47,7 +47,7 @@ func main() {
 
 func run(cmd *cobra.Command, args []string) {
 	router := routers_gin.SetupRouter()
-	_ = router.Run(":8080")
+	_ = router.Run(":3456")
 }
 
 func preRun(cmd *cobra.Command, args []string) {

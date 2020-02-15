@@ -20,7 +20,7 @@ export class StorageService {
   }
 
   save(key: string, value: any) {
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(key, value);
   }
 
   remove(key: string) {

@@ -8,10 +8,10 @@ import {Component, OnInit} from '@angular/core';
       <app-admin-nav></app-admin-nav>
       <div class="content-container">
         <div class="content-area">
-<!--          <wayne-breadcrumb></wayne-breadcrumb>-->
+          <app-shared-breadcrumb></app-shared-breadcrumb>
           <router-outlet></router-outlet>
         </div>
-<!--        <wayne-sidenav style="display: flex; order: -1"></wayne-sidenav>-->
+        <app-admin-sidenav style="display: flex; order: -1"></app-admin-sidenav>
       </div>
     </clr-main-container>
 
