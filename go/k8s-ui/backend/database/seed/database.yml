@@ -61,3 +61,67 @@ notification_logs:
     user_id: 1
     notification_id: 2
     is_read: false
+namespaces:
+  - id: 1
+    name: "default"
+    kube_namespace: "default"
+    meta_data: "meta_data"
+apps:
+  - id: 1
+    name: app_demo
+    namespace_id: 1
+    meta_data: "meta_data"
+    description: "description for app_demo"
+    user_id: 1
+groups:
+  - id: 1
+    name: "master"
+    comment: "group comment"
+    type: 1
+namespace_users:
+  - namespace_id: 1
+    user_id: 1
+    group_id: 1
+clusters:
+  - id: 1
+    name: "minikube"
+    display_name: "minikube"
+    meta_data: "meta_data"
+    master: "minikube"
+    kube_config: '
+      {
+        \"apiVersion\":\"v1\",
+        \"clusters\":[
+          {
+            \"name\":\"minikube\",
+            \"cluster\":{
+              \"server\":\"https://192.168.64.15:8443\",
+              \"certificate-authority\":\"/Users/lx1036/.minikube/ca.crt\"
+            }
+          }
+        ],
+        \"contexts\":[
+          {
+            \"name\":\"minikube\",
+            \"context\":{
+              \"cluster\":\"minikube\",
+              \"user\":\"minikube\"
+            }
+          }
+        ],
+        \"current-context\":\"minikube\",
+        \"kind\":\"Config\",
+        \"preferences\":{},
+        \"users\": [
+          {
+            \"name\": \"minikube\",
+            \"user\": {
+              \"client-certificate\": \"/Users/lx1036/.minikube/client.crt\",
+              \"client-key\": \"/Users/lx1036/.minikube/client.key\"
+            }
+          }
+        ]
+      }
+    '
+    description: "minikube for test"
+    status: 0

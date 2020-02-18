@@ -4,6 +4,7 @@ import (
 	"k8s-lx1036/k8s-ui/backend/client"
 	"k8s-lx1036/k8s-ui/backend/client/api"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func GetPodListByType(kubeClient client.ResourceHandler, namespace, resourceName string, resourceType api.ResourceName) ([]*v1.Pod, error) {
@@ -62,4 +63,19 @@ func GetPodStatus(pod *v1.Pod) string {
 
 	// Unknown?
 	return "Unknown"
+}
+
+func GetPodCounts(cache *client.CacheFactory) (int, error) {
+	pods, err := cache.PodLister().List(labels.Everything())
+	if err != nil {
+		return 0, nil
+	}
+	length := 0
+	for _, pod := range pods {
+		if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
+			continue
+		}
+		length++
+	}
+	return length, nil
 }

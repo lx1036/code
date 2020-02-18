@@ -1,0 +1,91 @@
+[
+  200,
+  {
+    "Content-Type": [
+      "application/json; charset=utf-8"
+    ],
+    "Vary": [
+      "Origin"
+    ]
+  },
+  {
+    "errno": 0,
+    "errmsg": "success",
+    "data": [
+      {
+        "id": 1,
+        "user_id": 1,
+        "notification_id": 1,
+        "is_read": false,
+        "created_at": "2020-02-09T23:16:06+08:00",
+        "updated_at": "2020-02-09T23:16:06+08:00",
+        "deleted_at": null,
+        "notification": {
+          "id": 1,
+          "type": "info",
+          "title": "this is a notification from admin",
+          "message": "this is a message from admin, this is a message from admin",
+          "from_user_id": 1,
+          "level": 1,
+          "is_published": true,
+          "created_at": "2020-02-09T23:16:06+08:00",
+          "updated_at": "2020-02-09T23:16:06+08:00",
+          "deleted_at": null,
+          "user": {
+            "id": 0,
+            "name": "",
+            "password": "",
+            "salt": "",
+            "email": "",
+            "display": "",
+            "comment": "",
+            "type": 0,
+            "admin": false,
+            "last_login": "0001-01-01T00:00:00Z",
+            "last_ip": "",
+            "created_at": "0001-01-01T00:00:00Z",
+            "updated_at": "0001-01-01T00:00:00Z",
+            "deleted_at": null
+          }
+        }
+      },
+      {
+        "id": 2,
+        "user_id": 1,
+        "notification_id": 2,
+        "is_read": false,
+        "created_at": "2020-02-09T23:16:06+08:00",
+        "updated_at": "2020-02-09T23:16:06+08:00",
+        "deleted_at": null,
+        "notification": {
+          "id": 2,
+          "type": "danger",
+          "title": "this is another notification from admin",
+          "message": "this is another message from admin, this is another message from admin",
+          "from_user_id": 1,
+          "level": 1,
+          "is_published": true,
+          "created_at": "2020-02-09T23:16:06+08:00",
+          "updated_at": "2020-02-09T23:16:06+08:00",
+          "deleted_at": null,
+          "user": {
+            "id": 0,
+            "name": "",
+            "password": "",
+            "salt": "",
+            "email": "",
+            "display": "",
+            "comment": "",
+            "type": 0,
+            "admin": false,
+            "last_login": "0001-01-01T00:00:00Z",
+            "last_ip": "",
+            "created_at": "0001-01-01T00:00:00Z",
+            "updated_at": "0001-01-01T00:00:00Z",
+            "deleted_at": null
+          }
+        }
+      }
+    ]
+  }
+]

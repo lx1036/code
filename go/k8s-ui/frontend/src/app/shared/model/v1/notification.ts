@@ -6,7 +6,7 @@ export class Notification {
   type: string;
   title: string;
   message: string;
-  from: User;
+  user: User;
   level: number;
   isPublished: boolean;
   createTime: Date;

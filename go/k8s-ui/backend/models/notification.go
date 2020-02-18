@@ -17,10 +17,10 @@ const (
 )
 
 type Notification struct {
-	ID      uint             `gorm:"column:id;primary_key;" json:"id"`
-	Type    NotificationType `gorm:"column:type;size:128;not null;default:'';" json:"type"`
-	Title   string           `gorm:"column:title;size:2000;not null;default:'';" json:"title"`
-	Message string           `gorm:"column:message;type:longtext;not null;" json:"message"`
+	ID          uint              `gorm:"column:id;primary_key;" json:"id"`
+	Type        NotificationType  `gorm:"column:type;size:128;not null;default:'';" json:"type"`
+	Title       string            `gorm:"column:title;size:2000;not null;default:'';" json:"title"`
+	Message     string            `gorm:"column:message;type:longtext;not null;" json:"message"`
 	FromUserId  uint              `gorm:"column:from_user_id" json:"from_user_id"`
 	Level       NotificationLevel `gorm:"column:level;size:11;not null;default:'0';" json:"level"`
 	IsPublished bool              `gorm:"column:is_published;not null;default:'0';" json:"is_published"`
