@@ -18,9 +18,9 @@ type BaseConfigController struct {
 //	controller.Mapping("ListBase", controller.ListBase)
 //}
 
-func (controller *BaseConfigController) Init() {
-
-}
+//func (controller *BaseConfigController) Init() {
+//
+//}
 
 func (controller *BaseConfigController) ListBase() gin.HandlerFunc {
 	return func(context *gin.Context) {

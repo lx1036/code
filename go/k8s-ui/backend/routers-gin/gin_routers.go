@@ -5,6 +5,7 @@ import (
 	cors "github.com/rs/cors/wrapper/gin"
 	"k8s-lx1036/k8s-ui/backend/controllers"
 	"k8s-lx1036/k8s-ui/backend/controllers/auth"
+	"k8s-lx1036/k8s-ui/backend/controllers/kubernetes"
 	"k8s-lx1036/k8s-ui/backend/routers-gin/middlewares"
 )
 
@@ -27,6 +28,10 @@ func SetupRouter() *gin.Engine {
 		apiV1Router.GET("/notifications/subscribe", (&controllers.NotificationController{}).Subscribe())
 		apiV1Router.POST("/notifications", (&controllers.NotificationController{}).Create())
 		apiV1Router.GET("/notifications", (&controllers.NotificationController{}).List())
+		apiV1Router.GET("/apps/statistics", (&controllers.AppController{}).AppStatistics())
+		apiV1Router.GET("/users/statistics", (&controllers.UserController{}).UserStatistics())
+		apiV1Router.GET("/kubernetes/pods/statistics", (&kubernetes.KubePodController{}).PodStatistics())
+		apiV1Router.GET("/kubernetes/nodes/statistics", (&kubernetes.KubeNodeController{}).PodStatistics())
 	}
 
 	return router

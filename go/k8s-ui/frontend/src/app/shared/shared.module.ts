@@ -24,6 +24,11 @@ import {NamespaceClient} from './client/v1/kubernetes/namespace';
 import {ProgressComponent} from './progress.component';
 import {SideNavFooterComponent} from './sidenav-footer.component';
 import {AppService} from './app.service';
+import {BreadcrumbComponent} from "./breadcrumb.component";
+import {BreadcrumbService} from "./breadcrumb.service";
+import {UserService} from "./user.service";
+import {PodClientService} from "./client/v1/kubernetes/pod.service";
+import {NodeClientService} from "./client/v1/kubernetes/node.service";
 
 const routes: Routes = [
   {
@@ -37,7 +42,6 @@ const routes: Routes = [
 })
 export class AuthRoutingModule {
 }
-
 
 @NgModule({
   imports: [
@@ -60,39 +64,45 @@ export class AuthRoutingModule {
     TranslateModule,
     FormsModule,
 
-    MessageComponent,
-    DiffComponent,
+    BoxComponent,
+    BreadcrumbComponent,
+    CardComponent,
     ConfirmationDialogComponent,
+    DiffComponent,
     DropdownItemComponent,
     DropdownComponent,
+    MessageComponent,
     PaginateComponent,
-    CardComponent,
-    BoxComponent,
     ProgressComponent,
     SideNavFooterComponent,
   ],
   declarations: [
-    SignInComponent,
-    InputComponent,
-    MessageComponent,
-    DiffComponent,
+    BoxComponent,
+    BreadcrumbComponent,
+    CardComponent,
     ConfirmationDialogComponent,
+    DiffComponent,
     DropdownComponent,
     DropdownItemComponent,
+    InputComponent,
+    MessageComponent,
     PaginateComponent,
-    CardComponent,
-    BoxComponent,
     ProgressComponent,
     SideNavFooterComponent,
+    SignInComponent,
   ],
   providers: [
     AppService,
-    MessageService,
-    CacheService,
     AuthoriseService,
-    StorageService,
+    BreadcrumbService,
+    CacheService,
+    MessageService,
     NotificationService,
     NamespaceClient,
+    NodeClientService,
+    PodClientService,
+    StorageService,
+    UserService,
   ],
 })
 export class SharedModule {
