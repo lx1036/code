@@ -1,0 +1,57 @@
+# https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/
+# minikube ssh; sudo mkdir /mnt/data;
+# sudo sh -c "echo 'Hello from Kubernetes storage' > /mnt/data/index.html"
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: task-pv-volume
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: task-pv-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: task-pv-pod
+  labels:
+    app: task-pv-pod
+  annotations:
+    pv.beta.kubernetes.io/gid: "gid123"
+spec:
+  containers:
+    - name: task-pv-container
+      image: nginx:1.17.8
+      imagePullPolicy: IfNotPresent
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html"
+          name: task-pv-storage
+  volumes:
+    - name: task-pv-storage
+      persistentVolumeClaim:
+        claimName: task-pv-claim
