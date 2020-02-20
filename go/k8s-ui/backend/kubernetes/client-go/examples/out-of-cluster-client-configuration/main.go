@@ -68,26 +68,27 @@ func main() {
 // PodLoggingController logs the name and namespace of pods that are added, deleted, or updated
 type PodLoggingController struct {
 	informerFactory informers.SharedInformerFactory
-	podInformer v1.PodInformer
+	podInformer     v1.PodInformer
 }
 type PvcLoggingController struct {
 	informerFactory informers.SharedInformerFactory
-	pvcInformer v1.PersistentVolumeClaimInformer
+	pvcInformer     v1.PersistentVolumeClaimInformer
 }
 
-func (controller *PodLoggingController)podAdd(obj interface{})  {
+func (controller *PodLoggingController) podAdd(obj interface{}) {
 	pod := obj.(*apiv1.Pod)
 	log.Printf("create a new pod [%s/%s]", pod.Namespace, pod.Name)
 }
-func (controller *PodLoggingController)podUpdate(oldObj, newObj interface{})  {
+func (controller *PodLoggingController) podUpdate(oldObj, newObj interface{}) {
 	oldPod := oldObj.(*apiv1.Pod)
 	newPod := newObj.(*apiv1.Pod)
 	log.Printf("update a pod from [%s/%s] to [%s/%s]", oldPod.Namespace, oldPod.Name, newPod.Namespace, newPod.Name)
 }
-func (controller *PodLoggingController)podDelete(obj interface{})  {
+func (controller *PodLoggingController) podDelete(obj interface{}) {
 	pod := obj.(*apiv1.Pod)
 	log.Printf("delete an existing pod [%s/%s]", pod.Namespace, pod.Name)
 }
+
 // Run starts shared informers and waits for the shared informer cache to synchronize
 func (controller *PodLoggingController) Run(stop chan struct{}) error {
 	controller.informerFactory.Start(stop)
@@ -97,16 +98,16 @@ func (controller *PodLoggingController) Run(stop chan struct{}) error {
 
 	return nil
 }
-func (controller *PvcLoggingController)pvcAdd(obj interface{})  {
+func (controller *PvcLoggingController) pvcAdd(obj interface{}) {
 	pvc := obj.(*apiv1.PersistentVolumeClaim)
 	log.Printf("create a new pvc [%s/%s]", pvc.Namespace, pvc.Name)
 }
-func (controller *PvcLoggingController)pvcUpdate(oldObj, newObj interface{})  {
+func (controller *PvcLoggingController) pvcUpdate(oldObj, newObj interface{}) {
 	oldPvc := oldObj.(*apiv1.PersistentVolumeClaim)
 	newPvc := newObj.(*apiv1.PersistentVolumeClaim)
 	log.Printf("update a pvc from [%s/%s] to [%s/%s]", oldPvc.Namespace, oldPvc.Name, newPvc.Namespace, newPvc.Name)
 }
-func (controller *PvcLoggingController)pvcDelete(obj interface{})  {
+func (controller *PvcLoggingController) pvcDelete(obj interface{}) {
 	pvc := obj.(*apiv1.PersistentVolumeClaim)
 	log.Printf("delete an existing pvc [%s/%s]", pvc.Namespace, pvc.Name)
 }
@@ -118,24 +119,24 @@ func (controller *PvcLoggingController) Run(stop chan struct{}) error {
 
 	return nil
 }
-func informer()  {
+func informer() {
 	factory := informers.NewSharedInformerFactory(clientSet, time.Hour)
 
 	podInformer := factory.Core().V1().Pods()
 	podLog := &PodLoggingController{
-		informerFactory:factory,
-		podInformer:podInformer,
+		informerFactory: factory,
+		podInformer:     podInformer,
 	}
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:  podLog.podAdd,
+		AddFunc:    podLog.podAdd,
 		UpdateFunc: podLog.podUpdate,
 		DeleteFunc: podLog.podDelete,
 	})
 
 	pvcInformer := factory.Core().V1().PersistentVolumeClaims()
 	pvcLog := &PvcLoggingController{
-		informerFactory:factory,
-		pvcInformer:pvcInformer,
+		informerFactory: factory,
+		pvcInformer:     pvcInformer,
 	}
 	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    pvcLog.pvcAdd,
@@ -145,7 +146,7 @@ func informer()  {
 
 	stop := make(chan struct{})
 	defer close(stop)
-	if err := podLog.Run(stop);err != nil {
+	if err := podLog.Run(stop); err != nil {
 		log.Fatal(err)
 	}
 	select {}
@@ -216,7 +217,7 @@ func deployment() {
 		Spec: appsv1.DeploymentSpec{
 			Replicas: int32Ptr(2),
 			Selector: &metav1.LabelSelector{
-				MatchLabels:      map[string]string{"app": "deployment-abc"},
+				MatchLabels: map[string]string{"app": "deployment-abc"},
 			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

@@ -11,7 +11,7 @@ import (
 
 /**
 @see https://blog.csdn.net/weixin_42663840/article/details/81530606
- */
+*/
 
 func testIndexFunc(obj interface{}) ([]string, error) {
 	pod := obj.(*v1.Pod)
@@ -98,7 +98,7 @@ func TestMultiIndexKeys(test *testing.T) {
 	{
 		for k, v := range expected {
 			found := sets.String{}
-			results, err :=index.ByIndex("byUser", k)
+			results, err := index.ByIndex("byUser", k)
 			if err != nil {
 				test.Errorf("error: %v", err)
 			}
@@ -114,7 +114,7 @@ func TestMultiIndexKeys(test *testing.T) {
 
 	// delete pod3
 	_ = index.Delete(pod3)
-	user1Pods, err :=index.ByIndex("byUser", "user1")
+	user1Pods, err := index.ByIndex("byUser", "user1")
 	if err != nil {
 		test.Errorf("error: %v", err)
 	}
@@ -126,14 +126,14 @@ func TestMultiIndexKeys(test *testing.T) {
 			test.Errorf("got %s, want %s", pod.(*v1.Pod).Name, "one")
 		}
 	}
-	user4Pods, err :=index.ByIndex("byUser", "user4")
+	user4Pods, err := index.ByIndex("byUser", "user4")
 	if err != nil {
 		test.Errorf("error: %v", err)
 	}
 	if len(user4Pods) != 0 {
 		test.Errorf("got %d, want %d", len(user4Pods), 0)
 	}
-	
+
 	// update pod2
 	copyOfPod2 := pod2.DeepCopy() // 这里不是添加了一个新的pod，而是去更新pod2的annotation值为"user3"
 	copyOfPod2.Annotations["users"] = "user3"

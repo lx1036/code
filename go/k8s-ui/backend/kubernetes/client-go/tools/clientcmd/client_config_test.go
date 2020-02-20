@@ -10,38 +10,32 @@ import (
 )
 
 func TestMergoSemantics(test *testing.T) {
-	
+
 }
 
 func TestInsecureOverridesCA(test *testing.T) {
-	
-}
 
+}
 
 func TestCAOverridesCAData(test *testing.T) {
 
 }
 
-
 func TestMergeContext(test *testing.T) {
 
 }
-
 
 func TestModifyContext(test *testing.T) {
 
 }
 
-
 func TestCertificateData(test *testing.T) {
 
 }
 
-
 func TestBasicAuthData(test *testing.T) {
 
 }
-
 
 func TestBasicTokenFile(test *testing.T) {
 
