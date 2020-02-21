@@ -1,6 +1,5 @@
 package controller
 
-
 import (
 	"k8s-lx1036/k8s-ui/backend/kubernetes/operator/ingress-proxy/pkg/controller/proxier"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
