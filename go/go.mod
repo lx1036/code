@@ -29,6 +29,7 @@ require (
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/olivere/elastic/v7 v7.0.9
+	github.com/operator-framework/operator-sdk v0.12.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
@@ -38,6 +39,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cast v1.3.0
 	github.com/spf13/cobra v0.0.5
+	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
 	github.com/stretchr/testify v1.4.0
@@ -54,8 +56,9 @@ require (
 	k8s.io/api v0.17.3
 	k8s.io/apiextensions-apiserver v0.17.3 // indirect
 	k8s.io/apimachinery v0.17.3
-	k8s.io/client-go v0.17.3
+	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/kubernetes v1.17.3
+	sigs.k8s.io/controller-runtime v0.5.0
 )
 
 replace (
@@ -80,4 +83,6 @@ replace (
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.17.3
 	k8s.io/metrics => k8s.io/metrics v0.17.3
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.17.3
+	github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309
+	github.com/openshift/api => github.com/openshift/api v0.0.0-20190924102528-32369d4db2ad // Required until https://github.com/operator-framework/operator-lifecycle-manager/pull/1241 is resolved
 )
