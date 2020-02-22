@@ -5,7 +5,7 @@ metadata:
   name: guestbook-viewer-role
 rules:
 - apiGroups:
-  - webapp.lx1036.kubebuilder
+  - batch.lx1036.kubebuilder
   resources:
   - guestbooks
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - webapp.lx1036.kubebuilder
+  - batch.lx1036.kubebuilder
   resources:
   - guestbooks/status
   verbs:

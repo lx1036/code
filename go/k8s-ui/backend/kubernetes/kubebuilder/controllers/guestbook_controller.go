@@ -33,8 +33,8 @@ type GuestbookReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=webapp.lx1036.kubebuilder,resources=guestbooks,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=webapp.lx1036.kubebuilder,resources=guestbooks/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=batch.lx1036.kubebuilder,resources=guestbooks,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch.lx1036.kubebuilder,resources=guestbooks/status,verbs=get;update;patch
 
 func (r *GuestbookReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()

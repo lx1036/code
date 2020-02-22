@@ -1,7 +1,7 @@
 apiVersion: batch.lx1036.kubebuilder/v1
-kind: Guestbook
+kind: CronJob
 metadata:
-  name: guestbook-sample
+  name: cronjob-sample
 spec:
   # Add fields here
   foo: bar

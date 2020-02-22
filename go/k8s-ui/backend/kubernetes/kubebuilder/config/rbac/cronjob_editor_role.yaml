@@ -1,13 +1,13 @@
-# permissions to do edit guestbooks.
+# permissions to do edit cronjobs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: guestbook-editor-role
+  name: cronjob-editor-role
 rules:
 - apiGroups:
   - batch.lx1036.kubebuilder
   resources:
-  - guestbooks
+  - cronjobs
   verbs:
   - create
   - delete
@@ -19,7 +19,7 @@ rules:
 - apiGroups:
   - batch.lx1036.kubebuilder
   resources:
-  - guestbooks/status
+  - cronjobs/status
   verbs:
   - get
   - patch
