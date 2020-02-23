@@ -20,7 +20,7 @@ type UserController struct {
 //}
 
 // @router /statistics [get]
-func (controller *UserController) UserStatistics() gin.HandlerFunc{
+func (controller *UserController) UserStatistics() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		var count int
 		type Total struct {
@@ -30,9 +30,8 @@ func (controller *UserController) UserStatistics() gin.HandlerFunc{
 		context.JSON(http.StatusOK, base.JsonResponse{
 			Errno:  0,
 			Errmsg: "success",
-			Data: Total{Total:count},
+			Data:   Total{Total: count},
 		})
 	}
-
 
 }

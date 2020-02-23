@@ -1,0 +1,7 @@
+apiVersion: batch.lx1036.kubebuilder/v1
+kind: CronJob
+metadata:
+  name: cronjob-sample
+spec:
+  # Add fields here
+  foo: bar

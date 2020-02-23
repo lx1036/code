@@ -12,7 +12,7 @@ type CacheFactory struct {
 	sharedInformerFactory informers.SharedInformerFactory
 }
 
-func (cache *CacheFactory)PodLister() v1.PodLister {
+func (cache *CacheFactory) PodLister() v1.PodLister {
 	return cache.sharedInformerFactory.Core().V1().Pods().Lister()
 }
 
@@ -35,7 +35,7 @@ func buildCacheController(client *kubernetes.Clientset) (*CacheFactory, error) {
 	sharedInformerFactory.Start(stop)
 
 	return &CacheFactory{
-		stopChan: stop,
-		sharedInformerFactory:sharedInformerFactory,
+		stopChan:              stop,
+		sharedInformerFactory: sharedInformerFactory,
 	}, nil
 }

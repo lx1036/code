@@ -118,9 +118,9 @@ func (suite *AuthSuite) TestNotificationSubscribe() {
 	body, _ := ioutil.ReadAll(response.Body)
 
 	type NotificationLogs struct {
-		Errno int `json:"errno"`
-		Errmsg string `json:"errmsg"`
-		Data []models.NotificationLog `json:"data"`
+		Errno  int                      `json:"errno"`
+		Errmsg string                   `json:"errmsg"`
+		Data   []models.NotificationLog `json:"data"`
 	}
 	var notificationLogs NotificationLogs
 	_ = json.Unmarshal(body, &notificationLogs)
@@ -158,7 +158,7 @@ func (suite *AuthSuite) TestNotificationSubscribe() {
 		_ = json.Unmarshal(decoded[1], &header)
 		assert.EqualValues(suite.T(), header, response.Header)
 
-		assert.EqualValues(suite.T(), strings.ReplaceAll(strings.ReplaceAll(string(decoded[2]), "\n", ""), " ", "") , strings.ReplaceAll(strings.ReplaceAll(string(body), "\n", ""), " ", ""))
+		assert.EqualValues(suite.T(), strings.ReplaceAll(strings.ReplaceAll(string(decoded[2]), "\n", ""), " ", ""), strings.ReplaceAll(strings.ReplaceAll(string(body), "\n", ""), " ", ""))
 
 		var content NotificationLogs
 		_ = json.Unmarshal(decoded[2], &content)

@@ -8,14 +8,19 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
+	v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 )
 
 var (
@@ -52,8 +57,99 @@ func main() {
 		panic(err)
 	}
 
-	pvc()
+	go func() {
+		informer()
+	}()
+
+	//pvc()
 	deployment()
+}
+
+// PodLoggingController logs the name and namespace of pods that are added, deleted, or updated
+type PodLoggingController struct {
+	informerFactory informers.SharedInformerFactory
+	podInformer     v1.PodInformer
+}
+type PvcLoggingController struct {
+	informerFactory informers.SharedInformerFactory
+	pvcInformer     v1.PersistentVolumeClaimInformer
+}
+
+func (controller *PodLoggingController) podAdd(obj interface{}) {
+	pod := obj.(*apiv1.Pod)
+	log.Printf("create a new pod [%s/%s]", pod.Namespace, pod.Name)
+}
+func (controller *PodLoggingController) podUpdate(oldObj, newObj interface{}) {
+	oldPod := oldObj.(*apiv1.Pod)
+	newPod := newObj.(*apiv1.Pod)
+	log.Printf("update a pod from [%s/%s] to [%s/%s]", oldPod.Namespace, oldPod.Name, newPod.Namespace, newPod.Name)
+}
+func (controller *PodLoggingController) podDelete(obj interface{}) {
+	pod := obj.(*apiv1.Pod)
+	log.Printf("delete an existing pod [%s/%s]", pod.Namespace, pod.Name)
+}
+
+// Run starts shared informers and waits for the shared informer cache to synchronize
+func (controller *PodLoggingController) Run(stop chan struct{}) error {
+	controller.informerFactory.Start(stop)
+	if !cache.WaitForCacheSync(stop, controller.podInformer.Informer().HasSynced) {
+		return fmt.Errorf("failed to sync cache")
+	}
+
+	return nil
+}
+func (controller *PvcLoggingController) pvcAdd(obj interface{}) {
+	pvc := obj.(*apiv1.PersistentVolumeClaim)
+	log.Printf("create a new pvc [%s/%s]", pvc.Namespace, pvc.Name)
+}
+func (controller *PvcLoggingController) pvcUpdate(oldObj, newObj interface{}) {
+	oldPvc := oldObj.(*apiv1.PersistentVolumeClaim)
+	newPvc := newObj.(*apiv1.PersistentVolumeClaim)
+	log.Printf("update a pvc from [%s/%s] to [%s/%s]", oldPvc.Namespace, oldPvc.Name, newPvc.Namespace, newPvc.Name)
+}
+func (controller *PvcLoggingController) pvcDelete(obj interface{}) {
+	pvc := obj.(*apiv1.PersistentVolumeClaim)
+	log.Printf("delete an existing pvc [%s/%s]", pvc.Namespace, pvc.Name)
+}
+func (controller *PvcLoggingController) Run(stop chan struct{}) error {
+	controller.informerFactory.Start(stop)
+	if !cache.WaitForCacheSync(stop, controller.pvcInformer.Informer().HasSynced) {
+		return fmt.Errorf("failed to sync cache")
+	}
+
+	return nil
+}
+func informer() {
+	factory := informers.NewSharedInformerFactory(clientSet, time.Hour)
+
+	podInformer := factory.Core().V1().Pods()
+	podLog := &PodLoggingController{
+		informerFactory: factory,
+		podInformer:     podInformer,
+	}
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    podLog.podAdd,
+		UpdateFunc: podLog.podUpdate,
+		DeleteFunc: podLog.podDelete,
+	})
+
+	pvcInformer := factory.Core().V1().PersistentVolumeClaims()
+	pvcLog := &PvcLoggingController{
+		informerFactory: factory,
+		pvcInformer:     pvcInformer,
+	}
+	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    pvcLog.pvcAdd,
+		UpdateFunc: pvcLog.pvcUpdate,
+		DeleteFunc: pvcLog.pvcDelete,
+	})
+
+	stop := make(chan struct{})
+	defer close(stop)
+	if err := podLog.Run(stop); err != nil {
+		log.Fatal(err)
+	}
+	select {}
 }
 
 func pvc() {
@@ -104,11 +200,11 @@ func pvc() {
 
 		log.Printf("current storage quantity: %s\n", currentQuantity.String())
 	}
-
-	os.Exit(0)
 }
 
 func deployment() {
+	fmt.Println("Starting...")
+	util.Prompt()
 	deploymentsClient := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault)
 
 	const deploymentName = "deployment-123"
@@ -121,31 +217,14 @@ func deployment() {
 		Spec: appsv1.DeploymentSpec{
 			Replicas: int32Ptr(2),
 			Selector: &metav1.LabelSelector{
-				MatchLabels:      map[string]string{"app": "deployment-abc"},
-				MatchExpressions: nil,
+				MatchLabels: map[string]string{"app": "deployment-abc"},
 			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:                       "pod-123",
-					GenerateName:               "",
-					Namespace:                  "",
-					SelfLink:                   "",
-					UID:                        "",
-					ResourceVersion:            "",
-					Generation:                 0,
-					CreationTimestamp:          metav1.Time{},
-					DeletionTimestamp:          nil,
-					DeletionGracePeriodSeconds: nil,
-					Labels:                     map[string]string{"app": "deployment-abc"},
-					Annotations:                nil,
-					OwnerReferences:            nil,
-					Finalizers:                 nil,
-					ClusterName:                "",
-					ManagedFields:              nil,
+					Name:   "pod-123",
+					Labels: map[string]string{"app": "deployment-abc"},
 				},
 				Spec: apiv1.PodSpec{
-					Volumes:        nil,
-					InitContainers: nil,
 					Containers: []apiv1.Container{
 						{
 							Name:  "web",
@@ -159,44 +238,8 @@ func deployment() {
 							},
 						},
 					},
-					EphemeralContainers:           nil,
-					RestartPolicy:                 "",
-					TerminationGracePeriodSeconds: nil,
-					ActiveDeadlineSeconds:         nil,
-					DNSPolicy:                     "",
-					NodeSelector:                  nil,
-					ServiceAccountName:            "",
-					DeprecatedServiceAccount:      "",
-					AutomountServiceAccountToken:  nil,
-					NodeName:                      "",
-					HostNetwork:                   false,
-					HostPID:                       false,
-					HostIPC:                       false,
-					ShareProcessNamespace:         nil,
-					SecurityContext:               nil,
-					ImagePullSecrets:              nil,
-					Hostname:                      "",
-					Subdomain:                     "",
-					Affinity:                      nil,
-					SchedulerName:                 "",
-					Tolerations:                   nil,
-					HostAliases:                   nil,
-					PriorityClassName:             "",
-					Priority:                      nil,
-					DNSConfig:                     nil,
-					ReadinessGates:                nil,
-					RuntimeClassName:              nil,
-					EnableServiceLinks:            nil,
-					PreemptionPolicy:              nil,
-					Overhead:                      nil,
-					TopologySpreadConstraints:     nil,
 				},
 			},
-			Strategy:                appsv1.DeploymentStrategy{},
-			MinReadySeconds:         0,
-			RevisionHistoryLimit:    nil,
-			Paused:                  false,
-			ProgressDeadlineSeconds: nil,
 		},
 		Status: appsv1.DeploymentStatus{},
 	}
@@ -242,7 +285,12 @@ func deployment() {
 
 	// Update
 	fmt.Println("Updating deployment: " + newDeployment.Name + " ...")
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	retryErr := retry.RetryOnConflict(wait.Backoff{
+		Duration: 500 * time.Millisecond,
+		Factor:   1.0,
+		Jitter:   0.1,
+		Steps:    5,
+	}, func() error {
 		newDeployment.Spec.Replicas = int32Ptr(3)
 		newDeployment.Spec.Template.Spec.Containers[0].Image = "nginx:1.13"
 		_, updateErr := deploymentsClient.Update(newDeployment)
@@ -293,7 +341,7 @@ func deployment() {
 	}
 	fmt.Println("Deleted deployment: " + newDeployment.Name + " ...")
 
-	os.Exit(0)
+	select {}
 }
 
 func int32Ptr(i int32) *int32 {

@@ -44,7 +44,7 @@ func (controller *AppController) AppStatistics() gin.HandlerFunc {
 		context.JSON(http.StatusOK, base.JsonResponse{
 			Errno:  0,
 			Errmsg: "success",
-			Data: Total{Total:count},
+			Data:   Total{Total: count},
 		})
 	}
 }

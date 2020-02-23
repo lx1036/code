@@ -18,8 +18,6 @@ type KubePodController struct {
 //
 //}
 
-
-
 func (controller *KubePodController) PodStatistics() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		type PodStatistics struct {
