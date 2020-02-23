@@ -1,0 +1,120 @@
+package main
+
+import (
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
+	informers "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/informers/externalversions/samplecontroller/v1alpha1"
+	samplescheme "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/clientset/versioned/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
+)
+
+const controllerAgentName = "sample-controller"
+
+// Controller is the controller implementation for Foo resources
+type Controller struct {
+	// kubeclientset is a standard kubernetes clientset
+	kubeclientset kubernetes.Interface
+	// sampleclientset is a clientset for our own API group
+	sampleclientset clientset.Interface
+
+	deploymentsLister appslisters.DeploymentLister
+	deploymentsSynced cache.InformerSynced
+	foosLister        listers.FooLister
+	foosSynced        cache.InformerSynced
+
+	// workqueue is a rate limited work queue. This is used to queue work to be
+	// processed instead of performing it as soon as a change happens. This
+	// means we can ensure we only process a fixed amount of resources at a
+	// time, and makes it easy to ensure we are never processing the same item
+	// simultaneously in two different workers.
+	workqueue workqueue.RateLimitingInterface
+
+	// recorder is an event recorder for recording Event resources to the
+	// Kubernetes API.
+	recorder record.EventRecorder
+}
+
+
+// NewController returns a new sample controller
+func NewController(
+	kubeclientset kubernetes.Interface,
+	sampleclientset clientset.Interface,
+	deploymentInformer appsinformers.DeploymentInformer,
+	fooInformer informers.FooInformer) *Controller {
+
+	// Create event broadcaster
+	// Add sample-controller types to the default Kubernetes Scheme so Events can be
+	// logged for sample-controller types.
+	utilruntime.Must(samplescheme.AddToScheme(scheme.Scheme))
+	klog.V(4).Info("Creating event broadcaster")
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})
+
+
+	controller := &Controller{
+		kubeclientset:     kubeclientset,
+		sampleclientset:   sampleclientset,
+		deploymentsLister: deploymentInformer.Lister(),
+		deploymentsSynced: deploymentInformer.Informer().HasSynced,
+		foosLister:        fooInformer.Lister(),
+		foosSynced:        fooInformer.Informer().HasSynced,
+		workqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Foos"),
+		recorder:          recorder,
+	}
+
+	klog.Info("Setting up event handlers")
+	// Set up an event handler for when Foo resources change
+	fooInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.enqueueFoo,
+		UpdateFunc: func(old, new interface{}) {
+			controller.enqueueFoo(new)
+		},
+	})
+
+	// Set up an event handler for when Deployment resources change. This
+	// handler will lookup the owner of the given Deployment, and if it is
+	// owned by a Foo resource will enqueue that Foo resource for
+	// processing. This way, we don't need to implement custom logic for
+	// handling Deployment resources. More info on this pattern:
+	// https://github.com/kubernetes/community/blob/8cafef897a22026d42f5e5bb3f104febe7e29830/contributors/devel/controllers.md
+	deploymentInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.handleObject,
+		UpdateFunc: func(old, new interface{}) {
+			newDepl := new.(*appsv1.Deployment)
+			oldDepl := old.(*appsv1.Deployment)
+			if newDepl.ResourceVersion == oldDepl.ResourceVersion {
+				// Periodic resync will send update events for all known Deployments.
+				// Two different versions of the same Deployment will always have different RVs.
+				return
+			}
+			controller.handleObject(new)
+		},
+		DeleteFunc: controller.handleObject,
+	})
+
+	return controller
+}
+
+// enqueueFoo takes a Foo resource and converts it into a namespace/name
+// string which is then put onto the work queue. This method should *not* be
+// passed resources of any type other than Foo.
+func (c *Controller) enqueueFoo(obj interface{}) {
+	var key string
+	var err error
+	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+	c.workqueue.Add(key)
+}

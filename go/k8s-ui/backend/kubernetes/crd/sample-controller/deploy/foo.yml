@@ -1,0 +1,6 @@
+apiVersion: "controller.k8s.io/v1"
+kind: Foo
+metadata:
+  name: custom-foo-object
+spec:
+  replicas: 2

@@ -60,7 +60,9 @@ require (
 	k8s.io/apiextensions-apiserver v0.17.3 // indirect
 	k8s.io/apimachinery v0.17.3
 	k8s.io/client-go v11.0.0+incompatible
+	k8s.io/code-generator v0.17.3
 	k8s.io/kubernetes v1.17.3
+	k8s.io/sample-controller v0.17.3
 	sigs.k8s.io/controller-runtime v0.5.0
 )
 
@@ -75,7 +77,7 @@ replace (
 	k8s.io/client-go => k8s.io/client-go v0.17.3
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.17.3
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.17.3
-	k8s.io/code-generator => k8s.io/code-generator v0.17.3
+	k8s.io/code-generator => k8s.io/code-generator v0.0.0-20200214080538-dc8f3adce97c
 	k8s.io/component-base => k8s.io/component-base v0.17.3
 	k8s.io/cri-api => k8s.io/cri-api v0.17.3
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.17.3
