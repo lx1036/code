@@ -1,23 +1,26 @@
 package main
 
 import (
+	"fmt"
+	samplescheme "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/clientset/versioned/scheme"
+	informers "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/informers/externalversions/samplecontroller/v1alpha1"
+	listers "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/listers/samplecontroller/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
-	informers "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/informers/externalversions/samplecontroller/v1alpha1"
-	samplescheme "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/clientset/versioned/scheme"
-	listers "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/listers/samplecontroller/v1alpha1"
+	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
-	"k8s.io/client-go/kubernetes/scheme"
-	appsinformers "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
+	"time"
 )
 
 const controllerAgentName = "sample-controller"
@@ -46,7 +49,6 @@ type Controller struct {
 	recorder record.EventRecorder
 }
 
-
 // NewController returns a new sample controller
 func NewController(
 	kubeclientset kubernetes.Interface,
@@ -63,7 +65,6 @@ func NewController(
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})
-
 
 	controller := &Controller{
 		kubeclientset:     kubeclientset,
@@ -149,4 +150,54 @@ func (c *Controller) handleObject(obj interface{}) {
 		c.enqueueFoo(foo)
 		return
 	}
+}
+
+// Run will set up the event handlers for types we are interested in, as well
+// as syncing informer caches and starting workers. It will block until stopCh
+// is closed, at which point it will shutdown the workqueue and wait for
+// workers to finish processing their current work items.
+func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
+	defer utilruntime.HandleCrash()
+	defer c.workqueue.ShutDown()
+
+	// Start the informer factories to begin populating the informer caches
+	klog.Info("Starting Foo controller")
+
+	// Wait for the caches to be synced before starting workers
+	klog.Info("Waiting for informer caches to sync")
+	if ok := cache.WaitForCacheSync(stopCh, c.deploymentsSynced, c.foosSynced); !ok {
+		return fmt.Errorf("failed to wait for caches to sync")
+	}
+
+	klog.Info("Starting workers")
+	// Launch two workers to process Foo resources
+	for i := 0; i < threadiness; i++ {
+		go wait.Until(c.runWorker, time.Second, stopCh)
+	}
+
+	klog.Info("Started workers")
+	<-stopCh
+	klog.Info("Shutting down workers")
+
+	return nil
+}
+
+// runWorker is a long-running function that will continually call the
+// processNextWorkItem function in order to read and process a message on the
+// workqueue.
+func (c *Controller) runWorker() {
+	for c.processNextWorkItem() {
+	}
+}
+
+// processNextWorkItem will read a single work item off the workqueue and
+// attempt to process it, by calling the syncHandler.
+func (c *Controller) processNextWorkItem() bool {
+	obj, shutdown := c.workqueue.Get()
+
+	if shutdown {
+		return false
+	}
+
+	return true
 }

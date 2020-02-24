@@ -3,18 +3,19 @@ package main
 import (
 	"flag"
 	"fmt"
+	informers "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/informers/externalversions"
+	"k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/informers/externalversions/samplecontroller"
+	"k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/informers/externalversions/samplecontroller/v1alpha1"
 	"k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/signals"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"os"
 	"path/filepath"
 	"time"
-	kubeinformers "k8s.io/client-go/informers"
-	informers "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/informers/externalversions"
 )
-
 
 var (
 	masterURL  string
@@ -58,14 +59,16 @@ func main() {
 
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	exampleInformerFactory := informers.NewSharedInformerFactory(exampleClient, time.Second*30)
+	var sampleController samplecontroller.Interface
+	sampleController = exampleInformerFactory.Samplecontroller()
+	var sampleControllerV1alpha1 v1alpha1.Interface
+	sampleControllerV1alpha1 =  sampleController.V1alpha1()
 
 	controller := NewController(kubeClient, exampleClient,
 		kubeInformerFactory.Apps().V1().Deployments(),
-		exampleInformerFactory.Samplecontroller().V1alpha1().Foos())
+		sampleControllerV1alpha1.Foos())
 
 	if err = controller.Run(2, stopCh); err != nil {
 		klog.Fatalf("Error running controller: %s", err.Error())
 	}
 }
-
-
