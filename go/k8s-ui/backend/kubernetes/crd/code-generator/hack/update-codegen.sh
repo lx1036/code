@@ -34,8 +34,8 @@ GENERATION_TARGETS="${GENERATION_TARGETS:-all}"
 
 # Ugly but needs to be relative if we want to use k8s.io/code-generator
 # as it is without touching/sed-ing the code/scripts
-RELATIVE_ROOT_PATH=$(realpath --relative-to="${PWD}" /)
-CODEGEN_PKG=${RELATIVE_ROOT_PATH}${GOPATH}/src/k8s.io/code-generator
+#RELATIVE_ROOT_PATH=$(realpath --relative-to="${PWD}" /)
+#CODEGEN_PKG=${RELATIVE_ROOT_PATH}${GOPATH}/src/k8s.io/code-generator
 
 # Only generate deepcopy (runtime object needs) and typed client.
 # Typed listers & informers not required for the moment. Used with generic
@@ -43,9 +43,12 @@ CODEGEN_PKG=${RELATIVE_ROOT_PATH}${GOPATH}/src/k8s.io/code-generator
 # https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/
 
 
+cd ${CODE_GENERATOR_PATH}
 
+go env -w GOPROXY="https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,direct"
+go mod vendor
 
-${CODEGEN_PKG}/generate-groups.sh GENERATION_TARGETS \
+./generate-groups.sh all \
   ${CLIENT_GENERATOR_OUT} \
   ${APIS_ROOT} \
   "${GROUPS_VERSION}"
