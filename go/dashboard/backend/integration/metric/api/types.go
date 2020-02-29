@@ -26,8 +26,6 @@ type MetricClient interface {
 	integrationapi.Integration
 }
 
-
-
 // ResourceSelector is a structure used to quickly and uniquely identify given resource.
 // This struct can be later used for heapster data download etc.
 type ResourceSelector struct {
@@ -53,6 +51,7 @@ type CachedResources struct {
 }
 
 type MetricPromises []MetricPromise
+
 // MetricPromise is used for parallel data extraction. Contains len 1 channels for Metric and Error.
 type MetricPromise struct {
 	Metric chan *Metric

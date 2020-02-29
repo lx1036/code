@@ -13,7 +13,6 @@ const (
 	holderMapCertEntry = "pub"
 )
 
-
 // KeyHolder is responsible for generating, storing and synchronizing encryption key used for token
 // generation/decryption.
 type KeyHolder interface {
@@ -46,9 +45,8 @@ func (self *rsaKeyHolder) Refresh() {
 }
 
 func (self *rsaKeyHolder) init() {
-	
-}
 
+}
 
 // NewRSAKeyHolder creates new KeyHolder instance.
 func NewRSAKeyHolder(synchronizer syncApi.Synchronizer) KeyHolder {
@@ -59,4 +57,3 @@ func NewRSAKeyHolder(synchronizer syncApi.Synchronizer) KeyHolder {
 	holder.init()
 	return holder
 }
-

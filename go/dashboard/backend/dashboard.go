@@ -7,15 +7,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	"k8s-lx1036/dashboard/backend/args"
+	authApi "k8s-lx1036/dashboard/backend/auth/api"
 	"k8s-lx1036/dashboard/backend/client"
 	clientapi "k8s-lx1036/dashboard/backend/client/api"
 	"k8s-lx1036/dashboard/backend/handler"
 	"k8s-lx1036/dashboard/backend/sync"
+	"log"
 	"net"
-	authApi "k8s-lx1036/dashboard/backend/auth/api"
 	"net/http"
 	"os"
-	"log"
 	"time"
 )
 
@@ -56,7 +56,6 @@ var (
 	localeConfig                 = pflag.String("locale-config", "./locale_conf.json", "File containing the configuration of locales")
 )
 
-
 func main() {
 	// Set logging output to standard console out
 	log.SetOutput(os.Stdout)
@@ -93,8 +92,6 @@ func main() {
 		args.Holder.GetSystemBannerSeverity())
 	// Init integrations
 	integrationManager := integration.NewIntegrationManager(clientManager)
-
-
 
 	apiHandler, err := handler.CreateHTTPAPIHandler(
 		integrationManager,
@@ -172,10 +169,8 @@ func initAuthManager(clientManager clientapi.ClientManager) authApi.AuthManager 
 	synchronizerManager := sync.NewSynchronizerManager(insecureClient)
 	keySynchronizer := synchronizerManager.Secret(args.Holder.GetNamespace(), authApi.EncryptionKeyHolderName)
 
-
 	// Register synchronizer. Overwatch will be responsible for restarting it in case of error.
 	sync.Overwatch.RegisterSynchronizer(keySynchronizer, sync.AlwaysRestart)
-
 
 	// Init encryption key holder and token manager
 	keyHolder := jwe.NewRSAKeyHolder(keySynchronizer)
@@ -184,7 +179,6 @@ func initAuthManager(clientManager clientapi.ClientManager) authApi.AuthManager 
 	if tokenTTL != authApi.DefaultTokenTTL {
 		tokenManager.SetTokenTTL(tokenTTL)
 	}
-
 
 }
 

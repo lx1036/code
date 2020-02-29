@@ -1,9 +1,9 @@
 package v1alpha1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	coreV1 "k8s.io/api/core/v1"
-	)
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

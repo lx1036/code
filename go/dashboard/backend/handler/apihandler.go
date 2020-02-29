@@ -11,4 +11,4 @@ func CreateHTTPAPIHandler(iManager integration.IntegrationManager, cManager clie
 	authManager authApi.AuthManager, sManager settingsApi.SettingsManager,
 	sbManager systembanner.SystemBannerManager) (http.Handler, error) {
 
-	}
+}

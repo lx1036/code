@@ -1,10 +1,9 @@
 package jwe
 
 import (
-	"testing"
 	"k8s.io/client-go/kubernetes/fake"
-	)
-
+	"testing"
+)
 
 func getKeyHolder() KeyHolder {
 	client := fake.NewSimpleClientset()
@@ -23,5 +22,3 @@ func TestRsaKeyHolder_Encrypter(test *testing.T) {
 
 func TestRsaKeyHolder_Key(test *testing.T) {
 }
-
-

@@ -19,7 +19,6 @@ type IntegrationState struct {
 	Error       error   `json:"error"`
 }
 
-
 // Integration represents application integrated into the dashboard. Every application
 // has to provide health check and id. Additionally every client supported by integration manager
 // has to implement this interface

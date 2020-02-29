@@ -1,10 +1,10 @@
 package sync
 
 import (
+	syncApi "k8s-lx1036/dashboard/backend/sync/api"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	syncApi "k8s-lx1036/dashboard/backend/sync/api"
-	)
+)
 
 // Implements SynchronizerManager interface.
 type synchronizerManager struct {
@@ -25,4 +25,3 @@ func (self *synchronizerManager) Secret(namespace, name string) syncApi.Synchron
 func NewSynchronizerManager(client kubernetes.Interface) syncApi.SynchronizerManager {
 	return &synchronizerManager{client: client}
 }
-

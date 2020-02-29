@@ -23,8 +23,6 @@ func (self AuthenticationMode) String() string {
 	return string(self)
 }
 
-
-
 // TokenManager is responsible for generating and decrypting tokens used for authorization. Authorization is handled
 // by K8S apiserver. Token contains AuthInfo structure used to create K8S api client.
 type TokenManager interface {

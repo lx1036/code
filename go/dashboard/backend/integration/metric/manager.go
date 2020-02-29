@@ -1,10 +1,10 @@
 package metric
 
 import (
-	"time"
-	metricapi "k8s-lx1036/dashboard/backend/integration/metric/api"
 	integrationapi "k8s-lx1036/dashboard/backend/integration/api"
-	)
+	metricapi "k8s-lx1036/dashboard/backend/integration/metric/api"
+	"time"
+)
 
 // MetricManager is responsible for management of all integrated applications related to metrics.
 type MetricManager interface {
@@ -25,5 +25,3 @@ type MetricManager interface {
 	// ConfigureHeapster configures and adds sidecar to clients list.
 	ConfigureHeapster(host string) MetricManager
 }
-
-

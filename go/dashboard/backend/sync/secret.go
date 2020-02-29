@@ -64,4 +64,3 @@ func (self *secretSynchronizer) SetPoller(poller syncApi.Poller) {
 func (self *secretSynchronizer) Name() string {
 	return fmt.Sprintf("%s-%s", self.name, self.namespace)
 }
-

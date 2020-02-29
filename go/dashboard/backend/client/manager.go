@@ -2,14 +2,14 @@ package client
 
 import (
 	"github.com/emicklei/go-restful"
-	"k8s-lx1036/dashboard/backend/errors"
-	v1 "k8s.io/api/authorization/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	authApi "k8s-lx1036/dashboard/backend/auth/api"
 	clientapi "k8s-lx1036/dashboard/backend/client/api"
+	"k8s-lx1036/dashboard/backend/errors"
 	pluginclientset "k8s-lx1036/dashboard/backend/plugin/client/clientset/versioned"
+	v1 "k8s.io/api/authorization/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"log"
@@ -65,7 +65,6 @@ type clientManager struct {
 	// to service account used by dashboard or kubeconfig file if it was passed during dashboard
 	// init.
 	insecureConfig *rest.Config
-
 }
 
 func (self *clientManager) Client(req *restful.Request) (kubernetes.Interface, error) {
