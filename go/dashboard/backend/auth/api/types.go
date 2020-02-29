@@ -38,3 +38,40 @@ type TokenManager interface {
 	// SetTokenTTL sets expiration time (in seconds) of generated tokens.
 	SetTokenTTL(time.Duration)
 }
+
+// AuthManager is used for user authentication management.
+type AuthManager interface {
+	// Login authenticates user based on provided LoginSpec and returns AuthResponse. AuthResponse contains
+	// generated token and list of non-critical errors such as 'Failed authentication'.
+	Login(*LoginSpec) (*AuthResponse, error)
+	// Refresh takes valid token that hasn't expired yet and returns a new one with expiration time set to TokenTTL. In
+	// case provided token has expired, token expiration error is returned.
+	Refresh(string) (string, error)
+	// AuthenticationModes returns array of auth modes supported by dashboard.
+	AuthenticationModes() []AuthenticationMode
+	// AuthenticationSkippable tells if the Skip button should be enabled or not
+	AuthenticationSkippable() bool
+}
+
+// LoginSpec is extracted from request coming from Dashboard frontend during login request. It contains all the
+// information required to authenticate user.
+type LoginSpec struct {
+	// Username is the username for basic authentication to the kubernetes cluster.
+	Username string `json:"username,omitempty"`
+	// Password is the password for basic authentication to the kubernetes cluster.
+	Password string `json:"password,omitempty"`
+	// Token is the bearer token for authentication to the kubernetes cluster.
+	Token string `json:"token,omitempty"`
+	// KubeConfig is the content of users' kubeconfig file. It will be parsed and auth data will be extracted.
+	// Kubeconfig can not contain any paths. All data has to be provided within the file.
+	KubeConfig string `json:"kubeconfig,omitempty"`
+}
+
+// AuthResponse is returned from our backend as a response for login/refresh requests. It contains generated JWEToken
+// and a list of non-critical errors such as 'Failed authentication'.
+type AuthResponse struct {
+	// JWEToken is a token generated during login request that contains AuthInfo data in the payload.
+	JWEToken string `json:"jweToken"`
+	// Errors are a list of non-critical errors that happened during login request.
+	Errors []error `json:"errors"`
+}

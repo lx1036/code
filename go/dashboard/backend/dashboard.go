@@ -1,14 +1,22 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
+	"fmt"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	"k8s-lx1036/dashboard/backend/args"
 	"k8s-lx1036/dashboard/backend/client"
+	clientapi "k8s-lx1036/dashboard/backend/client/api"
+	"k8s-lx1036/dashboard/backend/handler"
+	"k8s-lx1036/dashboard/backend/sync"
 	"net"
 	authApi "k8s-lx1036/dashboard/backend/auth/api"
+	"net/http"
 	"os"
 	"log"
+	"time"
 )
 
 var (
@@ -74,6 +82,60 @@ func main() {
 	if err != nil {
 		handleFatalInitError(err)
 	}
+	log.Printf("Successful initial request to the apiserver, version: %s", versionInfo.String())
+
+	// Init auth manager
+	authManager := initAuthManager(clientManager)
+	// Init settings manager
+	settingsManager := settings.NewSettingsManager()
+	// Init system banner manager
+	systemBannerManager := systembanner.NewSystemBannerManager(args.Holder.GetSystemBanner(),
+		args.Holder.GetSystemBannerSeverity())
+	// Init integrations
+	integrationManager := integration.NewIntegrationManager(clientManager)
+
+
+
+	apiHandler, err := handler.CreateHTTPAPIHandler(
+		integrationManager,
+		clientManager,
+		authManager,
+		settingsManager,
+		systemBannerManager)
+	if err != nil {
+		handleFatalInitError(err)
+	}
+
+	var servingCerts []tls.Certificate
+	if args.Holder.GetAutoGenerateCertificates() {
+
+	} else if args.Holder.GetCertFile() != "" && args.Holder.GetKeyFile() != "" {
+
+	}
+	// Run a HTTP server that serves static public files from './public' and handles API calls.
+	//http.Handle("/", handler.MakeGzipHandler(handler.CreateLocaleHandler()))
+	http.Handle("/api/", apiHandler)
+	//http.Handle("/config", handler.AppHandler(handler.ConfigHandler))
+	//http.Handle("/api/sockjs/", handler.CreateAttachHandler("/api/sockjs"))
+	http.Handle("/metrics", promhttp.Handler())
+
+	// Listen for http or https
+	if servingCerts != nil {
+		log.Printf("Serving securely on HTTPS port: %d", args.Holder.GetPort())
+		secureAddr := fmt.Sprintf("%s:%d", args.Holder.GetBindAddress(), args.Holder.GetPort())
+		server := &http.Server{
+			Addr:      secureAddr,
+			Handler:   http.DefaultServeMux,
+			TLSConfig: &tls.Config{Certificates: servingCerts},
+		}
+		go func() { log.Fatal(server.ListenAndServeTLS("", "")) }()
+	} else {
+		log.Printf("Serving insecurely on HTTP port: %d", args.Holder.GetInsecurePort())
+		addr := fmt.Sprintf("%s:%d", args.Holder.GetInsecureBindAddress(), args.Holder.GetInsecurePort())
+		go func() { log.Fatal(http.ListenAndServe(addr, nil)) }()
+	}
+
+	select {}
 }
 
 func initArgHolder() {
@@ -104,6 +166,28 @@ func initArgHolder() {
 	builder.SetLocaleConfig(*localeConfig)
 }
 
+func initAuthManager(clientManager clientapi.ClientManager) authApi.AuthManager {
+	insecureClient := clientManager.InsecureClient()
+	// Init default encryption key synchronizer
+	synchronizerManager := sync.NewSynchronizerManager(insecureClient)
+	keySynchronizer := synchronizerManager.Secret(args.Holder.GetNamespace(), authApi.EncryptionKeyHolderName)
+
+
+	// Register synchronizer. Overwatch will be responsible for restarting it in case of error.
+	sync.Overwatch.RegisterSynchronizer(keySynchronizer, sync.AlwaysRestart)
+
+
+	// Init encryption key holder and token manager
+	keyHolder := jwe.NewRSAKeyHolder(keySynchronizer)
+	tokenManager := jwe.NewJWETokenManager(keyHolder)
+	tokenTTL := time.Duration(args.Holder.GetTokenTTL())
+	if tokenTTL != authApi.DefaultTokenTTL {
+		tokenManager.SetTokenTTL(tokenTTL)
+	}
+
+
+}
+
 /**
 * Lookup the environment variable provided and set to default value if variable isn't found
  */
@@ -113,4 +197,17 @@ func getEnv(key, fallback string) string {
 		value = fallback
 	}
 	return value
+}
+
+/**
+ * Handles fatal init error that prevents server from doing any work. Prints verbose error
+ * message and quits the server.
+ */
+func handleFatalInitError(err error) {
+	log.Fatalf("Error while initializing connection to Kubernetes apiserver. "+
+		"This most likely means that the cluster is misconfigured (e.g., it has "+
+		"invalid apiserver certificates or service account's configuration) or the "+
+		"--apiserver-host param points to a server that does not exist. Reason: %s\n"+
+		"Refer to our FAQ and wiki pages for more information: "+
+		"https://github.com/kubernetes/dashboard/wiki/FAQ", err)
 }

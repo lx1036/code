@@ -72,23 +72,11 @@ func (self *clientManager) Client(req *restful.Request) (kubernetes.Interface, e
 	panic("implement me")
 }
 
-func (self *clientManager) InsecureClient() kubernetes.Interface {
-	panic("implement me")
-}
-
 func (self *clientManager) APIExtensionsClient(req *restful.Request) (apiextensionsclientset.Interface, error) {
 	panic("implement me")
 }
 
-func (self *clientManager) PluginClient(req *restful.Request) (interface{}, error) {
-	panic("implement me")
-}
-
 func (self *clientManager) InsecureAPIExtensionsClient() apiextensionsclientset.Interface {
-	panic("implement me")
-}
-
-func (self *clientManager) InsecurePluginClient() interface{} {
 	panic("implement me")
 }
 
@@ -109,10 +97,6 @@ func (self *clientManager) CSRFKey() string {
 }
 
 func (self *clientManager) HasAccess(authInfo api.AuthInfo) error {
-	panic("implement me")
-}
-
-func (self *clientManager) VerberClient(req *restful.Request, config *rest.Config) (interface{}, error) {
 	panic("implement me")
 }
 
@@ -181,6 +165,32 @@ func (self *clientManager) buildConfigFromFlags(apiserverHost, kubeConfigPath st
 // Returns true if in-cluster config is used
 func (self *clientManager) isRunningInCluster() bool {
 	return self.inClusterConfig != nil
+}
+
+// PluginClient returns a plugin client. In case dashboard login is enabled and
+// option to skip login page is disabled only secure client will be returned, otherwise insecure
+// client will be used.
+func (self *clientManager) PluginClient(req *restful.Request) (pluginclientset.Interface, error) {
+
+}
+
+// VerberClient returns new verber client based on authentication information extracted from request
+func (self *clientManager) VerberClient(req *restful.Request, config *rest.Config) (clientapi.ResourceVerber, error) {
+
+}
+
+// InsecurePluginClient returns plugin client that was created without providing
+// auth info. It uses permissions granted to service account used by dashboard or kubeconfig file
+// if it was passed during dashboard init.
+func (self *clientManager) InsecurePluginClient() pluginclientset.Interface {
+	return self.insecurePluginClient
+}
+
+// InsecureClient returns kubernetes client that was created without providing auth info. It uses
+// permissions granted to service account used by dashboard or kubeconfig file if it was passed
+// during dashboard init.
+func (self *clientManager) InsecureClient() kubernetes.Interface {
+	return self.insecureClient
 }
 
 // Initializes client manager
