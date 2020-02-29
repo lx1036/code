@@ -8,8 +8,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"sync"
 	"log"
+	"sync"
 )
 
 // Entries held by resource used to synchronize encryption key data.
@@ -75,6 +75,7 @@ func (self *rsaKeyHolder) init() {
 func (self *rsaKeyHolder) update(obj runtime.Object) {
 
 }
+
 // Handler function executed by synchronizer used to store encryption key. It is called whenever watched object
 // gets deleted. It is then recreated based on local key.
 func (self *rsaKeyHolder) recreate(obj runtime.Object) {
@@ -87,7 +88,6 @@ func (self *rsaKeyHolder) recreate(obj runtime.Object) {
 
 func (self *rsaKeyHolder) getEncryptionKeyHolder() runtime.Object {
 	priv, pub := ExportRSAKeyOrDie(self.Key())
-
 
 }
 
