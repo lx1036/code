@@ -4,5 +4,5 @@
 ```shell script
 brew update
 brew install grafana
-brew services start/stop grafana # http://localhost:3000, user:password(admin:admin)
+brew services start/stop grafana # http://localhost:3000, user:password(admin:password)
 ```
