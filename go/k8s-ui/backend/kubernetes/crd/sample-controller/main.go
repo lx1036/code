@@ -62,7 +62,7 @@ func main() {
 	var sampleController samplecontroller.Interface
 	sampleController = exampleInformerFactory.Samplecontroller()
 	var sampleControllerV1alpha1 v1alpha1.Interface
-	sampleControllerV1alpha1 =  sampleController.V1alpha1()
+	sampleControllerV1alpha1 = sampleController.V1alpha1()
 
 	controller := NewController(kubeClient, exampleClient,
 		kubeInformerFactory.Apps().V1().Deployments(),
