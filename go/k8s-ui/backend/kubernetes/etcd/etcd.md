@@ -29,3 +29,11 @@ etcdctl --endpoints=localhost:12379 get foo1 # 重启，关闭期间的数据会
 1. **[Raft算法原理](https://www.codedump.info/post/20180921-raft/)**
 2. **[etcd Raft库解析](https://www.codedump.info/post/20180922-etcd-raft/)**
 3. **[Etcd存储的实现](https://www.codedump.info/post/20181125-etcd-server/)**
+
+
+# Etcd Watch
+**watch to get notified of future changes(写操作).**
+
+# Etcd Metrics
+
+
