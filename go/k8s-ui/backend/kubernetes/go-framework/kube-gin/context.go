@@ -12,6 +12,7 @@ type Context struct {
 	Path       string
 	Method     string
 	StatusCode int
+	Params     map[string]string // 动态路由参数
 }
 
 type H map[string]interface{}

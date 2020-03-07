@@ -7,23 +7,23 @@ import (
 type HandlerFunc func(*Context)
 
 type Engine struct {
-	routers *router
+	router *router
 }
 
 func (engine *Engine) addRoute(method string, pattern string, handler HandlerFunc) {
-	engine.routers.addRoute(method, pattern, handler)
+	engine.router.addRoute(method, pattern, handler)
 }
 
 func (engine *Engine) Get(pattern string, handler HandlerFunc) {
-	engine.routers.addRoute("GET", pattern, handler)
+	engine.router.addRoute("GET", pattern, handler)
 }
 func (engine *Engine) Post(pattern string, handler HandlerFunc) {
-	engine.routers.addRoute("POST", pattern, handler)
+	engine.router.addRoute("POST", pattern, handler)
 }
 
 func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := newContext(w, req)
-	engine.routers.handle(ctx)
+	engine.router.handle(ctx)
 }
 
 func (engine *Engine) Run(addr string) error {
@@ -32,6 +32,6 @@ func (engine *Engine) Run(addr string) error {
 
 func New() *Engine {
 	return &Engine{
-		routers: newRouter(),
+		router: newRouter(),
 	}
 }

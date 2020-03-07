@@ -1,7 +1,9 @@
 package kube_gin
 
 import (
+	"github.com/stretchr/testify/assert"
 	"net/http"
+	"reflect"
 	"testing"
 )
 
@@ -14,7 +16,7 @@ func TestEngine_Step1(test *testing.T) {
 	_ = engine.Run(":9999")*/
 }
 
-func TestEngine_Step2(test *testing.T) {
+func TestContext_Step2(test *testing.T) {
 	engine := New()
 	engine.Get("/", func(context *Context) {
 		context.HTML(http.StatusOK, "<h1>hello world</h1>")
@@ -28,6 +30,45 @@ func TestEngine_Step2(test *testing.T) {
 		context.JSON(http.StatusOK, H{
 			"username": context.PostForm("username"),
 			"password": context.PostForm("password"),
+		})
+	})
+
+	_ = engine.Run(":9999")
+}
+
+func TestParsePattern(test *testing.T) {
+	ok := reflect.DeepEqual(parsePattern("/p/:name"), []string{"p", ":name"})
+	ok = ok && reflect.DeepEqual(parsePattern("/p/*"), []string{"p", "*"})
+	ok = ok && reflect.DeepEqual(parsePattern("/p/*name/*"), []string{"p", "*name"})
+	if !ok {
+		test.Fatal("test parsePattern failed")
+	}
+}
+
+func TestDynamicRoutes_Step3(test *testing.T) {
+	engine := New()
+	engine.Get("/", nil)
+	engine.Get("/people/*name/accounts", nil)
+	engine.Get("/people/:id/accounts", nil)
+
+	accountsNode, params := engine.router.getRoute("GET", "/people/lx1036/accounts")
+	assert.Equal(test, "lx1036/accounts", params["name"])
+	assert.Equal(test, "/people/*name/accounts", accountsNode.pattern)
+
+	engine.Get("/people/:id", nil)
+	peopleNode, params := engine.router.getRoute("GET", "/people/lx1036")
+	assert.Equal(test, "lx1036", params["id"])
+	assert.Equal(test, "/people/:id", peopleNode.pattern)
+}
+
+func TestDynamicRoutes_Engine_Step3(test *testing.T) {
+	engine := New()
+	engine.Get("/people/:id", func(context *Context) {
+		id := context.Params["id"]
+		context.JSON(http.StatusOK, H{
+			"errno":  0,
+			"errmsg": "success",
+			"data":   id,
 		})
 	})
 
