@@ -8,8 +8,16 @@ minikube start --network-plugin=cni --memory=4096 # Create a minikube cluster
 minikube ssh -- sudo mount bpffs -t bpf /sys/fs/bpf # Mount the BPF filesystem
 kubectl create -f https://raw.githubusercontent.com/cilium/cilium/v1.7/install/kubernetes/quick-install.yaml # Install Cilium as DaemonSet into your new Kubernetes cluster. 
 kubectl -n kube-system get pods --watch # watch
+
 kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/v1.7/examples/kubernetes/connectivity-check/connectivity-check.yaml # validate
+
 kubectl apply -f https://raw.githubusercontent.com/cilium/hubble/master/tutorials/deploy-hubble-servicemap/hubble-all-minikube.yaml # install Hubble
+kubectl delete -f https://raw.githubusercontent.com/cilium/hubble/master/tutorials/deploy-hubble-servicemap/hubble-all-minikube.yaml # install Hubble
+
+# Hubble UI
+# https://github.com/cilium/hubble/blob/master/tutorials/deploy-hubble-servicemap/README.md
+kubectl create namespace jobs-demo
+kubectl -n jobs-demo apply -f https://app.isovalent.com/demos/jobs.yaml
 ```
 
 
