@@ -5,7 +5,6 @@ package api
 // that based on resource kind, name and namespace deletes it.
 type ResourceKind string
 
-
 // ListMeta describes list of objects, i.e. holds information about pagination options set for the list.
 type ListMeta struct {
 	// Total number of items on the list. Used for pagination.
