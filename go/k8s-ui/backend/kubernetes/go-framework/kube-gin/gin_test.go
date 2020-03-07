@@ -1,6 +1,7 @@
 package kube_gin
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"reflect"
@@ -71,6 +72,47 @@ func TestDynamicRoutes_Engine_Step3(test *testing.T) {
 			"data":   id,
 		})
 	})
+
+	_ = engine.Run(":9999")
+}
+
+func TestGroupRoutes_Step4(test *testing.T) {
+	engine := New()
+	v1 := engine.Group("/v1")
+	{
+		v1.Get("/people/:id", func(context *Context) {
+			id := context.Params["id"]
+			context.JSON(http.StatusOK, H{
+				"errno":  0,
+				"errmsg": "success ",
+				"data":   fmt.Sprintf("%s %s", "/v1", id),
+			})
+		})
+	}
+
+	v2 := engine.Group("/v2")
+	{
+		v2.Get("/people/:id", func(context *Context) {
+			id := context.Params["id"]
+			context.JSON(http.StatusOK, H{
+				"errno":  0,
+				"errmsg": "success",
+				"data":   fmt.Sprintf("%s %s", "/v2", id),
+			})
+		})
+	}
+
+	v2Alpha := v2.Group("/alpha")
+	{
+		v2Alpha.Get("/people/:id", func(context *Context) {
+			id := context.Params["id"]
+			context.JSON(http.StatusOK, H{
+				"errno":  0,
+				"errmsg": "success",
+				"data":   fmt.Sprintf("%s%s %s", "/v2", "/alpha", id),
+			})
+		})
+	}
 
 	_ = engine.Run(":9999")
 }

@@ -8,6 +8,7 @@ type HandlerFunc func(*Context)
 
 type Engine struct {
 	router *router
+	*RouterGroup
 }
 
 func (engine *Engine) addRoute(method string, pattern string, handler HandlerFunc) {
@@ -21,6 +22,11 @@ func (engine *Engine) Post(pattern string, handler HandlerFunc) {
 	engine.router.addRoute("POST", pattern, handler)
 }
 
+func (engine *Engine) Group(prefix string) *RouterGroup {
+	engine.RouterGroup.prefix = prefix
+	return engine.RouterGroup
+}
+
 func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := newContext(w, req)
 	engine.router.handle(ctx)
@@ -31,7 +37,9 @@ func (engine *Engine) Run(addr string) error {
 }
 
 func New() *Engine {
+	router := newRouter()
 	return &Engine{
-		router: newRouter(),
+		router:      router,
+		RouterGroup: &RouterGroup{router: router},
 	}
 }

@@ -95,3 +95,28 @@ func (r *router) handle(ctx *Context) {
 		})
 	}
 }
+
+type RouterGroup struct {
+	prefix      string
+	router      *router
+	middlewares []HandlerFunc // 支持中间件功能
+	child       *RouterGroup  // support nested group
+}
+
+func (group *RouterGroup) Group(prefix string) *RouterGroup {
+	group.prefix += prefix
+	return group
+}
+
+func (group *RouterGroup) Get(pattern string, handler HandlerFunc) {
+	group.addRoute("GET", pattern, handler)
+}
+
+func (group *RouterGroup) Post(pattern string, handler HandlerFunc) {
+	group.addRoute("POST", pattern, handler)
+}
+
+func (group *RouterGroup) addRoute(method string, pattern string, handler HandlerFunc) {
+	pattern = group.prefix + pattern
+	group.router.addRoute(method, pattern, handler)
+}
