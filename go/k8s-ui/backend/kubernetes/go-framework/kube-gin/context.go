@@ -13,6 +13,9 @@ type Context struct {
 	Method     string
 	StatusCode int
 	Params     map[string]string // 动态路由参数
+
+	handlers []HandlerFunc
+	index    int
 }
 
 type H map[string]interface{}
@@ -23,6 +26,13 @@ func newContext(writer http.ResponseWriter, request *http.Request) *Context {
 		Req:    request,
 		Path:   request.URL.Path,
 		Method: request.Method,
+	}
+}
+
+func (context *Context) Next() {
+	context.index++
+	for ; context.index < len(context.handlers); context.index++ {
+		context.handlers[context.index](context)
 	}
 }
 
@@ -65,4 +75,12 @@ func (context *Context) JSON(code int, obj interface{}) {
 	if err := json.NewEncoder(context.Writer).Encode(obj); err != nil {
 		http.Error(context.Writer, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (context *Context) Fail(code int, err string) {
+	context.index = len(context.handlers)
+	context.JSON(code, H{
+		"errno":    -1,
+		"errormsg": err,
+	})
 }

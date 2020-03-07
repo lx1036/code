@@ -3,9 +3,11 @@ package kube_gin
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"net/http"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestEngine_Step1(test *testing.T) {
@@ -111,6 +113,33 @@ func TestGroupRoutes_Step4(test *testing.T) {
 				"errmsg": "success",
 				"data":   fmt.Sprintf("%s%s %s", "/v2", "/alpha", id),
 			})
+		})
+	}
+
+	_ = engine.Run(":9999")
+}
+
+func middlewareOnlyForV2() HandlerFunc {
+	return func(context *Context) {
+		now := time.Now()
+		context.Fail(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+		log.Printf("[%d] %s %v", context.StatusCode, context.Req.RequestURI, time.Since(now).Milliseconds())
+	}
+}
+
+func TestMiddleware_Step5(test *testing.T) {
+	engine := New()
+	engine.Use(Logger())
+
+	engine.Get("/hello", func(context *Context) {
+		context.String(http.StatusOK, "hello %s,the url path is %s", context.Query("name"), context.Path)
+	})
+
+	v2 := engine.Group("/v2")
+	v2.Use(middlewareOnlyForV2())
+	{
+		v2.Get("/hello", func(context *Context) {
+			context.String(http.StatusOK, "hello %s,the url path is %s", context.Query("name"), context.Path)
 		})
 	}
 

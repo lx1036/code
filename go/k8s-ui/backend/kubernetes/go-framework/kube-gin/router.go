@@ -81,19 +81,25 @@ func (r *router) handle(ctx *Context) {
 		ctx.Params = params
 		handler := r.handlers[ctx.Method][route.pattern]
 		if handler != nil {
-			handler(ctx)
+			ctx.handlers = append(ctx.handlers, handler)
 		} else {
-			ctx.JSON(http.StatusInternalServerError, H{
-				"errno":  -1,
-				"errmsg": "not found matched route handler",
+			ctx.handlers = append(ctx.handlers, func(context *Context) {
+				ctx.JSON(http.StatusInternalServerError, H{
+					"errno":  -1,
+					"errmsg": "not found matched route handler",
+				})
 			})
 		}
 	} else {
-		ctx.JSON(http.StatusNotFound, H{
-			"errno":  -1,
-			"errmsg": "not found",
+		ctx.handlers = append(ctx.handlers, func(context *Context) {
+			ctx.JSON(http.StatusNotFound, H{
+				"errno":  -1,
+				"errmsg": "not found",
+			})
 		})
 	}
+
+	ctx.Next()
 }
 
 type RouterGroup struct {
@@ -101,6 +107,10 @@ type RouterGroup struct {
 	router      *router
 	middlewares []HandlerFunc // 支持中间件功能
 	child       *RouterGroup  // support nested group
+}
+
+func (group *RouterGroup) Use(middlewares ...HandlerFunc) {
+	group.middlewares = append(group.middlewares, middlewares...)
 }
 
 func (group *RouterGroup) Group(prefix string) *RouterGroup {
