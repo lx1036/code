@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: falcon
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: curl
+    spec:
+      containers:
+        - image: docker.io/tutum/curl
+          imagePullPolicy: IfNotPresent
+          name: curl
+          command: [ "sleep" ]
+          args:
+            - 1000h
+  selector:
+    matchLabels:
+      app: curl
