@@ -104,9 +104,13 @@ func (r *router) handle(ctx *Context) {
 
 type RouterGroup struct {
 	prefix      string
+	basePath string
 	router      *router
 	middlewares []HandlerFunc // 支持中间件功能
 	child       *RouterGroup  // support nested group
+	engine *Engine
+	Handlers HandlersChain
+	root bool
 }
 
 func (group *RouterGroup) Use(middlewares ...HandlerFunc) {

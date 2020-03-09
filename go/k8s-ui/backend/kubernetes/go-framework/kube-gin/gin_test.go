@@ -135,13 +135,13 @@ func TestMiddleware_Step5(test *testing.T) {
 		context.String(http.StatusOK, "hello %s,the url path is %s", context.Query("name"), context.Path)
 	})
 
-	v2 := engine.Group("/v2")
+	/*v2 := engine.Group("/v2")
 	v2.Use(middlewareOnlyForV2())
 	{
 		v2.Get("/hello", func(context *Context) {
 			context.String(http.StatusOK, "hello %s,the url path is %s", context.Query("name"), context.Path)
 		})
-	}
+	}*/
 
 	_ = engine.Run(":9999")
 }

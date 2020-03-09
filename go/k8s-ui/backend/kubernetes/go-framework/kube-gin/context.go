@@ -3,12 +3,15 @@ package kube_gin
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
 )
 
 type Context struct {
-	Writer     http.ResponseWriter
+	Writer     ResponseWriter
 	Req        *http.Request
+	Request   *http.Request
 	Path       string
 	Method     string
 	StatusCode int
@@ -16,6 +19,12 @@ type Context struct {
 
 	handlers []HandlerFunc
 	index    int
+
+	// Keys is a key/value pair exclusively for the context of each request.
+	Keys map[string]interface{}
+	engine *Engine
+	// Errors is a list of errors attached to all the handlers/middlewares who used this context.
+	Errors errorMsgs
 }
 
 type H map[string]interface{}
@@ -83,4 +92,27 @@ func (context *Context) Fail(code int, err string) {
 		"errno":    -1,
 		"errormsg": err,
 	})
+}
+
+func (context *Context) ClientIP() string {
+	if context.engine.ForwardedByClientIP {
+		clientIP := context.requestHeader("X-Forwarded-For")
+		clientIP = strings.TrimSpace(strings.Split(clientIP, ",")[0])
+		if clientIP == "" {
+			clientIP = strings.TrimSpace(context.requestHeader("X-Real-Ip"))
+		}
+		if clientIP != "" {
+			return clientIP
+		}
+	}
+
+	if ip, _, err := net.SplitHostPort(strings.TrimSpace(context.Request.RemoteAddr)); err == nil {
+		return ip
+	}
+
+	return ""
+}
+
+func (context *Context) requestHeader(key string) string {
+	return context.Request.Header.Get(key)
 }
