@@ -29,14 +29,14 @@ type Context struct {
 
 type H map[string]interface{}
 
-func newContext(writer http.ResponseWriter, request *http.Request) *Context {
-	return &Context{
-		Writer: writer,
-		Req:    request,
-		Path:   request.URL.Path,
-		Method: request.Method,
-	}
-}
+//func newContext(writer http.ResponseWriter, request *http.Request) *Context {
+//	return &Context{
+//		Writer: writer,
+//		Req:    request,
+//		Path:   request.URL.Path,
+//		Method: request.Method,
+//	}
+//}
 
 func (context *Context) Next() {
 	context.index++

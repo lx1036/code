@@ -2,6 +2,18 @@ package kube_gin
 
 import "strings"
 
+
+type methodTree struct {
+	method string
+	root   *node
+}
+
+type methodTrees []methodTree
+
+
+
+
+
 type node struct {
 	pattern  string // /person/:name
 	part     string // :name ->segment
