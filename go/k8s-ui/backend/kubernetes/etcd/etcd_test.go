@@ -1,21 +1,29 @@
-package main
+package etcd
 
 import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
+	"go.etcd.io/etcd/pkg/transport"
+	"google.golang.org/grpc/grpclog"
 	"log"
+	"os"
+	"path/filepath"
+	"testing"
 	"time"
 )
 
 /**
 go run etcd.go --endpoint localhost:12379
 */
-func main() {
+
+func TestClientv3(test *testing.T) {
 	endpoint := flag.String("endpoint", "localhost:2379", "talk with client")
 	flag.Parse()
+
+	clientv3.SetLogger(grpclog.NewLoggerV2(os.Stderr, os.Stderr, os.Stderr))
 
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:            []string{*endpoint},
@@ -40,8 +48,8 @@ func main() {
 	defer client.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-	response, err := client.Put(ctx, "foo1", "bar1")
 	defer cancel()
+	response, err := client.Put(ctx, "foo1", "bar1")
 	if err != nil {
 		switch err {
 		case context.Canceled:
@@ -72,4 +80,50 @@ func main() {
 	}
 
 	fmt.Println(*getResponse)
+}
+
+// etcd --cert-file ./kubernetes.pem --key-file ./kubernetes-key.pem --trusted-ca-file ./ca.pem
+func TestClientv3WithTLS(test *testing.T) {
+	abs, _ := filepath.Abs(".")
+	tlsInfo := transport.TLSInfo{
+		CertFile:      abs + "/kubernetes.pem",
+		KeyFile:       abs + "/kubernetes-key.pem",
+		TrustedCAFile: abs + "/ca.pem",
+	}
+	tlsConfig, err := tlsInfo.ClientConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(tlsConfig.MaxVersion)
+
+	endpoint := flag.String("endpoint", "localhost:2379", "talk with client")
+	flag.Parse()
+
+	clientv3.SetLogger(grpclog.NewLoggerV2(os.Stderr, os.Stderr, os.Stderr))
+
+	client, err := clientv3.New(clientv3.Config{
+		Endpoints:   []string{*endpoint},
+		DialTimeout: time.Second * 5,
+		TLS:         tlsConfig,
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	response, err := client.Get(ctx, "foo1")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(*response)
+
+	watch := client.Watch(ctx, "foo1")
+	for w := range watch {
+		for _, event := range w.Events {
+			fmt.Printf("%s %q:%q\n", event.Type, event.Kv.Key, event.Kv.Value)
+		}
+	}
 }

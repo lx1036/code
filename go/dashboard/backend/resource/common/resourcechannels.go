@@ -98,4 +98,3 @@ type ReplicationControllerListChannel struct {
 	List  chan *v1.ReplicationControllerList
 	Error chan error
 }
-
