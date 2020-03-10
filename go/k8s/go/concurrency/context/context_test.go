@@ -16,7 +16,7 @@ func TestContextUsage(test *testing.T) {
 	serve()
 }
 
-func serve()  {
+func serve() {
 	http.HandleFunc("/search", handleSearch)
 	log.Fatal(http.ListenAndServe(":8001", nil))
 }

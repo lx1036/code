@@ -19,7 +19,6 @@ import (
 go run etcd.go --endpoint localhost:12379
 */
 
-
 func TestClientv3(test *testing.T) {
 	endpoint := flag.String("endpoint", "localhost:2379", "talk with client")
 	flag.Parse()
@@ -87,9 +86,9 @@ func TestClientv3(test *testing.T) {
 func TestClientv3WithTLS(test *testing.T) {
 	abs, _ := filepath.Abs(".")
 	tlsInfo := transport.TLSInfo{
-		CertFile:            abs + "/kubernetes.pem",
-		KeyFile:             abs + "/kubernetes-key.pem",
-		TrustedCAFile:       abs + "/ca.pem",
+		CertFile:      abs + "/kubernetes.pem",
+		KeyFile:       abs + "/kubernetes-key.pem",
+		TrustedCAFile: abs + "/ca.pem",
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
@@ -104,9 +103,9 @@ func TestClientv3WithTLS(test *testing.T) {
 	clientv3.SetLogger(grpclog.NewLoggerV2(os.Stderr, os.Stderr, os.Stderr))
 
 	client, err := clientv3.New(clientv3.Config{
-		Endpoints:            []string{*endpoint},
-		DialTimeout:          time.Second * 5,
-		TLS:                  tlsConfig,
+		Endpoints:   []string{*endpoint},
+		DialTimeout: time.Second * 5,
+		TLS:         tlsConfig,
 	})
 	if err != nil {
 		panic(err)
