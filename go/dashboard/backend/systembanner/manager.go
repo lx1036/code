@@ -6,3 +6,13 @@ import "k8s-lx1036/dashboard/backend/systembanner/api"
 type SystemBannerManager struct {
 	systemBanner api.SystemBanner
 }
+
+// NewSystemBannerManager creates new settings manager.
+func NewSystemBannerManager(message, severity string) SystemBannerManager {
+	return SystemBannerManager{
+		systemBanner: api.SystemBanner{
+			Message:  message,
+			Severity: api.GetSeverity(severity),
+		},
+	}
+}

@@ -8,10 +8,13 @@ import (
 	"github.com/spf13/pflag"
 	"k8s-lx1036/dashboard/backend/args"
 	authApi "k8s-lx1036/dashboard/backend/auth/api"
+	"k8s-lx1036/dashboard/backend/auth/jwe"
 	"k8s-lx1036/dashboard/backend/client"
 	clientapi "k8s-lx1036/dashboard/backend/client/api"
 	"k8s-lx1036/dashboard/backend/handler"
+	"k8s-lx1036/dashboard/backend/settings"
 	"k8s-lx1036/dashboard/backend/sync"
+	"k8s-lx1036/dashboard/backend/systembanner"
 	"log"
 	"net"
 	"net/http"
@@ -90,7 +93,7 @@ func main() {
 	// Init system banner manager
 	systemBannerManager := systembanner.NewSystemBannerManager(args.Holder.GetSystemBanner(),
 		args.Holder.GetSystemBannerSeverity())
-	// Init integrations
+	// Init integration manager
 	integrationManager := integration.NewIntegrationManager(clientManager)
 
 	apiHandler, err := handler.CreateHTTPAPIHandler(
@@ -98,7 +101,8 @@ func main() {
 		clientManager,
 		authManager,
 		settingsManager,
-		systemBannerManager)
+		systemBannerManager,
+	)
 	if err != nil {
 		handleFatalInitError(err)
 	}
