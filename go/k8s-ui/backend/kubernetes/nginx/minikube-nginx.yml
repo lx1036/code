@@ -4,36 +4,37 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-demo
+  name: nginx-demo-a
   labels:
-    app: nginx-demo
+    app: nginx-demo-a
 spec:
   replicas: 1
   template:
     metadata:
-      name: nginx-demo
+      name: nginx-demo-a
       labels:
-        app: nginx-demo
+        app: nginx-demo-a
     spec:
       containers:
-        - name: nginx-demo
+        - name: nginx-demo-a
           image: nginx:1.17.8
           imagePullPolicy: IfNotPresent
-      restartPolicy: Always
+      restartPolicy: Never
   selector:
     matchLabels:
-      app: nginx-demo
+      app: nginx-demo-a
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: nginx-demo
+  name: nginx-demo-a
 spec:
   selector:
-    app: nginx-demo
+    app: nginx-demo-a
   ports:
     - port: 8088
       targetPort: 80
+      protocol: TCP
   type: NodePort
 
 ---
@@ -55,7 +56,7 @@ spec:
         - name: nginx-demo-2
           image: nginx:1.17.8
           imagePullPolicy: IfNotPresent
-      restartPolicy: Always
+      restartPolicy: Never
   selector:
     matchLabels:
       app: nginx-demo-2
@@ -93,7 +94,7 @@ spec:
         - name: nginx-demo-3
           image: nginx:1.17.8
           imagePullPolicy: IfNotPresent
-      restartPolicy: Always
+      restartPolicy: Never
   selector:
     matchLabels:
       app: nginx-demo-3

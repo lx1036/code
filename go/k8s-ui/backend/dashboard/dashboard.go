@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s-lx1036/k8s-ui/backend/dashboard/client"
 	"k8s-lx1036/k8s-ui/backend/dashboard/router"
 	"path/filepath"
 )
@@ -40,6 +41,9 @@ func preRun(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 	fmt.Println("Using config file:", viper.ConfigFileUsed())
+
+	client.DefaultClientManager = client.NewClientManager(viper.GetString("common.kubeconfig"), viper.GetString("common.apiserver-host"))
+
 }
 
 func run(cmd *cobra.Command, args []string) {
