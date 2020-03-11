@@ -14,7 +14,9 @@ const (
 	disableColor
 	forceColor
 )
+
 var consoleColorMode = autoColor
+
 const (
 	green   = "\033[97;42m"
 	white   = "\033[90;47m"
@@ -111,6 +113,7 @@ func (p *LogFormatterParams) MethodColor() string {
 func (p *LogFormatterParams) ResetColor() string {
 	return reset
 }
+
 // defaultLogFormatter is the default log format function Logger middleware uses.
 var defaultLogFormatter = func(param LogFormatterParams) string {
 	var statusColor, methodColor, resetColor string
@@ -156,9 +159,7 @@ func LoggerWithConfig(conf LoggerConfig) HandlerFunc {
 
 	notlogged := conf.SkipPaths
 
-
 	isTerm := true
-
 
 	var skip map[string]struct{}
 
@@ -203,4 +204,3 @@ func LoggerWithConfig(conf LoggerConfig) HandlerFunc {
 		}
 	}
 }
-

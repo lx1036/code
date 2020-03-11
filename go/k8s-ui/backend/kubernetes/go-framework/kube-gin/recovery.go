@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 )
+
 func Recovery() HandlerFunc {
 	return RecoveryWithWriter(DefaultErrorWriter)
 }

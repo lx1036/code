@@ -17,8 +17,8 @@ type Engine struct {
 
 	HandleMethodNotAllowed bool
 	ForwardedByClientIP    bool
-	pool             sync.Pool
-	trees            methodTrees
+	pool                   sync.Pool
+	trees                  methodTrees
 }
 
 func (engine *Engine) addRoute(method string, pattern string, handler HandlerFunc) {
@@ -45,14 +45,13 @@ func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	//ctx := newContext(w, req)
 	//ctx.handlers = engine.RouterGroup.middlewares
 
-
 	ctx := engine.pool.Get().(*Context)
 
 	httpMethod := ctx.Request.Method
 	path := ctx.Request.URL.Path
 
 	tree := engine.trees
-	for i, tl := 0, len(tree); i < tl; i++  {
+	for i, tl := 0, len(tree); i < tl; i++ {
 		if tree[i].method != httpMethod {
 			continue
 		}
@@ -60,15 +59,9 @@ func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		//root := tree[i].root
 		node, params := engine.router.getRoute(httpMethod, path)
 
-
-
 	}
 
-
-
 	engine.router.handle(ctx)
-
-
 
 	engine.pool.Put(ctx)
 }
@@ -83,20 +76,19 @@ func New() *Engine {
 	}
 	engine.RouterGroup = &RouterGroup{engine:engine}
 	engine.groups = []*RouterGroup{engine.RouterGroup}
-*/
+	*/
 
 	engine := &Engine{
-		router:      nil,
+		router: nil,
 		RouterGroup: RouterGroup{
 			Handlers: nil,
 			basePath: "/",
-			root: true,
+			root:     true,
 		},
-		ForwardedByClientIP:true,
-		groups:      nil,
-		trees: make(methodTrees, 0, 9),
+		ForwardedByClientIP: true,
+		groups:              nil,
+		trees:               make(methodTrees, 0, 9),
 	}
-
 
 	engine.RouterGroup.engine = engine
 

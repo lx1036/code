@@ -1,8 +1,8 @@
 package kube_gin
 
 import (
-	"os"
 	"io"
+	"os"
 )
 
 const EnvGinMode = "GIN_MODE"
@@ -26,6 +26,7 @@ var ginMode = debugCode
 var modeName = DebugMode
 
 var DefaultWriter io.Writer = os.Stdout
+
 // DefaultErrorWriter is the default io.Writer used by Gin to debug errors
 var DefaultErrorWriter io.Writer = os.Stderr
 
@@ -51,6 +52,7 @@ func SetMode(value string) {
 	}
 	modeName = value
 }
+
 // Mode returns currently gin mode.
 func Mode() string {
 	return modeName
