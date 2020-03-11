@@ -48,7 +48,6 @@ const (
 
 func (controller *DeploymentController) HandleDeploy() gin.HandlerFunc {
 	return func(context *gin.Context) {
-
 		var spec DeploymentSpec
 		if err := context.ShouldBindJSON(&spec); err != nil {
 			context.JSON(http.StatusBadRequest, gin.H{

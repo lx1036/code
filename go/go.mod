@@ -8,7 +8,6 @@ require (
 	github.com/astaxie/beego v1.12.1
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
-	github.com/coreos/etcd v3.3.17+incompatible // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/getsentry/sentry-go v0.3.0
@@ -64,7 +63,6 @@ require (
 	k8s.io/apiextensions-apiserver v0.17.3
 	k8s.io/apimachinery v0.17.3
 	k8s.io/client-go v11.0.0+incompatible
-	k8s.io/code-generator v0.19.0-alpha.0 // indirect
 	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.17.3
 	k8s.io/sample-controller v0.17.3

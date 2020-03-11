@@ -1,7 +1,9 @@
 package client
 
 import (
+	"k8s-lx1036/k8s-ui/backend/dashboard/mode"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"log"
@@ -52,6 +54,9 @@ func (manager *ClientManager) initInsecureClient() {
 }
 
 func (manager *ClientManager) Client() kubernetes.Interface {
+	if mode.Mode() == mode.TestMode {
+		return fake.NewSimpleClientset()
+	}
 
 	return manager.insecureClient
 }

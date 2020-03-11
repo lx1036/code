@@ -1,0 +1,92 @@
+[
+  200,
+  {
+    "Content-Type": [
+      "application/json; charset=utf-8"
+    ]
+  },
+  {
+    "errno": 0,
+    "errmsg": "success",
+    "data": {
+      "deployment": {
+        "metadata": {
+          "name": "nginx-demo",
+          "namespace": "test-namespace",
+          "creationTimestamp": null,
+          "labels": {
+            "app": "nginx-demo"
+          },
+          "annotations": {
+            "description": "create nginx deployment and service"
+          }
+        },
+        "spec": {
+          "replicas": 3,
+          "selector": {
+            "matchLabels": {
+              "app": "nginx-demo"
+            }
+          },
+          "template": {
+            "metadata": {
+              "name": "nginx-demo",
+              "creationTimestamp": null,
+              "labels": {
+                "app": "nginx-demo"
+              },
+              "annotations": {
+                "description": "create nginx deployment and service"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "name": "nginx-demo",
+                  "image": "nginx:1.17.8",
+                  "resources": {},
+                  "securityContext": {
+                    "privileged": true
+                  }
+                }
+              ],
+              "restartPolicy": "Always"
+            }
+          },
+          "strategy": {}
+        },
+        "status": {}
+      },
+      "service": {
+        "metadata": {
+          "name": "nginx-demo",
+          "namespace": "test-namespace",
+          "creationTimestamp": null,
+          "labels": {
+            "app": "nginx-demo"
+          },
+          "annotations": {
+            "description": "create nginx deployment and service"
+          }
+        },
+        "spec": {
+          "ports": [
+            {
+              "name": "nginx-demo",
+              "protocol": "TCP",
+              "port": 8088,
+              "targetPort": 80
+            }
+          ],
+          "selector": {
+            "app": "nginx-demo"
+          },
+          "type": "NodePort"
+        },
+        "status": {
+          "loadBalancer": {}
+        }
+      }
+    }
+  }
+]
