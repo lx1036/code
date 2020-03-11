@@ -64,7 +64,6 @@ func CreateHTTPAPIHandler(iManager integration.IntegrationManager, cManager clie
 		apiV1Ws.GET("/appdeployment/protocols").
 			To(apiHandler.handleGetAvailableProtocols).
 			Writes(deployment.Protocols{}))
-
 	apiV1Ws.Route(
 		apiV1Ws.POST("/appdeploymentfromfile").
 			To(apiHandler.handleDeployFromFile).
@@ -557,4 +556,8 @@ func (apiHandler *APIHandler) handleDeploy(request *restful.Request, response *r
 		return
 	}
 	response.WriteHeaderAndEntity(http.StatusCreated, appDeploymentSpec)
+}
+
+func (apiHandler *APIHandler) handleNameValidity(request *restful.Request, response *restful.Response) {
+
 }
