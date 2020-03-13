@@ -3,6 +3,7 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"k8s-lx1036/k8s-ui/backend/dashboard/controllers/resource/deployment"
+	"k8s-lx1036/k8s-ui/backend/dashboard/controllers/resource/pod"
 )
 
 func SetupRouter() *gin.Engine {
@@ -12,6 +13,9 @@ func SetupRouter() *gin.Engine {
 		// Deployment
 		api.POST("/appdeployment", (&deployment.DeploymentController{}).HandleDeploy())
 		api.POST("/appdeployment/validate/name", (&deployment.DeploymentController{}).HandleNameValidity())
+
+		// Pod
+		api.GET("/pod", (&pod.PodController{}).List())
 
 		// Replication
 		api.GET("/replicationcontroller")
