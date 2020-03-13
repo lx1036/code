@@ -1,8 +1,9 @@
 import {Component, OnInit} from '@angular/core';
 import {HttpClient} from "@angular/common/http";
 import {ActivatedRoute} from "@angular/router";
-import {KdError, StateError} from "../typings/api";
+import {KdError, StateError} from "../typings/frontend-api";
 import {map} from "rxjs/operators";
+import {AuthenticationMode, EnabledAuthenticationModes, LoginSkippableResponse} from "../typings/backend-api";
 
 
 enum LoginModes {
@@ -81,21 +82,27 @@ enum LoginModes {
 })
 export class LoginComponent implements OnInit {
   errors: KdError[] = [];
+  private enabledAuthenticationModes: AuthenticationMode[] = [];
+  private isLoginSkippable = false;
+  selectedAuthenticationMode = LoginModes.Kubeconfig;
 
-  constructor(private readonly http: HttpClient,private readonly route: ActivatedRoute,) {
+  constructor(
+    private readonly http: HttpClient,
+    private readonly route: ActivatedRoute,
+    private readonly authService_: AuthService,) {
   }
 
   ngOnInit() {
     this.http
     .get<EnabledAuthenticationModes>('api/v1/login/modes')
     .subscribe((enabledModes: EnabledAuthenticationModes) => {
-      this.enabledAuthenticationModes_ = enabledModes.modes;
+      this.enabledAuthenticationModes = enabledModes.modes;
     });
 
     this.http
     .get<LoginSkippableResponse>('api/v1/login/skippable')
     .subscribe((loginSkippableResponse: LoginSkippableResponse) => {
-      this.isLoginSkippable_ = loginSkippableResponse.skippable;
+      this.isLoginSkippable = loginSkippableResponse.skippable;
     });
 
     this.route.paramMap.pipe(map(() => window.history.state)).subscribe((state: StateError) => {
@@ -103,6 +110,36 @@ export class LoginComponent implements OnInit {
         this.errors = [state.error];
       }
     });
+  }
+
+  getEnabledAuthenticationModes(): AuthenticationMode[] {
+    if (this.enabledAuthenticationModes.length > 0 && this.enabledAuthenticationModes.indexOf(LoginModes.Kubeconfig) < 0) {
+      // Push this option to the beginning of the list
+      this.enabledAuthenticationModes.splice(0, 0, LoginModes.Kubeconfig);
+    }
+
+    return this.enabledAuthenticationModes;
+  }
+
+  login(): void {
+    this.authService_.login(this.getLoginSpec_()).subscribe(
+      (errors: K8SError[]) => {
+        if (errors.length > 0) {
+          this.errors = errors.map((error: K8SError) =>
+            new K8SError(error.ErrStatus).toKdError().localize(),
+          );
+          return;
+        }
+
+        this.pluginConfigService_.refreshConfig();
+        this.ngZone_.run(() => {
+          this.state_.navigate(['overview']);
+        });
+      },
+      (err: HttpErrorResponse) => {
+        this.errors = [AsKdError(err)];
+      },
+    );
   }
 }
 
