@@ -6,6 +6,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -177,6 +178,35 @@ func (controller *DeploymentController) HandleDeploy() gin.HandlerFunc {
 				Service:    serviceNew,
 			},
 		})
+	}
+}
+
+type AppNameValiditySpec struct {
+	Name string `json:"name" form:"name" binding:"required"`
+	Namespace string `json:"namespace" form:"namespace" binding:"required"`
+}
+
+func (controller *DeploymentController) HandleNameValidity() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		var spec AppNameValiditySpec
+		if err := context.ShouldBindJSON(&spec); err != nil {
+			context.JSON(http.StatusBadRequest, gin.H{
+				"errno":  -1,
+				"errmsg": err.Error(),
+				"data":   nil,
+			})
+			return
+		}
+
+		k8sClient := client.DefaultClientManager.Client()
+
+
+		_, err := k8sClient.AppsV1().Deployments(spec.Namespace).Get(spec.Name, metaV1.GetOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) || errors.IsForbidden(err) {
+
+			}
+		}
 	}
 }
 

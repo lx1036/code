@@ -9,7 +9,13 @@ func SetupRouter() *gin.Engine {
 	router := gin.Default()
 	api := router.Group("/api")
 	{
+		// Deployment
 		api.POST("/appdeployment", (&deployment.DeploymentController{}).HandleDeploy())
+		api.POST("/appdeployment", (&deployment.DeploymentController{}).HandleNameValidity())
+
+		// Replication
+		api.GET("/replicationcontroller", )
+		//api.GET("/replicationcontroller/:namespace/:replicationController/event")
 	}
 
 	return router

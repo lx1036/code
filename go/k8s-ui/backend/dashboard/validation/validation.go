@@ -1,0 +1,8 @@
+package validation
+
+
+
+
+func ValidateAppName()  {
+
+}
