@@ -11,10 +11,10 @@ func SetupRouter() *gin.Engine {
 	{
 		// Deployment
 		api.POST("/appdeployment", (&deployment.DeploymentController{}).HandleDeploy())
-		api.POST("/appdeployment", (&deployment.DeploymentController{}).HandleNameValidity())
+		api.POST("/appdeployment/validate/name", (&deployment.DeploymentController{}).HandleNameValidity())
 
 		// Replication
-		api.GET("/replicationcontroller", )
+		api.GET("/replicationcontroller")
 		//api.GET("/replicationcontroller/:namespace/:replicationController/event")
 	}
 

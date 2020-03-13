@@ -1,0 +1,15 @@
+[
+  200,
+  {
+    "Content-Type": [
+      "application/json; charset=utf-8"
+    ]
+  },
+  {
+    "errno": 0,
+    "errmsg": "success",
+    "data": {
+      "valid": true
+    }
+  }
+]

@@ -182,7 +182,7 @@ func (controller *DeploymentController) HandleDeploy() gin.HandlerFunc {
 }
 
 type AppNameValiditySpec struct {
-	Name string `json:"name" form:"name" binding:"required"`
+	Name      string `json:"name" form:"name" binding:"required"`
 	Namespace string `json:"namespace" form:"namespace" binding:"required"`
 }
 
@@ -198,14 +198,48 @@ func (controller *DeploymentController) HandleNameValidity() gin.HandlerFunc {
 			return
 		}
 
+		isDeploymentValid := false
+		isServiceValid := false
 		k8sClient := client.DefaultClientManager.Client()
-
-
 		_, err := k8sClient.AppsV1().Deployments(spec.Namespace).Get(spec.Name, metaV1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) || errors.IsForbidden(err) {
-
+				isDeploymentValid = true
 			}
+		} else {
+			isDeploymentValid = true
+		}
+
+		_, err = k8sClient.CoreV1().Services(spec.Namespace).Get(spec.Name, metaV1.GetOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) || errors.IsForbidden(err) {
+				isServiceValid = true
+			}
+		} else {
+			isServiceValid = true
+		}
+
+		isValid := isDeploymentValid && isServiceValid
+		if isValid {
+			context.JSON(http.StatusOK, gin.H{
+				"errno":  0,
+				"errmsg": "success",
+				"data": struct {
+					Valid bool `json:"valid"`
+				}{
+					Valid: isValid,
+				},
+			})
+		} else {
+			context.JSON(http.StatusInternalServerError, gin.H{
+				"errno":  0,
+				"errmsg": "fail",
+				"data": struct {
+					Valid bool `json:"valid"`
+				}{
+					Valid: isValid,
+				},
+			})
 		}
 	}
 }

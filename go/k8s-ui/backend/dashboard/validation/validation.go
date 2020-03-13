@@ -1,8 +1,5 @@
 package validation
 
-
-
-
-func ValidateAppName()  {
+func ValidateAppName() {
 
 }
