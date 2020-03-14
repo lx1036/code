@@ -1,15 +1,26 @@
 import {Component, OnInit} from '@angular/core';
 import {HttpClient} from "@angular/common/http";
 import {ActivatedRoute} from "@angular/router";
-import {KdError, StateError} from "../typings/frontend-api";
+import {KdError, KdFile, StateError} from "../typings/frontend-api";
 import {map} from "rxjs/operators";
-import {AuthenticationMode, EnabledAuthenticationModes, LoginSkippableResponse} from "../typings/backend-api";
+import {K8SError, LoginSpec} from "../typings/backend-api";
+import {AuthService} from "../common/services/global/authentication";
 
 
 enum LoginModes {
   Kubeconfig = 'kubeconfig',
   Basic = 'basic',
   Token = 'token',
+}
+
+export interface LoginSkippableResponse {
+  skippable: boolean;
+}
+
+export type AuthenticationMode = string;
+
+export interface EnabledAuthenticationModes {
+  modes: AuthenticationMode[];
 }
 
 @Component({
@@ -55,9 +66,8 @@ enum LoginModes {
                   <input id="password" name="password" matInput i18n-placeholder placeholder="Password" type="password" required (change)="onChange($event)">
                 </mat-form-field>
               </div>
-
               <div *ngSwitchCase="loginModes.Kubeconfig" class="kd-login-input">
-                <kd-upload-file label="Choose kubeconfig file" i18n-label (onLoad)="onChange($event)"></kd-upload-file>
+                <kube-upload-file label="Choose kubeconfig file" i18n-label (onLoad)="onChange($event)"></kube-upload-file>
               </div>
               <ng-template ngFor let-error [ngForOf]="errors" ngProjectAs="mat-error" class="kd-login-input">
                 <mat-error class="kd-login-input kd-error kd-error-text">
@@ -85,23 +95,24 @@ export class LoginComponent implements OnInit {
   private enabledAuthenticationModes: AuthenticationMode[] = [];
   private isLoginSkippable = false;
   selectedAuthenticationMode = LoginModes.Kubeconfig;
+  loginModes = LoginModes;
+  private kubeconfig: string;
+  private token: string;
+  private username: string;
+  private password: string;
 
   constructor(
     private readonly http: HttpClient,
     private readonly route: ActivatedRoute,
-    private readonly authService_: AuthService,) {
+    private readonly authService: AuthService,) {
   }
 
   ngOnInit() {
-    this.http
-    .get<EnabledAuthenticationModes>('api/v1/login/modes')
-    .subscribe((enabledModes: EnabledAuthenticationModes) => {
+    this.http.get<EnabledAuthenticationModes>('api/v1/login/modes').subscribe((enabledModes: EnabledAuthenticationModes) => {
       this.enabledAuthenticationModes = enabledModes.modes;
     });
 
-    this.http
-    .get<LoginSkippableResponse>('api/v1/login/skippable')
-    .subscribe((loginSkippableResponse: LoginSkippableResponse) => {
+    this.http.get<LoginSkippableResponse>('api/v1/login/skippable').subscribe((loginSkippableResponse: LoginSkippableResponse) => {
       this.isLoginSkippable = loginSkippableResponse.skippable;
     });
 
@@ -122,7 +133,7 @@ export class LoginComponent implements OnInit {
   }
 
   login(): void {
-    this.authService_.login(this.getLoginSpec_()).subscribe(
+    this.authService.login(this.getLoginSpec()).subscribe(
       (errors: K8SError[]) => {
         if (errors.length > 0) {
           this.errors = errors.map((error: K8SError) =>
@@ -141,5 +152,50 @@ export class LoginComponent implements OnInit {
       },
     );
   }
+
+  onChange(event: Event & KdFile): void {
+    switch (this.selectedAuthenticationMode) {
+      case LoginModes.Kubeconfig:
+        this.kubeconfig = (event as KdFile).content;
+        break;
+      case LoginModes.Token:
+        this.token = (event.target as HTMLInputElement).value;
+        break;
+      case LoginModes.Basic:
+        if ((event.target as HTMLInputElement).id === 'username') {
+          this.username = (event.target as HTMLInputElement).value;
+        } else {
+          this.password = (event.target as HTMLInputElement).value;
+        }
+        break;
+      default:
+    }
+  }
+
+  isSkipButtonEnabled(): boolean {
+    return this.isLoginSkippable;
+  }
+
+  skip() {
+
+  }
+
+
+  getLoginSpec(): LoginSpec {
+    switch (this.selectedAuthenticationMode) {
+      case LoginModes.Kubeconfig:
+        return {kubeConfig: this.kubeconfig} as LoginSpec;
+      case LoginModes.Token:
+        return {token: this.token} as LoginSpec;
+      case LoginModes.Basic:
+        return {
+          username: this.username,
+          password: this.password,
+        } as LoginSpec;
+      default:
+        return {} as LoginSpec;
+    }
+  }
+
 }
 
