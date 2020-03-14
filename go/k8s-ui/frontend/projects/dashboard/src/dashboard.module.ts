@@ -8,6 +8,8 @@ import {LoginComponent} from "./login/login.component";
 import {LoginGuard} from "./login/login.guard";
 import {SharedModule} from "./shared.module";
 import {CardComponent} from "./common/components/card/card.component";
+import {UploadFileComponent} from "./common/components/uploadfile/uploadfile.component";
+import {AlertDialog} from "./common/components/dialog/dialog";
 
 
 
@@ -42,6 +44,8 @@ export const routes: Routes = [
 
     LoginComponent,
     CardComponent,
+    UploadFileComponent,
+    AlertDialog,
   ],
   bootstrap: [RootComponent],
 })

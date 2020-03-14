@@ -1,5 +1,5 @@
 import {Injectable} from "@angular/core";
-import {AuthResponse, CsrfToken, K8sError, LoginSpec} from "../../../typings/backend-api";
+import {AuthResponse, CsrfToken, K8SError, LoginSpec} from "../../../typings/backend-api";
 import {Observable, of} from "rxjs";
 import {CsrfTokenService} from "./csrftoken";
 import {switchMap} from "rxjs/operators";
@@ -19,7 +19,7 @@ export class AuthService {
   /**
    * Sends a login request to the backend with filled in login spec structure.
    */
-  login(loginSpec: LoginSpec): Observable<K8sError[]> {
+  login(loginSpec: LoginSpec): Observable<K8SError[]> {
     return this.csrfTokenService
     .getTokenForAction('login')
     .pipe(

@@ -1,16 +1,6 @@
 import {KdError} from "./frontend-api";
 
 
-export type AuthenticationMode = string;
-
-export interface EnabledAuthenticationModes {
-  modes: AuthenticationMode[];
-}
-
-export interface LoginSkippableResponse {
-  skippable: boolean;
-}
-
 export interface LoginSpec {
   username: string;
   password: string;
@@ -18,7 +8,7 @@ export interface LoginSpec {
   kubeConfig: string;
 }
 
-export interface K8sError {
+export interface K8SError {
   ErrStatus: ErrStatus;
 
   toKdError(): KdError;
@@ -37,5 +27,5 @@ export interface CsrfToken {
 
 export interface AuthResponse {
   jweToken: string;
-  errors: K8sError[];
+  errors: K8SError[];
 }
