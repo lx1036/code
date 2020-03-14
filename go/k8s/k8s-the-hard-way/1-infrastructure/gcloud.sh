@@ -11,23 +11,23 @@ gcloud compute firewall-rules create kubernetes-the-hard-way-allow-external --al
 gcloud compute addresses create kubernetes-the-hard-way --region $(gcloud config get-value compute/region) # address
 
 # VM
-## gcp worker-instances
+## gcp master-instances
 for (( i = 0; i < 3; i++ )); do
-    gcloud compute instances create worker-${i} --async --boot-disk-size 200GB \
+    gcloud compute instances create controller-${i} --async --boot-disk-size 200GB \
       --can-ip-forward --image-family ubuntu-1804-lts \
       --image-project ubuntu-os-cloud --machine-type n1-standard-1 \
       --private-network-ip 10.240.0.1${i} \
       --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
       --subnet kubernetes --tags kubernetes-the-hard-way,controller
 done
-## gcp master-instances
+## gcp worker-instances
 for (( i = 0; i < 3; i++ )); do
-    gcloud compute instances create master-${i} --async --boot-disk-size 200GB \
+    gcloud compute instances create worker-${i} --async --boot-disk-size 200GB \
       --can-ip-forward --image-family ubuntu-1804-lts \
       --image-project ubuntu-os-cloud --machine-type n1-standard-1 \
       --private-network-ip 10.240.0.2${i} --metadata pod-cidr=10.200.${i}.0/24 \
       --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
-      --subnet kubernetes --tags kubernetes-the-hard-way,controller
+      --subnet kubernetes --tags kubernetes-the-hard-way,worker
 done
 ## check instances
 gcloud compute instances list
