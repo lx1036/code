@@ -24,3 +24,7 @@ const (
 	Token AuthenticationMode = "token"
 	Basic AuthenticationMode = "basic"
 )
+
+type LoginSkippableResponse struct {
+	Skippable bool `json:"skippable"`
+}

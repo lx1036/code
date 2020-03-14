@@ -51,6 +51,17 @@ func (controller *AuthenticationController) GetLoginModes() gin.HandlerFunc {
 	}
 }
 
+func (controller *AuthenticationController) GetLoginSkippable() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		skippable := AuthenticationSkippable()
+		context.JSON(http.StatusOK, gin.H{
+			"errno": 0,
+			"errmsg": "success",
+			"data": LoginSkippableResponse{Skippable:skippable},
+		})
+	}
+}
+
 
 func getAuthenticator(spec LoginSpec) Authenticator {
 	switch {

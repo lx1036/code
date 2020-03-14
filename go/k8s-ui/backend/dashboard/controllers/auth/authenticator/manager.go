@@ -15,7 +15,9 @@ func AuthenticationModes() []AuthenticationMode {
 	return authModes
 }
 
-
+func AuthenticationSkippable() bool {
+	return viper.GetBool("common.enable-skip-login")
+}
 
 
 

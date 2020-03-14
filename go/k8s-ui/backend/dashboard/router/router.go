@@ -17,6 +17,7 @@ func SetupRouter() *gin.Engine {
 
 		// login
 		api.GET("/login/modes", (&authenticator.AuthenticationController{}).GetLoginModes())
+		api.GET("/login/skippable", (&authenticator.AuthenticationController{}).GetLoginSkippable())
 
 		// Deployment
 		api.POST("/appdeployment", (&deployment.DeploymentController{}).HandleDeploy())
