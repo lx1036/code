@@ -51,6 +51,7 @@ require (
 	github.com/urfave/cli v1.22.1
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	go.uber.org/zap v1.10.0
+	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20200116001909-b77594299b42
 	google.golang.org/grpc v1.23.1

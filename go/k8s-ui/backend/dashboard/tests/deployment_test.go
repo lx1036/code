@@ -43,7 +43,7 @@ func (suite *DeploymentSuite) TestDeploymentNameValidity() {
 		Namespace: "default",
 	}
 	requestBody, _ := json.Marshal(payload)
-	request := httptest.NewRequest("POST", "/api/appdeployment/validate/name", bytes.NewBuffer(requestBody))
+	request := httptest.NewRequest("POST", "/api/v1/appdeployment/validate/name", bytes.NewBuffer(requestBody))
 	request.Header.Set("content-type", "application/json")
 	writer := httptest.NewRecorder()
 	suite.router.ServeHTTP(writer, request)
@@ -116,7 +116,7 @@ func (suite *DeploymentSuite) TestDeployment() {
 		IsExternal: true,
 	}
 	requestBody, _ := json.Marshal(payload)
-	request := httptest.NewRequest("POST", "/api/appdeployment", bytes.NewBuffer(requestBody))
+	request := httptest.NewRequest("POST", "/api/v1/appdeployment", bytes.NewBuffer(requestBody))
 	request.Header.Set("content-type", "application/json")
 	writer := httptest.NewRecorder()
 	suite.router.ServeHTTP(writer, request)
