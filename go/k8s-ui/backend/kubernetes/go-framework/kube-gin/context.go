@@ -11,7 +11,7 @@ import (
 type Context struct {
 	Writer     ResponseWriter
 	Req        *http.Request
-	Request   *http.Request
+	Request    *http.Request
 	Path       string
 	Method     string
 	StatusCode int
@@ -21,7 +21,7 @@ type Context struct {
 	index    int
 
 	// Keys is a key/value pair exclusively for the context of each request.
-	Keys map[string]interface{}
+	Keys   map[string]interface{}
 	engine *Engine
 	// Errors is a list of errors attached to all the handlers/middlewares who used this context.
 	Errors errorMsgs
