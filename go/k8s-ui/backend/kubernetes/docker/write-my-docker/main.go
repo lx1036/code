@@ -6,7 +6,7 @@ https://github.com/xianlubird/mydocker/blob/master/main.go
 import (
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"k8s-lx1036/k8s/write-my-docker/container"
+	"k8s-lx1036/k8s-ui/backend/kubernetes/docker/write-my-docker/container"
 	"os"
 )
 
