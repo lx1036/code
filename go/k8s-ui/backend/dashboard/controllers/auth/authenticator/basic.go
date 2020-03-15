@@ -1,5 +1,5 @@
 package authenticator
 
-func NewBasicAuthenticator(spec LoginSpec)  {
+func NewBasicAuthenticator(spec LoginSpec) {
 	return
 }

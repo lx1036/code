@@ -6,11 +6,7 @@ import (
 )
 
 type AuthenticationController struct {
-
 }
-
-
-
 
 func (controller *AuthenticationController) Login() gin.HandlerFunc {
 	return func(context *gin.Context) {
@@ -32,21 +28,20 @@ func (controller *AuthenticationController) Login() gin.HandlerFunc {
 		token := tokenManager.Generate(authInfo)
 
 		context.JSON(http.StatusOK, gin.H{
-			"errno": 0,
+			"errno":  0,
 			"errmsg": nil,
-			"data": AuthResponse{JweToken: token},
+			"data":   AuthResponse{JweToken: token},
 		})
 	}
 }
-
 
 func (controller *AuthenticationController) GetLoginModes() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		modes := AuthenticationModes()
 		context.JSON(http.StatusOK, gin.H{
-			"errno": 0,
+			"errno":  0,
 			"errmsg": "success",
-			"data": LoginModesResponse{Modes:modes},
+			"data":   LoginModesResponse{Modes: modes},
 		})
 	}
 }
@@ -55,17 +50,16 @@ func (controller *AuthenticationController) GetLoginSkippable() gin.HandlerFunc 
 	return func(context *gin.Context) {
 		skippable := AuthenticationSkippable()
 		context.JSON(http.StatusOK, gin.H{
-			"errno": 0,
+			"errno":  0,
 			"errmsg": "success",
-			"data": LoginSkippableResponse{Skippable:skippable},
+			"data":   LoginSkippableResponse{Skippable: skippable},
 		})
 	}
 }
 
-
 func getAuthenticator(spec LoginSpec) Authenticator {
 	switch {
-	case len(spec.Username) >0 && len(spec.Password) > 0 && authenticationModes.IsEnabled(Basic):
+	case len(spec.Username) > 0 && len(spec.Password) > 0 && authenticationModes.IsEnabled(Basic):
 		return NewBasicAuthenticator(spec)
 	case len(spec.Token) > 0 && authenticationModes.IsEnabled(Token):
 		return NewTokenAuthenticator(spec)
@@ -73,4 +67,3 @@ func getAuthenticator(spec LoginSpec) Authenticator {
 		return NewKubeConfigAuthenticator(spec)
 	}
 }
-
