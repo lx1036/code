@@ -55,7 +55,9 @@ func (manager *ClientManager) initInsecureClient() {
 
 func (manager *ClientManager) Client() kubernetes.Interface {
 	if mode.Mode() == mode.TestMode {
-		return fake.NewSimpleClientset()
+		clientSet := fake.NewSimpleClientset()
+		// TODO: add something
+		return clientSet
 	}
 
 	return manager.insecureClient

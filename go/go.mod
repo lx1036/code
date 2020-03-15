@@ -8,7 +8,10 @@ require (
 	github.com/astaxie/beego v1.12.1
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
+	github.com/containerd/containerd v1.0.2
+	github.com/containerd/fifo v0.0.0-20191213151349-ff969a566b00 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/getsentry/sentry-go v0.3.0
 	github.com/gin-gonic/gin v1.5.0
@@ -51,6 +54,7 @@ require (
 	github.com/urfave/cli v1.22.1
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	go.uber.org/zap v1.10.0
+	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20200116001909-b77594299b42
 	google.golang.org/grpc v1.23.1

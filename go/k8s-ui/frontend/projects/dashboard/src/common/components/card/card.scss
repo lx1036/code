@@ -1,0 +1,64 @@
+
+@import '../../../variables';
+@import '../../../mixins';
+
+
+:host {
+  .mat-card {
+    min-width: 100 * $baseline-grid;
+    padding: 0;
+  }
+
+  .mat-card.kd-graph {
+    min-width: unset;
+  }
+
+  .mat-card-title {
+    margin: 0;
+  }
+
+  .mat-card-footer {
+    display: inline;
+    margin: 0;
+  }
+}
+
+.kd-card-header:hover {
+  cursor: pointer;
+}
+
+.kd-card-actions {
+  display: block;
+  padding: $baseline-grid (2 * $baseline-grid);
+}
+
+.kd-card-toggle {
+  cursor: pointer;
+  margin-right: (3 * $baseline-grid);
+  outline: none;
+}
+
+.kd-card-content {
+  margin: 0;
+  padding: 2 * $baseline-grid;
+}
+
+.kd-card-content-table {
+  padding: 0;
+}
+
+.kd-card-title {
+  font-size: $title-font-size-base;
+  font-weight: $regular-font-weight;
+  margin-right: $baseline-grid;
+  padding: $baseline-grid 0 $baseline-grid (2 * $baseline-grid);
+}
+
+.kd-card-description {
+  font-size: $subhead-font-size-base-lg;
+}
+
+.kd-card-footer {
+  font-size: $footer-font-size-base;
+  padding: 0 (2 * $baseline-grid) $baseline-grid;
+}

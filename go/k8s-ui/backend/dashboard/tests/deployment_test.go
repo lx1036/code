@@ -37,6 +37,68 @@ func (suite *DeploymentSuite) TeardownTest() {
 
 }
 
+func (suite *DeploymentSuite) TestDeploymentNameValidity() {
+	payload := deployment.AppNameValiditySpec{
+		Name:      "nginx-demo",
+		Namespace: "default",
+	}
+	requestBody, _ := json.Marshal(payload)
+	request := httptest.NewRequest("POST", "/api/v1/appdeployment/validate/name", bytes.NewBuffer(requestBody))
+	request.Header.Set("content-type", "application/json")
+	writer := httptest.NewRecorder()
+	suite.router.ServeHTTP(writer, request)
+	response := writer.Result()
+	defer response.Body.Close()
+	body, _ := ioutil.ReadAll(response.Body)
+
+	type Response struct {
+		Errno  int    `json:"errno"`
+		Errmsg string `json:"errmsg"`
+		Data   struct {
+			Valid bool `json:"valid"`
+		} `json:"data"`
+	}
+	var deploymentResponse Response
+	_ = json.Unmarshal(body, &deploymentResponse)
+
+	// Assert
+	var slices []interface{}
+	slices = append(slices, response.StatusCode)
+	slices = append(slices, response.Header)
+	slices = append(slices, deploymentResponse)
+
+	path := getBaselineDataFile()
+	if !assert.FileExists(suite.T(), path) || rebase { // create baseline use first actual as next expected
+		body2, _ := json.Marshal(slices)
+		var buffer = new(bytes.Buffer)
+		_ = json.Indent(buffer, body2, "", "  ")
+		_ = ioutil.WriteFile(path, buffer.Bytes(), 0666)
+	} else if rebase { // new actual override baseline as next expected
+
+	} else {
+		var decoded []json.RawMessage
+		baseline, _ := ioutil.ReadFile(path)
+		err := json.Unmarshal(baseline, &decoded)
+		if err != nil {
+			panic(err)
+		}
+
+		var code int
+		_ = json.Unmarshal(decoded[0], &code)
+		assert.EqualValues(suite.T(), code, response.StatusCode)
+
+		var header http.Header
+		_ = json.Unmarshal(decoded[1], &header)
+		assert.EqualValues(suite.T(), header, response.Header)
+
+		//assert.EqualValues(suite.T(), strings.ReplaceAll(strings.ReplaceAll(string(decoded[2]), "\n", ""), " ", ""), strings.ReplaceAll(strings.ReplaceAll(string(body), "\n", ""), " ", ""))
+
+		var content Response
+		_ = json.Unmarshal(decoded[2], &content)
+		assert.EqualValues(suite.T(), content, deploymentResponse)
+	}
+}
+
 func (suite *DeploymentSuite) TestDeployment() {
 	payload := deployment.DeploymentSpec{
 		Name:      "nginx-demo",
@@ -54,7 +116,7 @@ func (suite *DeploymentSuite) TestDeployment() {
 		IsExternal: true,
 	}
 	requestBody, _ := json.Marshal(payload)
-	request := httptest.NewRequest("POST", "/api/appdeployment", bytes.NewBuffer(requestBody))
+	request := httptest.NewRequest("POST", "/api/v1/appdeployment", bytes.NewBuffer(requestBody))
 	request.Header.Set("content-type", "application/json")
 	writer := httptest.NewRecorder()
 	suite.router.ServeHTTP(writer, request)
