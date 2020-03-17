@@ -17,14 +17,13 @@ package controllers
 
 import (
 	"context"
-	"time"
-
 	"github.com/go-logr/logr"
+	batchv1 "k8s-lx1036/k8s-ui/backend/kubernetes/kubebuilder/api/v1"
+	kbatch "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	batchv1 "k8s-lx1036/k8s-ui/backend/kubernetes/kubebuilder/api/v1"
+	"time"
 )
 
 type realClock struct{}
@@ -91,6 +90,11 @@ func (r *CronJobReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	return ctrl.Result{}, nil
 }
+
+var (
+	jobOwnerKey = ".metadata.controller"
+	apiGVStr    = batchv1.GroupVersion.String()
+)
 
 func (r *CronJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
