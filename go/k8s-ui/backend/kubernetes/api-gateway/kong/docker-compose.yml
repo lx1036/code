@@ -1,0 +1,102 @@
+version: "3.7"
+services:
+  kong:
+    image: ${KONG_IMAGE}
+    environment:
+      - "KONG_DATABASE=postgres" # 数据持久化方式，使用postgres数据库
+      - "KONG_CASSANDRA_CONTACT_POINTS=kong-database" # 数据库名称
+      - "KONG_PG_HOST=kong-database" # 数据库容器名称,Kong连接数据时使用些名称
+      - "KONG_PG_DATABASE=${KONG_DATABASE}" # 数据库名称
+      - "KONG_PG_USER=${KONG_DATABASE_USER}"
+      - "KONG_PG_PASSWORD=${KONG_DATABASE_PASSWORD}"
+      - "KONG_PROXY_ACCESS_LOG=/dev/stdout" # 日志记录目录
+      - "KONG_ADMIN_ACCESS_LOG=/dev/stdout"
+      - "KONG_PROXY_ERROR_LOG=/dev/stderr"
+      - "KONG_ADMIN_ERROR_LOG=/dev/stderr"
+      - "KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl"
+    ports:
+      - "8000:8000/tcp"
+      - "8001:8001/tcp"
+      - "8443:8443/tcp"
+      - "8444:8444/tcp"
+    networks:
+      - kong-net
+    depends_on:
+      - kong-database
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    restart: on-failure
+
+  kong-dashboard:
+    image: pantsel/konga
+    environment:
+      - "TOKEN_SECRET=password"
+      - "NODE_ENV=production"
+    ports:
+      - 8080:1337
+    networks:
+      - kong-net
+    depends_on:
+      - kong-database
+
+  kong-migrations:
+    image: ${KONG_IMAGE}
+    command: kong migrations bootstrap
+    depends_on:
+      - kong-database
+    environment:
+      - "KONG_DATABASE=postgres" # 数据持久化方式，使用postgres数据库
+      - "KONG_PG_HOST=kong-database" # 数据库容器名称,Kong连接数据时使用些名称
+      - "KONG_PG_DATABASE=${KONG_DATABASE}" # 数据库名称
+      - "KONG_PG_USER=${KONG_DATABASE_USER}"
+      - "KONG_PG_PASSWORD=${KONG_DATABASE_PASSWORD}"
+    networks:
+      - kong-net
+    restart: on-failure
+
+  kong-migrations-up:
+    image: ${KONG_IMAGE}
+    command: kong migrations up && kong migrations finish
+    depends_on:
+      - kong-database
+    environment:
+      - "KONG_DATABASE=postgres" # 数据持久化方式，使用postgres数据库
+      - "KONG_PG_HOST=kong-database" # 数据库容器名称,Kong连接数据时使用些名称
+      - "KONG_PG_DATABASE=${KONG_DATABASE}" # 数据库名称
+      - "KONG_PG_USER=${KONG_DATABASE_USER}"
+      - "KONG_PG_PASSWORD=${KONG_DATABASE_PASSWORD}"
+    networks:
+      - kong-net
+    restart: on-failure
+
+  kong-database:
+    image: postgres:9.6
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_DB=kong
+      - POSTGRES_USER=kong # 访问数据库的用户
+      - POSTGRES_PASSWORD=kong
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kong"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    restart: on-failure
+    tty: true
+    stdin_open: true
+    volumes:
+#      - /private/etc/localtime:/etc/localtime:ro # 同步时间
+      - kong_data:/var/lib/postgresql/data # 数据库数据落地
+    networks:
+      - kong-net
+
+networks:
+  kong-net:
+    external: true
+
+volumes:
+  kong_data: {}
