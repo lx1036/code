@@ -1,3 +1,4 @@
+# https://github.com/Kong/docker-kong/blob/master/compose/docker-compose.yml
 version: "3.7"
 services:
   kong:
