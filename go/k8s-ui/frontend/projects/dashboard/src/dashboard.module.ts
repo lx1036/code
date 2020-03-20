@@ -29,7 +29,7 @@ export const routes: Routes = [
     // ChromeModule,
     // LoginModule,
     RouterModule.forRoot(routes, {
-      useHash: true,
+      useHash: false,
       onSameUrlNavigation: 'reload',
     }),
 

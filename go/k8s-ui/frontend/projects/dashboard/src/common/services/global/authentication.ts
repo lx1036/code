@@ -5,7 +5,7 @@ import {CsrfTokenService} from "./csrftoken";
 import {switchMap} from "rxjs/operators";
 import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {CONFIG} from "../../../index.config";
-
+import {CookieService} from 'ngx-cookie-service';
 
 @Injectable()
 export class AuthService {
@@ -13,7 +13,8 @@ export class AuthService {
 
   constructor(
     private readonly csrfTokenService: CsrfTokenService,
-    private readonly http: HttpClient,) {
+    private readonly http: HttpClient,
+    private readonly cookies_: CookieService,) {
   }
 
   /**
@@ -37,6 +38,31 @@ export class AuthService {
 
         return of(authResponse.errors);
       }),
+    );
+  }
+
+  private setTokenCookie_(token: string): void {
+    // This will only work for HTTPS connection
+    this.cookies_.set(this._config.authTokenCookieName, token, null, null, null, true, 'Strict');
+    // This will only work when accessing Dashboard at 'localhost' or
+    // '127.0.0.1'
+    this.cookies_.set(
+      this._config.authTokenCookieName,
+      token,
+      null,
+      null,
+      'localhost',
+      false,
+      'Strict',
+    );
+    this.cookies_.set(
+      this._config.authTokenCookieName,
+      token,
+      null,
+      null,
+      '127.0.0.1',
+      false,
+      'Strict',
     );
   }
 }
