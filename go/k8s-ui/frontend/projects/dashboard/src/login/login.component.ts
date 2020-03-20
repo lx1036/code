@@ -1,10 +1,12 @@
-import {Component, OnInit} from '@angular/core';
-import {HttpClient} from "@angular/common/http";
-import {ActivatedRoute} from "@angular/router";
+import {Component, NgZone, OnInit} from '@angular/core';
+import {HttpClient, HttpErrorResponse} from "@angular/common/http";
+import {ActivatedRoute, Router} from "@angular/router";
 import {KdError, KdFile, StateError} from "../typings/frontend-api";
 import {map} from "rxjs/operators";
-import {K8SError, LoginSpec} from "../typings/backend-api";
+import {LoginSpec} from "../typings/backend-api";
 import {AuthService} from "../common/services/global/authentication";
+import {PluginConfigService} from "../common/services/global/plugin";
+import {AsKdError, K8SError} from "../common/errors/errors";
 
 
 enum LoginModes {
@@ -104,7 +106,10 @@ export class LoginComponent implements OnInit {
   constructor(
     private readonly http: HttpClient,
     private readonly route: ActivatedRoute,
-    private readonly authService: AuthService,) {
+    private readonly authService: AuthService,
+    private readonly pluginConfigService: PluginConfigService,
+    private readonly router: Router,
+    private readonly ngZone: NgZone,) {
   }
 
   ngOnInit() {
@@ -142,9 +147,9 @@ export class LoginComponent implements OnInit {
           return;
         }
 
-        this.pluginConfigService_.refreshConfig();
-        this.ngZone_.run(() => {
-          this.state_.navigate(['overview']);
+        this.pluginConfigService.refreshConfig();
+        this.ngZone.run(() => {
+          this.router.navigate(['overview']);
         });
       },
       (err: HttpErrorResponse) => {
