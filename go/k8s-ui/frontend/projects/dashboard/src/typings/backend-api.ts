@@ -8,6 +8,12 @@ export interface LoginSpec {
   kubeConfig: string;
 }
 
+export interface LoginStatus {
+  tokenPresent: boolean;
+  headerPresent: boolean;
+  httpsMode: boolean;
+}
+
 export interface K8SError {
   ErrStatus: ErrStatus;
 

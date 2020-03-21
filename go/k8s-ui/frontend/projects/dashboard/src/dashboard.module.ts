@@ -10,6 +10,10 @@ import {SharedModule} from "./shared.module";
 import {CardComponent} from "./common/components/card/card.component";
 import {UploadFileComponent} from "./common/components/uploadfile/uploadfile.component";
 import {AlertDialog} from "./common/components/dialog/dialog";
+import {AuthService} from "./common/services/global/authentication";
+import {CsrfTokenService} from "./common/services/global/csrftoken";
+import {PluginConfigService} from "./common/services/global/plugin";
+import {CookieService} from "ngx-cookie-service";
 
 
 
@@ -36,6 +40,11 @@ export const routes: Routes = [
     SharedModule,
   ],
   providers: [
+    LoginGuard,
+    AuthService,
+    CsrfTokenService,
+    PluginConfigService,
+    CookieService,
     // {provide: ErrorHandler, useClass: GlobalErrorHandler},
     // {provide: HAMMER_GESTURE_CONFIG, useClass: GestureConfig},
   ],

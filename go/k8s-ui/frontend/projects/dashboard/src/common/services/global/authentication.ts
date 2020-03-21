@@ -1,5 +1,5 @@
 import {Injectable} from "@angular/core";
-import {AuthResponse, CsrfToken, K8SError, LoginSpec} from "../../../typings/backend-api";
+import {AuthResponse, CsrfToken, K8SError, LoginSpec, LoginStatus} from "../../../typings/backend-api";
 import {Observable, of} from "rxjs";
 import {CsrfTokenService} from "./csrftoken";
 import {switchMap} from "rxjs/operators";
@@ -64,6 +64,14 @@ export class AuthService {
       false,
       'Strict',
     );
+  }
+
+  getLoginStatus() {
+    return this.http.get<LoginStatus>('api/v1/login/status');
+  }
+
+  isAuthenticationEnabled(loginStatus: LoginStatus): boolean {
+    return loginStatus.httpsMode;
   }
 }
 
