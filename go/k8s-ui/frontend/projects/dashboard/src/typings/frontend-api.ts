@@ -23,3 +23,16 @@ export interface KdFile {
 export interface HTMLInputEvent extends Event {
   target: HTMLInputElement & EventTarget;
 }
+
+
+export interface PluginMetadata {
+  name: string;
+  path: string;
+  dependencies: string[];
+}
+
+export interface PluginsConfig {
+  status: number;
+  plugins: PluginMetadata[];
+  errors?: object[];
+}

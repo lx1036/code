@@ -110,6 +110,15 @@
   dependencies:
     tslib "^1.9.0"
 
+"@angular/cdk@8.2.3":
+  version "8.2.3"
+  resolved "https://registry.npm.taobao.org/@angular/cdk/download/@angular/cdk-8.2.3.tgz#16b96ffa935cbf5a646757ecaf2b19c434678f72"
+  integrity sha1-Frlv+pNcv1pkZ1fsrysZxDRnj3I=
+  dependencies:
+    tslib "^1.7.1"
+  optionalDependencies:
+    parse5 "^5.0.0"
+
 "@angular/cli@~8.1.0":
   version "8.1.3"
   resolved "https://registry.npm.taobao.org/@angular/cli/download/@angular/cli-8.1.3.tgz?cache=0&other_urls=https%3A%2F%2Fregistry.npm.taobao.org%2F%40angular%2Fcli%2Fdownload%2F%40angular%2Fcli-8.1.3.tgz#9a12953eb0be68c3c96712111e29ed437cecfa22"
@@ -171,10 +180,12 @@
   dependencies:
     tslib "^1.9.0"
 
-"@angular/flex-layout@^9.0.0-beta.29":
-  version "9.0.0-beta.29"
-  resolved "https://registry.npm.taobao.org/@angular/flex-layout/download/@angular/flex-layout-9.0.0-beta.29.tgz#a334ffd15c272e2d48cdaef3879625aadcc13a54"
-  integrity sha1-ozT/0VwnLi1Iza7zh5YlqtzBOlQ=
+"@angular/flex-layout@8.0.0-beta.27":
+  version "8.0.0-beta.27"
+  resolved "https://registry.npm.taobao.org/@angular/flex-layout/download/@angular/flex-layout-8.0.0-beta.27.tgz#a697d5a90e6d04c06b02ee872f88f384d1723f7c"
+  integrity sha1-ppfVqQ5tBMBrAu6HL4jzhNFyP3w=
+  dependencies:
+    tslib "^1.7.1"
 
 "@angular/forms@^8.1.0":
   version "8.2.14"
@@ -4963,6 +4974,11 @@ ng2-ace-editor@^0.3.9:
     ace-builds "^1.4.2"
     brace "^0.11.1"
 
+ngx-cookie-service@2.3.0:
+  version "2.3.0"
+  resolved "https://registry.npm.taobao.org/ngx-cookie-service/download/ngx-cookie-service-2.3.0.tgz#290e6f55047ad9e9f1aa4ddf30d1ab8d41927949"
+  integrity sha1-KQ5vVQR62enxqk3fMNGrjUGSeUk=
+
 ngx-filter-pipe@^2.1.2:
   version "2.1.2"
   resolved "https://registry.npm.taobao.org/ngx-filter-pipe/download/ngx-filter-pipe-2.1.2.tgz#d3368f22bf45c74d5fcdae3701501db15fb90399"
@@ -5486,6 +5502,11 @@ parse5@4.0.0:
   version "4.0.0"
   resolved "https://registry.npm.taobao.org/parse5/download/parse5-4.0.0.tgz?cache=0&sync_timestamp=1573036762880&other_urls=https%3A%2F%2Fregistry.npm.taobao.org%2Fparse5%2Fdownload%2Fparse5-4.0.0.tgz#6d78656e3da8d78b4ec0b906f7c08ef1dfe3f608"
   integrity sha1-bXhlbj2o14tOwLkG98CO8d/j9gg=
+
+parse5@^5.0.0:
+  version "5.1.1"
+  resolved "https://registry.npm.taobao.org/parse5/download/parse5-5.1.1.tgz#f68e4e5ba1852ac2cadc00f4555fff6c2abb6178"
+  integrity sha1-9o5OW6GFKsLK3AD0VV//bCq7YXg=
 
 parseqs@0.0.5:
   version "0.0.5"
