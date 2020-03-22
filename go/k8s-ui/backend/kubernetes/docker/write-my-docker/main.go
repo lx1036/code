@@ -5,18 +5,44 @@ https://github.com/xianlubird/mydocker/blob/master/main.go
 */
 import (
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 	"github.com/urfave/cli"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/docker/write-my-docker/container"
+	"k8s-lx1036/k8s-ui/backend/kubernetes/docker/write-my-docker/cmd"
 	"os"
 )
 
 func main() {
+	var rootCmd = &cobra.Command{
+		Use:                        "my-docker",
+		Short: "write my own docker",
+		PreRun:                    preRun,
+		Run:                        run,
+	}
+
+	rootCmd.AddCommand(cmd.InitCmd)
+
+	err := rootCmd.Execute()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func preRun(cmd *cobra.Command, args []string)  {
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stdout)
+}
+
+func run(cmd *cobra.Command, args []string)  {
+
+}
+
+func mainlx() {
 	app := cli.NewApp()
 	app.Name = "my-docker"
 	app.Usage = `write my docker`
 
 	app.Commands = []cli.Command{
-		initCommand,
+		//initCommand,
 		runCommand,
 		listCommand,
 		logCommand,
@@ -37,16 +63,6 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-}
-
-var initCommand = cli.Command{
-	Name:  "init",
-	Usage: "Init container process run user's process in container. Do not call it outside",
-	Action: func(context *cli.Context) error {
-		log.Infof("init come on")
-		err := container.RunContainerInitProcess()
-		return err
-	},
 }
 
 var runCommand = cli.Command{
