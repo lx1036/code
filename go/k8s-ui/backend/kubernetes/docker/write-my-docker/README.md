@@ -1,7 +1,4 @@
 
-[mydocker](https://github.com/xianlubird/mydocker)
-
-
 # logs
 **[docker logs](https://docs.docker.com/engine/reference/commandline/logs/)**
 **[logging](https://docs.docker.com/config/containers/logging/)**

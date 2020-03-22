@@ -66,14 +66,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.GuestbookReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Guestbook"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Guestbook")
-		os.Exit(1)
-	}
 	if err = (&controllers.CronJobReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("CronJob"),
