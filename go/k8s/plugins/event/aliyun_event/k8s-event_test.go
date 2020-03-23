@@ -1,4 +1,4 @@
-package event
+package aliyun_event
 
 import (
 	"flag"
