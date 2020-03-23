@@ -22,6 +22,7 @@ require (
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/go-querystring v1.0.0
 	github.com/google/uuid v1.1.1
+	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jinzhu/gorm v1.9.11
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/kavu/go_reuseport v1.4.0 // indirect
