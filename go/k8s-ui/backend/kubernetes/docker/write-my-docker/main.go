@@ -13,10 +13,10 @@ import (
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:                        "my-docker",
-		Short: "write my own docker",
-		PreRun:                    preRun,
-		Run:                        run,
+		Use:    "my-docker",
+		Short:  "write my own docker",
+		PreRun: preRun,
+		Run:    run,
 	}
 
 	rootCmd.AddCommand(cmd.InitCmd)
@@ -27,12 +27,12 @@ func main() {
 	}
 }
 
-func preRun(cmd *cobra.Command, args []string)  {
+func preRun(cmd *cobra.Command, args []string) {
 	log.SetFormatter(&log.JSONFormatter{})
 	log.SetOutput(os.Stdout)
 }
 
-func run(cmd *cobra.Command, args []string)  {
+func run(cmd *cobra.Command, args []string) {
 
 }
 
