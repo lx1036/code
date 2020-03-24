@@ -10,8 +10,8 @@ import (
 
 type Product struct {
 	gorm.Model
-	Code   string `gorm:"code"`
-	Price   int `gorm:"price"`
+	Code  string `gorm:"code"`
+	Price int    `gorm:"price"`
 }
 
 const (
@@ -70,6 +70,6 @@ func TestGorm(test *testing.T) {
 	//db.Find(&account, "person_id=?", "3")
 	var product Product
 	db.First(&product)
-	
+
 	fmt.Println(product)
 }

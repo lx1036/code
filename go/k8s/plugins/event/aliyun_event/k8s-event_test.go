@@ -35,5 +35,5 @@ func TestKubernetesEvent(test *testing.T) {
 	eventClient := kubeClient.CoreV1().Events(kubeapi.NamespaceAll)
 	eventList, _ := eventClient.List(metav1.ListOptions{})
 
-	log.Table(eventList.Items)
+	log_exception.Table(eventList.Items)
 }
