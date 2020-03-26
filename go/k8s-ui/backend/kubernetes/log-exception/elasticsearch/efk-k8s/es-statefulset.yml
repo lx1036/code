@@ -25,7 +25,7 @@ spec:
           emptyDir: {} # pod terminate 后数据会丢失
       containers:
         - name: elasticsearch-logging
-          image: quay.io/lx1036/elasticsearch:7.4.2
+          image: lx1036/elasticsearch:7.4.2
           imagePullPolicy: Always
           resources:
             limits:
