@@ -1,7 +1,7 @@
 
 https://github.com/sirupsen/logrus
 
-
+**[Docker 双栈日志](https://mp.weixin.qq.com/s/oZ5xbCbO_1lsgEa3QKBxoQ)**
 
 # Problem
 如何在k8s环境中，搭建log架构，每一个container如何去接入log。

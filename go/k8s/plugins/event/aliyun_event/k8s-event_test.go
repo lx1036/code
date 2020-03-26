@@ -3,7 +3,7 @@ package aliyun_event
 import (
 	"flag"
 	"fmt"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/log"
+	log_exception "k8s-lx1036/k8s-ui/backend/kubernetes/log-exception"
 	kubeapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
