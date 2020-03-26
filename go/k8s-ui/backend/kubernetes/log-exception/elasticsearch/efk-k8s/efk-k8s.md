@@ -1,5 +1,5 @@
 
-
+**[Logging Using Elasticsearch and Kibana](https://kubernetes.io/docs/tasks/debug-application-cluster/logging-elasticsearch-kibana/)**
 
 # EFK-K8S
 K8S 官方有个 EFK 插件说明 **[Elasticsearch Add-On](https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/fluentd-elasticsearch/README.md)**:
