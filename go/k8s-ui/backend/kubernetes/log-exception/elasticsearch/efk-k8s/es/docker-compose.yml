@@ -19,7 +19,7 @@ services:
     volumes:
       - data01:/usr/share/elasticsearch/data
     ports:
-      - 9200:9200
+      - 127.0.0.1:9200:9200 # only accessible from host machine
     networks:
       - elastic
   es02:
@@ -62,19 +62,26 @@ services:
 volumes:
   data01:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /usr/share/elasticsearch/data
+#    driver_opts:
+#      type: none
+#      o: bind
+#      device: ./.cache/elasticsearch/data/data01
   data02:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /usr/share/elasticsearch/data
+#    driver_opts:
+#      type: none
+#      o: bind
+#      device: ./.cache/elasticsearch/data/data02
   data03:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /usr/share/elasticsearch/data # host path
+#    driver_opts:
+#      type: none
+#      o: bind
+#      device: ./.cache/elasticsearch/data/data03 # host path
+
+networks:
+  elastic:
+    driver: bridge
+
+# Validate:
+#  curl -X GET "127.0.0.1:9200/_cat/nodes?v&pretty"
