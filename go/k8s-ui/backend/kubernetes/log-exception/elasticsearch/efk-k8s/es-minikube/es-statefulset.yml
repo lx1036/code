@@ -1,0 +1,47 @@
+
+# https://staight.github.io/2019/09/16/%E5%9C%A8k8s%E4%B8%8A%E9%83%A8%E7%BD%B2elasticsearch/
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: es
+  namespace: es
+  labels:
+    k8s-app: es
+spec:
+  replicas: 3
+  serviceName: es
+  selector:
+    matchLabels:
+      k8s-app: es
+  template:
+    metadata:
+      labels:
+        k8s-app: es
+    spec:
+      containers:
+        - name: es
+          image: ccr.ccs.tencentyun.com/staightchen/elasticsearch:7.3.2
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            limits:
+              cpu: '1'
+              memory: 2Gi
+            requests:
+              cpu: '1'
+              memory: 2Gi
+          volumeMounts:
+            - name: es-config
+              mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+              subPath: elasticsearch.yml
+      volumes:
+        - name: es-config
+          configMap:
+            name: es

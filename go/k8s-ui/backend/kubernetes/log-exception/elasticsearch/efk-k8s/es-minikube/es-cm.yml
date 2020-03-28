@@ -1,0 +1,13 @@
+# https://www.elastic.co/guide/en/elasticsearch/reference/current/discovery-settings.html
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: es
+  namespace: es
+data:
+  elasticsearch.yml: |
+    cluster.name: "${NAMESPACE}"
+    node.name: "${POD_NAME}"
+    network.host: 0.0.0.0
+    discovery.seed_hosts: "es-in"
+    cluster.initial_master_nodes: "es-0,es-1,es-2"
