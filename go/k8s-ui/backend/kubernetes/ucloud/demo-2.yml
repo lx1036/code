@@ -1,0 +1,279 @@
+
+# http://education.ucloud.cn/gameday/uk8s/item_2.php
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-out
+  labels:
+    app: nginx-out
+spec:
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  selector:
+    app: nginx-out
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-out
+  labels:
+    app: nginx-out
+spec:
+  containers:
+    - name: nginx
+      image: uhub.service.ucloud.cn/ucloud/nginx:1.9.2
+      ports:
+        - containerPort: 80
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-out-http
+  labels:
+    app: nginx-out
+  annotations:
+    "service.beta.kubernetes.io/ucloud-load-balancer-vserver-protocol": "http"
+#    "service.beta.kubernetes.io/ucloud-load-balancer-eip-bandwidth": "50" # 50M EIP
+spec:
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  selector:
+    app: nginx-out
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-in
+  labels:
+    app: nginx-out
+  annotations:
+    "service.beta.kubernetes.io/ucloud-load-balancer-type": "inner"
+spec:
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  selector:
+    app: nginx-out
+
+---
+# Validate
+# curl -k https://106.75.57.205:443
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-out-https
+  labels:
+    app: nginx-out
+  annotations:
+    service.beta.kubernetes.io/ucloud-load-balancer-vserver-protocol: "http"
+    service.beta.kubernetes.io/ucloud-load-balancer-vserver-ssl-cert: "ssl-1uavf1rt" # lb 证书管理页面内的 ssl_id
+    service.beta.kubernetes.io/ucloud-load-balancer-vserver-ssl-port: "443"
+spec:
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 80
+      name: "http"
+      targetPort: 80
+    - protocol: TCP
+      port: 443
+      name: "https"
+      targetPort: 80
+  selector:
+    app: nginx-out
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-out-existing-ulb
+  labels:
+    app: nginx-out
+  annotations:
+    service.beta.kubernetes.io/ucloud-load-balancer-id: "ulb-uuqksmzf" #替换成自己的ULB Id
+spec:
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  selector:
+    app: nginx-out
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: csi-udisk
+provisioner: udisk.csi.ucloud.cn
+parameters:
+  type: "ssd"   # 云盘类型ssd,sata
+  fsType: "ext4"    # 文件系统
+  udataArkMode: "no"   # 是否开启方舟模式,yes/no
+  chargeType: "month" # 付费类型，支持dynamic、month、year，默认为month，非必填
+  quantity: "1" # 购买时长，dynamic无需填写，可购买1-9个月，或1-10年
+reclaimPolicy: Delete  # PV回收策略，支持Delete和Retain，默认为Delete，非必填
+mountOptions:   # 挂载选项
+  - debug
+  - rw
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logdisk-claim
+spec:
+  accessModes:
+    - ReadWriteOnce     # 块存储设备必须为ReadWriteOnce
+  storageClassName: csi-udisk
+  resources:
+    requests:
+      storage: 100Gi  # 申请100GiB的UDisk云盘
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: logdisk
+  labels:
+    app: httplogdisk
+spec:
+  containers:
+    - name: http
+      image: uhub.service.ucloud.cn/ucloud/nginx:1.9.2
+      imagePullPolicy: Always
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: log
+          mountPath: /data
+  volumes:
+    - name: log
+      persistentVolumeClaim:
+        claimName: logdisk-claim
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: existing-udisk
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 100Gi
+  csi:
+    driver: udisk.csi.ucloud.cn
+    fsType: ext4
+    volumeHandle: bsm-51evry5b
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: csi-udisk
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: existing-logdisk-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-udisk
+  resources:
+    requests:
+      storage: 100Gi
+  volumeName: existing-udisk
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: existing-logdisk
+  labels:
+    app: httplogdisk
+spec:
+  containers:
+    - name: http
+      image: uhub.service.ucloud.cn/ucloud/nginx:1.9.2
+      imagePullPolicy: Always
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: log
+          mountPath: /data
+  volumes:
+    - name: log
+      persistentVolumeClaim:
+        claimName: existing-logdisk-claim
+
+
+---
+
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: csi-udisk-dynamic
+provisioner: udisk.csi.ucloud.cn
+parameters:
+  type: "ssd"   # 云盘类型ssd,sata
+  fsType: "ext4"    # 文件系统
+  udataArkMode: "no"   # 是否开启方舟模式,yes/no
+  chargeType: "month" # 付费类型，支持dynamic、month、year，默认为month，非必填
+  quantity: "1" # 购买时长，dynamic无需填写，可购买1-9个月，或1-10年
+reclaimPolicy: Delete  # PV回收策略，支持Delete和Retain，默认为Delete，非必填
+mountOptions:   # 挂载选项
+  - debug
+  - rw
+volumeBindingMode: WaitForFirstConsumer
+
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: logdisk-claim-dynamic
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-udisk-dynamic
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: with-node-affinity
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: failure-domain.beta.kubernetes.io/zone
+                operator: In
+                values:
+                  - cn-bj2-04
+  containers:
+    - name: http
+      image: uhub.service.ucloud.cn/ucloud/nginx:1.9.2
+      imagePullPolicy: Always
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: log
+          mountPath: /data
+  volumes:
+    - name: log
+      persistentVolumeClaim:
+        claimName: logdisk-claim-dynamic
