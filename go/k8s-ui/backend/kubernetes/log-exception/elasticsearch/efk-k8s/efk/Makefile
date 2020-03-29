@@ -18,4 +18,4 @@ single-node:
 	docker run -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:7.6.1
 
 multi-nodes:
-	docker-compose -f ./docker-compose.yml up
+	docker-compose -f ./docker-compose.yml -p elk down && docker-compose -f ./docker-compose.yml -p elk up --force-recreate

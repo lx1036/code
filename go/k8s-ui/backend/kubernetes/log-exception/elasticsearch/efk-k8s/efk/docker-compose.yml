@@ -1,4 +1,5 @@
 # https://www.elastic.co/guide/en/elasticsearch/reference/7.6/docker.html
+# https://www.docker.elastic.co/
 
 version: "3.7"
 services:
@@ -63,10 +64,31 @@ services:
     container_name: kibana
     links:
       - es01:elasticsearch
+    depends_on:
+      - es01
+      - es02
+      - es03
 #    volumes:
 #      - ./kibana.yml:/usr/share/kibana/config/kibana.yml
     ports:
     - 5601:5601
+#    environment:
+#      ELASTICSEARCH_URL: http://elasticsearch:9200
+#      ELASTICSEARCH_USERNAME: kibana
+#      ELASTICSEARCH_PASSWORD: kibana
+    networks:
+      - elastic
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:7.6.1
+    container_name: filebeat
+    command: filebeat -e -strict.perms=false
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+    depends_on:
+      - kibana
+    links:
+      - kibana:kibana
+      - es01:elasticsearch
     networks:
       - elastic
 
