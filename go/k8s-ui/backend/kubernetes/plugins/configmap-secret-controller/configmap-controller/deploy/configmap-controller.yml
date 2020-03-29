@@ -1,0 +1,83 @@
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: configmap-controller
+  labels:
+    app: configmap-controller
+  annotations:
+    configmap.fabric8.io/update-on-change: "foo"
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: configmap-controller
+      labels:
+        app: configmap-controller
+    spec:
+      containers:
+        - name: configmap-controller
+          image: nginx:1.17.8
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - mountPath: /var/www/html # k8s v1.17.3 cat /var/www/html == "APP_NAME=k8s APP_KEY=abc123"
+              name: cfgmap
+              subPath: .env.production
+          envFrom:
+            - configMapRef:
+                name: foo
+      restartPolicy: Always
+      volumes:
+        - name: cfgmap
+          configMap:
+            name: foo
+  selector:
+    matchLabels:
+      app: configmap-controller
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: foo
+data:
+  .env.production: >
+   APP_NAME=k8s
+   APP_KEY=abc123
+  foo: bar3 # 不起作用 bar -> bar2
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: configmapcontroller-fabric
+  labels:
+    app: configmapcontroller-fabric
+    provider: fabric8
+    project: configmapcontroller
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: configmapcontroller-fabric
+      labels:
+        app: configmapcontroller-fabric
+        provider: fabric8
+        project: configmapcontroller
+    spec:
+      containers:
+        - name: configmapcontroller-fabric
+          image: fabric8/configmapcontroller:2.3.11
+          imagePullPolicy: IfNotPresent
+          args:
+            - --v=8
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app: configmapcontroller-fabric
+      provider: fabric8
+      project: configmapcontroller
+
+
+

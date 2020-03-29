@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch-logging
+  namespace: kube-system
+  labels:
+    version: 7.4.2
+    k8s-app: elasticsearch-logging
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  selector:
+    matchLabels:
+      version: 7.4.2
+      k8s-app: elasticsearch-logging
+  serviceName: elasticsearch-logging
+  template:
+    metadata:
+      labels:
+        version: 7.4.2
+        k8s-app: elasticsearch-logging
+    spec:
+      serviceAccountName: elasticsearch-logging
+      volumes:
+        - name: elasticsearch-logging
+          emptyDir: {} # pod terminate 后数据会丢失
+      containers:
+        - name: elasticsearch-logging
+          image: lx1036/elasticsearch:7.4.2
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 3Gi
+            requests:
+              cpu: 100m
+              memory: 3Gi
+          ports:
+            - containerPort: 9200
+              name: db
+              protocol: TCP
+            - containerPort: 9300
+              name: transport
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /data
+              name: elasticsearch-logging
+          env:
+            - name: "NAMESPACE"
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          livenessProbe:
+            tcpSocket:
+              port: transport
+            initialDelaySeconds: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: transport
+            initialDelaySeconds: 5
+            timeoutSeconds: 10
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: elasticsearch-logging
+  namespace: kube-system
+  labels:
+    k8s-app: elasticsearch-logging
+    addonmanager.kubernetes.io/mode: Reconcile
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: elasticsearch-logging
+  labels:
+    k8s-app: elasticsearch-logging
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - "services"
+      - "namespaces"
+      - "endpoints"
+    verbs:
+      - "get"
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: elasticsearch-logging
+  namespace: kube-system
+  labels:
+    k8s-app: elasticsearch-logging
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: elasticsearch-logging
+    namespace: kube-system
+    apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: elasticsearch-logging
+  apiGroup: ""
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-logging
+  namespace: kube-system
+  labels:
+    k8s-app: elasticsearch-logging
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "Elasticsearch"
+spec:
+  selector:
+    k8s-app: elasticsearch-logging
+  ports:
+    - port: 9200
+      protocol: TCP
+      targetPort: db # not NodePort, use Ingress
+

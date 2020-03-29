@@ -8,12 +8,10 @@ import (
 	"testing"
 )
 
-type Account struct {
+type Product struct {
 	gorm.Model
-	Name   string
-	Type   string
-	Source string `json:"source"`
-	//CreatedAt time.Time `db:"created_at" json:"created_at"`
+	Code  string `gorm:"code"`
+	Price int    `gorm:"price"`
 }
 
 const (
@@ -44,7 +42,7 @@ type Email struct {
 func TestGorm(test *testing.T) {
 
 	dbName := "demo1"
-	db, err := gorm.Open("mysql", "root:root@tcp(127.0.0.1:3306)/?charset=utf8mb4&parseTime=True&loc=Local")
+	db, err := gorm.Open("mysql", "testing:testing@tcp(127.0.0.1:3306)/orm?parseTime=True&charset=utf8mb4&loc=Local")
 	if err != nil {
 		switch err.(type) {
 		case *mysql.MySQLError:
@@ -70,5 +68,8 @@ func TestGorm(test *testing.T) {
 
 	//var account Account
 	//db.Find(&account, "person_id=?", "3")
-	//log.Println(account)
+	var product Product
+	db.First(&product)
+
+	fmt.Println(product)
 }

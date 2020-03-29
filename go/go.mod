@@ -8,6 +8,7 @@ require (
 	github.com/astaxie/beego v1.12.1
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
+	github.com/containerd/cgroups v0.0.0-20200308110149-6c3dec43a103 // indirect
 	github.com/containerd/containerd v1.0.2
 	github.com/containerd/fifo v0.0.0-20191213151349-ff969a566b00 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -22,6 +23,7 @@ require (
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/go-querystring v1.0.0
 	github.com/google/uuid v1.1.1
+	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jinzhu/gorm v1.9.11
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/kavu/go_reuseport v1.4.0 // indirect
@@ -36,7 +38,7 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/operator-framework/operator-sdk v0.12.0
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/romanyx/polluter v1.2.2
@@ -51,12 +53,12 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/tidwall/evio v1.0.2
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
-	github.com/urfave/cli v1.22.1
+	github.com/urfave/cli v1.22.2
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	go.uber.org/zap v1.10.0
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys v0.0.0-20200116001909-b77594299b42
+	golang.org/x/sys v0.0.0-20200120151820-655fe14d7479
 	google.golang.org/grpc v1.23.1
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
