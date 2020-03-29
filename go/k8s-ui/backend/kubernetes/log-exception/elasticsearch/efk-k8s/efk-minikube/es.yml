@@ -1,0 +1,165 @@
+
+---
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: logging
+  labels:
+    app: elasticsearch
+spec:
+  selector:
+    app: elasticsearch
+  clusterIP: None
+  ports:
+    - port: 9200
+      name: rest
+    - port: 9300
+      name: inter-node
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-public
+  namespace: logging
+  labels:
+    app: elasticsearch
+spec:
+  selector:
+    app: elasticsearch
+  ports:
+    - port: 9200
+      name: rest
+  type: NodePort
+
+---
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: es-data-db
+provisioner: fuseim.pri/ifs
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-config
+data:
+  elasticsearch.yml: |
+    cluster.name: "${NAMESPACE}"
+    node.name: "${POD_NAME}"
+    network.host: 0.0.0.0
+    discovery.seed_hosts: "elasticsearch"
+    cluster.initial_master_nodes: "es-cluster-0,es-cluster-1,es-cluster-2"
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: logging
+  name: es-cluster
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: elasticsearch
+  serviceName: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      containers:
+        - name: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch:7.6.1
+          resources:
+            limits:
+              cpu: 1000m
+            requests:
+              cpu: 100m
+          ports:
+            - containerPort: 9200
+              name: rest
+              protocol: TCP
+            - containerPort: 9300
+              name: inter-node
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+            - name: elasticsearch-config
+              mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+              subPath: elasticsearch.yml
+          env:
+#            - name: cluster.name
+#              value: k8s-logs
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+#            - name: discovery.zen.ping.unicast.hosts
+#              value: "es-cluster-0.elasticsearch.logging.svc.cluster.local,es-cluster-1.elasticsearch.logging.svc.cluster.local,es-cluster-2.elasticsearch.logging.svc.cluster.local"
+#            - name: discovery.zen.minimum_master_nodes
+#              value: "2"
+            - name: cluster.initial_master_nodes
+              value: "es-cluster-0.elasticsearch.logging.svc.cluster.local,es-cluster-1.elasticsearch.logging.svc.cluster.local,es-cluster-2.elasticsearch.logging.svc.cluster.local"
+            - name: ES_JAVA_OPTS
+              value: "-Xms512m -Xmx512m"
+      initContainers:
+        - name: fix-permissions
+          image: busybox
+          command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+        - name: increase-vm-max-map
+          image: busybox
+          command: ["sysctl", "-w", "vm.max_map_count=262144"]
+          securityContext:
+            privileged: true
+        - name: increase-fd-ulimit
+          image: busybox
+          command: ["sh", "-c", "ulimit -n 65536"]
+          securityContext:
+            privileged: true
+      volumes:
+        - name: data
+          emptyDir: {} # pod terminate 后数据会丢失
+        - name: elasticsearch-config
+          configMap:
+            name: elasticsearch-config
+#  volumeClaimTemplates:
+#    - metadata:
+#        name: data
+#        labels:
+#          app: elasticsearch
+#      spec:
+#        accessModes: [ "ReadWriteOnce" ]
+#        storageClassName: es-data-db
+#        resources:
+#          requests:
+#            storage: 100Gi
+
+
+# Validate:
+#  curl -X GET "$(minikube ip):$(k get services elasticsearch-public -o=jsonpath='{.spec.ports[0].nodePort}' -n logging)/_cluster/state?pretty"
+#  curl -X GET "$(minikube ip):$(k get services elasticsearch-public -o=jsonpath='{.spec.ports[0].nodePort}' -n logging)/_cat/nodes?v&pretty"

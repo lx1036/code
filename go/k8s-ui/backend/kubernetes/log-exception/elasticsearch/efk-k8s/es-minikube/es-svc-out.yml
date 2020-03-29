@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: es-out
+  namespace: es
+  labels:
+    k8s-app: es
+spec:
+  selector:
+    k8s-app: es
+  ports:
+    - name: out
+      port: 9200
+      protocol: TCP
+  type: NodePort

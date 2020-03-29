@@ -1,0 +1,120 @@
+# https://www.elastic.co/guide/en/elasticsearch/reference/7.6/docker.html
+# https://www.docker.elastic.co/
+
+version: "3.7"
+services:
+  es01:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.6.1
+    container_name: es01
+    environment:
+      - node.name=es01
+      - cluster.name=es-docker-cluster
+      - discovery.seed_hosts=es02,es03
+      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - data01:/usr/share/elasticsearch/data
+    ports:
+      - 127.0.0.1:9200:9200 # only accessible from host machine
+    networks:
+      - elastic
+  es02:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.6.1
+    container_name: es02
+    environment:
+      - node.name=es02
+      - cluster.name=es-docker-cluster
+      - discovery.seed_hosts=es01,es03
+      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - data02:/usr/share/elasticsearch/data
+    networks:
+      - elastic
+  es03:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.6.1
+    container_name: es03
+    environment:
+      - node.name=es03
+      - cluster.name=es-docker-cluster
+      - discovery.seed_hosts=es01,es02
+      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - data03:/usr/share/elasticsearch/data
+    networks:
+      - elastic
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.6.1
+    container_name: kibana
+    links:
+      - es01:elasticsearch
+    depends_on:
+      - es01
+      - es02
+      - es03
+#    volumes:
+#      - ./kibana.yml:/usr/share/kibana/config/kibana.yml
+    ports:
+    - 5601:5601
+#    environment:
+#      ELASTICSEARCH_URL: http://elasticsearch:9200
+#      ELASTICSEARCH_USERNAME: kibana
+#      ELASTICSEARCH_PASSWORD: kibana
+    networks:
+      - elastic
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:7.6.1
+    container_name: filebeat
+    command: filebeat -e -strict.perms=false
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+    depends_on:
+      - kibana
+    links:
+      - kibana:kibana
+      - es01:elasticsearch
+    networks:
+      - elastic
+
+volumes:
+  data01:
+    driver: local
+#    driver_opts:
+#      type: none
+#      o: bind
+#      device: ./.cache/elasticsearch/data/data01
+  data02:
+    driver: local
+#    driver_opts:
+#      type: none
+#      o: bind
+#      device: ./.cache/elasticsearch/data/data02
+  data03:
+    driver: local
+#    driver_opts:
+#      type: none
+#      o: bind
+#      device: ./.cache/elasticsearch/data/data03 # host path
+
+networks:
+  elastic:
+    driver: bridge
+
+# Validate:
+#  curl -X GET "127.0.0.1:9200/_cat/nodes?v&pretty"
