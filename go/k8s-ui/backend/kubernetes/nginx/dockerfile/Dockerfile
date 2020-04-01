@@ -1,12 +1,13 @@
+# https://github.com/laradock/laradock/blob/master/nginx/Dockerfile
 FROM nginx:alpine
 
-LABEL maintainer="Mahmoud Zalt <mahmoud@zalt.me>"
+LABEL maintainer="Xiang Liu <lx1036@126.com>"
 
 COPY nginx.conf /etc/nginx/
 
 # If you're in China, or you need to change sources, will be set CHANGE_SOURCE to true in .env.
 
-ARG CHANGE_SOURCE=false
+ARG CHANGE_SOURCE=true
 RUN if [ ${CHANGE_SOURCE} = true ]; then \
     # Change application source from dl-cdn.alpinelinux.org to aliyun source
     sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/' /etc/apk/repositories \

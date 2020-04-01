@@ -1,0 +1,16 @@
+{
+  "CN": "Nginx SSL",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "CN",
+      "L": "China",
+      "O": "Nginx",
+      "OU": "CA",
+      "ST": "BeiJing"
+    }
+  ]
+}
