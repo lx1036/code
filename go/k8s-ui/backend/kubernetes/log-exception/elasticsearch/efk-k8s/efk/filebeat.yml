@@ -147,6 +147,10 @@ setup.template.settings:
 #fields:
 #  env: staging
 
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      hints.enabled: true
 
 #============================== Dashboards =====================================
 # These settings control loading the sample dashboards to the Kibana index. Loading
