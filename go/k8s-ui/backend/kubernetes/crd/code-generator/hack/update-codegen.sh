@@ -45,7 +45,7 @@ GENERATION_TARGETS="${GENERATION_TARGETS:-all}"
 
 cd ${CODE_GENERATOR_PATH}
 
-go env -w GOPROXY="https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,direct"
+ENV GOPROXY https://mirrors.aliyun.com/goproxy/,https://goproxy.cn,direct
 go mod vendor
 
 ./generate-groups.sh all \
