@@ -54,3 +54,6 @@ Error response from daemon: configured logging driver does not support reading
 缓存容器的日志。`
 
 
+## Docker Plugin
+(1) golang写一个plugin，然后做成docker image，再通过docker plugin install去拉取镜像并enable the plugin。
+
