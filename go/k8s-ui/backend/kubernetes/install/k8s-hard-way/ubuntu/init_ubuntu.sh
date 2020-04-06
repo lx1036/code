@@ -7,13 +7,13 @@ set -e
 TZ='Asia/Shanghai'
 OS_RELEASE="$(lsb_release -cs)"
 SOURCES_LIST_URL='https://git.io/fhQ6B'
-DOCKER_LIST_URL='https://git.io/fhQ68'
+DOCKER_LIST_URL='https://raw.githubusercontent.com/mritd/config/master/ubuntu/docker.list'
 OZ_DOWNLOAD_URL='https://github.com/robbyrussell/oh-my-zsh.git'
 OZ_CONFIG_DOWNLOAD_URL='https://git.io/fh9U2'
 OZ_SYNTAX_HIGHLIGHTING_DOWNLOAD_URL='https://github.com/zsh-users/zsh-syntax-highlighting.git'
 VIM_CONFIG_DOWNLOAD_URL='https://git.io/fh9rI'
 VIM_PLUGINS_DOWNLOAD_URL='https://git.io/fh9r3'
-DOCKER_CONFIG_DOWNLOAD_URL='https://git.io/fh9Ui'
+DOCKER_CONFIG_DOWNLOAD_URL='https://raw.githubusercontent.com/mritd/config/master/docker/docker.service'
 CTOP_DOWNLOAD_URL='https://github.com/bcicen/ctop/releases/download/v0.7.2/ctop-0.7.2-linux-amd64'
 DOCKER_COMPOSE_DOWNLOAD_URL="https://github.com/docker/compose/releases/download/1.23.2/docker-compose-Linux-x86_64"
 HEY_DOWNLOAD_URL="https://storage.googleapis.com/hey-release/hey_linux_amd64"
@@ -55,7 +55,7 @@ function sysupdate(){
     apt update -y
     apt upgrade -y
     apt install -y apt-transport-https ca-certificates software-properties-common \
-        wget vim zsh git htop tzdata conntrack ipvsadm ipset stress sysstat axel
+        curl -fsSL vim zsh git htop tzdata conntrack ipvsadm ipset stress sysstat axel
     apt autoremove -y
     apt autoclean -y
 }
@@ -92,12 +92,12 @@ function config_vim(){
 function install_docker(){
     printf "install_docker start:\n"
 
-    curl -fsSL ${DOCKER_LIST_URL} | sed "s@{{OS_RELEASE}}@${OS_RELEASE}@gi" > /etc/apt/sources.list.d/docker.list
+    echo "deb [arch=amd64] http://mirrors.aliyun.com/docker-ce/linux/ubuntu {{OS_RELEASE}} stable" | sed "s@{{OS_RELEASE}}@${OS_RELEASE}@gi" > /etc/apt/sources.list.d/docker.list
     curl -fsSL http://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | apt-key add -
     apt update -y
     apt install docker-ce -y
-    mv /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.list.bak
-    mv /lib/systemd/system/docker.service /lib/systemd/system/docker.service.bak
+#    mv /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.list.bak
+#    mv /lib/systemd/system/docker.service /lib/systemd/system/docker.service.bak
     curl -fsSL ${DOCKER_CONFIG_DOWNLOAD_URL} > /lib/systemd/system/docker.service
     systemctl daemon-reload
     systemctl restart docker
@@ -159,16 +159,16 @@ function install_osquery(){
     apt-get install osquery -y
 }
 
-disable_cloudinit
-setlocale
-sysupdate
-settimezone
-config_vim
-install_ohmyzsh
+#disable_cloudinit
+#setlocale
+#sysupdate
+#settimezone
+#config_vim
+#install_ohmyzsh
 install_docker
-install_ctop
-install_dc
-install_hey
-install_bat
-install_termshark
-install_osquery
+#install_ctop
+#install_dc
+#install_hey
+#install_bat
+#install_termshark
+#install_osquery
