@@ -15,12 +15,12 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dlclark/regexp2 v1.2.0 // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
-	github.com/docker/go-plugins-helpers v0.0.0-20200102110956-c9a8a2d92ccc // indirect
+	github.com/docker/go-plugins-helpers v0.0.0-20200102110956-c9a8a2d92ccc
 	github.com/dop251/goja v0.0.0-20200326102500-6438c8ddc517 // indirect
 	github.com/dop251/goja_nodejs v0.0.0-20200128125109-2d688c7e0ac4 // indirect
-	github.com/elastic/beats v7.6.2+incompatible // indirect
+	github.com/elastic/beats v7.6.2+incompatible
 	github.com/elastic/ecs v1.5.0 // indirect
-	github.com/elastic/go-lookslike v0.3.0 // indirect
+	github.com/elastic/go-lookslike v0.3.0
 	github.com/elastic/go-lumber v0.1.0 // indirect
 	github.com/elastic/go-seccomp-bpf v1.1.0 // indirect
 	github.com/elastic/go-structform v0.0.6 // indirect
