@@ -1,0 +1,41 @@
+
+version: "3.7"
+services:
+  mysql:
+    image: mysql:8.0.19
+    container_name: mysql_proxy
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=mysql_proxy
+      - MYSQL_USER=test
+      - MYSQL_PASSWORD=test
+    volumes:
+      - ./docker-entrypoint-initdb.d/:/docker-entrypoint-initdb.d/ # alphabetical order
+      - ./my.cnf:/etc/mysql/my.cnf
+    ports:
+      - 33061:3306
+      - 33062:33060
+  golang:
+    image: golang:1.14.1
+    container_name: golang_proxy
+    volumes:
+      - ./go.sh:/go/src/go.sh
+      - ./.env:/go/src/.env
+      - ./main.go:/go/src/main.go
+      - ../../../../vendor:/go/src/vendor
+      - ../../../../go.mod:/go/src/go.mod
+      - ../../../../go.sum:/go/src/go.sum
+    command: ["sh", "-c", "/go/src/go.sh"]
+    links:
+      - mysql:mysql_host
+    environment:
+      - NUMBER=2 #环境变量必须大写
+      - PORT=${PORT}
+      - DB_HOST=mysql_host
+      - DB_USERNAME=root
+      - DB_PASSWORD=root_password
+      - DB_PORT=3306
+      - DB_NAME=mysql_proxy
+      - "GOPROXY=https://mirrors.aliyun.com/goproxy/,https://goproxy.cn,direct"
+    ports:
+      - ${PORT}:${PORT}
