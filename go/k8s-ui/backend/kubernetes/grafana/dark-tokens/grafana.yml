@@ -1,0 +1,63 @@
+
+# https://github.com/kubernetes/ingress-nginx/blob/master/deploy/grafana/deployment.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-dark-tokens
+  labels:
+    app: grafana-dark-tokens
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: grafana-dark-tokens
+      labels:
+        app: grafana-dark-tokens
+    spec:
+      containers:
+        - name: grafana-dark-tokens
+          image: grafana/grafana
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - mountPath: /var/lib/grafana
+              name: data
+      restartPolicy: Always
+      volumes:
+        - name: data
+          emptyDir: {}
+  selector:
+    matchLabels:
+      app: grafana-dark-tokens
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-dark-tokens
+spec:
+  selector:
+    app: grafana-dark-tokens
+  ports:
+    - port: 3000
+      protocol: TCP
+      targetPort: 3000
+  type: NodePort
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-dark-tokens-2
+spec:
+  selector:
+    app: grafana-dark-tokens
+  ports:
+    - port: 3000
+      protocol: TCP
+      targetPort: 3000
