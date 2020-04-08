@@ -22,11 +22,19 @@ spec:
             - name: GRAFANA_HOST
               value: http://grafana-dark-tokens.default:3000
             - name: GRAFANA_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  key: grafana_k8s
-                  name: dark-tokens
+              value: eyJrIjoiOGt0c2t2NmFZc2VZSWZBSDM5enJpUmtHYmJKNFp3N0QiLCJuIjoiZGFyay10b2tlbi12b2x1bWUiLCJpZCI6MX0=
+#              valueFrom:
+#                secretKeyRef:
+#                  key: grafana
+#                  name: dark-tokens
       volumes:
         - name: dark-tokens
           secret:
-            secretName: dark-tokens-k8s
+            secretName: dark-token-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dark-token-secret
+data:
+  grafana: ZXlKcklqb2lPR3QwYzJ0Mk5tRlpjMlZaU1daQlNETTVlbkpwVW10SFltSktORnAzTjBRaUxDSnVJam9pWkdGeWF5MTBiMnRsYmkxMmIyeDFiV1VpTENKcFpDSTZNWDA9Cg==

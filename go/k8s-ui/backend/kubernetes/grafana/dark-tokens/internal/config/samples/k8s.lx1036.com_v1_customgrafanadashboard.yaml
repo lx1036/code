@@ -1,0 +1,7 @@
+apiVersion: k8s.lx1036.com.k8s.lx1036.com/v1
+kind: CustomGrafanaDashboard
+metadata:
+  name: customgrafanadashboard-sample
+spec:
+  # Add fields here
+  foo: bar
