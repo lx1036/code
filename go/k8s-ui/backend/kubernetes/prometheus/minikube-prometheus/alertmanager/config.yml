@@ -1,0 +1,7 @@
+route:
+  receiver: 'dingding'
+
+receiver:
+  - name: 'dingding'
+    webhook_configs:
+      - url: 'xxx'
