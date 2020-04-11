@@ -1,11 +1,15 @@
 route:
   receiver: 'slack'
+#  routes:
+#    - receiver: 'slack'
+#    - receiver: 'dingding'
 
 receivers:
-#  - name: 'dingding'
-#    webhook_configs:
-#      - url: 'https://oapi.dingtalk.com/robot/send?access_token=0be2c5f8f0e7d5408690aa934915b3de856341256d8ea9ef4ea8f8298a85328c'
-  - name: "slack" # 验证：docker run --rm -it busybox sh -c "while true; do echo "hello"; done"，Slack 会收到消息
+  - name: 'dingding'
+    webhook_configs:
+      - url: 'https://oapi.dingtalk.com/robot/send?access_token=0be2c5f8f0e7d5408690aa934915b3de856341256d8ea9ef4ea8f8298a85328c'
+        send_resolved: true
+  - name: "slack" # 验证：docker run --rm -it busybox sh -c "while true; do :; done", Slack 会收到消息
     slack_configs:
       - send_resolved: true
         username: 'lx1036'
