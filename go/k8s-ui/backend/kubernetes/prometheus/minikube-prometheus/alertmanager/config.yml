@@ -1,7 +1,13 @@
 route:
-  receiver: 'dingding'
+  receiver: 'slack'
 
-receiver:
-  - name: 'dingding'
-    webhook_configs:
-      - url: 'xxx'
+receivers:
+#  - name: 'dingding'
+#    webhook_configs:
+#      - url: 'https://oapi.dingtalk.com/robot/send?access_token=0be2c5f8f0e7d5408690aa934915b3de856341256d8ea9ef4ea8f8298a85328c'
+  - name: "slack" # 验证：docker run --rm -it busybox sh -c "while true; do echo "hello"; done"，Slack 会收到消息
+    slack_configs:
+      - send_resolved: true
+        username: 'lx1036'
+        channel: 'code'
+        api_url: 'https://hooks.slack.com/services/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'
