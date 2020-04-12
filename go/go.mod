@@ -3,7 +3,6 @@ module k8s-lx1036
 go 1.13
 
 require (
-	4d63.com/tz v1.1.0 // indirect
 	bou.ke/monkey v1.0.2
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/astaxie/beego v1.12.1
@@ -13,28 +12,12 @@ require (
 	github.com/containerd/containerd v1.0.2
 	github.com/containerd/fifo v0.0.0-20191213151349-ff969a566b00 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/dlclark/regexp2 v1.2.0 // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
-	github.com/docker/go-plugins-helpers v0.0.0-20200102110956-c9a8a2d92ccc // indirect
-	github.com/dop251/goja v0.0.0-20200326102500-6438c8ddc517 // indirect
-	github.com/dop251/goja_nodejs v0.0.0-20200128125109-2d688c7e0ac4 // indirect
-	github.com/elastic/beats v7.6.2+incompatible // indirect
-	github.com/elastic/ecs v1.5.0 // indirect
-	github.com/elastic/go-lookslike v0.3.0 // indirect
-	github.com/elastic/go-lumber v0.1.0 // indirect
-	github.com/elastic/go-seccomp-bpf v1.1.0 // indirect
-	github.com/elastic/go-structform v0.0.6 // indirect
-	github.com/elastic/go-sysinfo v1.3.0 // indirect
-	github.com/elastic/go-txfile v0.0.7 // indirect
-	github.com/elastic/go-ucfg v0.8.3 // indirect
-	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible
-	github.com/garyburd/redigo v1.6.0 // indirect
 	github.com/getsentry/sentry-go v0.3.0
 	github.com/gin-gonic/gin v1.5.0
 	github.com/go-logr/logr v0.1.0
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
-	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gohouse/gorose/v2 v2.1.3
 	github.com/gomodule/redigo v2.0.0+incompatible
@@ -49,7 +32,6 @@ require (
 	github.com/libp2p/go-reuseport v0.0.1
 	github.com/mholt/certmagic v0.8.3
 	github.com/miekg/dns v1.1.15
-	github.com/mitchellh/hashstructure v1.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/olivere/elastic/v7 v7.0.9

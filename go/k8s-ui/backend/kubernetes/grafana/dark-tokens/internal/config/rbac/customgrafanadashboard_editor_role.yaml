@@ -1,0 +1,26 @@
+# permissions to do edit customgrafanadashboards.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: customgrafanadashboard-editor-role
+rules:
+- apiGroups:
+  - k8s.lx1036.com.k8s.lx1036.com
+  resources:
+  - customgrafanadashboards
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.lx1036.com.k8s.lx1036.com
+  resources:
+  - customgrafanadashboards/status
+  verbs:
+  - get
+  - patch
+  - update

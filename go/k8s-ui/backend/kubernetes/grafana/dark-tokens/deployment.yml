@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dark
+  labels:
+    app: dark
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dark
+  template:
+    metadata:
+      labels:
+        app: dark
+    spec:
+      serviceAccountName: dark
+      containers:
+        - name: dark
+          image: kphoen/dark:latest
+          env:
+            - name: GRAFANA_HOST
+              value: http://grafana-dark-tokens.default:3000
+            - name: GRAFANA_TOKEN
+              value: eyJrIjoiOGt0c2t2NmFZc2VZSWZBSDM5enJpUmtHYmJKNFp3N0QiLCJuIjoiZGFyay10b2tlbi12b2x1bWUiLCJpZCI6MX0=
+#              valueFrom:
+#                secretKeyRef:
+#                  key: grafana
+#                  name: dark-tokens
+      volumes:
+        - name: dark-tokens
+          secret:
+            secretName: dark-token-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dark-token-secret
+data:
+  grafana: ZXlKcklqb2lPR3QwYzJ0Mk5tRlpjMlZaU1daQlNETTVlbkpwVW10SFltSktORnAzTjBRaUxDSnVJam9pWkdGeWF5MTBiMnRsYmkxMmIyeDFiV1VpTENKcFpDSTZNWDA9Cg==

@@ -1,0 +1,7 @@
+domain: k8s.lx1036.com
+repo: k8s-lx1036
+resources:
+- group: k8s.lx1036.com
+  kind: CustomGrafanaDashboard
+  version: v1
+version: "2"
