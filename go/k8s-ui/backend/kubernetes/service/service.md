@@ -66,6 +66,11 @@ ip link list
 ```shell script
 ip link add veth0 type veth peer name veth1 # 创建一对虚拟以太网卡 veth0 veth1，默认情况下都会在宿主机的 root network namespace
 ip link list
+
+# 把 veth0/veth1 up 起来
+ip link set dev veth0 up
+ip link set dev veth1 up
+
 ip link set veth1 netns netns1 # 把 veth1 移到 netns1 network namespace
 ip link list
  
@@ -88,6 +93,34 @@ ip netns exec netns1 ip link set veth1 netns 1
 (3) Network Namespace API
 Demo:
 ./network-namespace.go
+
+
+#### 容器网络与 veth pair
+Docker 容器网络就是 veth pair + bridge 模式组成的。
+(1)如何知道host上的 vethxxx 和哪个 container eth0是 veth pair 成对关系？
+```shell script
+# 在目标容器内
+docker run -p 8088:80 -d  nginx
+docker container ls
+docker exec -it ${container_id} /bin/bash
+cat /sys/class/net/eth0/iflink
+# 在 host 宿主机上执行，两者结果应该是一样的，就表示 host 上的虚拟网卡 vethxxx 与容器内的 eth0 是一对
+cat /sys/class/net/vethxxx/ifindex
+```
+
+(2) linux bridge
+Linux bridge 则有多个端口，数据可以从任何端口进来，进来之后从哪个口出去取决于目的 MAC 地址，原理和物理交换机差不多。
+```shell script
+# 创建一个 bridge
+# brctl addbr br1 # bridge-utils 软件包里的 brctl 工具管理网桥
+ip link add name br0 type bridge
+ip link list
+ip link set br0 up
+ip link list
+
+# 创建一对 veth pair
+ip link add br-veth0 type veth peer name br-veth1
+```
 
 
 ### Network Policy
