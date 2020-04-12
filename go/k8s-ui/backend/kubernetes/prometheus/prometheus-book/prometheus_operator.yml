@@ -135,7 +135,7 @@ spec:
       restartPolicy: Always
       securityContext:
         runAsNonRoot: true
-        runAsUser: 65534
+        runAsUser: 65534 # uid=65534(nobody) gid=65534(nogroup) groups=65534(nogroup)
       serviceAccountName: prometheus-operator
   selector:
     matchLabels:

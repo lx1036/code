@@ -87,7 +87,7 @@ ip netns exec netns1 ip link set veth1 netns 1
 
 (3) Network Namespace API
 Demo:
-
+./network-namespace.go
 
 
 ### Network Policy

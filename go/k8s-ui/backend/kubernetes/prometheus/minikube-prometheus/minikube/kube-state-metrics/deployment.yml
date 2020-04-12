@@ -26,7 +26,7 @@ spec:
           image: quay.io/coreos/kube-state-metrics:v1.9.5
           name: kube-state-metrics
           securityContext:
-            runAsUser: 65534
+            runAsUser: 65534 # uid=65534(nobody) gid=65534(nogroup) groups=65534(nogroup)
         - args:
             - --logtostderr
             - --secure-listen-address=:8443
@@ -38,7 +38,7 @@ spec:
             - containerPort: 8443
               name: https-main
           securityContext:
-            runAsUser: 65534
+            runAsUser: 65534 # uid=65534(nobody) gid=65534(nogroup) groups=65534(nogroup)
         - args:
             - --logtostderr
             - --secure-listen-address=:9443
@@ -50,7 +50,7 @@ spec:
             - containerPort: 9443
               name: https-self
           securityContext:
-            runAsUser: 65534
+            runAsUser: 65534 # uid=65534(nobody) gid=65534(nogroup) groups=65534(nogroup)
 #      nodeSelector:
 #        kubernetes.io/os: linux
       serviceAccountName: kube-state-metrics
