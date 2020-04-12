@@ -1,0 +1,54 @@
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-demo
+  labels:
+    app: nginx-demo
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: nginx-demo
+      labels:
+        app: nginx-demo
+    spec:
+      containers:
+        - name: nginx-demo
+          image: nginx:1.17.8
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app: nginx-demo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-demo
+spec:
+  selector:
+    app: nginx-demo
+  ports:
+    - port: 8089
+      targetPort: 80
+      name: nginx-demo-port
+  type: NodePort
+
+---
+
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nginx-demo
+  labels:
+    team: frontend
+spec:
+  selector:
+    matchLabels:
+      app: nginx-demo
+  endpoints:
+    - port: nginx-demo-port
