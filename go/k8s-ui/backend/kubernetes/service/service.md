@@ -97,7 +97,7 @@ Demo:
 
 #### 容器网络与 veth pair
 Docker 容器网络就是 veth pair + bridge 模式组成的。
-(1)如何知道host上的 vethxxx 和哪个 container eth0是 veth pair 成对关系？
+(1) 如何知道host上的 vethxxx 和哪个 container eth0是 veth pair 成对关系？
 ```shell script
 # 在目标容器内
 docker run -p 8088:80 -d  nginx
@@ -109,6 +109,8 @@ cat /sys/class/net/vethxxx/ifindex
 ```
 
 (2) linux bridge
+bridge 是一个虚拟网络设备，可以配置 IP、MAC 地址；其次，是一个虚拟交换机。
+普通网络设备只有两个端口，如物理网卡，流量包从外部进来进入内核协议栈，或者从内核协议栈进来出去外面的物理网络中。
 Linux bridge 则有多个端口，数据可以从任何端口进来，进来之后从哪个口出去取决于目的 MAC 地址，原理和物理交换机差不多。
 ```shell script
 # 创建一个 bridge
@@ -118,9 +120,40 @@ ip link list
 ip link set br0 up
 ip link list
 
-# 创建一对 veth pair
+# 创建一对 veth pair (eth0: 172.17.186.210)
 ip link add br-veth0 type veth peer name br-veth1
+ip addr add 172.17.186.101/24 dev br-veth0
+ip addr add 172.17.186.102/24 dev br-veth1
+ip link set br-veth0 up
+ip link set br-veth1 up
+# 把 br-veth0 搭到 br0 网桥上
+ip link set dev br-veth0 master br0 # brctl addif br0 veth0
+# 查看网桥上都有哪些网络设备
+bridge link # brctl show
+# 10: br-veth0 state UP @br-veth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master br0 state forwarding priority 32 cost 2
+# br-veth0 没法 ping 通 br-veth1
+ping -c 1 -w 1 -I br-veth0 172.17.186.102
+tcpdump -n -i br-veth1 # 抓包
+
+# veth0 的 IP 给 bridge
+ip addr del 172.17.186.101/24 dev br-veth0
+ip addr add 172.17.186.101/24 dev br0
 ```
+
+(3) iptables
+
+查看所有 iptables 规则
+```shell script
+iptables -L -n # 默认是 filter 表
+# 可以指定表
+iptables -t nat -L -n
+```
+
+
+
+
+
+
 
 
 ### Network Policy
