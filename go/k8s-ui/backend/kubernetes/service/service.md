@@ -140,6 +140,9 @@ ip addr del 172.17.186.101/24 dev br-veth0
 ip addr add 172.17.186.101/24 dev br0
 ```
 
+**[Linux 虚拟网络设备详解之 Bridge 网桥](https://www.cnblogs.com/bakari/p/10529575.html)**
+
+
 (3) iptables
 
 查看所有 iptables 规则
@@ -150,10 +153,39 @@ iptables -t nat -L -n
 ```
 
 
+# LVS 基本原理
+
+**[LVS 工作原理图文讲解，非常详细！](https://mp.weixin.qq.com/s/VWBDoa5eCEH64zcs2V4_jQ)**
+**[LVS 3种工作模式实战及Q&A！](https://mp.weixin.qq.com/s/FgMy8hEmQkswx1cKlvjIkA)**
+
+## IPVS
+```shell script
+vip=192.168.64.6
+rs1=192.168.64.4
+rs2=192.168.64.5
+
+sudo ipvsadm -C
+sudo ipvsadm -A -t 192.168.64.6:8080 -s rr
+sudo ipvsadm -a -t 192.168.64.6:8080 -r 192.168.64.4:80 -g
+sudo ipvsadm -a -t 192.168.64.6:8080 -r 192.168.64.5:80 -g
+
+sudo ipvsadm -ln -t 192.168.64.6:8080
+
+sudo su
+sudo ifconfig lo:0 192.168.64.6 broadcast 192.168.64.6 netmask 255.255.255.255 up
+echo "1" >/proc/sys/net/ipv4/conf/lo/arp_ignore
+echo "2" >/proc/sys/net/ipv4/conf/lo/arp_announce
+echo "1" >/proc/sys/net/ipv4/conf/all/arp_ignore
+echo "2" >/proc/sys/net/ipv4/conf/all/arp_announce
+```
 
 
+DR 模式：
+![DR mode](https://mmbiz.qpic.cn/mmbiz_png/d5patQGz8KdwBYwDyVuDdYUrJKvrPv2ibeicicGn15jcvdxQxwZYqJtm1Psq2J3khIUPDfsq8RlebVzTrEGZM2JdQ/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
 
 
+NAT 模式：
+![NAT mode](https://mmbiz.qpic.cn/mmbiz_png/d5patQGz8KdwBYwDyVuDdYUrJKvrPv2ibBHtE4TynXmhSbue6icqFvYScPMsPVQBKkEusmCXK4ZibLjjic3htNAdww/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
 
 
 ### Network Policy
