@@ -45,12 +45,22 @@ services:
     image: quay.io/prometheus/alertmanager:v0.20.0
     container_name: alertmanager
     volumes:
-      - ./alertmanager/:/etc/alertmanager/
+      - ./alertmanager/config.yml:/etc/alertmanager/config.yml
     command:
       - '--config.file=/etc/alertmanager/config.yml'
       - '--storage.path=/alertmanager'
     ports:
       - 9093:9093
+    links:
+      - alert-manager-dingtalk:alert-manager-dingtalk
+
+  alert-manager-dingtalk:
+    image: lx1036/alert-manager-dingtalk:v1.0.0
+    container_name: alert-manager-dingtalk
+    command:
+      - '--url=${DINGTALKURL}'
+    ports:
+      - 8800:8080
 
   node-exporter: # https://hub.docker.com/r/prom/node-exporter
     image: prom/node-exporter:v0.18.1
