@@ -1,0 +1,17 @@
+groups:
+  - name: MYSQL服务监控
+    rules:
+      - alert: MYSQLDown
+        expr: mysql_up != 1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: mysql server {{ $labels.realip }} is down. please check it in time.
+      - alert: mysql QPS too high
+        expr: (rate(mysql_global_status_queries{job="mysql_exporter"}[5m]) or irate(mysql_global_status_queries{job="mysql_exporter"}[5m])) > 300
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: mysql server {{ $labels.realip }} QPS is too high. please keep an eyes on it.

@@ -1,0 +1,128 @@
+groups:
+  - name: 系统资源监控
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: Instance Node {{ $labels.realip }} is down
+      - alert: root volumes usage is more than 95%
+        expr: 100 - ((node_filesystem_avail_bytes{mountpoint="/",fstype!="rootfs"} * 100) / node_filesystem_size_bytes{mountpoint="/",fstype!="rootfs"}) > 95
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: Instance Node {{ $labels.realip }} 的根分区磁盘大小使用超过95%.
+      - alert: data volumes usage is more than 95%
+        expr: 100 - ((node_filesystem_avail_bytes{mountpoint="/data",fstype!="rootfs"} * 100) / node_filesystem_size_bytes{mountpoint="/data",fstype!="rootfs"}) > 95
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: Instance Node {{ $labels.realip }} data volumes is more than 95%.
+      - alert: SwapIsFillingUp
+        expr: (1 - (node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes)) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Swap is filling up (instance {{ $labels.realip }})"
+          description: "Swap is filling up (>80%)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: OutOfMemory
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Out of memory (instance {{ $labels.realip }})"
+          description: "Node memory is filling up (< 10% left)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: UnusualNetworkThroughputIn
+        expr: sum by (instance) (irate(node_network_receive_bytes_total[2m])) / 1024 / 1024 > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual network throughput in (instance {{ $labels.realip }})"
+          description: "Host network interfaces are probably receiving too much data (> 50 MB/s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: UnusualNetworkThroughputOut
+        expr: sum by (instance) (irate(node_network_transmit_bytes_total[2m])) / 1024 / 1024 > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual network throughput in (instance {{ $labels.realip }})"
+          description: "Host network interfaces are probably sending too much data (> 50 MB/s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: UnusualDiskReadRate
+        expr: sum by (instance) (irate(node_disk_read_bytes_total[2m])) / 1024 / 1024 > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual disk read rate (instance {{ $labels.realip }})"
+          description: "Disk is probably reading too much data (> 20 MB/s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: UnusualDiskReadRate
+        expr: sum by (instance) (irate(node_disk_written_bytes_total[2m])) / 1024 / 1024 > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual disk write rate (instance {{ $labels.realip }})"
+          description: "Disk is probably writing too much data (> 20 MB/s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: OutOfDiskSpace
+        expr: node_filesystem_free_bytes{mountpoint ="/"} / node_filesystem_size_bytes{mountpoint ="/"} * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Out of disk space (instance {{ $labels.realip }})"
+          description: "Disk is almost full (< 15% left)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: OutOfInodes
+        expr: node_filesystem_files_free{mountpoint ="/rootfs"} / node_filesystem_files{mountpoint ="/rootfs"} * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Out of inodes (instance {{ $labels.realip }})"
+          description: "Disk is almost running out of available inodes (< 10% left)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: UnusualDiskReadLatency
+        expr: rate(node_disk_read_time_seconds_total[1m]) / rate(node_disk_reads_completed_total[1m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual disk read latency (instance {{ $labels.realip }})"
+          description: "Disk latency is growing (read operations > 100ms)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: UnusualDiskWriteLatency
+        expr: rate(node_disk_write_time_seconds_total[1m]) / rate(node_disk_writes_completed_total[1m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual disk write latency (instance {{ $labels.realip }})"
+          description: "Disk latency is growing (write operations > 100ms)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: HighCpuLoad
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU load (instance {{ $labels.realip }})"
+          description: "CPU load is > 80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: ContextSwitching
+        expr: rate(node_context_switches_total[5m]) > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Context switching (instance {{ $labels.realip }})"
+          description: "Context switching is growing on node (> 10000 / s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      - alert: SystemdServiceCrashed
+        expr: node_systemd_unit_state{state="failed"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SystemD service crashed (instance {{ $labels.realip }})"
+          description: "SystemD service crashed\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
