@@ -1,4 +1,12 @@
 package receivers
 
-type Sink struct {
+import "strings"
+
+type ReceiverFactory struct {
+}
+
+func (factory *ReceiverFactory) BuildAll(receiverStr string)  {
+	receivers := strings.Split(receiverStr, ",")
+	receiver := receivers[0]
+
 }
