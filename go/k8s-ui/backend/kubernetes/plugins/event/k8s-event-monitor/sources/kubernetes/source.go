@@ -7,6 +7,7 @@ import (
 	kubewatch "k8s.io/apimachinery/pkg/watch"
 	kubeclient "k8s.io/client-go/kubernetes"
 	kubev1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	kuberest "k8s.io/client-go/rest"
 	"net/url"
 	"time"
 )
@@ -93,6 +94,10 @@ readEventLoop:
 	return events
 }
 
+func (eventSource *EventSource) ListEvents()  {
+
+}
+
 func NewKubernetesEventSource(uri *url.URL) (*EventSource, error) {
 	kubeConfig, err := GetKubeClientConfig(uri)
 	if err != nil {
@@ -103,7 +108,8 @@ func NewKubernetesEventSource(uri *url.URL) (*EventSource, error) {
 		return nil, err
 	}
 
-	eventClient := clientSet.CoreV1().Events(kubeapi.NamespaceAll)
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#event-v1-core
+	eventClient := clientSet.CoreV1().Events(kubeapi.NamespaceDefault)
 	eventSource := &EventSource{
 		EventClient: eventClient,
 		StopChannel: make(chan struct{}),
@@ -113,4 +119,22 @@ func NewKubernetesEventSource(uri *url.URL) (*EventSource, error) {
 	go eventSource.Watch()
 
 	return eventSource, nil
+}
+
+const (
+	defaultInClusterConfig = true
+)
+
+func GetKubeClientConfig(uri *url.URL) (*kuberest.Config, error) {
+	var kubeConfig *kuberest.Config
+	var err error
+	inClusterConfig := defaultInClusterConfig
+	if inClusterConfig {
+		kubeConfig, err = kuberest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return kubeConfig, nil
 }
