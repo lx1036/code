@@ -1,12 +1,14 @@
 package kubernetes
 
 import (
+	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/common"
 	kubeapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubewatch "k8s.io/apimachinery/pkg/watch"
 	kubeclient "k8s.io/client-go/kubernetes"
 	kubev1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"net/url"
+	"time"
 )
 
 const (
@@ -73,18 +75,20 @@ func (eventSource *EventSource) Watch() {
 	}
 }
 
-func (eventSource *EventSource) GetEvents() []*kubeapi.Event {
-	var events []*kubeapi.Event
+func (eventSource *EventSource) GetEvents() common.Events {
+	var events common.Events
 
 readEventLoop:
 	for {
 		select {
 		case event := <-eventSource.EventBuffer:
-			events = append(events, event)
+			events.Events = append(events.Events, event)
 		default:
 			break readEventLoop
 		}
 	}
+
+	events.Timestamp = time.Now()
 
 	return events
 }
