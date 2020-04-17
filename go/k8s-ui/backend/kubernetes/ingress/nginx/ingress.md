@@ -54,5 +54,8 @@ log_format upstreaminfo '$remote_addr - $remote_user [$time_local] "$request" $s
 ```
 
 
+# Sticky sessions
+**[Sticky sessions](https://github.com/kubernetes/ingress-nginx/blob/master/docs/examples/affinity/cookie/README.md)**
+
 # Install Grafana/Prometheus for metrics
 **[monitor](https://kubernetes.github.io/ingress-nginx/user-guide/monitoring/)**
