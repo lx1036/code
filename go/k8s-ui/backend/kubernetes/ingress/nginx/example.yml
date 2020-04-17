@@ -88,6 +88,8 @@ kind: Ingress
 metadata:
   name: example-ingress
   annotations:
+    # Nginx is configured to automatically discover all ingress with the kubernetes.io/ingress.class: "nginx" annotation.
+    kubernetes.io/ingress.class: "nginx"
     nginx.ingress.kubernetes.io/rewrite-target: /$1
     nginx.ingress.kubernetes.io/configuration-snippet: |
       more_set_headers "Request-Id: $req_id";
@@ -112,6 +114,7 @@ kind: Ingress
 metadata:
   name: example-ingress-2
   annotations:
+    kubernetes.io/ingress.class: "nginx"
     nginx.ingress.kubernetes.io/rewrite-target: /$1
     nginx.ingress.kubernetes.io/server-snippet: |
       location /status.html {
