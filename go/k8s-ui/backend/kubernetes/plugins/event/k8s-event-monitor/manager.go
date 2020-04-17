@@ -1,6 +1,7 @@
 package main
 
 import (
+	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/common"
 	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/receivers"
 	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/sources/kubernetes"
 	"time"
@@ -12,7 +13,7 @@ type manager struct {
 	StopChan chan struct{}
 }
 
-func NewManager(srouce *kubernetes.EventSource, receiverManager *receivers.ReceiverManager) *manager {
+func NewManager(source common.EventSource, receiverManager *receivers.ReceiverManager) *manager {
 	return &manager{
 		StopChan: make(chan struct{}),
 		ReceiverManager: receiverManager,

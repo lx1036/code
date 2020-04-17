@@ -8,6 +8,7 @@ import (
 	"k8s.io/klog"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 )
 
@@ -17,6 +18,8 @@ var (
 	argReceivers   string
 	argHealthzIP   = flag.String("healthz-ip", "0.0.0.0", "ip eventer health check service uses")
 	argHealthzPort = flag.Uint("healthz-port", 8084, "port eventer health check listens on")
+	
+	debug bool
 )
 
 func init() {
@@ -24,19 +27,24 @@ func init() {
 	// --sources="k8s:http://localhost:8080/abc?key1=value1" --sources="k9s:http://localhost:8090/abc?key1=value1"
 	flag.Var(&argSources, "sources", "source(s) to read events from")
 	flag.StringVar(&argReceivers, "receivers", "", "external notification receivers that receive events")
+	
+	flag.BoolVar(&debug, "debug", false, "debug application")
 }
 
 func main() {
 	flag.Parse()
 
-	source, err := sources.NewSourceFactory().Build(argSources)
+	srcs, err := sources.NewSourceFactory().Build(argSources)
 	if err != nil {
 		klog.Errorf("Failed to create source, because of %s", err.Error())
 	}
 
-
-
-
+	source := srcs[0]
+	events := source.GetEvents()
+	
+	if debug {
+		os.Exit(0)
+	}
 
 	receiver := receivers.NewReceiverFactory().BuildAll(argReceivers)
 	receiverManager := receivers.NewReceiverManager(receiver)

@@ -98,7 +98,7 @@ func (eventSource *EventSource) ListEvents()  {
 
 }
 
-func NewKubernetesEventSource(uri *url.URL) (*EventSource, error) {
+func NewKubernetesEventSource(uri *url.URL) (common.EventSource, error) {
 	kubeConfig, err := GetKubeClientConfig(uri)
 	if err != nil {
 		return nil, err

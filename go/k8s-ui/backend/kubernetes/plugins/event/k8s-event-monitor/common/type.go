@@ -13,3 +13,7 @@ type Events struct {
 	Timestamp time.Time
 	Events []*kubeapi.Event
 }
+
+type EventSource interface {
+	GetEvents() Events
+}
