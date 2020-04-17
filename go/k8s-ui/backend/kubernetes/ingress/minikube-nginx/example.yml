@@ -1,0 +1,150 @@
+# https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: web
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: gcr.io/google-samples/hello-app:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+  selector:
+    matchLabels:
+      app: web
+
+---
+# curl $(minikube service web --url)
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: NodePort
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web2
+  labels:
+    app: web2
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: web2
+      labels:
+        app: web2
+    spec:
+      containers:
+        - name: web2
+          image: gcr.io/google-samples/hello-app:2.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+  selector:
+    matchLabels:
+      app: web2
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: web2
+spec:
+  selector:
+    app: web2
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: NodePort
+
+---
+# curl hello-world.info
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: example-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Request-Id: $req_id";
+spec:
+  rules:
+    - host: hello-world.info
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: web
+              servicePort: 8080
+          - path: /v2/*
+            backend:
+              serviceName: web2
+              servicePort: 8080
+
+---
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: example-ingress-2
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location /status.html {
+          content_by_lua_block {
+              ngx.say("ok")
+          }
+      }
+
+      location ~* "^/v3/*" {
+          return 200 "ok2\n";
+      }
+
+spec:
+  rules:
+    - host: hello-world-2.info
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: web
+              servicePort: 8080
+          - path: /v2/*
+            backend:
+              serviceName: web2
+              servicePort: 8080
+    - host: hello-world-4.info
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: web
+              servicePort: 8080
+          - path: /v2/*
+            backend:
+              serviceName: web2
+              servicePort: 8080
