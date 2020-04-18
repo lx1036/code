@@ -59,3 +59,6 @@ log_format upstreaminfo '$remote_addr - $remote_user [$time_local] "$request" $s
 
 # Install Grafana/Prometheus for metrics
 **[monitor](https://kubernetes.github.io/ingress-nginx/user-guide/monitoring/)**
+
+
+# Nginx Ingress Controller
