@@ -1,9 +1,9 @@
 package common
 
 import (
-	"time"
 	kubeapi "k8s.io/api/core/v1"
-	)
+	"time"
+)
 
 type Receiver interface {
 	Send()
@@ -11,5 +11,9 @@ type Receiver interface {
 
 type Events struct {
 	Timestamp time.Time
-	Events []*kubeapi.Event
+	Events    []*kubeapi.Event
+}
+
+type EventSource interface {
+	GetEvents() Events
 }

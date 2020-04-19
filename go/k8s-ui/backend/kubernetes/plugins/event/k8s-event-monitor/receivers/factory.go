@@ -8,6 +8,9 @@ import (
 type ReceiverFactory struct {
 }
 
+type Receiver interface {
+}
+
 func NewReceiverFactory() *ReceiverFactory {
 	return &ReceiverFactory{}
 }

@@ -1,0 +1,160 @@
+
+# $(minikube ip) lx1036.affinity-cookie
+# curl -I  lx1036.affinity-cookie
+
+#HTTP/1.1 200 OK
+#Server: openresty/1.15.8.2
+#Date: Fri, 17 Apr 2020 09:05:39 GMT
+#Content-Type: text/plain; charset=utf-8
+#Content-Length: 76
+#Connection: keep-alive
+#Set-Cookie: route=1587114340.286.5381.501341; Expires=Sun, 19-Apr-20 09:05:39 GMT; Max-Age=172800; Path=/; HttpOnly
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: affinity-cookie
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "route"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+spec:
+  rules:
+    - host: lx1036.affinity-cookie
+      http:
+        paths:
+          - backend:
+              serviceName: service-affinity-cookie
+              servicePort: 8080
+            path: /
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-affinity-cookie
+spec:
+  selector:
+    app: pod-affinity-cookie
+  ports:
+    - port: 8080
+      targetPort: 8080
+#  type: NodePort
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-affinity-cookie
+  labels:
+    app: pod-affinity-cookie
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: pod-affinity-cookie
+      labels:
+        app: pod-affinity-cookie
+    spec:
+      containers:
+        - name: pod-affinity-cookie
+          image: gcr.io/google-samples/hello-app:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+  selector:
+    matchLabels:
+      app: pod-affinity-cookie
+
+---
+
+# curl -I lx1036.affinity-cookie.none
+
+#HTTP/1.1 200 OK
+#Server: openresty/1.15.8.2
+#Date: Fri, 17 Apr 2020 09:17:49 GMT
+#Content-Type: text/plain; charset=utf-8
+#Content-Length: 76
+#Connection: keep-alive
+#Set-Cookie: SSNONE=1587115070.678.5457.409366; Expires=Sun, 19-Apr-20 09:17:49 GMT; Max-Age=172800; Path=/; HttpOnly
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: affinity-cookie-samesite-none
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "SSNONE"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-samesite: "None"
+    nginx.ingress.kubernetes.io/session-cookie-conditional-samesite-none: "true"
+spec:
+  rules:
+    - host: lx1036.affinity-cookie.none
+      http:
+        paths:
+          - backend:
+              serviceName: service-affinity-cookie-samesite-none
+              servicePort: 8080
+            path: /
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-affinity-cookie-samesite-none
+spec:
+  selector:
+    app: pod-affinity-cookie
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+# curl -I lx1036.affinity-cookie.strict
+
+#HTTP/1.1 200 OK
+#Server: openresty/1.15.8.2
+#Date: Fri, 17 Apr 2020 09:18:36 GMT
+#Content-Type: text/plain; charset=utf-8
+#Content-Length: 76
+#Connection: keep-alive
+#Set-Cookie: STRICTCOOKIENAME=1587115117.845.5456.408382; Expires=Sun, 19-Apr-20 09:18:36 GMT; Max-Age=172800; Path=/; HttpOnly
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: affinity-cookie-samesite-strict
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "STRICTCOOKIENAME"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-samesite: "Strict"
+spec:
+  rules:
+    - host: lx1036.affinity-cookie.strict
+      http:
+        paths:
+          - backend:
+              serviceName: service-affinity-cookie-samesite-strict
+              servicePort: 8080
+            path: /
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-affinity-cookie-samesite-strict
+spec:
+  selector:
+    app: pod-affinity-cookie
+  ports:
+    - port: 8080
+      targetPort: 8080

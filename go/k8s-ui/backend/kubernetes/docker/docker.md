@@ -1,4 +1,10 @@
 
+# Installation
+
+
+
+
+
 # Docker Container 是什么？
 Docker Container 是一组进程以及它们所能访问资源的集合，使用 Namespace/CGroups 技术实现资源隔离和资源访问控制。
 如果不用Docker，Linux 默认启动的进程会在默认名为 'root' 的 Namespace/CGroups，而 Docker 启动的 abc container 会在

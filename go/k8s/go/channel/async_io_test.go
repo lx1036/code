@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-
 func TestAsyncIO(test *testing.T) {
 	type JsonResponse struct {
 		code int
@@ -16,25 +15,32 @@ func TestAsyncIO(test *testing.T) {
 
 	go func() {
 		for {
-			select {
-			case <-time.After(time.Second * 2):
-				log.Printf("timeout")
-				break
-			case data := <-response:
-				log.Println(data)
+		nextTick:
+			for {
+				select {
+				case <-time.After(time.Second * 2):
+					log.Printf("timeout")
+					break
+				case data := <-response:
+					log.Println(data)
+					break nextTick
+				}
 			}
 		}
+
 	}()
 
 	go func() {
-		message := JsonResponse{
-			code: 0,
-			data: "hello world",
-		}
+		for {
+			message := JsonResponse{
+				code: 0,
+				data: "hello world",
+			}
 
-		response <- message
+			response <- message
+			time.Sleep(time.Second * 3)
+		}
 	}()
 
 	select {}
 }
-

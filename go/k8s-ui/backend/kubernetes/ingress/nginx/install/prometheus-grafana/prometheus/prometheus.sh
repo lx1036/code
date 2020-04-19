@@ -1,0 +1,4 @@
+
+
+kubectl apply --kustomize .
+
