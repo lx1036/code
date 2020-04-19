@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/common/flags"
+	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/common/manager"
 	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/receivers"
 	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/sources"
 	"k8s.io/klog"
@@ -18,7 +20,7 @@ var (
 	argReceivers   string
 	argHealthzIP   = flag.String("healthz-ip", "0.0.0.0", "ip eventer health check service uses")
 	argHealthzPort = flag.Uint("healthz-port", 8084, "port eventer health check listens on")
-	
+
 	debug bool
 )
 
@@ -27,10 +29,11 @@ func init() {
 	// --sources="k8s:http://localhost:8080/abc?key1=value1" --sources="k9s:http://localhost:8090/abc?key1=value1"
 	flag.Var(&argSources, "sources", "source(s) to read events from")
 	flag.StringVar(&argReceivers, "receivers", "", "external notification receivers that receive events")
-	
+
 	flag.BoolVar(&debug, "debug", false, "debug application")
 }
 
+// go run ./event-monitor.go --sources="kubernetes:https://192.168.64.32:8443?inClusterConfig=false&insecure=true"
 func main() {
 	flag.Parse()
 
@@ -41,15 +44,23 @@ func main() {
 
 	source := srcs[0]
 	events := source.GetEvents()
-	
+
+	fmt.Println(events.Timestamp, len(events.Events))
+
+	for _, event := range events.Events {
+		fmt.Println(fmt.Sprintf("message: %s, reason: %s, type: %s", event.Message, event.Reason, event.Type))
+	}
+
+	select {}
 	if debug {
+		fmt.Println("exit.")
 		os.Exit(0)
 	}
 
 	receiver := receivers.NewReceiverFactory().BuildAll(argReceivers)
 	receiverManager := receivers.NewReceiverManager(receiver)
 
-	mgr := NewManager(source, receiverManager)
+	mgr := manager.NewManager(source, receiverManager)
 	mgr.Start()
 
 	go startHTTPServer()

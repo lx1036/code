@@ -7,23 +7,23 @@ import (
 )
 
 func TestUriString(test *testing.T) {
-	tests := []struct{
-		uri Uri
+	tests := []struct {
+		uri  Uri
 		want string
 	}{
 		{
-			uri:Uri{
+			uri: Uri{
 				Key:   "abc",
 				Value: url.URL{},
 			},
 			want: "abc",
 		},
 		{
-			uri:Uri{
-				Key:   "kubernetes",
+			uri: Uri{
+				Key: "kubernetes",
 				Value: url.URL{
-					Scheme: "http",
-					Host: "localhost:8080",
+					Scheme:   "http",
+					Host:     "localhost:8080",
 					RawQuery: "key1=value1&key2=value2",
 				},
 			},
@@ -39,7 +39,3 @@ func TestUriString(test *testing.T) {
 func TestUriSet(test *testing.T) {
 
 }
-
-
-
-

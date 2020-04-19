@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/common"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/receivers"
 	"k8s.io/api/core/v1"
 	"net/http"
 )
@@ -13,7 +12,6 @@ import (
 const (
 	WARNING = 2
 )
-
 
 type DingTalk struct {
 	Endpoint   string
@@ -48,7 +46,7 @@ type At struct {
 }
 
 //
-func NewDingTalkReceiver(receiver string) *DingTalk  {
+func NewDingTalkReceiver(receiver string) *DingTalk {
 	dingTalk := &DingTalk{
 		Level: WARNING,
 	}
@@ -60,7 +58,7 @@ func (receiver *DingTalk) ExportEvents(events *common.Events) {
 
 }
 
-func (receiver *DingTalk) send(event *v1.Event)  {
+func (receiver *DingTalk) send(event *v1.Event) {
 	message := transform(event)
 	msgBytes, err := json.Marshal(message)
 	if err != nil {
@@ -76,6 +74,6 @@ func (receiver *DingTalk) send(event *v1.Event)  {
 	}
 }
 
-func transform(event *v1.Event) DingTalkMarkdown  {
-
+func transform(event *v1.Event) DingTalkMarkdown {
+	return DingTalkMarkdown{}
 }

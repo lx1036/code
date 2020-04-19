@@ -8,13 +8,12 @@ import (
 	"strings"
 )
 
-
 type Uri struct {
-	Key string
+	Key   string
 	Value url.URL
 }
 
-func (uri *Uri)Set(value string) error {
+func (uri *Uri) Set(value string) error {
 	str := strings.SplitN(value, ":", 2)
 	if str[0] == "" {
 		return fmt.Errorf("missing key in {%s}", value)
@@ -51,7 +50,7 @@ func (uris *Uris) Set(value string) error {
 	return nil
 }
 
-func (uris *Uris)String() string {
+func (uris *Uris) String() string {
 	var buffer bytes.Buffer
 	buffer.WriteString("[")
 	for i, uri := range *uris {

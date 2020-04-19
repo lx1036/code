@@ -20,7 +20,6 @@ func NewSourceFactory() *SourceFactory {
 	return &SourceFactory{}
 }
 
-
 func (factory *SourceFactory) Build(sources flags.Uris) ([]common.EventSource, error) {
 	var eventSources []common.EventSource
 	for _, source := range sources {

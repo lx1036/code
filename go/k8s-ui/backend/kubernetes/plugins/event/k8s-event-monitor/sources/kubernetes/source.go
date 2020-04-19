@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"fmt"
 	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/common"
 	kubeapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -8,7 +9,10 @@ import (
 	kubeclient "k8s.io/client-go/kubernetes"
 	kubev1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	kuberest "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
 	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -56,6 +60,7 @@ func (eventSource *EventSource) Watch() {
 					case kubewatch.Added, kubewatch.Modified:
 						select {
 						case eventSource.EventBuffer <- event:
+							fmt.Println(event.Message)
 							// buffer not full
 						default:
 							// buffer is full, drop the event
@@ -94,7 +99,7 @@ readEventLoop:
 	return events
 }
 
-func (eventSource *EventSource) ListEvents()  {
+func (eventSource *EventSource) ListEvents() {
 
 }
 
@@ -128,13 +133,60 @@ const (
 func GetKubeClientConfig(uri *url.URL) (*kuberest.Config, error) {
 	var kubeConfig *kuberest.Config
 	var err error
+
+	configOverrides, err := getConfigOverrides(uri)
+	if err != nil {
+		return nil, err
+	}
+
+	query := uri.Query()
 	inClusterConfig := defaultInClusterConfig
+	if len(query["inClusterConfig"]) > 0 {
+		inClusterConfig, err = strconv.ParseBool(query["inClusterConfig"][0])
+		if err != nil {
+			return nil, err
+		}
+	}
 	if inClusterConfig {
 		kubeConfig, err = kuberest.InClusterConfig()
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		authFile := ""
+		if len(query["auth"]) > 0 {
+			authFile = query["auth"][0]
+		}
+		if len(authFile) != 0 {
+
+		} else {
+			kubeConfig = &kuberest.Config{
+				Host: configOverrides.ClusterInfo.Server,
+				TLSClientConfig: kuberest.TLSClientConfig{
+					Insecure: configOverrides.ClusterInfo.InsecureSkipTLSVerify,
+				},
+			}
+		}
 	}
 
 	return kubeConfig, nil
+}
+
+func getConfigOverrides(uri *url.URL) (*clientcmd.ConfigOverrides, error) {
+	configOverrides := &clientcmd.ConfigOverrides{
+		ClusterInfo: api.Cluster{},
+	}
+	if len(uri.Host) != 0 && len(uri.Scheme) != 0 {
+		configOverrides.ClusterInfo.Server = fmt.Sprintf("%s://%s", uri.Scheme, uri.Host)
+	}
+	query := uri.Query()
+	if len(query["insecure"]) != 0 {
+		insecure, err := strconv.ParseBool(query["insecure"][0])
+		if err != nil {
+			return nil, err
+		}
+		configOverrides.ClusterInfo.InsecureSkipTLSVerify = insecure
+	}
+
+	return configOverrides, nil
 }

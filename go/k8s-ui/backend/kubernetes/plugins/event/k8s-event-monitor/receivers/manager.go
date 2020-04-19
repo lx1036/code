@@ -5,9 +5,7 @@ import (
 )
 
 type ReceiverManager struct {
-
 }
-
 
 func NewReceiverManager(receiver Receiver) *ReceiverManager {
 
