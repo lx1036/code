@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-server
+  labels:
+    app: grafana-server
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: grafana-server
+      labels:
+        app: grafana-server
+    spec:
+      containers:
+        - name: grafana-server
+          image: grafana/grafana
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - mountPath: /var/lib/grafana
+              name: grafana-storage
+      volumes:
+        - name: grafana-storage
+          emptyDir: {}
+  selector:
+    matchLabels:
+      app: grafana-server
+
+

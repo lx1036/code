@@ -17,11 +17,16 @@ spec:
         - name: prometheus-server
           image: prom/prometheus
           imagePullPolicy: IfNotPresent
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus/"
           volumeMounts:
             - mountPath: /prometheus
               name: prometheus-storage
             - mountPath: /etc/prometheus/
               name: prometheus-config
+          ports:
+            - containerPort: 9090
       volumes:
         - name: prometheus-storage
           emptyDir: {}

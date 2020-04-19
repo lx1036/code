@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-server
+spec:
+  selector:
+    app: grafana-server
+  ports:
+    - port: 3000
+      targetPort: 3000
+  type: NodePort
