@@ -1,0 +1,11 @@
+groups:
+  - name: Alertmanager服务监控
+    rules:
+      - alert: AlertmanagerConfigurationReload
+        expr: alertmanager_config_last_reload_successful != 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AlertManager configuration reload (instance {{ $labels.instance }})"
+          description: "AlertManager configuration reload error\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"

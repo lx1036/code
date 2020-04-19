@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ingress-nginx
+commonLabels:
+  app.kubernetes.io/name: prometheus
+  app.kubernetes.io/part-of: ingress-nginx
+resources:
+  - role.yml
+  - service-account.yml
+  - role-binding.yml
+  - deployment.yml
+  - service.yml
+images:
+  - name: prom/prometheus
+    newTag: v2.17.1
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - prometheus.yml
+
+

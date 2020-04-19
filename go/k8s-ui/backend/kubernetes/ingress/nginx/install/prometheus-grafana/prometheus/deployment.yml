@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-server
+  labels:
+    app: prometheus-server
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: prometheus-server
+      labels:
+        app: prometheus-server
+    spec:
+      serviceAccountName: prometheus-server
+      containers:
+        - name: prometheus-server
+          image: prom/prometheus
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus/"
+          volumeMounts:
+            - mountPath: /prometheus
+              name: prometheus-storage
+            - mountPath: /etc/prometheus/
+              name: prometheus-config
+          ports:
+            - containerPort: 9090
+      volumes:
+        - name: prometheus-storage
+          emptyDir: {}
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+  selector:
+    matchLabels:
+      app: prometheus-server

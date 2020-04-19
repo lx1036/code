@@ -1,13 +1,18 @@
+
+# https://prometheus.io/docs/alerting/configuration/#configuration-file
+
 route:
-  receiver: 'slack'
+  receiver: 'dingtalk'
 #  routes:
 #    - receiver: 'slack'
 #    - receiver: 'dingding'
 
 receivers:
-  - name: 'dingding'
+  - name: 'dingtalk' # https://yunlzheng.gitbook.io/prometheus-book/parti-prometheus-ji-chu/alert/alert-manager-use-receiver/alert-manager-extension-with-webhook
+#    email_configs:
+#      - to: "lx1036@126.com"
     webhook_configs:
-      - url: 'https://oapi.dingtalk.com/robot/send?access_token=0be2c5f8f0e7d5408690aa934915b3de856341256d8ea9ef4ea8f8298a85328c'
+      - url: 'http://alert-manager-dingtalk:8080/webhook'
         send_resolved: true
   - name: "slack" # 验证：docker run --rm -it busybox sh -c "while true; do :; done", Slack 会收到消息
     slack_configs:

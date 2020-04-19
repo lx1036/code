@@ -1,0 +1,20 @@
+groups:
+  - name: kafka集群监控
+    rules:
+      - alert: KafkaTopics
+        expr: sum(kafka_topic_partition_in_sync_replica) by (topic) < 1
+        for: 5m
+        labels:
+          severity: error
+        annotations:
+          summary: "Kafka Topics (instance {{ $labels.realip }})"
+          description: "Kafka topic in-sync partition\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+      - alert: KafkaConsumersGroup
+        expr: sum(kafka_consumergroup_lag) by (consumergroup) > 50
+        for: 5m
+        labels:
+          severity: error
+        annotations:
+          summary: "Kafka consumers group (instance {{ $labels.realip }})"
+          description: "Kafka consumers group\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"

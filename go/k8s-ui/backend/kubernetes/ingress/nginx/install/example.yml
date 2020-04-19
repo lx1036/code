@@ -1,0 +1,92 @@
+# https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: web
+  namespace: ingress-nginx
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: web
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: gcr.io/google-samples/hello-app:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+  selector:
+    matchLabels:
+      app: web
+
+---
+# curl $(minikube service web -n ingress-nginx --url)
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: NodePort
+
+---
+# curl hello-world.info
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-example
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location /status.html {
+          content_by_lua_block {
+              ngx.say("ok")
+          }
+      }
+
+      location ~* "^/healthz/*" {
+          return 200 "ok\n";
+      }
+  namespace: ingress-nginx
+spec:
+  backend:
+    serviceName: ingress-nginx
+    servicePort: 8080
+  rules:
+    - host: hello-world-1.info
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: ingress-nginx
+              servicePort: 8080
+          - path: /healthz
+            backend:
+              serviceName: ingress-nginx
+              servicePort: 8080
+    - host: hello-world-2.info
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: ingress-nginx
+              servicePort: 8080
+          - path: /healthz
+            backend:
+              serviceName: ingress-nginx
+              servicePort: 8080

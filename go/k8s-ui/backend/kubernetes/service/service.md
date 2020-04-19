@@ -97,7 +97,7 @@ Demo:
 
 #### 容器网络与 veth pair
 Docker 容器网络就是 veth pair + bridge 模式组成的。
-(1)如何知道host上的 vethxxx 和哪个 container eth0是 veth pair 成对关系？
+(1) 如何知道host上的 vethxxx 和哪个 container eth0是 veth pair 成对关系？
 ```shell script
 # 在目标容器内
 docker run -p 8088:80 -d  nginx
@@ -109,6 +109,8 @@ cat /sys/class/net/vethxxx/ifindex
 ```
 
 (2) linux bridge
+bridge 是一个虚拟网络设备，可以配置 IP、MAC 地址；其次，是一个虚拟交换机。
+普通网络设备只有两个端口，如物理网卡，流量包从外部进来进入内核协议栈，或者从内核协议栈进来出去外面的物理网络中。
 Linux bridge 则有多个端口，数据可以从任何端口进来，进来之后从哪个口出去取决于目的 MAC 地址，原理和物理交换机差不多。
 ```shell script
 # 创建一个 bridge
@@ -118,9 +120,72 @@ ip link list
 ip link set br0 up
 ip link list
 
-# 创建一对 veth pair
+# 创建一对 veth pair (eth0: 172.17.186.210)
 ip link add br-veth0 type veth peer name br-veth1
+ip addr add 172.17.186.101/24 dev br-veth0
+ip addr add 172.17.186.102/24 dev br-veth1
+ip link set br-veth0 up
+ip link set br-veth1 up
+# 把 br-veth0 搭到 br0 网桥上
+ip link set dev br-veth0 master br0 # brctl addif br0 veth0
+# 查看网桥上都有哪些网络设备
+bridge link # brctl show
+# 10: br-veth0 state UP @br-veth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master br0 state forwarding priority 32 cost 2
+# br-veth0 没法 ping 通 br-veth1
+ping -c 1 -w 1 -I br-veth0 172.17.186.102
+tcpdump -n -i br-veth1 # 抓包
+
+# veth0 的 IP 给 bridge
+ip addr del 172.17.186.101/24 dev br-veth0
+ip addr add 172.17.186.101/24 dev br0
 ```
+
+**[Linux 虚拟网络设备详解之 Bridge 网桥](https://www.cnblogs.com/bakari/p/10529575.html)**
+
+
+(3) iptables
+
+查看所有 iptables 规则
+```shell script
+iptables -L -n # 默认是 filter 表
+# 可以指定表
+iptables -t nat -L -n
+```
+
+
+# LVS 基本原理
+
+**[LVS 工作原理图文讲解，非常详细！](https://mp.weixin.qq.com/s/VWBDoa5eCEH64zcs2V4_jQ)**
+**[LVS 3种工作模式实战及Q&A！](https://mp.weixin.qq.com/s/FgMy8hEmQkswx1cKlvjIkA)**
+
+## IPVS
+```shell script
+vip=192.168.64.6
+rs1=192.168.64.4
+rs2=192.168.64.5
+
+sudo ipvsadm -C
+sudo ipvsadm -A -t 192.168.64.6:8080 -s rr
+sudo ipvsadm -a -t 192.168.64.6:8080 -r 192.168.64.4:80 -g
+sudo ipvsadm -a -t 192.168.64.6:8080 -r 192.168.64.5:80 -g
+
+sudo ipvsadm -ln -t 192.168.64.6:8080
+
+sudo su
+sudo ifconfig lo:0 192.168.64.6 broadcast 192.168.64.6 netmask 255.255.255.255 up
+echo "1" >/proc/sys/net/ipv4/conf/lo/arp_ignore
+echo "2" >/proc/sys/net/ipv4/conf/lo/arp_announce
+echo "1" >/proc/sys/net/ipv4/conf/all/arp_ignore
+echo "2" >/proc/sys/net/ipv4/conf/all/arp_announce
+```
+
+
+DR 模式：
+![DR mode](https://mmbiz.qpic.cn/mmbiz_png/d5patQGz8KdwBYwDyVuDdYUrJKvrPv2ibeicicGn15jcvdxQxwZYqJtm1Psq2J3khIUPDfsq8RlebVzTrEGZM2JdQ/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
+
+
+NAT 模式：
+![NAT mode](https://mmbiz.qpic.cn/mmbiz_png/d5patQGz8KdwBYwDyVuDdYUrJKvrPv2ibBHtE4TynXmhSbue6icqFvYScPMsPVQBKkEusmCXK4ZibLjjic3htNAdww/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
 
 
 ### Network Policy

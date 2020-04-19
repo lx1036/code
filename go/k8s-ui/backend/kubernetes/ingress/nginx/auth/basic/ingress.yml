@@ -1,0 +1,38 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ingress-basic-auth
+type: Opaque
+data:
+  # htpasswd -c auth foo (foo:bar) > auth
+  # cat ./auth | base64
+  auth: Zm9vOiRhcHIxJHpPclRWcE8vJERvUzdlUi90TkJ6eU9CVDBMOEZScy4K
+---
+# curl -I lx1036.basic-auth -u 'foo:bar'
+# curl -I lx1036.basic-auth
+# curl -v -H 'Host:lx1036.basic-auth' -u 'foo:bar' lx1036.basic-auth
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-basic-auth
+  annotations:
+    # type of authentication
+    nginx.ingress.kubernetes.io/auth-type: "basic"
+    # name of the secret that contains the user/password definitions
+    nginx.ingress.kubernetes.io/auth-secret: "ingress-basic-auth"
+    # message to display with an appropriate context why the authentication is required
+    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required.'
+spec:
+  rules:
+    - host: lx1036.basic-auth
+      http:
+        paths:
+          - backend:
+              serviceName: service-affinity-cookie
+              servicePort: 8080
+            path: /
+
+
+
