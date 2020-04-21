@@ -8,4 +8,4 @@ pc:
 	-u $(USER):$(GROUP) \
 	-v $(PWD)/index.html:/var/www/html/pc/index.html \
 	-v $(PWD)/openresty-default.conf:/etc/openresty/nginx.conf \
-	openresty/openresty
+	openresty/openresty:1.15.8.3-1-centos
