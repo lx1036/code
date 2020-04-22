@@ -1,28 +1,5 @@
--- Copyright (C) by Jiang Yang (jiangyang-pd@360.cn)
-
-local _M = { _VERSION = "1.1.4" }
-
 local find = string.find
 local sub = string.sub
-
-_M.CONF = {
-    initted = false,
-    app = "default",
-    idc = "",
-    monitor_switch = {
-        METRIC_COUNTER_RESPONSES = {},
-        METRIC_HISTOGRAM_LATENCY = {},
-        METRIC_COUNTER_SENT_BYTES = {},
-        METRIC_COUNTER_REVD_BYTES = {},
-        METRIC_COUNTER_EXCEPTION = true,
-        METRIC_GAUGE_CONNECTS = true,
-    },
-    log_method = {},
-    buckets = {},
-    merge_path = false,
-    debug = false
-}
-
 
 local function inTable(needle, table_name)
     if type(needle) ~= "string" or type(table_name) ~= "table" then
@@ -57,9 +34,28 @@ local function explode(separator, str)
     return t
 end
 
+local _M = { _VERSION = "1.1.4" }
+
+_M.CONF = {
+    initted = false,
+    app = "default",
+    idc = "",
+    monitor_switch = {
+        METRIC_COUNTER_RESPONSES = {},
+        METRIC_HISTOGRAM_LATENCY = {},
+        METRIC_COUNTER_SENT_BYTES = {},
+        METRIC_COUNTER_REVD_BYTES = {},
+        METRIC_COUNTER_EXCEPTION = true,
+        METRIC_GAUGE_CONNECTS = true,
+    },
+    log_method = {},
+    buckets = {},
+    merge_path = false,
+    debug = false
+}
 
 function _M:init(user_config)
-    for k, v in pairs(user_config) do
+    for k, v in pairs(user_config) do -- foreach
         if k == "app" then
             if type(v) ~= "string" then
                 return nil, '"app" must be a string'
@@ -70,16 +66,6 @@ function _M:init(user_config)
                 return nil, '"idc" must be a string'
             end
             self.CONF.idc = v
-        elseif k == "log_method" then
-            if type(v) ~= "table" then
-                return nil, '"log_method" must be a table'
-            end
-            self.CONF.log_method = v
-        elseif k == "buckets" then
-            if type(v) ~= "table" then
-                return nil, '"buckets" must be a table'
-            end
-            self.CONF.buckets = v
         elseif k == "monitor_switch" then
             if type(v) ~= "table" then
                 return nil, '"monitor_switch" must be a table'
@@ -89,11 +75,21 @@ function _M:init(user_config)
                     self.CONF.monitor_switch[i] = j
                 end
             end
+        elseif k == "log_method" then
+            if type(v) ~= "table" then
+                return nil, '"log_method" must be a table'
+            end
+            self.CONF.log_method = v
         elseif k == "merge_path" then
             if type(v) ~= "string" then
                 return nil, '"merge_path" must be a string'
             end
             self.CONF.merge_path = v
+        elseif k == "buckets" then
+            if type(v) ~= "table" then
+                return nil, '"buckets" must be a table'
+            end
+            self.CONF.buckets = v
         elseif k == "debug" then
             if type(v) ~= "boolean" then
                 return nil, '"debug" must be a boolean'
@@ -103,10 +99,11 @@ function _M:init(user_config)
     end
 
     if self.CONF.debug == false then
-        local config = ngx.shared.prometheus_metrics
+        local config = ngx.shared.prometheus_metrics -- 下同
         config:flush_all()
     end
 
+    -- "prometheus_metrics" 必须与 nginx.conf 中的 lua_shared_dict 的map名字相同，不是随便取的
     local prometheus = require("prometheus").init("prometheus_metrics")
 
     -- QPS
@@ -116,6 +113,17 @@ function _M:init(user_config)
             "module_responses",
             "[" .. self.CONF.idc .. "] number of /path",
             {"app", "api", "module", "method", "code"}
+        )
+    end
+
+    -- 延迟
+    if not empty(self.CONF.monitor_switch.METRIC_HISTOGRAM_LATENCY) then
+        self:parseLogUri("METRIC_HISTOGRAM_LATENCY")
+        self.metric_latency = prometheus:histogram(
+                "response_duration_milliseconds",
+                "[" .. self.CONF.idc .. "] http request latency",
+                {"app", "api", "module", "method"},
+                self.CONF.buckets
         )
     end
 
@@ -148,17 +156,6 @@ function _M:init(user_config)
         )
     end
 
-    -- 延迟
-    if not empty(self.CONF.monitor_switch.METRIC_HISTOGRAM_LATENCY) then
-        self:parseLogUri("METRIC_HISTOGRAM_LATENCY")
-        self.metric_latency = prometheus:histogram(
-            "response_duration_milliseconds",
-            "[" .. self.CONF.idc .. "] http request latency",
-            {"app", "api", "module", "method"},
-            self.CONF.buckets
-        )
-    end
-
     -- 状态
     if not empty(self.CONF.monitor_switch.METRIC_GAUGE_CONNECTS) then
         self.metric_connections = prometheus:gauge(
@@ -168,14 +165,11 @@ function _M:init(user_config)
         )
     end
 
-    if true then
-        self.CONF.initted = true
-        self.prometheus = prometheus
-    end
+    self.CONF.initted = true
+    self.prometheus = prometheus
 
     return self.CONF.initted
 end
-
 
 function _M:log(app)
     if not self.CONF.initted then

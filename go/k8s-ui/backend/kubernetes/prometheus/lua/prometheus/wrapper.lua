@@ -113,7 +113,6 @@ function _M:init(config)
         )
     end
 
-
     -- status from ngx_http_stub_status_module module
     if not empty(self.CONF.monitor_switch.METRIC_GAUGE_CONNECTS) then
         self.metric_connections = prometheus:gauge("module_connections", "[" .. self.CONF.idc .. "] state",

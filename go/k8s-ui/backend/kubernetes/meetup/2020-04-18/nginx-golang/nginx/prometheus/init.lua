@@ -17,7 +17,7 @@ local ok, err = require("wrapper"):init({
     log_method = { "GET", "POST", "PUT" },
     merge_path = "/gometrics",
     buckets = { 10, 11, 13, 15, 17, 19, 22, 25, 28, 32, 36, 41, 47, 54, 62, 71, 81, 92, 105, 120, 137, 156, 178, 203, 231, 263, 299, 340, 387, 440, 500 }, -- 桶距配置
-    debug = false -- 用于开发环境调试，init 时不 flush 内存。线上请关闭
+    debug = false -- 用于开发环境调试，init 时不 flush 内存，线上请关闭
 })
 if not ok then
     ngx.log(ngx.ERR, "prometheus init error: ", err)
