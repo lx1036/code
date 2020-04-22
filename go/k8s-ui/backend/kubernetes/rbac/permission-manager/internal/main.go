@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -33,11 +34,11 @@ func main() {
 	api := router.Group("api/v1")
 	api.Use(Auth())
 	{
-		api.GET("/list-users", ListUsers())
-		api.GET("/list-namespace", ListNamespaces())
-		api.GET("/list-rbac", ListRbac())
+		api.GET("/users", ListUsers())
+		api.GET("/namespaces", ListNamespaces())
+		api.GET("/rbac", ListRbac())
 
-		api.POST("/user", CreateUser())
+		api.POST("/users", CreateUser())
 		api.POST("/cluster-role", CreateClusterRole())
 		api.POST("/cluster-role-binding", CreateClusterRoleBinding())
 		api.POST("/role", CreateRole())
@@ -132,7 +133,25 @@ func ListUsers() gin.HandlerFunc {
 
 func ListNamespaces() gin.HandlerFunc {
 	return func(context *gin.Context) {
+		namespaces, err := kubeClient.CoreV1().Namespaces().List(metav1.ListOptions{})
+		if err != nil {
+			context.JSON(http.StatusBadRequest, Response{
+				Code:    -1,
+				Message: "bad body",
+			})
+			return
+		}
 
+		var names []string
+		for _, namespace := range namespaces.Items {
+			names = append(names, namespace.Name)
+		}
+
+		context.JSON(http.StatusOK, Response{
+			Code:    0,
+			Message: "success",
+			Data:    names,
+		})
 	}
 }
 
