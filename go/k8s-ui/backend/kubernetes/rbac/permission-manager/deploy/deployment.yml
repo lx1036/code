@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: permission-manager
+  name: permission-manager-deployment
+  labels:
+    app: permission-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: permission-manager
+  template:
+    metadata:
+      labels:
+        app: permission-manager
+    spec:
+      serviceAccountName: permission-manager-service-account
+      containers:
+        - name: permission-manager
+          image: quay.io/sighup/permission-manager:1.5.0
+          ports:
+            - containerPort: 4000
+          env:
+            - name: PORT
+              value: "4000"
+            - name: CLUSTER_NAME
+              value: "minikube"
+            - name: CONTROL_PLANE_ADDRESS
+              value: "https://kubernetes.default"
+            - name: BASIC_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auth-password-secret
+                  key: password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: permission-manager
+  name: permission-manager-service
+spec:
+  selector:
+    app: permission-manager
+  ports:
+    - protocol: TCP
+      port: 4000
+      targetPort: 4000
+---
