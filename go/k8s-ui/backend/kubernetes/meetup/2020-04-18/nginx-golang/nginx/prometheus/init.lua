@@ -1,6 +1,7 @@
 
 local log_path = {
-    "/api/v1/hello"
+    "/api/v1/hello",
+    "/status",
 }
 
 local ok, err = require("wrapper"):init({
