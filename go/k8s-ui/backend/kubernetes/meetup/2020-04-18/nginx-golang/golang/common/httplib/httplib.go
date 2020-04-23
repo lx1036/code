@@ -291,7 +291,7 @@ func (r *HTTPRequest) getResponse() (*http.Response, error) {
 	latency := float64(time.Since(now).Milliseconds())
 
 	go func() {
-		if prometheus.GetWrapper() != nil {
+		if prometheus.GetWrapper() != nil && response != nil {
 			prometheus.GetWrapper().QpsCounterLog(prometheus.QpsRecord{
 				Times:  1,
 				Api:    r.req.URL.Path,
