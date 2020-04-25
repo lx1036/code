@@ -41,28 +41,34 @@ func main() {
 		var body1, body2 string
 		go func() {
 			defer wg.Done()
-			body, _ := httplib.Get("https://api.github.com/repos/lx1036/code/commits?per_page=3&sha=master").Bytes()
+			var err error
+			var body []byte
+			body, err = httplib.Get("https://api.github.com/repos/lx1036/code/commits?per_page=3&sha=master").Bytes()
 			type Commit struct {
 				Url string `json:"url"`
 			}
 			var commit []Commit
-			err := json.Unmarshal(body, &commit)
+			err = json.Unmarshal(body, &commit)
 			if err != nil {
 				body1 = "https://www.default.com"
+				return
 			}
 			body1 = commit[0].Url
 		}()
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			body, _ := httplib.Get("https://api.github.com/users/lx1036").Bytes()
+			var err error
+			var body []byte
+			body, err = httplib.Get("https://api.github.com/users/lx1036").Bytes()
 			type User struct {
 				Login string `json:"login"`
 			}
 			var user User
-			err := json.Unmarshal(body, &user)
+			err = json.Unmarshal(body, &user)
 			if err != nil {
 				body2 = "default"
+				return
 			}
 			body2 = user.Login
 		}()
