@@ -1,7 +1,7 @@
 version: "3"
 services:
   openresty:
-    image: openresty/openresty
+    image: openresty/openresty:1.15.8.3-1-centos
     container_name: php-fpm-exporter-openresty
     volumes:
       - "./openresty/nginx.conf:/etc/openresty/nginx.conf"

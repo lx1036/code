@@ -28,9 +28,9 @@ _M.CONF = {
     idc = "",
     monitor_switch = {
         METRIC_COUNTER_RESPONSES = {},
+        METRIC_HISTOGRAM_LATENCY = {},
         METRIC_COUNTER_SENT_BYTES = {},
         METRIC_COUNTER_RECEIVED_BYTES = {},
-        METRIC_HISTOGRAM_LATENCY = {},
         METRIC_COUNTER_EXCEPTION = true,
         METRIC_GAUGE_CONNECTS = true,
     },
@@ -89,7 +89,29 @@ function _M:init(config)
         config:flush_all()
     end
 
+    -- "prometheus_metrics" 必须与 nginx.conf 中的 lua_shared_dict 的map名字相同，不是随便取的
     local prometheus = require("prometheus").init("prometheus_metrics")
+
+    -- module_responses QPS
+    -- QPS
+    if not empty(self.CONF.monitor_switch.METRIC_COUNTER_RESPONSES) then
+        self.metric_requests = prometheus:counter(
+            "module_responses",
+            "[" .. self.CONF.idc .. "] number of /path",
+            {"app", "api", "module", "method", "code"}
+        )
+    end
+
+    -- response_duration_milliseconds
+    -- 延迟
+    if not empty(self.CONF.monitor_switch.METRIC_HISTOGRAM_LATENCY) then
+        self.metric_latency = prometheus:histogram(
+                "response_duration_milliseconds",
+                "[" .. self.CONF.idc .. "] http request latency",
+                {"app", "api", "module", "method"},
+                self.CONF.buckets
+        )
+    end
 
     -- status from ngx_http_stub_status_module module
     if not empty(self.CONF.monitor_switch.METRIC_GAUGE_CONNECTS) then
@@ -109,19 +131,10 @@ function _M:init(config)
             {"app", "api", "module", "method", "code"})
     end
 
-    -- module_responses QPS
-    if not empty(self.CONF.monitor_switch.METRIC_COUNTER_RESPONSES) then
-        self.metric_requests = prometheus:counter("module_responses", "[" .. self.CONF.idc .. "] number of /path",
-            {"app", "api", "module", "method", "code"})
-    end
+
 
     -- nginx_metric_errors_total
 
-    -- response_duration_milliseconds
-    if not empty(self.CONF.monitor_switch.METRIC_HISTOGRAM_LATENCY) then
-        self.metric_latency = prometheus:histogram("response_duration_milliseconds", "[" .. self.CONF.idc .. "] http request latency",
-            {"app", "api", "module", "method"}, self.CONF.buckets)
-    end
 
 
     self.CONF.initted = true
@@ -193,5 +206,7 @@ end
 function _M:isLogUri(request_uri, monitor_key)
 
 end
+
+
 
 return _M
