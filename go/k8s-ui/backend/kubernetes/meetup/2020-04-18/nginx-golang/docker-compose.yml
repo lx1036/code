@@ -29,7 +29,7 @@ services:
 
   prometheus: # https://hub.docker.com/r/prom/prometheus
     image: prom/prometheus:v2.17.1
-    container_name: prometheus
+    container_name: prometheus-meetup
     volumes:
       - ./prometheus/:/etc/prometheus/
       - prometheus_data:/prometheus
@@ -68,7 +68,7 @@ services:
 
   grafana:
     image: grafana/grafana:6.7.2
-    container_name: grafana
+    container_name: grafana-meetup
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning/

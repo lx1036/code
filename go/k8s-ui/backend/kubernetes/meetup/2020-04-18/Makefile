@@ -1,6 +1,6 @@
 
 PROJECT := lx1036/nginx
-VERSION := v1.0.0.1
+VERSION := v1.0.0.2
 
 build:
 	docker build -f Dockerfile -t $(PROJECT):$(VERSION) .

@@ -16,7 +16,7 @@ func main() {
 			syscall.CLONE_NEWPID | // PID Namespace，隔离进程的 PID。`echo $$` `pstree -pl`
 			syscall.CLONE_NEWNS | // Mount Namespace，隔离各个进程看到的文件系统挂载点视图。`ls /proc` `ps -ef`
 			syscall.CLONE_NEWUSER | // User Namespace，隔离用户的用户组 ID`。 `id`
-			syscall.CLONE_NEWNET, // Network Namespace，隔离网络设备、IP地址端口、单独协议栈以及 iptables/ipvs 规则。
+			syscall.CLONE_NEWNET, // Network Namespace，隔离网络设备、IP地址端口、单独协议栈以及 iptables/ipvs 规则。验证：`ip link list`
 		// `ip link list`，只有一个本地回环设备 lo，没有 veth 虚拟网卡，docker0 网桥
 	}
 	cmd.Stdin = os.Stdin
