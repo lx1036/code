@@ -82,9 +82,7 @@ ping -c 1 redis-default-network
 
 
 
-# iptables
 
-![iptables 工作流程图](./img/tables_traverse.jpg)
 
 
 # Docker 内置的 DNS 服务
