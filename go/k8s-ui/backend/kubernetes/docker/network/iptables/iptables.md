@@ -2,9 +2,14 @@
 # iptables
 
 ![iptables 工作流程图](./img/tables_traverse.jpg)
+![iptables 思维导图](./img/iptables_mindmap.jpg)
+
+# iptables 三篇精选文章
+**[(1)iptables防火墙-四表/五链、数据包匹配流程、编写iptables规则](https://zhuanlan.zhihu.com/p/84432006)**
+**[(2)iptables防火墙-SNAT/DNAT策略及应用](https://zhuanlan.zhihu.com/p/87468533)**
+**[(3)iptables防火墙-规则的导出/导入、使用防火墙脚本程序](https://zhuanlan.zhihu.com/p/87483037)**
 
 
-**[(1)iptables 防火墙-四表/五链、数据包匹配流程、编写 iptables 规则](https://zhuanlan.zhihu.com/p/84432006)**
 (1) Linux 防火墙基础
 iptables: 属于`用户空间`的防火墙命令工具，来和内核空间的 netfilter 交互，在目录 `/sbin/iptables` 中。
 netfilter: Linux 内核中实现包过滤防火墙的内部结构，属于`内核空间`的防火墙工具。
@@ -59,5 +64,8 @@ iptables -I FORWARD -s 192.168.123.0/24 -j DROP
 * 控制类型：指数据包的处理方式，比如：允许、拒绝、丢弃等
 
 (4)编写防火墙规则(go代码执行)
-
+**[linux iptables 官网](https://linux.die.net/man/8/iptables)**
+`iptables -t nat -A PREROUTING -m addrtype --dst-type LOCAL -j lx1036` 命令解释：
+-m, --match，匹配 addrtype module，该模块包含 `--dst-type type` 参数 `Matches if the destination address is of given type`
+-j, --jump target: 该 rule 的 target，如果 packet 与 addrtype 匹配了该跳转到哪里，该 target 可以用户自定义。
 
