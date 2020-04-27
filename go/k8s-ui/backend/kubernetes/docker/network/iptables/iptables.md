@@ -69,3 +69,13 @@ iptables -I FORWARD -s 192.168.123.0/24 -j DROP
 -m, --match，匹配 addrtype module，该模块包含 `--dst-type type` 参数 `Matches if the destination address is of given type`
 -j, --jump target: 该 rule 的 target，如果 packet 与 addrtype 匹配了该跳转到哪里，该 target 可以用户自定义。
 
+(5) SNAT(source network address transfer)/DNAT(destination network address transfer)
+> SNAT: 根据指定条件修改数据包的源IP地址。解决问题：一个家只有一个路由器外网IP地址100.200.300.400，但是局域网内每一个设备有内网IP，IP为192.168.31.35的数据包出去时，
+先通过交换机端口123，然后到达路由器内网网卡IP100.200.300.401，然后路由转发到达到网关IP100.200.300.400，然后SNAT实现包源IP为100.200.300.400，
+然后数据包回来时，到达交换机123端口，再回去192.168.31.35。
+
+*将局域网内的源IP转换为路由器网关IP，数据包再出去外网。*
+
+DNAT: 根据指定条件修改数据包的目的IP地址。
+
+
