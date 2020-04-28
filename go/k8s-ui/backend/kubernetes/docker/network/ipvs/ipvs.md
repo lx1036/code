@@ -50,3 +50,6 @@ ipvsadm是IPVS的命令行管理工具，安装ipvs命令行客户端来操作�
 ```shell script
 apt install -y ipvsadm
 ```
+
+# 《k8s网络权威指南》有关 ipvs/service/ingress 讲解
+**[IPVS从入门到精通kube-proxy实现原理](https://zhuanlan.zhihu.com/p/94418251)**
