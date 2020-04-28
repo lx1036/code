@@ -16,7 +16,7 @@ netfilter: Linux 内核中实现包过滤防火墙的内部结构，属于`内�
 
 (2)iptables 4种规则表、5种链结构
 规则表：对数据包进行过滤或处理
-链：容纳多种防火墙规则
+链：容纳多种防火墙规则，五种链中每一个链都会包含多个规则，只是这些规则按照分类又被分为四类，即四张表。
 ![iptables](./img/iptables.jpg)
 
 四种规则表：
@@ -79,6 +79,11 @@ iptables -I FORWARD -s 192.168.123.0/24 -j DROP
 DNAT: 根据指定条件修改数据包的目的IP地址。
 
 
-(6)iptables in kube-proxy
+(6)iptables in kube-proxy 和 hairpin mode
+hairpin 就是自己访问自己，Pod 有时候使用 service ip 无法访问自己，就是 hairpin 配置问题。kube-proxy 以 iptables 或 ipvs 模式运行，
+并且Pod与桥接网络连接时，就会发生这种情况。
+kubelet 启动参数会有 --hairbin-mode。
 ![kube-proxy-iptables-arch](./img/kube-proxy-iptables-arch.svg)
+
+
 
