@@ -79,3 +79,6 @@ iptables -I FORWARD -s 192.168.123.0/24 -j DROP
 DNAT: 根据指定条件修改数据包的目的IP地址。
 
 
+(6)iptables in kube-proxy
+![kube-proxy-iptables-arch](./img/kube-proxy-iptables-arch.svg)
+
