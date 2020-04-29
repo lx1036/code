@@ -1,10 +1,35 @@
 
+**[netlink](https://github.com/vishvananda/netlink)**: Simple netlink library for go
+
 
 **[ipvs go client](https://github.com/moby/ipvs)**
 **[ipvs k8s go client](https://github.com/kubernetes/kubernetes/blob/master/pkg/util/ipvs/ipvs_linux.go)**
+**[ipvs k8s go client](https://github.com/kubernetes/kubernetes/blob/master/pkg/proxy/ipvs/README.md)**
+
+# LVS
+**[负载均衡 LVS 入门教程详解 - 基础原理](https://blog.csdn.net/liwei0526vip/article/details/103104483)**
+LVS在内核中以ko形式存在，用户使用ipvsadm命令行工具，通过`raw socket`或`netlink socket`方式来修改lvs。
+
+但是ipvsadm命令行不适用于生产环境，所以通过keepalived工具来解决lvs配置管理问题：
+
+## Keepalived
+Keepalived 除了解决配置管理维护问题，还提供了健康检查的功能。
+**[keepalived 入门介绍](https://blog.csdn.net/liwei0526vip/article/details/103981423)**
+
+
+
+
+
 
 
 # IPVS
+
+* IPVS: LVS 是基于内核态的 netfilter 框架实现的 IPVS 功能，工作在内核态。
+那么用户是如何配置 VIP 等相关信息并传递到 IPVS 呢，就需要用到了 ipvsadm 工具。
+
+* ipvsadm 工具: ipvsadm 是 LVS 用户态的配套工具，可以实现 VIP 和 RS 的增删改查功能。
+它是基于 netlink 或 raw socket 方式与内核 LVS 进行通信的，如果 LVS 类比于 netfilter，那么 ipvsadm 就是类似 iptables 工具的地位。
+
 IPVS 基于 netfilter 的散列表，比 iptables 性能更好。支持 TCP、UDP、SCTP、IPV4 和 IPV6 等协议，负载均衡策略支持:
 IPVS支持十种负载均衡调度算法：
 > 轮叫rr（Round Robin）：轮询模式，每一个rs按照均衡比例接收请求。以轮叫的方式依次将请求调度到不同的服务器，会略过权值是0的服务器。
@@ -46,10 +71,58 @@ lsmod | grep ipvs
 如果内核没有打开ipvs内核模块，
 
 ### ipvsadm
-ipvsadm是IPVS的命令行管理工具，安装ipvs命令行客户端来操作内核中ipvs等几个模块：
+在 Ubuntu/CentOS 中安装 ipvs，ipvsadm是IPVS的命令行管理工具:
 ```shell script
 apt install -y ipvsadm
+yum install -y ipvsadm
+# 检查是否安装成功
+lsmod | grep ip_vs
+# ip_vs                 172032  0
 ```
 
 # 《k8s网络权威指南》有关 ipvs/service/ingress 讲解
 **[IPVS从入门到精通kube-proxy实现原理](https://zhuanlan.zhihu.com/p/94418251)**
+
+
+# LVS 基本原理
+
+**[LVS 工作原理图文讲解，非常详细！](https://mp.weixin.qq.com/s/VWBDoa5eCEH64zcs2V4_jQ)**
+**[LVS 3种工作模式实战及Q&A！](https://mp.weixin.qq.com/s/FgMy8hEmQkswx1cKlvjIkA)**
+
+## IPVS
+
+
+
+```shell script
+vip=192.168.64.6
+rs1=192.168.64.4
+rs2=192.168.64.5
+
+sudo ipvsadm -C
+sudo ipvsadm -A -t 192.168.64.6:8080 -s rr
+sudo ipvsadm -a -t 192.168.64.6:8080 -r 192.168.64.4:80 -g
+sudo ipvsadm -a -t 192.168.64.6:8080 -r 192.168.64.5:80 -g
+
+sudo ipvsadm -ln -t 192.168.64.6:8080
+
+sudo su
+sudo ifconfig lo:0 192.168.64.6 broadcast 192.168.64.6 netmask 255.255.255.255 up
+echo "1" >/proc/sys/net/ipv4/conf/lo/arp_ignore
+echo "2" >/proc/sys/net/ipv4/conf/lo/arp_announce
+echo "1" >/proc/sys/net/ipv4/conf/all/arp_ignore
+echo "2" >/proc/sys/net/ipv4/conf/all/arp_announce
+```
+
+
+DR 模式：
+[DR mode](https://mmbiz.qpic.cn/mmbiz_png/d5patQGz8KdwBYwDyVuDdYUrJKvrPv2ibeicicGn15jcvdxQxwZYqJtm1Psq2J3khIUPDfsq8RlebVzTrEGZM2JdQ/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
+
+
+NAT 模式：
+
+![NAT mode](https://mmbiz.qpic.cn/mmbiz_png/d5patQGz8KdwBYwDyVuDdYUrJKvrPv2ibBHtE4TynXmhSbue6icqFvYScPMsPVQBKkEusmCXK4ZibLjjic3htNAdww/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
+
+CentOS 上查看默认网关命令:
+```shell script
+ip route show
+```
