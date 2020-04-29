@@ -6,9 +6,9 @@ if [ ! $label ]; then
     exit 1
 fi
 
-pods=$(kubectl get pods -l ${label} -o jsonpath="{.items[*].metadata.name}")
+pods=$(kubectl get pods -l $label -o jsonpath="{.items[*].metadata.name}")
 
-for pod in ${pods}; do
+for pod in $pods; do
 	# shellcheck disable=SC2046
-	echo $(kubectl get pods/${pod} -o jsonpath="{.status.podIP}")
+	echo $(kubectl get pods/$pod -o jsonpath="{.status.podIP}")
 done

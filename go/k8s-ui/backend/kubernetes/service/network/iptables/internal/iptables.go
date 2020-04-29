@@ -32,7 +32,7 @@ const (
 )
 
 var (
-	once          sync.Once
+	iptabelsOnce  sync.Once
 	iptablesPath  string
 	supportsXlock = false
 )
@@ -168,7 +168,7 @@ func iptableCmd(args ...string) ([]byte, error) {
 }
 
 func checkIptables() error {
-	once.Do(initDependencies)
+	iptabelsOnce.Do(initDependencies)
 
 	if len(iptablesPath) == 0 {
 		return fmt.Errorf("iptables not found")

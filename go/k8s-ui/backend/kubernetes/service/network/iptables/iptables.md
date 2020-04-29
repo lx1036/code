@@ -1,4 +1,8 @@
 
+
+**[iptables go client](https://github.com/moby/libnetwork/blob/master/iptables/iptables.go)**
+**[iptables k8s go client](https://github.com/kubernetes/kubernetes/blob/master/pkg/util/iptables/iptables.go)**
+
 # iptables
 
 ![iptables 工作流程图](./img/tables_traverse.jpg)
@@ -13,6 +17,13 @@
 (1) Linux 防火墙基础
 iptables: 属于`用户空间`的防火墙命令工具，来和内核空间的 netfilter 交互，在目录 `/sbin/iptables` 中。
 netfilter: Linux 内核中实现包过滤防火墙的内部结构，属于`内核空间`的防火墙工具。
+
+查看所有 iptables 规则
+```shell script
+iptables -L -n # 默认是 filter 表
+# 可以指定表
+iptables -t nat -L -n
+```
 
 (2)iptables 4种规则表、5种链结构
 规则表：对数据包进行过滤或处理
