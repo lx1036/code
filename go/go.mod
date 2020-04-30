@@ -13,6 +13,7 @@ require (
 	github.com/containerd/fifo v0.0.0-20191213151349-ff969a566b00 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
+	github.com/elastic/go-lookslike v0.3.0 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/getsentry/sentry-go v0.3.0
 	github.com/gin-gonic/gin v1.5.0
@@ -76,6 +77,7 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.17.3
 	k8s.io/sample-controller v0.17.3
+	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
 	sigs.k8s.io/controller-runtime v0.5.0
 )
 
