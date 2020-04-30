@@ -33,6 +33,7 @@ require (
 	github.com/mholt/certmagic v0.8.3
 	github.com/miekg/dns v1.1.15
 	github.com/mitchellh/mapstructure v1.1.2
+	github.com/moby/ipvs v1.0.1
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/olivere/elastic/v7 v7.0.9
 	github.com/onsi/ginkgo v1.11.0
@@ -54,12 +55,13 @@ require (
 	github.com/tidwall/evio v1.0.2
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
 	github.com/urfave/cli v1.22.2
-	github.com/vishvananda/netlink v1.0.0
+	github.com/vishvananda/netlink v1.1.0
+	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	go.uber.org/zap v1.10.0
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys v0.0.0-20200120151820-655fe14d7479
+	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527
 	google.golang.org/grpc v1.23.1
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
