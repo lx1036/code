@@ -2,7 +2,7 @@
 **[ipvs in kube-proxy](https://github.com/kubernetes/kubernetes/blob/master/pkg/proxy/ipvs/proxier.go)**
 
 **[Kube-Proxy IPVS 模式源码分析](https://xigang.github.io/2019/07/28/kube-proxy-source-code/)**
-
+**[浅谈 Kubernetes Service 负载均衡实现机制](https://www.infoq.cn/article/P0V9D4br7UDzWTgIHuYq)**
 
 
 # (笔记)kube-proxy 源码中使用 ipvs 基本流程

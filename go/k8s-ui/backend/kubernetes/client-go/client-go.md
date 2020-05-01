@@ -9,3 +9,7 @@ minikube stop
 ```
 
 **[client-go demos](https://github.com/kubernetes/client-go/blob/master/examples/README.md)**
+
+
+**[Kubernetes Client-Go Informer 实现源码剖析](https://xigang.github.io/2019/09/21/client-go/)**
+
