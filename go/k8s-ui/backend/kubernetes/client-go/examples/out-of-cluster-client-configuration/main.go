@@ -8,6 +8,8 @@ import (
 	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
@@ -19,6 +21,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -71,6 +74,7 @@ type PvcLoggingController struct {
 	informerFactory informers.SharedInformerFactory
 	pvcInformer     v1.PersistentVolumeClaimInformer
 }
+
 func (controller *PvcLoggingController) pvcAdd(obj interface{}) {
 	pvc := obj.(*coreV1.PersistentVolumeClaim)
 	log.Printf("create a new pvc [%s/%s]", pvc.Namespace, pvc.Name)
@@ -93,20 +97,30 @@ func (controller *PvcLoggingController) Run(stop chan struct{}) error {
 	return nil
 }
 func informer() {
-	factory := informers.NewSharedInformerFactory(clientSet, time.Second * 10)
-	/*sharedInformerFactory := informers.NewSharedInformerFactory(clientSet, time.Second * 10)
-	deploymentGenericInformer, err := sharedInformerFactory.ForResource(schema.GroupVersionResource{
-		Group: coreV1.GroupName,
-		Version: coreV1.SchemeGroupVersion.Version,
+	stop := make(chan struct{})
+	defer close(stop)
+
+	//factory := informers.NewSharedInformerFactory(clientSet, time.Second * 10)
+	sharedInformerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, time.Second*10, informers.WithNamespace(*namespace))
+	podsGenericInformer, err := sharedInformerFactory.ForResource(schema.GroupVersionResource{
+		Group:    coreV1.GroupName,
+		Version:  coreV1.SchemeGroupVersion.Version,
 		Resource: "pods",
 	})
 	if err != nil {
 		panic(err)
 	}
-	objs, err := deploymentGenericInformer.Lister().ByNamespace(*namespace).List(labels.Everything())*/
 
-	podInformer := factory.Core().V1().Pods()
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	go podsGenericInformer.Informer().Run(stop)
+	/*fmt.Println(*namespace)
+	objs, err := podsGenericInformer.Lister().List(labels.Everything())
+	fmt.Println(len(objs))
+	for _, obj := range objs {
+		pod, _ := obj.(*coreV1.Pod)
+		log.Printf("pod [%s] in namespace [%s]", pod.Name, *namespace)
+	}*/
+
+	podsGenericInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*coreV1.Pod)
 			log.Printf("create a new pod [%s/%s]", pod.Namespace, pod.Name)
@@ -114,14 +128,16 @@ func informer() {
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			oldPod := oldObj.(*coreV1.Pod)
 			newPod := newObj.(*coreV1.Pod)
-			log.Printf("update a pod from [%s/%s] to [%s/%s]", oldPod.Namespace, oldPod.Name, newPod.Namespace, newPod.Name)
+			if !reflect.DeepEqual(oldPod, newPod) {
+				log.Printf("update a pod from [%s/%s] to [%s/%s]", oldPod.Namespace, oldPod.Name, newPod.Namespace, newPod.Name)
 
-			startCount := 0
-			for _, containerStatus := range newPod.Status.ContainerStatuses {
-				startCount += int(containerStatus.RestartCount)
+				startCount := 0
+				for _, containerStatus := range newPod.Status.ContainerStatuses {
+					startCount += int(containerStatus.RestartCount)
+				}
+
+				log.Printf("start count: %d", startCount)
 			}
-
-			log.Printf("start count: %d", startCount)
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*coreV1.Pod)
@@ -140,11 +156,9 @@ func informer() {
 		DeleteFunc: pvcLog.pvcDelete,
 	})*/
 
-	stop := make(chan struct{})
-	defer close(stop)
-	factory.Start(stop)
+	sharedInformerFactory.Start(stop)
 
-	if !cache.WaitForCacheSync(stop, podInformer.Informer().HasSynced) {
+	if !cache.WaitForCacheSync(stop, podsGenericInformer.Informer().HasSynced) {
 		log.Fatal("failed to sync cache")
 	}
 

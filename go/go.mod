@@ -77,7 +77,7 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.17.3
 	k8s.io/sample-controller v0.17.3
-	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
+	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f // indirect
 	sigs.k8s.io/controller-runtime v0.5.0
 )
 

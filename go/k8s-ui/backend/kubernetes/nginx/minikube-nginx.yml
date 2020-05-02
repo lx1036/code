@@ -7,6 +7,7 @@ metadata:
   name: nginx-demo-1
   labels:
     app: nginx-demo-1
+    restartCount: test
 spec:
   replicas: 3
   template:
@@ -19,6 +20,13 @@ spec:
         - name: nginx-demo-1
           image: nginx:1.17.8
           imagePullPolicy: IfNotPresent
+          livenessProbe:
+            httpGet:
+              port: 80
+              path: /index.html # /status(会不断重启), /index.html(正确的) 测试 RestartCount
+            failureThreshold: 2
+            initialDelaySeconds: 2
+            periodSeconds: 2
       restartPolicy: Always
   selector:
     matchLabels:
