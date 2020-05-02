@@ -12,4 +12,7 @@ minikube stop
 
 
 **[Kubernetes Client-Go Informer 实现源码剖析](https://xigang.github.io/2019/09/21/client-go/)**
+**[深入浅出kubernetes之client-go的Indexer](https://blog.csdn.net/weixin_42663840/article/details/81530606)**
 
+
+![client-go-architecture](./imgs/client-go-architecture.jpg)
