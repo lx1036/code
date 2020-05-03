@@ -12,3 +12,8 @@ for pod in $pods; do
 	# shellcheck disable=SC2046
 	echo $(kubectl get pods/$pod -o jsonpath="{.status.podIP}")
 done
+
+for pod in $pods; do
+	# shellcheck disable=SC2046
+	echo $(kubectl get pods/$pod -o jsonpath="{.status.containerStatuses[0].restartCount}")
+done
