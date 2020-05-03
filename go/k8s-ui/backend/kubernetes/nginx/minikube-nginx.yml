@@ -4,33 +4,41 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-demo-a
+  name: nginx-demo-1
   labels:
-    app: nginx-demo-a
+    app: nginx-demo-1
+    restartCount: test
 spec:
-  replicas: 1
+  replicas: 3
   template:
     metadata:
-      name: nginx-demo-a
+      name: nginx-demo-1
       labels:
-        app: nginx-demo-a
+        app: nginx-demo-1
     spec:
       containers:
-        - name: nginx-demo-a
+        - name: nginx-demo-1
           image: nginx:1.17.8
           imagePullPolicy: IfNotPresent
+          livenessProbe:
+            httpGet:
+              port: 80
+              path: /index.html # /status(会不断重启), /index.html(正确的) 测试 RestartCount
+            failureThreshold: 2
+            initialDelaySeconds: 2
+            periodSeconds: 2
       restartPolicy: Always
   selector:
     matchLabels:
-      app: nginx-demo-a
+      app: nginx-demo-1
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: nginx-demo-a
+  name: nginx-demo-1
 spec:
   selector:
-    app: nginx-demo-a
+    app: nginx-demo-1
   ports:
     - port: 8088
       targetPort: 80

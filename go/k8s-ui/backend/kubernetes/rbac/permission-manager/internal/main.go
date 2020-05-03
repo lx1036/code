@@ -69,7 +69,7 @@ func Auth() gin.HandlerFunc {
 }
 
 const (
-	ResourceUserUrl = "/apis/permissionmanager.user/v1alpha1/permissionmanagerusers"
+	ResourceUserUrl = "/apis/permissionmanager.user/v1/permissionmanagerusers"
 )
 
 type PermissionManagerUserMetadata struct {

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"k8s-lx1036/k8s-ui/backend/kubernetes/client-go/examples/util"
 	appsv1 "k8s.io/api/apps/v1"
-	apiv1 "k8s.io/api/core/v1"
+	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
@@ -19,6 +21,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -43,7 +46,7 @@ func main() {
 
 	labelSelector = flag.String("label", "", "label selector")
 	fieldSelector = flag.String("field", "", "field selector")
-	namespace = flag.String("namespace", "", "namespace")
+	namespace = flag.String("namespace", coreV1.NamespaceDefault, "namespace")
 	maxClaims = flag.String("max-claims", "1Gi", "max quantity of storage resource")
 
 	flag.Parse()
@@ -62,53 +65,27 @@ func main() {
 	}()
 
 	//pvc()
-	deployment()
+	//deployment()
+
+	select {}
 }
 
-// PodLoggingController logs the name and namespace of pods that are added, deleted, or updated
-type PodLoggingController struct {
-	informerFactory informers.SharedInformerFactory
-	podInformer     v1.PodInformer
-}
 type PvcLoggingController struct {
 	informerFactory informers.SharedInformerFactory
 	pvcInformer     v1.PersistentVolumeClaimInformer
 }
 
-func (controller *PodLoggingController) podAdd(obj interface{}) {
-	pod := obj.(*apiv1.Pod)
-	log.Printf("create a new pod [%s/%s]", pod.Namespace, pod.Name)
-}
-func (controller *PodLoggingController) podUpdate(oldObj, newObj interface{}) {
-	oldPod := oldObj.(*apiv1.Pod)
-	newPod := newObj.(*apiv1.Pod)
-	log.Printf("update a pod from [%s/%s] to [%s/%s]", oldPod.Namespace, oldPod.Name, newPod.Namespace, newPod.Name)
-}
-func (controller *PodLoggingController) podDelete(obj interface{}) {
-	pod := obj.(*apiv1.Pod)
-	log.Printf("delete an existing pod [%s/%s]", pod.Namespace, pod.Name)
-}
-
-// Run starts shared informers and waits for the shared informer cache to synchronize
-func (controller *PodLoggingController) Run(stop chan struct{}) error {
-	controller.informerFactory.Start(stop)
-	if !cache.WaitForCacheSync(stop, controller.podInformer.Informer().HasSynced) {
-		return fmt.Errorf("failed to sync cache")
-	}
-
-	return nil
-}
 func (controller *PvcLoggingController) pvcAdd(obj interface{}) {
-	pvc := obj.(*apiv1.PersistentVolumeClaim)
+	pvc := obj.(*coreV1.PersistentVolumeClaim)
 	log.Printf("create a new pvc [%s/%s]", pvc.Namespace, pvc.Name)
 }
 func (controller *PvcLoggingController) pvcUpdate(oldObj, newObj interface{}) {
-	oldPvc := oldObj.(*apiv1.PersistentVolumeClaim)
-	newPvc := newObj.(*apiv1.PersistentVolumeClaim)
+	oldPvc := oldObj.(*coreV1.PersistentVolumeClaim)
+	newPvc := newObj.(*coreV1.PersistentVolumeClaim)
 	log.Printf("update a pvc from [%s/%s] to [%s/%s]", oldPvc.Namespace, oldPvc.Name, newPvc.Namespace, newPvc.Name)
 }
 func (controller *PvcLoggingController) pvcDelete(obj interface{}) {
-	pvc := obj.(*apiv1.PersistentVolumeClaim)
+	pvc := obj.(*coreV1.PersistentVolumeClaim)
 	log.Printf("delete an existing pvc [%s/%s]", pvc.Namespace, pvc.Name)
 }
 func (controller *PvcLoggingController) Run(stop chan struct{}) error {
@@ -120,20 +97,55 @@ func (controller *PvcLoggingController) Run(stop chan struct{}) error {
 	return nil
 }
 func informer() {
-	factory := informers.NewSharedInformerFactory(clientSet, time.Hour)
+	stop := make(chan struct{})
+	defer close(stop)
 
-	podInformer := factory.Core().V1().Pods()
-	podLog := &PodLoggingController{
-		informerFactory: factory,
-		podInformer:     podInformer,
+	//factory := informers.NewSharedInformerFactory(clientSet, time.Second * 10)
+	sharedInformerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, time.Second*10, informers.WithNamespace(*namespace))
+	podsGenericInformer, err := sharedInformerFactory.ForResource(schema.GroupVersionResource{
+		Group:    coreV1.GroupName,
+		Version:  coreV1.SchemeGroupVersion.Version,
+		Resource: "pods",
+	})
+	if err != nil {
+		panic(err)
 	}
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    podLog.podAdd,
-		UpdateFunc: podLog.podUpdate,
-		DeleteFunc: podLog.podDelete,
+
+	go podsGenericInformer.Informer().Run(stop)
+	/*fmt.Println(*namespace)
+	objs, err := podsGenericInformer.Lister().List(labels.Everything())
+	fmt.Println(len(objs))
+	for _, obj := range objs {
+		pod, _ := obj.(*coreV1.Pod)
+		log.Printf("pod [%s] in namespace [%s]", pod.Name, *namespace)
+	}*/
+
+	podsGenericInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			pod := obj.(*coreV1.Pod)
+			log.Printf("create a new pod [%s/%s]", pod.Namespace, pod.Name)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			oldPod := oldObj.(*coreV1.Pod)
+			newPod := newObj.(*coreV1.Pod)
+			if !reflect.DeepEqual(oldPod, newPod) {
+				log.Printf("update a pod from [%s/%s] to [%s/%s]", oldPod.Namespace, oldPod.Name, newPod.Namespace, newPod.Name)
+
+				startCount := 0
+				for _, containerStatus := range newPod.Status.ContainerStatuses {
+					startCount += int(containerStatus.RestartCount)
+				}
+
+				log.Printf("start count: %d", startCount)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			pod := obj.(*coreV1.Pod)
+			log.Printf("delete an existing pod [%s/%s]", pod.Namespace, pod.Name)
+		},
 	})
 
-	pvcInformer := factory.Core().V1().PersistentVolumeClaims()
+	/*pvcInformer := factory.Core().V1().PersistentVolumeClaims()
 	pvcLog := &PvcLoggingController{
 		informerFactory: factory,
 		pvcInformer:     pvcInformer,
@@ -142,13 +154,14 @@ func informer() {
 		AddFunc:    pvcLog.pvcAdd,
 		UpdateFunc: pvcLog.pvcUpdate,
 		DeleteFunc: pvcLog.pvcDelete,
-	})
+	})*/
 
-	stop := make(chan struct{})
-	defer close(stop)
-	if err := podLog.Run(stop); err != nil {
-		log.Fatal(err)
+	sharedInformerFactory.Start(stop)
+
+	if !cache.WaitForCacheSync(stop, podsGenericInformer.Informer().HasSynced) {
+		log.Fatal("failed to sync cache")
 	}
+
 	select {}
 }
 
@@ -165,7 +178,7 @@ func pvc() {
 	maxClaimsQuantity := resource.MustParse(*maxClaims)
 	for _, pvc := range pvcs.Items {
 		log.Printf("pvc name: [%s]\n", pvc.Name)
-		storage := pvc.Spec.Resources.Requests[apiv1.ResourceStorage]
+		storage := pvc.Spec.Resources.Requests[coreV1.ResourceStorage]
 		currentQuantity.Add(storage)
 	}
 	log.Printf("current storage quantity: %s\n", currentQuantity.String())
@@ -176,11 +189,11 @@ func pvc() {
 	}
 	events := watcher.ResultChan()
 	for event := range events {
-		pvc, ok := event.Object.(*apiv1.PersistentVolumeClaim)
+		pvc, ok := event.Object.(*coreV1.PersistentVolumeClaim)
 		if !ok {
 			log.Fatal("unexpected type\n")
 		}
-		storage := pvc.Spec.Resources.Requests[apiv1.ResourceStorage]
+		storage := pvc.Spec.Resources.Requests[coreV1.ResourceStorage]
 		switch event.Type {
 		case watch.Added:
 			currentQuantity.Add(storage)
@@ -205,7 +218,7 @@ func pvc() {
 func deployment() {
 	fmt.Println("Starting...")
 	util.Prompt()
-	deploymentsClient := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault)
+	deploymentsClient := clientSet.AppsV1().Deployments(coreV1.NamespaceDefault)
 
 	const deploymentName = "deployment-123"
 
@@ -219,20 +232,20 @@ func deployment() {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "deployment-abc"},
 			},
-			Template: apiv1.PodTemplateSpec{
+			Template: coreV1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "pod-123",
 					Labels: map[string]string{"app": "deployment-abc"},
 				},
-				Spec: apiv1.PodSpec{
-					Containers: []apiv1.Container{
+				Spec: coreV1.PodSpec{
+					Containers: []coreV1.Container{
 						{
 							Name:  "web",
 							Image: "nginx:1.12",
-							Ports: []apiv1.ContainerPort{
+							Ports: []coreV1.ContainerPort{
 								{
 									Name:          "http",
-									Protocol:      apiv1.ProtocolTCP,
+									Protocol:      coreV1.ProtocolTCP,
 									ContainerPort: 80,
 								},
 							},
@@ -261,7 +274,7 @@ func deployment() {
 
 	util.Prompt()
 
-	pods, err := clientSet.CoreV1().Pods(apiv1.NamespaceDefault).List(metav1.ListOptions{
+	pods, err := clientSet.CoreV1().Pods(coreV1.NamespaceDefault).List(metav1.ListOptions{
 		//LabelSelector: "deployment-abc",
 	})
 	if err != nil {
@@ -304,7 +317,7 @@ func deployment() {
 	util.Prompt()
 
 	// List
-	fmt.Println("Listing deployment in namespace[" + apiv1.NamespaceDefault + "]:")
+	fmt.Println("Listing deployment in namespace[" + coreV1.NamespaceDefault + "]:")
 	list, err := deploymentsClient.List(metav1.ListOptions{
 		TypeMeta:            metav1.TypeMeta{},
 		LabelSelector:       "",

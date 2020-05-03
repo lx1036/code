@@ -5,7 +5,7 @@ metadata:
   labels:
     app: nginx-demo
 spec:
-  replicas: 1
+  replicas: 3
   template:
     metadata:
       name: nginx-demo
@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: nginx-demo
-          image: lx1036/nginx:v1.0.0.1
+          image: lx1036/nginx:v1.0.0.2
           imagePullPolicy: IfNotPresent
       restartPolicy: Always
   selector:
