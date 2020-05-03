@@ -1,3 +1,5 @@
+// +build linux
+
 package internal
 
 import "fmt"
@@ -7,7 +9,7 @@ var (
 	firewallRunning bool // if firewalld service is running
 )
 
+// 不考虑防火墙程序 firewalld
 func FirewallInit() error {
-
 	return fmt.Errorf("firewall error")
 }

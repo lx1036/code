@@ -99,4 +99,9 @@ kubelet 启动参数会有 --hairbin-mode。
 ![kube-proxy-iptables-arch](./img/kube-proxy-iptables-arch.svg)
 
 
+(7)docker 如何使用 iptables 来实现网络通信的？
+**[Service Traffic Flow](https://github.com/moby/libnetwork/blob/master/docs/network.md)**
+traffic flow from container to outside:
+
+traffic flow from outside to container:
 
