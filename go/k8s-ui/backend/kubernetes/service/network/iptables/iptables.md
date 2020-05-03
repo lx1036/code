@@ -101,7 +101,11 @@ kubelet 启动参数会有 --hairbin-mode。
 
 (7)docker 如何使用 iptables 来实现网络通信的？
 **[Service Traffic Flow](https://github.com/moby/libnetwork/blob/master/docs/network.md)**
-traffic flow from container to outside:
+**[Introduction to Container Networking](https://rancher.com/learning-paths/introduction-to-container-networking/)**
+**[Docker and iptables](https://docs.docker.com/network/iptables/)**
 
-traffic flow from outside to container:
+(7.1) Container-to-Container Network:
 
+(7.2) Container-to-Outside Network:
+
+(7.3) Outside-to-Container Network:
