@@ -1,0 +1,50 @@
+
+# [笔记]iptables 学习记录
+iptables 是基于内核态的 netfilter 框架，用来过滤 ipv4 数据包和网络地址转换NAT的一个工具，一般用作防火墙功能，或负载均衡功能。
+简单点说：iptables 是用户态的命令行工具，可以操作内核态的 iptables 的几个模块(基于更底层的netfilter模块)，然后达到过滤或网络地址转换数据包。
+
+K8S 里的 kube-proxy 模块会调用 iptables go client 来往 linux 内核中去用户自定义 iptables chain，和往
+一些表内(如 filter 表或 nat 表)写自定义rule，来实现每一个 Node 节点做到四层负载均衡功能，且由于 kube-proxy
+作为 DaemonSet 部署，会在每一个 Node 节点内运行这个进程，导致这种负载均衡还是分布式的。另外，由于集群内每次新建一个 service 都会
+在每一个 Node 节点上写 iptables rules，由于 iptables 的数据结构是链表，所以每一次读操作都是 O(n)，效率就很低了，导致一个 k8s cluster
+如果使用 iptables 作为负载均衡底层技术的话，就只能支撑中小数量的 service 了。这一点，被 ipvs 完爆，ipvs 的数据结构哈希表，而且 ipvs 天生就是
+为负载均衡而生，支持的负载均衡策略更多，包括 rr、wrr 或 lc 等等。
+
+但是不是说 iptables 没有学习的价值，相反，官方的 K8S 在代码里也大量使用 iptables 功能，而且即使使用 ipvs，也在一些情况下必须借助 iptables。
+
+本文笔记记录，作为最近几天的学习总结 
+
+(1) iptables 官网：https://linux.die.net/man/8/iptables
+公式：iptables = 4 tables = (5 chains + user-defined chains) = rules * EveryChain
+rule 会去匹配(-m 参数)这个数据包，告诉该数据包 packet 下一跳干啥去(-J 参数)，是跳到下一个 target，还是直接丢弃。
+
+一个数据包来了，会发生什么？(没考虑表内用户自定义的 chain)
+* packet 来了，首先依次经过 raw/mangle/nat 三张表的 prerouting chain 的每一个 rule，每一个 rule 对该 packet 
+发出四个信号值：ACCEPT、DROP、QUEUE 和 RETURN。其中，QUEUE 表示把 packet 传给用户空间，即本机处理这个 packet；或者丢弃 DROP；或者返回上一个 chain；
+或者转发。
+* 如果本机处理：那就走 input -> output chain。filter/mangle 表的 input chain 内的每一个 rule，到达用户进程，处理完后再依次经过 raw/mangle/nat/filter 表的
+output chain 内的每一个 rule。
+* 如果本机只是转发 forward：那就走 mangle/filter 表的 forward chain 内的每一个 rule。
+* packet 处理结束，走 mangle/nat 表内的 postrouting chain 内的每一个 rule。离开本机。
+
+kube-proxy 是怎么利用 iptables 做 service 四层负载均衡的？
+创建一个 NodePort service 时，在每一个机器内核中，会把 service 后面挂的每一个 endpoint ip ，写入到自定义 chain 的规则中。NodePort service 过程如下： 
+```shell script
+# (1) 首先进入 prerouting chain，跳转到 KUBE-SERVICES chain
+sudo iptables-save -t nat | grep -- '-A PREROUTING'
+-A PREROUTING -m comment --comment "kubernetes service portals" -j KUBE-SERVICES
+# (2) 跳转到 KUBE-NODEPORTS
+sudo iptables-save -t nat | grep -- '-A KUBE-SERVICES'
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+# (3) 发现 default/nginx-demo NodePort service 会跳转到 KUBE-SVC-JKOCBQALQGD3X3RT chain
+sudo iptables-save -t nat | grep -- '-A KUBE-NODEPORTS'
+-A KUBE-NODEPORTS -p tcp -m comment --comment "default/nginx-demo-1:" -m tcp --dport 32719 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -p tcp -m comment --comment "default/nginx-demo-1:" -m tcp --dport 32719 -j KUBE-SVC-JKOCBQALQGD3X3RT
+# (4) 查看 KUBE-SVC-JKOCBQALQGD3X3RT chain，又发现 0.33333333349 概率跳转到 KUBE-SEP-HWWSIA644OJY5W7C
+# 剩下的2/3概率中，又有 0.50000000000 概率跳转到 KUBE-SEP-5Z6HLG57ALXCA2BN，最后剩下的概率跳转到 KUBE-SEP-HE7NEHV2WH3AYFZT。
+# 即以平均概率跳转到 KUBE-SEP-HWWSIA644OJY5W7C、KUBE-SEP-5Z6HLG57ALXCA2BN、KUBE-SEP-HE7NEHV2WH3AYFZT
+sudo iptables-save -t nat | grep -- '-A KUBE-SVC-JKOCBQALQGD3X3RT'
+-A KUBE-SVC-JKOCBQALQGD3X3RT -m comment --comment "default/nginx-demo-1:" -m statistic --mode random --probability 0.33333333349 -j KUBE-SEP-HWWSIA644OJY5W7C
+-A KUBE-SVC-JKOCBQALQGD3X3RT -m comment --comment "default/nginx-demo-1:" -m statistic --mode random --probability 0.50000000000 -j KUBE-SEP-5Z6HLG57ALXCA2BN
+-A KUBE-SVC-JKOCBQALQGD3X3RT -m comment --comment "default/nginx-demo-1:" -j KUBE-SEP-HE7NEHV2WH3AYFZT
+```
