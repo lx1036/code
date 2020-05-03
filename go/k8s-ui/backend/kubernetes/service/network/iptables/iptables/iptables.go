@@ -1,6 +1,6 @@
 // +build linux
 
-package internal
+package iptables
 
 import (
 	"fmt"
@@ -32,6 +32,9 @@ const (
 	List    Action = "-L"
 	Flush   Action = "-F"
 	New     Action = "-N"
+
+	Drop   Policy = "DROP"
+	Accept Policy = "ACCEPT"
 )
 
 var (
@@ -42,6 +45,7 @@ var (
 type Table string
 type Action string
 type Chain string
+type Policy string
 
 // define iptables chain
 type ChainInfo struct {
@@ -69,13 +73,13 @@ func NewChain(name string, table Table, haripinMode bool) (*ChainInfo, error) {
 		# Warning: iptables-legacy tables present, use iptables-legacy to see them
 		iptables: No chain/target/match by that name.
 	*/
-	if _, err := chain.IptableCmd("-t", string(chain.Table), "-n", string(List), chain.Name); err != nil {
+	if _, err := IptablesCmd("-t", string(chain.Table), "-n", string(List), chain.Name); err != nil {
 		// -N is --new: Create a new user-defined chain
 		/*
 			sudo iptables -t nat -N lx1036
 			sudo iptables-save -t nat
 		*/
-		if output, err := chain.IptableCmd("-t", string(chain.Table), string(New), chain.Name); err != nil {
+		if output, err := IptablesCmd("-t", string(chain.Table), string(New), chain.Name); err != nil {
 			return nil, err
 		} else if len(string(output)) != 0 {
 			return nil, fmt.Errorf("can't create %s/%s chain because of %s", chain.Table, chain.Name, output)
@@ -85,6 +89,23 @@ func NewChain(name string, table Table, haripinMode bool) (*ChainInfo, error) {
 	return chain, nil
 }
 
+// iptables -t table -P chain DROP/ACCEPT
+func SetPolicy(table Table, chain Chain, policy Policy) error {
+	args := []string{"-t", string(table), "-P", string(chain), string(policy)}
+	var mu = &sync.Mutex{}
+	mu.Lock()
+	defer mu.Unlock()
+	output, err := IptablesCmd(args...)
+	if err != nil {
+		return err
+	} else if len(output) != 0 {
+		log.Infof("iptables cmd[iptables %s] output: %s", strings.Join(args, " "), string(output))
+		return fmt.Errorf("can't add %s/%s policy because of %s", table, chain, output)
+	}
+
+	return nil
+}
+
 // check/add/delete rule to nat/PREROUTING chain
 // iptables -t nat -C/A/D PREROUTING/OUTPUT -m addrtype --dst-type LOCAL -j lx1036
 func (chainInfo *ChainInfo) Rule(action Action, chain Chain, rule ...string) error {
@@ -92,7 +113,7 @@ func (chainInfo *ChainInfo) Rule(action Action, chain Chain, rule ...string) err
 	args = append(args, rule...)
 	chainInfo.Mu.Lock()
 	defer chainInfo.Mu.Unlock()
-	output, err := chainInfo.IptableCmd(args...)
+	output, err := IptablesCmd(args...)
 	if err != nil {
 		return err
 	} else if len(output) != 0 {
@@ -178,14 +199,14 @@ func Rule(chainInfo *ChainInfo, bridgeName string, harbinMode bool, enable bool)
 }
 
 // syscall 'iptables' command
-func (chainInfo *ChainInfo) IptableCmd(args ...string) ([]byte, error) {
+func IptablesCmd(args ...string) ([]byte, error) {
 	// check iptables command
 	if err := checkIptables(); err != nil {
 		return nil, err
 	}
-
-	chainInfo.Mu.Lock()
-	defer chainInfo.Mu.Unlock()
+	var mu = &sync.Mutex{}
+	mu.Lock()
+	defer mu.Unlock()
 	output, err := exec.Command(iptablesPath, args...).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("iptables failed to exec command [%s], output is: %s, error is %v", iptablesPath+" "+strings.Join(args, " "), string(output), err)
