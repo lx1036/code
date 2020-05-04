@@ -7,7 +7,6 @@ import (
 	"github.com/vishvananda/netlink/nl"
 	"github.com/vishvananda/netns"
 	"golang.org/x/sys/unix"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/service/network/ipvs/internal/netlink"
 	"net"
 	"sync/atomic"
 	"syscall"
@@ -71,14 +70,14 @@ type SvcStats struct {
 }
 
 // a specific namespace handler
-type Handle struct {
+type Runner struct {
 	seq  uint32
 	sock *nl.NetlinkSocket
 }
 
 // new a ipvs handle
-func New(path string) (*Handle, error) {
-	netlink.Setup()
+func New(path string) (*Runner, error) {
+	Setup()
 
 	//simple way to handle network namespaces
 	ns := netns.None()
@@ -105,18 +104,18 @@ func New(path string) (*Handle, error) {
 		return nil, err
 	}
 
-	return &Handle{sock: sock}, nil
+	return &Runner{sock: sock}, nil
 }
 
-func (handle *Handle) GetServices() ([]*Service, error) {
+func (handle *Runner) GetServices() ([]*Service, error) {
 	return handle.GetServicesCmd(nil)
 }
 
-func (handle *Handle) GetDestinations(service *Service) ([]*Destination, error) {
+func (handle *Runner) GetDestinations(service *Service) ([]*Destination, error) {
 	return handle.GetDestinationCmd(service, nil)
 }
 
-func (handle *Handle) GetServicesCmd(service *Service) ([]*Service, error) {
+func (handle *Runner) GetServicesCmd(service *Service) ([]*Service, error) {
 	var services []*Service
 	messages, err := handle.doCmdWithResponse(service, nil, ipvsCmdGetService)
 	if err != nil {
@@ -134,7 +133,7 @@ func (handle *Handle) GetServicesCmd(service *Service) ([]*Service, error) {
 	return services, nil
 }
 
-func (handle *Handle) GetDestinationCmd(service *Service, destination *Destination) ([]*Destination, error) {
+func (handle *Runner) GetDestinationCmd(service *Service, destination *Destination) ([]*Destination, error) {
 	var destionations []*Destination
 	messages, err := handle.doCmdWithResponse(service, destination, ipvsCmdGetDestination)
 	if err != nil {
@@ -152,11 +151,11 @@ func (handle *Handle) GetDestinationCmd(service *Service, destination *Destinati
 	return destionations, nil
 }
 
-func (handle *Handle) parseService(message []byte) (*Service, error) {
+func (handle *Runner) parseService(message []byte) (*Service, error) {
 
 	//Remove General header for this message and parse the NetLink message
-	hdr := deserializeGenlMsg(msg)
-	NetLinkAttrs, err := nl.ParseRouteAttr(msg[hdr.Len():])
+	hdr := deserializeGenlMsg(message)
+	NetLinkAttrs, err := nl.ParseRouteAttr(message[hdr.Len():])
 	if err != nil {
 		return nil, err
 	}
@@ -172,11 +171,11 @@ func (handle *Handle) parseService(message []byte) (*Service, error) {
 
 }
 
-func (handle *Handle) parseDestination(message []byte) (*Destination, error) {
+func (handle *Runner) parseDestination(message []byte) (*Destination, error) {
 
 }
 
-func (handle *Handle) doCmdWithResponse(service *Service, destination *Destination, cmd uint8) ([][]byte, error) {
+func (handle *Runner) doCmdWithResponse(service *Service, destination *Destination, cmd uint8) ([][]byte, error) {
 	request := nl.NewNetlinkRequest(ipvsFamily, syscall.NLM_F_ACK)
 	request.AddData(&genlMsgHdr{cmd: cmd, version: 1})
 	request.Seq = atomic.AddUint32(&handle.seq, 1)

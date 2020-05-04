@@ -11,3 +11,22 @@ Netlink 套接字是启用此通信的原语。也就是说，netlink 不仅仅�
 ## netlink 消息格式
 
 
+
+
+
+
+# netlink go client
+本客户端被用来 crud 网络设备interfaces, 设置IP地址和路由表set ip addresses and routes, and configure ipsec.
+
+功能点：
+* 添加一个新 bridge，并添加一个虚拟网卡，比如创建一个lx1036的bridge，然后把eth0网卡接入进去。
+
+
+
+# [笔记]《k8s网络权威指南》1.3小节：Linux Bridge
+```shell script
+# 1. 创建一个 bridge 并启动
+ip link add name br0 type bridge
+ip link set br0 up
+```
+
