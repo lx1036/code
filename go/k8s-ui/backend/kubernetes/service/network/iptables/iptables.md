@@ -100,6 +100,20 @@ kubelet 启动参数会有 --hairbin-mode。
 
 
 (7)docker 如何使用 iptables 来实现网络通信的？
+**[Docker Swarm Reference Architecture: Exploring Scalable, Portable Docker Container Networks](https://success.docker.com/article/networking)**
+docker network driver = network namespace + linux bridge + virtual ethernet pair + iptables
+linux bridge: linux 内核中虚拟交换机，L2 设备，根据 MAC 地址转发 traffic。
+network namespace: 独立的 interface, routes and firewall rules.
+veth pair: 虚拟网卡，用来连接两个独立的 network namespace.
+iptables: L3/L4 层，过滤、转发数据包，端口映射或负载均衡
+
+### bridge driver network
+[1] 创建一个 "docker0" linux bridge
+```shell script
+sudo apt install -y bridge-utils
+brctl show
+```
+
 **[Service Traffic Flow](https://github.com/moby/libnetwork/blob/master/docs/network.md)**
 **[Introduction to Container Networking](https://rancher.com/learning-paths/introduction-to-container-networking/)**
 **[Docker and iptables](https://docs.docker.com/network/iptables/)**

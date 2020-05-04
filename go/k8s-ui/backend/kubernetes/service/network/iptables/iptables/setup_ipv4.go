@@ -5,6 +5,7 @@ package iptables
 import (
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 )
 
 // 开关 linux 内核容许 ipv4 forward 数据包转发
@@ -41,4 +42,21 @@ func configureIPv4Forwarding(enable bool) error {
 		val = '1'
 	}
 	return ioutil.WriteFile(ipv4ForwardConf, []byte{val, '\n'}, ipv4ForwardConfPerm)
+}
+
+// cat /proc/sys/net/ipv4/conf/docker0/route_localnet
+// Setup Loopback Addresses Routing
+func SetupLoopbackAddressesRouting(bridgeName string) error {
+	sysPath := filepath.Join("/proc/sys/net/ipv4/conf", bridgeName, "route_localnet")
+	ipv4LoRoutingData, err := ioutil.ReadFile(sysPath)
+	if err != nil {
+		return fmt.Errorf("can't read IPv4 local routing setup: %v", err)
+	}
+	// Enable loopback addresses routing only if it isn't already enabled
+	if ipv4LoRoutingData[0] != '1' {
+		if err := ioutil.WriteFile(sysPath, []byte{'1', '\n'}, 0644); err != nil {
+			return fmt.Errorf("can't enable local routing for hairpin mode: %v", err)
+		}
+	}
+	return nil
 }
