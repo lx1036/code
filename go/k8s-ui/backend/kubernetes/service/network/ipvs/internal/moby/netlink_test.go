@@ -1,6 +1,6 @@
 // +build linux
 
-package netlink
+package moby
 
 import (
 	"encoding/binary"

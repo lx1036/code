@@ -1,6 +1,6 @@
 // +build linux
 
-package netlink
+package k8s
 
 import (
 	"fmt"
@@ -30,4 +30,8 @@ func TestGetVirtualServers(test *testing.T) {
 	for _, virtualServer := range virtualServers {
 		fmt.Println(virtualServer)
 	}
+}
+
+func TestEqual(test *testing.T) {
+
 }

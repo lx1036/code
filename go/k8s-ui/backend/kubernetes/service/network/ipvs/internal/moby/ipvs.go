@@ -1,6 +1,6 @@
 // +build linux
 
-package internal
+package moby
 
 import (
 	"fmt"
