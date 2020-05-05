@@ -1,0 +1,13 @@
+
+version: "3.7"
+
+services:
+  k8s-api:
+    image: swaggerapi/swagger-ui
+    container_name: k8s-api-swagger
+    environment:
+      - "SWAGGER_JSON=/var/www/swagger.json"
+    volumes:
+      - ./swagger.json:/var/www/swagger.json
+    ports:
+      - 8889:8080
