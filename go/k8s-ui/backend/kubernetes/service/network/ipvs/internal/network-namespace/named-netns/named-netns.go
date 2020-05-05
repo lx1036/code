@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"os"
 	"runtime"
+	"syscall"
 )
 
 func main() {
@@ -16,7 +18,7 @@ func main() {
 	args := flag.Args()
 	if len(args) < 2 {
 		flag.Usage()
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	if err := ExecNetworkNamespace(args[0], args[1:]); err != nil {
@@ -31,6 +33,19 @@ func ExecNetworkNamespace(name string, args []string) error {
 
 }
 
-func CreateNetworkNamespace()  {
-	
+//
+func CreateNetworkNamespace(name string)  {
+	if err := syscall.Unshare(syscall.CLONE_NEWNET); err != nil {
+		return -1, err
+	}
+
+}
+
+func SetNs(file *os.File) error {
+	_, _, err := syscall.Syscall(unix.SYS_SETNS, file.Fd(), syscall.CLONE_NEWNET, 0)
+	if err != 0 {
+		return err
+	}
+
+	return nil
 }
