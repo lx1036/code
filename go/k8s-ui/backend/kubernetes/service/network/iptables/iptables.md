@@ -108,6 +108,7 @@ veth pair: 虚拟网卡，用来连接两个独立的 network namespace.
 iptables: L3/L4 层，过滤、转发数据包，端口映射或负载均衡
 
 ### bridge driver network
+**[docker bridge 到 k8s pod 跨节点网络通信机制演进](https://mp.weixin.qq.com/s/nDzJQq8nysywicctr7EAhw)**
 [1] 创建一个 "docker0" linux bridge
 ```shell script
 sudo apt install -y bridge-utils
