@@ -24,9 +24,9 @@ spec:
             httpGet:
               port: 80
               path: /index.html # /status(会不断重启), /index.html(正确的) 测试 RestartCount
-            failureThreshold: 2
-            initialDelaySeconds: 2
-            periodSeconds: 2
+            failureThreshold: 10
+            initialDelaySeconds: 10
+            periodSeconds: 10
       restartPolicy: Always
   selector:
     matchLabels:
