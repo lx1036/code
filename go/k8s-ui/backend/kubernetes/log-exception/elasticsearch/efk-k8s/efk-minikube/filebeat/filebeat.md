@@ -6,7 +6,8 @@ Filebeat 从配置文件中的 inputs(数据源，如/var/lib/docker/containers/
 
 ![filebeat](./filebeat.png)
 
-  
+## **[配置 filebeat](https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-configuration.html)**
+
 
 
 

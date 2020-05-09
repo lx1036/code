@@ -8,6 +8,9 @@ metadata:
   labels:
     app: nginx-demo-1
     restartCount: test
+    log-filebeat: filebeat
+  annotations:
+    lx1036/controller-kind: filebeat
 spec:
   replicas: 3
   template:
