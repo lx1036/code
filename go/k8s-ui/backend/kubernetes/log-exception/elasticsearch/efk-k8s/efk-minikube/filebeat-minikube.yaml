@@ -1,5 +1,6 @@
 
 # https://www.elastic.co/guide/en/beats/filebeat/current/running-on-kubernetes.html
+# https://github.com/elastic/beats/blob/master/deploy/kubernetes/filebeat-kubernetes.yaml
 
 ---
 apiVersion: v1
@@ -46,6 +47,13 @@ data:
 
     processors:
       - add_kubernetes_metadata:
+          include_labels:
+            - log-filebeat
+          include_annotations:
+            - lx1036/controller-kind
+          #matchers:
+          #  - logs_path:
+          #      logs_path: /data/tmp/
       #- add_cloud_metadata:
       #- add_host_metadata:
 
@@ -92,10 +100,7 @@ spec:
       containers:
       - name: filebeat
         image: docker.elastic.co/beats/filebeat:7.6.2
-        args: [
-          "-c", "/etc/filebeat.yml",
-          "-e",
-        ]
+        args: ["-c", "/etc/filebeat.yml", "-e"]
         env:
         - name: ELASTICSEARCH_HOST
           value: elasticsearch

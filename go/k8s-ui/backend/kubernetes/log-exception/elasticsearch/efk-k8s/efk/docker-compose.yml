@@ -20,7 +20,7 @@ services:
     volumes:
       - data01:/usr/share/elasticsearch/data
     ports:
-      - 127.0.0.1:9200:9200 # only accessible from host machine
+      - 9200:9200 # only accessible from host machine
     networks:
       - elastic
   es02:
