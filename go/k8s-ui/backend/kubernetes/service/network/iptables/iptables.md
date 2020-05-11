@@ -1,5 +1,7 @@
 
 **[iptables 官网](https://linux.die.net/man/8/iptables)**
+**[iptables 理论基础及日志记录](https://mp.weixin.qq.com/s/YSv4wLJyetsEg4W3l6XpfA)**
+**[VxLAN 与 Bridge、Namespace基础](https://mp.weixin.qq.com/s/JYp36vfX8r0l7VlCGMK8kA)**
 
 
 **[iptables go client](https://github.com/moby/libnetwork/blob/master/iptables/iptables.go)**

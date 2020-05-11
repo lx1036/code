@@ -1,4 +1,7 @@
 
+**[通过traceID实例讲解 Nginx Ingress 参数配置](https://mp.weixin.qq.com/s/tF0A04ZzKzy32c0nu9DUqA)**
+**[同一kubernetes部署多个Nginx Ingress Controller](https://mp.weixin.qq.com/s/603OMSae70tNVM27iSV4sQ)**
+
 # Installation
 
 ## minikube
