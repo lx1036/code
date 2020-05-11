@@ -20,4 +20,4 @@ single-node:
 # 执行后，就可以在Kibana里看到每一个容器的日志：
 # filebeat去/var/lib/docker/containers/*/*.log里收集日志(每一个log文件都会启动一个日志收割机harvester)，发给elasticsearch，然后在kibana里展示。
 multi-nodes:
-	docker-compose -f ./docker-compose.yml -p elk down && docker-compose -f ./docker-compose.yml -p elk up --force-recreate -d
+	docker-compose -f ./docker-compose.yml -p elk down && docker-compose -f ./docker-compose.yml -p elk up --remove-orphans -d

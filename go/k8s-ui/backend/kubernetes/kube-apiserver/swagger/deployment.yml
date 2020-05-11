@@ -1,0 +1,35 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apiserver-swagger
+  labels:
+    app: apiserver-swagger
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: apiserver-swagger
+      labels:
+        app: apiserver-swagger
+    spec:
+      containers:
+        - name: apiserver-swagger
+          image: lx1036/apiserver-swagger:1.0.3
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app: apiserver-swagger
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apiserver-swagger
+spec:
+  selector:
+    app: apiserver-swagger
+  ports:
+    - port: 8899
+      targetPort: 8080
+  type: NodePort

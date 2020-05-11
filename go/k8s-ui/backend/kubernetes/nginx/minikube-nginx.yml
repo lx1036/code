@@ -8,6 +8,9 @@ metadata:
   labels:
     app: nginx-demo-1
     restartCount: test
+    log-filebeat: filebeat
+  annotations:
+    lx1036/controller-kind: filebeat
 spec:
   replicas: 3
   template:
@@ -24,9 +27,9 @@ spec:
             httpGet:
               port: 80
               path: /index.html # /status(会不断重启), /index.html(正确的) 测试 RestartCount
-            failureThreshold: 2
-            initialDelaySeconds: 2
-            periodSeconds: 2
+            failureThreshold: 10
+            initialDelaySeconds: 10
+            periodSeconds: 10
       restartPolicy: Always
   selector:
     matchLabels:

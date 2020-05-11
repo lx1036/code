@@ -1,5 +1,6 @@
 
 # https://www.elastic.co/guide/en/beats/filebeat/current/running-on-kubernetes.html
+# https://github.com/elastic/beats/blob/master/deploy/kubernetes/filebeat-kubernetes.yaml
 
 ---
 apiVersion: v1
@@ -11,39 +12,70 @@ metadata:
     k8s-app: filebeat
 data:
   filebeat.yml: |-
-    filebeat.inputs:
-    - type: container
-      paths:
-        - /var/log/containers/*.log
-      processors:
-        - add_kubernetes_metadata:
-            host: ${NODE_NAME}
-            matchers:
-            - logs_path:
-                logs_path: "/var/log/containers/"
+    #filebeat.inputs:
+    #- type: container
+    #  paths:
+    #    - /var/log/containers/*.log
+    #  processors:
+    #    - add_kubernetes_metadata:
+    #        host: ${NODE_NAME}
+    #        matchers:
+    #        - logs_path:
+    #            logs_path: "/var/log/containers/"
 
+    # 怎么让 filebeat 去抓取指定 namespace/pod 呢？https://www.elastic.co/guide/en/beats/filebeat/master/configuration-autodiscover.html#_kubernetes
     # To enable hints based autodiscover, remove `filebeat.inputs` configuration and uncomment this:
-    #filebeat.autodiscover:
-    #  providers:
-    #    - type: kubernetes
-    #      node: ${NODE_NAME}
-    #      hints.enabled: true
-    #      hints.default_config:
-    #        type: container
-    #        paths:
-    #          - /var/log/containers/*${data.kubernetes.container.id}.log
+    filebeat.autodiscover:
+      providers:
+        - type: kubernetes
+          node: ${NODE_NAME}
+          hints.enabled: true
+          # hints.default_config:
+          #  type: container
+          #  paths:
+          #    - /var/log/containers/*${data.kubernetes.container.id}.log
+          templates:
+            - conditions:
+                equals:
+                  kubernetes.namespace: default
+                  kubernetes.labels.app: log
+              config:
+                - type: container
+                  paths:
+                    - /var/log/containers/*${data.kubernetes.container.id}.log
+                  exclude_lines: ["^\\s+[\\-`('.|_]"]  # drop asciiart lines
 
     processors:
-      - add_cloud_metadata:
-      - add_host_metadata:
+      - add_kubernetes_metadata:
+          include_labels:
+            - log-filebeat
+          include_annotations:
+            - lx1036/controller-kind
+          #matchers:
+          #  - logs_path:
+          #      logs_path: /data/tmp/
+      #- add_cloud_metadata:
+      #- add_host_metadata:
 
-    cloud.id: ${ELASTIC_CLOUD_ID}
-    cloud.auth: ${ELASTIC_CLOUD_AUTH}
+    # https://www.elastic.co/guide/en/beats/filebeat/master/file-output.html
+    output.file:
+      enabled: true
+      path: "/tmp/filebeat"
+      filename: filebeat2
+      rotate_every_kb: 10000 # 10MB
+      number_of_files: 24
+      permissions: 0666
+      codec.json:
+        pretty: true
+        escape_html: true
 
-    output.elasticsearch:
-      hosts: ['${ELASTICSEARCH_HOST:elasticsearch}:${ELASTICSEARCH_PORT:9200}']
-      username: ${ELASTICSEARCH_USERNAME}
-      password: ${ELASTICSEARCH_PASSWORD}
+    # cloud.id: ${ELASTIC_CLOUD_ID}
+    # cloud.auth: ${ELASTIC_CLOUD_AUTH}
+
+    # output.elasticsearch:
+      # hosts: ['${ELASTICSEARCH_HOST:elasticsearch}:${ELASTICSEARCH_PORT:9200}']
+      # username: ${ELASTICSEARCH_USERNAME}
+      # password: ${ELASTICSEARCH_PASSWORD}
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -68,10 +100,7 @@ spec:
       containers:
       - name: filebeat
         image: docker.elastic.co/beats/filebeat:7.6.2
-        args: [
-          "-c", "/etc/filebeat.yml",
-          "-e",
-        ]
+        args: ["-c", "/etc/filebeat.yml", "-e"]
         env:
         - name: ELASTICSEARCH_HOST
           value: elasticsearch

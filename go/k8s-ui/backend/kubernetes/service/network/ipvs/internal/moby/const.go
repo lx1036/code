@@ -1,6 +1,6 @@
 // +build linux
 
-package netlink
+package moby
 
 const (
 	genlCtrlID = 0x10

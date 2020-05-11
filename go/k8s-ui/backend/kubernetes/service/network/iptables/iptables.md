@@ -1,5 +1,7 @@
 
 **[iptables 官网](https://linux.die.net/man/8/iptables)**
+**[iptables 理论基础及日志记录](https://mp.weixin.qq.com/s/YSv4wLJyetsEg4W3l6XpfA)**
+**[VxLAN 与 Bridge、Namespace基础](https://mp.weixin.qq.com/s/JYp36vfX8r0l7VlCGMK8kA)**
 
 
 **[iptables go client](https://github.com/moby/libnetwork/blob/master/iptables/iptables.go)**
@@ -100,6 +102,21 @@ kubelet 启动参数会有 --hairbin-mode。
 
 
 (7)docker 如何使用 iptables 来实现网络通信的？
+**[Docker Swarm Reference Architecture: Exploring Scalable, Portable Docker Container Networks](https://success.docker.com/article/networking)**
+docker network driver = network namespace + linux bridge + virtual ethernet pair + iptables
+linux bridge: linux 内核中虚拟交换机，L2 设备，根据 MAC 地址转发 traffic。
+network namespace: 独立的 interface, routes and firewall rules.
+veth pair: 虚拟网卡，用来连接两个独立的 network namespace.
+iptables: L3/L4 层，过滤、转发数据包，端口映射或负载均衡
+
+### bridge driver network
+**[docker bridge 到 k8s pod 跨节点网络通信机制演进](https://mp.weixin.qq.com/s/nDzJQq8nysywicctr7EAhw)**
+[1] 创建一个 "docker0" linux bridge
+```shell script
+sudo apt install -y bridge-utils
+brctl show
+```
+
 **[Service Traffic Flow](https://github.com/moby/libnetwork/blob/master/docs/network.md)**
 **[Introduction to Container Networking](https://rancher.com/learning-paths/introduction-to-container-networking/)**
 **[Docker and iptables](https://docs.docker.com/network/iptables/)**
