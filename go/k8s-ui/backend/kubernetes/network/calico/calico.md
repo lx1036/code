@@ -32,10 +32,21 @@ DATASTORE_TYPE=kubernetes KUBECONFIG=~/.kube/config calicoctl get nodes
 ```shell script
 minikube start --network-plugin=cni
 kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+# or
+cd install && make install
+
 # validate
 curl $(minikube ip):$(kubectl get svc nginx-demo-1 -o=jsonpath='{.spec.ports[0].nodePort}') -v
 ```
 
 ### network policy
 **[k8s network policy](https://docs.projectcalico.org/security/kubernetes-network-policy)**:
+k8s 内所有 pod 默认都是互联互通的，但是这不符合生产实践，所以需要 network policy 来 namespace-scoped 级别去网络隔离，比如不同 namespace 下的 pod 不可以网络互通。
+k8s 只是定义了 network policy api，具体实现是由 cni network plugin 实现的，比如 calico 实现了 network policy 功能，控制 pod 的网络流量的流入 ingress 和流出 egress。
+network policy api 定义内容：
+* policy 是 namespace scoped
+* policy 作用于可以使用 label selector 来过滤出来的 pod
+* poliy rule 支持协议(TCP/UDP/SCTP)和端口指定
+* policy rule 可以使用 namespace/cidr(ip 段)/pod 来定义流量的流入和流出 
 
+**[calico network policy demo](https://docs.projectcalico.org/security/tutorials/kubernetes-policy-demo/kubernetes-demo)** 
