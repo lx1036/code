@@ -26,3 +26,6 @@ cleanup-raw:
 
 chrome:
 	open http://$(IP):$(PORT)
+
+nodes:
+	DATASTORE_TYPE=kubernetes KUBECONFIG=~/.kube/config calicoctl get nodes
