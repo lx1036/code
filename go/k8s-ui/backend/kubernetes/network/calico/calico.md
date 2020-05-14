@@ -19,8 +19,9 @@ BIRD是布拉格查理大学数学与物理学院的一个学校项目，项目�
 route reflector 路由反射器：提供了在大型IBGP实现中IBGP全网状连接问题的一个简单解决方案。
 * calicoctl: calico 命令行管理工具
 
-calicoctl:
+## calicoctl:
 ```shell script
+brew install calicoctl
 DATASTORE_TYPE=kubernetes KUBECONFIG=~/.kube/config calicoctl get nodes
 ```
 
