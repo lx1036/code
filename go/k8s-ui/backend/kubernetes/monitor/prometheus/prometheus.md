@@ -58,3 +58,6 @@ metrics 都是类似 **prometheus_http_request_duration_seconds_bucket{handler="
 
 在 K8S 中安装：**[部署Prometheus](https://docs.ucloud.cn/uk8s/monitor/prometheus/installprometheus)**
 
+
+# 高可用 prometheus
+使用 thanos 软件来实现 prometheus 高可用。

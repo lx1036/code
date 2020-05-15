@@ -7,6 +7,12 @@
 
 ![how-it-works](./imgs/how-it-works.png)
 
+**[Calico 介绍、原理与使用](https://mp.weixin.qq.com/s/rhR1bfVrB4PnSZX1BTFNDg)**
+**[kubernetes系列之Calico网络原理篇](https://kuaibao.qq.com/s/20200111AZOTQ200)**
+**[kubernetes/k8s概念calico 介绍与与原理](https://blog.csdn.net/zhonglinzhang/article/details/97613927)**
+**[Kubernetes网络组件之Calico策略实践(BGP、RR、IPIP)](https://blog.51cto.com/14143894/2463392)**
+**[BGP概述和工作原理](https://blog.csdn.net/x503809622/article/details/82629474)**
+
 **[calico architecture](https://docs.projectcalico.org/reference/architecture/overview)** 主要有以下几部分组成:
 * Felix: calico agent，运行在每一个 Node 节点上
 * Orchestrator plugin: 编排器插件，比如k8s 插件，这样可以使k8s调用这个插件来调用calico。
@@ -60,15 +66,16 @@ watch api-server，读取 `NetworkPolicy events`，然后去 sync k8s network po
 只有 datastore 是 etcd 时才有效。
 
 (2) namespace controller: watches namespaces and programs Calico profiles.
-
+watch api-server，读取 `Namespace events`，然后 sync namespace label changes，写入到 datastore 里。
+只有 datastore 是 etcd 时才有效。
 
 (3)serviceaccount controller: watches service accounts and programs Calico profiles.
-
+watch api-server，读取 `ServiceAccount events`，然后 sync namespace label changes，写入到 datastore 里。
+只有 datastore 是 etcd 时才有效。
 
 (4)workloadendpoint controller: watches for changes to pod labels and updates Calico workload endpoints.
-
+watch api-server，读取 `Pod events`，然后 sync pod label changes，写入到 datastore 里。
 只有 datastore 是 etcd 时才有效。
 
 (5)node controller 
 node controller 会 watch api-server，读取 `Node events`，用来更新有关Node的配置(比如: crud node)。必须通过 `ENABLED_CONTROLLERS` 环境变量显示开启。
-

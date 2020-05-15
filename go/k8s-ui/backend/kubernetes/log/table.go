@@ -1,4 +1,4 @@
-package log_exception
+package log
 
 import (
 	"fmt"
