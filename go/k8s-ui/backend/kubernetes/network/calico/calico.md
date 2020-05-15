@@ -51,3 +51,24 @@ network policy api 定义内容：
 * policy rule 可以使用 namespace/cidr(ip 段)/pod 来定义流量的流入和流出 
 
 **[calico network policy demo](https://docs.projectcalico.org/security/tutorials/kubernetes-policy-demo/kubernetes-demo)** 
+
+
+### calico/kube-controllers image
+包含几个controllers:
+(1) policy controller: watches network policies and programs Calico policies.
+watch api-server，读取 `NetworkPolicy events`，然后去 sync k8s network policy，写入到 datastore 里。
+只有 datastore 是 etcd 时才有效。
+
+(2) namespace controller: watches namespaces and programs Calico profiles.
+
+
+(3)serviceaccount controller: watches service accounts and programs Calico profiles.
+
+
+(4)workloadendpoint controller: watches for changes to pod labels and updates Calico workload endpoints.
+
+只有 datastore 是 etcd 时才有效。
+
+(5)node controller 
+node controller 会 watch api-server，读取 `Node events`，用来更新有关Node的配置(比如: crud node)。必须通过 `ENABLED_CONTROLLERS` 环境变量显示开启。
+
