@@ -1,7 +1,12 @@
-# Go client
+# prometheus docs
+**[官方文档中文版](https://ryanyang.gitbook.io/prometheus/di-san-zhang-prometheus/storage)**
+**[prometheus 监控接入流程](http://wiki.so.corp.qihoo.net/pages/viewpage.action?pageId=13398570)**
 
+# Go client
 **[prometheus go-client](https://github.com/prometheus/client_golang)**
 
+# php client
+**[itsmikej/prometheus_client_php_wrapper](https://github.com/itsmikej/prometheus_client_php_wrapper)**
 
 # 安装方式
 ```shell script
