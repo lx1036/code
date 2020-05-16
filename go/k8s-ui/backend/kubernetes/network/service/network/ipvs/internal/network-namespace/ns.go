@@ -33,4 +33,3 @@ func GetFromPath(path string) (*NetworkNamespace, error) {
 	netns := NetworkNamespace(fd)
 	return &netns, err
 }
-

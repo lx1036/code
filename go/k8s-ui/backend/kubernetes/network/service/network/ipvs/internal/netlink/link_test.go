@@ -20,7 +20,7 @@ func TestAddBridgeWithEth(test *testing.T) {
 	}
 	// `ip link add $link`
 	err := netlink.LinkAdd(bridge)
-	if err != nil  {
+	if err != nil {
 		panic(err)
 	}
 	eth1, err := netlink.LinkByName("eth0")

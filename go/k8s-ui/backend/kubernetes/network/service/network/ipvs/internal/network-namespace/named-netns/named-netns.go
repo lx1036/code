@@ -30,11 +30,10 @@ func ExecNetworkNamespace(name string, args []string) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-
 }
 
 //
-func CreateNetworkNamespace(name string)  {
+func CreateNetworkNamespace(name string) {
 	if err := syscall.Unshare(syscall.CLONE_NEWNET); err != nil {
 		return -1, err
 	}
