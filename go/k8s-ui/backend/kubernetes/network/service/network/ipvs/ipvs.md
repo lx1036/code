@@ -126,3 +126,6 @@ CentOS 上查看默认网关命令:
 ```shell script
 ip route show
 ```
+
+
+# **[ipvs 详解系列](http://www.zsythink.net/archives/tag/lvs/)**
