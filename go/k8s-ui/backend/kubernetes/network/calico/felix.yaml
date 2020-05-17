@@ -1,0 +1,13 @@
+
+# get current felixconfig
+
+apiVersion: projectcalico.org/v3
+kind: FelixConfiguration
+metadata:
+  creationTimestamp: null
+  name: default
+spec:
+  bpfLogLevel: ""
+  ipipEnabled: true
+  logSeverityScreen: Info
+  reportingInterval: 0s
