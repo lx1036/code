@@ -129,3 +129,5 @@ ip route show
 
 
 # **[ipvs 详解系列](http://www.zsythink.net/archives/tag/lvs/)**
+1. **[ipvs之nat概述](http://www.zsythink.net/archives/2134)**
+2. **[ipvs之nat](http://www.zsythink.net/archives/2185)**
