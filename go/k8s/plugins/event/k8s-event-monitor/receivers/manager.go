@@ -1,7 +1,6 @@
 package receivers
 
-import (
-)
+import ()
 
 type ReceiverManager struct {
 }

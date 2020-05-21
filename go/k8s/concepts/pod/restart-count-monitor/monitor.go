@@ -131,7 +131,7 @@ func main() {
 	sharedInformerFactory.Start(stopChannel)
 
 	router := SetupRouter()
-	
+
 	err = router.Run(":8080")
 	if err != nil {
 		log.WithFields(log.Fields{

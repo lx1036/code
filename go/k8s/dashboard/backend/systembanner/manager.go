@@ -1,6 +1,5 @@
 package systembanner
 
-
 // SystemBannerManager is a structure containing all system banner manager members.
 type SystemBannerManager struct {
 	systemBanner api.SystemBanner

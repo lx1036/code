@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s-lx1036/k8s-ui/backend/dashboard/client"
 	"k8s-lx1036/k8s-ui/backend/dashboard/router"
+	"os"
 	"path/filepath"
 )
 
@@ -19,6 +21,9 @@ var (
 )
 
 func main() {
+	log.SetOutput(os.Stdout)
+	log.SetFormatter(&log.JSONFormatter{})
+
 	var rootCmd = &cobra.Command{
 		Use:    ProjectName,
 		Short:  fmt.Sprintf("%s %s", ProjectName, Version),
@@ -47,6 +52,11 @@ func preRun(cmd *cobra.Command, args []string) {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	router := router.SetupRouter()
-	_ = router.Run(":3456")
+	app := router.SetupRouter()
+	err := app.Run(":3456")
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Info("[app level]")
+	}
 }

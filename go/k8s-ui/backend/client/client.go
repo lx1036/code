@@ -31,9 +31,9 @@ var (
 )
 
 type ClusterManager struct {
-	Cluster *models.Cluster
-	Config       *rest.Config
-	KubeClient   ResourceHandler
+	Cluster    *models.Cluster
+	Config     *rest.Config
+	KubeClient ResourceHandler
 }
 
 func clusterChanged(clusters []models.Cluster) bool {
@@ -166,15 +166,14 @@ func buildCacheController(client *kubernetes.Clientset) (*CacheFactory, error) {
 		}
 		go genericInformer.Informer().Run(stop)
 	}
-	
+
 	sharedInformerFactory.Start(stop)
-	
+
 	return &CacheFactory{
 		stopChan:              stop,
 		sharedInformerFactory: sharedInformerFactory,
 	}, nil
 }
-
 
 type ResourceHandler interface {
 	Create(kind string, namespace string, object *runtime.Unknown) (*runtime.Unknown, error)
@@ -218,14 +217,14 @@ func (handler *resourceHandler) Delete(kind string, namespace string, name strin
 func (handler *resourceHandler) Get(kind string, namespace string, name string) (runtime.Object, error) {
 	resource, ok := KindToResourceMap[kind]
 	if !ok {
-	
+
 	}
-	
+
 	genericInformer, err := handler.CacheFactory.sharedInformerFactory.ForResource(resource.GroupVersionResourceKind.GroupVersionResource)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var result runtime.Object
 	lister := genericInformer.Lister()
 	if resource.Namespaced {
@@ -239,13 +238,13 @@ func (handler *resourceHandler) Get(kind string, namespace string, name string) 
 			return nil, err
 		}
 	}
-	
+
 	result.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   resource.GroupVersionResourceKind.Group,
 		Version: resource.GroupVersionResourceKind.Version,
 		Kind:    resource.GroupVersionResourceKind.Kind,
 	})
-	
+
 	return result, nil
 }
 
@@ -263,7 +262,7 @@ func BuildApiServerClient() {
 		logs.Error("empty clusters.")
 		return
 	}
-	
+
 	changed := clusterChanged(newClusters)
 	if changed {
 		logs.Info("cluster changed, so resync info...")
@@ -284,21 +283,21 @@ func BuildApiServerClient() {
 				logs.Warning("build cluster (%s) cache controller error :%v", cluster.Name, err)
 				continue
 			}
-			
+
 			clusterManager := &ClusterManager{
-				Config:       config,
-				Cluster:      &cluster,
-				KubeClient:   NewResourceHandler(clientSet, cacheFactory),
+				Config:     config,
+				Cluster:    &cluster,
+				KubeClient: NewResourceHandler(clientSet, cacheFactory),
 			}
 			managerInterface, ok := clusterManagerSets.Load(cluster.Name)
 			if ok {
 				manager := managerInterface.(*ClusterManager)
 				manager.Close()
 			}
-			
+
 			clusterManagerSets.Store(cluster.Name, clusterManager)
 		}
-		
+
 		logs.Info("resync cluster finished! ")
 	}
 }

@@ -1,4 +1,3 @@
 package caddyhttp
 
-import (
-)
+import ()

@@ -1,6 +1,5 @@
 package integration
 
-
 // IntegrationManager is responsible for management of all integrated applications.
 type IntegrationManager interface {
 	// IntegrationsGetter is responsible for listing all supported integrations.

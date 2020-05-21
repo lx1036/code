@@ -1,6 +1,5 @@
 package deployment
 
-
 // DeploymentList contains a list of Deployments in the cluster.
 type DeploymentList struct {
 	ListMeta          api.ListMeta       `json:"listMeta"`

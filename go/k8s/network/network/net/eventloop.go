@@ -1,6 +1,5 @@
 package net
 
-
 type loop struct {
 	idx         int                 // loop index in the server loops list
 	svr         *server             // server in loop
