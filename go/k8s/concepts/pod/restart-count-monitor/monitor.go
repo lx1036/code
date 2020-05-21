@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	kubeV1 "k8s.io/api/apps/v1"
@@ -132,6 +131,11 @@ func main() {
 	sharedInformerFactory.Start(stopChannel)
 
 	router := SetupRouter()
-
-	fmt.Println(router.Run(":8080"))
+	
+	err = router.Run(":8080")
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Info("[app level]")
+	}
 }

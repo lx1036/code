@@ -15,3 +15,9 @@ minikube dashboard
 
 
 ## ConfigMap
+
+
+
+
+# Docs
+**[k8s informer 有趣讲解](https://zhuanlan.zhihu.com/p/109260420)**
