@@ -4,10 +4,15 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s-lx1036/k8s-ui/backend/client"
 	_ "k8s-lx1036/k8s-ui/backend/database/lorm"
 	"k8s-lx1036/k8s-ui/backend/initial"
 	routers_gin "k8s-lx1036/k8s-ui/backend/routers-gin"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"os"
 	"path/filepath"
+	"time"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -20,7 +25,9 @@ var (
 )
 
 func main() {
-
+	log.SetOutput(os.Stdout)
+	log.SetFormatter(&log.JSONFormatter{})
+	
 	var rootCmd = &cobra.Command{
 		Use:    ProjectName,
 		Short:  fmt.Sprintf("%s %s", ProjectName, Version),
@@ -30,19 +37,13 @@ func main() {
 
 	rootCmd.PersistentFlags().StringVar(&configFile, "configFile", "app.conf", "config file path")
 
-	/*cmd.Version = Version
-	_ = cmd.RootCmd.Execute()*/
-
-	//cmd2.Run()
-
-	//database.InitDb()
-
-	// K8S Client
-	initial.InitClient()
-
 	// 初始化 rsa key
-	_ = rootCmd.Execute()
-
+	err := rootCmd.Execute()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Info("[app level]")
+	}
 }
 
 func run(cmd *cobra.Command, args []string) {
@@ -62,4 +63,7 @@ func preRun(cmd *cobra.Command, args []string) {
 	fmt.Println("Using config file:", viper.ConfigFileUsed())
 
 	initial.InitRsaKey(viper.GetString("default.RsaPrivateKey"), viper.GetString("default.RsaPublicKey"))
+	
+	// K8S Client
+	go wait.Forever(client.BuildApiServerClient, 30*time.Second)
 }
