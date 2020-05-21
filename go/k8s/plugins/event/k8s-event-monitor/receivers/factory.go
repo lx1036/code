@@ -1,7 +1,7 @@
 package receivers
 
 import (
-	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/receivers/dingtalk"
+	"k8s-lx1036/k8s/plugins/event/k8s-event-monitor/receivers/dingtalk"
 	"strings"
 )
 

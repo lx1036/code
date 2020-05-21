@@ -1,7 +1,6 @@
 package apis
 
 import (
-	"k8s-lx1036/k8s-ui/backend/kubernetes/operator/ingress-proxy/pkg/apis/proxy/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

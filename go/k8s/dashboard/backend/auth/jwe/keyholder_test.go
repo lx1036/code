@@ -1,7 +1,6 @@
 package jwe
 
 import (
-	"k8s-lx1036/dashboard/backend/sync"
 	"k8s.io/client-go/kubernetes/fake"
 	"testing"
 )

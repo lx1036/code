@@ -1,7 +1,6 @@
 package sync
 
 import (
-	syncApi "k8s-lx1036/dashboard/backend/sync/api"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 )

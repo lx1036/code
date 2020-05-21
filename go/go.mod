@@ -69,6 +69,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/sohlich/elogrus.v7 v7.0.0
 	gopkg.in/square/go-jose.v2 v2.3.1
+	gopkg.in/yaml.v3 v3.0.0-20190905181640-827449938966
 	gotest.tools v2.2.0+incompatible
 	k8s.io/api v0.17.3
 	k8s.io/apiextensions-apiserver v0.17.3

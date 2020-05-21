@@ -3,7 +3,6 @@ package dnsserver
 import (
 	"context"
 	"github.com/miekg/dns"
-	"k8s-lx1036/k8s/dns/coredns/plugin"
 	"testing"
 )
 

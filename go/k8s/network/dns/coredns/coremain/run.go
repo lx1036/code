@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/caddyserver/caddy"
 	"io/ioutil"
-	"k8s-lx1036/k8s/dns/coredns/core/dnsserver"
 	"log"
 	"os"
 )

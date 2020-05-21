@@ -1,8 +1,7 @@
 package main
 
 import (
-	"k8s-lx1036/k8s/dns/coredns/coremain"
-	_ "k8s-lx1036/k8s/dns/coredns/plugin"
+	"k8s-lx1036/k8s/network/dns/coredns/coremain"
 )
 
 func main() {

@@ -1,8 +1,6 @@
 package eloquent
 
 import (
-	"k8s-lx1036/k8s-ui/backend/eloquent/grammar"
-	"k8s-lx1036/k8s-ui/backend/eloquent/query"
 	"reflect"
 )
 

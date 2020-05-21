@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/common"
 	kubeapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubewatch "k8s.io/apimachinery/pkg/watch"

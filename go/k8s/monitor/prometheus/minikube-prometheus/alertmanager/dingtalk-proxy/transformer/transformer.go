@@ -3,7 +3,7 @@ package transformer
 import (
 	"bytes"
 	"fmt"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/prometheus/minikube-prometheus/alertmanager/dingtalk-proxy/model"
+	"k8s-lx1036/k8s/monitor/prometheus/minikube-prometheus/alertmanager/dingtalk-proxy/model"
 )
 
 func TransformToMarkdown(notification model.Notification) model.DingTalkMarkdown {

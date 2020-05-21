@@ -1,7 +1,6 @@
 package grammar
 
 import (
-	"k8s-lx1036/k8s-ui/backend/eloquent/query"
 	"strings"
 )
 

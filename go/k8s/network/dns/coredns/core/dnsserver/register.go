@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/caddyserver/caddy"
 	"github.com/caddyserver/caddy/caddyfile"
-	"k8s-lx1036/k8s/dns/coredns/plugin"
 	"net"
 )
 

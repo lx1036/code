@@ -12,8 +12,6 @@ import (
 	"github.com/operator-framework/operator-sdk/pkg/restmapper"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 	"github.com/spf13/pflag"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/operator/ingress-proxy/pkg/apis"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/operator/ingress-proxy/pkg/controller"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest"

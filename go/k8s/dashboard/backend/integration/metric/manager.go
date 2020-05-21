@@ -1,8 +1,6 @@
 package metric
 
 import (
-	integrationapi "k8s-lx1036/dashboard/backend/integration/api"
-	metricapi "k8s-lx1036/dashboard/backend/integration/metric/api"
 	"time"
 )
 

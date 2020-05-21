@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	eventloop "k8s-lx1036/k8s/network/event-loop-network/event-loop"
 	"log"
 	"strings"
 )

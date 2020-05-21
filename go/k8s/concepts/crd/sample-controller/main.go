@@ -3,10 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	informers "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/informers/externalversions"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/informers/externalversions/samplecontroller"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/informers/externalversions/samplecontroller/v1alpha1"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/signals"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"

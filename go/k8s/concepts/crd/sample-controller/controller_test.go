@@ -1,8 +1,6 @@
 package main
 
 import (
-	samplecontroller "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/apis/samplecontroller/v1alpha1"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/clientset/versioned/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"

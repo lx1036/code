@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/jinzhu/gorm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s-lx1036/k8s-ui/backend/client"
@@ -36,7 +37,8 @@ func main() {
 	}
 
 	rootCmd.PersistentFlags().StringVar(&configFile, "configFile", "app.conf", "config file path")
-
+	
+	
 	// 初始化 rsa key
 	err := rootCmd.Execute()
 	if err != nil {

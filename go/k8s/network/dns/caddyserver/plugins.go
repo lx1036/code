@@ -2,7 +2,6 @@ package caddy
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/dns/caddyserver/caddyfile"
 	"log"
 	"net"
 	"sort"

@@ -18,11 +18,6 @@ package main
 import (
 	"flag"
 	"os"
-
-	batchv1 "k8s-lx1036/k8s-ui/backend/kubernetes/kubebuilder/api/v1"
-
-	"k8s-lx1036/k8s-ui/backend/kubernetes/kubebuilder/controllers"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"

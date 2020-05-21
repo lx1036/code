@@ -1,7 +1,6 @@
 package receivers
 
 import (
-	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/common"
 )
 
 type ReceiverManager struct {
