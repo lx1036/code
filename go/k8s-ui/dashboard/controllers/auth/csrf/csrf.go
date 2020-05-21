@@ -3,7 +3,7 @@ package csrf
 import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/net/xsrftoken"
-	"k8s-lx1036/k8s-ui/backend/dashboard/client/api"
+	"k8s-lx1036/k8s-ui/dashboard/client/api"
 	"net/http"
 )
 

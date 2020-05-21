@@ -5,8 +5,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"k8s-lx1036/k8s-ui/backend/dashboard/client"
-	"k8s-lx1036/k8s-ui/backend/dashboard/router"
+	"k8s-lx1036/k8s-ui/dashboard/client"
+	"k8s-lx1036/k8s-ui/dashboard/router"
 	"os"
 	"path/filepath"
 )
@@ -45,10 +45,12 @@ func preRun(cmd *cobra.Command, args []string) {
 	if err := viper.ReadInConfig(); err != nil {
 		panic(err)
 	}
-	fmt.Println("Using config file:", viper.ConfigFileUsed())
+	
+	log.WithFields(log.Fields{
+		"config-file": viper.ConfigFileUsed(),
+	}).Info("[app level]")
 
 	client.DefaultClientManager = client.NewClientManager(viper.GetString("common.kubeconfig"), viper.GetString("common.apiserver-host"))
-
 }
 
 func run(cmd *cobra.Command, args []string) {

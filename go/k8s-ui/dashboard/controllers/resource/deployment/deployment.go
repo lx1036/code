@@ -2,7 +2,7 @@ package deployment
 
 import (
 	"github.com/gin-gonic/gin"
-	"k8s-lx1036/k8s-ui/backend/dashboard/client"
+	"k8s-lx1036/k8s-ui/dashboard/client"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	api "k8s.io/api/core/v1"

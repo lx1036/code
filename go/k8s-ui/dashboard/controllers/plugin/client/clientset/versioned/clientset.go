@@ -1,7 +1,7 @@
 package versioned
 
 import (
-	dashboardv1alpha1 "k8s-lx1036/k8s-ui/backend/dashboard/controllers/plugin/client/clientset/versioned/typed/apis/v1alpha1"
+	dashboardv1alpha1 "k8s-lx1036/k8s-ui/dashboard/controllers/plugin/client/clientset/versioned/typed/apis/v1alpha1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 )

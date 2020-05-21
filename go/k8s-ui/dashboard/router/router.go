@@ -2,11 +2,11 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	"k8s-lx1036/k8s-ui/backend/dashboard/controllers/auth/authenticator"
-	"k8s-lx1036/k8s-ui/backend/dashboard/controllers/auth/csrf"
-	"k8s-lx1036/k8s-ui/backend/dashboard/controllers/plugin"
-	"k8s-lx1036/k8s-ui/backend/dashboard/controllers/resource/deployment"
-	"k8s-lx1036/k8s-ui/backend/dashboard/controllers/resource/pod"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/auth/authenticator"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/auth/csrf"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/plugin"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/deployment"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/pod"
 )
 
 func SetupRouter() *gin.Engine {

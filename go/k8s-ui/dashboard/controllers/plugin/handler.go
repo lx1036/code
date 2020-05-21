@@ -2,7 +2,7 @@ package plugin
 
 import (
 	"github.com/gin-gonic/gin"
-	"k8s-lx1036/k8s-ui/backend/dashboard/client"
+	"k8s-lx1036/k8s-ui/dashboard/client"
 )
 
 type PluginController struct {

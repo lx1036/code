@@ -1,7 +1,7 @@
 package v1alpha1
 
 import (
-	"k8s-lx1036/k8s-ui/backend/dashboard/controllers/plugin/apis"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/plugin/apis"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

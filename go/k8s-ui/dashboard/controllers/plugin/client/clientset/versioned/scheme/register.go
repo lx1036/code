@@ -1,7 +1,7 @@
 package scheme
 
 import (
-	dashboardv1alpha1 "k8s-lx1036/k8s-ui/backend/dashboard/controllers/plugin/apis/v1alpha1"
+	dashboardv1alpha1 "k8s-lx1036/k8s-ui/dashboard/controllers/plugin/apis/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

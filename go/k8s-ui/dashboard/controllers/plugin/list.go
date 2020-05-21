@@ -1,9 +1,9 @@
 package plugin
 
 import (
-	"k8s-lx1036/k8s-ui/backend/dashboard/api"
-	"k8s-lx1036/k8s-ui/backend/dashboard/controllers/plugin/apis/v1alpha1"
-	pluginclientset "k8s-lx1036/k8s-ui/backend/dashboard/controllers/plugin/client/clientset/versioned"
+	"k8s-lx1036/k8s-ui/dashboard/api"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/plugin/apis/v1alpha1"
+	pluginclientset "k8s-lx1036/k8s-ui/dashboard/controllers/plugin/client/clientset/versioned"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
