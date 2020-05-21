@@ -3,6 +3,7 @@ package client
 import (
 	pluginclientset "k8s-lx1036/k8s-ui/dashboard/controllers/plugin/client/clientset/versioned"
 	"k8s-lx1036/k8s-ui/dashboard/mode"
+	"k8s-lx1036/k8s-ui/dashboard/model"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
@@ -68,7 +69,7 @@ func (manager *ClientManager) GetPluginClient() pluginclientset.Interface {
 }
 
 func (manager *ClientManager) Client() kubernetes.Interface {
-	if mode.Mode() == mode.TestMode {
+	if model.Mode() == model.TestMode {
 		clientSet := fake.NewSimpleClientset()
 		// TODO: add something
 		return clientSet

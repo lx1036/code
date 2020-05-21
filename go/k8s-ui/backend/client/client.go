@@ -1,7 +1,6 @@
 package client
 
 import (
-	"github.com/astaxie/beego/logs"
 	"k8s-lx1036/k8s-ui/backend/database/lorm"
 	"k8s-lx1036/k8s-ui/backend/models"
 	"k8s-lx1036/k8s-ui/backend/util"

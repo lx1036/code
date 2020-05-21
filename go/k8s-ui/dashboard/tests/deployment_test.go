@@ -29,7 +29,7 @@ type DeploymentSuite struct {
 }
 
 func (suite *DeploymentSuite) SetupTest() {
-	mode.SetMode(mode.TestMode)
+	model.SetMode(model.TestMode)
 	suite.router = router.SetupRouter()
 }
 

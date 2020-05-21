@@ -54,8 +54,11 @@ func preRun(cmd *cobra.Command, args []string) {
 }
 
 func run(cmd *cobra.Command, args []string) {
+	// TODO: Listen for http or https
+	
+	
 	app := router.SetupRouter()
-	err := app.Run(":3456")
+	err := app.Run(fmt.Sprintf(":%d", viper.GetInt("common.port")))
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error": err.Error(),

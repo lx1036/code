@@ -29,6 +29,12 @@ func SetupRouter() *gin.Engine {
 
 		// Pod
 		api.GET("/pod", (&pod.PodController{}).List())
+		api.GET("/pod/{namespace}", (&pod.PodController{}).ListNamespacePod())
+		api.GET("/pod/{namespace}/{pod}", (&pod.PodController{}).ListNamespacePod())
+		api.GET("/pod/{namespace}/{pod}/container", (&pod.PodController{}).ListNamespacePod())
+		api.GET("/pod/{namespace}/{pod}/event", (&pod.PodController{}).ListNamespacePod())
+		api.GET("/pod/{namespace}/{pod}/shell/{container}", (&pod.PodController{}).ListNamespacePod())
+		api.GET("/pod/{namespace}/{pod}/persistentvolumeclaim", (&pod.PodController{}).ListNamespacePod())
 
 		// Replication
 		api.GET("/replicationcontroller")
