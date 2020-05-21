@@ -40,7 +40,7 @@ type ClusterCapacity struct {
 	status Status
 }
 type Status struct {
-	Pods []*corev1.Pod
+	Pods       []*corev1.Pod
 	StopReason string
 }
 
@@ -180,7 +180,7 @@ func New(kubeSchedulerConfig *schedulerConfig.CompletedConfig, simulatedPod *cor
 		storageClassInformer:          sharedInformerFactory.Storage().V1().StorageClasses(),
 		simulatedPod:                  simulatedPod,
 
-		informerFactory: sharedInformerFactory,
+		informerFactory:     sharedInformerFactory,
 		informerStopChannel: make(chan struct{}),
 	}
 
