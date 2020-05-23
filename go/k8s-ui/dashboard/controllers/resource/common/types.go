@@ -25,3 +25,11 @@ type Metric struct {
 	MetricPoints []MetricPoint `json:"metricPoints"`
 	MetricName string `json:"metricName"`
 }
+
+type ObjectMeta struct {
+
+}
+
+type Event struct {
+	ObjectMeta ObjectMeta `json:"objectMeta"`
+}

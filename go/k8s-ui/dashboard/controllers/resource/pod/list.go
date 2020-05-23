@@ -2,6 +2,7 @@ package pod
 
 import (
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/dataselect"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/event"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -23,10 +24,10 @@ type PodList struct {
 }
 
 
-func ListPod(client kubernetes.Interface)  {
+func ListPod(k8sClient kubernetes.Interface, metricClient, namespaceQuery *common.NamespaceQuery, dataselectQuery *dataselect.DataSelectQuery)  {
 	channels := common.ResourceChannels{
-		PodListChannel: GetPodListChannelWithOptions(client, 1),
-		EventListChannel: event.GetEventListChannelWithOptions(client, 1),
+		PodListChannel: GetPodListChannelWithOptions(k8sClient, 1),
+		EventListChannel: event.GetEventListChannelWithOptions(k8sClient, 1),
 	}
 
 	// get pods
@@ -39,6 +40,7 @@ func ListPod(client kubernetes.Interface)  {
 	
 	// merge pod/events
 	podList := ToPodList(pods, events)
+	podList.Status = getPodStatus(pods, events.Items)
 
 	return podList
 }
@@ -49,7 +51,7 @@ func GetPodList(client kubernetes.Interface) {
 	
 }
 
-func ToPodList(pods []corev1.Pod, events []corev1.Event) {
+func ToPodList(pods []corev1.Pod, events []corev1.Event) PodList {
 	podList := PodList{
 		Pods: make([]Pod, 0),
 	}
