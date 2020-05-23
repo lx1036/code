@@ -1,7 +1,5 @@
 package common
 
-import "time"
-
 type ResourceStatus struct {
 	// Number of resources that are currently in running state.
 	Running int `json:"running"`
@@ -16,20 +14,6 @@ type ResourceStatus struct {
 	Succeeded int `json:"succeeded"`
 }
 
-type MetricPoint struct {
-	Timestamp time.Time `json:"timestamp"`
-	Value     uint64    `json:"value"`
-}
 
-type Metric struct {
-	MetricPoints []MetricPoint `json:"metricPoints"`
-	MetricName string `json:"metricName"`
-}
 
-type ObjectMeta struct {
 
-}
-
-type Event struct {
-	ObjectMeta ObjectMeta `json:"objectMeta"`
-}

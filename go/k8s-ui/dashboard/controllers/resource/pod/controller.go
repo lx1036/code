@@ -5,6 +5,7 @@ import (
 	"k8s-lx1036/k8s-ui/dashboard/client"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/dataselect"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/namespace"
 	"net/http"
 	"strings"
 )
@@ -26,8 +27,8 @@ func (controller *PodController) ListNamespacePod() gin.HandlerFunc {
 	}
 }
 
-func parseNamespace(namespace string) *common.NamespaceQuery {
-	namespaces := strings.Split(namespace, ",")
+func parseNamespace(namespaceQuery string) *namespace.NamespaceQuery {
+	namespaces := strings.Split(namespaceQuery, ",")
 	var noEmptyNamespaces []string
 	for _, value := range namespaces {
 		if len(strings.TrimSpace(value)) != 0 {
@@ -35,5 +36,5 @@ func parseNamespace(namespace string) *common.NamespaceQuery {
 		}
 	}
 
-	return common.NewNamespaceQuery(noEmptyNamespaces)
+	return namespace.NewNamespaceQuery(noEmptyNamespaces)
 }

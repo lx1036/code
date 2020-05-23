@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"io/ioutil"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/deployment"
-	"k8s-lx1036/k8s-ui/dashboard/mode"
+	"k8s-lx1036/k8s-ui/dashboard/model"
 	"k8s-lx1036/k8s-ui/dashboard/router"
 	v1 "k8s.io/api/apps/v1"
 	api "k8s.io/api/core/v1"

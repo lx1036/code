@@ -2,7 +2,6 @@ package client
 
 import (
 	pluginclientset "k8s-lx1036/k8s-ui/dashboard/controllers/plugin/client/clientset/versioned"
-	"k8s-lx1036/k8s-ui/dashboard/mode"
 	"k8s-lx1036/k8s-ui/dashboard/model"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"

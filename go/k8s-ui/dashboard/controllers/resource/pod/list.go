@@ -3,14 +3,17 @@ package pod
 import (
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/dataselect"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/metric"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/event"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/namespace"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
 type Pod struct {
 	Metrics *PodMetrics `json:"metrics"`
-	Warnings []common.Event `json:"warnings"`
+	Warnings []event.Event `json:"warnings"`
 }
 
 
@@ -24,10 +27,13 @@ type PodList struct {
 }
 
 
-func ListPod(k8sClient kubernetes.Interface, metricClient, namespaceQuery *common.NamespaceQuery, dataselectQuery *dataselect.DataSelectQuery)  {
+func ListPod(k8sClient kubernetes.Interface,
+	metricClient metric.MetricClient,
+	namespaceQuery *namespace.NamespaceQuery,
+	dataSelectQuery *dataselect.DataSelectQuery)  {
 	channels := common.ResourceChannels{
-		PodListChannel: GetPodListChannelWithOptions(k8sClient, 1),
-		EventListChannel: event.GetEventListChannelWithOptions(k8sClient, 1),
+		PodListChannel: GetPodListChannelWithOptions(k8sClient, namespaceQuery, metav1.ListOptions{}, 1),
+		EventListChannel: event.GetEventListChannelWithOptions(k8sClient, namespaceQuery, 1),
 	}
 
 	// get pods
@@ -39,7 +45,7 @@ func ListPod(k8sClient kubernetes.Interface, metricClient, namespaceQuery *commo
 
 	
 	// merge pod/events
-	podList := ToPodList(pods, events)
+	podList := ToPodList(pods.Items, events.Items, dataSelectQuery, metricClient)
 	podList.Status = getPodStatus(pods, events.Items)
 
 	return podList
