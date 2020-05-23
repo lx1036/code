@@ -28,7 +28,7 @@ func SetupRouter() *gin.Engine {
 		api.POST("/appdeployment/validate/name", (&deployment.DeploymentController{}).HandleNameValidity())
 
 		// Pod
-		api.GET("/pod", (&pod.PodController{}).List())
+		api.GET("/pod", (&pod.PodController{}).ListNamespacePod())
 		api.GET("/pod/{namespace}", (&pod.PodController{}).ListNamespacePod())
 		api.GET("/pod/{namespace}/{pod}", (&pod.PodController{}).ListNamespacePod())
 		api.GET("/pod/{namespace}/{pod}/container", (&pod.PodController{}).ListNamespacePod())

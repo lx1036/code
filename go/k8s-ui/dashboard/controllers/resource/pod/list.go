@@ -24,27 +24,27 @@ type PodList struct {
 
 
 func ListPod(client kubernetes.Interface)  {
-	
-	
-	
-	pods := <-channels.PodList.List
-	err := <-channels.PodList.Error
-	
-	
-	
-}
-
-func GetPodList(client kubernetes.Interface) {
 	channels := common.ResourceChannels{
 		PodListChannel: GetPodListChannelWithOptions(client, 1),
 		EventListChannel: event.GetEventListChannelWithOptions(client, 1),
 	}
-	
+
+	// get pods
 	pods := <-channels.PodListChannel.List
 	err1 := <-channels.PodListChannel.Error
-	
+	// get events
 	events := <-channels.EventListChannel.List
 	err2 := <-channels.EventListChannel.Error
+
+	
+	// merge pod/events
+	podList := ToPodList(pods, events)
+
+	return podList
+}
+
+func GetPodList(client kubernetes.Interface) {
+
 	
 	
 }
