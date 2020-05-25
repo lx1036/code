@@ -28,7 +28,7 @@ type PodList struct {
 
 
 func ListPod(k8sClient kubernetes.Interface,
-	metricClient metric.MetricClient,
+	//metricClient metric.MetricClient,
 	namespaceQuery *namespace.NamespaceQuery,
 	dataSelectQuery *dataselect.DataSelectQuery)  {
 	channels := common.ResourceChannels{
@@ -45,7 +45,7 @@ func ListPod(k8sClient kubernetes.Interface,
 
 	
 	// merge pod/events
-	podList := ToPodList(pods.Items, events.Items, dataSelectQuery, metricClient)
+	podList := ToPodList(pods.Items, events.Items, dataSelectQuery)
 	podList.Status = getPodStatus(pods, events.Items)
 
 	return podList

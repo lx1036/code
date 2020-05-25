@@ -24,7 +24,6 @@ type MetricClient interface {
 		aggregations dataselect.AggregationModes) MetricPromises
 
 	// Implements IntegrationApp interface
-	integrationapi.Integration
 }
 
 type MetricPromises []MetricPromise
