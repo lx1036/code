@@ -18,7 +18,6 @@ package controllers
 import (
 	"context"
 	"github.com/go-logr/logr"
-	batchv1 "k8s-lx1036/k8s-ui/backend/kubernetes/kubebuilder/api/v1"
 	kbatch "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"

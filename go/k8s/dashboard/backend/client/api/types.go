@@ -2,8 +2,6 @@ package api
 
 import (
 	"github.com/emicklei/go-restful"
-	authApi "k8s-lx1036/dashboard/backend/auth/api"
-	pluginclientset "k8s-lx1036/dashboard/backend/plugin/client/clientset/versioned"
 	v1 "k8s.io/api/authorization/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"

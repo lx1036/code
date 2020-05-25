@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"github.com/gin-gonic/gin"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/prometheus/minikube-prometheus/alertmanager/dingtalk-proxy/model"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/prometheus/minikube-prometheus/alertmanager/dingtalk-proxy/notifier"
+	"k8s-lx1036/k8s/monitor/prometheus/minikube-prometheus/alertmanager/dingtalk-proxy/model"
+	"k8s-lx1036/k8s/monitor/prometheus/minikube-prometheus/alertmanager/dingtalk-proxy/notifier"
 	"net/http"
 )
 

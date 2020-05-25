@@ -2,12 +2,6 @@ package handler
 
 import (
 	"github.com/emicklei/go-restful"
-	authApi "k8s-lx1036/dashboard/backend/auth/api"
-	clientapi "k8s-lx1036/dashboard/backend/client/api"
-	"k8s-lx1036/dashboard/backend/integration"
-	"k8s-lx1036/dashboard/backend/resource/deployment"
-	settingsApi "k8s-lx1036/dashboard/backend/settings/api"
-	"k8s-lx1036/dashboard/backend/systembanner"
 	"net/http"
 )
 

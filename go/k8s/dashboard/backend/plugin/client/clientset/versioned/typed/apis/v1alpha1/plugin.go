@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	"k8s-lx1036/dashboard/backend/plugin/apis/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"

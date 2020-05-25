@@ -2,7 +2,6 @@ package sync
 
 import (
 	"fmt"
-	syncApi "k8s-lx1036/dashboard/backend/sync/api"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"

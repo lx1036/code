@@ -1,7 +1,5 @@
 package integration
 
-import "k8s-lx1036/dashboard/backend/integration/api"
-
 // IntegrationManager is responsible for management of all integrated applications.
 type IntegrationManager interface {
 	// IntegrationsGetter is responsible for listing all supported integrations.

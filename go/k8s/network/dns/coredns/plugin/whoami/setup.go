@@ -2,8 +2,6 @@ package whoami
 
 import (
 	"github.com/caddyserver/caddy"
-	"k8s-lx1036/k8s/dns/coredns/core/dnsserver"
-	"k8s-lx1036/k8s/dns/coredns/plugin"
 )
 
 func init() {

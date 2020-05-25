@@ -3,9 +3,6 @@ package sources
 import (
 	"errors"
 	"fmt"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/common"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/common/flags"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/plugins/event/k8s-event-monitor/sources/kubernetes"
 	"k8s.io/klog"
 )
 

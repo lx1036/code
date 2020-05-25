@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/meetup/2020-04-18/nginx-golang/golang/common/httplib"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/meetup/2020-04-18/nginx-golang/golang/prometheus"
 	"net/http"
 	"os"
 	"sync"

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/astaxie/beego"
-	_ "k8s-lx1036/k8s/beego/routers"
 )
 
 /*

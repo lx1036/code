@@ -1,7 +1,6 @@
 package jwe
 
 import (
-	authApi "k8s-lx1036/dashboard/backend/auth/api"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"time"

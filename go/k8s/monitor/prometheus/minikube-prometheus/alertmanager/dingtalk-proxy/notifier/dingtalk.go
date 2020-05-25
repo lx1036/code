@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/prometheus/minikube-prometheus/alertmanager/dingtalk-proxy/model"
-	"k8s-lx1036/k8s-ui/backend/kubernetes/prometheus/minikube-prometheus/alertmanager/dingtalk-proxy/transformer"
 	"net/http"
 )
 

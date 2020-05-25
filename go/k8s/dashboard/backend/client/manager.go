@@ -2,10 +2,6 @@ package client
 
 import (
 	"github.com/emicklei/go-restful"
-	authApi "k8s-lx1036/dashboard/backend/auth/api"
-	clientapi "k8s-lx1036/dashboard/backend/client/api"
-	"k8s-lx1036/dashboard/backend/errors"
-	pluginclientset "k8s-lx1036/dashboard/backend/plugin/client/clientset/versioned"
 	v1 "k8s.io/api/authorization/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"

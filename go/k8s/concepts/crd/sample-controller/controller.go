@@ -2,9 +2,6 @@ package main
 
 import (
 	"fmt"
-	samplescheme "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/clientset/versioned/scheme"
-	informers "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/informers/externalversions/samplecontroller/v1alpha1"
-	listers "k8s-lx1036/k8s-ui/backend/kubernetes/crd/sample-controller/pkg/generated/listers/samplecontroller/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"

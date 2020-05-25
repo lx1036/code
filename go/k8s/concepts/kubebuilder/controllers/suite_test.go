@@ -16,22 +16,16 @@ limitations under the License.
 package controllers
 
 import (
-	"path/filepath"
-	"testing"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	webappv1 "k8s-lx1036/k8s-ui/backend/kubernetes/kubebuilder/api/v1"
-
-	batchv1 "k8s-lx1036/k8s-ui/backend/kubernetes/kubebuilder/api/v1"
-
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"testing"
 	// +kubebuilder:scaffold:imports
 )
 

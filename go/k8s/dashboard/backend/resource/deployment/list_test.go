@@ -1,9 +1,6 @@
 package deployment
 
 import (
-	"k8s-lx1036/dashboard/backend/api"
-	"k8s-lx1036/dashboard/backend/errors"
-	metricapi "k8s-lx1036/dashboard/backend/integration/metric/api"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"

@@ -1,8 +1,6 @@
 package api
 
 import (
-	"k8s-lx1036/dashboard/backend/api"
-	integrationapi "k8s-lx1036/dashboard/backend/integration/api"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"time"

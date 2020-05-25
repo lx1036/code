@@ -1,6 +1,6 @@
 package netpoll
 
-import "k8s-lx1036/k8s/network/internal"
+import "k8s-lx1036/k8s/network/network/internal"
 
 // Poller ...
 type Poller struct {

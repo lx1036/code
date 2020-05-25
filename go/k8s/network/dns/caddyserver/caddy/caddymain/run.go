@@ -11,10 +11,6 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"io/ioutil"
-	caddy "k8s-lx1036/k8s/dns/caddyserver"
-	"k8s-lx1036/k8s/dns/caddyserver/caddyfile"
-	"k8s-lx1036/k8s/dns/caddyserver/caddytls"
-	"k8s-lx1036/k8s/dns/caddyserver/telemetry"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,9 +18,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
-
 	// built-in plugins
-	_ "k8s-lx1036/k8s/dns/caddyserver/caddyhttp"
 	// add custom plugins here:
 )
 

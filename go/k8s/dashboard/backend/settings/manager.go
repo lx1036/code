@@ -1,7 +1,6 @@
 package settings
 
 import (
-	"k8s-lx1036/dashboard/backend/settings/api"
 	"k8s.io/client-go/kubernetes"
 )
 

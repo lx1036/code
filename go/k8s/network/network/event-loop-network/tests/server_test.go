@@ -1,8 +1,6 @@
 package tests
 
 import (
-	event_loop "k8s-lx1036/k8s/network/event-loop-network/event-loop"
-	"k8s-lx1036/k8s/network/net"
 	"os"
 	"strings"
 	"sync/atomic"

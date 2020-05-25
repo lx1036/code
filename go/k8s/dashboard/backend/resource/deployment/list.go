@@ -1,7 +1,5 @@
 package deployment
 
-import metricapi "k8s-lx1036/dashboard/backend/integration/metric/api"
-
 // DeploymentList contains a list of Deployments in the cluster.
 type DeploymentList struct {
 	ListMeta          api.ListMeta       `json:"listMeta"`
