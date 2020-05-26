@@ -25,3 +25,19 @@ func (controller *EventController)  ListNamespaceEvents() gin.HandlerFunc {
 		})
 	}
 }
+
+func (controller *EventController)  ListPodEvents() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		k8sClient := client.DefaultClientManager.Client()
+		namespaceName := context.Param("namespace")
+		podName := context.Param("pod")
+		dataSelectQuery := dataselect.ParseDataSelectFromRequest(context)
+		events, _ := ListResourceEventsByQuery(k8sClient, namespaceName, podName, dataSelectQuery)
+
+		context.JSON(http.StatusOK, common.JsonResponse{
+			Errno: 0,
+			Errmsg: "success",
+			Data: events,
+		})
+	}
+}

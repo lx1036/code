@@ -2,9 +2,13 @@ package event
 
 import (
 	"context"
+	"fmt"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/dataselect"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"strings"
 )
@@ -14,6 +18,34 @@ var FailedReasonPartials = []string{"failed", "err", "exceeded", "invalid", "unh
 
 func GetPodsEventWarnings(events []corev1.Event, pods []corev1.Pod) []Event {
 
+}
+
+func ListResourceEventsByQuery(
+	k8sClient kubernetes.Interface,
+	namespaceName string,
+	resourceName string,
+	dataSelect *dataselect.DataSelectQuery) (EventList, error) {
+	fieldSelector, err := fields.ParseSelector(fmt.Sprintf("involvedObject.name=%s", resourceName))
+	if err != nil {
+		return EventList{}, err
+	}
+
+	channel := common.ResourceChannels{
+		EventListChannel: GetEventListChannelWithOptions(
+			k8sClient,
+			namespaceName,
+			metav1.ListOptions{
+				FieldSelector: fieldSelector.String(),
+				LabelSelector: labels.Everything().String(),
+			},
+			1),
+	}
+	eventList := <-channel.EventListChannel.List
+	err = <-channel.EventListChannel.Error
+	if err != nil {
+		return EventList{}, err
+	}
+	return toEventList(FillEventsType(eventList.Items)), nil
 }
 
 func ListNamespaceEventsByQuery(
