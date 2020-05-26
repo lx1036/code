@@ -44,14 +44,33 @@ func FillEventsType(events []corev1.Event) []corev1.Event {
 	return events
 }
 
-func toEventList(events []corev1.Event) EventList {
+func toEventList(rawEvents []corev1.Event) EventList {
 	eventList := EventList{
 		ListMeta: common.ListMeta{
-			TotalItems: len(events),
+			TotalItems: len(rawEvents),
 		},
 	}
-	
-	
+
+	var events []Event
+	for _, event := range rawEvents {
+		 events = append(events,  Event{
+			ObjectMeta: common.NewObjectMeta(event.ObjectMeta),
+			TypeMeta: common.NewTypeMeta(common.ResourceKindEvent),
+			Message: event.Message,
+			SourceComponent: event.Source.Component,
+			SourceHost: event.Source.Host,
+			SubObject: event.InvolvedObject.FieldPath,
+			Count: event.Count,
+			FirstSeen: event.FirstTimestamp,
+			LastSeen: event.LastTimestamp,
+			Reason: event.Reason,
+			Type: event.Type,
+		})
+	}
+
+	eventList.Events = events
+
+	return eventList
 }
 
 func isFailedReason(reason string, partials ...string) bool {
