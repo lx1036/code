@@ -1,6 +1,9 @@
 package event
 
-import corev1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common"
+	corev1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 type ObjectMeta struct {
 
@@ -43,4 +46,14 @@ type Event struct {
 
 	// Event type (at the moment only normal and warning are supported).
 	Type string `json:"type"`
+}
+
+type EventList struct {
+	ListMeta common.ListMeta `json:"listMeta"`
+	
+	// List of events from given namespace.
+	Events []Event `json:"events"`
+	
+	// List of non-critical errors, that occurred during resource retrieval.
+	Errors []error `json:"errors"`
 }

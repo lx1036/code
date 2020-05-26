@@ -6,6 +6,7 @@ import (
 	"k8s-lx1036/k8s-ui/dashboard/controllers/auth/csrf"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/plugin"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/deployment"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/event"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/pod"
 )
 
@@ -23,11 +24,11 @@ func SetupRouter() *gin.Engine {
 		api.GET("/login/modes", (&authenticator.AuthenticationController{}).GetLoginModes())
 		api.GET("/login/skippable", (&authenticator.AuthenticationController{}).GetLoginSkippable())
 
-		// Deployment
+		// deployment
 		api.POST("/appdeployment", (&deployment.DeploymentController{}).HandleDeploy())
 		api.POST("/appdeployment/validate/name", (&deployment.DeploymentController{}).HandleNameValidity())
 
-		// Pod
+		// pod
 		api.GET("/pod", (&pod.PodController{}).ListNamespacePod())
 		api.GET("/pod/{namespace}", (&pod.PodController{}).ListNamespacePod())
 		api.GET("/pod/{namespace}/{pod}", (&pod.PodController{}).ListNamespacePod())
@@ -35,6 +36,9 @@ func SetupRouter() *gin.Engine {
 		api.GET("/pod/{namespace}/{pod}/event", (&pod.PodController{}).ListNamespacePod())
 		api.GET("/pod/{namespace}/{pod}/shell/{container}", (&pod.PodController{}).ListNamespacePod())
 		api.GET("/pod/{namespace}/{pod}/persistentvolumeclaim", (&pod.PodController{}).ListNamespacePod())
+		
+		// event
+		api.GET("/namespace/{namespace}/event", (&event.EventController{}).ListNamespaceEvents())
 
 		// Replication
 		api.GET("/replicationcontroller")

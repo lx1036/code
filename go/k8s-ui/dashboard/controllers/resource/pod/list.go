@@ -3,7 +3,6 @@ package pod
 import (
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/dataselect"
-	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/metric"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/event"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/namespace"
 	corev1 "k8s.io/api/core/v1"
