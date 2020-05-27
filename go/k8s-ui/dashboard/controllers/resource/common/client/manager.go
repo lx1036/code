@@ -1,7 +1,6 @@
 package client
 
 import (
-	pluginclientset "k8s-lx1036/k8s-ui/dashboard/controllers/plugin/client/clientset/versioned"
 	"k8s-lx1036/k8s-ui/dashboard/model"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -27,7 +26,7 @@ type ClientManager struct {
 
 	// Plugin client created without providing auth info. It uses permissions granted to
 	// service account used by dashboard or kubeconfig file if it was passed during dashboard init.
-	insecurePluginClient pluginclientset.Interface
+	//insecurePluginClient pluginclientset.Interface
 }
 
 func (manager *ClientManager) initInClusterConfig() {
@@ -53,19 +52,19 @@ func (manager *ClientManager) initInsecureClients() {
 	if err != nil {
 		panic(err)
 	}
-	pluginClient, err := pluginclientset.NewForConfig(config)
+	/*pluginClient, err := pluginclientset.NewForConfig(config)
 	if err != nil {
 		panic(err)
-	}
+	}*/
 
 	manager.insecureConfig = config
 	manager.insecureClient = k8sClient
-	manager.insecurePluginClient = pluginClient
+	//manager.insecurePluginClient = pluginClient
 }
 
-func (manager *ClientManager) GetPluginClient() pluginclientset.Interface {
+/*func (manager *ClientManager) GetPluginClient() pluginclientset.Interface {
 	return manager.insecurePluginClient
-}
+}*/
 
 func (manager *ClientManager) Client() kubernetes.Interface {
 	if model.Mode() == model.TestMode {

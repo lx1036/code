@@ -44,6 +44,8 @@ var ListEverything = metav1.ListOptions{
 	LabelSelector: labels.Everything().String(),
 	FieldSelector: fields.Everything().String(),
 }
+var GetEverything = metav1.GetOptions{}
+var CreateEverything = metav1.CreateOptions{}
 
 type ResourceStatus struct {
 	// Number of resources that are currently in running state.

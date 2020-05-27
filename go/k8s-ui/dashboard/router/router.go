@@ -20,6 +20,8 @@ func SetupRouter() *gin.Engine {
 		
 		// namespace
 		api.GET("/namespaces", (&namespace.NamespaceController{}).ListNamespaces())
+		api.GET("/namespaces/{namespace}", (&namespace.NamespaceController{}).GetNamespace())
+		api.POST("/namespace", (&namespace.NamespaceController{}).CreateNamespaces())
 
 		// login
 		api.GET("/login/modes", (&authenticator.AuthenticationController{}).GetLoginModes())
