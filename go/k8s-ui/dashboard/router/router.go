@@ -39,6 +39,16 @@ func SetupRouter() *gin.Engine {
 		// event
 		api.GET("/namespace/{namespace}/event", (&event.EventController{}).ListNamespaceEvents())
 		api.GET("/pod/{namespace}/{pod}/event", (&event.EventController{}).ListPodEvents())
+		api.GET("/replicationcontroller/{namespace}/{replicationcontroller}/event", (&event.EventController{}).ListReplicationControllerEvents())
+		api.GET("/replicaset/{namespace}/{replicaset}/event", (&event.EventController{}).ListReplicationSetEvents())
+		api.GET("/deployment/{namespace}/{deployment}/event", (&event.EventController{}).ListDeploymentEvents())
+		api.GET("/deamonset/{namespace}/{deamonset}/event", (&event.EventController{}).ListDeamonSetEvents())
+		api.GET("/job/{namespace}/{job}/event", (&event.EventController{}).ListJobEvents())
+		api.GET("/cronjob/{namespace}/{cronjob}/event", (&event.EventController{}).ListCronjobEvents())
+		api.GET("/service/{namespace}/{service}/event", (&event.EventController{}).ListServiceEvents())
+		api.GET("/statefulset/{namespace}/{statefulset}/event", (&event.EventController{}).ListStatefulSetEvents())
+		api.GET("/node/{namespace}/{node}/event", (&event.EventController{}).ListNodeEvents())
+		api.GET("/crd/{namespace}/{crd}/{object}/event", (&event.EventController{}).ListCrdEvents())
 
 		// Replication
 		api.GET("/replicationcontroller")
