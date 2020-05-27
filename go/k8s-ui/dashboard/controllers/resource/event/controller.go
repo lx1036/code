@@ -2,8 +2,8 @@ package event
 
 import (
 	"github.com/gin-gonic/gin"
-	"k8s-lx1036/k8s-ui/dashboard/client"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/client"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/dataselect"
 	"net/http"
 )

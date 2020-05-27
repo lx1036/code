@@ -4,9 +4,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/auth/authenticator"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/auth/csrf"
-	"k8s-lx1036/k8s-ui/dashboard/controllers/plugin"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/deployment"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/event"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/namespace"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/pod"
 )
 
@@ -17,8 +17,9 @@ func SetupRouter() *gin.Engine {
 		// csrftoken
 		api.GET("/csrftoken/:action", (&csrf.CsrfController{}).GetCsrfToken())
 
-		// plugin
-		api.GET("/plugin/config", (&plugin.PluginController{}).HandleConfig())
+		
+		// namespace
+		api.GET("/namespaces", (&namespace.NamespaceController{}).ListNamespaces())
 
 		// login
 		api.GET("/login/modes", (&authenticator.AuthenticationController{}).GetLoginModes())

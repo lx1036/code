@@ -2,7 +2,7 @@ package pod
 
 import (
 	"github.com/gin-gonic/gin"
-	"k8s-lx1036/k8s-ui/dashboard/client"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/dataselect"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/namespace"
 	"net/http"
@@ -15,13 +15,14 @@ type PodController struct {
 func (controller *PodController) ListNamespacePod() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		k8sClient := client.DefaultClientManager.Client()
-
 		namespaceQuery := parseNamespace(context.Param("namespace"))
 		dataselectQuery := dataselect.ParseDataSelectFromRequest(context)
 		result := ListPod(k8sClient, namespaceQuery, dataselectQuery)
-
-		return context.JSON(http.StatusOK, gin.H{
-
+		
+		context.JSON(http.StatusOK, common.JsonResponse{
+			Errno: 0,
+			Errmsg: "success",
+			Data: result,
 		})
 	}
 }

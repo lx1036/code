@@ -29,7 +29,7 @@ type PodList struct {
 func ListPod(k8sClient kubernetes.Interface,
 	//metricClient metric.MetricClient,
 	namespaceQuery *namespace.NamespaceQuery,
-	dataSelectQuery *dataselect.DataSelectQuery)  {
+	dataSelectQuery *dataselect.DataSelectQuery) PodList {
 	channels := common.ResourceChannels{
 		PodListChannel: GetPodListChannelWithOptions(k8sClient, namespaceQuery, metav1.ListOptions{}, 1),
 		EventListChannel: event.GetEventListChannelWithOptions(k8sClient, namespaceQuery, 1),

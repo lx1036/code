@@ -5,7 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"k8s-lx1036/k8s-ui/dashboard/client"
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/client"
 	"k8s-lx1036/k8s-ui/dashboard/router"
 	"os"
 	"path/filepath"
@@ -39,7 +39,7 @@ func main() {
 func preRun(cmd *cobra.Command, args []string) {
 	filename, _ := filepath.Abs(".")
 	viper.SetConfigType("ini")
-	file := fmt.Sprintf("%s/conf/%s", filename, configFile)
+	file := fmt.Sprintf("%s/%s", filename, configFile)
 	viper.SetConfigFile(file)
 	viper.AutomaticEnv()
 	if err := viper.ReadInConfig(); err != nil {
@@ -55,8 +55,6 @@ func preRun(cmd *cobra.Command, args []string) {
 
 func run(cmd *cobra.Command, args []string) {
 	// TODO: Listen for http or https
-	
-	
 	app := router.SetupRouter()
 	err := app.Run(fmt.Sprintf(":%d", viper.GetInt("common.port")))
 	if err != nil {
