@@ -2,8 +2,8 @@
  * Frontend specific errors or errors transformed based on server response.
  */
 import {HttpErrorResponse} from "@angular/common/http";
-import {KdError as KdApiError} from "../../typings/frontend-api";
-import {ErrStatus, K8SError as K8SApiError} from "../../typings/backend-api";
+import {KdError as KdApiError} from "../../typings/frontendapi";
+import {ErrStatus, K8SError as K8SApiError} from "@api/backendapi";
 
 
 export enum ApiError {

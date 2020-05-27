@@ -53,7 +53,7 @@ func SetupRouter() *gin.Engine {
 		api.GET("/node/{namespace}/{node}/event", (&event.EventController{}).ListNodeEvents())
 		api.GET("/crd/{namespace}/{crd}/{object}/event", (&event.EventController{}).ListCrdEvents())
 
-		// Replication
+		// replication controller
 		api.GET("/replicationcontroller")
 		//api.GET("/replicationcontroller/:namespace/:replicationController/event")
 	}
