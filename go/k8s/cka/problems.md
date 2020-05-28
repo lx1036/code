@@ -1,12 +1,30 @@
 **[kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)**
 **[真题1](https://blog.csdn.net/deerjoe/java/article/details/86300826)**
 
-# 
+# Storage 7%
 
-
-#列出环境内所有的pv 并以 name字段排序（使用kubectl自带排序功能）
+## (1)列出集群所有的pv，并以 name 字段排序（使用kubectl自带排序功能）
+```shell script
 kubectl get pv --sort-by=.metadata.name
-考点：kubectl命令熟悉程度
+```
+### (1.1)创建一个1G可读可写的PV，挂载在宿主机的"/mnt/data"目录
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: task-pv-volume
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+```
+ 
 
 列出指定pod的日志中状态为Error的行，并记录在指定的文件上
 
