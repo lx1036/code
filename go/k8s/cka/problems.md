@@ -3,7 +3,7 @@
 
 # Storage 7%
 
-1. 列出集群所有的pv，并以 name 字段排序/并以 capacity字段排序（使用kubectl自带排序功能）
+1. 列出集群所有的pv，并以 name 字段排序/并以 capacity 字段排序（使用kubectl自带排序功能）
 ```shell script
 kubectl get pv
 kubectl get pv/{pv} -o json
