@@ -1,0 +1,136 @@
+
+# kubectl create namespace limit-range
+# kubectl apply -f ./request-limit.yml -n limit-range
+# kubectl --kubeconfig ./kubeconfig.yml apply -f ./cluster/request-limit.yml -n limit-range
+
+# kubectl get pods -n limit-range --watch
+#
+
+# kubectl --kubeconfig ./kubeconfig.yml get pods/default-mem-demo -n limit-range -o yaml
+# kubectl --kubeconfig ./kubeconfig.yml get pods/default-mem-demo-2 -n limit-range -o yaml
+# kubectl --kubeconfig ./kubeconfig.yml get pods/default-mem-demo-3 -n limit-range -o yaml
+# kubectl --kubeconfig ./kubeconfig.yml get pods/default-cpu-demo -n limit-range -o yaml
+# kubectl --kubeconfig ./kubeconfig.yml get pods/default-cpu-demo-2 -n limit-range -o yaml
+# kubectl --kubeconfig ./kubeconfig.yml get pods/default-cpu-demo-3 -n limit-range -o yaml
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: mem-limit-range
+spec:
+  limits:
+    - default:
+        memory: 512Mi
+      defaultRequest:
+        memory: 256Mi
+      type: Container
+---
+#resources:
+#  limits:
+#    memory: 512Mi
+#  requests:
+#    memory: 256Mi
+apiVersion: v1
+kind: Pod
+metadata:
+  name: default-mem-demo
+spec:
+  containers:
+    - name: default-mem-demo-ctr
+      image: uhub.service.ucloud.cn/ucloud/nginx
+---
+#resources:
+#  limits:
+#    memory: 1Gi
+#  requests:
+#    memory: 1Gi
+apiVersion: v1
+kind: Pod
+metadata:
+  name: default-mem-demo-2
+spec:
+  containers:
+    - name: default-mem-demo-2-ctr
+      image: uhub.service.ucloud.cn/ucloud/nginx
+      resources:
+        limits:
+          memory: "1Gi"
+---
+#resources:
+#  limits:
+#    memory: 512Mi
+#  requests:
+#    memory: 128Mi
+apiVersion: v1
+kind: Pod
+metadata:
+  name: default-mem-demo-3
+spec:
+  containers:
+    - name: default-mem-demo-3-ctr
+      image: uhub.service.ucloud.cn/ucloud/nginx
+      resources:
+        requests:
+          memory: "128Mi"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-limit-range
+spec:
+  limits:
+    - default:
+        cpu: "1"
+      defaultRequest:
+        cpu: "0.5"
+      type: Container
+---
+#resources:
+#  limits:
+#    cpu: "1"
+#  requests:
+#    cpu: 500m
+apiVersion: v1
+kind: Pod
+metadata:
+  name: default-cpu-demo
+spec:
+  containers:
+    - name: default-cpu-demo-ctr
+      image: uhub.service.ucloud.cn/ucloud/nginx
+---
+#resources:
+#  limits:
+#    cpu: "1"
+#  requests:
+#    cpu: "1"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: default-cpu-demo-2
+spec:
+  containers:
+    - name: default-cpu-demo-2-ctr
+      image: uhub.service.ucloud.cn/ucloud/nginx
+      resources:
+        limits:
+          cpu: "1"
+---
+#resources:
+#  limits:
+#    cpu: "1"
+#  requests:
+#    cpu: 750m
+apiVersion: v1
+kind: Pod
+metadata:
+  name: default-cpu-demo-3
+spec:
+  containers:
+    - name: default-cpu-demo-3-ctr
+      image: uhub.service.ucloud.cn/ucloud/nginx
+      resources:
+        requests:
+          cpu: "0.75"
+---

@@ -19,7 +19,7 @@
     }
 ]
 ```
-* 容量和可分配资源 capacity and allocatable:
+* 容量和可分配资源 capacity and allocatable(描述节点上的可用资源：CPU、内存和可以调度到节点上的 pods 的最大数量):
 ```json
 {
     "allocatable": {
