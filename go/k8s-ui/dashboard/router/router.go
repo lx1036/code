@@ -17,7 +17,6 @@ func SetupRouter() *gin.Engine {
 		// csrftoken
 		api.GET("/csrftoken/:action", (&csrf.CsrfController{}).GetCsrfToken())
 
-		
 		// namespace
 		api.GET("/namespaces", (&namespace.NamespaceController{}).ListNamespaces())
 		api.GET("/namespaces/{namespace}", (&namespace.NamespaceController{}).GetNamespace())
@@ -32,13 +31,13 @@ func SetupRouter() *gin.Engine {
 		api.POST("/appdeployment/validate/name", (&deployment.DeploymentController{}).HandleNameValidity())
 
 		// pod
-		api.GET("/pod", (&pod.PodController{}).ListNamespacePod())
-		api.GET("/pod/{namespace}", (&pod.PodController{}).ListNamespacePod())
-		api.GET("/pod/{namespace}/{pod}", (&pod.PodController{}).ListNamespacePod())
-		api.GET("/pod/{namespace}/{pod}/container", (&pod.PodController{}).ListNamespacePod())
-		api.GET("/pod/{namespace}/{pod}/shell/{container}", (&pod.PodController{}).ListNamespacePod())
-		api.GET("/pod/{namespace}/{pod}/persistentvolumeclaim", (&pod.PodController{}).ListNamespacePod())
-		
+		api.GET("/pod", (&pod.PodController{}).ListPods())
+		api.GET("/pod/{namespace}", (&pod.PodController{}).ListPods())
+		api.GET("/pod/{namespace}/{pod}", (&pod.PodController{}).GetPod())
+		api.GET("/pod/{namespace}/{pod}/containers", (&pod.PodController{}).ListPodContainers())
+		api.GET("/pod/{namespace}/{pod}/shell/{container}", (&pod.PodController{}).ExecPodShell())
+		api.GET("/pod/{namespace}/{pod}/persistentvolumeclaim", (&pod.PodController{}).GetPodPvc())
+
 		// event
 		api.GET("/namespace/{namespace}/event", (&event.EventController{}).ListNamespaceEvents())
 		api.GET("/pod/{namespace}/{pod}/event", (&event.EventController{}).ListPodEvents())
