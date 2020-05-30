@@ -97,7 +97,7 @@ func SetupRouter() *gin.Engine {
 		api.GET("/cronjob/{namespace}/{cronjob}/event", (&event.EventController{}).ListCronjobEvents())
 		api.GET("/service/{namespace}/{service}/event", (&event.EventController{}).ListServiceEvents())
 		api.GET("/statefulset/{namespace}/{statefulset}/event", (&event.EventController{}).ListStatefulSetEvents())
-		api.GET("/node/{namespace}/{node}/event", (&event.EventController{}).ListNodeEvents())
+		api.GET("/node/{node}/event", (&event.EventController{}).ListNodeEvents())
 		api.GET("/crd/{namespace}/{crd}/{object}/event", (&event.EventController{}).ListCrdEvents())
 
 		/* CRD */
