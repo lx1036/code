@@ -6,15 +6,15 @@ import (
 )
 
 type ResourceQuotaDetailList struct {
-	ListMeta common.ListMeta `json:"listMeta"`
-	Items []ResourceQuotaDetail `json:"items"`
+	ListMeta common.ListMeta       `json:"listMeta"`
+	Items    []ResourceQuotaDetail `json:"items"`
 }
 
 type ResourceQuotaDetail struct {
 	ObjectMeta common.ObjectMeta `json:"objectMeta"`
 	TypeMeta   common.TypeMeta   `json:"typeMeta"`
-	
-	Scopes []corev1.ResourceQuotaScope `json:"scopes"`
+
+	Scopes     []corev1.ResourceQuotaScope            `json:"scopes"`
 	StatusList map[corev1.ResourceName]ResourceStatus `json:"statusList"`
 }
 
@@ -32,7 +32,7 @@ func ToResourceQuotaDetail(rawResourceQuota *corev1.ResourceQuota) ResourceQuota
 			Hard: value.String(),
 		}
 	}
-	
+
 	return ResourceQuotaDetail{
 		ObjectMeta: common.NewObjectMeta(rawResourceQuota.ObjectMeta),
 		TypeMeta:   common.NewTypeMeta(common.ResourceKindResourceQuota),

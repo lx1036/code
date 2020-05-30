@@ -45,7 +45,7 @@ func preRun(cmd *cobra.Command, args []string) {
 	if err := viper.ReadInConfig(); err != nil {
 		panic(err)
 	}
-	
+
 	log.WithFields(log.Fields{
 		"config-file": viper.ConfigFileUsed(),
 	}).Info("[app level]")

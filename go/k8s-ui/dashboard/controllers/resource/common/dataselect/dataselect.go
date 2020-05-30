@@ -4,18 +4,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
-
-
-
 type DataSelectQuery struct {
 	PaginationQuery *PaginationQuery
-	SortQuery *SortQuery
-	FilterQuery *FilterQuery
-	MetricQuery *MetricQuery
+	SortQuery       *SortQuery
+	FilterQuery     *FilterQuery
+	MetricQuery     *MetricQuery
 }
-
-
 
 // ComparableValue hold any value that can be compared to its own kind.
 type ComparableValue interface {
@@ -28,9 +22,9 @@ type ComparableValue interface {
 func NewDataSelectQuery(paginationQuery *PaginationQuery, sortQuery *SortQuery, filterQuery *FilterQuery, metricQuery *MetricQuery) *DataSelectQuery {
 	return &DataSelectQuery{
 		PaginationQuery: paginationQuery,
-		SortQuery: sortQuery,
-		FilterQuery: filterQuery,
-		MetricQuery: metricQuery,
+		SortQuery:       sortQuery,
+		FilterQuery:     filterQuery,
+		MetricQuery:     metricQuery,
 	}
 }
 
@@ -42,10 +36,8 @@ func ParseDataSelectFromRequest(context *gin.Context) *DataSelectQuery {
 
 	return &DataSelectQuery{
 		PaginationQuery: paginationQuery,
-		SortQuery: sortQuery,
-		FilterQuery: filterQuery,
-		MetricQuery: metricQuery,
+		SortQuery:       sortQuery,
+		FilterQuery:     filterQuery,
+		MetricQuery:     metricQuery,
 	}
 }
-
-
