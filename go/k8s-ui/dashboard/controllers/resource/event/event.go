@@ -16,7 +16,7 @@ import (
 var FailedReasonPartials = []string{"failed", "err", "exceeded", "invalid", "unhealthy",
 	"mismatch", "insufficient", "conflict", "outof", "nil", "backoff"}
 
-func GetPodsEventWarnings(events []corev1.Event, pods []corev1.Pod) []Event {
+func GetPodsWarningEvents(events []corev1.Event, pods []corev1.Pod) []Event {
 
 }
 
