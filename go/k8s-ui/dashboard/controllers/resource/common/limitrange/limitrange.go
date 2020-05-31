@@ -37,38 +37,38 @@ func (rMap rangeMap) getRange(resource corev1.ResourceName) *LimitRangeItem {
 
 // toLimitRanges converts raw limit ranges to limit ranges map
 func toLimitRangesMap(rawLimitRange *corev1.LimitRange) limitRangesMap {
-	
+
 	rawLimitRanges := rawLimitRange.Spec.Limits
-	
+
 	limitRanges := make(limitRangesMap, len(rawLimitRanges))
-	
+
 	for _, rawLimitRange := range rawLimitRanges {
-		
+
 		rangeMap := make(rangeMap)
-		
+
 		for resource, min := range rawLimitRange.Min {
 			rangeMap.getRange(resource).Min = min.String()
 		}
-		
+
 		for resource, max := range rawLimitRange.Max {
 			rangeMap.getRange(resource).Max = max.String()
 		}
-		
+
 		for resource, df := range rawLimitRange.Default {
 			rangeMap.getRange(resource).Default = df.String()
 		}
-		
+
 		for resource, dfR := range rawLimitRange.DefaultRequest {
 			rangeMap.getRange(resource).DefaultRequest = dfR.String()
 		}
-		
+
 		for resource, mLR := range rawLimitRange.MaxLimitRequestRatio {
 			rangeMap.getRange(resource).MaxLimitRequestRatio = mLR.String()
 		}
-		
+
 		limitRanges[rawLimitRange.Type] = rangeMap
 	}
-	
+
 	return limitRanges
 }
 

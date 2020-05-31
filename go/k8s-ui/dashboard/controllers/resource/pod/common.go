@@ -21,7 +21,7 @@ func getPodStatus(pods *corev1.PodList, events []corev1.Event) common.ResourceSt
 			info.Pending++
 		}
 	}
-	
+
 	return info
 }
 
@@ -60,4 +60,3 @@ func getPodStatusPhase(pod corev1.Pod, warnings []event.Event) corev1.PodPhase {
 	// pending
 	return corev1.PodPending
 }
-

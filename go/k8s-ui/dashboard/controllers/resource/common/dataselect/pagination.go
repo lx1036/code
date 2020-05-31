@@ -7,13 +7,13 @@ import (
 
 type PaginationQuery struct {
 	ItemsPerPage int
-	Page int
+	Page         int
 }
 
 func NewPaginationQuery(itemsPerPage, page int) *PaginationQuery {
 	return &PaginationQuery{
 		ItemsPerPage: itemsPerPage,
-		Page: page,
+		Page:         page,
 	}
 }
 

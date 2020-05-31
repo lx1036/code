@@ -21,7 +21,7 @@ func NewNamespaceQuery(namespaces []string) *NamespaceQuery {
 	}
 }
 
-func (namespaces *NamespaceQuery) GetNamespace() string  {
+func (namespaces *NamespaceQuery) GetNamespace() string {
 	if len(namespaces.namespaces) == 1 {
 		return namespaces.namespaces[0]
 	}
@@ -35,7 +35,7 @@ func ListNamespacesByQuery(
 	if err != nil {
 		return nil, err
 	}
-	
+
 	namespaceList := &NamespaceList{
 		ListMeta: common.ListMeta{
 			TotalItems: len(rawNamespaces.Items),
@@ -46,7 +46,7 @@ func ListNamespacesByQuery(
 		namespaces = append(namespaces, toNamespace(namespace))
 	}
 	namespaceList.Namespaces = namespaces
-	
+
 	return namespaceList, nil
 }
 
@@ -67,20 +67,20 @@ func GetNamespaceByQuery(
 	if err != nil {
 		return nil, err
 	}
-	
+
 	resourceQuotaDetailList, err := getResourceQuotas(k8sClient, *rawNamespace)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	limitRangeItems, err := getLimitRanges(k8sClient, *rawNamespace)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &NamespaceDetail{
-		Namespace: toNamespace(*rawNamespace),
-		ResourceLimits: limitRangeItems,
+		Namespace:         toNamespace(*rawNamespace),
+		ResourceLimits:    limitRangeItems,
 		ResourceQuotaList: resourceQuotaDetailList,
 	}, nil
 }
@@ -95,12 +95,12 @@ func CreateNamespaceByQuery(k8sClient kubernetes.Interface, namespaceName string
 	if err != nil {
 		return Namespace{}, err
 	}
-	
+
 	return toNamespace(*namespace), nil
 }
 
 func getResourceQuotas(k8sClient kubernetes.Interface, rawNamespace corev1.Namespace) (*resourcequota.ResourceQuotaDetailList, error) {
-	resourceQuotasList, err :=  k8sClient.CoreV1().ResourceQuotas(rawNamespace.Name).List(context.TODO(), common.ListEverything)
+	resourceQuotasList, err := k8sClient.CoreV1().ResourceQuotas(rawNamespace.Name).List(context.TODO(), common.ListEverything)
 	if err != nil {
 		return nil, err
 	}
@@ -109,11 +109,11 @@ func getResourceQuotas(k8sClient kubernetes.Interface, rawNamespace corev1.Names
 			TotalItems: len(resourceQuotasList.Items),
 		},
 	}
-	
+
 	for _, item := range resourceQuotasList.Items {
 		result.Items = append(result.Items, resourcequota.ToResourceQuotaDetail(&item))
 	}
-	
+
 	return result, nil
 }
 
@@ -126,8 +126,6 @@ func getLimitRanges(k8sClient kubernetes.Interface, rawNamespace corev1.Namespac
 	for _, item := range limitRange.Items {
 		limitRanges = append(limitRanges, limitrange.ToLimitRangeItem(&item)...)
 	}
-	
+
 	return limitRanges, nil
 }
-
-

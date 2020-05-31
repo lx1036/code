@@ -33,6 +33,7 @@ type MetricPromise struct {
 	Metric chan *Metric
 	Error  chan error
 }
+
 // Metric is a format of data used in this module. This is also the format of data that is being sent by backend API.
 type Metric struct {
 	// DataPoints is a list of X, Y int64 data points, sorted by X.

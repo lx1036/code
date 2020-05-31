@@ -11,7 +11,7 @@ type SortQuery struct {
 
 type SortBy struct {
 	Ascending bool
-	Property PropertyName
+	Property  PropertyName
 }
 type PropertyName string
 
@@ -19,6 +19,6 @@ func parseSortQueryFromRequest(context *gin.Context) *SortQuery {
 	strings.Split(context.Query("sortBy"), ",")
 }
 
-func NewSortQuery(sortQuery []string) *SortQuery  {
+func NewSortQuery(sortQuery []string) *SortQuery {
 
 }

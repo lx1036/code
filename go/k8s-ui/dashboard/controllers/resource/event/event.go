@@ -16,7 +16,7 @@ import (
 var FailedReasonPartials = []string{"failed", "err", "exceeded", "invalid", "unhealthy",
 	"mismatch", "insufficient", "conflict", "outof", "nil", "backoff"}
 
-func GetPodsEventWarnings(events []corev1.Event, pods []corev1.Pod) []Event {
+func GetPodsWarningEvents(events []corev1.Event, pods []corev1.Pod) []Event {
 
 }
 
@@ -56,9 +56,9 @@ func ListNamespaceEventsByQuery(
 	if err != nil {
 		return EventList{}, err
 	}
-	
+
 	eventList := toEventList(FillEventsType(rawEventList.Items))
-	
+
 	return eventList, nil
 }
 
@@ -72,7 +72,7 @@ func FillEventsType(events []corev1.Event) []corev1.Event {
 			}
 		}
 	}
-	
+
 	return events
 }
 
@@ -85,18 +85,18 @@ func toEventList(rawEvents []corev1.Event) EventList {
 
 	var events []Event
 	for _, event := range rawEvents {
-		 events = append(events,  Event{
-			ObjectMeta: common.NewObjectMeta(event.ObjectMeta),
-			TypeMeta: common.NewTypeMeta(common.ResourceKindEvent),
-			Message: event.Message,
+		events = append(events, Event{
+			ObjectMeta:      common.NewObjectMeta(event.ObjectMeta),
+			TypeMeta:        common.NewTypeMeta(common.ResourceKindEvent),
+			Message:         event.Message,
 			SourceComponent: event.Source.Component,
-			SourceHost: event.Source.Host,
-			SubObject: event.InvolvedObject.FieldPath,
-			Count: event.Count,
-			FirstSeen: event.FirstTimestamp,
-			LastSeen: event.LastTimestamp,
-			Reason: event.Reason,
-			Type: event.Type,
+			SourceHost:      event.Source.Host,
+			SubObject:       event.InvolvedObject.FieldPath,
+			Count:           event.Count,
+			FirstSeen:       event.FirstTimestamp,
+			LastSeen:        event.LastTimestamp,
+			Reason:          event.Reason,
+			Type:            event.Type,
 		})
 	}
 
@@ -111,6 +111,6 @@ func isFailedReason(reason string, partials ...string) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
