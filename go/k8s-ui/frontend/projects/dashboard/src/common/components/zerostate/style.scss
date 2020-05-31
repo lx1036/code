@@ -1,0 +1,21 @@
+
+
+@import '../../../variables';
+@import '../../../mixins';
+
+.kd-zerostate-icon {
+  @include kd-icon-size($body-font-size-base);
+  vertical-align: middle;
+}
+
+.kd-zerostate-title {
+  font-size: $headline-font-size-base;
+  font-weight: $regular-font-weight;
+  margin-bottom: $baseline-grid / 2;
+}
+
+.kd-zerostate-text {
+  font-size: $body-font-size-base;
+  font-weight: $regular-font-weight;
+  word-break: break-all;
+}

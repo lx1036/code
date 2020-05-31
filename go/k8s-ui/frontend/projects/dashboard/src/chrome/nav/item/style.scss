@@ -1,0 +1,36 @@
+
+
+@import '../../../variables';
+
+:host {
+  display: block;
+}
+
+.kd-nav-item-button {
+  border-radius: $baseline-grid / 4;
+  display: block;
+  font-weight: $regular-font-weight;
+  height: 5.5 * $baseline-grid;
+  line-height: 5.5 * $baseline-grid;
+  margin: 0;
+  max-height: 5.5 * $baseline-grid;
+  padding: 0 (2 * $baseline-grid) 0 (1.5 * $baseline-grid);
+  text-align: left;
+  text-transform: none;
+  white-space: nowrap;
+  width: 100%;
+}
+
+:host-context(.kd-nav-item) {
+  .kd-nav-item-button {
+    line-height: 4 * $baseline-grid;
+    max-height: 4 * $baseline-grid;
+    min-height: 4 * $baseline-grid;
+  }
+}
+
+:host-context(.kd-nav-group-item) {
+  .kd-nav-item-button {
+    font-weight: $bold-font-weight;
+  }
+}

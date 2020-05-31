@@ -1,0 +1,28 @@
+
+
+@import '../../../variables';
+
+.kd-block {
+  display: block;
+}
+
+.kd-deploy-input-row {
+  margin-bottom: $baseline-grid;
+  margin-top: $baseline-grid;
+}
+
+$bar-height: .5px;
+
+::ng-deep mat-progress-bar {
+  &.kd-deploy-form-progress {
+    clear: left;
+    height: $bar-height;
+    margin-bottom: -$bar-height;
+    overflow: hidden;
+    top: 10 * $bar-height;
+
+    &:not(.kd-deploy-form-progress-show) {
+      visibility: hidden;
+    }
+  }
+}

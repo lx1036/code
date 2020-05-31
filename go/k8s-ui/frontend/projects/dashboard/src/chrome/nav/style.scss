@@ -1,0 +1,41 @@
+
+
+@import '../../variables';
+
+.kd-nav {
+  background-color: transparent;
+  font-size: $body-font-size-base;
+  height: 100%;
+  overflow: hidden;
+  overflow-y: auto;
+  white-space: nowrap;
+
+  .mat-divider {
+    margin: $baseline-grid $baseline-grid (2 * $baseline-grid) 0;
+  }
+
+  // Children of kd-nav should not shrink to prevent layout issues on IE.
+  & > * {
+    flex-shrink: 0;
+  }
+}
+
+.kd-nav-group {
+  margin-right: $baseline-grid;
+
+  &:last-child {
+    > .kd-nav-item {
+      &:last-child {
+        padding-bottom: 2 * $baseline-grid;
+      }
+    }
+  }
+}
+
+.kd-nav-group-item {
+  margin-left: 1.5 * $baseline-grid;
+}
+
+.kd-nav-item {
+  margin-left: 3 * $baseline-grid;
+}

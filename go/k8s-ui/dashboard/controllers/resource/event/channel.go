@@ -2,39 +2,34 @@ package event
 
 import (
 	"context"
-	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/dataselect"
-	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/namespace"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
 type EventListChannel struct {
-	List chan *corev1.EventList
+	List  chan *corev1.EventList
 	Error chan error
 }
 
-
 func GetEventListChannelWithOptions(
 	client kubernetes.Interface,
-	namespaceQuery *namespace.NamespaceQuery,
+	namespace string,
+	options metav1.ListOptions,
 	numReads int) EventListChannel {
 	channel := EventListChannel{
-		List: make(chan *corev1.EventList, numReads),
+		List:  make(chan *corev1.EventList, numReads),
 		Error: make(chan error, numReads),
 	}
-	
-	
+
 	go func() {
-		list, err := client.CoreV1().Events(namespaceQuery.GetNamespace()).List(context.TODO(), dataselect.ListEverything)
-		
-		for i:=0; i< numReads; i++ {
+		list, err := client.CoreV1().Events(namespace).List(context.TODO(), options)
+
+		for i := 0; i < numReads; i++ {
 			channel.List <- list
 			channel.Error <- err
 		}
 	}()
-	
+
 	return channel
 }
-
-
-

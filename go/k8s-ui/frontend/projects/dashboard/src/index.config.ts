@@ -1,13 +1,9 @@
 
 
-// Override default material tooltip values.
-import {MatTooltipDefaultOptions} from "@angular/material/tooltip";
+import {InjectionToken} from '@angular/core';
+import {MatTooltipDefaultOptions} from '@angular/material/tooltip';
 
-export const KD_TOOLTIP_DEFAULT_OPTIONS: MatTooltipDefaultOptions = {
-  showDelay: 500,
-  hideDelay: 0,
-  touchendHideDelay: 0,
-};
+export let CONFIG_DI_TOKEN = new InjectionToken<Config>('kd.config');
 
 export interface Config {
   authTokenCookieName: string;
@@ -23,4 +19,11 @@ export const CONFIG: Config = {
   csrfHeaderName: 'X-CSRF-TOKEN',
   skipLoginPageCookieName: 'skipLoginPage',
   defaultNamespace: 'default',
+};
+
+// Override default material tooltip values.
+export const KD_TOOLTIP_DEFAULT_OPTIONS: MatTooltipDefaultOptions = {
+  showDelay: 500,
+  hideDelay: 0,
+  touchendHideDelay: 0,
 };

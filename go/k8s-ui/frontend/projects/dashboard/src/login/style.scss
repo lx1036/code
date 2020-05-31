@@ -1,0 +1,41 @@
+
+
+@import '../variables';
+
+.kd-login-container {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+}
+
+.kd-login-card {
+  grid-column: 3 / 8;
+  grid-row: 2;
+}
+
+.kd-login-mode-description {
+  padding: $baseline-grid (3.5 * $baseline-grid) (2 * $baseline-grid);
+}
+
+.kd-login-input {
+  padding: 0 (3.5 * $baseline-grid);
+}
+
+.kd-login-button {
+  margin: (4 * $baseline-grid) $baseline-grid $baseline-grid 0;
+}
+
+.kd-error-container {
+  align-self: end;
+  grid-column: 3 / 8;
+  grid-row: 1;
+  justify-self: stretch;
+}
+
+.kd-error-text {
+  text-align: left;
+}
+
+:host {
+  height: 100vh;
+}

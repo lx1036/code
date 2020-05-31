@@ -1,0 +1,14 @@
+
+
+@import '../variables';
+@import '../mixins';
+
+.kd-about-logo-icon {
+  @include kd-icon-size(8 * $baseline-grid);
+
+  margin: 0 (2 * $baseline-grid) 0 0;
+}
+
+.kd-error-icon {
+  margin-right: $baseline-grid;
+}

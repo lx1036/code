@@ -6,7 +6,6 @@ import (
 )
 
 type ResourceChannels struct {
-	PodListChannel pod.PodListChannel
+	PodListChannel   pod.PodListChannel
 	EventListChannel event.EventListChannel
 }
-

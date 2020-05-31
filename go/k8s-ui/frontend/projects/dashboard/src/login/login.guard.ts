@@ -3,7 +3,7 @@ import {ActivatedRouteSnapshot, CanActivate, Router, RouterStateSnapshot, UrlTre
 import {Observable, of} from "rxjs";
 import {AuthService} from "../common/services/global/authentication";
 import {catchError, first, switchMap} from "rxjs/operators";
-import {LoginStatus} from "../typings/backend-api";
+import {LoginStatus} from "../typings/backendapi";
 
 
 @Injectable()

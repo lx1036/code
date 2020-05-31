@@ -1,0 +1,26 @@
+
+
+@import '../../../variables';
+
+:host {
+  display: block;
+  padding: 0 $baseline-grid 0 (3 * $baseline-grid);
+
+  .kd-namespace-select-title {
+    font-family: $font-family-sans;
+    font-size: $caption-font-size-base;
+  }
+}
+
+.kd-namespace-select-input-container {
+  font-weight: $bold-font-weight;
+  margin-right: $baseline-grid;
+  width: 100%;
+}
+
+.kd-namespace-select-input {
+  border: 0;
+  height: 3 * $baseline-grid;
+  outline: none;
+  padding: (2 * $baseline-grid) 0 (2 * $baseline-grid) (2 * $baseline-grid);
+}

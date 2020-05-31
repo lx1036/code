@@ -1,0 +1,29 @@
+
+
+@import '../../../../variables';
+
+:host {
+  display: flex;
+  flex: 1 1 auto;
+}
+
+.kd-resource-card-list-filter-wrapper {
+  padding-right: ($baseline-grid / 2);
+}
+
+.kd-search-icon {
+  cursor: pointer;
+  outline: none;
+}
+
+.kd-search-input {
+  border-bottom: 1px solid;
+  border-left-width: 0;
+  border-right-width: 0;
+  border-top-width: 0;
+  outline: none;
+}
+
+.kd-search-container {
+  user-select: none;
+}

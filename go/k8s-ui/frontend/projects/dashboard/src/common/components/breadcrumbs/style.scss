@@ -1,0 +1,27 @@
+
+
+@import '../../../variables';
+
+.kd-breadcrumbs-container {
+  display: flex;
+  font-size: $subhead-font-size-base-lg;
+  padding: (.25 * $baseline-grid) 0 0 $baseline-grid;
+
+  a {
+    color: inherit;
+  }
+}
+
+.kd-faded-breadcrumb {
+  color: inherit;
+  opacity: .54;
+}
+
+.kd-inline-breadcrumb {
+  display: flex;
+}
+
+.kd-breadcrumb-divider {
+  align-self: center;
+  padding: 0 (.5 * $baseline-grid);
+}

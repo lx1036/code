@@ -1,18 +1,13 @@
 package event
 
-import corev1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-type ObjectMeta struct {
-
-}
-
-type TypeMeta struct {
-
-}
+import (
+	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 type Event struct {
-	ObjectMeta ObjectMeta `json:"objectMeta"`
-	TypeMeta TypeMeta `json:"typeMeta"`
+	ObjectMeta common.ObjectMeta `json:"objectMeta"`
+	TypeMeta   common.TypeMeta   `json:"typeMeta"`
 
 	// A human-readable description of the status of related object.
 	Message string `json:"message"`
@@ -32,10 +27,10 @@ type Event struct {
 	Count int32 `json:"count"`
 
 	// The time at which the event was first recorded.
-	FirstSeen corev1.Time `json:"firstSeen"`
+	FirstSeen metav1.Time `json:"firstSeen"`
 
 	// The time at which the most recent occurrence of this event was recorded.
-	LastSeen corev1.Time `json:"lastSeen"`
+	LastSeen metav1.Time `json:"lastSeen"`
 
 	// Short, machine understandable string that gives the reason
 	// for this event being generated.
@@ -43,4 +38,14 @@ type Event struct {
 
 	// Event type (at the moment only normal and warning are supported).
 	Type string `json:"type"`
+}
+
+type EventList struct {
+	ListMeta common.ListMeta `json:"listMeta"`
+
+	// List of events from given namespace.
+	Events []Event `json:"events"`
+
+	// List of non-critical errors, that occurred during resource retrieval.
+	Errors []error `json:"errors"`
 }

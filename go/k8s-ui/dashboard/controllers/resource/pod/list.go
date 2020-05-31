@@ -3,7 +3,6 @@ package pod
 import (
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/dataselect"
-	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/common/metric"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/event"
 	"k8s-lx1036/k8s-ui/dashboard/controllers/resource/namespace"
 	corev1 "k8s.io/api/core/v1"
@@ -12,27 +11,24 @@ import (
 )
 
 type Pod struct {
-	Metrics *PodMetrics `json:"metrics"`
+	Metrics  *PodMetrics   `json:"metrics"`
 	Warnings []event.Event `json:"warnings"`
 }
 
-
 type PodList struct {
-	Pods []Pod `json:"pods"`
-	Errors []error `json:"errors"`
+	Pods   []Pod                 `json:"pods"`
+	Errors []error               `json:"errors"`
 	Status common.ResourceStatus `json:"status"`
-	
+
 	Metrics []common.Metric `json:"metrics"`
-	
 }
 
-
 func ListPod(k8sClient kubernetes.Interface,
-	metricClient metric.MetricClient,
+	//metricClient metric.MetricClient,
 	namespaceQuery *namespace.NamespaceQuery,
-	dataSelectQuery *dataselect.DataSelectQuery)  {
+	dataSelectQuery *dataselect.DataSelectQuery) PodList {
 	channels := common.ResourceChannels{
-		PodListChannel: GetPodListChannelWithOptions(k8sClient, namespaceQuery, metav1.ListOptions{}, 1),
+		PodListChannel:   GetPodListChannelWithOptions(k8sClient, namespaceQuery, metav1.ListOptions{}, 1),
 		EventListChannel: event.GetEventListChannelWithOptions(k8sClient, namespaceQuery, 1),
 	}
 
@@ -43,9 +39,8 @@ func ListPod(k8sClient kubernetes.Interface,
 	events := <-channels.EventListChannel.List
 	err2 := <-channels.EventListChannel.Error
 
-	
 	// merge pod/events
-	podList := ToPodList(pods.Items, events.Items, dataSelectQuery, metricClient)
+	podList := ToPodList(pods.Items, events.Items, dataSelectQuery)
 	podList.Status = getPodStatus(pods, events.Items)
 
 	return podList
@@ -53,21 +48,19 @@ func ListPod(k8sClient kubernetes.Interface,
 
 func GetPodList(client kubernetes.Interface) {
 
-	
-	
 }
 
 func ToPodList(pods []corev1.Pod, events []corev1.Event) PodList {
 	podList := PodList{
 		Pods: make([]Pod, 0),
 	}
-	
+
 	for _, pod := range pods {
 		warnings := event.GetPodWarningEvents(events, []corev1.Pod{pod})
 		podDetail := podWithMetricsEvents(&pod, metrics, warnings)
 		podList.Pods = append(podList.Pods, podDetail)
 	}
-	
+
 }
 
 func podWithMetricsEvents(pod *Pod, metrics *PodMetrics, events []corev1.Event) Pod {
@@ -75,7 +68,3 @@ func podWithMetricsEvents(pod *Pod, metrics *PodMetrics, events []corev1.Event) 
 		Metrics: metrics,
 	}
 }
-
-
-
-

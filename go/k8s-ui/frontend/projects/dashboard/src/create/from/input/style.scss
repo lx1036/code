@@ -1,0 +1,20 @@
+
+
+@import '../../../variables';
+
+.kd-create-from-input-info {
+  margin-bottom: $baseline-grid * 3;
+  padding: 0 (.5 * $baseline-grid);
+
+  .material-icons {
+    font-size: $body-font-size-base;
+  }
+}
+
+.kd-create-from-input-button {
+  margin-left: 0;
+}
+
+::ng-deep .kd-ace {
+  margin-bottom: $baseline-grid * 3;
+}

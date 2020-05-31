@@ -1,0 +1,13 @@
+
+
+@import '../../../variables';
+
+.kd-graph-container {
+  flex: auto;
+  text-align: center;
+}
+
+.kd-graph-title {
+  font-size: $subhead-font-size-base;
+  padding-bottom: 2 * $baseline-grid;
+}

@@ -35,7 +35,7 @@ func parseMetricQueryFromRequest(context *gin.Context) *MetricQuery {
 
 func NewMetricQuery(metricNames []string, aggregations AggregationModes) *MetricQuery {
 	return &MetricQuery{
-		MetricNames: metricNames,
+		MetricNames:  metricNames,
 		Aggregations: aggregations,
 	}
 }

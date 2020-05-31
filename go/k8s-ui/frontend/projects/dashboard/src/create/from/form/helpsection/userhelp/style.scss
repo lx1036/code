@@ -1,0 +1,17 @@
+
+
+@import '../../../../../variables';
+
+.kd-user-help ::ng-deep {
+  font-size: $body-font-size-base;
+
+  .material-icons {
+    font-size: $caption-font-size-base;
+    vertical-align: middle;
+  }
+
+  a {
+    opacity: 1;
+    text-decoration: none;
+  }
+}
