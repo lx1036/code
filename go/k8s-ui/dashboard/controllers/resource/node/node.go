@@ -52,6 +52,7 @@ func toNode(rawNode corev1.Node, podList *corev1.PodList) Node {
 func getNodePods(k8sClient kubernetes.Interface, rawNode corev1.Node) *corev1.PodList {
 
 }
+
 // ???
 func getNodeConditionStatus(node corev1.Node, conditionType corev1.NodeConditionType) corev1.ConditionStatus {
 	for _, condition := range node.Status.Conditions {
@@ -61,6 +62,7 @@ func getNodeConditionStatus(node corev1.Node, conditionType corev1.NodeCondition
 	}
 	return corev1.ConditionUnknown
 }
+
 // 获取该 Node 上可用资源 cpu/memory
 func getNodeAllocatedResources(rawNode corev1.Node, podList *corev1.PodList) (NodeAllocatedResources, error) {
 

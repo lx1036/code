@@ -8,17 +8,17 @@ import (
 
 type NodeList struct {
 	ListMeta common.ListMeta `json:"listMeta"`
-	Metrics []metric.Metric `json:"metrics"`
+	Metrics  []metric.Metric `json:"metrics"`
 
-	Nodes []Node `json:"nodes"`
+	Nodes  []Node  `json:"nodes"`
 	Errors []error `json:"errors"`
 }
 
 type Node struct {
 	ObjectMeta common.ObjectMeta `json:"objectMeta"`
-	TypeMeta common.TypeMeta `json:"typeMeta"`
+	TypeMeta   common.TypeMeta   `json:"typeMeta"`
 
-	Ready corev1.ConditionStatus `json:"ready"`
+	Ready              corev1.ConditionStatus `json:"ready"`
 	AllocatedResources NodeAllocatedResources `json:"allocatedResources"`
 }
 
