@@ -4,9 +4,6 @@
 通过nodeSelector选择边缘节点。
 
 
-(2)什么是边缘节点？如何部署？
-**[edge node](https://jimmysong.io/kubernetes-handbook/practice/edge-node-configuration.html)**
-
 
 
 
