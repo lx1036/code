@@ -1,5 +1,6 @@
 
-
+# 查看证书信息
+openssl x509 -noout -text -in ca.crt
 
 openssl genrsa -out developer.key 2048 # 创建证书私钥
 openssl req -new -key developer.key -out developer.csr -subj "/CN=developer" # 私钥创建一个 csr(证书签名请求)文件
