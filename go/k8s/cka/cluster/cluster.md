@@ -35,3 +35,6 @@ spec:
 ```
 
 4. 如何获取一个 Node 的 memory/cpu request and limit?
+
+
+5. 列出一个 Node 上所有部署的 Pods？
