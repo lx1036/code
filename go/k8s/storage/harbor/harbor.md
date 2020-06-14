@@ -30,3 +30,7 @@
 # Docs
 **[使用Harbor搭建企业级的Docker私有镜像库](https://www.jianshu.com/p/95191c4eed92)**
 
+
+## harbor-ui 和 harbor-registry 交互
+
+

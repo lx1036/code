@@ -1,0 +1,61 @@
+
+version: "3.7"
+
+volumes:
+  harbor_registry_data: {}
+  harbor_redis_data: {}
+
+networks:
+  harbor:
+    external: false
+
+services:
+  registry:
+    image: "docker.io/goharbor/registry-photon:v1.10.3"
+    container_name: harbor-registry
+    volumes:
+      - harbor_registry_data:/var/lib/registry
+      - ./registry/:/etc/registry
+    command:
+      ["serve", "/etc/registry/config.yml"]
+    depends_on:
+      - redis
+    links:
+      - redis:redis.svc.default
+    networks:
+      - harbor
+  redis:
+    image: "docker.io/goharbor/redis-photon:v1.10.3"
+    container_name: harbor-redis
+    volumes:
+    - harbor_redis_data:/data
+    networks:
+      - harbor
+  ui:
+    image: "docker.io/goharbor/harbor-portal:v1.10.3"
+    container_name: harbor-ui
+    env_file:
+      - ./ui/env
+    volumes:
+    - ./ui/app.conf:/etc/ui/app.conf
+    - ./ui/private_key.pem:/etc/ui/private_key.pem
+    networks:
+      - harbor
+  adminserver:
+    image: "docker.io/goharbor/harbor-portal:v1.10.3"
+
+  proxy:
+    image: "docker.io/goharbor/nginx-photon:v1.10.3"
+    container_name: harbor-proxy
+    volumes:
+    - ./nginx/nginx.https.conf:/etc/nginx/nginx.conf
+    - ./nginx/ssl/so-qihoo-net/:/etc/nginx/ssl/
+    ports:
+    - 80:80
+    - 443:443
+    - 4443:4443
+    depends_on:
+      - ui
+      - registry
+    networks:
+      - harbor
