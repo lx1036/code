@@ -1,0 +1,6 @@
+
+
+- name: Copy nginx configuration for wordpress
+  template: src=default.conf dest=/tmp/default.conf
+#  notify: restart nginx
+
