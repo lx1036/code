@@ -1,7 +1,9 @@
 
 ---
 
-- hosts:
+- name: "for test"
+  hosts:
     - acp
   roles:
+    - nginx
     - copy_files

@@ -1,25 +1,21 @@
 
-#- name: "copy files"
-#  copy:
-#    src: '{{item}}'
-#    dest: '/root/{{item}}'
-#    owner: root
-#    group: root
-#    mode: '0644'
-#  with_items:
-#    - server_a
-#  tags:
-#    - push
+- name: prepare some dirs
+  file: name={{ item }} state=directory
+  with_items:
+#    - "{{ bin_dir }}"
+#    - "{{ ca_dir }}"
+    - /tmp/.kube
+
+- name: "copy files"
+  copy:
+    src: '{{item}}'
+    dest: '/tmp/{{item}}'
+  with_items:
+    - server_a
 
 - name: "template conf file"
   template:
     src: config_a.ini.j2
-    dest: /root/config_a.ini
-    owner: root
-    group: root
-    mode: '0644'
+    dest: /tmp/config_a.ini
   with_items:
     - config_a.ini
-  tags:
-    - push
-    - conf
