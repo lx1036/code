@@ -1,0 +1,75 @@
+
+- name: main.yml | Installing Docker
+  yum:
+    name: docker
+    state: latest
+  when: ansible_os_family == "RedHat"
+
+- name: main.yml | Installing Docker
+  apt:
+    name: docker-engine
+    state: latest
+  when: ansible_os_family == "Debian"
+
+- name: main.yml | Templating out the network-environment
+  template:
+    src: network-environment.j2
+    dest: /etc/network-environment
+    owner: root
+    group: root
+    mode: 0644
+
+- name: main.yml | Building calico's directory scrucuture
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: 0755
+  with_items:
+    - "/etc/cni/net.d/"
+    - "/opt/cni/bin/"
+
+- name: main.yml | Fetching calico
+  get_url:
+    url: "https://github.com/projectcalico/cni-plugin/releases/download/v{{ calico.version }}/calico-amd64"
+    dest: /opt/cni/bin/calico
+    mode: 0755
+
+- name: main.yml | Fetching calicoi IPAM
+  get_url:
+    url: "https://github.com/projectcalico/cni-plugin/releases/download/v{{ calico.version }}/calico-ipam-amd64"
+    dest: /opt/cni/bin/calico-ipam
+    mode: 0755
+
+- name: main.yml | Templating out Calico CNI config
+  template:
+    src: 10-calico.conf.j2
+    dest: /etc/cni/net.d/10-calico.conf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: main.yml | Fetching calicoctl
+  get_url:
+    url: "https://github.com/projectcalico/calicoctl/releases/download/v{{ calico.version }}/calicoctl"
+    dest: /usr/bin/calicoctl
+    mode: 0755
+
+- name: main.yml | Fetching calico container
+  docker:
+    name: calico
+    image: "calico/node:v{{ calico.version }}"
+    state: present
+
+- name: main.yml | Templating out calico's systemd script
+  template:
+    src: calico.service.j2
+    dest: /usr/lib/systemd/system/calico-node.service
+    owner: root
+    group: root
+    mode: 0644
+
+- name: main.yml | Starting calico
+  service:
+    name: calico-node
+    state: started
+    enabled: yes

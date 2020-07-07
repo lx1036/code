@@ -1,9 +1,16 @@
 
 ---
 
-- name: "for test"
+#- name: "for test"
+#  hosts:
+#    - acp
+#  roles:
+#    - nginx
+#    - copy_files
+
+- name: "install etcd"
   hosts:
     - acp
+  remote_user: root
   roles:
-    - nginx
-    - copy_files
+    - etcd
