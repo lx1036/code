@@ -25,7 +25,7 @@ services:
   # migrate 数据表
   kong-migrations:
     image: kong:1.5.1
-    command: kong migrations bootstrap && kong migrations up && kong migrations finish
+    command: kong migrations bootstrap # Bootstrap the database and run all migrations
     environment:
       KONG_DATABASE: postgres # 数据持久化方式，使用postgres数据库
       KONG_PG_HOST: kong-database.svc # 数据库容器名称,Kong连接数据时使用些名称
