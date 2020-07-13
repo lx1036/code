@@ -1,0 +1,58 @@
+
+## https://github.com/vmware/ansible-etcd-cluster/blob/master/tasks/main.yml
+
+
+- name: main.yml | Checking for etcd processes
+  shell: "etcd --version | grep etcd | grep {{ etcd.version }}"
+  register: etcd_present
+  ignore_errors: true
+
+- name: main.yml | Fetching etcd binaries
+  get_url:
+    url: "https://github.com/etcd-io/etcd/releases/download/v{{ etcd.version }}/etcd-v{{ etcd.version }}-{{ etcd.arch }}.tar.gz"
+    dest: /tmp/etcd.tar.gz
+    mode: 0640
+  when: etcd_present is failed
+
+- name: ensure directory exists
+  file:
+    path: "/tmp/etcd-v{{ etcd.version }}-{{ etcd.arch }}"
+    state: directory
+
+- name: main.yml | Unpacking etcd binaries
+  unarchive:
+    src: /tmp/etcd.tar.gz
+    dest: "/tmp/"
+    remote_src: yes
+  when: etcd_present is failed
+
+- name: main.yml | Installing etcd binaries
+  copy:
+    src: "/tmp/etcd-v{{ etcd.version }}-{{ etcd.arch }}/{{ item }}"
+    dest: /usr/bin
+    remote_src: yes
+    mode: '0755'
+  when: etcd_present is failed
+  with_items:
+    - etcd
+    - etcdctl
+
+#- name: main.yml | Cleaning up
+#  file:
+#    path: "/tmp/etcd-v{{ etcd.version }}-{{ etcd.arch }}"
+#    state: absent
+#  when: etcd_present is failed
+
+- name: main.yml | Templating out etcd systemd script
+  template:
+    src: etcd.service.j2
+    dest: /usr/lib/systemd/system/etcd.service
+    owner: root
+    group: root
+    mode: 0644
+
+- name:  main.yml | Starting etcd up
+  service:
+    name: etcd
+    state: started
+    enabled: yes

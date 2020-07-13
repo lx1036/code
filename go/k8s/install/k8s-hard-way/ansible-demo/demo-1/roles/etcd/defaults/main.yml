@@ -1,0 +1,6 @@
+
+etcd:
+  version: "3.4.9"
+  port: 2379
+  arch: "linux-amd64"
+

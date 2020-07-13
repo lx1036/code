@@ -1,0 +1,13 @@
+
+
+[Unit]
+Description=etcd
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/etcd --name {{ ansible_default_ipv4.address }} --addr {{ ansible_default_ipv4.address }}:{{ etcd.port }} --data-dir /var/lib/etcd --bind-addr 0.0.0.0:{{ etcd.port }}
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

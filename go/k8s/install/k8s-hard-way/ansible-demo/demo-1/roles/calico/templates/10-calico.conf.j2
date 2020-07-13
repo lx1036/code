@@ -1,0 +1,9 @@
+{
+  "name": "calico-k8s-network",
+  "type": "calico",
+  "etcd_authority": "{{ ansible_default_ipv4.address }}:{{ etcd.port }}",
+  "log_level": "info",
+  "ipam": {
+      "type": "calico-ipam"
+  }
+}
