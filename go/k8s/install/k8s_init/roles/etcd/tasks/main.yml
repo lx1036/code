@@ -1,0 +1,15 @@
+
+- name: prepare some dirs
+  file: name={{ item }} state=directory
+  with_items:
+    - "{{ bin_dir }}"
+    - "{{ ca_dir }}"
+    - "/etc/etcd/ssl"    # etcd 证书目录
+    - "/var/lib/etcd"    # etcd 工作目录
+
+- name: 下载etcd二进制文件
+  copy: src={{ base_dir }}/bin/{{ item }} dest={{ bin_dir }}/{{ item }} mode=0755
+  with_items:
+    - etcd
+    - etcdctl
+  tags: upgrade_etcd
