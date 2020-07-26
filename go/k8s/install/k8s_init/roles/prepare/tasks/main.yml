@@ -1,0 +1,65 @@
+
+# 系统基础软件环境
+- name: apt更新缓存刷新
+  apt: update_cache=yes cache_valid_time=72000
+  ignore_errors: true
+  when:
+    - 'ansible_distribution in ["Ubuntu","Debian"]'
+    - 'INSTALL_SOURCE != "offline"'
+
+- import_tasks: ubuntu.yml
+  when: 'ansible_distribution in ["Ubuntu","Debian"]'
+
+- import_tasks: centos.yml
+  when: 'ansible_distribution in ["CentOS","RedHat","Amazon"]'
+
+# 公共系统参数设置
+- import_tasks: common.yml
+
+- name: prepare some dirs
+  file: name={{ item }} state=directory
+  with_items:
+    - "{{ bin_dir }}"
+    - "{{ ca_dir }}"
+    - /root/.kube
+
+- name: 分发证书工具 CFSSL
+  copy: src={{ base_dir }}/bin/{{ item }} dest={{ bin_dir }}/{{ item }} mode=0755
+  with_items:
+    - cfssl
+    - cfssl-certinfo
+    - cfssljson
+
+- block:
+    - name: 分发证书相关
+      copy: src={{ base_dir }}/.cluster/ssl/{{ item }} dest={{ ca_dir }}/{{ item }}
+      with_items:
+        - admin.pem
+        - admin-key.pem
+        - ca.pem
+        - ca-key.pem
+        - ca-config.json
+
+    - name: 添加 kubectl 命令自动补全
+      lineinfile:
+        dest: ~/.bashrc
+        state: present
+        regexp: 'kubectl completion'
+        line: 'source <(kubectl completion bash)'
+
+    - name: 分发 kubeconfig配置文件
+      copy: src=/root/.kube/config dest=/root/.kube/config
+
+    - name: 分发 kube-proxy.kubeconfig配置文件
+      copy: src={{ base_dir }}/.cluster/kube-proxy.kubeconfig dest=/etc/kubernetes/kube-proxy.kubeconfig
+
+    - name: 分发 kube-controller-manager.kubeconfig配置文件
+      copy: src={{ base_dir }}/.cluster/kube-controller-manager.kubeconfig dest=/etc/kubernetes/kube-controller-manager.kubeconfig
+      when: "inventory_hostname in groups['kube-master']"
+
+    - name: 分发 kube-scheduler.kubeconfig配置文件
+      copy: src={{ base_dir }}/.cluster/kube-scheduler.kubeconfig dest=/etc/kubernetes/kube-scheduler.kubeconfig
+      when: "inventory_hostname in groups['kube-master']"
+
+  when: "inventory_hostname in groups['kube-master'] or inventory_hostname in groups['kube-node']"
+

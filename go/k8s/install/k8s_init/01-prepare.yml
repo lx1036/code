@@ -1,0 +1,23 @@
+
+#- hosts:
+#    - kube-master
+#    - kube-node
+#    - etcd
+#    - edge-node
+#    - chrony
+#  roles:
+#    - {role: chrony, when: "groups['chrony']|length > 0"}
+
+
+- hosts:
+    - localhost
+  roles:
+    - deploy
+
+# prepare tasks for all nodes
+- hosts:
+    - kube-master
+    - kube-node
+    - etcd
+  roles:
+    - prepare
