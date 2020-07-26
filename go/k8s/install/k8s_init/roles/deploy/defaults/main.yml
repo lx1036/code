@@ -1,0 +1,8 @@
+
+# CA 证书相关参数
+CA_EXPIRY: "876000h"
+CERT_EXPIRY: "438000h"
+
+CLUSTER_NAME: "cluster1"
+# apiserver 默认第一个master节点
+KUBE_APISERVER: "https://{{ groups['kube-master'][0] }}:6443"

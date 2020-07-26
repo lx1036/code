@@ -1,0 +1,15 @@
+
+
+# to create CA, kubeconfig, kube-proxy.kubeconfig etc.
+- hosts:
+    - localhost
+  roles:
+    - deploy
+
+# prepare tasks for all nodes
+- hosts:
+    - kube-master
+    - kube-node
+    - etcd
+  roles:
+    - prepare
