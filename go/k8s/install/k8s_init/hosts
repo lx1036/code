@@ -1,0 +1,10 @@
+
+[kube-master]
+
+[kube-node]
+
+[etcd]
+
+[edge-node]
+
+[chrony]
