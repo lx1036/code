@@ -1,0 +1,7 @@
+
+
+
+- hosts:
+    - shbt
+  roles:
+    - ssh
