@@ -9,6 +9,7 @@ require (
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
 	github.com/containerd/containerd v1.3.2
+	github.com/coreos/etcd v3.3.22+incompatible // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/getsentry/sentry-go v0.3.0
@@ -55,7 +56,7 @@ require (
 	github.com/urfave/cli v1.22.2
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
-	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
+	go.etcd.io/etcd v3.3.22+incompatible // indirect
 	go.uber.org/zap v1.14.1
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e

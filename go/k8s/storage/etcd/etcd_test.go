@@ -4,9 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
-	"go.etcd.io/etcd/pkg/transport"
 	"google.golang.org/grpc/grpclog"
 	"log"
 	"os"
@@ -20,7 +17,7 @@ go run etcd.go --endpoint localhost:12379
 */
 
 func TestClientv3(test *testing.T) {
-	endpoint := flag.String("endpoint", "localhost:12379", "talk with client")
+	endpoint := flag.String("endpoint", "localhost:2379", "talk with client")
 	flag.Parse()
 
 	clientv3.SetLogger(grpclog.NewLoggerV2(os.Stderr, os.Stderr, os.Stderr))
