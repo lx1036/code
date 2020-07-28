@@ -20,7 +20,7 @@ go run etcd.go --endpoint localhost:12379
 */
 
 func TestClientv3(test *testing.T) {
-	endpoint := flag.String("endpoint", "localhost:2379", "talk with client")
+	endpoint := flag.String("endpoint", "localhost:12379", "talk with client")
 	flag.Parse()
 
 	clientv3.SetLogger(grpclog.NewLoggerV2(os.Stderr, os.Stderr, os.Stderr))
@@ -65,7 +65,7 @@ func TestClientv3(test *testing.T) {
 
 	fmt.Println(*response)
 
-	getResponse, err := client.Get(ctx, "foo")
+	getResponse, err := client.Get(ctx, "foo1")
 	if err != nil {
 		switch err {
 		case context.Canceled:
@@ -82,7 +82,7 @@ func TestClientv3(test *testing.T) {
 	fmt.Println(*getResponse)
 }
 
-// etcd --cert-file ./kubernetes.pem --key-file ./kubernetes-key.pem --trusted-ca-file ./ca.pem
+// etcd --listen-client-urls http://127.0.0.1:12379 --cert-file ./kubernetes.pem --key-file ./kubernetes-key.pem --trusted-ca-file ./ca.pem
 func TestClientv3WithTLS(test *testing.T) {
 	abs, _ := filepath.Abs(".")
 	tlsInfo := transport.TLSInfo{
@@ -97,7 +97,7 @@ func TestClientv3WithTLS(test *testing.T) {
 
 	fmt.Println(tlsConfig.MaxVersion)
 
-	endpoint := flag.String("endpoint", "localhost:2379", "talk with client")
+	endpoint := flag.String("endpoint", "localhost:12379", "talk with client")
 	flag.Parse()
 
 	clientv3.SetLogger(grpclog.NewLoggerV2(os.Stderr, os.Stderr, os.Stderr))
@@ -114,6 +114,8 @@ func TestClientv3WithTLS(test *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
+	
+	_, _ = client.Put(ctx, "foo1", "bar1")
 	response, err := client.Get(ctx, "foo1")
 	if err != nil {
 		panic(err)
