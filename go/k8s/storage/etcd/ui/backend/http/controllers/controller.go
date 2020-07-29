@@ -1,12 +1,27 @@
 package controllers
 
-import "github.com/gin-gonic/gin"
+import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"k8s-lx1036/k8s/storage/etcd/ui/backend/common"
+	"net/http"
+)
 
 type EtcdController struct {
 }
 
 func (controller *EtcdController) ListMembers() gin.HandlerFunc {
 	return func(context *gin.Context) {
+		etcdName, ok := context.Get("etcd_name")
+		if !ok {
+			context.JSON(http.StatusBadRequest, common.JsonResponse{
+				Errno:  -1,
+				Errmsg: "etcd_server is needed",
+				Data:   nil,
+			})
+		}
+		
+		fmt.Println(etcdName)
 	}
 }
 

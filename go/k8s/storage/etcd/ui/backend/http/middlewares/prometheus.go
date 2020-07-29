@@ -1,9 +1,9 @@
 package middlewares
 
 import (
-	"app/http/log/prometheus"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
+	"k8s-lx1036/k8s/storage/etcd/ui/backend/http/prometheus"
 	"time"
 )
 

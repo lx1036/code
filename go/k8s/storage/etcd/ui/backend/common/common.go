@@ -6,6 +6,13 @@ import (
 	"runtime"
 )
 
+type JsonResponse struct {
+	Errno  int         `json:"errno"`
+	Errmsg string      `json:"errmsg"`
+	Data   interface{} `json:"data"`
+}
+
+
 // 打开url
 func openURL(urlAddr string) {
 	var cmd *exec.Cmd
