@@ -56,7 +56,7 @@ require (
 	github.com/urfave/cli v1.22.2
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
-	go.etcd.io/etcd v3.3.22+incompatible // indirect
+	go.etcd.io/etcd v3.3.22+incompatible
 	go.uber.org/zap v1.14.1
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e

@@ -4,6 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
+	"go.etcd.io/etcd/pkg/transport"
 	"google.golang.org/grpc/grpclog"
 	"log"
 	"os"
@@ -79,7 +82,6 @@ func TestClientv3(test *testing.T) {
 	fmt.Println(*getResponse)
 }
 
-// etcd --listen-client-urls http://127.0.0.1:12379 --cert-file ./kubernetes.pem --key-file ./kubernetes-key.pem --trusted-ca-file ./ca.pem
 func TestClientv3WithTLS(test *testing.T) {
 	abs, _ := filepath.Abs(".")
 	tlsInfo := transport.TLSInfo{
@@ -111,7 +113,7 @@ func TestClientv3WithTLS(test *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
-	
+
 	_, _ = client.Put(ctx, "foo1", "bar1")
 	response, err := client.Get(ctx, "foo1")
 	if err != nil {
