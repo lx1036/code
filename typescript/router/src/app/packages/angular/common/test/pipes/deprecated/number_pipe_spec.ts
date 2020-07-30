@@ -42,7 +42,7 @@ import {browserDetection} from '@angular/platform-browser/testing/src/browser_ut
         });
 
         it('should not support other objects', () => {
-          expect(() => pipe.transform(new Object())).toThrowError();
+          expect(() => pipe.transform({})).toThrowError();
           expect(() => pipe.transform('123abc')).toThrowError();
         });
       });
@@ -60,7 +60,7 @@ import {browserDetection} from '@angular/platform-browser/testing/src/browser_ut
         });
 
         it('should not support other objects',
-           () => { expect(() => pipe.transform(new Object())).toThrowError(); });
+           () => { expect(() => pipe.transform({})).toThrowError(); });
       });
     });
 
@@ -82,7 +82,7 @@ import {browserDetection} from '@angular/platform-browser/testing/src/browser_ut
         });
 
         it('should not support other objects',
-           () => { expect(() => pipe.transform(new Object())).toThrowError(); });
+           () => { expect(() => pipe.transform({})).toThrowError(); });
       });
     });
 

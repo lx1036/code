@@ -14,7 +14,7 @@ import {ReflectiveKey} from './reflective_key';
 import {ReflectiveDependency, ResolvedReflectiveFactory, ResolvedReflectiveProvider, resolveReflectiveProviders} from './reflective_provider';
 
 // Threshold for the dynamic version
-const UNDEFINED = new Object();
+const UNDEFINED = {};
 
 /**
  * A ReflectiveDependency injection container used for instantiating objects and resolving

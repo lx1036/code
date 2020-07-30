@@ -15,7 +15,7 @@ import {TestBedRender3, _getTestBedRender3} from './r3_test_bed';
 import {ComponentFixtureAutoDetect, ComponentFixtureNoNgZone, TestBedStatic, TestComponentRenderer, TestModuleMetadata} from './test_bed_common';
 import {TestingCompiler, TestingCompilerFactory} from './test_compiler';
 
-const UNDEFINED = new Object();
+const UNDEFINED = {};
 
 
 let _nextRootElementId = 0;

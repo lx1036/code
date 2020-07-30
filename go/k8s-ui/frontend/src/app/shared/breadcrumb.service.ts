@@ -9,7 +9,7 @@ export class BreadcrumbService {
   }
 
   getFriendName(url: string) {
-    let urlInfo: any = new Object();
+    let urlInfo: any = {};
     const routeEnd = url.substr(url.lastIndexOf('/') + 1, url.length);
     const info: any = this.routesFriendlyNames.get(url);
     if (info !== undefined) {

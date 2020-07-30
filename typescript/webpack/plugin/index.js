@@ -22,7 +22,7 @@ class ConsoleLogOnBuildWebpackPlugin {
 // 一个 JavaScript 命名函数。
 function MyExampleWebpackPlugin() {
 
-};
+}
 
 // 在插件函数的 prototype 上定义一个 `apply` 方法。
 MyExampleWebpackPlugin.prototype.apply = function(compiler) {

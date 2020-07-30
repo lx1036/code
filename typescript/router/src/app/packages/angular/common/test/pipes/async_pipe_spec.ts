@@ -103,7 +103,7 @@ import {SpyChangeDetectorRef} from '../spies';
     });
 
     describe('Promise', () => {
-      const message = new Object();
+      const message = {};
       let pipe: AsyncPipe;
       let resolve: (result: any) => void;
       let reject: (error: any) => void;
