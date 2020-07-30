@@ -13,13 +13,13 @@ func TestViper(test *testing.T) {
 	if err := viper.ReadInConfig(); err != nil {
 		panic(err.Error())
 	}
-	
+
 	fmt.Println(viper.AllSettings())
 	var etcdServer common.EtcdServer
 	err := viper.Unmarshal(&etcdServer)
 	if err != nil {
 		panic(err.Error())
 	}
-	
+
 	fmt.Println(etcdServer)
 }

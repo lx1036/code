@@ -12,7 +12,6 @@ type JsonResponse struct {
 	Data   interface{} `json:"data"`
 }
 
-
 // 打开url
 func openURL(urlAddr string) {
 	var cmd *exec.Cmd

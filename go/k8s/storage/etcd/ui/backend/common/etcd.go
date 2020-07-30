@@ -15,9 +15,9 @@ var (
 
 func NewEtcdClient(config *EtcdServer) (*clientv3.Client, error) {
 	var (
-		client *clientv3.Client
+		client    *clientv3.Client
 		tlsConfig *tls.Config
-		err error
+		err       error
 	)
 	if config.TLSEnable {
 		tlsInfo := transport.TLSInfo{
@@ -30,7 +30,7 @@ func NewEtcdClient(config *EtcdServer) (*clientv3.Client, error) {
 			return nil, err
 		}
 	}
-	
+
 	client, err = clientv3.New(clientv3.Config{
 		Endpoints:   strings.Split(config.Endpoints, ","),
 		DialTimeout: time.Second * 5,
@@ -39,9 +39,8 @@ func NewEtcdClient(config *EtcdServer) (*clientv3.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	EtcdClient.Store(config.Name, client)
-	
+
 	return client, nil
 }
-

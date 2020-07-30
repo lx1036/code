@@ -20,7 +20,7 @@ func (controller *EtcdController) ListMembers() gin.HandlerFunc {
 				Data:   nil,
 			})
 		}
-		
+
 		fmt.Println(etcdName)
 	}
 }
