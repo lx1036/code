@@ -17,3 +17,10 @@ sudo docker run -p 8088:80 --name nginx-demo -d nginx
 sudo docker run -p 8089:80 --name nginx-demo2 -v /home/lx1036/index2.html:/usr/share/nginx/html/index.html -d nginx
 
 sudo docker container exec -it nginx-demo /bin/bash
+
+# centos
+sudo yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+sudo yum -y install docker-ce
+sudo systemctl start docker
+sudo systemctl status docker
+echo '{"debug":true,"registry-mirrors":["https://wvtedxym.mirror.aliyuncs.com"],"experimental":true}' > /etc/docker/daemon.json
