@@ -179,10 +179,11 @@ echo PrometheusWrapper\Wrapper::ins();
 package qprometheus
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"strings"
-	"errors"
-	"strconv"
+
+"errors"
+"github.com/prometheus/client_golang/prometheus"
+"strconv"
+"strings"
 )
 
 type Opts struct {
@@ -312,9 +313,10 @@ func (p *prom) LatencyLog(r LatencyRecord) (ret bool, err error) {
 
 package main
 import (
-	"fmt"
-	"demo_project/qprometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+"demo_project/qprometheus"
+"fmt"
+"github.com/prometheus/client_golang/prometheus/promhttp"
 	...
 )
 
@@ -457,7 +459,7 @@ func init_bucket_range(minVal float64, maxVal float64, bucket_count int) {
 		last_count := bucket_count - bucket_index
 		log_ratio := (log_max - log_current) / float64(last_count)
 		log_next := log_current + log_ratio
-		next := (math.Floor(math.Exp(log_next) + 0.5))
+		next := math.Floor(math.Exp(log_next) + 0.5)
 		if next > current {
 			current = next
 		} else {

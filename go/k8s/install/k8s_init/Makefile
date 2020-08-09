@@ -1,6 +1,6 @@
 
 
 prepare:
-	ansible-playbook 01-prepare.yml
+	ansible-playbook -i ./inventory/hosts.conf 01-prepare.yml
 
 

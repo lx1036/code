@@ -11,7 +11,6 @@ import (
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeClientset "k8s.io/client-go/kubernetes/fake"
-	schedulerConfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 )
 
 type ClusterCapacity struct {

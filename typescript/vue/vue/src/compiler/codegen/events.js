@@ -129,7 +129,7 @@ function genHandler (handler: ASTElementHandler | Array<ASTElementHandler>): str
           keys.push(key)
         }
       } else if (key === 'exact') {
-        const modifiers: ASTModifiers = (handler.modifiers: any)
+        const modifiers: ASTModifiers = (handler.any)
         genModifierCode += genGuard(
           ['ctrl', 'shift', 'alt', 'meta']
             .filter(keyModifier => !modifiers[keyModifier])

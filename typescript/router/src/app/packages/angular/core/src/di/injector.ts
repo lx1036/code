@@ -17,7 +17,7 @@ import {Inject, Optional, Self, SkipSelf} from './metadata';
 import {ConstructorProvider, ExistingProvider, FactoryProvider, StaticClassProvider, StaticProvider, ValueProvider} from './provider';
 
 export const SOURCE = '__source';
-const _THROW_IF_NOT_FOUND = new Object();
+const _THROW_IF_NOT_FOUND = {};
 export const THROW_IF_NOT_FOUND = _THROW_IF_NOT_FOUND;
 
 /**

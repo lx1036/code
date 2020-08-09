@@ -164,7 +164,7 @@ class Child {
   static ngComponentDef = defineComponent({
     ...
     hostVars: 1
-  });
+  })
   ...
 }
 
@@ -176,7 +176,7 @@ class Tooltip {
   static ngDirectiveDef = defineDirective({
     ...
     hostVars: 1
-  });
+  })
   ...
 }
 ```
@@ -297,7 +297,7 @@ class MyApp {
   ],
   viewProviders: [
     {provide: ServiceC, useFactory: () => new ServiceC)}
-    {provide: ServiceD, useClass: ServiceE},
+    {ServiceD, useClass: ServiceE},
   ]
   ...
 })
@@ -312,11 +312,11 @@ class Child {
           {provide: ServiceB, useValue: 'someServiceBValue'},
         ],[
           {provide: ServiceC, useFactory: () => new ServiceC())}
-          {provide: ServiceD, useClass: ServiceE},
+          {ServiceD, useClass: ServiceE},
         ]
       )
     ]
-  });
+  })
   ...
 }
 ```

@@ -177,7 +177,7 @@ func TestDeploymentSuite(test *testing.T) {
 	suite.Run(test, new(DeploymentSuite))
 }
 
-var rebase bool = false
+var rebase = false
 
 func getBaselineDataFile() string {
 	pc, file, _, _ := runtime.Caller(1)

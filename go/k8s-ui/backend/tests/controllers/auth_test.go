@@ -166,7 +166,7 @@ func (suite *AuthSuite) TestNotificationSubscribe() {
 	}
 }
 
-var rebase bool = false
+var rebase = false
 
 func Assert(actual interface{}) {
 	var baselines = map[string]map[int]interface{}{}

@@ -3,8 +3,6 @@ package utils
 import (
 	"fmt"
 	"k8s.io/client-go/tools/clientcmd"
-	schedulerConfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
-	schedulerOptions "k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 )
 
 func GetMasterFromKubeConfig(kubeConfig string) (string, error) {
