@@ -17,10 +17,15 @@ package main
 
 import (
 	"flag"
+	batchv1 "k8s-lx1036/api/v1"
+	"k8s-lx1036/controllers"
+	v1 "k8s-lx1036/k8s/concepts/kubebuilder/api/v1"
+	"k8s-lx1036/k8s/concepts/kubebuilder/controllers"
+	"os"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
@@ -34,6 +39,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
+	_ = v1.AddToScheme(scheme)
 	_ = batchv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
@@ -67,6 +73,21 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CronJob")
+		os.Exit(1)
+	}
+
+	if os.Getenv("ENABLE_WEBHOOK") == "true" {
+		if err = (&v1.CronJob{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Captain")
+			os.Exit(1)
+		}
+	}
+	if err = (&batchv1.CronJob{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "CronJob")
+		os.Exit(1)
+	}
+	if err = (&batchv1.CronJob{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "CronJob")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
