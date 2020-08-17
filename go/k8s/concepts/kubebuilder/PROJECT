@@ -2,9 +2,6 @@ domain: lx1036.kubebuilder
 repo: k8s-lx1036
 resources:
 - group: batch
-  kind: Guestbook
-  version: v1
-- group: batch
   kind: CronJob
   version: v1
 version: "2"
