@@ -2,11 +2,11 @@ package common
 
 import (
 	"crypto/tls"
-	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/pkg/transport"
 	"strings"
 	"sync"
 	"time"
+	"go.etcd.io/etcd/clientv3"
 )
 
 var (
