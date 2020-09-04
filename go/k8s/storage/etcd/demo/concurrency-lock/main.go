@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
 	"go.etcd.io/etcd/clientv3"
+	log "github.com/sirupsen/logrus"
 	"go.etcd.io/etcd/clientv3/concurrency"
 	"os"
 	"os/signal"
@@ -13,8 +13,8 @@ import (
 
 // https://segmentfault.com/a/1190000021603215
 func main() {
-	c := make(chan os.Signal)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	sig := make(chan os.Signal)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{"127.0.0.1:2379"},
@@ -46,7 +46,7 @@ func main() {
 		// business logic
 		log.WithFields(log.Fields{
 			"msg": "do job1",
-		}).Error("[job1]")
+		}).Info("[job1]")
 		time.Sleep(time.Second * 3)
 	}()
 
@@ -70,9 +70,9 @@ func main() {
 		// business logic
 		log.WithFields(log.Fields{
 			"msg": "do job2",
-		}).Error("[job2]")
+		}).Info("[job2]")
 		time.Sleep(time.Second * 3)
 	}()
 
-	<-c
+	<-sig
 }

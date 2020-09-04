@@ -4,7 +4,7 @@
 
 **[Etcd go client 包](https://github.com/etcd-io/etcd/blob/master/clientv3/README.md)**
 
-# install
+# standalone install
 ```shell script
 brew install etcd
 etcd

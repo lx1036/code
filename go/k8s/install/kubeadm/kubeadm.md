@@ -26,6 +26,9 @@ sysctl --system
 
 # 安装docker使用阿里云源，docker镜像拉取使用源https://wvtedxym.mirror.aliyuncs.com，可以使用自己的阿里云源
 # 修改docker cgroup driver为systemd，如果不修改则在后续添加worker节点时会遇到"detected cgroupfs as ths Docker driver.xx"的报错信息
+wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo
+sed -i -e '/mirrors.cloud.aliyuncs.com/d' '/mirrors.aliyuncs.com/d' /etc/yum.repos.d/CentOS-Base.repo
+yum makecache
 yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
 yum update && yum install -y docker-ce docker-ce-cli containerd.io
 systemctl enable docker
