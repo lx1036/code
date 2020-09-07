@@ -1,4 +1,5 @@
 ENDPOINTS := "http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379"
+ENDPOINTS_AUTH := "https://127.0.0.1:42379,https://127.0.0.1:52379,https://127.0.0.1:62379"
 CLUSTER := "etcd12379=http://127.0.0.1:12380,etcd22379=http://127.0.0.1:22380,etcd32379=http://127.0.0.1:32380"
 ENDPOINT1 := "http://127.0.0.1:12379"
 CLUSTER_TOKEN := "etcd-cluster-1"
@@ -154,6 +155,12 @@ status:
 
 health:
 	etcdctl --write-out=table --endpoints=$(ENDPOINTS) endpoint health
+
+health-auth:
+	etcdctl --write-out=table --endpoints=$(ENDPOINTS_AUTH) endpoint health \
+	--cacert $(PWD)/tls/ca.pem \
+    --cert $(PWD)/tls/etcd-client.pem \
+    --key $(PWD)/tls/etcd-client-key.pem
 
 snapshot:
 	etcdctl --endpoints=$(ENDPOINT1) snapshot save my.db

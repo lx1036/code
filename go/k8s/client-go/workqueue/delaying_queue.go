@@ -3,7 +3,7 @@ package workqueue
 import "time"
 
 type DelayingQueue interface {
-	Queue
+	Interface
 	
 	AddAfter(item interface{}, duration time.Duration)
 }
