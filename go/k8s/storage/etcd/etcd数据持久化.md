@@ -22,3 +22,5 @@ https://github.com/google/btree
 (4)etcd 如何保证数据读写的事务性？
 
 
+# WAL文件如何实现
+
