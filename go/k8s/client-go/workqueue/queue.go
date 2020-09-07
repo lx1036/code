@@ -1,6 +1,10 @@
 package workqueue
 
-import "sync"
+import (
+	"k8s.io/apimachinery/pkg/util/clock"
+	"sync"
+	"time"
+)
 
 type Interface interface {
 	Add(item interface{})
@@ -10,6 +14,8 @@ type Interface interface {
 	ShutDown()
 	ShuttingDown() bool
 }
+
+const defaultUnfinishedWorkUpdatePeriod = 500 * time.Millisecond
 
 type Queue struct {
 	jobs []job
@@ -25,6 +31,9 @@ type Queue struct {
 	processing set
 	
 	metrics queueMetrics
+	
+	clock clock.Clock
+	unfinishedWorkUpdatePeriod time.Duration
 }
 
 type job interface {}
@@ -122,16 +131,42 @@ func (queue *Queue) ShuttingDown() bool {
 	return queue.shuttingDown
 }
 
+func (queue *Queue) updateUnfinishedWorkLoop()  {
+	t := queue.clock.NewTicker(queue.unfinishedWorkUpdatePeriod)
+	defer t.Stop()
+	for range t.C() {
+		metrics := func() bool {
+			queue.cond.L.Lock()
+			defer queue.cond.L.Unlock()
+			if !queue.shuttingDown {
+				queue.metrics.updateUnfinishedWork()
+				return true
+			}
+			return false
+		}
+		if !metrics() {
+			return
+		}
+	}
+}
 
 func New() *Queue {
+	return NewNamed("")
+}
+func NewNamed(name string) *Queue {
+	rc := clock.RealClock{}
+	
 	queue := &Queue{
-		jobs:         nil,
-		shuttingDown: false,
-		cond:         nil,
-		dirty:        nil,
-		processing:   nil,
-		metrics:      nil,
+		clock: rc,
+		dirty: set{},
+		processing: set{},
+		cond: sync.NewCond(&sync.Mutex{}),
+		metrics: globalMetricsFactory.newQueueMetrics(name, rc),
+		unfinishedWorkUpdatePeriod: defaultUnfinishedWorkUpdatePeriod,
 	}
+	
+	go queue.updateUnfinishedWorkLoop()
+	
 	return queue
 }
 
