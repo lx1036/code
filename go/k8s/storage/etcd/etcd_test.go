@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	"go.etcd.io/etcd/pkg/transport"
 	"google.golang.org/grpc/grpclog"
@@ -12,7 +13,6 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-	"go.etcd.io/etcd/clientv3"
 )
 
 /**

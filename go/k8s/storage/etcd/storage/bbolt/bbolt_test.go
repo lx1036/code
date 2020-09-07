@@ -3,9 +3,9 @@ package bbolt
 import (
 	"fmt"
 	bolt "go.etcd.io/bbolt"
+	"log"
 	"testing"
 	"time"
-	"log"
 )
 
 var testBucket = []byte("test-bucket")
@@ -57,6 +57,3 @@ func TestBbolt(test *testing.T) {
 		log.Fatal(err)
 	}
 }
-
-
-

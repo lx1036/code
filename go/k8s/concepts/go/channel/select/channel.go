@@ -31,7 +31,7 @@ func demo2() {
 	stop := make(chan os.Signal)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	opened := false
-	for  {
+	for {
 		select {
 		case <-time.Tick(time.Second * 2):
 			fmt.Println("hello")

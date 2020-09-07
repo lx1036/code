@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"go.etcd.io/etcd/clientv3"
 	log "github.com/sirupsen/logrus"
+	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
 	"os"
 	"os/signal"

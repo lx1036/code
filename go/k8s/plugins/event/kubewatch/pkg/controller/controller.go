@@ -6,10 +6,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func Run(config *config.Config)  {
+func Run(config *config.Config) {
 	kubeClient := client.GetKubeClient("")
 	informer := cache.NewSharedIndexInformer()
 	go informer.Run()
 }
-
-
