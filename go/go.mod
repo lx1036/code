@@ -1,6 +1,6 @@
 module k8s-lx1036
 
-go 1.13
+go 1.14
 
 require (
 	bou.ke/monkey v1.0.2
@@ -9,7 +9,6 @@ require (
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
 	github.com/containerd/containerd v1.3.2
-	github.com/coreos/etcd v3.3.22+incompatible // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/getsentry/sentry-go v0.3.0
@@ -17,9 +16,9 @@ require (
 	github.com/go-logr/logr v0.1.0
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.4.1
-	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/gohouse/gorose/v2 v2.1.3
 	github.com/gomodule/redigo v2.0.0+incompatible
+	github.com/google/btree v1.0.0
 	github.com/google/go-querystring v1.0.0
 	github.com/google/uuid v1.1.1
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
@@ -57,7 +56,8 @@ require (
 	github.com/urfave/cli v1.22.2
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
-	go.etcd.io/etcd v0.0.0-20200625034214-cdc1c8f02ff1
+	go.etcd.io/bbolt v1.3.3
+	go.etcd.io/etcd v0.5.0-alpha.5.0.20200401174654-e694b7bb0875
 	go.uber.org/zap v1.14.1
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
@@ -68,6 +68,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/sohlich/elogrus.v7 v7.0.0
 	gopkg.in/square/go-jose.v2 v2.3.1
+	gopkg.in/yaml.v2 v2.3.0
 	gopkg.in/yaml.v3 v3.0.0-20190905181640-827449938966
 	gotest.tools v2.2.0+incompatible
 	k8s.io/api v0.18.6
@@ -81,6 +82,7 @@ require (
 )
 
 replace (
+	google.golang.org/grpc => google.golang.org/grpc v1.26.0
 	k8s.io/api => k8s.io/api v0.18.3
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.3
 	k8s.io/apimachinery => k8s.io/apimachinery v0.18.3
