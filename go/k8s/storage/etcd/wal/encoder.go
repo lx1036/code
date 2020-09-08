@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"go.etcd.io/etcd/pkg/crc"
 	"go.etcd.io/etcd/pkg/ioutil"
-	"k8s-lx1036/k8s/storage/etcd/wal/walpb"
 	"hash"
 	"io"
+	"k8s-lx1036/k8s/storage/etcd/wal/walpb"
 	"os"
 	"sync"
 )
@@ -29,7 +29,7 @@ type encoder struct {
 func (e *encoder) encode(rec *walpb.Record) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	
+
 	e.crc.Write(rec.Data)
 	rec.Crc = e.crc.Sum32()
 	var (
@@ -37,7 +37,7 @@ func (e *encoder) encode(rec *walpb.Record) error {
 		err  error
 		n    int
 	)
-	
+
 	if rec.Size() > len(e.buf) {
 		data, err = rec.Marshal()
 		if err != nil {
@@ -50,12 +50,12 @@ func (e *encoder) encode(rec *walpb.Record) error {
 		}
 		data = e.buf[:n]
 	}
-	
+
 	lenField, padBytes := encodeFrameSize(len(data))
 	if err = writeUint64(e.bw, lenField, e.uint64buf); err != nil {
 		return err
 	}
-	
+
 	if padBytes != 0 {
 		data = append(data, make([]byte, padBytes)...)
 	}

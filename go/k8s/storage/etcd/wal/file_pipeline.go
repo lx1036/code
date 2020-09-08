@@ -1,41 +1,27 @@
 package wal
 
 import (
+	"fmt"
 	"go.etcd.io/etcd/pkg/fileutil"
 	"go.uber.org/zap"
 	"os"
-	"fmt"
 	"path/filepath"
-
 )
 
 // filePipeline pipelines allocating disk space
 type filePipeline struct {
 	lg *zap.Logger
-	
+
 	// dir to put files
 	dir string
 	// size of files to make, in bytes
 	size int64
 	// count number of files generated
 	count int
-	
+
 	filec chan *fileutil.LockedFile
 	errc  chan error
 	donec chan struct{}
-}
-
-func newFilePipeline(lg *zap.Logger, dir string, fileSize int64) *filePipeline {
-	fp := &filePipeline{
-		lg:    lg,
-		dir:   dir,
-		size:  fileSize,
-		filec: make(chan *fileutil.LockedFile),
-		errc:  make(chan error, 1),
-		donec: make(chan struct{}),
-	}
-	go fp.run()
-	return fp
 }
 
 func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
@@ -56,10 +42,13 @@ func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
 	fp.count++
 	return f, nil
 }
-
+func (fp *filePipeline) Close() error {
+	close(fp.donec)
+	return <-fp.errc
+}
 func (fp *filePipeline) run() {
 	defer close(fp.errc)
-	for  {
+	for {
 		f, err := fp.alloc()
 		if err != nil {
 			fp.errc <- err
@@ -75,3 +64,15 @@ func (fp *filePipeline) run() {
 	}
 }
 
+func newFilePipeline(lg *zap.Logger, dir string, fileSize int64) *filePipeline {
+	fp := &filePipeline{
+		lg:    lg,
+		dir:   dir,
+		size:  fileSize,
+		filec: make(chan *fileutil.LockedFile),
+		errc:  make(chan error, 1),
+		donec: make(chan struct{}),
+	}
+	go fp.run()
+	return fp
+}

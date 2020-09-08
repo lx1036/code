@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
+	"k8s-lx1036/k8s/storage/etcd/wal/walpb"
 	"os"
 	"path/filepath"
 	"testing"
@@ -44,17 +45,17 @@ func TestNew(test *testing.T) {
 
 	var wb bytes.Buffer
 	e := newEncoder(&wb, 0, 0)
-	err = e.encode(&Record{Type: crcType, Crc: 0})
+	err = e.encode(&walpb.Record{Type: crcType, Crc: 0})
 	if err != nil {
 		test.Fatalf("err = %v, want nil", err)
 	}
-	err = e.encode(&Record{Type: metadataType, Data: []byte("somedata")})
+	err = e.encode(&walpb.Record{Type: metadataType, Data: []byte("somedata")})
 	if err != nil {
 		test.Fatalf("err = %v, want nil", err)
 	}
-	r := &Record{
+	r := &walpb.Record{
 		Type: snapshotType,
-		Data: pbutil.MustMarshal(&Snapshot{}),
+		Data: pbutil.MustMarshal(&walpb.Snapshot{}),
 	}
 	if err = e.encode(r); err != nil {
 		test.Fatalf("err = %v, want nil", err)
