@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-monitor
+data:
+  monitor.yaml: |
+    namespace: ""
+    handlers:
+      360home:
+        url: "https://example.com/notification"
+        token: "abc123"
+      email:
+        url: "https://example.com/notification"
+        from: "root@example.com"
+        to: "user@example.com"
+    resources:
+      deployment: false
+      replicationcontroller: false
+      replicaset: false
+      daemonset: false
+      services: true
+      pod: true
+      node: true
+      event: true
+      ingress: true
+      secret: false
+      configmap: false

@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	FileName = ".kube-watcher.yaml"
+	FileName = "kube-watcher.yaml"
 )
 
 type Webhook struct {

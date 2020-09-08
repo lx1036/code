@@ -44,6 +44,7 @@ func main() {
 	// whenever the cache is updated, the pod key is added to the workqueue.
 	// Note that when we finally process the item from the workqueue, we might see a newer version
 	// of the Pod than the version which was responsible for triggering the update.
+	//cache.NewSharedIndexInformer()
 	indexer, informer := cache.NewIndexerInformer(podListWatcher, &v1.Pod{}, 0, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
