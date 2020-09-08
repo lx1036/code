@@ -17,7 +17,7 @@ func TestNew(test *testing.T) {
 		test.Fatal(err)
 	}
 	defer os.RemoveAll(p)
-	
+
 	w, err := Create(zap.NewExample(), p, []byte("somedata"))
 	if err != nil {
 		test.Fatalf("err = %v, want nil", err)
@@ -26,7 +26,7 @@ func TestNew(test *testing.T) {
 		test.Errorf("name = %+v, want %+v", g, walName(0, 0))
 	}
 	defer w.Close()
-	
+
 	// file is preallocated to segment size; only read data written by wal
 	off, err := w.tail().Seek(0, io.SeekCurrent)
 	if err != nil {
@@ -41,7 +41,7 @@ func TestNew(test *testing.T) {
 	if _, err = io.ReadFull(f, gd); err != nil {
 		test.Fatalf("err = %v, want nil", err)
 	}
-	
+
 	var wb bytes.Buffer
 	e := newEncoder(&wb, 0, 0)
 	err = e.encode(&Record{Type: crcType, Crc: 0})
@@ -64,4 +64,3 @@ func TestNew(test *testing.T) {
 		test.Errorf("data = %v, want %v", gd, wb.Bytes())
 	}
 }
-

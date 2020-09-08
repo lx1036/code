@@ -16,7 +16,7 @@ func TestNewXXX(test *testing.T) {
 		test.Fatal(err)
 	}
 	defer os.RemoveAll(p)
-	
+
 	w, err := wal.Create(zap.NewExample(), p, []byte("somedata"))
 	if err != nil {
 		test.Fatalf("err = %v, want nil", err)
@@ -25,4 +25,3 @@ func TestNewXXX(test *testing.T) {
 	t := &walpb.Record{Type: 0, Crc: 0}
 	fmt.Println(t)
 }
-

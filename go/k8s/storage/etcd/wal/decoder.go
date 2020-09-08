@@ -4,14 +4,16 @@ import (
 	"bufio"
 	"go.etcd.io/etcd/pkg/crc"
 	"hash"
-	"sync"
 	"io"
+	"sync"
 )
+
+const minSectorSize = 512
 
 type decoder struct {
 	mu  sync.Mutex
 	brs []*bufio.Reader
-	
+
 	// lastValidOff file offset following the last valid decoded record
 	lastValidOff int64
 	crc          hash.Hash32
