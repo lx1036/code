@@ -76,8 +76,8 @@ func run(cmd *cobra.Command, args []string) {
 	//fmt.Println(viper.GetString("namespace"), kubeconfig, config.Namespace)
 	//os.Exit(0)
 	//controller.Start(config)
-	client := client.GetKubeClient(kubeconfig)
-	Start(config, client)
+	kubeClient := client.GetKubeClient(kubeconfig)
+	Start(config, kubeClient)
 }
 
 func Execute() {
