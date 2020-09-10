@@ -66,7 +66,7 @@ func Start(config Config, kubeClient kubernetes.Interface) {
 	stopNodeNotReadyCh := make(chan struct{})
 	defer close(stopNodeNotReadyCh)
 	go nodeNotReadyController.Run(stopNodeNotReadyCh)
-	
+
 	// For Capturing Critical Event NodeReady in Nodes
 	nodeReadyInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -87,8 +87,7 @@ func Start(config Config, kubeClient kubernetes.Interface) {
 	stopNodeReadyCh := make(chan struct{})
 	defer close(stopNodeReadyCh)
 	go nodeReadyController.Run(stopNodeReadyCh)
-	
-	
+
 	/*informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -106,17 +105,17 @@ func Start(config Config, kubeClient kubernetes.Interface) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go c.Run(stopCh)*/
-	
+
 	// For Capturing CrashLoopBackOff Events in pods
 	backoffInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = "involvedObject.kind=Pod,type=Warning,reason=BackOff"
-				return kubeClient.CoreV1().Events(config.Namespace).List(context.TODO(),options)
+				return kubeClient.CoreV1().Events(config.Namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = "involvedObject.kind=Pod,type=Warning,reason=BackOff"
-				return kubeClient.CoreV1().Events(config.Namespace).Watch(context.TODO(),options)
+				return kubeClient.CoreV1().Events(config.Namespace).Watch(context.TODO(), options)
 			},
 		},
 		&apiv1.Event{},
@@ -127,8 +126,7 @@ func Start(config Config, kubeClient kubernetes.Interface) {
 	stopBackoffCh := make(chan struct{})
 	defer close(stopBackoffCh)
 	go backoffcontroller.Run(stopBackoffCh)
-	
-	
+
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -146,14 +144,14 @@ func Start(config Config, kubeClient kubernetes.Interface) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go c.Run(stopCh)
-	
+
 	nodeInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return kubeClient.CoreV1().Nodes().List(context.TODO(),options)
+				return kubeClient.CoreV1().Nodes().List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return kubeClient.CoreV1().Nodes().Watch(context.TODO(),options)
+				return kubeClient.CoreV1().Nodes().Watch(context.TODO(), options)
 			},
 		},
 		&apiv1.Node{},
@@ -320,7 +318,7 @@ func (c *Controller) processItem(newEvent Event) error {
 				Reason:    "Created",
 			}
 			//c.eventHandler.Handle(kbEvent)
-			
+
 			logrus.WithFields(logrus.Fields{
 				"Name":      kbEvent.Name,
 				"Namespace": kbEvent.Namespace,
