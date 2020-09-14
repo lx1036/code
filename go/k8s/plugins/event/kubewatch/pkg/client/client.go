@@ -1,13 +1,13 @@
 package client
 
 import (
+	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
-	KubeClient kubernetes.Interface 
+	KubeClient kubernetes.Interface
 )
 
 func GetKubeClient(kubeconfig string) kubernetes.Interface {

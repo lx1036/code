@@ -1,4 +1,6 @@
 
+**![架构](./imgs/etcd-arch.png)**
+
 
 # 数据持久化
 (1)Etcd是如何实现数据持久化的？
@@ -21,4 +23,6 @@ https://github.com/google/btree
 
 (4)etcd 如何保证数据读写的事务性？
 
+
+# WAL文件如何实现
 

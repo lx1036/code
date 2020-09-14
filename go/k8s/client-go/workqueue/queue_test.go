@@ -22,7 +22,7 @@ func TestMultipleProducersAndMultipleConsumers(test *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	consumerWg := sync.WaitGroup{}
 	consumerNumber := 10
 	consumerWg.Add(consumerNumber)
@@ -37,15 +37,15 @@ func TestMultipleProducersAndMultipleConsumers(test *testing.T) {
 				if quit {
 					return
 				}
-				
+
 				fmt.Println(item)
 				time.Sleep(time.Millisecond * 4)
-				
+
 				queue.Done(item)
 			}
 		}(i)
 	}
-	
+
 	producerWg.Wait()
 	queue.ShutDown()
 	queue.Add("added after shutdown")

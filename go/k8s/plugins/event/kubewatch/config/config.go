@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	FileName = ".kube-watcher.yaml"
+	FileName = "kube-watcher.yaml"
 )
 
 type Webhook struct {
@@ -18,7 +18,7 @@ type Webhook struct {
 }
 type Mail struct {
 	From string `json:"from"`
-	To string `json:"to"`
+	To   string `json:"to"`
 }
 type Sink struct {
 	Webhook Webhook `json:"webhook"`
@@ -32,7 +32,7 @@ func New() (*Config, error) {
 	if err := c.Load(); err != nil {
 		return nil, err
 	}
-	
+
 	c.DefaultVars()
 
 	return c, nil
@@ -54,8 +54,8 @@ func (config *Config) Load() error {
 	return errors.New("config file content is empty")
 }
 
-func (config *Config) DefaultVars()  {
-	
+func (config *Config) DefaultVars() {
+
 }
 
 func getConfigFile() string {
@@ -67,6 +67,6 @@ func configDir() string {
 	if len(configDir) != 0 {
 		return configDir
 	}
-	
+
 	return os.Getenv("HOME")
 }

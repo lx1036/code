@@ -1,0 +1,27 @@
+namespace: "default"
+handlers:
+  log:
+    opened: true
+  360home:
+    opened: true
+    options:
+      url: "https://example.com/notification"
+      token: "abc123"
+  email:
+    opened: true
+    options:
+      url: "https://example.com/notification"
+      from: "root@example.com"
+      to: "user@example.com"
+resources:
+  deployment: false
+  replicationcontroller: false
+  replicaset: false
+  daemonset: false
+  service: true
+  pod: true
+  node: true
+  event: true
+  ingress: true
+  secret: false
+  configmap: false

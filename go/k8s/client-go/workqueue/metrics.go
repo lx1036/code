@@ -1,8 +1,8 @@
 package workqueue
 
 import (
-	"sync"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"sync"
 	"time"
 )
 
@@ -19,20 +19,24 @@ type GaugeMetric interface {
 	Inc()
 	Dec()
 }
+
 // CounterMetric represents a single numerical value that only ever
 // goes up.
 type CounterMetric interface {
 	Inc()
 }
+
 // HistogramMetric counts individual observations.
 type HistogramMetric interface {
 	Observe(float64)
 }
+
 // SettableGaugeMetric represents a single numerical value that can arbitrarily go up
 // and down. (Separate from GaugeMetric to preserve backwards compatibility.)
 type SettableGaugeMetric interface {
 	Set(float64)
 }
+
 // MetricsProvider generates various metrics used by the queue.
 type MetricsProvider interface {
 	NewDepthMetric(name string) GaugeMetric
@@ -45,11 +49,14 @@ type MetricsProvider interface {
 }
 
 type noopMetric struct{}
+
 func (noopMetric) Inc()            {}
 func (noopMetric) Dec()            {}
 func (noopMetric) Set(float64)     {}
 func (noopMetric) Observe(float64) {}
+
 type noopMetricsProvider struct{}
+
 func (_ noopMetricsProvider) NewDepthMetric(name string) GaugeMetric {
 	return noopMetric{}
 }
@@ -77,16 +84,18 @@ func (_ noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string
 func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return noopMetric{}
 }
+
 type noMetrics struct{}
 
-func (noMetrics) add(item job)            {}
-func (noMetrics) get(item job)            {}
-func (noMetrics) done(item job)           {}
+func (noMetrics) add(item job)          {}
+func (noMetrics) get(item job)          {}
+func (noMetrics) done(item job)         {}
 func (noMetrics) updateUnfinishedWork() {}
+
 // defaultQueueMetrics expects the caller to lock before setting any metrics.
 type defaultQueueMetrics struct {
 	clock clock.Clock
-	
+
 	// current depth of a workqueue
 	depth GaugeMetric
 	// total number of adds handled by a workqueue
@@ -97,16 +106,17 @@ type defaultQueueMetrics struct {
 	workDuration         HistogramMetric
 	addTimes             map[job]time.Time
 	processingStartTimes map[job]time.Time
-	
+
 	// how long have current threads been working?
 	unfinishedWorkSeconds   SettableGaugeMetric
 	longestRunningProcessor SettableGaugeMetric
 }
+
 func (m *defaultQueueMetrics) add(item job) {
 	if m == nil {
 		return
 	}
-	
+
 	m.adds.Inc()
 	m.depth.Inc()
 	if _, exists := m.addTimes[item]; !exists {
@@ -117,7 +127,7 @@ func (m *defaultQueueMetrics) get(item job) {
 	if m == nil {
 		return
 	}
-	
+
 	m.depth.Dec()
 	m.processingStartTimes[item] = m.clock.Now()
 	if startTime, exists := m.addTimes[item]; exists {
@@ -129,7 +139,7 @@ func (m *defaultQueueMetrics) done(item job) {
 	if m == nil {
 		return
 	}
-	
+
 	if startTime, exists := m.processingStartTimes[item]; exists {
 		m.workDuration.Observe(m.sinceInSeconds(startTime))
 		delete(m.processingStartTimes, item)
@@ -150,18 +160,22 @@ func (m *defaultQueueMetrics) updateUnfinishedWork() {
 	m.unfinishedWorkSeconds.Set(total)
 	m.longestRunningProcessor.Set(oldest)
 }
+
 // Gets the time since the specified start in seconds.
 func (m *defaultQueueMetrics) sinceInSeconds(start time.Time) float64 {
 	return m.clock.Since(start).Seconds()
 }
+
 var globalMetricsFactory = queueMetricsFactory{
 	metricsProvider: noopMetricsProvider{},
 }
+
 type queueMetricsFactory struct {
 	metricsProvider MetricsProvider
-	
+
 	onlyOnce sync.Once
 }
+
 func (f *queueMetricsFactory) newQueueMetrics(name string, clock clock.Clock) queueMetrics {
 	mp := f.metricsProvider
 	if len(name) == 0 || mp == (noopMetricsProvider{}) {
