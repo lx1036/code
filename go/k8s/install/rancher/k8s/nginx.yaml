@@ -1,0 +1,47 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-demo
+  labels:
+    app: nginx-demo
+    restartCount: test
+    log-filebeat: filebeat
+  annotations:
+    lx1036/controller-kind: filebeat
+spec:
+  replicas: 3
+  template:
+    metadata:
+      name: nginx-demo
+      labels:
+        app: nginx-demo
+    spec:
+      containers:
+        - name: nginx-demo
+          image: nginx:1.17.8
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            httpGet:
+              port: 80
+              path: /index.html # /status(会不断重启), /index.html(正确的) 测试 RestartCount
+            failureThreshold: 10
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app: nginx-demo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-demo
+spec:
+  selector:
+    app: nginx-demo
+  ports:
+    - port: 8088
+      targetPort: 80
+      protocol: TCP
+  type: NodePort

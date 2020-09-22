@@ -1,78 +1,15 @@
 
-# rke
-```shell script
-brew install rke
-```
-
-## 使用rke安装k8s
-(1)准备两台centos机器，安装docker，并初始化机器
-```shell script
-wget -O /etc/yum.repos.d/CentOS-Base.repo https://mirrors.aliyun.com/repo/Centos-7.repo
-sed -i -e '/mirrors.cloud.aliyuncs.com/d' -e '/mirrors.aliyuncs.com/d' /etc/yum.repos.d/CentOS-Base.repo
-yum makecache
-yum install -y yum-utils
-yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-yum install docker-ce docker-ce-cli containerd.io -y
-systemctl enable docker
-#注意docker 跟目录设置 "graph": "/data/docker", 改为实际的registry ip:port  "insecure-registries": ["10.19.214.141"],
-cat <<EOF | sudo tee /etc/docker/daemon.json
-{
-  "registry-mirrors": ["https://wvtedxym.mirror.aliyuncs.com"],
-  "oom-score-adjust": -1000,
-  "graph": "/data/docker",
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "100m",
-    "max-file": "3"
-    },
-  "live-restore": true,
-  "init": true
-}
-EOF
-systemctl daemon-reload
-systemctl restart docker
-
-# 关闭swap
-# 临时禁用
-swapoff -a
-# 永久禁用
-# vi /etc/fstab
-sed -i 's/.*swap.*/#&/' /etc/fstab
-# 设置docker用户组
-useradd dockeruser
-usermod -aG docker liuxiang3
-# 关闭Selinux，设置SELINUX=disabled
-vi /etc/sysconfig/selinux
-# 设置IPV4转发
-vi /etc/sysctl.conf
-net.ipv4.ip_forward = 1
-net.bridge.bridge-nf-call-ip6tables = 1
-net.bridge.bridge-nf-call-iptables = 1
-# 设置IPV4转发生效
-sudo sysctl -p
-#分发密钥
-ssh-copy-id liuxiang3@xxx.xxx.xxx.xxx
-```
-(2)rke客户机上运行命令，安装k8s
-(2.1) 本地安装rke
-```shell script
-brew install rke
-```
-
-(2.2) 配置rke配置文件cluster.yaml，主要需要关注service_cluster_ip_range、service_node_port_range这几个和网络相关的字段。
-具体字段含义可看文档 https://rancher.com/docs/rke/latest/en/example-yamls/。网络使用cilium，daemonset部署，这里network.plugin字段
-设置为`none`：
-```yaml
 ###
 # https://rancher.com/docs/rke/latest/en/example-yamls/
 ###
 
+
 # If you intened to deploy Kubernetes in an air-gapped environment,
 # please consult the documentation on how to configure custom RKE images.
 nodes:
-  - address: p46282v.hulk.zzzc.qihoo.net
+  - address: abc.lx1036.com
     port: "22"
-    internal_address: 10.174.224.180
+    internal_address: 10.10.224.180
     role:
       - controlplane
       - worker
@@ -86,9 +23,9 @@ nodes:
     ssh_cert_path: ""
     labels: {}
     taints: []
-  - address: p46284v.hulk.shbt.qihoo.net
+  - address: abc.lx1035.com
     port: "22"
-    internal_address: 10.202.148.133
+    internal_address: 10.10.148.133
     role:
       - worker
     hostname_override: ""
@@ -267,17 +204,3 @@ restore:
   restore: false
   snapshot_name: ""
 dns: null
-```
-
-(2.3) 运行 `rke up --config rancher-k8s.yaml`
-
-(3)部署cilium
-部署yaml主要来自于官方文档 https://github.com/cilium/cilium/blob/master/install/kubernetes/quick-install.yaml
-```shell script
-kubectl --kubeconfig ./kube_config_rancher-k8s.yaml apply -f ./cilium.yaml
-```
-
-(4)测试
-```shell script
-kubectl --kubeconfig ./kube_config_rancher-k8s.yaml apply -f ./nginx.yaml
-```
