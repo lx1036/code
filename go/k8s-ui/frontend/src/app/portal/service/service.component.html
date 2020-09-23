@@ -1,0 +1,65 @@
+<button (click)="openModal()" class="app-button primary"
+        *ngIf="authService.currentAppPermission.service.create || authService.currentUser.admin">
+  创建负载均衡
+</button>
+
+<create-edit-service (create)="createService($event)"></create-edit-service>
+
+<div *ngIf="serviceId && services?.length>0">
+  <app-tabs>
+    <app-tab (click)="tabClick(service.id)"
+               [id]="service.id"
+               *ngFor="let service of services"
+               [active]="service.id==serviceId"
+               [description]="service.description">
+      {{service.name}}
+    </app-tab>
+  </app-tabs>
+
+  <div class="table-search">
+    <div class="table-search-left">
+      <button (click)="createServiceTpl()" class="app-button normal"
+              *ngIf="serviceTpls?.length <= 0 && (authService.currentAppPermission.service.create || authService.currentUser.admin)">
+        创建负载均衡模版
+      </button>
+      <button (click)="editService()" class="app-button normal"
+              *ngIf="authService.currentAppPermission.service.update || authService.currentUser.admin">
+        编辑负载均衡
+      </button>
+      <button (click)="publishHistory()" class="app-button normal"
+              *ngIf="authService.currentAppPermission.service.read || authService.currentUser.admin">
+        发布历史
+      </button>
+      <button (click)="deleteService()" class="app-button normal"
+              *ngIf="authService.currentAppPermission.service.delete || authService.currentUser.admin">
+        删除负载均衡
+      </button>
+      <button class="app-button normal" (click)="diffTpl()">{{'BUTTON.COMPARE_TEMPLATES' | translate}}</button>
+      <app-filter-box (confirm)="confirmEvent()" (cancel)="cancelEvent()">
+        <app-checkbox-group [(ngModel)]="showList">
+          <app-checkbox>创建时间</app-checkbox>
+          <app-checkbox>端口号</app-checkbox>
+          <app-checkbox>上线机房</app-checkbox>
+          <app-checkbox>发布说明</app-checkbox>
+          <app-checkbox>创建者</app-checkbox>
+          <app-checkbox>操作</app-checkbox>
+        </app-checkbox-group>
+      </app-filter-box>
+    </div>
+    <div class="table-search-right">
+      <div class="clr-toggle-wrapper">
+        <input type="checkbox" id="search-online" [(ngModel)]="isOnline" name="toggle-basic" class="clr-toggle" (change)="onlineChange()">
+        <label for="search-online">{{'MESSAGE.ONLY_ONLINE_TEMPLATE' | translate}}</label>
+      </div>
+    </div>
+  </div>
+
+  <list-service [services]="services"
+                (cloneTpl)="cloneServiceTpl($event)"
+                [serviceTpls]="serviceTpls"
+                (edit)="editService()"
+                (paginate)="retrieve($event)"
+                [appId]="appId"
+                [showState]="showState"
+                [page]="pageState.page"></list-service>
+</div>

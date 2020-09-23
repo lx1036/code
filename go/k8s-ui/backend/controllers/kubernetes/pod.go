@@ -3,9 +3,9 @@ package kubernetes
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"k8s-lx1036/k8s-ui/backend/client"
+	"k8s-lx1036/k8s-ui/backend/common/kubeclient"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
-	"k8s-lx1036/k8s-ui/backend/resources/pod"
+	"k8s-lx1036/k8s-ui/backend/common/resources/pod"
 	"net/http"
 	"sync"
 )
@@ -29,13 +29,13 @@ func (controller *KubePodController) PodStatistics() gin.HandlerFunc {
 		countSyncMap := sync.Map{}
 		cluster := context.Query("cluster")
 		if cluster == "" {
-			managers := client.Managers()
+			managers := kubeclient.Managers()
 			wg := sync.WaitGroup{}
 
 			managers.Range(func(key, value interface{}) bool {
-				manager := value.(*client.ClusterManager)
+				manager := value.(*kubeclient.ClusterManager)
 				wg.Add(1)
-				go func(manager *client.ClusterManager) {
+				go func(manager *kubeclient.ClusterManager) {
 					defer wg.Done()
 					count, err := pod.GetPodCounts(manager.CacheFactory)
 					if err != nil {

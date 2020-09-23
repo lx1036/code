@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
-	"k8s-lx1036/k8s-ui/backend/database/lorm"
+	"k8s-lx1036/k8s-ui/backend/database"
 	"k8s-lx1036/k8s-ui/backend/models"
-	"k8s-lx1036/k8s-ui/backend/routers-gin/middlewares"
+	"k8s-lx1036/k8s-ui/backend/routers/middlewares"
 	"net/http"
 )
 
@@ -37,7 +37,7 @@ func (controller *NotificationController) Prepare() {
 func (controller *NotificationController) List() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		var notifications []models.Notification
-		err := lorm.DB.Debug().Preload("User").Find(&notifications).Error
+		err := database.DB.Debug().Preload("User").Find(&notifications).Error
 		if err != nil {
 			context.JSON(http.StatusNoContent, base.JsonResponse{
 				Errno:  -1,
@@ -74,7 +74,7 @@ func (controller *NotificationController) Create() gin.HandlerFunc {
 			IsPublished: false,
 		}
 
-		err := lorm.DB.Table(models.Notification{}.TableName()).Create(&notification).Error
+		err := database.DB.Table(models.Notification{}.TableName()).Create(&notification).Error
 		if err != nil {
 			context.JSON(http.StatusInternalServerError, base.JsonResponse{
 				Errno:  -1,
@@ -99,7 +99,7 @@ func (controller *NotificationController) Publish() {
 func (controller *NotificationController) Subscribe() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		user := middlewares.User
-		db := lorm.DB.Debug().Where("user_id=?", user.ID) //.Table(models.NotificationLog{}.TableName()).Where("user_id=?", user.ID)
+		db := database.DB.Debug().Where("user_id=?", user.ID) //.Table(models.NotificationLog{}.TableName()).Where("user_id=?", user.ID)
 		isRead := context.Query("is_read")
 		if isRead != "" {
 			db.Where("is_read=?", isRead)

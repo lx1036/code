@@ -5,11 +5,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"k8s-lx1036/k8s-ui/backend/client"
+	"k8s-lx1036/k8s-ui/backend/common/kubeclient"
 	"k8s-lx1036/k8s-ui/backend/common/rsa"
 	"k8s-lx1036/k8s-ui/backend/common/util"
 	"k8s-lx1036/k8s-ui/backend/database"
-	routersGin "k8s-lx1036/k8s-ui/backend/routers-gin"
+	"k8s-lx1036/k8s-ui/backend/routers"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"os"
 	"time"
@@ -52,7 +52,7 @@ func main() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	router := routersGin.SetupRouter()
+	router := routers.SetupRouter()
 	db := database.InitDb()
 	defer db.Close()
 
@@ -86,5 +86,5 @@ func preRun(cmd *cobra.Command, args []string) {
 	}
 
 	// K8S Client
-	go wait.Forever(client.BuildApiServerClient, 30*time.Second)
+	go wait.Forever(kubeclient.BuildApiServerClient, 30*time.Second)
 }

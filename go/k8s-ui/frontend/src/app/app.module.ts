@@ -22,6 +22,7 @@ import {Location} from '@angular/common';
 import { environment} from '../environments/environment';
 import {UnauthorizedComponent} from './shared/unauthorized.component';
 import {PageNotFoundComponent} from './shared/page-not-found.component';
+import { ServiceComponent } from './service/service.component';
 
 export function HttpLoaderFactory(httpClient: HttpClient) {
   return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json');
@@ -82,6 +83,7 @@ const routes: Routes = [
   declarations: [
     UnauthorizedComponent,
     PageNotFoundComponent,
+    ServiceComponent,
   ]
 })
 export class RoutingModule { }

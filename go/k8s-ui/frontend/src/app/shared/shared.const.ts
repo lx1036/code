@@ -8,6 +8,10 @@ export const enum AlertType {
   DANGER, WARNING, INFO, SUCCESS
 }
 
+export const enum TemplateState {
+  SUCCESS, FAILD, NOT_FOUND
+}
+
 export const httpStatusCode = {
   NoContent: 204,
   Unauthorized: 401,
@@ -112,3 +116,32 @@ export const KubeApiTypeAutoscale = 'Autoscale';
 
 
 export const SideNavCollapseStorage = 'nav-collapse';
+// 同步发布状态时间
+export const syncStatusInterval = 5 * 1000;
+
+export type KubeResourcesName = string;
+export const KubeResourceConfigMap: KubeResourcesName = 'configmaps';
+export const KubeResourceDaemonSet: KubeResourcesName = 'daemonsets';
+export const KubeResourceDeployment: KubeResourcesName = 'deployments';
+export const KubeResourceEvent: KubeResourcesName = 'events';
+export const KubeResourceHorizontalPodAutoscaler: KubeResourcesName = 'horizontalpodautoscalers';
+export const KubeResourceIngress: KubeResourcesName = 'ingresses';
+export const KubeResourceJob: KubeResourcesName = 'jobs';
+export const KubeResourceCronJob: KubeResourcesName = 'cronjobs';
+export const KubeResourceNamespace: KubeResourcesName = 'namespaces';
+export const KubeResourceNode: KubeResourcesName = 'nodes';
+export const KubeResourcePersistentVolumeClaim: KubeResourcesName = 'persistentvolumeclaims';
+export const KubeResourcePersistentVolume: KubeResourcesName = 'persistentvolumes';
+export const KubeResourcePod: KubeResourcesName = 'pods';
+export const KubeResourceReplicaSet: KubeResourcesName = 'replicasets';
+export const KubeResourceSecret: KubeResourcesName = 'secrets';
+export const KubeResourceService: KubeResourcesName = 'services';
+export const KubeResourceStatefulSet: KubeResourcesName = 'statefulsets';
+export const KubeResourceEndpoint: KubeResourcesName = 'endpoints';
+export const KubeResourceStorageClass: KubeResourcesName = 'storageclasses';
+export const KubeResourceRole: KubeResourcesName = 'roles';
+export const KubeResourceRoleBinding: KubeResourcesName = 'rolebindings';
+export const KubeResourceClusterRole: KubeResourcesName = 'clusterroles';
+export const KubeResourceClusterRoleBinding: KubeResourcesName = 'clusterrolebindings';
+export const KubeResourceServiceAccount: KubeResourcesName = 'serviceaccounts';
+export const KubeResourceCustomResourceDefinition: KubeResourcesName = 'customresourcedefinitions';
