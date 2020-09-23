@@ -1,7 +1,8 @@
 package client
 
 import (
-	"k8s-lx1036/k8s-ui/backend/database/lorm"
+	log "github.com/sirupsen/logrus"
+	"k8s-lx1036/k8s-ui/backend/database"
 	"k8s-lx1036/k8s-ui/backend/models"
 	"k8s-lx1036/k8s-ui/backend/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,7 @@ type ClusterManager struct {
 
 func clusterChanged(clusters []models.Cluster) bool {
 	if util.SyncMapLen(clusterManagerSets) != len(clusters) {
-		logs.Info("cluster length (%d) changed to (%d).", util.SyncMapLen(clusterManagerSets), len(clusters))
+		log.Info("cluster length (%d) changed to (%d).", util.SyncMapLen(clusterManagerSets), len(clusters))
 		return true
 	}
 
@@ -50,16 +51,16 @@ func clusterChanged(clusters []models.Cluster) bool {
 		manager := managerInterface.(*ClusterManager)
 		// master changed, the cluster is changed, ignore others
 		if manager.Cluster.Master != cluster.Master {
-			logs.Info("cluster master (%s) changed to (%s).", manager.Cluster.Master, cluster.Master)
+			log.Info("cluster master (%s) changed to (%s).", manager.Cluster.Master, cluster.Master)
 			return true
 		}
 		if manager.Cluster.Status != cluster.Status {
-			logs.Info("cluster status (%d) changed to (%d).", manager.Cluster.Status, cluster.Status)
+			log.Info("cluster status (%d) changed to (%d).", manager.Cluster.Status, cluster.Status)
 			return true
 		}
 
 		if manager.Cluster.KubeConfig != manager.Cluster.KubeConfig {
-			logs.Info("cluster kubeConfig (%d) changed to (%d).", manager.Cluster.KubeConfig, cluster.KubeConfig)
+			log.Info("cluster kubeConfig (%d) changed to (%d).", manager.Cluster.KubeConfig, cluster.KubeConfig)
 			return true
 		}
 	}
@@ -71,7 +72,7 @@ func buildClient(master string, kubeconfig string) (*kubernetes.Clientset, *rest
 	//configV1 := clientcmdapiv1.Config{}
 	//err := json.Unmarshal([]byte(kubeconfig), &configV1)
 	//if err != nil {
-	//	logs.Error("json unmarshal kubeconfig error: %v ", err)
+	//	log.Error("json unmarshal kubeconfig error: %v ", err)
 	//	return nil, nil, err
 	//}
 
@@ -89,7 +90,7 @@ func buildClient(master string, kubeconfig string) (*kubernetes.Clientset, *rest
 	//}).ClientConfig()
 	clientConfig, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
 	if err != nil {
-		logs.Error("build client config error. %v ", err)
+		log.Error("build client config error. %v ", err)
 		return nil, nil, err
 	}
 
@@ -97,7 +98,7 @@ func buildClient(master string, kubeconfig string) (*kubernetes.Clientset, *rest
 	clientConfig.Burst = defaultBurst
 	clientSet, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
-		logs.Error("(%s) kubernetes.NewForConfig(%v) error.%v", master, err, clientConfig)
+		log.Error("(%s) kubernetes.NewForConfig(%v) error.%v", master, err, clientConfig)
 		return nil, nil, err
 	}
 
@@ -256,30 +257,30 @@ func NewResourceHandler(kubeClient *kubernetes.Clientset, cacheFactory *CacheFac
 
 func BuildApiServerClient() {
 	var newClusters []models.Cluster
-	err := lorm.DB.Where("status=?", models.ClusterStatusNormal).Where("deleted_at is null").Find(&newClusters).Error
+	err := database.DB.Where("status=?", models.ClusterStatusNormal).Where("deleted_at is null").Find(&newClusters).Error
 	if err != nil {
-		logs.Error("empty clusters.")
+		log.Error("empty clusters.")
 		return
 	}
 
 	changed := clusterChanged(newClusters)
 	if changed {
-		logs.Info("cluster changed, so resync info...")
+		log.Info("cluster changed, so resync info...")
 		// build new clientManager
 		for i := 0; i < len(newClusters); i++ {
 			cluster := newClusters[i]
 			if cluster.Master == "" {
-				logs.Warning("cluster's master is null:%s", cluster.Name)
+				log.Warning("cluster's master is null:%s", cluster.Name)
 				continue
 			}
 			clientSet, config, err := buildClient(cluster.Master, cluster.KubeConfig)
 			if err != nil {
-				logs.Warning("build cluster (%s) client error :%v", cluster.Name, err)
+				log.Warning("build cluster (%s) client error :%v", cluster.Name, err)
 				continue
 			}
 			cacheFactory, err := buildCacheController(clientSet)
 			if err != nil {
-				logs.Warning("build cluster (%s) cache controller error :%v", cluster.Name, err)
+				log.Warning("build cluster (%s) cache controller error :%v", cluster.Name, err)
 				continue
 			}
 
@@ -297,6 +298,6 @@ func BuildApiServerClient() {
 			clusterManagerSets.Store(cluster.Name, clusterManager)
 		}
 
-		logs.Info("resync cluster finished! ")
+		log.Info("resync cluster finished! ")
 	}
 }

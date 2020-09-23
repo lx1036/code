@@ -1,26 +1,37 @@
-package initial
+package rsa
 
 import (
+	"crypto/rsa"
+	"errors"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/spf13/viper"
 	"io/ioutil"
-	"k8s-lx1036/k8s-ui/backend/apikey"
 	"path/filepath"
 )
 
-func InitRsaKey(privateKeyPath string, publicKeyPath string) {
-	//privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(readKey("RsaPrivateKey"))
+var (
+	RsaPrivateKey *rsa.PrivateKey
+	RsaPublicKey  *rsa.PublicKey
+)
+
+func InitRsaKey() {
+	privateKeyPath := viper.GetString("default.RsaPrivateKey")
+	publicKeyPath := viper.GetString("default.RsaPublicKey")
+	if len(privateKeyPath) == 0 || len(publicKeyPath) == 0 {
+		panic(errors.New("rsa private/public key can't be empty"))
+	}
+
 	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(readKey(privateKeyPath))
 	if err != nil {
 		panic(err)
 	}
-	apikey.RsaPrivateKey = privateKey
+	RsaPrivateKey = privateKey
 
-	//publicKey, err := jwt.ParseRSAPublicKeyFromPEM(readKey("RsaPublicKey"))
 	publicKey, err := jwt.ParseRSAPublicKeyFromPEM(readKey(publicKeyPath))
 	if err != nil {
 		panic(err)
 	}
-	apikey.RsaPublicKey = publicKey
+	RsaPublicKey = publicKey
 }
 
 func readKey(filename string) []byte {
