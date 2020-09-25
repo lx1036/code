@@ -1,0 +1,36 @@
+<div class="content-area" style="position: relative">
+  <create-edit-apikey (create)="createApiKey($event)"></create-edit-apikey>
+  <app-box style="padding: 15px;">
+    <div class="clr-row">
+      <div class="clr-col-lg-12 clr-col-md-12 clr-col-sm-12 clr-col-xs-12">
+        <div class="clr-row flex-items-xs-between flex-items-xs-top" style="padding-left: 15px; padding-right: 15px;">
+          <h2 class="header-title">APIKey {{'TITLE.LIST' | translate}}</h2>
+        </div>
+        <div class="table-search">
+          <div class="table-search-left">
+            <button class="wayne-button normal"
+                    *ngIf="authService.currentNamespacePermission.apiKey.create || authService.currentUser.admin"
+                    (click)="openModal()">
+              {{'ACTION.CREATE' | translate}} APIKey
+            </button>
+            <app-filter-box (confirm)="confirmEvent()" (cancel)="cancelEvent()">
+              <app-checkbox-group [(ngModel)]="showList">
+                <app-checkbox value="name">{{'TITLE.NAME' | translate}}</app-checkbox>
+                <app-checkbox value="role">{{'TITLE.ROLE' | translate}}</app-checkbox>
+                <app-checkbox value="create_time">{{'TITLE.CREATE_TIME' | translate}}</app-checkbox>
+                <app-checkbox value="expire_time">{{'TITLE.EXPIRE_TIME' | translate}}</app-checkbox>
+                <app-checkbox value="create_user">{{'TITLE.CREATE_USER' | translate}}</app-checkbox>
+                <app-checkbox value="description">{{'TITLE.DESCRIPTION' | translate}}</app-checkbox>
+                <app-checkbox value="action">{{'TITLE.ACTION' | translate}}</app-checkbox>
+              </app-checkbox-group>
+            </app-filter-box>
+          </div>
+        </div>
+        <list-apikey [apiKeys]="changedApiKeys" (delete)="deleteApiKey($event)" (edit)="editApiKey($event)"
+                     (paginate)="retrieve($event)"
+                     [page]="pageState.page" [showState]="showState"></list-apikey>
+      </div>
+    </div>
+  </app-box>
+</div>
+<app-sidenav-namespace style="display: flex; order: -1"></app-sidenav-namespace>

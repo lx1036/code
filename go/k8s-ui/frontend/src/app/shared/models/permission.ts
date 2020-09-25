@@ -1,4 +1,9 @@
-
+export class Permission {
+  id: number;
+  name: string;
+  comment: string;
+  type: string;
+}
 
 
 export class ActionPermission {
