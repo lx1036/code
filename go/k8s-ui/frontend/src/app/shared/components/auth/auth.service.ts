@@ -1,9 +1,8 @@
 import {Injectable} from '@angular/core';
-import {HttpClient, HttpErrorResponse} from '@angular/common/http';
+import {HttpClient, HttpErrorResponse, HttpHeaders} from '@angular/common/http';
 import {CacheService} from './cache.service';
 import {MessageHandlerService} from './message-handler.service';
-import {TypePermission} from './model/v1/permission';
-import {User} from './model/v1/user';
+import {Observable} from "rxjs";
 
 interface BaseConfig {
   appLabelKey: string;
@@ -20,6 +19,9 @@ export class AuthService {
   currentNamespacePermission: TypePermission = null;
   currentAppPermission: TypePermission = null;
   currentUser: User = null;
+
+  headers = new HttpHeaders({'Content-Type': 'application/json'});
+  options = {headers: this.headers};
 
   constructor(private http: HttpClient,
               private messageHandlerService: MessageHandlerService,
@@ -50,4 +52,16 @@ export class AuthService {
   handleError(error: any): Promise<any> {
     return Promise.reject(error);
   }
+
+  login(username: string, password: string, type: string): Observable<any> {
+    // const url = `login/${type}?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+    const url = `login/${type}`;
+    return this.http.post(url, {
+      username,
+      password,
+    }, this.options);
+  }
+
+
+
 }

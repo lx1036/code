@@ -1,11 +1,10 @@
 import {Component, Injector, OnInit} from '@angular/core';
 import {ActivatedRoute, Router} from '@angular/router';
 import {NgForm} from '@angular/forms';
-import {AuthoriseService} from './client/v1/auth.service';
-import {AuthService} from './auth.service';
 import * as particlesJS from 'particlesjs/dist/particles';
-import {AuthType, LoginTokenKey} from './shared.const';
-import {StorageService} from "./storage.service";
+import {StorageService} from "../../../common/storage.service";
+import {AuthService} from "../auth.service";
+import {AuthType, LoginTokenKey} from "../auth.const";
 
 interface Token {
   token: string;
@@ -88,8 +87,7 @@ export class SignInComponent implements OnInit {
   currentForm: NgForm;
   isSubmitOnGoing: boolean;
 
-  constructor(private authoriseService: AuthoriseService,
-              private route: ActivatedRoute,
+  constructor(private route: ActivatedRoute,
               public authService: AuthService,
               private storage: StorageService,
               private injector: Injector) {}
@@ -100,6 +98,8 @@ export class SignInComponent implements OnInit {
       color: ['#DA0463', '#404B69', '#DBEDF3'],
       connectParticles: true
     });
+
+
   }
 
   public get isValid(): boolean {
@@ -124,7 +124,7 @@ export class SignInComponent implements OnInit {
       type = AuthType.Ldap;
     }
 
-    this.authoriseService.login(this.username, this.password, type).subscribe(
+    this.authService.login(this.username, this.password, type).subscribe(
       (response: {data: Token}) => {
         const ref = this.route.snapshot.queryParams.ref ? this.route.snapshot.queryParams.ref : '/';
 

@@ -1,7 +1,7 @@
 import {AfterViewInit, Component} from '@angular/core';
 import {ScrollBarService} from './shared/scroll-bar.service';
 import {TranslateService} from '@ngx-translate/core';
-import {StorageService} from './shared/storage.service';
+import {StorageService} from "./shared/common/storage.service";
 
 @Component({
   selector: 'app-root',
