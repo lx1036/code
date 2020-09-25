@@ -5,7 +5,8 @@ import {Component, Input, OnInit} from '@angular/core';
   template: `
     <div *ngIf="cardTitle" class="card-title">{{cardTitle}}</div>
     <ng-content></ng-content>
-  `
+  `,
+  styleUrls: ['./card.component.scss']
 })
 
 export class CardComponent {

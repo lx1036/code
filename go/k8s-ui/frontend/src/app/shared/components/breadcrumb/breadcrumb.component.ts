@@ -11,7 +11,8 @@ import {BreadcrumbService} from "./breadcrumb.service";
         <a href="javascript:;" (click)="navigateTo(url, friendlyName(url).avail)">{{friendlyName(url).name}}</a>
       </li>
     </ul>
-  `
+  `,
+  styleUrls: ['./breadcrumb.component.scss']
 })
 export class BreadcrumbComponent implements OnInit {
   @Input() prefix = '';

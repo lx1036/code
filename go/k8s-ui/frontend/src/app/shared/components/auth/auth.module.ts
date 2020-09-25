@@ -15,6 +15,9 @@ const routes: Routes = [
   imports: [
     SharedModule,
     RouterModule.forChild(routes),
+  ],
+  providers: [
+
   ]
 })
 export class AuthModule { }

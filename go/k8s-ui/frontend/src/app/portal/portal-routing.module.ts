@@ -21,8 +21,8 @@ const routes: Routes = [
         children: [
           {path: 'service', component: ServiceComponent},
           {path: 'service/:serviceId', component: ServiceComponent},
-          {path: 'service/:serviceId/tpl', component: CreateEditServiceTplComponent},
-          {path: 'service/:serviceId/tpl/:tplId', component: CreateEditServiceTplComponent},
+          // {path: 'service/:serviceId/tpl', component: CreateEditServiceTplComponent},
+          // {path: 'service/:serviceId/tpl/:tplId', component: CreateEditServiceTplComponent},
         ]
       }
     ],

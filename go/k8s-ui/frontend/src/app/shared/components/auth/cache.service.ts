@@ -29,6 +29,7 @@ export class CacheService {
     }
     this.namespace = namespace;
   }
+
   get currentNamespace(): Namespace {
     if (this.namespace) {
       return this.namespace;
