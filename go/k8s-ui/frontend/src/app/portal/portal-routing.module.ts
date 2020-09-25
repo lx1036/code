@@ -7,6 +7,7 @@ import {ServiceComponent} from "./service/service.component";
 import {AuthCheckGuard} from "../shared/components/auth/auth-check-guard.service";
 import {AppComponent} from "../app.component";
 import {NamespaceApiKeyComponent} from "./namespace-apikey/apikey.component";
+import {NamespaceUserComponent} from "./namespace-user/namespace-user.component";
 
 
 const routes: Routes = [
@@ -18,7 +19,7 @@ const routes: Routes = [
       {path: 'app', component: AppComponent},
       {path: 'apikey', component: NamespaceApiKeyComponent},
       {path: 'users', component: NamespaceUserComponent},
-      {path: 'webhook', component: NamespaceWebHookComponent},
+      // {path: 'webhook', component: NamespaceWebHookComponent},
       {path: 'overview', component: NamespaceReportComponent},
       {
         path: 'app/:id', component: BaseComponent,

@@ -1,8 +1,7 @@
 import {Injectable} from '@angular/core';
-import {PageState} from './page-state';
 import {HttpClient, HttpParams} from '@angular/common/http';
 import {Observable} from 'rxjs';
-import {Notification} from './model/v1/notification';
+import {PageState} from "../paginate/page-state";
 
 
 export type NotificationType = string;
