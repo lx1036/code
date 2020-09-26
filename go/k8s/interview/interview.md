@@ -49,3 +49,8 @@ Etcd是用Go编程语言编写的，是一个分布式键值存储，用于协�
 
 什么是Ingress网络，它是如何工作的？
 
+业务目前使用 k8s的遇到的一些问题，遇到过 k8s 的一些 bug 怎么解决的，改造过 k8s 么为啥要改造，这些问题提前想想？
+
+
+k8s 周边的一些东西也尽量了解一下，knative、argo、kubeflow、virtualkubelet？
+
