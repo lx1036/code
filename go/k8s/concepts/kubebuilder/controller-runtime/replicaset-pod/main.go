@@ -14,12 +14,14 @@ import (
 	"time"
 )
 
+// https://github.com/kubernetes-sigs/controller-runtime/blob/master/example_test.go
+
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = controllers.Log.WithName("setup")
 )
 
-// go run . --kubeconfig=~/.kube/config
+// go run . --kubeconfig=/Users/liuxiang/.kube/config
 func main() {
 	Replicaset()
 }
