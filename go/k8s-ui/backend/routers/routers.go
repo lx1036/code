@@ -24,7 +24,7 @@ func SetupRouter() *gin.Engine {
 	authorizedRouter.Use(middlewares.AuthRequired())
 	authorizedRouter.GET(`/me`, (&auth.AuthController{}).CurrentUser())
 	apiV1Router := authorizedRouter.Group("/api/v1")
-	
+
 	{
 		apiV1Router.GET("/notifications/subscribe", (&controllers.NotificationController{}).Subscribe())
 		apiV1Router.POST("/notifications", (&controllers.NotificationController{}).Create())
@@ -33,12 +33,12 @@ func SetupRouter() *gin.Engine {
 		apiV1Router.GET("/users/statistics", (&controllers.UserController{}).UserStatistics())
 		apiV1Router.GET("/kubernetes/pods/statistics", (&kubernetes.KubePodController{}).PodStatistics())
 		apiV1Router.GET("/kubernetes/nodes/statistics", (&kubernetes.KubeNodeController{}).PodStatistics())
-		
+
 		// edge-nodes
 		apiV1Router.GET("/services/edgenodes", (&service.EdgeNodeController{}).List())
 		apiV1Router.DELETE("/apps/:appId/services/:serviceId", (&service.ServiceController{}).Delete())
 	}
-	
+
 	{
 		apiV1Router.GET("/apps/:appId/_proxy/clusters/:cluster/namespaces/:namespace/:kind/:kindName")
 	}

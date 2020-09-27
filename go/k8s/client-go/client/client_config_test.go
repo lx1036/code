@@ -8,9 +8,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
-	"path/filepath"
 )
 
 func TestMergoSemantics(test *testing.T) {
@@ -134,11 +134,11 @@ func GetClientSet() *kubernetes.Clientset {
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to kubeconfig file")
 	}
-	
+
 	fmt.Println("kube config path: " + *kubeconfig)
-	
+
 	flag.Parse()
-	
+
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err)
@@ -147,7 +147,7 @@ func GetClientSet() *kubernetes.Clientset {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	return clientSet
 }
 
@@ -155,4 +155,3 @@ func TestRestClient(test *testing.T) {
 	restClient := GetClientSet().CoreV1().RESTClient()
 	restClient.Post().Resource("pods").SetHeader("Content-Type", "application/json").Body()
 }
-

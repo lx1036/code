@@ -3,9 +3,9 @@ package kubeclient
 import (
 	"context"
 	log "github.com/sirupsen/logrus"
+	"k8s-lx1036/k8s-ui/backend/common/util"
 	"k8s-lx1036/k8s-ui/backend/database"
 	"k8s-lx1036/k8s-ui/backend/models"
-	"k8s-lx1036/k8s-ui/backend/common/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -169,14 +169,14 @@ func (handler *resourceHandler) GetCacheFactory() *CacheFactory {
 func (handler *resourceHandler) Create(kind string, namespace string, object *runtime.Unknown) (*runtime.Unknown, error) {
 	var result *runtime.Unknown
 	err := handler.Client.CoreV1().RESTClient().Post().Resource(kind).Namespace(namespace).Body(object).Do(context.TODO()).Into(result)
-	
+
 	return result, err
 }
 
 func (handler *resourceHandler) Update(kind string, namespace string, name string, object *runtime.Unknown) (*runtime.Unknown, error) {
 	var result *runtime.Unknown
 	err := handler.Client.CoreV1().RESTClient().Put().Resource(kind).Namespace(namespace).Name(name).Body(object).Do(context.TODO()).Into(result)
-	
+
 	return result, err
 }
 
