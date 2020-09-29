@@ -26,27 +26,6 @@ func main() {
 	Replicaset()
 }
 
-// This example creates a simple application Controller that is configured for ReplicaSets and Pods.
-// This application controller will be running leader election with the provided configuration in the manager options.
-// If leader election configuration is not provided, controller runs leader election with default values.
-// Default values taken from: https://github.com/kubernetes/apiserver/blob/master/pkg/apis/config/v1alpha1/defaults.go
-//	defaultLeaseDuration = 15 * time.Second
-//	defaultRenewDeadline = 10 * time.Second
-//	defaultRetryPeriod   = 2 * time.Second
-//
-// * Create a new application for ReplicaSets that manages Pods owned by the ReplicaSet and calls into
-// ReplicaSetReconciler.
-//
-// * Start the application.
-// TODO(pwittrock): Update this example when we have better dependency injection support
-
-// This example creates a simple application Controller that is configured for ReplicaSets and Pods.
-//
-// * Create a new application for ReplicaSets that manages Pods owned by the ReplicaSet and calls into
-// ReplicaSetReconciler.
-//
-// * Start the application.
-// TODO(pwittrock): Update this example when we have better dependency injection support
 func Replicaset() {
 	flag.Parse()
 	controllers.SetLogger(zap.New(func(o *zap.Options) {
