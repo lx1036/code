@@ -9,3 +9,7 @@ Kubebuilder 是一个使用 CRDs 构建 K8s API 的 SDK，主要是：
 
 main -> new controllerManager -> controller builder -> builder add Runnable(Controller) -> controller(Reconciler)
                                                         -> Controller start -> controller.worker
+manager对象:
+
+初始化共享cache;
+初始化k8s client，用于与api-server通信
