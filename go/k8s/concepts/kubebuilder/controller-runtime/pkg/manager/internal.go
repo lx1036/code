@@ -160,7 +160,7 @@ type controllerManager struct {
 	shutdownCtx context.Context
 }
 
-func (cm controllerManager) Add(runnable Runnable) error {
+func (cm *controllerManager) Add(runnable Runnable) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -168,67 +168,109 @@ func (cm controllerManager) Add(runnable Runnable) error {
 
 }
 
-func (cm controllerManager) Elected() <-chan struct{} {
+func (cm *controllerManager) Elected() <-chan struct{} {
 	panic("implement me")
 }
 
-func (cm controllerManager) SetFields(i interface{}) error {
+func (cm *controllerManager) SetFields(i interface{}) error {
 
 	return nil
 }
 
-func (cm controllerManager) AddMetricsExtraHandler(path string, handler http.Handler) error {
+func (cm *controllerManager) AddMetricsExtraHandler(path string, handler http.Handler) error {
 	panic("implement me")
 }
 
-func (cm controllerManager) AddHealthzCheck(name string, check Checker) error {
+func (cm *controllerManager) AddHealthzCheck(name string, check Checker) error {
 	panic("implement me")
 }
 
-func (cm controllerManager) AddReadyzCheck(name string, check Checker) error {
+func (cm *controllerManager) AddReadyzCheck(name string, check Checker) error {
 	panic("implement me")
 }
 
-func (cm controllerManager) Start(i <-chan struct{}) error {
+
+
+func (cm *controllerManager) GetConfig() *rest.Config {
 	panic("implement me")
 }
 
-func (cm controllerManager) GetConfig() *rest.Config {
+func (cm *controllerManager) GetScheme() *runtime.Scheme {
 	panic("implement me")
 }
 
-func (cm controllerManager) GetScheme() *runtime.Scheme {
+func (cm *controllerManager) GetClient() client.Client {
 	panic("implement me")
 }
 
-func (cm controllerManager) GetClient() client.Client {
+func (cm *controllerManager) GetFieldIndexer() client.FieldIndexer {
 	panic("implement me")
 }
 
-func (cm controllerManager) GetFieldIndexer() client.FieldIndexer {
+func (cm *controllerManager) GetCache() cache.Cache {
 	panic("implement me")
 }
 
-func (cm controllerManager) GetCache() cache.Cache {
+func (cm *controllerManager) GetEventRecorderFor(name string) record.EventRecorder {
 	panic("implement me")
 }
 
-func (cm controllerManager) GetEventRecorderFor(name string) record.EventRecorder {
+func (cm *controllerManager) GetRESTMapper() meta.RESTMapper {
 	panic("implement me")
 }
 
-func (cm controllerManager) GetRESTMapper() meta.RESTMapper {
+func (cm *controllerManager) GetAPIReader() client.Reader {
 	panic("implement me")
 }
 
-func (cm controllerManager) GetAPIReader() client.Reader {
+func (cm *controllerManager) GetWebhookServer() *Server {
 	panic("implement me")
 }
 
-func (cm controllerManager) GetWebhookServer() *Server {
-	panic("implement me")
-}
-
-func (cm controllerManager) GetLogger() logr.Logger {
+func (cm *controllerManager) GetLogger() logr.Logger {
 	return cm.logger
+}
+
+func (cm *controllerManager) waitForCache() {
+
+
+	cm.cache.WaitForCacheSync(cm.internalStop)
+
+
+}
+func (cm *controllerManager) startNonLeaderElectionRunnables() {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	cm.waitForCache()
+
+	for _, c := range cm.nonLeaderElectionRunnables {
+		cm.startRunnable(c)
+	}
+}
+func (cm *controllerManager) startRunnable(r Runnable) {
+	cm.waitForRunnable.Add(1)
+	go func() {
+		defer cm.waitForRunnable.Done()
+		if err := r.Start(cm.internalStop); err != nil {
+			cm.errChan <- err
+		}
+	}()
+}
+
+func (cm *controllerManager) Start(stop <-chan struct{}) error {
+	stopComplete := make(chan struct{})
+	defer close(stopComplete)
+
+	go cm.startNonLeaderElectionRunnables()
+
+
+	select {
+	case <-stop:
+		// We are done
+		return nil
+	case err := <-cm.errChan:
+		// Error starting or running a runnable
+		return err
+	}
 }
