@@ -2,6 +2,8 @@ package manager
 
 import (
 	"github.com/go-logr/logr"
+	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/cache"
+	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/client"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -13,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sync"
 	"time"
+	"context"
 )
 
 var log = logf.RuntimeLog.WithName("manager")
@@ -145,3 +148,80 @@ type controllerManager struct {
 	// is closed because it will be nil.
 	shutdownCtx context.Context
 }
+
+func (cm controllerManager) Add(runnable Runnable) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	
+	
+	
+	// Add the runnable to the leader election or the non-leaderelection list
+	
+	
+	
+}
+
+func (cm controllerManager) Elected() <-chan struct{} {
+	panic("implement me")
+}
+
+func (cm controllerManager) SetFields(i interface{}) error {
+	panic("implement me")
+}
+
+func (cm controllerManager) AddMetricsExtraHandler(path string, handler http.Handler) error {
+	panic("implement me")
+}
+
+func (cm controllerManager) AddHealthzCheck(name string, check Checker) error {
+	panic("implement me")
+}
+
+func (cm controllerManager) AddReadyzCheck(name string, check Checker) error {
+	panic("implement me")
+}
+
+func (cm controllerManager) Start(i <-chan struct{}) error {
+	panic("implement me")
+}
+
+func (cm controllerManager) GetConfig() *rest.Config {
+	panic("implement me")
+}
+
+func (cm controllerManager) GetScheme() *runtime.Scheme {
+	panic("implement me")
+}
+
+func (cm controllerManager) GetClient() client.Client {
+	panic("implement me")
+}
+
+func (cm controllerManager) GetFieldIndexer() client.FieldIndexer {
+	panic("implement me")
+}
+
+func (cm controllerManager) GetCache() cache.Cache {
+	panic("implement me")
+}
+
+func (cm controllerManager) GetEventRecorderFor(name string) record.EventRecorder {
+	panic("implement me")
+}
+
+func (cm controllerManager) GetRESTMapper() meta.RESTMapper {
+	panic("implement me")
+}
+
+func (cm controllerManager) GetAPIReader() client.Reader {
+	panic("implement me")
+}
+
+func (cm controllerManager) GetWebhookServer() *Server {
+	panic("implement me")
+}
+
+func (cm controllerManager) GetLogger() logr.Logger {
+	panic("implement me")
+}
+
