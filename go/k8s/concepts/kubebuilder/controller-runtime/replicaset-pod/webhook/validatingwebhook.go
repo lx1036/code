@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -21,12 +21,12 @@ type podValidator struct {
 // podValidator admits a pod iff a specific annotation exists.
 func (v *podValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	pod := &corev1.Pod{}
-	
+
 	err := v.decoder.Decode(req, pod)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	
+
 	key := "example-mutating-admission-webhook"
 	anno, found := pod.Annotations[key]
 	if !found {
@@ -35,7 +35,7 @@ func (v *podValidator) Handle(ctx context.Context, req admission.Request) admiss
 	if anno != "foo" {
 		return admission.Denied(fmt.Sprintf("annotation %s did not have value %q", key, "foo"))
 	}
-	
+
 	return admission.Allowed("")
 }
 

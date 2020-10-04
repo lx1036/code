@@ -31,7 +31,7 @@ func Replicaset() {
 	controllers.SetLogger(zap.New(func(o *zap.Options) {
 		o.Development = true
 	}))
-	
+
 	leaseDuration := 100 * time.Second
 	renewDeadline := 80 * time.Second
 	retryPeriod := 20 * time.Second
@@ -65,6 +65,7 @@ func Replicaset() {
 type ReplicaSetReconciler struct {
 	client.Client
 }
+
 // Implement the business logic:
 // This function will be called when there is a change to a ReplicaSet or a Pod with an OwnerReference
 // to a ReplicaSet.
@@ -80,20 +81,20 @@ func (reconciler *ReplicaSetReconciler) Reconcile(request controllers.Request) (
 	if err != nil {
 		return controllers.Result{}, err
 	}
-	
+
 	// List the Pods matching the PodTemplate Labels
 	pods := &corev1.PodList{}
 	err = reconciler.List(ctx, pods, client.InNamespace(request.Namespace), client.MatchingLabels(rs.Spec.Template.Labels))
 	if err != nil {
 		return controllers.Result{}, err
 	}
-	
+
 	// Update the ReplicaSet
 	rs.Labels["pod-count"] = fmt.Sprintf("%v", len(pods.Items))
 	err = reconciler.Update(context.TODO(), rs)
 	if err != nil {
 		return controllers.Result{}, err
 	}
-	
+
 	return controllers.Result{}, nil
 }

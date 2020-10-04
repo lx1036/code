@@ -7,7 +7,6 @@ import (
 
 // 运行时自动发现resource type
 type dynamicRESTMapper struct {
-
 }
 
 type DynamicRESTMapperOption func(*dynamicRESTMapper) error

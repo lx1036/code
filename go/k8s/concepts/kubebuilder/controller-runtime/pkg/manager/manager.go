@@ -2,14 +2,6 @@ package manager
 
 import (
 	"fmt"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/tools/record"
-	"net/http"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/leaderelection"
-	"sigs.k8s.io/controller-runtime/pkg/recorder"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
-	"time"
 	"github.com/go-logr/logr"
 	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/cache"
 	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/client"
@@ -18,9 +10,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/tools/record"
 	"net"
+	"net/http"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/leaderelection"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
+	"sigs.k8s.io/controller-runtime/pkg/recorder"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"time"
 )
 
 type Runnable interface {
@@ -70,34 +69,29 @@ type Options struct {
 	Scheme *runtime.Scheme
 	// map(go types) -> k8s api
 	MapperProvider func(config *rest.Config) (meta.RESTMapper, error)
-	
+
 	NewClient NewClientFunc
-	
+
 	NewCache cache.NewCacheFunc
 
 	SyncPeriod *time.Duration
 
-
-
 	// Readiness probe endpoint name, defaults to "readyz"
 	ReadinessEndpointName string
-	
+
 	// Liveness probe endpoint name, defaults to "healthz"
 	LivenessEndpointName string
 
-
-	
 	GracefulShutdownTimeout *time.Duration
-	
+
 	Logger logr.Logger
 
 	DryRunClient bool
 
-	LeaderElectionConfig *rest.Config
-	LeaderElection bool
+	LeaderElectionConfig    *rest.Config
+	LeaderElection          bool
 	LeaderElectionNamespace string
-	LeaderElectionID string
-
+	LeaderElectionID        string
 
 	newResourceLock func(config *rest.Config, recorderProvider recorder.Provider, options leaderelection.Options) (resourcelock.Interface, error)
 
@@ -109,12 +103,10 @@ type Options struct {
 	HealthProbeBindAddress string
 	newHealthProbeListener func(addr string) (net.Listener, error)
 
-
 	// webhook server
-	Port int
-	Host string
+	Port    int
+	Host    string
 	CertDir string
-
 }
 
 type NewClientFunc func(cache cache.Cache, config *rest.Config, options client.Options) (client.Client, error)
@@ -124,63 +116,60 @@ func DefaultNewClient(cache cache.Cache, config *rest.Config, options client.Opt
 	if err != nil {
 		return nil, err
 	}
-	
-	
+
 }
 
-func setOptionsDefaults(options Options) Options  {
+func setOptionsDefaults(options Options) Options {
 	if options.Scheme == nil {
 		options.Scheme = scheme.Scheme
 	}
-	
+
 	if options.MapperProvider == nil {
 		options.MapperProvider = func(config *rest.Config) (meta.RESTMapper, error) {
 			return apiutil.NewDynamicRESTMapper(config)
 		}
 	}
-	
+
 	// Allow newClient to be mocked
 	if options.NewClient == nil {
 		options.NewClient = DefaultNewClient
 	}
-	
-	
+
 	if options.NewCache == nil {
 		options.NewCache = cache.New
 	}
-	
-	
+
 	if options.ReadinessEndpointName == "" {
 		options.ReadinessEndpointName = defaultReadinessEndpoint
 	}
-	
+
 	if options.LivenessEndpointName == "" {
 		options.LivenessEndpointName = defaultLivenessEndpoint
 	}
-	
+
 	if options.newHealthProbeListener == nil {
 		options.newHealthProbeListener = defaultHealthProbeListener
 	}
-	
+
 	if options.GracefulShutdownTimeout == nil {
 		gracefulShutdownTimeout := defaultGracefulShutdownPeriod
 		options.GracefulShutdownTimeout = &gracefulShutdownTimeout
 	}
-	
+
 	if options.Logger == nil {
 		options.Logger = logf.Log
 	}
-	
+
 	return options
 }
 
-func New(config *rest.Config, options Options) (Manager, error)  {
+func New(config *rest.Config, options Options) (Manager, error) {
 	if config == nil {
 		return nil, fmt.Errorf("must specify Config")
 	}
-	
+
 	options = setOptionsDefaults(options)
-	
+
 	// Create the mapper provider
 	mapper, err := options.MapperProvider(config)
 	if err != nil {
@@ -237,7 +226,6 @@ func New(config *rest.Config, options Options) (Manager, error)  {
 		return nil, err
 	}
 
-
 	stop := make(chan struct{})
 
 	return &controllerManager{
@@ -268,5 +256,3 @@ func New(config *rest.Config, options Options) (Manager, error)  {
 		gracefulShutdownTimeout: *options.GracefulShutdownTimeout,
 	}, nil
 }
-
-

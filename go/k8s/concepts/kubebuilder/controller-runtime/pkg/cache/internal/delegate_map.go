@@ -1,22 +1,18 @@
 package internal
 
 import (
-	"time"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"time"
 )
 
 type InformersMap struct {
-	
 	structured   *specificInformersMap
 	unstructured *specificInformersMap
-	
+
 	Scheme *runtime.Scheme
 }
-
-
-
 
 func NewInformersMap(
 	config *rest.Config,
@@ -27,7 +23,7 @@ func NewInformersMap(
 	return &InformersMap{
 		structured:   newStructuredInformersMap(config, scheme, mapper, resync, namespace),
 		unstructured: newUnstructuredInformersMap(config, scheme, mapper, resync, namespace),
-		
+
 		Scheme: scheme,
 	}
 }

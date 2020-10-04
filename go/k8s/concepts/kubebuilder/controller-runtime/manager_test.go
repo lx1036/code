@@ -27,25 +27,23 @@ func TestManager(test *testing.T) {
 		os.Exit(1)
 	}
 	log.Info("created manager", "manager", mgr)
-	
+
 	ns := corev1.Namespace{}
 	recorder := mgr.GetEventRecorderFor("test-manager")
 	err = mgr.Add(manager.RunnableFunc(func(stop <-chan struct{}) error {
 		// Do something
 		recorder.Event(&ns, "Warning", "reason", "message")
-		
+
 		return nil
 	}))
 	if err != nil {
 		log.Error(err, "unable add a runnable to the manager")
 		os.Exit(1)
 	}
-	
+
 	err = mgr.Start(signals.SetupSignalHandler())
 	if err != nil {
 		log.Error(err, "unable start the manager")
 		os.Exit(1)
 	}
 }
-
-

@@ -4,9 +4,9 @@ import (
 	"k8s.io/apimachinery/pkg/conversion/queryparams"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	
-	"net/url"
+
 	"errors"
+	"net/url"
 )
 
 type noConversionParamCodec struct{}

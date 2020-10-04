@@ -1,10 +1,10 @@
 package client
 
 import (
-	"fmt"
 	"context"
+	"fmt"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	
+
 	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/client/apiutil"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,7 +16,7 @@ import (
 
 type Options struct {
 	Scheme *runtime.Scheme
-	
+
 	Mapper meta.RESTMapper
 }
 
@@ -30,9 +30,7 @@ type client struct {
 
 func (c client) Get(ctx context.Context, key ObjectKey, obj runtime.Object) error {
 	_, ok := obj.(*unstructured.Unstructured)
-	
-	
-	
+
 }
 
 func (c client) List(ctx context.Context, list runtime.Object, opts ...ListOption) {
@@ -71,9 +69,6 @@ func (c client) RESTMapper() meta.RESTMapper {
 	panic("implement me")
 }
 
-
-
-
 func New(config *rest.Config, options Options) (Client, error) {
 	if config == nil {
 		return nil, fmt.Errorf("must provide non-nil rest.Config to client.New")
@@ -81,7 +76,7 @@ func New(config *rest.Config, options Options) (Client, error) {
 	if options.Scheme == nil {
 		options.Scheme = scheme.Scheme
 	}
-	
+
 	// Init a Mapper if none provided
 	if options.Mapper == nil {
 		var err error
@@ -90,7 +85,7 @@ func New(config *rest.Config, options Options) (Client, error) {
 			return nil, err
 		}
 	}
-	
+
 	clientcache := &clientCache{
 		config:         config,
 		scheme:         options.Scheme,
@@ -98,7 +93,7 @@ func New(config *rest.Config, options Options) (Client, error) {
 		codecs:         serializer.NewCodecFactory(options.Scheme),
 		resourceByType: make(map[schema.GroupVersionKind]*resourceMeta),
 	}
-	
+
 	c := &client{
 		typedClient: typedClient{
 			cache:      clientcache,
@@ -111,6 +106,6 @@ func New(config *rest.Config, options Options) (Client, error) {
 		scheme: options.Scheme,
 		mapper: options.Mapper,
 	}
-	
+
 	return c, nil
 }

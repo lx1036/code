@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	corev1 "k8s.io/api/core/v1"
+	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -20,22 +20,22 @@ type podAnnotator struct {
 // podAnnotator adds an annotation to every incoming pods.
 func (a *podAnnotator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	pod := &corev1.Pod{}
-	
+
 	err := a.decoder.Decode(req, pod)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	
+
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
 	pod.Annotations["example-mutating-admission-webhook"] = "foo"
-	
+
 	marshaledPod, err := json.Marshal(pod)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	
+
 	return admission.PatchResponseFromRaw(req.Object.Raw, marshaledPod)
 }
 
