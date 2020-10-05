@@ -8,6 +8,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// InNamespace restricts the list/delete operation to the given namespace.
+type InNamespace string
+
+// ApplyToList applies this configuration to the given list options.
+func (n InNamespace) ApplyToList(opts *ListOptions) {
+	opts.Namespace = string(n)
+}
+
+// ApplyToDeleteAllOf applies this configuration to the given an List options.
+func (n InNamespace) ApplyToDeleteAllOf(opts *DeleteAllOfOptions) {
+	n.ApplyToList(&opts.ListOptions)
+}
+
 type ListOption interface {
 	ApplyToList(*ListOptions)
 }
@@ -24,6 +37,37 @@ type ListOptions struct {
 	Continue string
 
 	Raw *metav1.ListOptions
+}
+
+// ApplyOptions applies the given list options on these options,
+// and then returns itself (for convenient chaining).
+func (o *ListOptions) ApplyOptions(opts []ListOption) *ListOptions {
+	for _, opt := range opts {
+		opt.ApplyToList(o)
+	}
+	return o
+}
+
+// AsListOptions returns these options as a flattened metav1.ListOptions.
+// This may mutate the Raw field.
+func (o *ListOptions) AsListOptions() *metav1.ListOptions {
+	if o == nil {
+		return &metav1.ListOptions{}
+	}
+	if o.Raw == nil {
+		o.Raw = &metav1.ListOptions{}
+	}
+	if o.LabelSelector != nil {
+		o.Raw.LabelSelector = o.LabelSelector.String()
+	}
+	if o.FieldSelector != nil {
+		o.Raw.FieldSelector = o.FieldSelector.String()
+	}
+	if !o.Raw.Watch {
+		o.Raw.Limit = o.Limit
+		o.Raw.Continue = o.Continue
+	}
+	return o.Raw
 }
 
 type CreateOption interface {

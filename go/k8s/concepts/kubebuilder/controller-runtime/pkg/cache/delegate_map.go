@@ -1,11 +1,11 @@
-package internal
+package cache
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	"time"
 	"k8s.io/client-go/tools/cache"
+	"time"
 )
 
 type InformersMap struct {
@@ -31,10 +31,8 @@ func NewInformersMap(
 
 func (m *InformersMap) WaitForCacheSync(stop <-chan struct{}) bool {
 
-
 	return cache.WaitForCacheSync(stop, syncedFuncs...)
 }
-
 
 // newStructuredInformersMap creates a new InformersMap for structured objects.
 func newStructuredInformersMap(config *rest.Config, scheme *runtime.Scheme, mapper meta.RESTMapper, resync time.Duration, namespace string) *specificInformersMap {

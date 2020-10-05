@@ -47,7 +47,7 @@ type Informers interface {
 	client.FieldIndexer
 }
 
-func setOptionsDefaults(options Options) (Options, error) {
+func setOptionsDefaults(config *rest.Config, options Options) (Options, error) {
 
 }
 
@@ -57,6 +57,6 @@ func New(config *rest.Config, options Options) (Cache, error) {
 		return nil, err
 	}
 
-	im := internal.NewInformersMap(config, opts.Scheme, opts.Mapper, *opts.Resync, opts.Namespace)
+	im := NewInformersMap(config, opts.Scheme, opts.Mapper, *opts.Resync, opts.Namespace)
 	return &informerCache{InformersMap: im}, nil
 }
