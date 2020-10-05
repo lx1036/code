@@ -2,14 +2,21 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"time"
-
 	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/client"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/scheme"
 )
+
+var (
+	logger = log.Log.WithName("object-cache")
+)
+
 
 type Options struct {
 	Scheme *runtime.Scheme
@@ -47,8 +54,26 @@ type Informers interface {
 	client.FieldIndexer
 }
 
+var defaultResyncTime = 10 * time.Hour
 func setOptionsDefaults(config *rest.Config, options Options) (Options, error) {
+	if options.Scheme == nil {
+		options.Scheme = scheme.Scheme
+	}
 
+	if options.Mapper == nil {
+		var err error
+		options.Mapper, err = client.NewDiscoveryRESTMapper(config)
+		if err != nil {
+			logger.WithName("setup").Error(err, "Failed to get API Group-Resources")
+			return options, fmt.Errorf("could not create RESTMapper from config")
+		}
+	}
+
+	// Default the resync period to 10 hours if unset
+	if options.Resync == nil {
+		options.Resync = &defaultResyncTime
+	}
+	return options, nil
 }
 
 func New(config *rest.Config, options Options) (Cache, error) {
@@ -57,6 +82,6 @@ func New(config *rest.Config, options Options) (Cache, error) {
 		return nil, err
 	}
 
-	im := NewInformersMap(config, opts.Scheme, opts.Mapper, *opts.Resync, opts.Namespace)
-	return &informerCache{InformersMap: im}, nil
+	informersMap := NewInformersMap(config, opts.Scheme, opts.Mapper, *opts.Resync, opts.Namespace)
+	return &informerCache{InformersMap: informersMap}, nil
 }

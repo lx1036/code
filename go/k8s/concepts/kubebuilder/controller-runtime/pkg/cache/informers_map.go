@@ -11,6 +11,16 @@ import (
 	"time"
 )
 
+// MapEntry contains the cached data for an Informer
+type MapEntry struct {
+	// Informer is the cached informer
+	Informer cache.SharedIndexInformer
+
+	// CacheReader wraps Informer and implements the CacheReader interface for a single type
+	Reader CacheReader
+}
+
+
 type specificInformersMap struct {
 	// Scheme maps runtime.Objects to GroupVersionKinds
 	Scheme *runtime.Scheme

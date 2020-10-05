@@ -126,7 +126,7 @@ func setOptionsDefaults(options Options) Options {
 
 	if options.MapperProvider == nil {
 		options.MapperProvider = func(config *rest.Config) (meta.RESTMapper, error) {
-			return apiutil.NewDynamicRESTMapper(config)
+			return client.NewDynamicRESTMapper(config)
 		}
 	}
 
@@ -177,7 +177,7 @@ func New(config *rest.Config, options Options) (Manager, error) {
 		return nil, err
 	}
 
-	cache, err := options.NewCache(config, cache.Options{Scheme: options.Scheme, Mapper: mapper, Resync: options.SyncPeriod, Namespace: options.Namespace})
+	cacheInformer, err := options.NewCache(config, cache.Options{Scheme: options.Scheme, Mapper: mapper, Resync: options.SyncPeriod, Namespace: options.Namespace})
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func New(config *rest.Config, options Options) (Manager, error) {
 		return nil, err
 	}
 
-	writeObj, err := options.NewClient(cache, config, client.Options{Scheme: options.Scheme, Mapper: mapper})
+	writeObj, err := options.NewClient(cacheInformer, config, client.Options{Scheme: options.Scheme, Mapper: mapper})
 	if err != nil {
 		return nil, err
 	}
@@ -231,8 +231,8 @@ func New(config *rest.Config, options Options) (Manager, error) {
 	return &controllerManager{
 		config:                  config,
 		scheme:                  options.Scheme,
-		cache:                   cache,
-		fieldIndexes:            cache,
+		cache:                   cacheInformer,
+		fieldIndexes:            cacheInformer,
 		client:                  writeObj,
 		apiReader:               apiReader,
 		recorderProvider:        recorderProvider,

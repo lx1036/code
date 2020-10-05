@@ -2,10 +2,13 @@ package client
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 )
 
 func GVKForObject(obj runtime.Object, scheme *runtime.Scheme) (schema.GroupVersionKind, error) {
@@ -55,4 +58,19 @@ func createRestConfig(gvk schema.GroupVersionKind, baseConfig *rest.Config) *res
 		cfg.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	return cfg
+}
+
+// NewDiscoveryRESTMapper constructs a new RESTMapper based on discovery
+// information fetched by a new client with the given config.
+func NewDiscoveryRESTMapper(c *rest.Config) (meta.RESTMapper, error) {
+	// Get a mapper
+	dc, err := discovery.NewDiscoveryClientForConfig(c)
+	if err != nil {
+		return nil, err
+	}
+	gr, err := restmapper.GetAPIGroupResources(dc)
+	if err != nil {
+		return nil, err
+	}
+	return restmapper.NewDiscoveryRESTMapper(gr), nil
 }
