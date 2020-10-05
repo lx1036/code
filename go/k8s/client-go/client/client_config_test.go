@@ -1,10 +1,14 @@
 package client
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
+	coreV1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -121,4 +125,33 @@ users:
 	}
 
 	fmt.Println(config)
+}
+
+func GetClientSet() *kubernetes.Clientset {
+	var kubeconfig *string
+	if home, _ := os.UserHomeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "absolute path to kubeconfig file")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to kubeconfig file")
+	}
+
+	fmt.Println("kube config path: " + *kubeconfig)
+
+	flag.Parse()
+
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		panic(err)
+	}
+	clientSet, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err)
+	}
+
+	return clientSet
+}
+
+func TestRestClient(test *testing.T) {
+	restClient := GetClientSet().CoreV1().RESTClient()
+	restClient.Post().Resource("pods").SetHeader("Content-Type", "application/json").Body()
 }

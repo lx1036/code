@@ -9,7 +9,7 @@
     "build:dashboard": "node --max_old_space_size=8000 ./node_modules/@angular/cli/bin/ng build dashboard",
     "build:aot": "node --max_old_space_size=8000 ./node_modules/@angular/cli/bin/ng build --prod --aot",
     "test": "ng test",
-    "lint": "ng lint",
+    "lint": "ng lint --fix",
     "e2e": "ng e2e"
   },
   "private": true,
@@ -64,6 +64,7 @@
     "ng2-ace-editor": "^0.3.9",
     "ngx-cookie-service": "2.4.0",
     "ngx-filter-pipe": "2.1.2",
+    "ngx-markdown": "^10.1.1",
     "normalize.css": "8.0.1",
     "particlesjs": "^2.2.3",
     "raven-js": "^3.21.0",
