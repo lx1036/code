@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+type ErrCacheNotStarted struct{}
+
+func (*ErrCacheNotStarted) Error() string {
+	return "the cache is not started, can not read objects"
+}
+
 // informerCache is a Kubernetes Object cache populated from InformersMap.  informerCache wraps an InformersMap.
 type informerCache struct {
 	*InformersMap
@@ -39,8 +45,8 @@ func (iCache informerCache) List(ctx context.Context, out runtime.Object, opts .
 // objectTypeForListObject tries to find the runtime.Object and associated GVK
 // for a single object corresponding to the passed-in list type. We need them
 // because they are used as cache map key.
-func (ip *informerCache) objectTypeForListObject(list runtime.Object) (*schema.GroupVersionKind, runtime.Object, error) {
-	gvk, err := client.GVKForObject(list, ip.Scheme)
+func (iCache *informerCache) objectTypeForListObject(list runtime.Object) (*schema.GroupVersionKind, runtime.Object, error) {
+	gvk, err := client.GVKForObject(list, iCache.Scheme)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -49,11 +55,7 @@ func (ip *informerCache) objectTypeForListObject(list runtime.Object) (*schema.G
 		return nil, nil, fmt.Errorf("non-list type %T (kind %q) passed as output", list, gvk)
 	}
 
-
-
-
 }
-
 
 func (iCache informerCache) GetInformer(ctx context.Context, obj runtime.Object) (interface{}, error) {
 	panic("implement me")

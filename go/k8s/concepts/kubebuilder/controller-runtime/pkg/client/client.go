@@ -46,7 +46,7 @@ func (c *client) resetGroupVersionKind(obj runtime.Object, gvk schema.GroupVersi
 		}
 	}
 }
-func (c *client) Get(ctx context.Context, key ObjectKey, obj Object) error {
+func (c *client) Get(ctx context.Context, key ObjectKey, obj runtime.Object) error {
 	_, ok := obj.(*unstructured.Unstructured)
 	if ok {
 		return c.unstructuredClient.Get(ctx, key, obj)

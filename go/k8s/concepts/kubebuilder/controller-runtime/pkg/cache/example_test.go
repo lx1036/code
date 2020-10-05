@@ -2,12 +2,12 @@ package cache
 
 import (
 	"context"
+	"fmt"
+	log "github.com/sirupsen/logrus"
 	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/client"
 	corev1 "k8s.io/api/core/v1"
-	"testing"
-	"fmt"
 	"os"
-	log "github.com/sirupsen/logrus"
+	"testing"
 )
 
 func TestList(test *testing.T) {
@@ -26,6 +26,5 @@ func TestList(test *testing.T) {
 			"err": err,
 		}).Debug("[err]")
 	}
-
 
 }

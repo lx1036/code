@@ -3,20 +3,19 @@ package cache
 import (
 	"context"
 	"fmt"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-	"time"
 	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/client"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"time"
 )
 
 var (
 	logger = log.Log.WithName("object-cache")
 )
-
 
 type Options struct {
 	Scheme *runtime.Scheme
@@ -55,6 +54,7 @@ type Informers interface {
 }
 
 var defaultResyncTime = 10 * time.Hour
+
 func setOptionsDefaults(config *rest.Config, options Options) (Options, error) {
 	if options.Scheme == nil {
 		options.Scheme = scheme.Scheme

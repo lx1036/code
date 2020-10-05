@@ -13,7 +13,7 @@ type IndexerFunc func(runtime.Object) []string
 
 // Reader knows how to read and list Kubernetes objects.
 type Reader interface {
-	Get(ctx context.Context, key ObjectKey, obj Object) error
+	Get(ctx context.Context, key ObjectKey, obj runtime.Object) error
 
 	List(ctx context.Context, list runtime.Object, opts ...ListOption) error
 }

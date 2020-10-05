@@ -14,7 +14,7 @@ type unstructuredClient struct {
 	paramCodec runtime.ParameterCodec
 }
 
-func (uc *unstructuredClient) Get(ctx context.Context, key ObjectKey, obj Object) error {
+func (uc *unstructuredClient) Get(ctx context.Context, key ObjectKey, obj runtime.Object) error {
 	u, ok := obj.(*unstructured.Unstructured)
 	log.WithFields(log.Fields{
 		"ok": ok,

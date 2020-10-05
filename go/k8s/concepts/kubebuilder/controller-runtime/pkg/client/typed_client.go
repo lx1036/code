@@ -10,7 +10,7 @@ type typedClient struct {
 	paramCodec runtime.ParameterCodec
 }
 
-func (c *typedClient) Get(ctx context.Context, key ObjectKey, obj Object) error {
+func (c *typedClient) Get(ctx context.Context, key ObjectKey, obj runtime.Object) error {
 	r, err := c.cache.getResource(obj)
 	if err != nil {
 		return err

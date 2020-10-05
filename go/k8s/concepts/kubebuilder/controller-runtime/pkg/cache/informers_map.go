@@ -1,6 +1,9 @@
 package cache
 
 import (
+	"context"
+	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,7 +22,6 @@ type MapEntry struct {
 	// CacheReader wraps Informer and implements the CacheReader interface for a single type
 	Reader CacheReader
 }
-
 
 type specificInformersMap struct {
 	// Scheme maps runtime.Objects to GroupVersionKinds
@@ -69,6 +71,34 @@ type specificInformersMap struct {
 }
 
 type createListWatcherFunc func(gvk schema.GroupVersionKind, ip *specificInformersMap) (*cache.ListWatch, error)
+
+// Get will create a new Informer and add it to the map of specificInformersMap if none exists.  Returns
+// the Informer from the map.
+func (ip *specificInformersMap) Get(ctx context.Context, gvk schema.GroupVersionKind, obj runtime.Object) (bool, *MapEntry, error) {
+	// Return the informer if it is found
+	i, started, ok := func() (*MapEntry, bool, bool) {
+		ip.mu.RLock()
+		defer ip.mu.RUnlock()
+		i, ok := ip.informersByGVK[gvk]
+		return i, ip.started, ok
+	}()
+
+	if !ok {
+		var err error
+		if i, started, err = ip.addInformerToMap(gvk, obj); err != nil {
+			return started, nil, err
+		}
+	}
+
+	if started && !i.Informer.HasSynced() {
+		// Wait for it to sync before returning the Informer so that folks don't read from a stale cache.
+		if !cache.WaitForCacheSync(ctx.Done(), i.Informer.HasSynced) {
+			return started, nil, apierrors.NewTimeoutError(fmt.Sprintf("failed waiting for %T Informer to sync", obj), 0)
+		}
+	}
+
+	return started, i, nil
+}
 
 // newListWatch returns a new ListWatch object that can be used to create a SharedIndexInformer.
 func createStructuredListWatch(gvk schema.GroupVersionKind, ip *specificInformersMap) (*cache.ListWatch, error) {
