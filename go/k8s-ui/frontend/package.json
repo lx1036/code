@@ -9,7 +9,7 @@
     "build:dashboard": "node --max_old_space_size=8000 ./node_modules/@angular/cli/bin/ng build dashboard",
     "build:aot": "node --max_old_space_size=8000 ./node_modules/@angular/cli/bin/ng build --prod --aot",
     "test": "ng test",
-    "lint": "ng lint",
+    "lint": "ng lint --fix",
     "e2e": "ng e2e"
   },
   "private": true,

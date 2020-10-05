@@ -5,7 +5,6 @@ import (
 )
 
 type BaseController struct {
-
 }
 
 func (controller *BaseController) KubeClient(cluster string) (kubeclient.ResourceHandler, error) {
@@ -13,6 +12,6 @@ func (controller *BaseController) KubeClient(cluster string) (kubeclient.Resourc
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return clusterManager.ResourceHandler, nil
 }

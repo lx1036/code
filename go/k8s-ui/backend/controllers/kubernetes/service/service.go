@@ -10,7 +10,6 @@ import (
 )
 
 type ServiceController struct {
-
 }
 
 func (controller *ServiceController) Delete() gin.HandlerFunc {
@@ -18,16 +17,16 @@ func (controller *ServiceController) Delete() gin.HandlerFunc {
 		serviceId := context.Param("serviceId")
 		id, err := strconv.Atoi(serviceId)
 		if err != nil {
-		
+
 		}
-		
+
 		data := database.DB.Delete(&models.Service{ID: uint(id)}).Value
-		
+
 		context.JSON(http.StatusOK, base.JsonResponse{
 			Errno:  0,
 			Errmsg: "success",
 			Data:   data,
 		})
-		
+
 	}
 }

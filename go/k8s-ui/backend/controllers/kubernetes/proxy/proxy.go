@@ -17,18 +17,18 @@ func (controller *KubeProxyController) Get() gin.HandlerFunc {
 		namespace := context.Param("namespace")
 		kind := context.Param("kind")
 		kindName := context.Param("kindName")
-		
+
 		resourceHandler, err := controller.KubeClient(cluster)
-		if err != nil  || resourceHandler == nil{
-			
+		if err != nil || resourceHandler == nil {
+
 			return
 		}
-		
-		result ,err := resourceHandler.Get(kind, namespace, kindName)
+
+		result, err := resourceHandler.Get(kind, namespace, kindName)
 		if err != nil {
-		
+
 		}
-		
+
 		context.JSON(http.StatusOK, base.JsonResponse{
 			Errno:  0,
 			Errmsg: "success",
@@ -36,5 +36,3 @@ func (controller *KubeProxyController) Get() gin.HandlerFunc {
 		})
 	}
 }
-
-

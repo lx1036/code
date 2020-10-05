@@ -1,0 +1,63 @@
+<clr-datagrid (clrDgRefresh)="refresh($event)">
+  <clr-dg-column>
+    <ng-container *clrDgHideableColumn="showState['ID']">
+      ID
+    </ng-container>
+  </clr-dg-column>
+  <clr-dg-column [clrDgField]="'user.name'" *ngIf="listType === 'namespace'">
+    <ng-container *clrDgHideableColumn="showState['name']">
+      {{'TITLE.USER' | translate}}{{'TITLE.NAME' | translate}}
+    </ng-container>
+  </clr-dg-column>
+  <clr-dg-column [clrDgField]="'namespace.name'" *ngIf="listType === 'user'">
+    <ng-container *clrDgHideableColumn="showState['namespace']">
+      {{'TITLE.NAMESPACE' | translate}}
+    </ng-container>
+  </clr-dg-column>
+  <clr-dg-column>
+    <ng-container *clrDgHideableColumn="showState['group']">
+      {{'TITLE.GROUP' | translate}}
+    </ng-container>
+  </clr-dg-column>
+  <clr-dg-column>
+    <ng-container *clrDgHideableColumn="showState['create_time']">
+      {{'TITLE.CREATE_TIME' | translate}}
+    </ng-container>
+  </clr-dg-column>
+  <clr-dg-column
+    *ngIf="authService.currentNamespacePermission.namespaceUser.update || authService.currentNamespacePermission.namespaceUser.delete ||  authService.currentUser.admin"
+  >
+    <ng-container *clrDgHideableColumn="showState['action']">
+      {{'TITLE.ACTION' | translate}}
+    </ng-container>
+  </clr-dg-column>
+  <clr-dg-row *ngFor="let namespaceUser of namespaceUsers" [clrDgItem]="namespaceUser">
+    <clr-dg-cell>{{namespaceUser.id}}</clr-dg-cell>
+    <clr-dg-cell *ngIf="listType === 'namespace'" class="copy">{{namespaceUser.user.name}}</clr-dg-cell>
+    <clr-dg-cell *ngIf="listType === 'user'" class="copy">{{namespaceUser.namespace.name}}</clr-dg-cell>
+    <clr-dg-cell>{{namespaceUser.groupsName }}</clr-dg-cell>
+    <clr-dg-cell>{{namespaceUser.createTime | date:'yyyy-MM-dd HH:mm'}}</clr-dg-cell>
+    <clr-dg-cell
+      *ngIf="authService.currentNamespacePermission.namespaceUser.update || authService.currentNamespacePermission.namespaceUser.delete ||  authService.currentUser.admin"
+    >
+      <button class="wayne-button text"
+              *ngIf="authService.currentNamespacePermission.namespaceUser.update || authService.currentUser.admin"
+              (click)="editNamespaceUser(namespaceUser)">
+        {{'BUTTON.EDIT' | translate}}</button>
+      <button class="wayne-button text"
+              *ngIf="authService.currentNamespacePermission.namespaceUser.delete || authService.currentUser.admin"
+              (click)="deleteNamespaceUser(namespaceUser)">
+        {{'BUTTON.DELETE' | translate}}</button>
+    </clr-dg-cell>
+  </clr-dg-row>
+
+  <clr-dg-footer>
+    <wayne-paginate
+      [(currentPage)]="currentPage"
+      [total]="page.totalCount"
+      [pageSizes]="[10, 20, 50]"
+      (sizeChange)="pageSizeChange($event)"
+    >
+    </wayne-paginate>
+  </clr-dg-footer>
+</clr-datagrid>

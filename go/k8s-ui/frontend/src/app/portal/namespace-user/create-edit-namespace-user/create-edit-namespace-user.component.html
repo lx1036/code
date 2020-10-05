@@ -1,0 +1,31 @@
+<clr-modal [(clrModalOpen)]="createNamespaceUserOpened" [clrModalSize]="'lg'">
+  <h3 class="modal-title">{{namespaceUserTitle}}</h3>
+  <div class="modal-body">
+    <form #namespaceUserForm="ngForm" clrForm clrLayout="horizontal">
+      <section class="form-block">
+        <clr-input-container>
+          <label class="required">{{'TITLE.NAME' | translate}}</label>
+          <input clrInput type="text" id="namespace_user_name" [(ngModel)]="namespaceUser.user.name" name="name" size="32"
+            required [readonly]="actionType==1" maxlength="32" (keyup)='handleValidation()'>
+            <clr-control-helper>
+              <span class="spinner spinner-inline" [hidden]="!checkOnGoing"></span>
+              <span style="color: red" *ngIf="!isNameValid">{{'MESSAGE.NO_USER' | translate}}</span>
+            </clr-control-helper>
+            <clr-control-error>{{'MESSAGE.NO_USER' | translate}}</clr-control-error>
+        </clr-input-container>
+        <div class="clr-form-container clr-row">
+          <label  class="clr-control-label required">{{'TITLE.GROUP' | translate}}</label>
+          <div class="clr-control-container clr-col-md-10 clr-col-12">
+            <ng2-dual-list-box name="namespace_user_group" [data]="allGroups" valueField="id" textField="name" [availableText]="'TITLE.AVAIL_ITEM' | translate" [selectedText]="'TITLE.CHOOSED_ITEM' | translate" [(ngModel)]="selectGroups">
+            </ng2-dual-list-box>
+          </div>
+        </div>
+      </section>
+    </form>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline" (click)="onCancel()">{{'BUTTON.CANCEL' | translate}}</button>
+    <button type="button" class="btn btn-primary" [disabled]="!isValid"
+            (click)="onSubmit()">{{'BUTTON.SUBMIT' | translate}}</button>
+  </div>
+</clr-modal>
