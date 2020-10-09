@@ -24,3 +24,5 @@ docs:
 
 (2)示例
 https://github.com/kubernetes/client-go/blob/master/examples/workqueue/README.md
+**[Kubernetes 源码学习之限速队列](https://mp.weixin.qq.com/s/RZ4BEkplfVfN-oxAS1XXbQ)**
+**[Kubernetes 源码学习之延时队列](https://mp.weixin.qq.com/s/aZC2MXQFuUu00TgmOozwKQ)**

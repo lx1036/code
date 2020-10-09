@@ -1,0 +1,7 @@
+apiVersion: batch.lx1036.kubebuilder/v1
+kind: LvsPod
+metadata:
+  name: lvspod-sample
+spec:
+  # Add fields here
+  foo: bar

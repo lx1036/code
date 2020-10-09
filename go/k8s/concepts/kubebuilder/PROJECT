@@ -4,4 +4,7 @@ resources:
 - group: batch
   kind: CronJob
   version: v1
+- group: batch
+  kind: LvsPod
+  version: v1
 version: "2"
