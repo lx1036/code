@@ -14,7 +14,7 @@ import (
 
 type DeploymentReconciler struct {
 	client.Client
-	Log    logr.Logger
+	Log logr.Logger
 }
 
 func (r DeploymentReconciler) Reconcile(request controllers.Request) (controllers.Result, error) {
@@ -30,10 +30,10 @@ func (r DeploymentReconciler) Reconcile(request controllers.Request) (controller
 		for _, lvsPod := range lvsPodList.Items {
 			names = append(names, lvsPod.Name)
 		}
-		
+
 		log.V(1).Info("list LvsPod", "names", strings.Join(names, ","))
 	}
-	
+
 	return controllers.Result{}, nil
 }
 
@@ -43,7 +43,7 @@ func LvsDeployment(manager manager.Manager) {
 		For(&appsv1.Deployment{}).       // ReplicaSet is the Application API
 		Complete(&DeploymentReconciler{
 			Client: manager.GetClient(),
-			Log: controllers.Log.WithName("controllers").WithName("LvsPod"),
+			Log:    controllers.Log.WithName("controllers").WithName("LvsPod"),
 		})
 	if err != nil {
 		setupLog.Error(err, "could not create controller")

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"os"
 	controllers "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"os"
 )
 
 type ReplicaSetReconciler struct {
@@ -27,21 +27,21 @@ func (reconciler *ReplicaSetReconciler) Reconcile(request controllers.Request) (
 	if err != nil {
 		return controllers.Result{}, err
 	}
-	
+
 	// List the Pods matching the PodTemplate Labels
 	pods := &corev1.PodList{}
 	err = reconciler.List(ctx, pods, client.InNamespace(request.Namespace), client.MatchingLabels(rs.Spec.Template.Labels))
 	if err != nil {
 		return controllers.Result{}, err
 	}
-	
+
 	// Update the ReplicaSet
 	rs.Labels["pod-count"] = fmt.Sprintf("%v", len(pods.Items))
 	err = reconciler.Update(context.TODO(), rs)
 	if err != nil {
 		return controllers.Result{}, err
 	}
-	
+
 	return controllers.Result{}, nil
 }
 

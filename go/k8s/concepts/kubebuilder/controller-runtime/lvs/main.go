@@ -29,11 +29,11 @@ func main() {
 	controllers.SetLogger(zap.New(func(o *zap.Options) {
 		o.Development = true
 	}))
-	
+
 	leaseDuration := 100 * time.Second
 	renewDeadline := 80 * time.Second
 	retryPeriod := 20 * time.Second
-	
+
 	mgr, err := controllers.NewManager(controllers.GetConfigOrDie(), controllers.Options{
 		LeaseDuration: &leaseDuration,
 		RenewDeadline: &renewDeadline,
@@ -43,11 +43,13 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-	
+
 	//Replicaset(mgr)
-	
-	LvsDeployment(mgr)
-	
+
+	//LvsDeployment(mgr)
+
+	LvsDeploymentError(mgr)
+
 	if err := mgr.Start(controllers.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "could not start manager")
 		os.Exit(1)
