@@ -1,0 +1,9 @@
+[etcd]
+docker2020.so.net
+docker2021.so.net
+docker2022.so.net
+
+[etcd:vars]
+ansible_ssh_user=liuxiang3
+ansible_ssh_pass=*K8s_kubectl
+ansible_su_pass=*K8s_kubectl
