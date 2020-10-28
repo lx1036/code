@@ -6,4 +6,5 @@
 [etcd:vars]
 ansible_ssh_user=liuxiang3
 ansible_ssh_pass=*K8s_kubectl
-ansible_su_pass=*K8s_kubectl
+ansible_become_pass=*K8s_kubectl
+ansible_become=true

@@ -4,7 +4,7 @@ etcd_user: root
 etcd_group: root
 etcd_home: /var/etcd
 etcd_data: /var/etcd/data
-etcd_rc: /var/etcd/etcd.rc
+etcd_conf: /var/etcd/etcd.conf
 etcd_log: /data/log/etcd.log
 etcd_pid: /data/var/run/etcd.pid
 

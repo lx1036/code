@@ -4,3 +4,4 @@
 - hosts: "{{ group }}"
   roles:
     - etcd
+  become: yes

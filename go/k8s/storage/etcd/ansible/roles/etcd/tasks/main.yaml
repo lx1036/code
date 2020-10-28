@@ -12,13 +12,23 @@
 - name: Create etcd data dir
   file: state=directory path={{ etcd_data }} owner={{ etcd_user }} group={{ etcd_group }} recurse=yes
 
+#- name: 安装cfssl/cfssljson
+#  shell: "curl -s -L -o /usr/bin/cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64 &&
+#          curl -s -L -o /usr/bin/cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64 &&
+#          chmod +x /usr/bin/cfssl*"
+#  warn: false
+
 - name: 安装cfssl/cfssljson
-  shell: "cd ~ &&
-          wget https://pkg.cfssl.org/R1.2/cfssl_linux-amd64 &&
-          wget https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64 &&
-          chmod +x cfssl_linux-amd64 cfssljson_linux-amd64 &&
-          mv cfssl_linux-amd64 /usr/bin/cfssl &&
-          mv cfssljson_linux-amd64 /usr/bin/cfssljson"
+  unarchive:
+    src: "../files/cfssl.tar.gz"
+    dest: "{{ etcd_certs }}"
+    mode: a+x
+
+- name: 安装cfssl/cfssljson
+  unarchive:
+    src: "../files/cfssljson.tar.gz"
+    dest: "{{ etcd_certs }}"
+    mode: a+x
 
 # 1. 证书
 - name: 分发证书相关
@@ -32,11 +42,11 @@
   template: src=etcd-csr.json.j2 dest={{ etcd_certs }}/etcd-csr.json
 
 - name: 创建etcd证书和私钥
-  shell: "cd {{ etcd_certs }} && /usr/bin/cfssl gencert \
+  shell: "cd {{ etcd_certs }} && {{ etcd_certs }}/cfssl gencert \
         -ca={{ etcd_certs }}/ca.pem \
         -ca-key={{ etcd_certs }}/ca-key.pem \
         -config={{ etcd_certs }}/ca-config.json \
-        -profile=kubernetes {{ etcd_certs }}/etcd-csr.json | /usr/bin/cfssljson -bare etcd"
+        -profile=kubernetes {{ etcd_certs }}/etcd-csr.json | {{ etcd_certs }}/cfssljson -bare etcd"
 
 - unarchive:
     src="../files/{{ etcd_release }}.tar.gz"
@@ -56,8 +66,8 @@
 
 # 2. 启动 etcd cluster
 - template:
-    src="../templates/etcd.rc.j2"
-    dest="{{ etcd_home }}/etcd.rc"
+    src="../templates/etcd.conf.j2"
+    dest="{{ etcd_home }}/etcd.conf"
     owner={{ etcd_user }} group={{ etcd_group }}
 
 - template:
