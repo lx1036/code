@@ -1,0 +1,79 @@
+
+# 0. 创建文件夹
+#- name: Create www home
+#  file: state=directory path=/var/www owner={{ etcd_user }} group={{ etcd_group }} recurse=yes
+
+- name: Create etcd home
+  file: state=directory path={{ etcd_home }} owner={{ etcd_user }} group={{ etcd_group }} recurse=yes
+
+- name: Create etcd certs home
+  file: state=directory path={{ etcd_certs }} owner={{ etcd_user }} group={{ etcd_group }} recurse=yes
+
+- name: Create etcd data dir
+  file: state=directory path={{ etcd_data }} owner={{ etcd_user }} group={{ etcd_group }} recurse=yes
+
+- name: 安装cfssl/cfssljson
+  shell: "cd ~ &&
+          wget https://pkg.cfssl.org/R1.2/cfssl_linux-amd64 &&
+          wget https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64 &&
+          chmod +x cfssl_linux-amd64 cfssljson_linux-amd64 &&
+          mv cfssl_linux-amd64 /usr/bin/cfssl &&
+          mv cfssljson_linux-amd64 /usr/bin/cfssljson"
+
+# 1. 证书
+- name: 分发证书相关
+  copy: src="../files/{{ item }}" dest={{ etcd_certs }}/{{ item }}
+  with_items:
+    - ca.pem
+    - ca-key.pem
+    - ca-config.json
+
+- name: 创建etcd证书请求
+  template: src=etcd-csr.json.j2 dest={{ etcd_certs }}/etcd-csr.json
+
+- name: 创建etcd证书和私钥
+  shell: "cd {{ etcd_certs }} && /usr/bin/cfssl gencert \
+        -ca={{ etcd_certs }}/ca.pem \
+        -ca-key={{ etcd_certs }}/ca-key.pem \
+        -config={{ etcd_certs }}/ca-config.json \
+        -profile=kubernetes {{ etcd_certs }}/etcd-csr.json | /usr/bin/cfssljson -bare etcd"
+
+- unarchive:
+    src="../files/{{ etcd_release }}.tar.gz"
+    dest="{{ etcd_home }}"
+    creates="{{ etcd_home }}/{{ etcd_release }}"
+
+- name: chown etcd dir
+  file:
+    path="{{ etcd_home }}/{{ etcd_release }}"
+    owner={{ etcd_user }} group={{ etcd_group }} recurse=yes
+
+- name: link etcd dir
+  file:
+    path="{{ etcd_home }}/etcd"
+    src="{{ etcd_home }}/{{ etcd_release }}"
+    owner={{ etcd_user }} group={{ etcd_group }} state=link
+
+# 2. 启动 etcd cluster
+- template:
+    src="../templates/etcd.rc.j2"
+    dest="{{ etcd_home }}/etcd.rc"
+    owner={{ etcd_user }} group={{ etcd_group }}
+
+- template:
+    src="../templates/etcd.service.j2"
+    dest=/etc/systemd/system/etcd-{{ etcd_config['client-port'] }}.service
+
+- name: 开机启用etcd服务
+  shell: systemctl enable etcd-{{ etcd_config['client-port'] }}
+  ignore_errors: true
+
+- name: 开启etcd服务
+  shell: systemctl daemon-reload && systemctl restart etcd-{{ etcd_config['client-port'] }}
+
+- name: 以轮询的方式等待服务同步完成
+  shell: "systemctl status etcd-{{ etcd_config['client-port'] }}.service|grep Active"
+  register: etcd_status
+  until: '"running" in etcd_status.stdout'
+  retries: 8
+  delay: 8

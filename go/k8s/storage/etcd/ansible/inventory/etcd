@@ -1,7 +1,7 @@
 [etcd]
-docker2020.so.net
-docker2021.so.net
-docker2022.so.net
+110.147.44.9
+110.147.44.38
+110.147.44.59
 
 [etcd:vars]
 ansible_ssh_user=liuxiang3
