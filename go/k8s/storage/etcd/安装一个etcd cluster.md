@@ -64,7 +64,7 @@ EOF
 
 ```
 # 集群初始化时，在没有证书的情况下，使用该命令生成 CA 证书及 CA的私钥
-cfssl gencert -initca ca-csr.json | ./cfssljson -bare ca
+cfssl gencert -initca ca-csr.json | cfssljson -bare ca
  
 # 如果集群已经在运行，但是 CA 证书即将到期，使用以下命令 复用之前的 私钥 重新生成 CA 证书，此 CA证书与之前的 CA证书可以同时使用，所以可以对线上集群逐步替换此为 此 CA 证书
 ## 使用 cfssl gencert -h 查看帮助，如何续签证书，有两种方式

@@ -56,7 +56,6 @@ kubectl exec etcd-minikube -n kube-system -- \
 ## Etcd 文章列表
 0. **[Etcd 中文文档](https://doczhcn.gitbook.io/etcd/)**
 1. **[Raft算法原理](https://www.codedump.info/post/20180921-raft/)**
-2. **[etcd Raft库解析](https://www.codedump.info/post/20180922-etcd-raft/)**
 3. **[Etcd存储的实现](https://www.codedump.info/post/20181125-etcd-server/)**
 
 
