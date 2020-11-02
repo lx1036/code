@@ -1,6 +1,12 @@
 
 **![架构](./imgs/etcd-arch.png)**
 
+一个请求处理过程：
+
+etcd-server -> etcd-raft -> wal
+etcd使用mvcc多版本并发控制乐观锁来解决并发冲突问题：处理写请求时，mvcc会为这一key添加version(mainID,subID)新版本，并写入新数据；
+读操作时，读的是之前版本旧数据，使得读写分离，读写不会阻塞。所以etcd特别适合多读场景。
+
 
 # 数据持久化
 (1)Etcd是如何实现数据持久化的？

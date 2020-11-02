@@ -15,7 +15,7 @@ type IndexerFunc func(runtime.Object) []string
 type Reader interface {
 	Get(ctx context.Context, key ObjectKey, obj runtime.Object) error
 
-	List(ctx context.Context, list runtime.Object, opts ...ListOption)
+	List(ctx context.Context, list runtime.Object, opts ...ListOption) error
 }
 
 type FieldIndexer interface {

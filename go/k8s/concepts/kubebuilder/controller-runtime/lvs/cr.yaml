@@ -1,0 +1,14 @@
+apiVersion: lvs.lx1036.io/v1
+kind: LvsPod
+metadata:
+  name: project1
+  annotations:
+    ips: ""
+spec:
+  deployments:
+    - deploymentName: "nginx-demo"
+      serviceName: "nginx-demo"
+      vips:
+        - vipPort: 80
+          vip: "1.2.3.4"
+          targetPort: 80

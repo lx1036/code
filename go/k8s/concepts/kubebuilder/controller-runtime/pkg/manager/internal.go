@@ -189,8 +189,6 @@ func (cm *controllerManager) AddReadyzCheck(name string, check Checker) error {
 	panic("implement me")
 }
 
-
-
 func (cm *controllerManager) GetConfig() *rest.Config {
 	panic("implement me")
 }
@@ -233,9 +231,7 @@ func (cm *controllerManager) GetLogger() logr.Logger {
 
 func (cm *controllerManager) waitForCache() {
 
-
 	cm.cache.WaitForCacheSync(cm.internalStop)
-
 
 }
 func (cm *controllerManager) startNonLeaderElectionRunnables() {
@@ -263,7 +259,6 @@ func (cm *controllerManager) Start(stop <-chan struct{}) error {
 	defer close(stopComplete)
 
 	go cm.startNonLeaderElectionRunnables()
-
 
 	select {
 	case <-stop:

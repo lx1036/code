@@ -17,15 +17,21 @@ package main
 
 import (
 	"flag"
-	v1 "k8s-lx1036/k8s/concepts/kubebuilder/api/v1"
-	"k8s-lx1036/k8s/concepts/kubebuilder/controllers"
+	"os"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"os"
+
+	v1 "k8s-lx1036/k8s/concepts/kubebuilder/api/v1"
+	"k8s-lx1036/k8s/concepts/kubebuilder/controllers"
+
 	// https://github.com/kubernetes-sigs/controller-runtime 用来创建k8s controllers的辅助库
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	batchv1 "k8s-lx1036/api/v1"
+	"k8s-lx1036/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -37,7 +43,6 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
-	_ = v1.AddToScheme(scheme)
 	_ = v1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"k8s-lx1036/k8s/client-go/examples/util"
 	appsv1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
