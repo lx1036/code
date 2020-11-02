@@ -1,0 +1,20 @@
+
+--
+- hosts: "{{ group }}"
+  vars:
+    etcd_cert: /data/usr/etcd/certs/{{ inventory_hostname }}.pem
+    etcd_key: /data/usr/etcd/certs/{{ inventory_hostname }}-key.pem
+    etcd_peer_cert: /data/usr/etcd/certs/{{ inventory_hostname }}.pem
+    etcd_peer_key: /data/usr/etcd/certs/{{ inventory_hostname }}-key.pem
+
+  tasks:
+    - include_tasks: "certs.yaml"
+
+    - name: Create etcd home
+      file: state=directory path={{ etcd_home }} owner={{ etcd_user }} group={{ etcd_group }} recurse=yes
+
+    - name: Create etcd data dir
+      file: state=directory path={{ etcd_config['data-dir'] }} owner={{ etcd_user }} group={{ etcd_group }} recurse=yes
+
+
+

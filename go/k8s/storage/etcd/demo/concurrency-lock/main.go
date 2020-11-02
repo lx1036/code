@@ -13,6 +13,9 @@ import (
 
 // https://segmentfault.com/a/1190000021603215
 func main() {
+	log.SetOutput(os.Stdout)
+	log.SetFormatter(&log.JSONFormatter{})
+
 	sig := make(chan os.Signal)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 

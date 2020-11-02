@@ -41,4 +41,5 @@ Transfer-Encoding: chunked
 
 {"type":"ADDED","object":{"kind":"Pod","apiVersion":"v1","metadata":{"name":"minikube-production-68df7c4898-pxhn9","generateName":"minikube-production-68df7c4898-","namespace":"default","selfLink":"/api/v1/namespaces/default/pods/minikube-production-68df7c4898-pxhn9","uid":"7ca67c2b-066d-4413-85e7-e9c72ea60445","resourceVersion":"237193"...}
 {"type":"MODIFIED","object":{"kind":"Pod","apiVersion":"v1","metadata":{"name":"nginx-demo-1-7f67f8bdd8-jc2zr","generateName":"nginx-demo-1-7f67f8bdd8-","namespace":"default","selfLink":"/api/v1/namespaces/default/pods/nginx-demo-1-7f67f8bdd8-jc2zr","uid":"32fd5db3-2f26-47de-87a3-f77f2bfba085","resourceVersion":"239251"...}
+# 上面object就是一个完整的pod对象coreV1.Pod
 ```

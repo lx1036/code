@@ -1,0 +1,10 @@
+[etcd]
+110.147.44.9
+110.147.44.38
+110.147.44.59
+
+[etcd:vars]
+ansible_ssh_user=liuxiang3
+ansible_ssh_pass=*K8s_kubectl
+ansible_become_pass=*K8s_kubectl
+ansible_become=true
