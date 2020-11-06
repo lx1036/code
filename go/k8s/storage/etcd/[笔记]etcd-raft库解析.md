@@ -4,4 +4,4 @@
 
 * 笔记
 
-
+etcd主要包括：etcd-server(包含了wal和snapshot小模块) -> etcd-raft(Store -> BoltDB)
