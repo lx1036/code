@@ -13,6 +13,7 @@ func lengthOfLongestSubstring(s string) int {
 
 	hashTable := map[byte]int{}
 	result := 0
+	
 	for i := 0; i < l; i++ {
 
 
