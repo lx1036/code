@@ -10,6 +10,13 @@ type Node struct {
 	right *Node
 }
 
+// 深度优先搜索
+// https://leetcode-cn.com/problems/diameter-of-binary-tree/solution/er-cha-shu-de-zhi-jing-by-leetcode-solution/
+func (node *Node) Diameter() int {
+
+	return 0
+}
+
 func (node *Node) find(value int) *Node {
 	current := node
 	for current != nil {

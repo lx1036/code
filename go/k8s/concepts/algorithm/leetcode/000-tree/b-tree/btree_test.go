@@ -1,4 +1,4 @@
-package btree
+package b_tree
 
 import (
 	"fmt"
