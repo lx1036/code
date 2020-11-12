@@ -62,3 +62,12 @@ func TestOrder(test *testing.T) {
 	fmt.Println()
 	root.PostOrder()
 }
+
+func TestMinMax(test *testing.T) {
+	root := NewBinarySearchTree()
+	min := root.Min()
+	assert.Equal(test, min.value, 4)
+	
+	max := root.Max()
+	assert.Equal(test, max.value, 20)
+}

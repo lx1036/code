@@ -49,8 +49,22 @@ func (node *Node) insert(value int) error {
 	return nil
 }
 
-func (node *Node) delete(value int)  {
-
+// 还未完成？？
+func (node *Node) delete(value int) error {
+	if value == node.value {
+		if node.left == nil && node.right == nil {
+			
+		}
+	}
+	
+	if value > node.value {
+		node.right.delete(value)
+	} else if value < node.value {
+		node.left.delete(value)
+	}
+	
+	
+	return nil
 }
 
 // 遍历树：根据特定顺序遍历树的每一个节点
@@ -85,10 +99,28 @@ func (node *Node) PostOrder()  {
 	}
 }
 
-func (node *Node) Min() {
+func (node *Node) Min() *Node {
+	current := node
+	if current.left == nil {
+		return current
+	}
 	
+	if current != nil {
+		return current.left.Min()
+	}
+	
+	return nil
 }
 
-func (node *Node) Max() {
-
+func (node *Node) Max() *Node{
+	current := node
+	if current.left == nil {
+		return current
+	}
+	
+	if current != nil {
+		return current.right.Max()
+	}
+	
+	return nil
 }
