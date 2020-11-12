@@ -14,20 +14,20 @@ func TestMultipleProducersAndMultipleConsumers(test *testing.T) {
 	producerNumber := 50
 	producerWg.Add(producerNumber)
 	for i := 0; i < producerNumber; i++ {
-		go func(i int) {
+		go func() {
 			defer producerWg.Done()
-			for j := 0; j < 50; j++ {
-				queue.Add(i)
+			for j := 0; j < 10; j++ {
+				queue.Add(j)
 				time.Sleep(time.Millisecond * 2)
 			}
-		}(i)
+		}()
 	}
 
 	consumerWg := sync.WaitGroup{}
 	consumerNumber := 10
 	consumerWg.Add(consumerNumber)
 	for i := 0; i < consumerNumber; i++ {
-		go func(i int) {
+		go func() {
 			defer consumerWg.Done()
 			for {
 				item, quit := queue.Get()
@@ -43,7 +43,7 @@ func TestMultipleProducersAndMultipleConsumers(test *testing.T) {
 
 				queue.Done(item)
 			}
-		}(i)
+		}()
 	}
 
 	producerWg.Wait()
