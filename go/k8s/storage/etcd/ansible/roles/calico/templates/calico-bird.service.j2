@@ -1,0 +1,15 @@
+[Unit]
+Description=Calico BIRD Internet Routing Daemon (IPv4)
+Requires=calico-confd.service
+
+[Service]
+EnvironmentFile=-/etc/sysconfig/calico
+ExecStartPre={{ calico_home }}/calico/bin/bird -p -c {{ calico_home }}/etc/bird/bird.cfg
+ExecReload=/usr/bin/kill -HUP $MAINPID
+ExecStart={{ calico_home }}/calico/bin/bird -R -d \
+          -s {{ calico_home }}/run/bird.ctl \
+          -c {{ calico_home }}/etc/bird/bird.cfg
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

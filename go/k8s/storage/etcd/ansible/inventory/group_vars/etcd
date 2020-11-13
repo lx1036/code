@@ -1,4 +1,4 @@
-# Etcd
+# etcd
 etcd_release: etcd-v3.4.13-linux-amd64
 etcd_user: root
 etcd_group: root
@@ -25,3 +25,11 @@ etcd_config:
     cluster: "p48090v.so.net=https://110.147.44.9:2380,\
             p48091v.so.net=https://110.147.44.38:2380,\
             p48092v.so.net=https://110.147.44.59:2380"
+
+# calico
+calico_home: /data/usr/calico
+calicoctl:
+    etcd_endpoints: https://110.147.44.9:2379,https://110.147.44.38:2379,https://110.147.44.59:2379
+calico_pool:
+    name: test-18-0
+    cidr: 192.168.24.0/18

@@ -1,0 +1,35 @@
+IDC={{ calico_idc }}
+IP={{ hostvars[inventory_hostname]['ansible_eth0']['ipv4']['address'] }}
+MAC=$(echo {{ hostvars[inventory_hostname]['ansible_eth0']['macaddress'] }} |sed 's/://g')
+
+IFACE={{ hostvars[inventory_hostname]['ansible_eth0']['device'] }}
+
+echo "Update TOR: $IDC $IP $MAC $IFACE"
+
+RESULT=$(curl -X POST -s \
+  'https://network.corp.lx1036.net/docker_bgp_peer/' \
+  -H 'Authorization: Token abc123' \
+  -H 'Content-Type: application/json' \
+  -d "{\"idc\":\"$IDC\",\"ip\":\"$IP\",\"mac\":\"0x$MAC\"}" \
+  | jq '.sw_as')
+
+#echo $RESULT
+
+echo "apiVersion: projectcalico.org/v3
+kind: BGPPeer
+metadata:"
+echo "  name: $(ip -4 addr show $IFACE | grep -oP '(?<=inet\s)\d+(\.\d+){3}')-$(ip route | grep default | awk '{print $3}')"
+echo "spec:"
+echo "  node: $(hostname)"
+echo "  peerIP: $(ip route | grep default | awk '{print $3}')"
+echo "  asNumber: $RESULT"
+
+# 示例：
+#apiVersion: projectcalico.org/v3
+#kind: BGPPeer
+#metadata:
+#  name: 10.20.30.40-10.20.30.129
+#spec:
+#  node: docker1234.lx1036.com
+#  peerIP: 10.20.30.129
+#  asNumber: 65188

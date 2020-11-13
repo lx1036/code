@@ -1,0 +1,11 @@
+[template]                                            
+src = "bird.cfg.template"
+dest = "{{ calico_home }}/etc/bird/bird.cfg"
+prefix = "/calico/bgp/v1"
+keys = [
+    "/host",
+    "/global",
+]
+check_cmd = "{{ calico_home }}/calico/bin/bird -p -c {{ "{{.src}}" }}"
+reload_cmd = "/bin/pkill -HUP bird || true"
+

@@ -1,0 +1,89 @@
+
+
+- shell: "/usr/sbin/ethtool {{iface}} | grep Speed | awk '{print $2}'"
+  register: result
+  ignore_errors: yes
+- set_fact:
+    iface: eth2
+  when: result.failed == True or result.stdout == 'Unknown!'
+
+
+# configure calicoctl
+- file: path=/etc/calico state=directory
+- file: src=/data/usr/certs/ca.pem path=/etc/calico/ca.pem state=link
+- file: src=/data/usr/certs/{{ inventory_hostname }}.pem path=/etc/calico/cert.pem state=link
+- file: src=/data/usr/certs/{{ inventory_hostname }}-key.pem path=/etc/calico/key.pem state=link
+- template: src=../templates/calicoctl.cfg.j2 dest=/etc/calico/calicoctl.cfg
+
+# upload calico bin
+- file: path={{ calico_home }} state=directory
+- copy: src=../files/calico-3.1.1-1.tar.gz dest={{ calico_home }}
+- shell: cd {{ calico_home }}  &&  tar -xzvf calico-3.1.1-1.tar.gz
+- file: path={{ calico_home }}/calico src={{ calico_home }}/calico-3.1.1-1 state=link
+- file: path={{ calico_home }}/run state=directory
+- file: path={{ calico_home }}/cfg state=directory
+- file: path={{ calico_home }}/etc/bird state=directory recurse=true
+
+# only master ndoes
+# 创建 calico BGPConfiguration/IPPool 资源
+- block:
+    - template: src=../templates/bgp.yaml.j2 dest={{ calico_home }}/cfg/bgp.yaml
+    - template: src=../templates/calico-pool.yaml.j2 dest={{ calico_home }}/cfg/calico-pool.yaml
+    - command: "{{ calico_home }}/calico/bin/calicoctl apply -f {{ calico_home }}/cfg/bgp.yaml"
+    - command: "{{ calico_home }}/calico/bin/calicoctl apply -f {{ calico_home }}/cfg/calico-pool.yaml"
+  when: master is defined
+
+- service: name=docker state=stopped
+  ignore_errors: yes
+- file: path=/etc/systemd/system/docker.service.d state=directory
+- file: path=/etc/docker state=directory
+
+
+- file: path={{ calico_home }}/confd/conf.d state=directory recurse=true
+- template: src=../templates/env.j2 dest=/etc/sysconfig/calico
+- template: src=../templates/bird.toml.j2 dest={{ calico_home }}/confd/conf.d/bird.toml
+- template: src=../templates/bird_aggr.toml.j2 dest={{ calico_home }}/confd/conf.d/bird_aggr.toml
+- template: src=../templates/bird_ipam.toml.j2 dest={{ calico_home }}/confd/conf.d/bird_ipam.toml
+- copy: src=../files/templates dest={{ calico_home }}/confd
+
+# Run the startup initialisation script.  These ensure the node is correctly configured to run.
+- shell: "env $(cat /etc/sysconfig/calico | grep -v ^# | xargs) {{ calico_home }}/calico/bin/startup"
+  register: stdout
+# - debug: msg={{ stdout }}
+# Run confd once - this ensures we have sensible config generated at the point we start bird
+- shell: "env $(cat /etc/sysconfig/calico | grep -v ^# | xargs) {{ calico_home }}/calico/bin/confd -confdir={{ calico_home }}/confd -onetime -keep-stage-file"
+  register: stdout
+# - debug: msg={{ stdout }}
+
+
+- template: src="../templates/calico-bird.service.j2" dest="/etc/systemd/system/calico-bird.service"
+- template: src="../templates/calico-confd.service.j2" dest="/etc/systemd/system/calico-confd.service"
+- command: systemctl daemon-reload
+- service: name=calico-confd enabled=yes
+- service: name=calico-bird enabled=yes
+- service: name=calico-confd state=restarted
+- service: name=calico-bird state=restarted
+
+
+# Node机器与机架式交换机Tor建立EBGP邻居，创建EBGP连接后，会在交换机上添加一条容器网络的静态路由。
+# 使用Node节点与接入交换机建立EBGP邻居关系，学习Pod路由，通常一个node上的pod在一个网段下，所以只需要在交换机上添加一条路由规则就行。
+# 可以通过api调用创建EBGP连接。
+# Kubernetes集群为什么要与交换机建立BGP连接呢？
+# 1. 规模要求，在Calico BGP模式下，如果不与网络设备建立BGP连接，Node只能在同一个局域网内。
+# 2. 在Calico BGP模式下，路由条目会从Node级别成Pod级别，使用EBGP模式可以将路由全部由交换机设备处理，
+# 目前看来企业数据中心级别核心交换机和接入交换机三层组网在支持1000-2000Node时，路由规模、BGP邻居、路由收敛速度就接近瓶颈。
+
+# 参考文献：[谐云Calico大规模场景落地实践](https://blog.csdn.net/M2l0ZgSsVc7r69eFdTj/article/details/106561069)
+
+# 目前公司方案：我们通常使用Calico的Downward Default模式来与交换机建立BGP连接，使用Node节点与接入交换机建立EBGP邻居关系，学习Pod路由；
+# 接入交换机将Pod路由汇聚后上报给核心交换机，将Pod路由分发到现网，所以公司内网直接通过pod ip来访问pod
+
+# 我们曾经遇到过这个问题
+# Calico分配IP地址的原则为，将整个IPPool分为多个地址块，每个Node获得一个Block，当有Pod调度到某个Node上时，Node优先使用Block内的地址。
+# 如果每个新增的Node分不到一个完整的地址块，Calico IP地址管理功能会去使用其他Node的Block的IP，此时，就会出现Pod无法访问的现象。
+# calico downward default model: https://docs.projectcalico.org/reference/architecture/design/l3-interconnect-fabric#the-downward-default-model
+# 这个链接也提到了这个问题： https://www.ichenfu.com/2019/09/21/calico-ip-allocation-problems/
+# 这个链接说到bird原理问题：[calico node bird原理分析](https://blog.csdn.net/zhonglinzhang/article/details/97626768)
+- template: src=../templates/peer.sh.j2 dest={{calico_home}}/cfg/peer.sh
+- shell: "sh {{calico_home}}/cfg/peer.sh > {{calico_home}}/cfg/calico-peer.yaml"
+- shell: "{{ calico_home }}/calico/bin/calicoctl apply -f {{ calico_home }}/cfg/calico-peer.yaml"

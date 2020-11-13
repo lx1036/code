@@ -1,0 +1,7 @@
+apiVersion: projectcalico.org/v3 
+kind: IPPool
+metadata:
+    name: {{ calico_pool['name'] }}
+spec:
+    cidr: {{ calico_pool['cidr'] }}
+

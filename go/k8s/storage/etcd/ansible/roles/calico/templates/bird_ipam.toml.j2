@@ -1,0 +1,9 @@
+[template]
+src = "bird_ipam.cfg.template"
+dest = "{{ calico_home }}/etc/bird/bird_ipam.cfg"
+prefix = "/calico"
+keys = [
+    "/v1/ipam/v4/pool",
+    "/bgp/v1/host/{{ ansible_nodename }}"
+]
+reload_cmd = "/bin/pkill -HUP bird || true"
