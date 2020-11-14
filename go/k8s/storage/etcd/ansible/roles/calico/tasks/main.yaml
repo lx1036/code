@@ -24,7 +24,7 @@
 - file: path={{ calico_home }}/cfg state=directory
 - file: path={{ calico_home }}/etc/bird state=directory recurse=true
 
-# only master ndoes
+# only master nodes
 # 创建 calico BGPConfiguration/IPPool 资源
 - block:
     - template: src=../templates/bgp.yaml.j2 dest={{ calico_home }}/cfg/bgp.yaml
@@ -33,10 +33,11 @@
     - command: "{{ calico_home }}/calico/bin/calicoctl apply -f {{ calico_home }}/cfg/calico-pool.yaml"
   when: master is defined
 
-- service: name=docker state=stopped
-  ignore_errors: yes
-- file: path=/etc/systemd/system/docker.service.d state=directory
-- file: path=/etc/docker state=directory
+# Docker
+#- service: name=docker state=stopped
+#  ignore_errors: yes
+#- file: path=/etc/systemd/system/docker.service.d state=directory
+#- file: path=/etc/docker state=directory
 
 
 - file: path={{ calico_home }}/confd/conf.d state=directory recurse=true
@@ -46,7 +47,7 @@
 - template: src=../templates/bird_ipam.toml.j2 dest={{ calico_home }}/confd/conf.d/bird_ipam.toml
 - copy: src=../files/templates dest={{ calico_home }}/confd
 
-# Run the startup initialisation script.  These ensure the node is correctly configured to run.
+# Run the startup initialisation script. These ensure the node is correctly configured to run.
 - shell: "env $(cat /etc/sysconfig/calico | grep -v ^# | xargs) {{ calico_home }}/calico/bin/startup"
   register: stdout
 # - debug: msg={{ stdout }}
@@ -55,7 +56,7 @@
   register: stdout
 # - debug: msg={{ stdout }}
 
-
+# BIRD: Border Internet Routing Daemon，是布拉格查理大学数学与物理学院的一个学校项目。BIRD项目旨在开发一个功能齐全的动态IP路由守护进程。
 - template: src="../templates/calico-bird.service.j2" dest="/etc/systemd/system/calico-bird.service"
 - template: src="../templates/calico-confd.service.j2" dest="/etc/systemd/system/calico-confd.service"
 - command: systemctl daemon-reload
@@ -76,7 +77,8 @@
 # 参考文献：[谐云Calico大规模场景落地实践](https://blog.csdn.net/M2l0ZgSsVc7r69eFdTj/article/details/106561069)
 
 # 目前公司方案：我们通常使用Calico的Downward Default模式来与交换机建立BGP连接，使用Node节点与接入交换机建立EBGP邻居关系，学习Pod路由；
-# 接入交换机将Pod路由汇聚后上报给核心交换机，将Pod路由分发到现网，所以公司内网直接通过pod ip来访问pod
+# 接入交换机将Pod路由汇聚后上报给核心交换机，将Pod路由分发到现网，所以公司内网直接通过pod ip来访问pod。
+# 采用downward default模式，node的网关是接入交换机，接入交换机网关是核心交换机。
 
 # 我们曾经遇到过这个问题
 # Calico分配IP地址的原则为，将整个IPPool分为多个地址块，每个Node获得一个Block，当有Pod调度到某个Node上时，Node优先使用Block内的地址。
@@ -87,3 +89,16 @@
 - template: src=../templates/peer.sh.j2 dest={{calico_home}}/cfg/peer.sh
 - shell: "sh {{calico_home}}/cfg/peer.sh > {{calico_home}}/cfg/calico-peer.yaml"
 - shell: "{{ calico_home }}/calico/bin/calicoctl apply -f {{ calico_home }}/cfg/calico-peer.yaml"
+
+# 使用bird cli工具birdcl查看bird连接状态
+# {{ calico_home }}/calico/bin/birdcl -s {{ calico_home }}/run/bird.ctl show route: 查看该worker节点所有路由
+# 文档：https://bird.network.cz/?get_doc&f=bird-4.html,
+# calico中Bird是一个BGP client，它会主动读取felix在host上设置的路由信息(我们目前每个worker节点路由信息是static的，不需要安装felix)，然后通过BGP协议广播出去。
+- wait_for: timeout=10
+- shell: "{{ calico_home }}/calico/bin/birdcl -s {{ calico_home }}/run/bird.ctl show protocols all | grep 'BGP state:'"
+  register: result
+  failed_when: "'Established' not in result['stdout']"
+
+
+# ./calico/bin/calicoctl get bgpPeer
+# ./calico/bin/calicoctl get workloadEndpoint
