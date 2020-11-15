@@ -10,7 +10,7 @@ type Node struct {
 	right *Node
 }
 
-// 深度优先搜索
+// 深度优先搜索 Depth-First-Search DFS
 // https://leetcode-cn.com/problems/diameter-of-binary-tree/solution/er-cha-shu-de-zhi-jing-by-leetcode-solution/
 func (node *Node) Diameter() int {
 
