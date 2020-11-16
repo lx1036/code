@@ -87,6 +87,7 @@
 # 这个链接也提到了这个问题： https://www.ichenfu.com/2019/09/21/calico-ip-allocation-problems/
 # 这个链接说到bird原理问题：[calico node bird原理分析](https://blog.csdn.net/zhonglinzhang/article/details/97626768)
 - template: src=../templates/peer.sh.j2 dest={{calico_home}}/cfg/peer.sh
+# 调用API获得每台worker节点的bgp peer,每台worker节点的peerIP一般是交换机Tor的ip
 - shell: "sh {{calico_home}}/cfg/peer.sh > {{calico_home}}/cfg/calico-peer.yaml"
 - shell: "{{ calico_home }}/calico/bin/calicoctl apply -f {{ calico_home }}/cfg/calico-peer.yaml"
 
