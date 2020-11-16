@@ -1,8 +1,7 @@
 
 
-- name: 批量ssh-copy-id
-  authorized_key:
-    user: liuxiang3
-    state: present
-    key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
-
+# ansible-playbook -i inventory/hosts main.yaml -e "group=all"
+- hosts: "{{ group }}"
+  tasks:
+    - name: 批量ssh-copy-id
+      authorized_key: user=liuxiang3 state=present key="{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
