@@ -1,3 +1,8 @@
+
+# common
+idc: beijing
+k8s_version: 1.10.13
+
 # etcd
 etcd_release: etcd-v3.4.13-linux-amd64
 etcd_user: root
@@ -26,6 +31,7 @@ etcd_config:
             p48091v.so.net=https://110.147.44.38:2380,\
             p48092v.so.net=https://110.147.44.59:2380"
 
+
 # calico
 calico_home: /data/usr/calico
 calicoctl:
@@ -33,3 +39,16 @@ calicoctl:
 calico_pool:
     name: test-18-0
     cidr: 192.168.24.0/18
+
+
+# kubernetes
+rbac: false
+kube_home: /data/usr/kubernetes
+kube_user: root
+kube_group: root
+
+# api-server的vip:port
+kube_api_servers: https://vip:port
+kube_cluster_name: kube-lx1036
+kube_etcd_servers: https://110.147.44.9:2379,https://110.147.44.38:2379,https://110.147.44.59:2379
+kube_service_ip_range: 10.254.0.0/16

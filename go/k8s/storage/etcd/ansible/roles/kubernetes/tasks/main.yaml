@@ -1,0 +1,64 @@
+
+
+- yum: name=conntrack-tools state=latest
+
+
+- set_fact:
+    kubelet_client_certificate: "{{ kube_home }}/certs/{{ inventory_hostname }}.pem"
+- set_fact:
+    kubelet_client_key: "{{ kube_home }}/certs/{{ inventory_hostname }}-key.pem"
+- set_fact:
+    kubeproxy_client_certificate: "{{ kube_home }}/certs/{{ inventory_hostname }}.pem"
+- set_fact:
+    kubeproxy_client_key: "{{ kube_home }}/certs/{{ inventory_hostname }}-key.pem"
+- block:
+    - set_fact:
+        kubelet_client_certificate: "{{ kube_home }}/certs/system_node_{{ inventory_hostname }}.pem"
+    - set_fact:
+        kubelet_client_key: "{{ kube_home }}/certs/system_node_{{ inventory_hostname }}-key.pem"
+    - set_fact:
+        kubeproxy_client_certificate: "{{ kube_home }}/certs/system_kube-proxy.pem"
+    - set_fact:
+        kubeproxy_client_key: "{{ kube_home }}/certs/system_kube-proxy-key.pem"
+  when: rbac
+
+- file: path={{ kube_home }} owner={{ kube_user }} group={{ kube_group }} state=directory
+- file: path={{ kube_home }}/manifests owner={{ kube_user }} group={{ kube_group }} state=directory
+- file: path={{ kube_home }}/cfg owner={{ kube_user }} group={{ kube_group }} state=directory
+- file: path={{ kube_home }}/certs src=/data/usr/certs state=link force=true
+
+
+# bin: kube-proxy,kubelet,kubectl
+- copy: src=../files/kubernetes-{{ k8s_version }}.tar.gz dest={{ kube_home }}
+- shell: cd {{ kube_home }} && tar -xzvf kubernetes-{{ k8s_version }}.tar.gz
+- file: path={{ kube_home }}/kubernetes-{{ k8s_version }} owner={{ kube_user }} group={{ kube_group }} recurse=yes
+- file: path={{ kube_home }}/kubernetes src={{ kube_home }}/kubernetes-{{ k8s_version }} owner={{ kube_user }} group={{ kube_group }} state=link force=true
+
+- template: src=../templates/kubeconfig.j2 dest={{ kube_home }}/kubeconfig owner={{ kube_user }} group={{ kube_group }}
+- template: src=../templates/kubeconfig.kube-proxy.j2 dest={{ kube_home }}/kubeconfig.kube-proxy owner={{ kube_user }} group={{ kube_group }}
+- template: src=../templates/kubelet.j2 dest={{ kube_home }}/cfg/kubelet owner={{ kube_user }} group={{ kube_group }}
+- template: src=../templates/kubelet.service.j2 dest=/etc/systemd/system/kubelet.service
+- template: src=../templates/kube-proxy.j2 dest={{ kube_home }}/cfg/kube-proxy owner={{ kube_user }} group={{ kube_group }}
+- template: src=../templates/kube-proxy.service.j2 dest=/etc/systemd/system/kube-proxy.service
+
+- command: systemctl daemon-reload
+
+# 这里启动master组件，有个静态pod概念：https://kubernetes.io/zh/docs/tasks/configure-pod-container/static-pod/
+# 主要是kubelet配置项：--pod-manifest-path
+# 这里可以设置三台机器master=true，安装master组件，参见inventory/etcd.conf文件
+- block:
+      - name: "pull hyperkube"
+        command: docker pull lx1036/hyperkube:v{{ k8s_version }}
+      - name: "template apiserver"
+        template: src=../templates/manifests/kube-apiserver.yaml.j2 dest={{ kube_home }}/manifests/kube-apiserver.yaml owner={{ kube_user }} group={{ kube_group }}
+      - name: "template controller-manager"
+        template: src=../templates/manifests/kube-controller-manager.yaml.j2 dest={{ kube_home }}/manifests/kube-controller-manager.yaml owner={{ kube_user }} group={{ kube_group }}
+      - name: "template scheduler"
+        template: src=../templates/manifests/kube-scheduler.yaml.j2 dest={{ kube_home }}/manifests/kube-scheduler.yaml owner={{ kube_user }} group={{ kube_group }}
+  when: master is defined
+
+- service: name=kube-proxy enabled=yes
+- service: name=kubelet enabled=yes
+- service: name=docker state=restarted
+- service: name=kube-proxy state=restarted
+- service: name=kubelet state=restarted

@@ -1,0 +1,21 @@
+# --logtostderr=true: log to standard error instead of files
+KUBE_LOGTOSTDERR="--logtostderr=true"
+
+#  --v=0: log level for V logs
+KUBE_LOG_LEVEL="--v=4"
+
+# --address=0.0.0.0: The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)
+#NODE_ADDRESS="--address={{ ansible_default_ipv4['address'] }}"
+NODE_ADDRESS="--address=0.0.0.0"
+
+# --port=10250: The port for the Kubelet to serve on. Note that "kubectl logs" will not work if you set this flag.
+#NODE_PORT="--port=10250 --read-only-port=10255"
+
+# --hostname-override="": If non-empty, will use this string as identification instead of the actual hostname.
+#NODE_HOSTNAME="--hostname-override="
+
+# --allow-privileged=false: If true, allow containers to request privileged mode. [default=false]
+KUBE_ALLOW_PRIV="--allow-privileged=false"
+
+# 1.10
+KUBELET_ARGS="--pod-manifest-path={{ kube_home }}/manifests --kubeconfig={{ kube_home }}/kubeconfig --cluster-dns={{ kube_dns_server_ip }} --cluster-domain={{ kube_dns_domain }} --image-gc-high-threshold=60 --image-gc-low-threshold=40 --image-pull-progress-deadline=3m --pod-infra-container-image=lx1036/pod-infrastructure --network-plugin=cni --cni-bin-dir=/data/usr/kubernetes/network-plugins --cni-conf-dir=/data/usr/kubernetes/net.d --kube-reserved=cpu=2,memory=10Gi,ephemeral-storage=1Gi --register-node=true --node-labels=lx1036.cloud/idc={{ idc }},lx1036.cloud/maintenance=new --register-with-taints=lx1036/maintenance=new:NoSchedule --seccomp-profile-root=/etc/docker/seccomp.json --feature-gates=Accelerators=true"

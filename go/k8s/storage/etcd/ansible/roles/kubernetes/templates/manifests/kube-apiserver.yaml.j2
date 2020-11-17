@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-apiserver
+    image: lx1036/hyperkube:v{{k8s_version}}
+    command:
+    - ./hyperkube
+    - apiserver
+    - --endpoint-reconciler-type=lease
+    - --bind-address=0.0.0.0
+    - --secure-port=443
+    - --storage-backend=etcd3
+    - --etcd-servers={{ kube_etcd_servers }}
+    - --etcd-cafile={{ kube_home }}/certs/ca.pem
+    - --etcd-certfile={{ kube_home }}/certs/{{ ansible_nodename }}.pem
+    - --etcd-keyfile={{ kube_home }}/certs/{{ ansible_nodename }}-key.pem
+    - --allow-privileged=true
+    - --service-cluster-ip-range={{ kube_service_ip_range }}
+    - --client-ca-file={{ kube_home }}/certs/ca.pem
+    - --admission-control=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+    - --tls-cert-file={{ kube_home }}/certs/{{ ansible_nodename }}.pem
+    - --tls-private-key-file={{ kube_home }}/certs/{{ ansible_nodename }}-key.pem
+    - --service-account-key-file={{ kube_home }}/certs/kube-service-account.pem
+    - --runtime-config=batch/v2alpha1=true
+    livenessProbe:
+      httpGet:
+        host: 127.0.0.1
+        port: 8080
+        path: /healthz
+      initialDelaySeconds: 15
+      timeoutSeconds: 15
+    ports:
+    - containerPort: 443
+      hostPort: 443
+      name: https
+    - containerPort: 8080
+      hostPort: 8080
+      name: local
+    volumeMounts:
+    - mountPath: {{ kube_home }}/certs
+      name: kube-certs
+      readOnly: true
+  volumes:
+  - hostPath:
+      path: {{ kube_home }}/certs
+    name: kube-certs
