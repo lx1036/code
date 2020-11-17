@@ -1,0 +1,38 @@
+
+
+- name: create certs home
+  file: state=directory path={{ certs_home }} owner={{ kube_user }} group={{ kube_group }} recurse=yes
+
+- name: 安装cfssl/cfssljson
+  unarchive:
+    src: "../../etcd/files/cfssl.tar.gz"
+    dest: "{{ certs_home }}"
+    mode: a+x
+
+- name: 安装cfssl/cfssljson
+  unarchive:
+    src: "../../etcd/files/cfssljson.tar.gz"
+    dest: "{{ certs_home }}"
+    mode: a+x
+
+- name: 分发证书相关
+  copy: src="../../etcd/files/{{ item }}" dest={{ certs_home }}/{{ item }}
+  with_items:
+    - ca.pem
+    - ca-key.pem
+    - ca-config.json
+
+- block:
+    - name: 分发master_etcd_csr.sh
+      template: src=../templates/master_etcd_csr.sh.j2 dest={{ certs_home }}/master_etcd_csr.sh owner={{ kube_user }} group={{ kube_group }} mode=a+x
+    - name: 生成当前master节点证书文件
+      shell: "cd {{ certs_home }} && {{ certs_home }}/master_etcd_csr.sh"
+  when: etcd is defined or master is defined
+
+- block:
+    - name: 分发worker_csr.sh
+      template: src=../templates/worker_csr.sh.j2 dest={{ certs_home }}/worker_csr.sh owner={{ kube_user }} group={{ kube_group }} mode=a+x
+    - name: 生成当前worker节点证书文件
+      shell: "cd {{ certs_home }} && sh {{ certs_home }}/worker_csr.sh"
+  when: etcd is undefined and master is undefined
+

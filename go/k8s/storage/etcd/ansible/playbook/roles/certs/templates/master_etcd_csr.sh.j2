@@ -1,0 +1,34 @@
+
+# csr的hosts字段也应该添加三台机器的vip，两个vip
+# etcd可以为vip:2379，api-server可以为vip:6443
+
+#ip=$(dig +short {{ inventory_hostname }})
+
+cat > {{ ansible_nodename }}-csr.json <<EOF
+    {
+      "CN": "{{ ansible_nodename }}",
+      "hosts": [
+        {% for host in groups['master'] %}
+            "{{ host }}",
+        {% endfor %}
+        "127.0.0.1"
+      ],
+      "key": {
+        "algo": "rsa",
+        "size": 2048
+      },
+      "names": [
+        {
+          "C": "CN",
+          "ST": "HangZhou",
+          "L": "XS",
+          "O": "k8s",
+          "OU": "System"
+        }
+      ]
+    }
+EOF
+
+{{ certs_home }}/cfssl gencert -ca={{ certs_home }}/ca.pem \
+    -ca-key={{ certs_home }}/ca-key.pem -config={{ certs_home }}/ca-config.json -profile=kubernetes \
+  {{ ansible_nodename }}-csr.json | {{ certs_home }}/cfssljson -bare {{ ansible_nodename }}

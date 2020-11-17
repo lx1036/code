@@ -1,7 +1,8 @@
 
 
-
 - hosts: "{{ group }}"
+  vars:
+    iface: eth0
   roles:
-    - etcd
+    - calico
   become: yes

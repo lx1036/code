@@ -1,4 +1,8 @@
 
+# Calico主要安装工作：
+## confd进程(https://github.com/projectcalico/confd)：根据etcd上状态信息，与本地模板，生成并更新BIRD配置
+## bird进程(https://github.com/projectcalico/bird): bgp client，上报路由信息
+
 
 - shell: "/usr/sbin/ethtool {{iface}} | grep Speed | awk '{print $2}'"
   register: result
@@ -18,7 +22,7 @@
 # upload calico bin
 - file: path={{ calico_home }} state=directory
 - copy: src=../files/calico-3.1.1-1.tar.gz dest={{ calico_home }}
-- shell: cd {{ calico_home }}  &&  tar -xzvf calico-3.1.1-1.tar.gz
+- shell: cd {{ calico_home }} && tar -xzvf calico-3.1.1-1.tar.gz
 - file: path={{ calico_home }}/calico src={{ calico_home }}/calico-3.1.1-1 state=link
 - file: path={{ calico_home }}/run state=directory
 - file: path={{ calico_home }}/cfg state=directory
@@ -86,9 +90,9 @@
 # calico downward default model: https://docs.projectcalico.org/reference/architecture/design/l3-interconnect-fabric#the-downward-default-model
 # 这个链接也提到了这个问题： https://www.ichenfu.com/2019/09/21/calico-ip-allocation-problems/
 # 这个链接说到bird原理问题：[calico node bird原理分析](https://blog.csdn.net/zhonglinzhang/article/details/97626768)
-- template: src=../templates/peer.sh.j2 dest={{calico_home}}/cfg/peer.sh
+- template: src=../templates/peer.sh.j2 dest={{calico_home}}/cfg/peer.sh mode=a+x
 # 调用API获得每台worker节点的bgp peer,每台worker节点的peerIP一般是交换机Tor的ip
-- shell: "sh {{calico_home}}/cfg/peer.sh > {{calico_home}}/cfg/calico-peer.yaml"
+- shell: "cd {{calico_home}}/cfg && sh {{calico_home}}/cfg/peer.sh"
 - shell: "{{ calico_home }}/calico/bin/calicoctl apply -f {{ calico_home }}/cfg/calico-peer.yaml"
 
 # 使用bird cli工具birdcl查看bird连接状态

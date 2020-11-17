@@ -47,14 +47,14 @@
 # 主要是kubelet配置项：--pod-manifest-path
 # 这里可以设置三台机器master=true，安装master组件，参见inventory/etcd.conf文件
 - block:
-      - name: "pull hyperkube"
-        command: docker pull lx1036/hyperkube:v{{ k8s_version }}
-      - name: "template apiserver"
-        template: src=../templates/manifests/kube-apiserver.yaml.j2 dest={{ kube_home }}/manifests/kube-apiserver.yaml owner={{ kube_user }} group={{ kube_group }}
-      - name: "template controller-manager"
-        template: src=../templates/manifests/kube-controller-manager.yaml.j2 dest={{ kube_home }}/manifests/kube-controller-manager.yaml owner={{ kube_user }} group={{ kube_group }}
-      - name: "template scheduler"
-        template: src=../templates/manifests/kube-scheduler.yaml.j2 dest={{ kube_home }}/manifests/kube-scheduler.yaml owner={{ kube_user }} group={{ kube_group }}
+    - name: "pull hyperkube"
+      command: docker pull lx1036/hyperkube:v{{ k8s_version }}
+    - name: "template apiserver"
+      template: src=../templates/manifests/kube-apiserver.yaml.j2 dest={{ kube_home }}/manifests/kube-apiserver.yaml owner={{ kube_user }} group={{ kube_group }}
+    - name: "template controller-manager"
+      template: src=../templates/manifests/kube-controller-manager.yaml.j2 dest={{ kube_home }}/manifests/kube-controller-manager.yaml owner={{ kube_user }} group={{ kube_group }}
+    - name: "template scheduler"
+      template: src=../templates/manifests/kube-scheduler.yaml.j2 dest={{ kube_home }}/manifests/kube-scheduler.yaml owner={{ kube_user }} group={{ kube_group }}
   when: master is defined
 
 - service: name=kube-proxy enabled=yes

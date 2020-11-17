@@ -1,0 +1,30 @@
+
+ip=$(dig +short {{ inventory_hostname }})
+
+cat > {{ inventory_hostname }}-csr.json <<EOF
+    {
+      "CN": "{{ inventory_hostname }}",
+      "hosts": [
+        "127.0.0.1",
+        "${ip}",
+        "{{ inventory_hostname }}"
+      ],
+      "key": {
+        "algo": "rsa",
+        "size": 2048
+      },
+      "names": [
+        {
+          "C": "CN",
+          "ST": "HangZhou",
+          "L": "XS",
+          "O": "k8s",
+          "OU": "System"
+        }
+      ]
+    }
+EOF
+
+{{ certs_home }}/cfssl gencert -ca={{ certs_home }}/ca.pem \
+    -ca-key={{ certs_home }}/ca-key.pem -config={{ certs_home }}/ca-config.json -profile=kubernetes \
+  {{ inventory_hostname }}-csr.json | {{ certs_home }}/cfssljson -bare {{ inventory_hostname }}

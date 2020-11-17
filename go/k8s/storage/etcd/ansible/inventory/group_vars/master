@@ -3,6 +3,10 @@
 idc: beijing
 k8s_version: 1.10.13
 
+
+# certs
+certs_home: /data/usr/k8s/certs
+
 # etcd
 etcd_release: etcd-v3.4.13-linux-amd64
 etcd_user: root
@@ -16,9 +20,7 @@ etcd_pid: /data/var/run/etcd.pid
 etcd_scheme: https
 etcd_peer_scheme: https
 etcd_cert_auth: "true"
-etcd_certs: /var/etcd/certs
-etcd_cert: /var/etcd/certs/etcd.pem
-etcd_key: /var/etcd/certs/etcd-key.pem
+etcd_certs: /data/usr/k8s/certs
 etcd_peer_cert_auth: "true"
 etcd_peer_cert: /var/etcd/certs/etcd.pem
 etcd_peer_key: /var/etcd/certs/etcd-key.pem

@@ -18,35 +18,36 @@
 #          chmod +x /usr/bin/cfssl*"
 #  warn: false
 
-- name: 安装cfssl/cfssljson
-  unarchive:
-    src: "../files/cfssl.tar.gz"
-    dest: "{{ etcd_certs }}"
-    mode: a+x
-
-- name: 安装cfssl/cfssljson
-  unarchive:
-    src: "../files/cfssljson.tar.gz"
-    dest: "{{ etcd_certs }}"
-    mode: a+x
+#- name: 安装cfssl/cfssljson
+#  unarchive:
+#    src: "../files/cfssl.tar.gz"
+#    dest: "{{ etcd_certs }}"
+#    mode: a+x
+#
+#- name: 安装cfssl/cfssljson
+#  unarchive:
+#    src: "../files/cfssljson.tar.gz"
+#    dest: "{{ etcd_certs }}"
+#    mode: a+x
 
 # 1. 证书
-- name: 分发证书相关
-  copy: src="../files/{{ item }}" dest={{ etcd_certs }}/{{ item }}
-  with_items:
-    - ca.pem
-    - ca-key.pem
-    - ca-config.json
+#- name: 分发证书相关
+#  copy: src="../files/{{ item }}" dest={{ etcd_certs }}/{{ item }}
+#  with_items:
+#    - ca.pem
+#    - ca-key.pem
+#    - ca-config.json
 
-- name: 创建etcd证书请求
-  template: src=etcd-csr.json.j2 dest={{ etcd_certs }}/etcd-csr.json
-
-- name: 创建etcd证书和私钥
-  shell: "cd {{ etcd_certs }} && {{ etcd_certs }}/cfssl gencert \
-        -ca={{ etcd_certs }}/ca.pem \
-        -ca-key={{ etcd_certs }}/ca-key.pem \
-        -config={{ etcd_certs }}/ca-config.json \
-        -profile=kubernetes {{ etcd_certs }}/etcd-csr.json | {{ etcd_certs }}/cfssljson -bare etcd"
+# csr的hosts字段也应该三台机器ip的vip，etcd可以为vip:2379，api-server可以为vip:6443
+#- name: 创建etcd证书请求
+#  template: src=etcd-csr.json.j2 dest={{ etcd_certs }}/etcd-csr.json
+#
+#- name: 创建etcd证书和私钥
+#  shell: "cd {{ etcd_certs }} && {{ etcd_certs }}/cfssl gencert \
+#        -ca={{ etcd_certs }}/ca.pem \
+#        -ca-key={{ etcd_certs }}/ca-key.pem \
+#        -config={{ etcd_certs }}/ca-config.json \
+#        -profile=kubernetes {{ etcd_certs }}/etcd-csr.json | {{ etcd_certs }}/cfssljson -bare {{ inventory_hostname }}"
 
 - unarchive:
     src="../files/{{ etcd_release }}.tar.gz"
@@ -72,14 +73,15 @@
 
 - template:
     src="../templates/etcd.service.j2"
-    dest=/etc/systemd/system/etcd-{{ etcd_config['client-port'] }}.service
+    dest=/etc/systemd/system/etcd.service
 
 - name: 开机启用etcd服务
-  shell: systemctl enable etcd-{{ etcd_config['client-port'] }}
+  shell: systemctl enable etcd
   ignore_errors: true
 
 - name: 开启etcd服务
-  shell: systemctl daemon-reload && systemctl restart etcd-{{ etcd_config['client-port'] }}
+  shell: systemctl daemon-reload && systemctl restart etcd
+#  shell: systemctl daemon-reload && systemctl restart etcd-{{ etcd_config['client-port'] }}
 
 - name: 以轮询的方式等待服务同步完成
   shell: "systemctl status etcd-{{ etcd_config['client-port'] }}.service|grep Active"
