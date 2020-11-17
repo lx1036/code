@@ -32,7 +32,6 @@ import (
 
 	"github.com/elastic/beats/v7/libbeat/logp"
 	log "github.com/sirupsen/logrus"
-
 )
 
 const (

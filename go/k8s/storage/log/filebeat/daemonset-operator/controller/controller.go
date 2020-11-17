@@ -12,29 +12,24 @@ import (
 )
 
 type LogController struct {
-	
 	InformerResources []schema.GroupVersionResource
-	ApiServerClient     kubernetes.Interface
-	PodStore cache.Store
-	PodInformer cache.Controller
-	NodeStore cache.Store
-	NodeInformer cache.Controller
-	
+	ApiServerClient   kubernetes.Interface
+	PodStore          cache.Store
+	PodInformer       cache.Controller
+	NodeStore         cache.Store
+	NodeInformer      cache.Controller
+
 	TaskQueue *TaskQueue
-	
-	stopCh         chan struct{}
-	
-	NodeName string
-	ResyncPeriod time.Duration
-	TaskHandlePeriod   time.Duration
-	
-	
+
+	stopCh chan struct{}
+
+	NodeName         string
+	ResyncPeriod     time.Duration
+	TaskHandlePeriod time.Duration
 }
 
-func New(apiServerClient kubernetes.Interface, options Options) (*LogController) {
-	
-	
-	
+func New(apiServerClient kubernetes.Interface, options Options) *LogController {
+
 	/*ctr := &LogController{
 		InformerResources: []schema.GroupVersionResource{
 			{
@@ -51,54 +46,52 @@ func New(apiServerClient kubernetes.Interface, options Options) (*LogController)
 		ApiServerClient:   apiServerClient,
 		stopCh:            nil,
 	}*/
-	
+
 	ctr := &LogController{
 		InformerResources: nil,
 		ApiServerClient:   nil,
 		stopCh:            nil,
 		NodeName:          "",
 		ResyncPeriod:      0,
-		TaskHandlePeriod: 0,
+		TaskHandlePeriod:  0,
 	}
-	
+
 	ctr.TaskQueue = NewTaskQueue(ctr.syncTask)
-	
-	
+
 	podListWatch := cache.NewListWatchFromClient(ctr.ApiServerClient.CoreV1().RESTClient(), "pods", coreV1.NamespaceAll, fields.OneTermEqualSelector("spec.nodeName", ctr.NodeName))
 	ctr.PodStore, ctr.PodInformer = cache.NewInformer(podListWatch, &coreV1.Pod{}, ctr.ResyncPeriod, cache.ResourceEventHandlerFuncs{
 		AddFunc:    ctr.AddPod,
 		UpdateFunc: ctr.UpdatePod,
 		DeleteFunc: ctr.DeletePod,
 	})
-	
+
 	nodeListWatch := cache.NewListWatchFromClient(ctr.ApiServerClient.CoreV1().RESTClient(), "nodes", coreV1.NamespaceAll, fields.OneTermEqualSelector("metadata.name", ctr.NodeName))
 	ctr.NodeStore, ctr.NodeInformer = cache.NewInformer(nodeListWatch, &coreV1.Node{}, ctr.ResyncPeriod, cache.ResourceEventHandlerFuncs{})
-	
+
 }
 
-func (ctr *LogController) AddPod(obj interface{})  {
+func (ctr *LogController) AddPod(obj interface{}) {
 	pod := obj.(*coreV1.Pod)
 	ctr.TaskQueue.Enqueue(pod)
 }
-func (ctr *LogController) UpdatePod(oldObj, newObj interface{})  {}
-func (ctr *LogController) DeletePod(obj interface{})  {
+func (ctr *LogController) UpdatePod(oldObj, newObj interface{}) {}
+func (ctr *LogController) DeletePod(obj interface{}) {
 	pod := obj.(*coreV1.Pod)
 	ctr.TaskQueue.Enqueue(pod)
 }
 
 // 批量处理pod事件，更新filebeat input.yml
-func (ctr *LogController) syncTask(tasks []interface{})  {
+func (ctr *LogController) syncTask(tasks []interface{}) {
 
 }
 
-func (ctr *LogController) Run()  {
-	
+func (ctr *LogController) Run() {
+
 	go ctr.PodInformer.Run(ctr.stopCh)
 	go ctr.NodeInformer.Run(ctr.stopCh)
-	
+
 	go ctr.TaskQueue.Run(ctr.TaskHandlePeriod, ctr.stopCh)
-	
+
 	<-ctr.stopCh
 	//k8s.Run(ctr.ApiServerClient, ctr.InformerResources, ctr.stopCh)
 }
-

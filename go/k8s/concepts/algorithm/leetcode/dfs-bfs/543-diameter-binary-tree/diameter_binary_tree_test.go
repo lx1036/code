@@ -1,10 +1,10 @@
 package _43_diameter_binary_tree
 
 import (
+	"github.com/stretchr/testify/assert"
 	"k8s-lx1036/k8s/concepts/algorithm/leetcode/000-tree/binary_search_tree"
 	"math"
 	"testing"
-	"github.com/stretchr/testify/assert"
 )
 
 // https://leetcode-cn.com/problems/diameter-of-binary-tree/
@@ -22,10 +22,10 @@ func depth(node *binary_search_tree.Node) int {
 		return 0
 	}
 
-	L := depth(node.Left) // 左子树深度
+	L := depth(node.Left)  // 左子树深度
 	R := depth(node.Right) // 右子树深度
 
-	result = math.Max(result, float64(L + R + 1))
+	result = math.Max(result, float64(L+R+1))
 	return int(math.Max(float64(L), float64(R))) + 1
 }
 

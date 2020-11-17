@@ -2,11 +2,11 @@ package source
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
-	"time"
 	"testing"
+	"time"
 )
 
 func TestSimpleQueue(t *testing.T) {
@@ -50,4 +50,3 @@ func TestSimpleQueue(t *testing.T) {
 		t.Errorf("should not have added")
 	}
 }
-

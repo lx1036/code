@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func Run(clientSet kubernetes.Interface, InformerResources []schema.GroupVersionResource, stopChannel chan struct{})  {
+func Run(clientSet kubernetes.Interface, InformerResources []schema.GroupVersionResource, stopChannel chan struct{}) {
 	sharedInformerFactory := informers.NewSharedInformerFactory(clientSet, time.Second*10)
 	for _, resource := range InformerResources {
 		// Informer: informer作为异步事件处理框架，完成了事件监听和分发处理两个过程

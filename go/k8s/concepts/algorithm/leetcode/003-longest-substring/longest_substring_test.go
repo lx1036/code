@@ -13,10 +13,8 @@ func lengthOfLongestSubstring(s string) int {
 
 	hashTable := map[byte]int{}
 	result := 0
-	
+
 	for i := 0; i < l; i++ {
-
-
 
 		if value, ok := hashTable[s[i]]; ok {
 			/*if len(hashTable) > result {
@@ -25,7 +23,7 @@ func lengthOfLongestSubstring(s string) int {
 			hashTable = map[byte]int{}
 			hashTable[s[i]] = value
 		} else {
-			hashTable[s[i]]= i
+			hashTable[s[i]] = i
 		}
 
 		if len(hashTable) > result {
@@ -62,5 +60,3 @@ func TestLengthOfLongestSubstring(test *testing.T) {
 	s = "dvdf"
 	assert.Equal(test, 3, lengthOfLongestSubstring(s))
 }
-
-

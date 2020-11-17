@@ -2,9 +2,9 @@ package kvstore
 
 import (
 	"errors"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"testing"
-	log "github.com/sirupsen/logrus"
 )
 
 func TestKVStore(test *testing.T) {
@@ -24,9 +24,9 @@ func TestKVStore(test *testing.T) {
 	}()
 }
 
-func readCommits(commitC <-chan *string, errorC <-chan error)  {
+func readCommits(commitC <-chan *string, errorC <-chan error) {
 	for data := range commitC {
-		if data== nil {
+		if data == nil {
 			log.Info("ok empty")
 		}
 

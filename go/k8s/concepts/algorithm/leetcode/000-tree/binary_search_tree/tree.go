@@ -6,7 +6,7 @@ import "fmt"
 
 type Node struct {
 	Value int
-	Left *Node
+	Left  *Node
 	Right *Node
 }
 
@@ -28,7 +28,7 @@ func (node *Node) find(value int) *Node {
 			return current
 		}
 	}
-	
+
 	return nil
 }
 
@@ -38,7 +38,7 @@ func (node *Node) insert(value int) error {
 	if value == node.Value {
 		return nil
 	}
-	
+
 	if value > node.Value {
 		if node.Right == nil {
 			node.Right = &Node{Value: value}
@@ -52,7 +52,7 @@ func (node *Node) insert(value int) error {
 			node.Left.insert(value)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -60,17 +60,16 @@ func (node *Node) insert(value int) error {
 func (node *Node) delete(value int) error {
 	if value == node.Value {
 		if node.Left == nil && node.Right == nil {
-			
+
 		}
 	}
-	
+
 	if value > node.Value {
 		node.Right.delete(value)
 	} else if value < node.Value {
 		node.Left.delete(value)
 	}
-	
-	
+
 	return nil
 }
 
@@ -79,7 +78,7 @@ func (node *Node) delete(value int) error {
 // 前序遍历：根节点 -> 左子树 -> 右子树
 // 后序遍历：左子树 -> 右子树 -> 根节点
 
-func (node *Node) Inorder()  {
+func (node *Node) Inorder() {
 	current := node
 	if current != nil {
 		current.Left.Inorder()
@@ -88,7 +87,7 @@ func (node *Node) Inorder()  {
 	}
 }
 
-func (node *Node) Preorder()  {
+func (node *Node) Preorder() {
 	current := node
 	if current != nil {
 		fmt.Println(current.Value)
@@ -97,7 +96,7 @@ func (node *Node) Preorder()  {
 	}
 }
 
-func (node *Node) Postorder()  {
+func (node *Node) Postorder() {
 	current := node
 	if current != nil {
 		current.Left.Postorder()
@@ -110,9 +109,9 @@ func (node *Node) Levelorder() [][]int {
 	if node == nil {
 		return nil
 	}
-	
+
 	root := node
-	
+
 	var result [][]int
 	var queue []*Node
 	queue = append(queue, root)
@@ -122,9 +121,9 @@ func (node *Node) Levelorder() [][]int {
 		for i := 0; i < l; i++ {
 			node := queue[0]
 			queue = queue[1:]
-			
+
 			tmp = append(tmp, node.Value)
-			
+
 			if node.Left != nil {
 				queue = append(queue, node.Left)
 			}
@@ -132,10 +131,10 @@ func (node *Node) Levelorder() [][]int {
 				queue = append(queue, node.Right)
 			}
 		}
-		
+
 		result = append(result, tmp)
 	}
-	
+
 	return result
 }
 
@@ -144,27 +143,26 @@ func (node *Node) Min() *Node {
 	if current.Left == nil {
 		return current
 	}
-	
+
 	if current != nil {
 		return current.Left.Min()
 	}
-	
+
 	return nil
 }
 
-func (node *Node) Max() *Node{
+func (node *Node) Max() *Node {
 	current := node
 	if current.Left == nil {
 		return current
 	}
-	
+
 	if current != nil {
 		return current.Right.Max()
 	}
-	
+
 	return nil
 }
-
 
 //          10
 //        /    \

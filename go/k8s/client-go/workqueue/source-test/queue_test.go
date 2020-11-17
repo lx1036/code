@@ -2,9 +2,9 @@ package source_test
 
 import (
 	"sync"
-	"time"
 	"testing"
-	
+	"time"
+
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -13,7 +13,7 @@ import (
 func TestBasic(t *testing.T) {
 	// If something is seriously wrong this test will never complete.
 	q := workqueue.New()
-	
+
 	// Start producers
 	const producers = 5
 	producerWG := sync.WaitGroup{}

@@ -7,7 +7,7 @@ import (
 
 type ListNode struct {
 	value int
-	next *ListNode
+	next  *ListNode
 }
 
 // 迭代

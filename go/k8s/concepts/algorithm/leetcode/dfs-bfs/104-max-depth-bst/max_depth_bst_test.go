@@ -15,7 +15,7 @@ func dfs(root *binary_search_tree.Node) int {
 		return 0
 	}
 
-	L := dfs(root.Left) // 左子树深度
+	L := dfs(root.Left)  // 左子树深度
 	R := dfs(root.Right) // 右子树深度
 	return int(math.Max(float64(L), float64(R))) + 1
 }

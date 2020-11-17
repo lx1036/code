@@ -13,7 +13,7 @@ func TwoSum(nums []int, target int) []int {
 	hashTable := map[int]int{}
 
 	for key, value := range nums {
-		if p, ok := hashTable[target - value];ok {
+		if p, ok := hashTable[target-value]; ok {
 			return []int{key, p}
 		}
 
@@ -23,21 +23,20 @@ func TwoSum(nums []int, target int) []int {
 	return nil
 }
 
-func TwoSum2(nums []int, target int) []int  {
+func TwoSum2(nums []int, target int) []int {
 	hashTable := map[int]int{}
 	for key, value := range nums {
 		hashTable[value] = key
 	}
 
 	for key, value := range nums {
-		if p, ok := hashTable[target - value]; ok {
+		if p, ok := hashTable[target-value]; ok {
 			return []int{p, key}
 		}
 	}
 
 	return nil
 }
-
 
 func TestTwoSum(test *testing.T) {
 	nums := []int{6, 3, 8, 2, 1}
@@ -48,4 +47,3 @@ func TestTwoSum(test *testing.T) {
 	result2 := TwoSum2(nums, target)
 	fmt.Println(result2)
 }
-

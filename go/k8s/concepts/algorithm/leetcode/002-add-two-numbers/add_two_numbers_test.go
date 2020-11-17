@@ -7,14 +7,14 @@ import (
 
 type ListNode struct {
 	value int
-	next *ListNode
+	next  *ListNode
 }
 
 func AddTwoNumbers(l1 *ListNode, l2 *ListNode) *ListNode {
 	var head, tail *ListNode
 	carry := 0
 	for l1 != nil || l2 != nil {
-		n1 , n2 := 0, 0
+		n1, n2 := 0, 0
 
 		if l1 != nil {
 			n1 = l1.value
@@ -26,7 +26,7 @@ func AddTwoNumbers(l1 *ListNode, l2 *ListNode) *ListNode {
 		}
 
 		sum := n1 + n2 + carry
-		sum, carry = sum % 10, sum / 10
+		sum, carry = sum%10, sum/10
 		if head == nil {
 			head = &ListNode{value: sum}
 			tail = head
@@ -42,9 +42,6 @@ func AddTwoNumbers(l1 *ListNode, l2 *ListNode) *ListNode {
 
 	return head
 }
-
-
-
 
 func TestAddTwoNumbers(test *testing.T) {
 	a1 := &ListNode{value: 3, next: nil}
@@ -75,5 +72,3 @@ func TestAddTwoNumbers(test *testing.T) {
 		C = C.next
 	}
 }
-
-
