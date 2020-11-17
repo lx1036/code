@@ -79,31 +79,64 @@ func (node *Node) delete(value int) error {
 // 前序遍历：根节点 -> 左子树 -> 右子树
 // 后序遍历：左子树 -> 右子树 -> 根节点
 
-func (node *Node) MiddleOrder()  {
+func (node *Node) Inorder()  {
 	current := node
 	if current != nil {
-		current.Left.MiddleOrder()
+		current.Left.Inorder()
 		fmt.Println(current.Value)
-		current.Right.MiddleOrder()
+		current.Right.Inorder()
 	}
 }
 
-func (node *Node) PreOrder()  {
+func (node *Node) Preorder()  {
 	current := node
 	if current != nil {
 		fmt.Println(current.Value)
-		current.Left.MiddleOrder()
-		current.Right.MiddleOrder()
+		current.Left.Preorder()
+		current.Right.Preorder()
 	}
 }
 
-func (node *Node) PostOrder()  {
+func (node *Node) Postorder()  {
 	current := node
 	if current != nil {
-		current.Left.MiddleOrder()
-		current.Right.MiddleOrder()
+		current.Left.Postorder()
+		current.Right.Postorder()
 		fmt.Println(current.Value)
 	}
+}
+
+func (node *Node) Levelorder() [][]int {
+	if node == nil {
+		return nil
+	}
+	
+	root := node
+	
+	var result [][]int
+	var queue []*Node
+	queue = append(queue, root)
+	for len(queue) != 0 {
+		var tmp []int
+		l := len(queue)
+		for i := 0; i < l; i++ {
+			node := queue[0]
+			queue = queue[1:]
+			
+			tmp = append(tmp, node.Value)
+			
+			if node.Left != nil {
+				queue = append(queue, node.Left)
+			}
+			if node.Right != nil {
+				queue = append(queue, node.Right)
+			}
+		}
+		
+		result = append(result, tmp)
+	}
+	
+	return result
 }
 
 func (node *Node) Min() *Node {
