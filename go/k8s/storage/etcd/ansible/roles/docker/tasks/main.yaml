@@ -1,0 +1,28 @@
+
+
+- copy: src=../files/{{ docker_rpm }} dest=/tmp
+- copy: src=../files/{{ docker_selinux_rpm }} dest=/tmp
+- yum: name=/tmp/{{ docker_rpm }},/tmp/{{ docker_selinux_rpm }} state=present disable_gpg_check=yes
+
+# # (?) https://github.com/kubernetes/kubernetes/issues/40182
+- command: lvs VolGroup01/ThinPool00
+    register: result
+    ignore_errors: yes
+- set_fact:
+    docker_thinpooldev: /dev/mapper/VolGroup01-ThinPool00
+  when: result is success
+
+# https://kubernetes.io/docs/concepts/policy/pod-security-policy/#seccomp
+# Note: The --seccomp-profile-root flag is deprecated since Kubernetes v1.19. Users are encouraged to use the default path.
+- file: path="/etc/systemd/system/docker.service.d" state=directory
+- file: path="/etc/docker" state=directory
+- copy: src=../files/seccomp.json dest=/etc/docker/seccomp.json
+- copy: src=../files/daemon.json dest=/etc/docker/daemon.json
+
+
+- file: path="/root/.docker" state=directory
+- copy: src=../files/config.json dest=/root/.docker/config.json
+
+- command: systemctl daemon-reload
+- service: name=docker enabled=yes
+- service: name=docker state=started

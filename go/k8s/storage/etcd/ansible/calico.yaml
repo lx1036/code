@@ -3,7 +3,6 @@
 - hosts: "{{ group }}"
   vars:
     iface: eth0
-
   roles:
     - calico
   become: yes
