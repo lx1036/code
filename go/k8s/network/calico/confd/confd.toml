@@ -1,0 +1,16 @@
+
+# 高版本使用etcdv3: /api/v3/xxx
+backend = "etcdv3"
+#client_cert = "/etc/confd/ssl/client.crt"
+#client_key = "/etc/confd/ssl/client.key"
+confdir = "."
+log-level = "debug"
+# 默认10分钟: 600
+interval = 30
+nodes = [
+  "http://127.0.0.1:2379",
+]
+noop = false
+prefix = "/"
+scheme = "http"
+#srv_domain = "etcd.example.com"
