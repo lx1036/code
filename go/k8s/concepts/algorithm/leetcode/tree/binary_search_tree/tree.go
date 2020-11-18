@@ -193,3 +193,16 @@ func NewBinarySearchTree() *Node {
 
 	return root
 }
+
+func NewBinarySearchTreeByValues(values []int) *Node {
+	if len(values) == 0 {
+		return nil
+	}
+	root := &Node{Value: values[0]}
+	values = values[1:]
+	for _, value := range values {
+		root.insert(value)
+	}
+
+	return root
+}

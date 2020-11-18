@@ -2,7 +2,7 @@ package _04_max_depth_bst
 
 import (
 	"github.com/stretchr/testify/assert"
-	"k8s-lx1036/k8s/concepts/algorithm/leetcode/000-tree/binary_search_tree"
+	"k8s-lx1036/k8s/concepts/algorithm/leetcode/tree/binary_search_tree"
 	"math"
 	"testing"
 )

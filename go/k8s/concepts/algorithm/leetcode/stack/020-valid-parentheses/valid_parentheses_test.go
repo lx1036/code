@@ -59,3 +59,17 @@ func TestValid(test *testing.T) {
 	s = "(("
 	assert.Equal(test, false, isValid(s))
 }
+
+func valid(queue []int) bool {
+	if len(queue) % 2 != 0 {
+		return false
+	}
+
+	l := len(queue)
+	for i, j:=0, l-1; j>=i; i, j = i+1, j-1 {
+		if queue[i] != queue[j] {
+			return false
+		}
+	}
+	return true
+}
