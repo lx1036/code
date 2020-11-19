@@ -26,11 +26,11 @@ func TestInsert(test *testing.T) {
 
 func TestOrder(test *testing.T) {
 	root := NewBinarySearchTree()
-	root.MiddleOrder()
+	root.Inorder()
 	fmt.Println()
-	root.PreOrder()
+	root.Preorder()
 	fmt.Println()
-	root.PostOrder()
+	root.Postorder()
 }
 
 func TestMinMax(test *testing.T) {
