@@ -1,4 +1,4 @@
-package _03_longest_substring
+package leetcode
 
 import (
 	"fmt"

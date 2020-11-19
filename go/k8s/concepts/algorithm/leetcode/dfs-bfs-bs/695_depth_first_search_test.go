@@ -1,4 +1,4 @@
-package _95_max_area_island
+package dfs_bfs_bs
 
 import (
 	"github.com/stretchr/testify/assert"

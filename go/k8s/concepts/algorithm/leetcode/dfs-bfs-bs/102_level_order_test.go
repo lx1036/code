@@ -1,4 +1,4 @@
-package _02_bst_level_order
+package dfs_bfs_bs
 
 import (
 	"fmt"

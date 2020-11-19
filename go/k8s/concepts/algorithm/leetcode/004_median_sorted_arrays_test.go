@@ -1,4 +1,4 @@
-package _04_median_sorted_arrays
+package leetcode
 
 // https://leetcode-cn.com/problems/median-of-two-sorted-arrays/
 

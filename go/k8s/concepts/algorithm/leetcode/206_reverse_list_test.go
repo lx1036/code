@@ -1,10 +1,11 @@
-package main
+package leetcode
 
 import (
 	"fmt"
 	"testing"
 )
 
+// https://leetcode-cn.com/problems/reverse-linked-list/
 type ListNode struct {
 	value int
 	next  *ListNode

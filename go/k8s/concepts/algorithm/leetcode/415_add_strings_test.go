@@ -1,4 +1,4 @@
-package _15_add_strings
+package leetcode
 
 import (
 	"github.com/stretchr/testify/assert"

@@ -1,4 +1,4 @@
-package _01_symmetic_tree
+package dfs_bfs_bs
 
 import (
 	"fmt"

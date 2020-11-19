@@ -1,4 +1,4 @@
-package _47_friend_circles
+package dfs_bfs_bs
 
 func findCircleNum(grid [][]int) int {
 

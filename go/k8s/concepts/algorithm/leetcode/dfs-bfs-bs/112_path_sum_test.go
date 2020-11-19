@@ -1,4 +1,4 @@
-package _12_path_sum
+package dfs_bfs_bs
 
 import (
 	"github.com/stretchr/testify/assert"

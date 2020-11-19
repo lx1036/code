@@ -1,9 +1,11 @@
-package main
+package leetcode
 
 import (
 	"fmt"
 	"testing"
 )
+
+// https://leetcode-cn.com/problems/two-sum/
 
 // 使用哈希表来O(1)查找target-value的值
 // 总体复杂度：

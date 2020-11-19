@@ -1,4 +1,4 @@
-package _04_max_depth_bst
+package dfs_bfs_bs
 
 import (
 	"github.com/stretchr/testify/assert"

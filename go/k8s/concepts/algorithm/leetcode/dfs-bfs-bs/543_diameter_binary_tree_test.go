@@ -1,4 +1,4 @@
-package _43_diameter_binary_tree
+package dfs_bfs_bs
 
 import (
 	"github.com/stretchr/testify/assert"

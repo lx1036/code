@@ -1,4 +1,4 @@
-package _16_next_right_pointer
+package dfs_bfs_bs
 
 import (
 	"fmt"
