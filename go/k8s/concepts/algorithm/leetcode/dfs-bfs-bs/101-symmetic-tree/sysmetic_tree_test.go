@@ -6,6 +6,7 @@ import (
 	"k8s-lx1036/k8s/concepts/algorithm/leetcode/tree/binary_search_tree"
 	"testing"
 )
+
 /**
  * Definition for a binary tree node.
  * type TreeNode struct {
@@ -25,7 +26,7 @@ func isSymmetric(root *binary_search_tree.Node) bool {
 	for len(queue) != 0 {
 		var tmp []int
 		l := len(queue)
-		for i:=0;i<l;i++ {
+		for i := 0; i < l; i++ {
 			node := queue[0]
 			queue = queue[1:]
 			if node.Left != nil {
@@ -52,12 +53,12 @@ func isSymmetric(root *binary_search_tree.Node) bool {
 }
 
 func valid(queue []int) bool {
-	if len(queue) % 2 != 0 {
+	if len(queue)%2 != 0 {
 		return false
 	}
 
 	l := len(queue)
-	for i,j:=0,l-1; j>=i; i,j=i+1,j-1 {
+	for i, j := 0, l-1; j >= i; i, j = i+1, j-1 {
 		if queue[i] != queue[j] {
 			return false
 		}
@@ -81,7 +82,7 @@ func dfs(node1, node2 *binary_search_tree.Node) bool {
 }
 
 func TestSymmetric(test *testing.T) {
-	values := []int{1,2}
+	values := []int{1, 2}
 	root := binary_search_tree.NewBinarySearchTreeByValues(values)
 	result := isSymmetric(root)
 	fmt.Println(result)
@@ -90,7 +91,7 @@ func TestSymmetric(test *testing.T) {
 	result = isSymmetricRecursive(root)
 	assert.Equal(test, false, result)
 
-	values = []int{1,2,2,3,4,4,3}
+	values = []int{1, 2, 2, 3, 4, 4, 3}
 	root = binary_search_tree.NewBinarySearchTreeByValues(values)
 	result = isSymmetric(root)
 	assert.Equal(test, false, result)

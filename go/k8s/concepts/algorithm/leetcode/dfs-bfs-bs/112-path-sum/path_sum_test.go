@@ -1,6 +1,7 @@
 package _12_path_sum
 
 import (
+	"github.com/stretchr/testify/assert"
 	"k8s-lx1036/k8s/concepts/algorithm/leetcode/tree/binary_search_tree"
 	"testing"
 )
@@ -8,20 +9,23 @@ import (
 // https://leetcode-cn.com/problems/path-sum/
 
 func hasPathSum(root *binary_search_tree.Node, sum int) bool {
-
-	return true
+	return dfs(root, sum)
 }
 
-/*func dfs(root *binary_search_tree.Node) int {
+// 时间复杂度O(n)，空间复杂度O(logN)
+func dfs(root *binary_search_tree.Node, sum int) bool {
 	if root == nil {
-		return 0
+		return false
 	}
 
-	l := root.Value + dfs(root.Left)
-	r := root.Value + dfs(root.Right)
+	if root.Left == nil && root.Right == nil {
+		return root.Value == sum
+	}
 
-}*/
+	return dfs(root.Left, sum-root.Value) || dfs(root.Right, sum-root.Value)
+}
 
+// 还没完成？？
 func bfs(root *binary_search_tree.Node, sum int) bool {
 	if root == nil {
 		return 0 == sum
@@ -48,10 +52,11 @@ func bfs(root *binary_search_tree.Node, sum int) bool {
 		//tmp = append(tmp, tmp1)
 	}
 
+	return false
 }
 
 func TestPathSum(test *testing.T) {
-
+	root := binary_search_tree.NewBinarySearchTree()
+	result := hasPathSum(root, 27)
+	assert.Equal(test, true, result)
 }
-
-
