@@ -9,11 +9,11 @@ import (
 // https://leetcode-cn.com/problems/path-sum/
 
 func hasPathSum(root *binary_search_tree.Node, sum int) bool {
-	return dfs(root, sum)
+	return dfs_112(root, sum)
 }
 
 // 时间复杂度O(n)，空间复杂度O(logN)
-func dfs(root *binary_search_tree.Node, sum int) bool {
+func dfs_112(root *binary_search_tree.Node, sum int) bool {
 	if root == nil {
 		return false
 	}
@@ -22,7 +22,7 @@ func dfs(root *binary_search_tree.Node, sum int) bool {
 		return root.Value == sum
 	}
 
-	return dfs(root.Left, sum-root.Value) || dfs(root.Right, sum-root.Value)
+	return dfs_112(root.Left, sum-root.Value) || dfs_112(root.Right, sum-root.Value)
 }
 
 // 还没完成？？

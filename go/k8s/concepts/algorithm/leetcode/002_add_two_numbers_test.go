@@ -7,11 +7,6 @@ import (
 
 // https://leetcode-cn.com/problems/add-two-numbers/
 
-type ListNode struct {
-	value int
-	next  *ListNode
-}
-
 func AddTwoNumbers(l1 *ListNode, l2 *ListNode) *ListNode {
 	var head, tail *ListNode
 	carry := 0

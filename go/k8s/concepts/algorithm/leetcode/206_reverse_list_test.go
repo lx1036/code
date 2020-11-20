@@ -28,8 +28,8 @@ func ReverseIteration(l1 *ListNode) *ListNode {
 
 // 递归
 func ReverseRecursion(l1 *ListNode) *ListNode {
-	current := l1
 
+	return nil
 }
 
 func TestReverse(test *testing.T) {

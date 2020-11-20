@@ -67,10 +67,10 @@ func valid(queue []int) bool {
 }
 
 func isSymmetricRecursive(root *binary_search_tree.Node) bool {
-	return dfs(root, root)
+	return dfs_101(root, root)
 }
 
-func dfs(node1, node2 *binary_search_tree.Node) bool {
+func dfs_101(node1, node2 *binary_search_tree.Node) bool {
 	if node1 == nil && node2 == nil {
 		return true
 	}
@@ -78,7 +78,7 @@ func dfs(node1, node2 *binary_search_tree.Node) bool {
 		return false
 	}
 
-	return node1.Value == node2.Value && dfs(node1.Left, node2.Right) && dfs(node1.Right, node2.Left)
+	return node1.Value == node2.Value && dfs_101(node1.Left, node2.Right) && dfs_101(node1.Right, node2.Left)
 }
 
 func TestSymmetric(test *testing.T) {

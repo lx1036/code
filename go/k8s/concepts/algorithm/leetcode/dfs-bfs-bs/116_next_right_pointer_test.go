@@ -15,14 +15,14 @@ type Node struct {
 }
 
 func connect(root *Node) *Node {
-	return bfs(root)
+	return bfs_116(root)
 }
 
-func bfs(root *Node) *Node {
+func bfs_116(root *Node) *Node {
 	if root == nil {
 		return root
 	}
-	
+
 	var queue []*Node
 	queue = append(queue, root)
 	for len(queue) != 0 {
@@ -33,7 +33,7 @@ func bfs(root *Node) *Node {
 			if i < l-1 {
 				node.Next = queue[0]
 			}
-			
+
 			if node.Left != nil {
 				queue = append(queue, node.Left)
 			}
@@ -42,10 +42,9 @@ func bfs(root *Node) *Node {
 			}
 		}
 	}
-	
+
 	return root
 }
-
 
 func TestConnect(test *testing.T) {
 
@@ -55,12 +54,16 @@ func TestName(test *testing.T) {
 	type Person struct {
 		Name string
 	}
-	
+
 	p := &Person{Name: "test"}
 	q := p
+
 	q.Name = "test2"
 	fmt.Println(p.Name) // test2
-	
+
+	p2 := &Person{Name: "test22"}
+	q = p2
+
 	var queue []*Person
 	queue = append(queue, p)
 	node := queue[0]

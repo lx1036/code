@@ -10,18 +10,18 @@ import (
 // 深度：二叉树的深度为根节点到最远叶子节点的最长路径上的节点数
 
 // dfs 深度优先搜索
-func dfs(root *binary_search_tree.Node) int {
+func dfs_104(root *binary_search_tree.Node) int {
 	if root == nil {
 		return 0
 	}
 
-	L := dfs(root.Left)  // 左子树深度
-	R := dfs(root.Right) // 右子树深度
+	L := dfs_104(root.Left)  // 左子树深度
+	R := dfs_104(root.Right) // 右子树深度
 	return int(math.Max(float64(L), float64(R))) + 1
 }
 
 // bfs 广度优先搜索
-func bfs(root *binary_search_tree.Node) int {
+func bfs_104(root *binary_search_tree.Node) int {
 	if root == nil {
 		return 0
 	}
@@ -50,12 +50,12 @@ func bfs(root *binary_search_tree.Node) int {
 	return result
 }
 
-func TestDFS(test *testing.T) {
+func TestDFS_104(test *testing.T) {
 	root := binary_search_tree.NewBinarySearchTree()
-	assert.Equal(test, 4, dfs(root))
+	assert.Equal(test, 4, bfs_104(root))
 }
 
-func TestBFS(test *testing.T) {
+func TestBFS_104(test *testing.T) {
 	root := binary_search_tree.NewBinarySearchTree()
-	assert.Equal(test, 4, bfs(root))
+	assert.Equal(test, 4, bfs_104(root))
 }
