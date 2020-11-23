@@ -19,6 +19,7 @@ func Constructor() MyLinkedList {
 }
 
 func (this *MyLinkedList) Get(index int) int {
+	//if index < 0 {
 	if index >= this.Length || index < 0 {
 		return -1
 	}
@@ -33,6 +34,9 @@ func (this *MyLinkedList) Get(index int) int {
 
 func (this *MyLinkedList) AddAtHead(val int) {
 
+	current := &MyLinkedList{Value: val, Length: this.Length + 1}
+	current.Next = this
+	this = current
 }
 
 func (this *MyLinkedList) AddAtTail(val int) {
@@ -41,6 +45,23 @@ func (this *MyLinkedList) AddAtTail(val int) {
 
 func (this *MyLinkedList) AddAtIndex(index int, val int) {
 
+	if index > this.Length {
+		return
+	}
+	if index < 0 {
+		index = 0
+	}
+
+	node := &MyLinkedList{Value: val, Length: this.Length + 1}
+
+	current := this
+	for i := 0; i < index - 1; i++ { // 获取当前位置的上一个节点
+		current = current.Next
+	}
+
+	next := current.Next
+	current.Next = node
+	node.Next = next
 }
 
 func (this *MyLinkedList) DeleteAtIndex(index int) {
