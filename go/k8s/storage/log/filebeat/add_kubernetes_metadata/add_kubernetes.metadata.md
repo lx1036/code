@@ -22,12 +22,12 @@ filebeat.config.inputs:
   reload.period: 10s
 processors:
   - add_kubernetes_metadata:
-    host: slave01
-    kube_config: /Users/liuxiang/.kube/config
-    in_cluster: true
-    matchers:
-      - logs_path:
-          logs_path: /Users/liuxiang/Code/k8s/beats/filebeat
+        host: slave01
+        kube_config: /Users/liuxiang/.kube/config
+        in_cluster: true
+        matchers:
+          - logs_path:
+              logs_path: /Users/liuxiang/Code/k8s/beats/filebeat
 
 output.console:
   pretty: true
@@ -48,7 +48,7 @@ output.console:
 学习golang。
 
 ## add_kubernetes_metadata 插件用途
-主要是给每一行日志添加一些k8s相关的元数据metadata，比如namespace、deployment/pod name、labels等等。
+主要是给每一行日志添加一些k8s相关的元数据metadata字段，比如namespace、deployment/pod name、labels等等。
 
 
 ## 基本概念
@@ -67,10 +67,25 @@ output.console:
 
 
 ## 工作原理
-add_kubernetes_metadata启动时
+1. 注册默认indexer和matcher
+add_kubernetes_metadata插件启动时，会注册四种indexer: container, pod_name, pod_uid 和 ip_port，和三种matcher: fields, field_format 和 logs_path，
+参见 **[L58-L63](https://github.com/elastic/beats/blob/7.10/libbeat/processors/add_kubernetes_metadata/kubernetes.go#L58-L63)** 和 **[L32-L39](https://github.com/elastic/beats/blob/7.10/filebeat/processor/add_kubernetes_metadata/matchers.go#L32-L39)** 。 
+并且，filebeat的init函数里设置了默认的container indexer和logs_path matcher。
 
 
+2. list&watch每个node上的pods
+插件初始化代码里，会在goroutine里异步初始化list&watch k8s pods相关代码，见**[L105-L107](https://github.com/elastic/beats/blob/7.10/libbeat/processors/add_kubernetes_metadata/kubernetes.go#L105-L107)**。
+最关键的初始化过程在init(kubeAnnotatorConfig, common.Config)函数内，见**[L133-L202](https://github.com/elastic/beats/blob/7.10/libbeat/processors/add_kubernetes_metadata/kubernetes.go#L133-L202)** ：
+首先会初始化k8s api-server client:
+```go
+    // config.KubeConfig 是filebeat.yaml里的配置项'kube_config'
+    client, err := kubernetes.GetKubernetesClient(config.KubeConfig)
+    ...
+```
+然后初始化pod watcher，并且指定当前:
+```go
 
+```
 
 
 
