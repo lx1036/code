@@ -10,26 +10,23 @@ import (
 
 var (
 	kubeconfig = flag.String("kubeconfig", "", "Paths to a kubeconfig. Only required if out-of-cluster.")
-	host = flag.String("host", "", "Specified node")
-	namespace = flag.String("namespace", "", "Specified namespace")
+	host       = flag.String("host", "", "Specified node")
+	namespace  = flag.String("namespace", "", "Specified namespace")
 )
-
-
 
 func main() {
 	flag.Parse()
-	
+
 	log.SetOutput(os.Stdout)
 	log.SetFormatter(&log.JSONFormatter{})
 
 	options := &common.Options{
 		KubeConfig: *kubeconfig,
-		Host: *host,
-		Namespace: *namespace,
+		Host:       *host,
+		Namespace:  *namespace,
 	}
 
 	ctl := controller.New(options)
 
 	ctl.Run()
 }
-

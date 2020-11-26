@@ -55,7 +55,7 @@ func (this *MyLinkedList) AddAtIndex(index int, val int) {
 	node := &MyLinkedList{Value: val, Length: this.Length + 1}
 
 	current := this
-	for i := 0; i < index - 1; i++ { // 获取当前位置的上一个节点
+	for i := 0; i < index-1; i++ { // 获取当前位置的上一个节点
 		current = current.Next
 	}
 

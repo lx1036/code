@@ -10,11 +10,11 @@ func GetKubernetesClient(kubeconfig string) (*kubernetes.Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return client, nil
 }

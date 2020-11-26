@@ -23,7 +23,7 @@ func pivotIndex(nums []int) int {
 
 		suml += nums[i]
 	}
-	
+
 	return -1
 }
 

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"k8s-lx1036/k8s/storage/log/filebeat/daemonset-operator/common"
 	k8s "k8s-lx1036/k8s/storage/log/filebeat/daemonset-operator/controller/kubernetes"
@@ -14,7 +15,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	log "github.com/sirupsen/logrus"
 )
 
 type LogController struct {
@@ -36,7 +36,7 @@ type LogController struct {
 
 const defaultNode = "localhost"
 
-func InClusterNamespace() (string, error)  {
+func InClusterNamespace() (string, error) {
 	data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		return "", err
@@ -49,7 +49,7 @@ func DiscoverKubernetesNode(host string, client kubernetes.Interface) string {
 		log.Infof("Using node %s provided by env", host)
 		return host
 	}
-	
+
 	// node discover by pod
 	ns, err := InClusterNamespace()
 	if err != nil {
@@ -61,35 +61,31 @@ func DiscoverKubernetesNode(host string, client kubernetes.Interface) string {
 		log.Errorf("Can't get hostname as pod name in cluster with error: %v", err)
 		return defaultNode
 	}
-	
+
 	pod, err := client.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil {
 		log.Errorf("Can't query pod in cluster with error: %v", err)
 		return defaultNode
 	}
-	
+
 	log.Infof("Using node %s discovered by pod in cluster", pod.Spec.NodeName)
-	
+
 	return pod.Spec.NodeName
 }
 
 func New(options common.Options) *LogController {
-	
-	
+
 	client, err := common.GetKubernetesClient(options.KubeConfig)
 	if err != nil {
-	
+
 	}
-	
+
 	podWatcher, err := k8s.NewWatcher(client, &k8s.Pod{}, k8s.WatchOptions{
 		SyncTimeout: time.Minute * 10,
 		Node:        DiscoverKubernetesNode(options.Host, client),
 		Namespace:   "",
 		IsUpdated:   nil,
 	}, nil)
-	
-	
-	
 
 	/*ctr := &LogController{
 		InformerResources: []schema.GroupVersionResource{
