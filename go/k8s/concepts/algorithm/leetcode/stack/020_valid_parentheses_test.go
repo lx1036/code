@@ -1,4 +1,4 @@
-package _20_valid_parentheses
+package stack
 
 import (
 	"github.com/stretchr/testify/assert"
