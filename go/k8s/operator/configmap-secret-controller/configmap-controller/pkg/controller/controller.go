@@ -1,68 +1,158 @@
 package controller
 
 import (
+	"context"
+	"crypto/sha1"
+	"errors"
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"github.com/golang/glog"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"io"
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/configmap-controller/pkg/kube"
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/configmap-controller/pkg/metrics"
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/reloader/pkg/handler"
+	"k8s-lx1036/k8s/operator/configmap-secret-controller/reloader/pkg/util"
+	api "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"sort"
+	"strings"
 	"time"
 )
 
 const (
-	// maxRetries is the number of times a handler.ResourceHandler will be retried before it is dropped out of the queue.
-	// With the current rate-limiter in use (5ms*2^(maxRetries-1)) the following numbers represent the
-	// sequence of delays between successive queuings of a service.
-	//
-	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
-	maxRetries = 15
+	UpdateOnChangeAnnotation = "configmap.lx1036.io/update-on-change"
+	Separator                = ","
 )
 
 // Controller for checking events
 type Controller struct {
-	client     kubernetes.Interface
-	indexer    cache.Indexer
-	queue      workqueue.RateLimitingInterface
-	informer   cache.Controller
+	//indexer    cache.Indexer
+	//queue      workqueue.RateLimitingInterface
+	//informer   cache.Controller
+
+	watcher    Watcher
+	client     *kubernetes.Clientset
 	namespace  string
-	collectors metrics.Collectors
 	resource   string
+	collectors metrics.Collectors
 }
 
 // NewController for initializing a Controller
-func NewController(client kubernetes.Interface, resource string, namespace string, collectors metrics.Collectors) (*Controller, error) {
-	c := &Controller{
-		client:    client,
-		namespace: namespace,
-		resource:  resource,
+func NewController(client *kubernetes.Clientset, resource string, namespace string, collectors metrics.Collectors) (*Controller, error) {
+	controller := &Controller{
+		client:     client,
+		namespace:  namespace,
+		resource:   resource,
+		collectors: collectors,
 	}
 
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	listWatcher := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), resource, namespace, fields.Everything())
-	// resyncPeriod=0 ???
-	indexer, informer := cache.NewIndexerInformer(listWatcher, kube.ResourceMap[resource], 0, cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.Add,
-		UpdateFunc: c.Update,
-		DeleteFunc: c.Delete,
-	}, cache.Indexers{})
+	watcher, err := NewWatcher(client, &ConfigMap{}, WatchOptions{
+		SyncTimeout: viper.GetDuration("sync-period"),
+		Namespace:   namespace,
+	}, nil)
+	if err != nil {
+		log.Errorf("Couldn't create kubernetes watcher for %T", &ConfigMap{})
+		return nil, err
+	}
 
-	c.indexer = indexer
-	c.informer = informer
-	c.queue = queue
-	c.collectors = collectors
+	watcher.AddEventHandler(ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			configMap := obj.(*ConfigMap)
+			log.Debugf("Adding kubernetes configmap: %s/%s", configMap.GetNamespace(), configMap.GetName())
+			controller.onAdd(configMap)
+		},
+		UpdateFunc: func(obj interface{}) {
+			configMap := obj.(*ConfigMap)
+			log.Debugf("Updating kubernetes configmap: %s/%s", configMap.GetNamespace(), configMap.GetName())
+			controller.onUpdate(configMap)
+		},
+		DeleteFunc: nil,
+	})
 
-	return c, nil
+	controller.watcher = watcher
+
+	return controller, nil
+}
+
+// updateContainers returns a boolean value indicating if any containers have been updated
+func updateContainers(containers []api.Container, annotationValue, configMapVersion string) bool {
+
+}
+
+func GetHashFromConfigmap(configMap *ConfigMap) string {
+	var values []string
+	for k, v := range configMap.Data {
+		values = append(values, k+"="+v)
+	}
+	sort.Strings(values)
+	return GenerateSHA(strings.Join(values, ";"))
+}
+
+// GenerateSHA generates SHA from string
+func GenerateSHA(data string) string {
+	hasher := sha1.New()
+	_, err := io.WriteString(hasher, data)
+	if err != nil {
+		log.Errorf("Unable to write data in hash writer %v", err)
+	}
+	sha := hasher.Sum(nil)
+	return fmt.Sprintf("%x", sha)
+}
+
+func (controller *Controller) rollingUpdateDeployment(configMap *ConfigMap, action string) {
+	deploymentList, err := controller.client.AppsV1().Deployments(configMap.Namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+
+		return
+	}
+
+	configMapVersion := GetHashFromConfigmap(configMap)
+
+	for _, deployment := range deploymentList.Items {
+		annotationValue := deployment.ObjectMeta.Annotations[UpdateOnChangeAnnotation]
+		if len(annotationValue) != 0 {
+			values := strings.Split(annotationValue, Separator)
+			matches := false
+			for _, value := range values {
+				if value == configMap.Name {
+					matches = true
+					break
+				}
+			}
+			if matches {
+				if updateContainers(deployment.Spec.Template.Spec.Containers, annotationValue, configMapVersion) {
+					// update the deployment
+					_, err := controller.client.AppsV1().Deployments(configMap.Namespace).Update(context.TODO(), &deployment, metav1.UpdateOptions{})
+					if err != nil {
+						log.Errorf("update deployment error: %s", err)
+						controller.watcher.EnqueueAfter(configMap, action, time.Second*3)
+						return
+					}
+					log.Infof("Updated Deployment %s", deployment.Name)
+				}
+			}
+		}
+	}
+}
+
+func (controller *Controller) onAdd(configMap *ConfigMap) {
+	controller.rollingUpdateDeployment(configMap, Add)
+}
+
+func (controller *Controller) onUpdate(configMap *ConfigMap) {
+	controller.rollingUpdateDeployment(configMap, Update)
 }
 
 //Run function for controller which handles the queue
-func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
-	defer runtime.HandleCrash()
+func (controller *Controller) Run(threadiness int, stopCh chan struct{}) {
+	/*defer runtime.HandleCrash()
 	// Let the workers stop when we are done
 	defer c.queue.ShutDown()
 
@@ -76,59 +166,13 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 
 	for i := 0; i < threadiness; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
+	}*/
+
+	if err := controller.watcher.Start(); err != nil {
+		log.Debugf("add_kubernetes_metadata", "Couldn't start watcher: %v", err)
+		return
 	}
 
 	<-stopCh
-	logrus.Infof("Stopping Controller")
-}
-
-func (c *Controller) runWorker() {
-	for c.processNextItem() {
-	}
-}
-
-func (c *Controller) processNextItem() bool {
-	// Wait until there is a new item in the working queue
-	resourceHandler, quit := c.queue.Get()
-	if quit {
-		return false
-	}
-
-	// Tell the queue that we are done with processing this key. This unblocks the key for other workers
-	// This allows safe parallel processing because two events with the same key are never processed in
-	// parallel.
-	defer c.queue.Done(resourceHandler)
-
-	err := resourceHandler.(handler.ResourceHandler).Handle()
-
-	// Handle the error if something went wrong during the execution of the business logic
-	c.handleErr(err, resourceHandler)
-
-	return true
-}
-
-// handleErr checks if an error happened and makes sure we will retry later.
-func (c *Controller) handleErr(err error, key interface{}) {
-	if err == nil {
-		// Forget about the #AddRateLimited history of the key on every successful synchronization.
-		// This ensures that future processing of updates for this key is not delayed because of
-		// an outdated error history.
-		c.queue.Forget(key)
-		return
-	}
-
-	// This controller retries maxRetries times if something goes wrong. After that, it stops trying.
-	if c.queue.NumRequeues(key) < maxRetries {
-		logrus.Errorf("Error syncing events %v: %v", key, err)
-
-		// Re-enqueue the key rate limited. Based on the rate limiter on the
-		// queue and the re-enqueue history, the key will be processed later again.
-		c.queue.AddRateLimited(key)
-		return
-	}
-
-	logrus.Infof("Dropping the key %q out of the queue: %v", key, err)
-	c.queue.Forget(key)
-	// Report to an external entity that, even after several retries, we could not successfully process this key
-	runtime.HandleError(err)
+	log.Infof("Stopping Controller")
 }

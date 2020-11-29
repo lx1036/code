@@ -9,6 +9,7 @@ import (
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/configmap-controller/pkg/metrics"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
+	"time"
 )
 
 func NewRootCommand() *cobra.Command {
@@ -21,9 +22,11 @@ func NewRootCommand() *cobra.Command {
 
 	cmd.PersistentFlags().Bool("debug", false, "Enable debug mode")
 	cmd.PersistentFlags().String("namespace", "", "Enable debug mode")
+	cmd.PersistentFlags().Duration("sync-period", time.Second*30, "Enable debug mode")
 
 	_ = viper.BindPFlag("debug", cmd.Flags().Lookup("debug"))
 	_ = viper.BindPFlag("namespace", cmd.Flags().Lookup("namespace"))
+	_ = viper.BindPFlag("sync-period", cmd.Flags().Lookup("sync-period"))
 
 	return cmd
 }

@@ -55,6 +55,8 @@ type StatefulSet = appsv1.StatefulSet
 // Service data
 type Service = v1.Service
 
+type ConfigMap = v1.ConfigMap
+
 const (
 	// PodPending phase
 	PodPending = v1.PodPending

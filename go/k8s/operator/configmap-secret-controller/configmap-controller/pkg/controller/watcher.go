@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	add    = "add"
-	update = "update"
-	delete = "delete"
+	Add    = "add"
+	Update = "update"
+	Delete = "delete"
 )
 
 var (
@@ -39,6 +39,8 @@ type Watcher interface {
 
 	// Store returns the store object for the watcher
 	Store() cache.Store
+
+	EnqueueAfter(obj interface{}, state string, time time.Duration)
 }
 
 // WatchOptions controls watch behaviors
@@ -112,14 +114,14 @@ func NewWatcher(client kubernetes.Interface, resource Resource, opts WatchOption
 
 	w.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(o interface{}) {
-			w.enqueue(o, add)
+			w.Enqueue(o, add)
 		},
 		DeleteFunc: func(o interface{}) {
-			w.enqueue(o, delete)
+			w.Enqueue(o, delete)
 		},
 		UpdateFunc: func(o, n interface{}) {
 			if opts.IsUpdated(o, n) {
-				w.enqueue(n, update)
+				w.Enqueue(n, update)
 			}
 		},
 	})
@@ -165,13 +167,22 @@ func (w *watcher) Stop() {
 
 // enqueue takes the most recent object that was received, figures out the namespace/name of the object
 // and adds it to the work queue for processing.
-func (w *watcher) enqueue(obj interface{}, state string) {
+func (w *watcher) Enqueue(obj interface{}, state string) {
 	// DeletionHandlingMetaNamespaceKeyFunc that we get a key only if the resource's state is not Unknown.
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return
 	}
 	w.queue.Add(&item{key, obj, state})
+}
+
+func (w *watcher) EnqueueAfter(obj interface{}, state string, time time.Duration) {
+	// DeletionHandlingMetaNamespaceKeyFunc that we get a key only if the resource's state is not Unknown.
+	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if err != nil {
+		return
+	}
+	w.queue.AddAfter(&item{key, obj, state}, time)
 }
 
 // process gets the top of the work queue and processes the object that is received.
@@ -199,7 +210,7 @@ func (w *watcher) process(ctx context.Context) bool {
 			return nil
 		}
 		if !exists {
-			if entry.state == delete {
+			if entry.state == Delete {
 				w.logger.Debugf("Object %+v was not found in the store, deleting anyway!", key)
 				// delete anyway in order to clean states
 				w.handler.OnDelete(entry.objectRaw)
@@ -208,11 +219,11 @@ func (w *watcher) process(ctx context.Context) bool {
 		}
 
 		switch entry.state {
-		case add:
+		case Add:
 			w.handler.OnAdd(o)
-		case update:
+		case Update:
 			w.handler.OnUpdate(o)
-		case delete:
+		case Delete:
 			w.handler.OnDelete(o)
 		}
 

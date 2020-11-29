@@ -34,7 +34,7 @@ func GetConfigmapConfig(configmap *corev1.ConfigMap) Config {
 		ResourceName:        configmap.Name,
 		ResourceAnnotations: configmap.Annotations,
 		Annotation:          options.ConfigmapUpdateOnChangeAnnotation,
-		SHAValue:            GetSHAFromConfigmap(configmap.Data),
+		SHAValue:            GetHashFromConfigmap(configmap.Data),
 		Type:                ConfigmapEnvVarPostfix,
 	}
 }
@@ -46,12 +46,12 @@ func GetSecretConfig(secret *corev1.Secret) Config {
 		ResourceName:        secret.Name,
 		ResourceAnnotations: secret.Annotations,
 		Annotation:          options.SecretUpdateOnChangeAnnotation,
-		SHAValue:            GetSHAFromSecret(secret.Data),
+		SHAValue:            GetHashFromSecret(secret.Data),
 		Type:                SecretEnvVarPostfix,
 	}
 }
 
-func GetSHAFromConfigmap(data map[string]string) string {
+func GetHashFromConfigmap(data map[string]string) string {
 	var values []string
 	for k, v := range data {
 		values = append(values, k+"="+v)
@@ -60,7 +60,7 @@ func GetSHAFromConfigmap(data map[string]string) string {
 	return util.GenerateSHA(strings.Join(values, ";"))
 }
 
-func GetSHAFromSecret(data map[string][]byte) string {
+func GetHashFromSecret(data map[string][]byte) string {
 	var values []string
 	for k, v := range data {
 		values = append(values, k+"="+string(v[:]))
@@ -132,10 +132,10 @@ func (handler *ResourceUpdatedHandler) GetConfig() (Config, string) {
 	var oldSHAData string
 	var config Config
 	if _, ok := handler.Resource.(*corev1.ConfigMap); ok {
-		oldSHAData = GetSHAFromConfigmap(handler.OldResource.(*corev1.ConfigMap).Data)
+		oldSHAData = GetHashFromConfigmap(handler.OldResource.(*corev1.ConfigMap).Data)
 		config = GetConfigmapConfig(handler.Resource.(*corev1.ConfigMap))
 	} else if _, ok := handler.Resource.(*corev1.Secret); ok {
-		oldSHAData = GetSHAFromSecret(handler.OldResource.(*corev1.Secret).Data)
+		oldSHAData = GetHashFromSecret(handler.OldResource.(*corev1.Secret).Data)
 		config = GetSecretConfig(handler.Resource.(*corev1.Secret))
 	} else {
 		logrus.Warnf("Invalid resource: Resource should be 'Secret' or 'Configmap' but found, %v", handler.Resource)
