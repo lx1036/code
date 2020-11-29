@@ -12,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"strconv"
 	"strings"
 )
 
@@ -426,8 +425,7 @@ func rollingUpgrade(clients *kubernetes.Clientset, config Config, upgradeFuncs R
 		}
 
 		result := NotUpdated
-		reloaderEnabled, err := strconv.ParseBool(reloaderEnabledValue)
-		if err == nil && reloaderEnabled {
+		if reloaderEnabledValue == "true" {
 			result = updateContainers(upgradeFuncs, item, config, true)
 		}
 
@@ -453,7 +451,7 @@ func rollingUpgrade(clients *kubernetes.Clientset, config Config, upgradeFuncs R
 
 		if result == Updated {
 			// 重启deployment/daemonset/statefulset
-			err = upgradeFuncs.UpdateFunc(clients, config.Namespace, item)
+			err := upgradeFuncs.UpdateFunc(clients, config.Namespace, item)
 			resourceName := util.ToObjectMeta(item).Name
 			if err != nil {
 				logrus.Errorf("Update for '%s' of type '%s' named %s in namespace '%s' failed with error %v", resourceName, upgradeFuncs.ResourceType, config.ResourceName, config.Namespace, err)
