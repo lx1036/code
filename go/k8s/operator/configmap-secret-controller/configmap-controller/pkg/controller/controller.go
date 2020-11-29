@@ -3,24 +3,14 @@ package controller
 import (
 	"context"
 	"crypto/sha1"
-	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"io"
-	"k8s-lx1036/k8s/operator/configmap-secret-controller/configmap-controller/pkg/kube"
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/configmap-controller/pkg/metrics"
-	"k8s-lx1036/k8s/operator/configmap-secret-controller/reloader/pkg/handler"
-	"k8s-lx1036/k8s/operator/configmap-secret-controller/reloader/pkg/util"
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 	"sort"
 	"strings"
 	"time"
@@ -33,10 +23,6 @@ const (
 
 // Controller for checking events
 type Controller struct {
-	//indexer    cache.Indexer
-	//queue      workqueue.RateLimitingInterface
-	//informer   cache.Controller
-
 	watcher    Watcher
 	client     *kubernetes.Clientset
 	namespace  string
