@@ -5,6 +5,7 @@ import (
 	"os"
 )
 
+// https://github.com/stakater/Reloader
 func main() {
 	if err := cmd.NewReloaderCommand().Execute(); err != nil {
 		os.Exit(1)
