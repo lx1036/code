@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: filebeat-daemonset-operator
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: filebeat-daemonset-operator
+  template:
+    metadata:
+      labels:
+        app: filebeat-daemonset-operator
+    spec:
+      terminationGracePeriodSeconds: 30 #30秒内优雅关闭程序
+      imagePullSecrets:
+        - name: registry
+      containers:
+        - image: lx1036/filebeat-daemonset-operator:v1.0
+          name: filebeat-operator
+          volumeMounts:
+            - mountPath: /etc/filebeat
+              name: filebeat-config
+            - mountPath: /etc/config/filebeat
+              name: filebeat-template
+          env:
+            - name: NODENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+        - image: lx1036/filebeat:v7.10
+          name: filebeat
+          volumeMounts:
+            - mountPath: /etc/filebeat
+              name: filebeat-config
+            - name: logvolume
+              mountPath: /data/kubelet/pods
+            - name: containerlogvolume
+              mountPath: /data/docker/containers
+      volumes:
+        - name: filebeat-config
+          emptyDir: {}
+        - name: logvolume
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+        - name: containerlogvolume
+          hostPath:
+            path: /data/docker/containers
+            type: Directory
+        - name: filebeat-template
+          configMap:
+            name: filebeat-daemonset-operator-configmap

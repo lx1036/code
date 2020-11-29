@@ -1,7 +1,10 @@
 
 
+certs:
+	ansible-playbook -i inventory/wayne.conf playbook/certs.yaml -e "group=master"
+
 etcd-cluster:
-	ansible-playbook -i inventory/etcd 02-etcd.yaml -e "group=etcd"
+	ansible-playbook -i inventory/etcd.conf 02-etcd.yaml -e "group=master"
 
 etcd-demo:
-	ansible-playbook -i inventory/wayne 02-etcd.yaml -e "group=wayne"
+	ansible-playbook -i inventory/wayne.conf 02-etcd.yaml -e "group=wayne"

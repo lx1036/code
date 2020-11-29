@@ -1,0 +1,33 @@
+output.console:
+  pretty: true
+
+
+filebeat.inputs:
+
+  # Each - is an input. Most options can be set at the input level, so
+  # you can use different inputs for various configurations.
+  # Below are the input specific configurations.
+
+  - type: log
+
+    # Change to true to enable this input configuration.
+    enabled: true
+
+    # Paths that should be crawled and fetched. Glob based paths.
+    paths:
+      - /Users/liuxiang/Code/360/k8s/beats/filebeat/tmp.log
+
+
+processors:
+  - add_kubernetes_metadata:
+      kube_config: /Users/liuxiang/.kube/config
+      in_cluster: true
+      include_labels:
+        - app
+      include_annotations:
+        - app.cloud/controller-kind
+      matchers:
+        - logs_path:
+            logs_path: /Users/liuxiang/Code/360/k8s
+
+

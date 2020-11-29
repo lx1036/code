@@ -1,0 +1,45 @@
+IDC={{ calico_idc }}
+IP={{ hostvars[inventory_hostname]['ansible_eth0']['ipv4']['address'] }}
+MAC=$(echo {{ hostvars[inventory_hostname]['ansible_eth0']['macaddress'] }} |sed 's/://g')
+
+IFACE={{ hostvars[inventory_hostname]['ansible_eth0']['device'] }}
+
+#echo "Update TOR: $IDC $IP $MAC $IFACE"
+
+RESULT=$(curl -X POST -s \
+  'https://network.corp.lx1036.net/docker_bgp_peer/' \
+  -H 'Authorization: Token abc123' \
+  -H 'Content-Type: application/json' \
+  -d "{\"idc\":\"$IDC\",\"ip\":\"$IP\",\"mac\":\"0x$MAC\"}" \
+  | jq '.sw_as')
+
+#echo $RESULT
+
+# https://docs.projectcalico.org/networking/bgp#configure-a-global-bgp-peer
+# 配置global peer，当前node与peerIP即机顶交换机，配对成一个BGPPeer，且在AS $RESULT
+# calico已经关闭了全网互联，参见bgp.yaml.j2文件。
+# 通过bgppeer资源对象，每一个worker都和其对应交换机建立bgp链接，calico网络也切换成了RR模式，可以支撑更多的worker机器。
+# bird进程运行在179端口，可以查看`ss -tnp|grep :179`:
+# ESTAB      0      0      10.173.7.203:43026              10.173.7.193:179                 users:(("bird",pid=14768,fd=8))
+
+cat > calico-peer.yaml <<EOF
+apiVersion: projectcalico.org/v3
+kind: BGPPeer
+metadata:
+  name: $(ip -4 addr show $IFACE | grep -oP '(?<=inet\s)\d+(\.\d+){3}')-$(ip route | grep default | awk '{print $3}')
+spec:
+  node: $(hostname)
+  peerIP: $(ip route | grep default | awk '{print $3}')
+  asNumber: $RESULT
+EOF
+
+
+# 示例：
+#apiVersion: projectcalico.org/v3
+#kind: BGPPeer
+#metadata:
+#  name: 10.20.30.40-10.20.30.129
+#spec:
+#  node: docker1234.lx1036.com
+#  peerIP: 10.20.30.129
+#  asNumber: 65188

@@ -1,0 +1,13 @@
+[Unit]
+Description=Calico BIRD Configuration Daemon
+After=network.target
+
+[Service]
+EnvironmentFile=-/etc/sysconfig/calico
+ExecStart={{ calico_home }}/calico/bin/confd -confdir={{ calico_home }}/confd
+ExecReload=/usr/bin/kill -HUP $MAINPID
+KillSignal=SIGINT
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+
+
+
+- hosts: "{{ group }}"
+  vars:
+    docker_rpm: docker-ce-18.06.1.ce-3.el7.x86_64.rpm
+    docker_selinux_rpm: container-selinux-2.68-1.el7.noarch.rpm
+    docker_thinpooldev: /dev/mapper/VolGroup00-ThinPool00
+  roles:
+    - docker
+  become: yes

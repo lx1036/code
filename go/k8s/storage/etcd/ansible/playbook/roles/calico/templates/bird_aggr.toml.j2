@@ -1,0 +1,8 @@
+[template]
+src = "bird_aggr.cfg.template"
+dest = "{{ calico_home }}/etc/bird/bird_aggr.cfg"
+prefix = "/calico/ipam/v2/host/{{ ansible_nodename }}/ipv4/block"
+keys = [
+    "/",
+]
+reload_cmd = "/bin/pkill -HUP bird || true"

@@ -1,0 +1,18 @@
+[Unit]
+Description=Kubernetes Kubelet
+After=docker.service
+Requires=docker.service
+
+[Service]
+EnvironmentFile=-{{ kube_home }}/cfg/kubelet
+ExecStart={{ kube_home }}/kubernetes/bin/kubelet \
+          $KUBE_LOGTOSTDERR     \
+          $KUBE_LOG_LEVEL       \
+          $NODE_ADDRESS         \
+          $KUBE_ALLOW_PRIV      \
+          $KUBELET_ARGS
+Restart=Always
+RestartForceExitStatus=SIGPIPE
+
+[Install]
+WantedBy=multi-user.target

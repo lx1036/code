@@ -16,12 +16,15 @@ import (
 	"time"
 )
 
+// go run . --kubeconfig=/Users/liuxiang/.kube/config --node=master01
 func main() {
 	var kubeconfig string
 	var master string
+	var nodeName string
 
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
 	flag.StringVar(&master, "master", "", "master url")
+	flag.StringVar(&nodeName, "node", "", "master url")
 	flag.Parse()
 
 	// creates the connection
@@ -37,7 +40,7 @@ func main() {
 	}
 
 	// create the pod watcher
-	podListWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "pods", v1.NamespaceDefault, fields.Everything())
+	podListWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "pods", v1.NamespaceDefault, fields.OneTermEqualSelector("spec.nodeName", nodeName))
 	// create the workqueue
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	// Bind the workqueue to a cache with the help of an informer. This way we make sure that
@@ -147,9 +150,6 @@ func (c *Controller) processNextItem() bool {
 	return true
 }
 
-// syncToStdout is the business logic of the controller. In this controller it simply prints
-// information about the pod to stdout. In case an error happened, it has to simply return the error.
-// The retry logic should not be part of the business logic.
 func (c *Controller) syncToStdout(key string) error {
 	obj, exists, err := c.indexer.GetByKey(key)
 	if err != nil {

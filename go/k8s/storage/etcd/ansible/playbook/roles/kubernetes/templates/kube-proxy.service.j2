@@ -1,0 +1,18 @@
+[Unit]
+Description=Kubernetes Proxy
+After=network.target
+
+[Service]
+EnvironmentFile=-{{ kube_home }}/cfg/kube-proxy
+ExecStart={{ kube_home }}/kubernetes/bin/kube-proxy \
+          $KUBE_LOGTOSTDERR \
+          $KUBE_LOG_LEVEL \
+          $NODE_HOSTNAME \
+          $NODE_ADDRESS \
+          $KUBE_MASTER \
+          $KUBEPROXY_ARGS
+Restart=Always
+RestartForceExitStatus=SIGPIPE
+
+[Install]
+WantedBy=multi-user.target

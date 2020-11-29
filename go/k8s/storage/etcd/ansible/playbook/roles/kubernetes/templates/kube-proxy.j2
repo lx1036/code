@@ -1,0 +1,12 @@
+# --logtostderr=true: log to standard error instead of files
+KUBE_LOGTOSTDERR="--logtostderr=true"
+
+# --v=0: log level for V logs
+KUBE_LOG_LEVEL="--v=4"
+
+# --hostname-override="": If non-empty, will use this string as identification instead of the actual hostname.
+#NODE_HOSTNAME="--hostname-override="
+
+NODE_ADDRESS="--bind-address={{ ansible_default_ipv4.address }}"
+
+KUBEPROXY_ARGS="--kubeconfig={{ kube_home }}/kubeconfig.kube-proxy  --conntrack-max-per-core=0 --conntrack-tcp-timeout-close-wait=0 --conntrack-tcp-timeout-established=0"

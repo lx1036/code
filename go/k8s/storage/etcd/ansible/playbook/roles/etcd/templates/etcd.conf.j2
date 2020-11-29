@@ -1,0 +1,32 @@
+# https://etcd.io/docs/v3.4.0/op-guide/configuration/
+
+ETCD_QUOTA_BACKEND_BYTES=8589934592
+
+# Member
+ETCD_NAME='{{ ansible_nodename }}'
+ETCD_DATA_DIR='{{ etcd_data }}'
+ETCD_LISTEN_PEER_URLS='{{ etcd_peer_scheme }}://{{ ansible_eth0.ipv4.address }}:{{ etcd_config["peer-port"] }}'
+ETCD_LISTEN_CLIENT_URLS='{{ etcd_scheme }}://{{ ansible_eth0.ipv4.address }}:{{ etcd_config["client-port"] }},{{ etcd_scheme }}://127.0.0.1:{{ etcd_config["client-port"] }}'
+
+# Cluster
+ETCD_INITIAL_ADVERTISE_PEER_URLS='{{ etcd_peer_scheme }}://{{ ansible_eth0.ipv4.address }}:{{ etcd_config["peer-port"] }}'
+ETCD_INITIAL_CLUSTER_TOKEN='{{ etcd_config["token"] }}'
+ETCD_INITIAL_CLUSTER='{{ etcd_config["cluster"] }}'
+ETCD_INITIAL_CLUSTER_STATE='new'
+ETCD_ADVERTISE_CLIENT_URLS='{{ etcd_scheme }}://{{ ansible_eth0.ipv4.address }}:{{ etcd_config["client-port"] }}'
+
+# Proxy
+ETCD_PROXY=off
+
+# Security
+ETCD_CERT_FILE='{{ etcd_certs }}/{{ ansible_nodename }}.pem'
+ETCD_KEY_FILE='{{ etcd_certs }}/{{ ansible_nodename }}-key.pem'
+ETCD_CLIENT_CERT_AUTH='{{ etcd_cert_auth }}'
+ETCD_TRUSTED_CA_FILE='{{ etcd_certs }}/ca.pem'
+ETCD_PEER_CERT_FILE='{{ etcd_certs }}/{{ ansible_nodename }}.pem'
+ETCD_PEER_KEY_FILE='{{ etcd_certs }}/{{ ansible_nodename }}-key.pem'
+ETCD_PEER_CLIENT_CERT_AUTH='{{ etcd_peer_cert_auth }}'
+ETCD_PEER_TRUSTED_CA_FILE='{{ etcd_certs }}/ca.pem'
+
+# Logging
+ETCD_DEBUG=true
