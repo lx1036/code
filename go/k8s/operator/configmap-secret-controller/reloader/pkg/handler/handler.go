@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/base64"
 	"github.com/sirupsen/logrus"
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/reloader/pkg/cmd/options"
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/reloader/pkg/metrics"

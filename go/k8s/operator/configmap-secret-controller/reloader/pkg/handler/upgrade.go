@@ -82,6 +82,34 @@ func GetDeploymentRollingUpgradeFuncs() RollingUpgradeFuncs {
 	}
 }
 
+// GetDaemonSetRollingUpgradeFuncs returns all callback funcs for a daemonset
+func GetDaemonSetRollingUpgradeFuncs() RollingUpgradeFuncs {
+	return RollingUpgradeFuncs{
+		ItemsFunc:          GetDaemonSetItems,
+		AnnotationsFunc:    GetDaemonSetAnnotations,
+		PodAnnotationsFunc: GetDaemonSetPodAnnotations,
+		ContainersFunc:     GetDaemonSetContainers,
+		InitContainersFunc: GetDaemonSetInitContainers,
+		UpdateFunc:         UpdateDaemonSet,
+		VolumesFunc:        GetDaemonSetVolumes,
+		ResourceType:       "DaemonSet",
+	}
+}
+
+// GetStatefulSetRollingUpgradeFuncs returns all callback funcs for a statefulSet
+func GetStatefulSetRollingUpgradeFuncs() RollingUpgradeFuncs {
+	return RollingUpgradeFuncs{
+		ItemsFunc:          GetStatefulSetItems,
+		AnnotationsFunc:    GetStatefulSetAnnotations,
+		PodAnnotationsFunc: GetStatefulSetPodAnnotations,
+		ContainersFunc:     GetStatefulSetContainers,
+		InitContainersFunc: GetStatefulSetInitContainers,
+		UpdateFunc:         UpdateStatefulSet,
+		VolumesFunc:        GetStatefulSetVolumes,
+		ResourceType:       "StatefulSet",
+	}
+}
+
 // GetDeploymentItems returns the deployments in given namespace
 func GetDeploymentItems(client *kubernetes.Clientset, namespace string) []interface{} {
 	deployments, err := client.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
@@ -91,9 +119,37 @@ func GetDeploymentItems(client *kubernetes.Clientset, namespace string) []interf
 	return util.InterfaceSlice(deployments.Items)
 }
 
+// GetDaemonSetItems returns the daemonSets in given namespace
+func GetDaemonSetItems(client *kubernetes.Clientset, namespace string) []interface{} {
+	daemonSets, err := client.AppsV1().DaemonSets(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		logrus.Errorf("Failed to list daemonSets %v", err)
+	}
+	return util.InterfaceSlice(daemonSets.Items)
+}
+
+// GetStatefulSetItems returns the statefulSets in given namespace
+func GetStatefulSetItems(client *kubernetes.Clientset, namespace string) []interface{} {
+	statefulSets, err := client.AppsV1().StatefulSets(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		logrus.Errorf("Failed to list statefulSets %v", err)
+	}
+	return util.InterfaceSlice(statefulSets.Items)
+}
+
 // GetDeploymentAnnotations returns the annotations of given deployment
 func GetDeploymentAnnotations(item interface{}) map[string]string {
 	return item.(appsv1.Deployment).ObjectMeta.Annotations
+}
+
+// GetDaemonSetAnnotations returns the annotations of given daemonSet
+func GetDaemonSetAnnotations(item interface{}) map[string]string {
+	return item.(appsv1.DaemonSet).ObjectMeta.Annotations
+}
+
+// GetStatefulSetAnnotations returns the annotations of given statefulSet
+func GetStatefulSetAnnotations(item interface{}) map[string]string {
+	return item.(appsv1.StatefulSet).ObjectMeta.Annotations
 }
 
 // GetDeploymentPodAnnotations returns the pod's annotations of given deployment
@@ -101,9 +157,29 @@ func GetDeploymentPodAnnotations(item interface{}) map[string]string {
 	return item.(appsv1.Deployment).Spec.Template.ObjectMeta.Annotations
 }
 
+// GetDaemonSetPodAnnotations returns the pod's annotations of given daemonSet
+func GetDaemonSetPodAnnotations(item interface{}) map[string]string {
+	return item.(appsv1.DaemonSet).Spec.Template.ObjectMeta.Annotations
+}
+
+// GetStatefulSetPodAnnotations returns the pod's annotations of given statefulSet
+func GetStatefulSetPodAnnotations(item interface{}) map[string]string {
+	return item.(appsv1.StatefulSet).Spec.Template.ObjectMeta.Annotations
+}
+
 // GetDeploymentVolumes returns the Volumes of given deployment
 func GetDeploymentVolumes(item interface{}) []corev1.Volume {
 	return item.(appsv1.Deployment).Spec.Template.Spec.Volumes
+}
+
+// GetDaemonSetVolumes returns the Volumes of given daemonSet
+func GetDaemonSetVolumes(item interface{}) []corev1.Volume {
+	return item.(appsv1.DaemonSet).Spec.Template.Spec.Volumes
+}
+
+// GetStatefulSetVolumes returns the Volumes of given statefulSet
+func GetStatefulSetVolumes(item interface{}) []corev1.Volume {
+	return item.(appsv1.StatefulSet).Spec.Template.Spec.Volumes
 }
 
 // GetDeploymentContainers returns the containers of given deployment
@@ -111,15 +187,49 @@ func GetDeploymentContainers(item interface{}) []corev1.Container {
 	return item.(appsv1.Deployment).Spec.Template.Spec.Containers
 }
 
+// GetDaemonSetContainers returns the containers of given daemonSet
+func GetDaemonSetContainers(item interface{}) []corev1.Container {
+	return item.(appsv1.DaemonSet).Spec.Template.Spec.Containers
+}
+
+// GetStatefulSetContainers returns the containers of given statefulSet
+func GetStatefulSetContainers(item interface{}) []corev1.Container {
+	return item.(appsv1.StatefulSet).Spec.Template.Spec.Containers
+}
+
 // GetDeploymentInitContainers returns the containers of given deployment
 func GetDeploymentInitContainers(item interface{}) []corev1.Container {
 	return item.(appsv1.Deployment).Spec.Template.Spec.InitContainers
+}
+
+// GetDaemonSetInitContainers returns the containers of given daemonSet
+func GetDaemonSetInitContainers(item interface{}) []corev1.Container {
+	return item.(appsv1.DaemonSet).Spec.Template.Spec.InitContainers
+}
+
+// GetStatefulSetInitContainers returns the containers of given statefulSet
+func GetStatefulSetInitContainers(item interface{}) []corev1.Container {
+	return item.(appsv1.StatefulSet).Spec.Template.Spec.InitContainers
 }
 
 // UpdateDeployment performs rolling upgrade on deployment
 func UpdateDeployment(client *kubernetes.Clientset, namespace string, resource interface{}) error {
 	deployment := resource.(appsv1.Deployment)
 	_, err := client.AppsV1().Deployments(namespace).Update(context.TODO(), &deployment, metav1.UpdateOptions{})
+	return err
+}
+
+// UpdateDaemonSet performs rolling upgrade on daemonSet
+func UpdateDaemonSet(client *kubernetes.Clientset, namespace string, resource interface{}) error {
+	daemonSet := resource.(appsv1.DaemonSet)
+	_, err := client.AppsV1().DaemonSets(namespace).Update(context.TODO(), &daemonSet, metav1.UpdateOptions{})
+	return err
+}
+
+// UpdateStatefulSet performs rolling upgrade on statefulSet
+func UpdateStatefulSet(client *kubernetes.Clientset, namespace string, resource interface{}) error {
+	statefulSet := resource.(appsv1.StatefulSet)
+	_, err := client.AppsV1().StatefulSets(namespace).Update(context.TODO(), &statefulSet, metav1.UpdateOptions{})
 	return err
 }
 
@@ -236,6 +346,7 @@ func getContainerWithVolumeMount(containers []corev1.Container, volumeMountName 
 	return nil
 }
 
+// 搜索containers里是否有container的volume和env使用了特定的configMap/secret
 func getContainerToUpdate(upgradeFuncs RollingUpgradeFuncs, item interface{}, config Config, autoReload bool) *corev1.Container {
 	volumes := upgradeFuncs.VolumesFunc(item)
 	containers := upgradeFuncs.ContainersFunc(item)
@@ -289,18 +400,16 @@ func updateContainers(upgradeFuncs RollingUpgradeFuncs, item interface{}, config
 	result = updateEnvVar(upgradeFuncs.ContainersFunc(item), envVar, config.SHAValue)
 	// if no existing env var exists lets create one
 	if result == NoEnvVarFound {
-		e := corev1.EnvVar{
+		container.Env = append(container.Env, corev1.EnvVar{
 			Name:  envVar,
 			Value: config.SHAValue,
-		}
-		container.Env = append(container.Env, e)
+		})
 		result = Updated
 	}
 	return result
 }
 func rollingUpgrade(clients *kubernetes.Clientset, config Config, upgradeFuncs RollingUpgradeFuncs, collectors metrics.Collectors) {
 	items := upgradeFuncs.ItemsFunc(clients, config.Namespace)
-	var err error
 	for _, item := range items {
 		// find correct annotation and update the resource
 		// 找resource annotation
@@ -347,7 +456,7 @@ func rollingUpgrade(clients *kubernetes.Clientset, config Config, upgradeFuncs R
 			err = upgradeFuncs.UpdateFunc(clients, config.Namespace, item)
 			resourceName := util.ToObjectMeta(item).Name
 			if err != nil {
-				logrus.Errorf("Update for '%s' of type '%s' in namespace '%s' failed with error %v", resourceName, upgradeFuncs.ResourceType, config.Namespace, err)
+				logrus.Errorf("Update for '%s' of type '%s' named %s in namespace '%s' failed with error %v", resourceName, upgradeFuncs.ResourceType, config.ResourceName, config.Namespace, err)
 				collectors.Counter.With(prometheus.Labels{"success": "false"}).Inc()
 			} else {
 				logrus.Infof("Changes detected in '%s' of type '%s' in namespace '%s'", config.ResourceName, config.Type, config.Namespace)
@@ -355,10 +464,6 @@ func rollingUpgrade(clients *kubernetes.Clientset, config Config, upgradeFuncs R
 				collectors.Counter.With(prometheus.Labels{"success": "true"}).Inc()
 			}
 		}
-	}
-
-	if err != nil {
-		logrus.Errorf("Rolling upgrade for '%s' failed with error = %v", config.ResourceName, err)
 	}
 }
 
