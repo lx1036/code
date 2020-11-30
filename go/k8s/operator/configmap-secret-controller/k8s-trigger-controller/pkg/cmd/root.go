@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/golang/glog"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -71,8 +70,6 @@ func startConfigmapSecretControllerCmd(cmd *cobra.Command, args []string) {
 		log.Errorf("unable to create kubernetes watcher")
 		os.Exit(1)
 	}
-
-	go informerFactory.Start(stopCh)
 
 	if err = c.Run(2, stopCh); err != nil {
 		log.Fatalf("Error running controller: %s", err.Error())
