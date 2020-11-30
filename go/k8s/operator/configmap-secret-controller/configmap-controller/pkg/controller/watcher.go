@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -12,8 +14,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -29,7 +29,7 @@ var (
 // Watcher watches Kubernetes resources events
 type Watcher interface {
 	// Start watching Kubernetes API for new events after resources were listed
-	Start() error
+	Start(threadiness int) error
 
 	// Stop watching Kubernetes API for new events
 	Stop()
@@ -114,14 +114,14 @@ func NewWatcher(client kubernetes.Interface, resource Resource, opts WatchOption
 
 	w.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(o interface{}) {
-			w.Enqueue(o, add)
+			w.Enqueue(o, Add)
 		},
 		DeleteFunc: func(o interface{}) {
-			w.Enqueue(o, delete)
+			w.Enqueue(o, Delete)
 		},
 		UpdateFunc: func(o, n interface{}) {
 			if opts.IsUpdated(o, n) {
-				w.Enqueue(n, update)
+				w.Enqueue(n, Update)
 			}
 		},
 	})
@@ -140,7 +140,7 @@ func (w *watcher) Store() cache.Store {
 }
 
 // Start watching pods
-func (w *watcher) Start() error {
+func (w *watcher) Start(threadiness int) error {
 	go w.informer.Run(w.ctx.Done())
 
 	if !cache.WaitForCacheSync(w.ctx.Done(), w.informer.HasSynced) {
@@ -149,13 +149,13 @@ func (w *watcher) Start() error {
 
 	w.logger.Debugf("cache sync done")
 
-	//TODO: Do we run parallel workers for this? It is useful when we run metricbeat as one instance per cluster?
-
-	// Wrap the process function with wait.Until so that if the controller crashes, it starts up again after a second.
-	go wait.Until(func() {
-		for w.process(w.ctx) {
-		}
-	}, time.Second*1, w.ctx.Done())
+	for i := 0; i < threadiness; i++ {
+		// Wrap the process function with wait.Until so that if the controller crashes, it starts up again after a second.
+		go wait.Until(func() {
+			for w.process(w.ctx) {
+			}
+		}, time.Second*1, w.ctx.Done())
+	}
 
 	return nil
 }

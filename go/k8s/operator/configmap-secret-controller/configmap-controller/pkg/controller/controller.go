@@ -1,19 +1,23 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"io"
-	"k8s-lx1036/k8s/operator/configmap-secret-controller/configmap-controller/pkg/metrics"
-	api "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"sort"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+
+	"k8s-lx1036/k8s/operator/configmap-secret-controller/configmap-controller/pkg/metrics"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -44,7 +48,7 @@ func NewController(client *kubernetes.Clientset, resource string, namespace stri
 		Namespace:   namespace,
 	}, nil)
 	if err != nil {
-		log.Errorf("Couldn't create kubernetes watcher for %T", &ConfigMap{})
+		log.Errorf("unable to create kubernetes watcher for %T", &ConfigMap{})
 		return nil, err
 	}
 
@@ -67,9 +71,61 @@ func NewController(client *kubernetes.Clientset, resource string, namespace stri
 	return controller, nil
 }
 
-// updateContainers returns a boolean value indicating if any containers have been updated
-func updateContainers(containers []api.Container, annotationValue, configMapVersion string) bool {
+// convertToEnvVarName converts the given text into a usable env var
+// removing any special chars with '_'
+func convertToEnvVarName(text string) string {
+	var buffer bytes.Buffer
+	upper := strings.ToUpper(text)
+	lastCharValid := false
+	for i := 0; i < len(upper); i++ {
+		ch := upper[i]
+		if ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' {
+			buffer.WriteByte(ch)
+			lastCharValid = true
+			continue
+		}
+		if lastCharValid {
+			buffer.WriteByte('_')
+		}
+		lastCharValid = false
+	}
+	return buffer.String()
+}
 
+// updateContainers returns a boolean value indicating if any containers have been updated
+func updateContainers(containers []corev1.Container, annotationValue, configMapVersion string) bool {
+	// we can have multiple configmaps to update
+	updated := false
+	configmaps := strings.Split(annotationValue, Separator)
+	for _, configmap := range configmaps {
+		customEnvName := "PREFIX_" + convertToEnvVarName(configmap)
+		for _, container := range containers {
+			envs := container.Env
+			matched := false
+			for _, env := range envs {
+				if env.Name == customEnvName {
+					matched = true
+					if env.Value != configMapVersion {
+						log.Infof("Updating %s to %s", customEnvName, configMapVersion)
+						env.Value = configMapVersion
+						updated = true
+					}
+				}
+			}
+
+			// if no existing env var exists lets create one
+			if !matched {
+				e := corev1.EnvVar{
+					Name:  customEnvName,
+					Value: configMapVersion,
+				}
+				container.Env = append(container.Env, e)
+				updated = true
+			}
+		}
+	}
+
+	return updated
 }
 
 func GetHashFromConfigmap(configMap *ConfigMap) string {
@@ -86,7 +142,7 @@ func GenerateSHA(data string) string {
 	hasher := sha1.New()
 	_, err := io.WriteString(hasher, data)
 	if err != nil {
-		log.Errorf("Unable to write data in hash writer %v", err)
+		log.Errorf("unable to write data in hash writer %v", err)
 	}
 	sha := hasher.Sum(nil)
 	return fmt.Sprintf("%x", sha)
@@ -95,10 +151,11 @@ func GenerateSHA(data string) string {
 func (controller *Controller) rollingUpdateDeployment(configMap *ConfigMap, action string) {
 	deploymentList, err := controller.client.AppsV1().Deployments(configMap.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-
+		log.Errorf("unable to list deployment in namespace %s with %v", configMap.Namespace, err)
 		return
 	}
 
+	// hash下configmap.data，与新的configMap的hash进行比较，来判断是否需要重启deployment
 	configMapVersion := GetHashFromConfigmap(configMap)
 
 	for _, deployment := range deploymentList.Items {
@@ -117,7 +174,7 @@ func (controller *Controller) rollingUpdateDeployment(configMap *ConfigMap, acti
 					// update the deployment
 					_, err := controller.client.AppsV1().Deployments(configMap.Namespace).Update(context.TODO(), &deployment, metav1.UpdateOptions{})
 					if err != nil {
-						log.Errorf("update deployment error: %s", err)
+						log.Errorf("update deployment error: %v", err)
 						controller.watcher.EnqueueAfter(configMap, action, time.Second*3)
 						return
 					}
@@ -138,24 +195,8 @@ func (controller *Controller) onUpdate(configMap *ConfigMap) {
 
 //Run function for controller which handles the queue
 func (controller *Controller) Run(threadiness int, stopCh chan struct{}) {
-	/*defer runtime.HandleCrash()
-	// Let the workers stop when we are done
-	defer c.queue.ShutDown()
-
-	go c.informer.Run(stopCh)
-
-	// Wait for all involved caches to be synced, before processing items from the queue is started
-	if !cache.WaitForNamedCacheSync(c.resource, stopCh, c.informer.HasSynced) {
-		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
-		return
-	}
-
-	for i := 0; i < threadiness; i++ {
-		go wait.Until(c.runWorker, time.Second, stopCh)
-	}*/
-
-	if err := controller.watcher.Start(); err != nil {
-		log.Debugf("add_kubernetes_metadata", "Couldn't start watcher: %v", err)
+	if err := controller.watcher.Start(threadiness); err != nil {
+		log.Errorf("unable to start watcher: %v", err)
 		return
 	}
 

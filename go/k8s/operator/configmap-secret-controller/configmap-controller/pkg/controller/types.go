@@ -57,6 +57,8 @@ type Service = v1.Service
 
 type ConfigMap = v1.ConfigMap
 
+type Secret = v1.Secret
+
 const (
 	// PodPending phase
 	PodPending = v1.PodPending
