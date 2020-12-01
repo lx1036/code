@@ -21,9 +21,13 @@ func NewRootCommand() *cobra.Command {
 
 	cmd.PersistentFlags().Bool("debug", false, "Enable debug mode")
 	cmd.PersistentFlags().String("configfile", "", "Config File")
+	cmd.PersistentFlags().String("source", "", "idc")
+	cmd.PersistentFlags().String("deployment", "", "deployment name")
 
 	_ = viper.BindPFlag("debug", cmd.Flags().Lookup("debug"))
 	_ = viper.BindPFlag("configfile", cmd.Flags().Lookup("configfile"))
+	_ = viper.BindPFlag("source", cmd.Flags().Lookup("source"))
+	_ = viper.BindPFlag("deployment", cmd.Flags().Lookup("deployment"))
 
 	return cmd
 }
