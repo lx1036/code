@@ -1,7 +1,6 @@
 package models
 
 import (
-	"k8s-lx1036/k8s-ui/backend/database/lorm"
 	"time"
 )
 

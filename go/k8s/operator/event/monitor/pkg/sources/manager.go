@@ -2,19 +2,13 @@ package sources
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	"go.opencensus.io/resource"
-	"k8s-lx1036/k8s/plugins/event/monitor/pkg/sources/client"
-	"k8s-lx1036/k8s/plugins/event/monitor/pkg/sources/events"
-	"k8s-lx1036/k8s/plugins/event/monitor/pkg/sources/resources"
-	"k8s-lx1036/k8s/plugins/event/monitor/pkg/utils"
+	"k8s-lx1036/k8s/operator/event/monitor/pkg/sources/events"
+	"k8s-lx1036/k8s/operator/event/monitor/pkg/sources/resources"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"strconv"
 	"time"
 )
 

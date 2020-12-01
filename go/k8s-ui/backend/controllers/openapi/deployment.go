@@ -4,11 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/astaxie/beego/validation"
-	"k8s-lx1036/k8s-ui/backend/client"
 	"k8s-lx1036/k8s-ui/backend/controllers/common"
 	"k8s-lx1036/k8s-ui/backend/models"
-	resdeployment "k8s-lx1036/k8s-ui/backend/resources/deployment"
-	"k8s-lx1036/k8s-ui/backend/util/hack"
 	"k8s.io/api/apps/v1beta1"
 	"strings"
 )

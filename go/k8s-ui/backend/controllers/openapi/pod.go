@@ -1,10 +1,8 @@
 package openapi
 
 import (
-	"k8s-lx1036/k8s-ui/backend/client"
 	"k8s-lx1036/k8s-ui/backend/models"
 	"k8s-lx1036/k8s-ui/backend/models/response"
-	"k8s-lx1036/k8s-ui/backend/resources/pod"
 	"net/http"
 	"time"
 )

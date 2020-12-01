@@ -1,7 +1,6 @@
 package receivers
 
 import (
-	"k8s-lx1036/k8s/plugins/event/k8s-event-monitor/receivers/dingtalk"
 	"strings"
 )
 

@@ -34,6 +34,7 @@ func NewRootCommand() *cobra.Command {
 }
 
 func preRun(cmd *cobra.Command, args []string) {
+	viper.AutomaticEnv()
 	if viper.GetBool("debug") {
 		log.SetLevel(log.DebugLevel)
 	} else {
@@ -75,17 +76,5 @@ func startConfigmapSecretControllerCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Error running controller: %s", err.Error())
 	}
 
-	/*for resourceType := range kube.ResourceMap {
-		c, err := controller.NewController(clientset, resourceType, currentNamespace, collectors)
-		if err != nil {
-			log.Fatalf("%s", err)
-		}
-
-		// Now let's start the controller
-		log.Infof("Starting Controller to watch resource type: %s", resourceType)
-		go c.Run(1, stop)
-	}
-
-	// Wait forever
-	<-stop*/
+	<-stopCh
 }

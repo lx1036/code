@@ -32,6 +32,7 @@ func NewRootCommand() *cobra.Command {
 }
 
 func preRun(cmd *cobra.Command, args []string) {
+	viper.AutomaticEnv()
 	if viper.GetBool("debug") {
 		log.SetLevel(log.DebugLevel)
 	} else {

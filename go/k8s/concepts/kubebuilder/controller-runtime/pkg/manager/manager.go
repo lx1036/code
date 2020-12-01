@@ -5,7 +5,6 @@ import (
 	"github.com/go-logr/logr"
 	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/cache"
 	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/client"
-	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/client/apiutil"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"

@@ -3,10 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"k8s-lx1036/k8s/plugins/event/k8s-event-monitor/common/flags"
-	"k8s-lx1036/k8s/plugins/event/k8s-event-monitor/common/manager"
-	"k8s-lx1036/k8s/plugins/event/k8s-event-monitor/receivers"
-	"k8s-lx1036/k8s/plugins/event/k8s-event-monitor/sources"
+	"k8s-lx1036/k8s/operator/event/k8s-event-monitor/common/flags"
+	"k8s-lx1036/k8s/operator/event/k8s-event-monitor/sources"
 	"k8s.io/klog"
 	"net"
 	"net/http"

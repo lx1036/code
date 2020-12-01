@@ -22,8 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	batchv1 "k8s-lx1036/api/v1"
 )
 
 // LvsPodReconciler reconciles a LvsPod object
