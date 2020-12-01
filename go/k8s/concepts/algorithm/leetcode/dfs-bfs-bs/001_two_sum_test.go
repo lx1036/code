@@ -1,4 +1,4 @@
-package leetcode
+package dfs_bfs_bs
 
 import (
 	"fmt"
