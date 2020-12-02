@@ -15,6 +15,7 @@ func (i *foo) Less(b btree.Item) bool {
 	return i.value < b.(*foo).value
 }
 
+// btree 的使用: https://zhengyinyong.com/post/btree-usage/
 func TestReplaceOrInsert(test *testing.T) {
 	// 创建一颗 btree
 	tree := btree.New(32)

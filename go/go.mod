@@ -43,6 +43,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
 	github.com/prometheus/prometheus v2.5.0+incompatible
+	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 	github.com/robfig/cron v1.1.0
 	github.com/romanyx/polluter v1.2.2
 	github.com/rs/cors v1.7.0
