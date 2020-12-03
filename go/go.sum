@@ -1855,6 +1855,7 @@ k8s.io/client-go v0.18.3/go.mod h1:4a/dpQEvzAhT1BbuWW09qvIaGw6Gbu1gZYiQZIi1DMw=
 k8s.io/cloud-provider v0.18.3 h1:h3zk/I1+Bkz4Wl5TAcJhK4wT+CYLws5mL1XTxIjkDwE=
 k8s.io/cloud-provider v0.18.3/go.mod h1:sZelqNhA+TI+FqV6smLvZ84/DQCNdrEUmdQLneZpfC4=
 k8s.io/cluster-bootstrap v0.18.3/go.mod h1:iM3iptIPGNWCvFBvm67JJWaFdYb+7Gzle2bj125ZBy8=
+k8s.io/code-generator v0.18.3 h1:5H57pYEbkMMXCLKD16YQH3yDPAbVLweUsB1M3m70D1c=
 k8s.io/code-generator v0.18.3/go.mod h1:TgNEVx9hCyPGpdtCWA34olQYLkh3ok9ar7XfSsr8b6c=
 k8s.io/component-base v0.18.3 h1:QXq+P4lgi4LCIREya1RDr5gTcBaVFhxEcALir3QCSDA=
 k8s.io/component-base v0.18.3/go.mod h1:bp5GzGR0aGkYEfTj+eTY0AN/vXTgkJdQXjNTTVUaa3k=
