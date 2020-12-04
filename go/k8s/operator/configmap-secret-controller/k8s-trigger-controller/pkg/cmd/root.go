@@ -22,9 +22,9 @@ func NewRootCommand() *cobra.Command {
 		PreRun: preRun,
 	}
 
-	cmd.PersistentFlags().Bool("debug", false, "Enable debug mode")
-	cmd.PersistentFlags().String("namespace", "", "Enable debug mode")
-	cmd.PersistentFlags().Duration("sync-period", time.Second*30, "Enable debug mode")
+	cmd.PersistentFlags().Bool("debug", false, "enable debug mode")
+	cmd.PersistentFlags().String("namespace", "", "watch specified namespace")
+	cmd.PersistentFlags().Duration("sync-period", time.Second*30, "sync-period for sync resource to local store")
 
 	_ = viper.BindPFlag("debug", cmd.Flags().Lookup("debug"))
 	_ = viper.BindPFlag("namespace", cmd.Flags().Lookup("namespace"))
