@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/k8s-trigger-controller/pkg/controller"
+	"k8s-lx1036/k8s/operator/configmap-secret-controller/k8s-trigger-controller/pkg/health"
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/k8s-trigger-controller/pkg/kube"
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/k8s-trigger-controller/pkg/metrics"
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/k8s-trigger-controller/pkg/signals"
@@ -50,6 +51,7 @@ func startConfigmapSecretControllerCmd(cmd *cobra.Command, args []string) {
 	log.Info("Starting ConfigmapSecret Controller")
 
 	stopCh := signals.SetupSignalHandler()
+	health.SetupHealthCheckHandler()
 
 	// create the clientset
 	clientset, err := kube.GetKubernetesClient()
@@ -65,9 +67,7 @@ func startConfigmapSecretControllerCmd(cmd *cobra.Command, args []string) {
 	}
 
 	collectors := metrics.SetupPrometheusEndpoint()
-
 	informerFactory := informers.NewSharedInformerFactory(clientset, time.Hour)
-
 	c, err := controller.NewController(informerFactory, clientset, collectors, currentNamespace)
 	if err != nil {
 		log.Errorf("unable to create kubernetes watcher")
