@@ -22,12 +22,14 @@ func NewRootCommand() *cobra.Command {
 		PreRun: preRun,
 	}
 
-	cmd.PersistentFlags().Bool("debug", false, "enable debug mode")
-	cmd.PersistentFlags().String("namespace", "", "watch specified namespace")
-	cmd.PersistentFlags().Duration("sync-period", time.Second*30, "sync-period for sync resource to local store")
+	cmd.Flags().Bool("debug", false, "enable debug mode")
+	cmd.Flags().String("namespace", "", "watch specified namespace")
+	cmd.Flags().String("kubeconfig", "", "kubeconfig path file")
+	cmd.Flags().Duration("sync-period", time.Second*30, "sync-period for sync resource to local store")
 
 	_ = viper.BindPFlag("debug", cmd.Flags().Lookup("debug"))
 	_ = viper.BindPFlag("namespace", cmd.Flags().Lookup("namespace"))
+	_ = viper.BindPFlag("kubeconfig", cmd.Flags().Lookup("kubeconfig"))
 	_ = viper.BindPFlag("sync-period", cmd.Flags().Lookup("sync-period"))
 
 	return cmd
@@ -72,7 +74,7 @@ func startConfigmapSecretControllerCmd(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	if err = c.Run(2, stopCh); err != nil {
+	if err = c.Run(1, stopCh); err != nil {
 		log.Fatalf("Error running controller: %s", err.Error())
 	}
 

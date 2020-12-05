@@ -4,9 +4,8 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"io"
-	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sort"
 	"strings"
 	"time"
@@ -14,9 +13,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s-lx1036/k8s/operator/configmap-secret-controller/k8s-trigger-controller/pkg/metrics"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -28,11 +29,13 @@ import (
 )
 
 const (
-	DataHashAnnotation = "deployment.k8s.io/hash"
+	DataHashAnnotation = "k8s.io/hash"
 
 	ConfigMapsAnnotation = "k8s.io/configMaps"
 
 	SecretsAnnotation = "k8s.io/secrets"
+
+	ReloadAnnotation = "k8s.io/reload"
 )
 
 type Kind string
@@ -41,6 +44,8 @@ const (
 	ConfigMap Kind = "configMap"
 	Secret    Kind = "secret"
 )
+
+const Name = "configmap-secret"
 
 type item struct {
 	object interface{}
@@ -62,12 +67,13 @@ var (
 )
 
 func NewController(informerFactory informers.SharedInformerFactory, client *kubernetes.Clientset, collectors metrics.Collectors, namespace string) (*Controller, error) {
-
-	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "configmap-secret")
+	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), Name)
 
 	controller := &Controller{
 		queue:           queue,
 		informerFactory: informerFactory,
+		client:          client,
+		collectors:      collectors,
 	}
 
 	configMapInformer := controller.informerFactory.Core().V1().ConfigMaps()
@@ -81,7 +87,7 @@ func NewController(informerFactory informers.SharedInformerFactory, client *kube
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			o, _ := accessor.ResourceVersion(oldObj.(runtime.Object))
 			n, _ := accessor.ResourceVersion(newObj.(runtime.Object))
-			// Only enqueue changes that have a different resource versions to avoid processing resyncs.
+			// 只有resource version不同才是新对象
 			if o != n {
 				controller.Enqueue(&item{
 					object: newObj,
@@ -102,7 +108,6 @@ func NewController(informerFactory informers.SharedInformerFactory, client *kube
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			o, _ := accessor.ResourceVersion(oldObj.(runtime.Object))
 			n, _ := accessor.ResourceVersion(newObj.(runtime.Object))
-			// Only enqueue changes that have a different resource versions to avoid processing resyncs.
 			if o != n {
 				controller.Enqueue(&item{
 					object: newObj,
@@ -127,15 +132,14 @@ func (controller *Controller) indexDeploymentsByConfigMap(obj interface{}) ([]st
 	if !ok {
 		return configs, fmt.Errorf("object is not deployment")
 	}
+
 	annotations := d.GetAnnotations()
 	if len(annotations) == 0 {
 		return configs, nil
 	}
 	if triggers, ok := annotations[ConfigMapsAnnotation]; ok {
 		configMaps := sets.NewString(strings.Split(triggers, ",")...)
-		// TODO: 这里搜索configmap不充分
-		// 仅仅查看了volume https://kubernetes.io/docs/concepts/storage/volumes/#configmap
-		// 还有container.env和container.envFrom作为环境变量
+		// volume使用configmap
 		for _, v := range d.Spec.Template.Spec.Volumes {
 			if v.ConfigMap != nil {
 				if configMaps.Has(v.ConfigMap.Name) {
@@ -143,7 +147,17 @@ func (controller *Controller) indexDeploymentsByConfigMap(obj interface{}) ([]st
 				}
 			}
 		}
+
+		// env使用configmap
+		for _, container := range d.Spec.Template.Spec.Containers {
+			for _, envVar := range container.Env {
+				if envVar.ValueFrom != nil && envVar.ValueFrom.ConfigMapKeyRef != nil && configMaps.Has(envVar.ValueFrom.ConfigMapKeyRef.Name) {
+					configs = append(configs, envVar.ValueFrom.ConfigMapKeyRef.Name)
+				}
+			}
+		}
 	}
+
 	return configs, nil
 }
 
@@ -159,13 +173,20 @@ func (controller *Controller) indexDeploymentsBySecret(obj interface{}) ([]strin
 	}
 	if triggers, ok := annotations[SecretsAnnotation]; ok {
 		secrets := sets.NewString(strings.Split(triggers, ",")...)
-		// TODO: 这里搜索configmap不充分
-		// 仅仅查看了volume https://kubernetes.io/docs/concepts/storage/volumes/#configmap
-		// 还有container.env和container.envFrom作为环境变量
+		// volume使用secret
 		for _, v := range d.Spec.Template.Spec.Volumes {
 			if v.Secret != nil {
 				if secrets.Has(v.Secret.SecretName) {
 					configs = append(configs, v.Secret.SecretName)
+				}
+			}
+		}
+
+		// env使用secret
+		for _, container := range d.Spec.Template.Spec.Containers {
+			for _, envVar := range container.Env {
+				if envVar.ValueFrom != nil && envVar.ValueFrom.SecretKeyRef != nil && secrets.Has(envVar.ValueFrom.SecretKeyRef.Name) {
+					configs = append(configs, envVar.ValueFrom.SecretKeyRef.Name)
 				}
 			}
 		}
@@ -174,18 +195,27 @@ func (controller *Controller) indexDeploymentsBySecret(obj interface{}) ([]strin
 }
 
 func (controller *Controller) Enqueue(item *item) {
+	annotations, err := accessor.Annotations(item.object.(runtime.Object))
+	if err != nil {
+		return
+	}
+	if value, ok := annotations[ReloadAnnotation]; !ok || value != "true" {
+		return
+	}
+
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(item.object)
 	if err != nil {
 		return
 	}
 	item.key = key
+
 	controller.queue.Add(item)
 }
 
 func (controller *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
 	go controller.informerFactory.Start(stopCh)
 
-	if !cache.WaitForCacheSync(stopCh,
+	if !cache.WaitForNamedCacheSync(Name, stopCh,
 		controller.informerFactory.Core().V1().ConfigMaps().Informer().HasSynced,
 		controller.informerFactory.Core().V1().Secrets().Informer().HasSynced,
 		controller.informerFactory.Apps().V1().Deployments().Informer().HasSynced) {
@@ -271,9 +301,10 @@ func (controller *Controller) process() bool {
 				return nil
 			}
 
-			//o, err = controller.informerFactory.Core().V1().ConfigMaps().Lister().ConfigMaps(entry.object.(*corev1.ConfigMap).Namespace).Get(entry.key)
-			o, err = controller.client.CoreV1().ConfigMaps(entry.object.(*corev1.ConfigMap).Namespace).Get(context.TODO(), entry.key, metav1.GetOptions{})
-
+			// 这只是从本地缓存local storage里取数据
+			o, err = controller.informerFactory.Core().V1().ConfigMaps().Lister().ConfigMaps(entry.object.(*corev1.ConfigMap).Namespace).Get(entry.object.(*corev1.ConfigMap).Name)
+			// http get请求api-server数据
+			//o, err = controller.client.CoreV1().ConfigMaps(entry.object.(*corev1.ConfigMap).Namespace).Get(context.TODO(), entry.key, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -291,8 +322,8 @@ func (controller *Controller) process() bool {
 				return nil
 			}
 
-			//o, err = controller.informerFactory.Core().V1().Secrets().Lister().Secrets(entry.object.(*corev1.Secret).Namespace).Get(entry.key)
-			o, err = controller.client.CoreV1().Secrets(entry.object.(*corev1.Secret).Namespace).Get(context.TODO(), entry.key, metav1.GetOptions{})
+			o, err = controller.informerFactory.Core().V1().Secrets().Lister().Secrets(entry.object.(*corev1.Secret).Namespace).Get(entry.object.(*corev1.Secret).Name)
+			//o, err = controller.client.CoreV1().Secrets(entry.object.(*corev1.Secret).Namespace).Get(context.TODO(), entry.key, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -307,7 +338,8 @@ func (controller *Controller) process() bool {
 			utilruntime.HandleError(err)
 		}
 
-		// Get all deployments that use the configMap or Secret
+		// 从本地缓存里查找使用该configMap/secret的所有deployments
+		// 参考L117-L120
 		filteringDeployments, err := controller.informerFactory.Apps().V1().Deployments().Informer().GetIndexer().ByIndex(string(entry.kind), objMeta.GetName())
 		if err != nil {
 			return err
@@ -317,7 +349,7 @@ func (controller *Controller) process() bool {
 			return nil
 		}
 
-		// get hash of configMap or secret, and update new hash data in annotation key
+		// 求算configMap/secret的data的hash值
 		hashVersion := controller.GetHash(o)
 		if len(hashVersion) == 0 {
 			return nil
@@ -325,6 +357,7 @@ func (controller *Controller) process() bool {
 
 		oldHashVersion := objMeta.GetAnnotations()[DataHashAnnotation]
 		if hashVersion != oldHashVersion {
+			// configMap/secret的data的hash不一样，说明数据已经修改了
 			switch entry.kind {
 			case ConfigMap:
 				c := o.(*corev1.ConfigMap).DeepCopy()
@@ -332,26 +365,32 @@ func (controller *Controller) process() bool {
 					c.Annotations = map[string]string{}
 				}
 				c.Annotations[DataHashAnnotation] = hashVersion
-				log.Infof("updating %s %s/%s with new data hash: %s", c.Kind, c.Namespace, c.Name, hashVersion)
+				log.Infof("updating %s %s/%s with new data hash: %s", entry.kind, c.Namespace, c.Name, hashVersion)
+				// http请求去更新configmap
+				// 这里是不是可以使用patch()更好些？
 				if _, err := controller.client.CoreV1().ConfigMaps(c.Namespace).Update(context.TODO(), c, metav1.UpdateOptions{}); err != nil {
+					controller.collectors.ConfigMapCounter.With(prometheus.Labels{"configMap": "fail"}).Inc()
 					if errors.IsNotFound(err) {
 						return nil
 					}
 					return err
 				}
+				controller.collectors.ConfigMapCounter.With(prometheus.Labels{"configMap": "success"}).Inc()
 			case Secret:
 				c := o.(*corev1.Secret).DeepCopy()
 				if c.Annotations == nil {
 					c.Annotations = map[string]string{}
 				}
 				c.Annotations[DataHashAnnotation] = hashVersion
-				log.Infof("updating %s %s/%s with new data hash: %s", c.Kind, c.Namespace, c.Name, hashVersion)
+				log.Infof("updating %s %s/%s with new data hash: %s", entry.kind, c.Namespace, c.Name, hashVersion)
 				if _, err := controller.client.CoreV1().Secrets(c.Namespace).Update(context.TODO(), c, metav1.UpdateOptions{}); err != nil {
+					controller.collectors.SecretCounter.With(prometheus.Labels{"secret": "fail"}).Inc()
 					if errors.IsNotFound(err) {
 						return nil
 					}
 					return err
 				}
+				controller.collectors.SecretCounter.With(prometheus.Labels{"secret": "success"}).Inc()
 			}
 		} else {
 			log.Infof("no change detected in hash for %s %s", entry.kind, entry.key)
@@ -382,16 +421,19 @@ func (controller *Controller) process() bool {
 			}
 			annotationKey := fmt.Sprintf("k8s.io/%s-%s", entry.kind, objMeta.GetName())
 			if annotations[annotationKey] != hashVersion {
-				// rolling update deployment
+				log.Infof("updating deployment %s/%s pod-template annotations with hash %s", deployment.Namespace, deployment.Name, hashVersion)
 				c := deployment.DeepCopy()
-				if c.Annotations == nil {
-					c.Annotations = map[string]string{}
+				if c.Spec.Template.Annotations == nil {
+					c.Spec.Template.Annotations = map[string]string{}
 				}
 				c.Spec.Template.Annotations[annotationKey] = hashVersion
+				// http更新deployment
 				if _, err := controller.client.AppsV1().Deployments(c.Namespace).Update(context.TODO(), c, metav1.UpdateOptions{}); err != nil {
+					controller.collectors.DeploymentCounter.With(prometheus.Labels{"deployment": "fail"}).Inc()
 					log.Errorf("failed to update deployment %s/%s: %v", c.Namespace, c.Name, err)
 					continue
 				}
+				controller.collectors.DeploymentCounter.With(prometheus.Labels{"deployment": "success"}).Inc()
 			}
 		}
 

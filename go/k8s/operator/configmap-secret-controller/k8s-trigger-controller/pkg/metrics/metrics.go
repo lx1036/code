@@ -8,35 +8,62 @@ import (
 )
 
 type Collectors struct {
-	Counter *prometheus.CounterVec
+	ConfigMapCounter  *prometheus.CounterVec
+	SecretCounter     *prometheus.CounterVec
+	DeploymentCounter *prometheus.CounterVec
 }
 
 func NewCollectors() Collectors {
-	counter := prometheus.NewCounterVec(
+	configMapCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "reloader",
-			Name:      "reload_executed_total",
-			Help:      "Counter of reloads executed by Reloader.",
+			Namespace: "trigger",
+			Name:      "configMap",
+			Help:      "Counter of configMap",
 		},
-		[]string{"success"},
+		[]string{"configMap"},
 	)
-
 	//set 0 as default value
-	counter.With(prometheus.Labels{"success": "true"}).Add(0)
-	counter.With(prometheus.Labels{"success": "false"}).Add(0)
+	configMapCounter.With(prometheus.Labels{"configMap": "success"}).Add(0)
+	configMapCounter.With(prometheus.Labels{"configMap": "fail"}).Add(0)
+
+	secretCounter := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "trigger",
+			Name:      "secret",
+			Help:      "Counter of secret",
+		},
+		[]string{"secret"},
+	)
+	secretCounter.With(prometheus.Labels{"secret": "success"}).Add(0)
+	secretCounter.With(prometheus.Labels{"secret": "fail"}).Add(0)
+
+	deploymentCounter := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "trigger",
+			Name:      "deployment",
+			Help:      "Counter of deployment",
+		},
+		[]string{"deployment"},
+	)
+	deploymentCounter.With(prometheus.Labels{"deployment": "success"}).Add(0)
+	deploymentCounter.With(prometheus.Labels{"deployment": "fail"}).Add(0)
 
 	return Collectors{
-		Counter: counter,
+		ConfigMapCounter:  configMapCounter,
+		SecretCounter:     secretCounter,
+		DeploymentCounter: deploymentCounter,
 	}
 }
 
 func SetupPrometheusEndpoint() Collectors {
 	collectors := NewCollectors()
-	prometheus.MustRegister(collectors.Counter)
+	prometheus.MustRegister(collectors.ConfigMapCounter)
+	prometheus.MustRegister(collectors.SecretCounter)
+	prometheus.MustRegister(collectors.DeploymentCounter)
 
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
-		logrus.Fatal(http.ListenAndServe(":9090", nil))
+		logrus.Fatal(http.ListenAndServe(":8001", nil))
 	}()
 
 	return collectors

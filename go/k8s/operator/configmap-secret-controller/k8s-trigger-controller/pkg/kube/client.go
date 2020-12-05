@@ -1,6 +1,7 @@
 package kube
 
 import (
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -17,12 +18,22 @@ var ResourceMap = map[string]runtime.Object{
 
 func getConfig() (*rest.Config, error) {
 	var config *rest.Config
+	var err error
+	if len(viper.GetString("kubeconfig")) != 0 {
+		config, err = clientcmd.BuildConfigFromFlags("", viper.GetString("kubeconfig"))
+		if err != nil {
+			return nil, err
+		}
+
+		return config, nil
+	}
+
 	kubeconfigPath := os.Getenv("KUBECONFIG")
 	if kubeconfigPath == "" {
 		kubeconfigPath = os.Getenv("HOME") + "/.kube/config"
 	}
 	//If file exists so use that config settings
-	if _, err := os.Stat(kubeconfigPath); err == nil {
+	if _, err = os.Stat(kubeconfigPath); err == nil {
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 		if err != nil {
 			return nil, err
