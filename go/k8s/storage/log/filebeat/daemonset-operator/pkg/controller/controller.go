@@ -10,12 +10,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"os"
 	"strings"
 	"time"
 )
+
+const Name = "filebeat"
 
 type LogController struct {
 	InformerResources []schema.GroupVersionResource
@@ -71,6 +75,35 @@ func DiscoverKubernetesNode(host string, client kubernetes.Interface) string {
 	log.Infof("Using node %s discovered by pod in cluster", pod.Spec.NodeName)
 
 	return pod.Spec.NodeName
+}
+
+type Controller struct {
+	queue           workqueue.RateLimitingInterface
+	informerFactory informers.SharedInformerFactory
+}
+
+func NewController(informerFactory informers.SharedInformerFactory, client *kubernetes.Clientset, collectors metrics.Collectors, namespace string) (*Controller, error) {
+	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), Name)
+	controller := &Controller{
+		queue:           queue,
+		informerFactory: informerFactory,
+	}
+
+	controller.informerFactory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    controller.AddPod,
+		UpdateFunc: nil,
+		DeleteFunc: nil,
+	})
+
+	return controller, nil
+}
+
+func (controller *Controller) AddPod(obj interface{}) {
+
+}
+
+func (controller *Controller) Enqueue() {
+
 }
 
 func New(options common.Options) *LogController {
