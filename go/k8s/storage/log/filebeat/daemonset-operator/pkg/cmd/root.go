@@ -27,12 +27,13 @@ func NewRootCommand() *cobra.Command {
 	}
 
 	cmd.Flags().Bool("debug", false, "enable debug mode")
-	cmd.Flags().String("host", "", "specified host node")
+	cmd.Flags().String("node", "", "specified host node")
 	cmd.Flags().String("namespace", "", "watch specified namespace")
 	cmd.Flags().String("kubeconfig", "", "kubeconfig path file")
-	cmd.Flags().Duration("sync-period", time.Second*30, "sync-period for sync resource to local store")
+	cmd.Flags().Duration("sync-period", 10*time.Minute, "sync-period for sync resource to local store")
 
 	_ = viper.BindPFlag("debug", cmd.Flags().Lookup("debug"))
+	_ = viper.BindPFlag("node", cmd.Flags().Lookup("node"))
 	_ = viper.BindPFlag("namespace", cmd.Flags().Lookup("namespace"))
 	_ = viper.BindPFlag("kubeconfig", cmd.Flags().Lookup("kubeconfig"))
 	_ = viper.BindPFlag("sync-period", cmd.Flags().Lookup("sync-period"))
@@ -64,15 +65,15 @@ func startFilebeatControllerCmd(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	var currentNamespace = viper.GetString("namespace")
-	if len(currentNamespace) == 0 {
-		currentNamespace = metav1.NamespaceAll
+	if len(viper.GetString("namespace")) == 0 {
+		//currentNamespace = metav1.NamespaceAll
+		viper.Set("namespace", metav1.NamespaceAll)
 		log.Warnf("KUBERNETES_NAMESPACE is unset, will detect changes in all namespaces.")
 	}
 
 	collectors := metrics.SetupPrometheusEndpoint()
 	informerFactory := informers.NewSharedInformerFactory(clientset, time.Hour)
-	c, err := controller.NewController(informerFactory, clientset, collectors, currentNamespace)
+	c, err := controller.NewController(informerFactory, clientset, collectors)
 	if err != nil {
 		log.Errorf("unable to create kubernetes watcher")
 		os.Exit(1)

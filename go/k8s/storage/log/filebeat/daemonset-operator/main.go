@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// go run . --debug=true
+// go run . --debug=true --node=docker4401
 // http://localhost:8001/metrics
 func main() {
 	if err := cmd.NewRootCommand().Execute(); err != nil {

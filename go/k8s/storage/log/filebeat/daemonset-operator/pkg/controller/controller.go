@@ -2,21 +2,29 @@ package controller
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
+	"fmt"
 	"io/ioutil"
-	"k8s-lx1036/k8s/storage/log/filebeat/daemonset-operator/common"
-	k8s "k8s-lx1036/k8s/storage/log/filebeat/daemonset-operator/controller/kubernetes"
+	"os"
+	"strings"
+	"time"
+
+	"k8s-lx1036/k8s/storage/log/filebeat/daemonset-operator/pkg/metrics"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+
 	coreV1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"os"
-	"strings"
-	"time"
 )
 
 const Name = "filebeat"
@@ -37,6 +45,10 @@ type LogController struct {
 	ResyncPeriod     time.Duration
 	TaskHandlePeriod time.Duration
 }
+
+var (
+	accessor = meta.NewAccessor()
+)
 
 const defaultNode = "localhost"
 
@@ -80,33 +92,195 @@ func DiscoverKubernetesNode(host string, client kubernetes.Interface) string {
 type Controller struct {
 	queue           workqueue.RateLimitingInterface
 	informerFactory informers.SharedInformerFactory
+	client          *kubernetes.Clientset
+
+	podInformer  cache.SharedIndexInformer
+	nodeInformer cache.SharedIndexInformer
 }
 
-func NewController(informerFactory informers.SharedInformerFactory, client *kubernetes.Clientset, collectors metrics.Collectors, namespace string) (*Controller, error) {
+// Resource data
+type Resource = runtime.Object
+type WatchOptions struct {
+	Namespace string
+	Node      string
+
+	// SyncTimeout is timeout for listing historical resources
+	SyncTimeout time.Duration
+}
+
+func nodeSelector(options *metav1.ListOptions, opt WatchOptions) {
+	if len(opt.Node) != 0 {
+		options.FieldSelector = fmt.Sprintf("spec.nodeName=%s", opt.Node)
+	}
+}
+func nameSelector(options *metav1.ListOptions, opt WatchOptions) {
+	if len(opt.Node) != 0 {
+		options.FieldSelector = fmt.Sprintf("metadata.name=%s", opt.Node)
+	}
+}
+func NewInformer(client kubernetes.Interface, resource Resource, opts WatchOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	ctx := context.TODO()
+	var listWatch *cache.ListWatch
+	switch resource.(type) {
+	case *coreV1.Pod:
+		pod := client.CoreV1().Pods(opts.Namespace)
+		listWatch = &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				nodeSelector(&options, opts)
+				return pod.List(ctx, options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				nodeSelector(&options, opts)
+				return pod.Watch(ctx, options)
+			},
+		}
+	case *coreV1.Node:
+		node := client.CoreV1().Nodes()
+		listWatch = &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				nameSelector(&options, opts)
+				return node.List(ctx, options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				nameSelector(&options, opts)
+				return node.Watch(ctx, options)
+			},
+		}
+	}
+
+	return cache.NewSharedIndexInformer(listWatch, resource, opts.SyncTimeout, indexers)
+}
+
+func NewController(informerFactory informers.SharedInformerFactory, client *kubernetes.Clientset, collectors metrics.Collectors) (*Controller, error) {
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), Name)
 	controller := &Controller{
 		queue:           queue,
 		informerFactory: informerFactory,
+		client:          client,
 	}
 
-	controller.informerFactory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer := NewInformer(client, &coreV1.Pod{}, WatchOptions{
+		Namespace:   viper.GetString("namespace"),
+		Node:        DiscoverKubernetesNode(viper.GetString("node"), client),
+		SyncTimeout: viper.GetDuration("sync-period"),
+	}, cache.Indexers{})
+	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    controller.AddPod,
-		UpdateFunc: nil,
+		UpdateFunc: controller.UpdatePod,
 		DeleteFunc: nil,
 	})
+	controller.podInformer = podInformer
+
+	nodeInformer := NewInformer(client, &coreV1.Node{}, WatchOptions{
+		Node:        DiscoverKubernetesNode(viper.GetString("node"), client),
+		SyncTimeout: viper.GetDuration("sync-period"),
+	}, cache.Indexers{})
+
+	controller.nodeInformer = nodeInformer
 
 	return controller, nil
 }
 
+type item struct {
+	object interface{}
+	key    string
+}
+
+func (controller *Controller) UpdatePod(oldObj, newObj interface{}) {
+	o, _ := accessor.ResourceVersion(oldObj.(runtime.Object))
+	n, _ := accessor.ResourceVersion(newObj.(runtime.Object))
+	// 只有resource version不同才是新对象
+	if o != n {
+		controller.Enqueue(&item{
+			object: n,
+		})
+	}
+}
+
 func (controller *Controller) AddPod(obj interface{}) {
-
+	controller.Enqueue(&item{
+		object: obj,
+	})
 }
 
-func (controller *Controller) Enqueue() {
+func (controller *Controller) Enqueue(item *item) {
+	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(item.object)
+	if err != nil {
+		return
+	}
 
+	item.key = key
+	controller.queue.Add(item)
 }
 
-func New(options common.Options) *LogController {
+func (controller *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
+	go controller.podInformer.Run(stopCh)
+	go controller.nodeInformer.Run(stopCh)
+
+	if !cache.WaitForNamedCacheSync(Name, stopCh,
+		controller.podInformer.HasSynced,
+		controller.nodeInformer.HasSynced) {
+		return fmt.Errorf("kubernetes informer is unable to sync cache")
+	}
+
+	for i := 0; i < threadiness; i++ {
+		// Wrap the process function with wait.Until so that if the controller crashes, it starts up again after a second.
+		go wait.Until(func() {
+			for controller.process() {
+			}
+		}, time.Second*1, stopCh)
+	}
+
+	return nil
+}
+
+func (controller *Controller) process() bool {
+	keyObj, quit := controller.queue.Get()
+	if quit {
+		return false
+	}
+
+	err := func(obj interface{}) error {
+		defer controller.queue.Done(obj)
+
+		var entry *item
+		var ok bool
+		if entry, ok = obj.(*item); !ok {
+			controller.queue.Forget(obj)
+			utilruntime.HandleError(fmt.Errorf("expected *item in workqueue but got %#v", obj))
+			return nil
+		}
+
+		obj, exists, err := controller.podInformer.GetStore().GetByKey(entry.key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			log.Infof("object %+v was not found in the store", entry.key)
+			return nil
+		}
+
+		var pod *coreV1.Pod
+		if pod, ok = obj.(*coreV1.Pod); !ok {
+			controller.queue.Forget(obj)
+			utilruntime.HandleError(fmt.Errorf("expected *coreV1.Pod but got %#v", obj))
+			return nil
+		}
+
+		log.Infof("updating cache with pod %s/%s", pod.Namespace, pod.Name)
+
+		return nil
+	}(keyObj)
+
+	if err != nil {
+		utilruntime.HandleError(err)
+		return true
+	}
+
+	return true
+}
+
+/*func New(options common.Options) *LogController {
 
 	client, err := common.GetKubernetesClient(options.KubeConfig)
 	if err != nil {
@@ -120,7 +294,7 @@ func New(options common.Options) *LogController {
 		IsUpdated:   nil,
 	}, nil)
 
-	/*ctr := &LogController{
+	ctr := &LogController{
 		InformerResources: []schema.GroupVersionResource{
 			{
 				Group:    coreV1.GroupName,
@@ -135,7 +309,7 @@ func New(options common.Options) *LogController {
 		},
 		ApiServerClient:   apiServerClient,
 		stopCh:            nil,
-	}*/
+	}
 
 	ctr := &LogController{
 		InformerResources: nil,
@@ -184,4 +358,4 @@ func (ctr *LogController) Run() {
 
 	<-ctr.stopCh
 	//k8s.Run(ctr.ApiServerClient, ctr.InformerResources, ctr.stopCh)
-}
+}*/

@@ -219,7 +219,7 @@ func (controller *Controller) Run(threadiness int, stopCh <-chan struct{}) error
 		controller.informerFactory.Core().V1().ConfigMaps().Informer().HasSynced,
 		controller.informerFactory.Core().V1().Secrets().Informer().HasSynced,
 		controller.informerFactory.Apps().V1().Deployments().Informer().HasSynced) {
-		return fmt.Errorf("kubernetes informer unable to sync cache")
+		return fmt.Errorf("kubernetes informer is unable to sync cache")
 	}
 
 	for i := 0; i < threadiness; i++ {
