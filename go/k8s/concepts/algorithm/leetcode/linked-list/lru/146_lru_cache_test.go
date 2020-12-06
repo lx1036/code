@@ -1,4 +1,4 @@
-package LRU
+package lru
 
 
 // LRU: Least Recently Used
