@@ -37,6 +37,7 @@ func NewRootCommand() *cobra.Command {
 	_ = viper.BindPFlag("node", cmd.Flags().Lookup("node"))
 	_ = viper.BindPFlag("namespace", cmd.Flags().Lookup("namespace"))
 	_ = viper.BindPFlag("kubeconfig", cmd.Flags().Lookup("kubeconfig"))
+	_ = viper.BindPFlag("container-log-path", cmd.Flags().Lookup("container-log-path"))
 	_ = viper.BindPFlag("sync-period", cmd.Flags().Lookup("sync-period"))
 
 	return cmd

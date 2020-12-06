@@ -1,0 +1,33 @@
+
+- type: log
+  hosts: 1.2.3.4:39092
+  paths:
+  
+  - /var/lib/docker/containers//f25a775131d74fe21982ffc3b6d7e1a1b2bcefe6146442b505f82879d598497d/f25a775131d74fe21982ffc3b6d7e1a1b2bcefe6146442b505f82879d598497d-json.log
+  
+  fields:
+    log_topic: "filebeat-stdout"
+    app_field: IDC=,PodName=daemonset-stdout-test-67647c75c6-rchw5
+  
+  tail_files: true
+  scan_frequency: 1s
+  max_backoff: 1s
+  backoff: 1s
+
+- type: log
+  hosts: 1.2.3.4:39092
+  paths:
+  
+  - /var/lib/docker/containers///-json.log
+  
+  - /var/lib/docker/containers//8ff9f754fbc5961e142b28325bb3d78d36b809dd6da125cca02741c189ef5418/8ff9f754fbc5961e142b28325bb3d78d36b809dd6da125cca02741c189ef5418-json.log
+  
+  fields:
+    log_topic: "filebeat-stdout"
+    app_field: IDC=,PodName=daemonset-stdout-demo-lx1036-7d8c79f474-zwfzm
+  
+  tail_files: true
+  scan_frequency: 1s
+  max_backoff: 1s
+  backoff: 1s
+

@@ -212,7 +212,7 @@ func (controller *Controller) UpdatePod(oldObj, newObj interface{}) {
 	// 只有resource version不同才是新对象
 	if o != n {
 		controller.Enqueue(&item{
-			object: n,
+			object: newObj,
 			action: Update,
 		})
 	}
@@ -252,6 +252,14 @@ func (controller *Controller) Enqueue(item *item) {
 
 	if _, ok := pod.Annotations[LogConfigAnnotation]; !ok {
 		return
+	}
+
+	// only queue ready pod, 同一个pod在启动过程中，会出现多种状态，直至最后status.conditions都是ready状态
+	// 但是会触发多次的update event
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == coreV1.PodReady && condition.Status != coreV1.ConditionTrue {
+			return
+		}
 	}
 
 	item.key = key
@@ -370,6 +378,8 @@ func (controller *Controller) syncFilebeatYamlByIncremental() {
 		return
 	}
 
+	log.Info("calculating filebeat input data...")
+
 	for key, pod := range controller.cache.items {
 		if config := strings.TrimSpace(pod.Annotations[LogConfigAnnotation]); len(config) != 0 {
 			conf, err := decodeConfig(config)
@@ -398,7 +408,8 @@ func (controller *Controller) syncFilebeatYamlByIncremental() {
 							continue
 						}
 
-						input.Paths = append(input.Paths, fmt.Sprintf("%s/%s/%s-json.log", containerLogPath, containerStatus.ContainerID, containerStatus.ContainerID))
+						containerId := strings.TrimPrefix(containerStatus.ContainerID, "docker://")
+						input.Paths = append(input.Paths, fmt.Sprintf("%s%s/%s-json.log", containerLogPath, containerId, containerId))
 
 					}
 
@@ -416,11 +427,13 @@ func (controller *Controller) syncFilebeatYamlByIncremental() {
 		}
 	}
 
+	log.Info("syncing filebeat inputs.yml by data...")
+
 	filebeatInputsData := FilebeatInputsData{
 		FilebeatInputs: inputs,
 	}
 
-	tpl, err := template.ParseFiles("../../config/inputs.yml.template")
+	tpl, err := template.ParseFiles("config/inputs.yml.template")
 	if err != nil {
 		log.Error(err)
 		os.Exit(1)
@@ -435,6 +448,8 @@ func (controller *Controller) syncFilebeatYamlByIncremental() {
 		log.Error(err)
 		os.Exit(1)
 	}
+
+	log.Info("synced filebeat inputs.yml by data")
 
 	controller.cache.changed = false
 }
@@ -476,12 +491,21 @@ func (controller *Controller) process() bool {
 			return nil
 		}
 
-		log.Infof("updating cache with pod %s/%s", pod.Namespace, pod.Name)
-
 		switch entry.action {
-		case Add, Update:
+		case Add:
+			log.Infof("adding cache with pod %s/%s", pod.Namespace, pod.Name)
+			controller.cache.Set(entry.key, pod)
+		case Update:
+			// TODO: 多次 {"level":"info","msg":"updating cache with pod default/daemonset-stdout-demo-lx1036-7d8c79f474-zwfzm","time":"2020-12-06T18:10:17+08:00"}
+			// 为何这么多次？
+			// 当pod没有ready时，会多次触发update event，queue里就会多次有update pod加进来
+			// 所以需要过滤，只有ready状态的pod进入queue
+			log.Infof("updating cache with pod %s/%s", pod.Namespace, pod.Name)
 			controller.cache.Set(entry.key, pod)
 		case Delete:
+			// TODO: 当kubectl delete -f deployment.yaml删除deployment时候，居然触发的是update事件
+			// TODO: 现在问题是：删除pod后，inputs.yml文件并没有立即删除pod对应的配置(或许应该这样设计，交给捞底sync去做？)
+			log.Infof("deleting cache with pod %s/%s", pod.Namespace, pod.Name)
 			controller.cache.Delete(entry.key)
 		}
 
@@ -495,83 +519,3 @@ func (controller *Controller) process() bool {
 
 	return true
 }
-
-/*func New(options common.Options) *LogController {
-
-	client, err := common.GetKubernetesClient(options.KubeConfig)
-	if err != nil {
-
-	}
-
-	podWatcher, err := k8s.NewWatcher(client, &k8s.Pod{}, k8s.WatchOptions{
-		SyncTimeout: time.Minute * 10,
-		Node:        DiscoverKubernetesNode(options.Host, client),
-		Namespace:   "",
-		IsUpdated:   nil,
-	}, nil)
-
-	ctr := &LogController{
-		InformerResources: []schema.GroupVersionResource{
-			{
-				Group:    coreV1.GroupName,
-				Version:  coreV1.SchemeGroupVersion.Version,
-				Resource: "pods",
-			},
-			{
-				Group: appsv1.GroupName,
-				Version:  coreV1.SchemeGroupVersion.Version,
-				Resource: "nodes",
-			},
-		},
-		ApiServerClient:   apiServerClient,
-		stopCh:            nil,
-	}
-
-	ctr := &LogController{
-		InformerResources: nil,
-		ApiServerClient:   nil,
-		stopCh:            nil,
-		NodeName:          "",
-		ResyncPeriod:      0,
-		TaskHandlePeriod:  0,
-	}
-
-	ctr.TaskQueue = NewTaskQueue(ctr.syncTask)
-
-	podListWatch := cache.NewListWatchFromClient(ctr.ApiServerClient.CoreV1().RESTClient(), "pods", coreV1.NamespaceAll, fields.OneTermEqualSelector("spec.nodeName", ctr.NodeName))
-	ctr.PodStore, ctr.PodInformer = cache.NewInformer(podListWatch, &coreV1.Pod{}, ctr.ResyncPeriod, cache.ResourceEventHandlerFuncs{
-		AddFunc:    ctr.AddPod,
-		UpdateFunc: ctr.UpdatePod,
-		DeleteFunc: ctr.DeletePod,
-	})
-
-	nodeListWatch := cache.NewListWatchFromClient(ctr.ApiServerClient.CoreV1().RESTClient(), "nodes", coreV1.NamespaceAll, fields.OneTermEqualSelector("metadata.name", ctr.NodeName))
-	ctr.NodeStore, ctr.NodeInformer = cache.NewInformer(nodeListWatch, &coreV1.Node{}, ctr.ResyncPeriod, cache.ResourceEventHandlerFuncs{})
-
-}
-
-func (ctr *LogController) AddPod(obj interface{}) {
-	pod := obj.(*coreV1.Pod)
-	ctr.TaskQueue.Enqueue(pod)
-}
-func (ctr *LogController) UpdatePod(oldObj, newObj interface{}) {}
-func (ctr *LogController) DeletePod(obj interface{}) {
-	pod := obj.(*coreV1.Pod)
-	ctr.TaskQueue.Enqueue(pod)
-}
-
-// 批量处理pod事件，更新filebeat input.yml
-func (ctr *LogController) syncTask(tasks []interface{}) {
-
-}
-
-func (ctr *LogController) Run() {
-
-	go ctr.PodInformer.Run(ctr.stopCh)
-	go ctr.NodeInformer.Run(ctr.stopCh)
-
-	go ctr.TaskQueue.Run(ctr.TaskHandlePeriod, ctr.stopCh)
-
-	<-ctr.stopCh
-	//k8s.Run(ctr.ApiServerClient, ctr.InformerResources, ctr.stopCh)
-}*/

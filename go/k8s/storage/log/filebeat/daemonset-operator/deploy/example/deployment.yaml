@@ -2,8 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: daemonset-stdout-test
-  name: daemonset-stdout-test
+    app: daemonset-stdout-demo-lx1036
+  name: daemonset-stdout-demo-lx1036
   namespace: default
 spec:
   progressDeadlineSeconds: 600
@@ -11,7 +11,7 @@ spec:
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app: daemonset-stdout-test
+      app: daemonset-stdout-demo-lx1036
   strategy:
     rollingUpdate:
       maxSurge: 25%
@@ -27,22 +27,46 @@ spec:
               "log_type": "stdout",
               "topic": "filebeat-stdout",
               "hosts": "1.2.3.4:39092",
-              "containers": ["nginx"]
+              "containers": ["alpine", "nginx"]
             }
           }
         k8s.io/log-enable: "true"
-      creationTimestamp: null
       labels:
-        app: daemonset-stdout-test
+        app: daemonset-stdout-demo-lx1036
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - docker4401
       containers:
+#        - image: alpine
+#          imagePullPolicy: IfNotPresent
+#          name: alpine
+#          resources:
+#            limits:
+#              cpu: "1"
+#              memory: 1Gi
+#            requests:
+#              cpu: "0.5"
+#              memory: 0.5Gi
         - image: nginx:stable
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           name: nginx
           ports:
             - containerPort: 80
               name: my80
               protocol: TCP
-          resources: {}
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: "0.5"
+              memory: 0.5Gi
       dnsPolicy: ClusterFirst
       restartPolicy: Always
