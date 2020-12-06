@@ -1,8 +1,11 @@
 package controller
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -244,7 +247,11 @@ func (controller *Controller) Enqueue(item *item) {
 	}
 
 	if value, ok := pod.Annotations[LogEnableAnnotation]; !ok || value != "true" {
+		return
+	}
 
+	if _, ok := pod.Annotations[LogConfigAnnotation]; !ok {
+		return
 	}
 
 	item.key = key
@@ -276,8 +283,160 @@ func (controller *Controller) Run(threadiness int, stopCh <-chan struct{}) error
 	return nil
 }
 
-func (controller *Controller) syncFilebeatYamlByIncremental() {
+type MultilineConfig struct {
+	MulPattern string `json:"multiline_pattern"`
+	MulNegate  string `json:"multiline_negate"`
+	MulMatch   string `json:"multiline_match"`
+}
+type LogCollectorType string
 
+const (
+	Daemonset LogCollectorType = "daemonset"
+	Sidecar   LogCollectorType = "sidecar"
+)
+
+type LogType string
+
+const (
+	Stdout LogType = "stdout"
+	File   LogType = "file"
+)
+
+type ContainerLogConfig struct {
+	LogCollectorType LogCollectorType `json:"log_collector_type"` //0: sidecar, 1: daemonset
+	LogType          LogType          `json:"log_type,omitempty"` //0: stdout， 1: filelog
+	Topic            string           `json:"topic"`
+	Hosts            string           `json:"hosts"`
+	Containers       []string         `json:"containers"`
+
+	Paths            []string        `json:"paths,omitempty"` //only daemonset mode, and stdout paths will be nil
+	MultilineEnable  bool            `json:"multiline_enable"`
+	MultilinePattern MultilineConfig `json:"multiline_pattern,omitempty"`
+}
+
+//type ContainerLogConfigs map[string]ContainerLogConfig // key写container name
+type Conf struct {
+	ContainerLogConfigs ContainerLogConfig `json:"containerLogConfigs"`
+}
+
+func decodeConfig(config string) (*Conf, error) {
+	conf := &Conf{}
+	if c := strings.TrimSpace(config); len(c) != 0 {
+		err := json.Unmarshal([]byte(c), conf)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return conf, nil
+}
+
+type FilebeatInput struct {
+	Hosts            string
+	Paths            []string
+	HostsTopic       string
+	Topic            string
+	MultilineEnable  bool
+	MultilinePattern MultilineConfig
+	CustomField      string
+}
+
+func getContainerLogPath() string {
+	logPath := viper.GetString("container-log-path")
+	if logPath[len(logPath)-1:] != string(os.PathSeparator) {
+		logPath += string(os.PathSeparator)
+	}
+
+	return logPath
+}
+func inSlice(slices []string, element string) bool {
+	for _, slice := range slices {
+		if slice == element {
+			return true
+		}
+	}
+
+	return false
+}
+
+type FilebeatInputsData struct {
+	FilebeatInputs []FilebeatInput `json:"FilebeatInputs"`
+}
+
+func (controller *Controller) syncFilebeatYamlByIncremental() {
+	var inputs []FilebeatInput
+
+	if !controller.cache.changed { // cache没有变化
+		return
+	}
+
+	for key, pod := range controller.cache.items {
+		if config := strings.TrimSpace(pod.Annotations[LogConfigAnnotation]); len(config) != 0 {
+			conf, err := decodeConfig(config)
+			if err != nil {
+				log.Errorf("fail to decode json config with pod %s", key)
+				continue
+			}
+			switch conf.ContainerLogConfigs.LogCollectorType {
+			case Daemonset:
+				switch conf.ContainerLogConfigs.LogType {
+				case Stdout:
+					input := FilebeatInput{
+						Hosts:           conf.ContainerLogConfigs.Hosts,
+						HostsTopic:      fmt.Sprintf("%s-%s", conf.ContainerLogConfigs.Hosts, conf.ContainerLogConfigs.Topic),
+						Topic:           conf.ContainerLogConfigs.Topic,
+						MultilineEnable: conf.ContainerLogConfigs.MultilineEnable,
+						CustomField:     fmt.Sprintf("IDC=%s,PodName=%s", viper.GetString("IDC"), pod.Name),
+					}
+					if input.MultilineEnable {
+						input.MultilinePattern = conf.ContainerLogConfigs.MultilinePattern
+					}
+
+					containerLogPath := getContainerLogPath()
+					for _, containerStatus := range pod.Status.ContainerStatuses {
+						if !inSlice(conf.ContainerLogConfigs.Containers, containerStatus.Name) {
+							continue
+						}
+
+						input.Paths = append(input.Paths, fmt.Sprintf("%s/%s/%s-json.log", containerLogPath, containerStatus.ContainerID, containerStatus.ContainerID))
+
+					}
+
+					inputs = append(inputs, input)
+				case File:
+
+				default:
+					log.Errorf("unsupported log type for pod %s", key)
+				}
+			case Sidecar:
+
+			default:
+				log.Errorf("unsupported log collector type for pod %s", key)
+			}
+		}
+	}
+
+	filebeatInputsData := FilebeatInputsData{
+		FilebeatInputs: inputs,
+	}
+
+	tpl, err := template.ParseFiles("../../config/inputs.yml.template")
+	if err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
+	buf := bytes.NewBufferString("")
+	if err = tpl.Execute(buf, filebeatInputsData); err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
+
+	if err = ioutil.WriteFile("inputs.yml", buf.Bytes(), os.ModePerm); err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
+
+	controller.cache.changed = false
 }
 
 func (controller *Controller) syncFilebeatYamlByTotal() {

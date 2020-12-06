@@ -30,6 +30,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.Flags().String("node", "", "specified host node")
 	cmd.Flags().String("namespace", "", "watch specified namespace")
 	cmd.Flags().String("kubeconfig", "", "kubeconfig path file")
+	cmd.Flags().String("container-log-path", "/var/lib/docker/containers/", "container log root path")
 	cmd.Flags().Duration("sync-period", 10*time.Minute, "sync-period for sync resource to local store")
 
 	_ = viper.BindPFlag("debug", cmd.Flags().Lookup("debug"))
@@ -66,7 +67,6 @@ func startFilebeatControllerCmd(cmd *cobra.Command, args []string) {
 	}
 
 	if len(viper.GetString("namespace")) == 0 {
-		//currentNamespace = metav1.NamespaceAll
 		viper.Set("namespace", metav1.NamespaceAll)
 		log.Warnf("KUBERNETES_NAMESPACE is unset, will detect changes in all namespaces.")
 	}

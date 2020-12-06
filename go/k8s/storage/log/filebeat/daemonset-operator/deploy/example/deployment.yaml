@@ -20,21 +20,17 @@ spec:
   template:
     metadata:
       annotations:
-        logging.io/logsidecar-config: |-
+        k8s.io/log-config: |-
           {
             "containerLogConfigs": {
-              "nginx": {
-                "datavolume1": {
-                  "log_collector_type": 1,
-                  "log_type": 0,
-                  "topic": "filebeat-stdout",
-                  "hosts": "10.173.194.217:39092",
-                  "multiline_enable": false
-                }
-              }
+              "log_collector_type": "daemonset",
+              "log_type": "stdout",
+              "topic": "filebeat-stdout",
+              "hosts": "1.2.3.4:39092",
+              "containers": ["nginx"]
             }
           }
-        logsidecar-inject.logging-enable: enable
+        k8s.io/log-enable: "true"
       creationTimestamp: null
       labels:
         app: daemonset-stdout-test
