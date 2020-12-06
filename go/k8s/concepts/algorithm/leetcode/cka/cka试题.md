@@ -8,7 +8,9 @@ Create a new ServiceAccount named cicd-token in the existing namespace app-team1
 Limited to namespace app-team1, bind the new ClusterRole deployment-clusterrole to the new ServiceAccount cicd-token.
 
 ```yaml
-
+# 参考文档：
+# https://kubernetes.io/zh/docs/reference/access-authn-authz/rbac/#kubectl-create-clusterrolebinding
+# https://kubernetes.io/zh/docs/reference/access-authn-authz/service-accounts-admin/
 ---
 # kubectl create namespace app-team1
 # kubectl delete namespace app-team1
