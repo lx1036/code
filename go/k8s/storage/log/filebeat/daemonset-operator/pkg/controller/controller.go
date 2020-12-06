@@ -29,6 +29,11 @@ import (
 
 const Name = "filebeat"
 
+const (
+	LogEnableAnnotation = "k8s.io/log-enable"
+	LogConfigAnnotation = "k8s.io/log-config"
+)
+
 type LogController struct {
 	InformerResources []schema.GroupVersionResource
 	ApiServerClient   kubernetes.Interface
@@ -96,6 +101,8 @@ type Controller struct {
 
 	podInformer  cache.SharedIndexInformer
 	nodeInformer cache.SharedIndexInformer
+
+	cache *Cache
 }
 
 // Resource data
@@ -157,6 +164,7 @@ func NewController(informerFactory informers.SharedInformerFactory, client *kube
 		queue:           queue,
 		informerFactory: informerFactory,
 		client:          client,
+		cache:           newCache(),
 	}
 
 	podInformer := NewInformer(client, &coreV1.Pod{}, WatchOptions{
@@ -167,7 +175,7 @@ func NewController(informerFactory informers.SharedInformerFactory, client *kube
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    controller.AddPod,
 		UpdateFunc: controller.UpdatePod,
-		DeleteFunc: nil,
+		DeleteFunc: controller.DeletePod,
 	})
 	controller.podInformer = podInformer
 
@@ -181,9 +189,18 @@ func NewController(informerFactory informers.SharedInformerFactory, client *kube
 	return controller, nil
 }
 
+type Action string
+
+const (
+	Add    Action = "add"
+	Update Action = "update"
+	Delete Action = "delete"
+)
+
 type item struct {
 	object interface{}
 	key    string
+	action Action
 }
 
 func (controller *Controller) UpdatePod(oldObj, newObj interface{}) {
@@ -193,6 +210,7 @@ func (controller *Controller) UpdatePod(oldObj, newObj interface{}) {
 	if o != n {
 		controller.Enqueue(&item{
 			object: n,
+			action: Update,
 		})
 	}
 }
@@ -200,13 +218,33 @@ func (controller *Controller) UpdatePod(oldObj, newObj interface{}) {
 func (controller *Controller) AddPod(obj interface{}) {
 	controller.Enqueue(&item{
 		object: obj,
+		action: Add,
+	})
+}
+
+func (controller *Controller) DeletePod(obj interface{}) {
+	controller.Enqueue(&item{
+		object: obj,
+		action: Delete,
 	})
 }
 
 func (controller *Controller) Enqueue(item *item) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(item.object)
 	if err != nil {
+		log.Errorf("fail to get key for %v", item.object)
 		return
+	}
+
+	// filter pod without log configuration
+	pod, ok := item.object.(*coreV1.Pod)
+	if !ok {
+		log.Errorf("expected *coreV1.Pod but got %T", item.object)
+		return
+	}
+
+	if value, ok := pod.Annotations[LogEnableAnnotation]; !ok || value != "true" {
+
 	}
 
 	item.key = key
@@ -231,7 +269,19 @@ func (controller *Controller) Run(threadiness int, stopCh <-chan struct{}) error
 		}, time.Second*1, stopCh)
 	}
 
+	go wait.Until(controller.syncFilebeatYamlByIncremental, time.Second*30, stopCh)
+
+	go wait.Until(controller.syncFilebeatYamlByTotal, viper.GetDuration("sync-period"), stopCh)
+
 	return nil
+}
+
+func (controller *Controller) syncFilebeatYamlByIncremental() {
+
+}
+
+func (controller *Controller) syncFilebeatYamlByTotal() {
+
 }
 
 func (controller *Controller) process() bool {
@@ -268,6 +318,13 @@ func (controller *Controller) process() bool {
 		}
 
 		log.Infof("updating cache with pod %s/%s", pod.Namespace, pod.Name)
+
+		switch entry.action {
+		case Add, Update:
+			controller.cache.Set(entry.key, pod)
+		case Delete:
+			controller.cache.Delete(entry.key)
+		}
 
 		return nil
 	}(keyObj)

@@ -1,0 +1,23 @@
+{{range .FBInputs}}
+- type: log
+  hosts: {{.Hosts}}
+  paths:
+  {{range .Paths}}
+  - {{.}}
+  {{end}}
+
+  fields:
+    log_topic: "{{.Topic}}"
+    app_field: {{.CustomField}}
+
+  {{if eq .MultilineEnable true}}
+  multiline.pattern: '{{.MultilinePattern.MulPattern}}'
+  multiline.negate: {{.MultilinePattern.MulNegate}}
+  multiline.match: {{.MultilinePattern.MulMatch}}
+  {{end}}
+
+   tail_files: true
+   scan_frequency: 1s
+   max_backoff: 1s
+   backoff: 1s
+{{end}}
