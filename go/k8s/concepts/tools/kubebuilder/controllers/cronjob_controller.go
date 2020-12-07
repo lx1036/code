@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	"github.com/robfig/cron"
-	v1 "k8s-lx1036/k8s/concepts/kubebuilder/api/v1"
+	v1 "k8s-lx1036/k8s/concepts/tools/kubebuilder/api/v1"
 	kbatch "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

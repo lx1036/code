@@ -2,8 +2,8 @@ package builder
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/controller"
-	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/manager"
+	"k8s-lx1036/k8s/concepts/tools/kubebuilder/controller-runtime/pkg/controller"
+	"k8s-lx1036/k8s/concepts/tools/kubebuilder/controller-runtime/pkg/manager"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"

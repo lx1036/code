@@ -3,9 +3,9 @@ package controller
 import (
 	"fmt"
 	"github.com/go-logr/logr"
-	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/controller/internal"
-	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/controller/reconcile"
-	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/manager"
+	"k8s-lx1036/k8s/concepts/tools/kubebuilder/controller-runtime/pkg/controller/internal"
+	"k8s-lx1036/k8s/concepts/tools/kubebuilder/controller-runtime/pkg/controller/reconcile"
+	"k8s-lx1036/k8s/concepts/tools/kubebuilder/controller-runtime/pkg/manager"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"

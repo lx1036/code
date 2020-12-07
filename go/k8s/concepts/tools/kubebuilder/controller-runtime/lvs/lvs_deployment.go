@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"github.com/go-logr/logr"
-	v1 "k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/lvs/v1"
+	v1 "k8s-lx1036/k8s/concepts/tools/kubebuilder/controller-runtime/lvs/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	"os"
 	controllers "sigs.k8s.io/controller-runtime"

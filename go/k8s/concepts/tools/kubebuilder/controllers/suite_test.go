@@ -28,7 +28,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	v1 "k8s-lx1036/k8s/concepts/kubebuilder/api/v1"
+	v1 "k8s-lx1036/k8s/concepts/tools/kubebuilder/api/v1"
 	// +kubebuilder:scaffold:imports
 )
 

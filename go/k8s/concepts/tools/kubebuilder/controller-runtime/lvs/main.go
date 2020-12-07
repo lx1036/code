@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	v1 "k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/lvs/v1"
+	v1 "k8s-lx1036/k8s/concepts/tools/kubebuilder/controller-runtime/lvs/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"os"
