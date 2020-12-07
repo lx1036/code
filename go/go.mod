@@ -5,10 +5,12 @@ go 1.14
 require (
 	bou.ke/monkey v1.0.2
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
+	github.com/Shopify/sarama v1.19.0
 	github.com/astaxie/beego v1.12.1
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
 	github.com/containerd/containerd v1.3.2
+	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/getsentry/sentry-go v0.3.0
@@ -17,6 +19,7 @@ require (
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gohouse/gorose/v2 v2.1.3
+	github.com/golang/protobuf v1.4.2
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/btree v1.0.0
 	github.com/google/go-querystring v1.0.0
@@ -40,6 +43,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
 	github.com/prometheus/prometheus v2.5.0+incompatible
+	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 	github.com/robfig/cron v1.1.0
 	github.com/romanyx/polluter v1.2.2
 	github.com/rs/cors v1.7.0
@@ -49,7 +53,7 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
-	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
+	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71 // indirect
 	github.com/stretchr/testify v1.4.0
 	github.com/tidwall/evio v1.0.2
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
@@ -58,10 +62,13 @@ require (
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
 	go.etcd.io/bbolt v1.3.3
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200401174654-e694b7bb0875
+	go.opencensus.io v0.22.2 // indirect
 	go.uber.org/zap v1.14.1
+	golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299
+	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/grpc v1.27.0
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
@@ -75,7 +82,9 @@ require (
 	k8s.io/apiextensions-apiserver v0.18.6
 	k8s.io/apimachinery v0.18.6
 	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/code-generator v0.19.4 // indirect
 	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.0.0
 	k8s.io/kubernetes v1.18.3
 	k8s.io/sample-controller v0.18.3
 	sigs.k8s.io/controller-runtime v0.6.2

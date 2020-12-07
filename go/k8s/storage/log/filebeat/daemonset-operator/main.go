@@ -1,32 +1,15 @@
 package main
 
 import (
-	"flag"
-	log "github.com/sirupsen/logrus"
-	"k8s-lx1036/k8s/storage/log/filebeat/daemonset-operator/common"
-	"k8s-lx1036/k8s/storage/log/filebeat/daemonset-operator/controller"
+	"k8s-lx1036/k8s/storage/log/filebeat/daemonset-operator/pkg/cmd"
 	"os"
 )
 
-var (
-	kubeconfig = flag.String("kubeconfig", "", "Paths to a kubeconfig. Only required if out-of-cluster.")
-	host       = flag.String("host", "", "Specified node")
-	namespace  = flag.String("namespace", "", "Specified namespace")
-)
-
+// go run . --debug=true --node=docker4401
+// http://localhost:8001/metrics
 func main() {
-	flag.Parse()
-
-	log.SetOutput(os.Stdout)
-	log.SetFormatter(&log.JSONFormatter{})
-
-	options := &common.Options{
-		KubeConfig: *kubeconfig,
-		Host:       *host,
-		Namespace:  *namespace,
+	if err := cmd.NewRootCommand().Execute(); err != nil {
+		os.Exit(1)
 	}
-
-	ctl := controller.New(options)
-
-	ctl.Run()
+	os.Exit(0)
 }

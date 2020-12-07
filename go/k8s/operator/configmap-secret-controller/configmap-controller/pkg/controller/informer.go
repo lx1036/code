@@ -30,6 +30,30 @@ func NewInformer(client kubernetes.Interface, resource Resource, opts WatchOptio
 	var listwatch *cache.ListWatch
 	ctx := context.TODO()
 	switch resource.(type) {
+	case *ConfigMap:
+		cm := client.CoreV1().ConfigMaps(opts.Namespace)
+		listwatch = &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return cm.List(ctx, options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return cm.Watch(ctx, options)
+			},
+		}
+
+		objType = "configmap"
+	case *Secret:
+		secret := client.CoreV1().Secrets(opts.Namespace)
+		listwatch = &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return secret.List(ctx, options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return secret.Watch(ctx, options)
+			},
+		}
+
+		objType = "secret"
 	case *Pod:
 		p := client.CoreV1().Pods(opts.Namespace)
 		listwatch = &cache.ListWatch{

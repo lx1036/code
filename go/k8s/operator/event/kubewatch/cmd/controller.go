@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	"k8s-lx1036/k8s/plugins/event/kubewatch/pkg/event"
-	"k8s-lx1036/k8s/plugins/event/monitor/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

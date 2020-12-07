@@ -1,0 +1,19 @@
+[Log]
+  Layout = "plain"
+
+  [Log.Formats]
+    log = "{{.Log}}|{{.Cluster}}"
+    plain = ""
+
+  # ip地址是伪造的
+  [Log.Sources]
+    [Log.Sources.shbt]
+      Brokers = ["192.168.30.210:39092"]
+    [Log.Sources.zzzc]
+      Brokers = ["10.172.20.22:39092"]
+    [Log.Sources.shyc]
+      Brokers = ["192.168.30.210:39092"]
+    [Log.Sources.zzdt]
+      Brokers = ["10.172.20.22:39092"]
+    [Log.Sources.all]
+      Brokers = ["10.172.20.22:39092", "192.168.30.210:39092"]

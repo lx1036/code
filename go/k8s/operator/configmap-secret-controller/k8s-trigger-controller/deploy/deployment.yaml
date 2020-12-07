@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-demo
+  labels:
+    app: nginx-demo
+  annotations:
+    k8s.io/configMaps: configmap1,configmap2
+    k8s.io/secrets: secret1
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: nginx-demo
+      labels:
+        app: nginx-demo
+    spec:
+#      affinity:
+#        nodeAffinity:
+#          requiredDuringSchedulingIgnoredDuringExecution:
+#            nodeSelectorTerms:
+#              - matchExpressions:
+#                  - key: kubernetes.io/hostname
+#                    operator: In
+#                    values:
+#                      - docker4401
+      containers:
+        - name: nginx-demo
+          image: nginx:stable
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: "0.5"
+              memory: 0.5Gi
+          volumeMounts:
+            - mountPath: /tmp/cm
+              name: configmap1
+              subPath: key
+          env:
+            - name: IDC
+              valueFrom:
+                configMapKeyRef:
+                  key: idc
+                  name: configmap2
+            - name: STORAGE
+              valueFrom:
+                secretKeyRef:
+                  key: storage
+                  name: secret1
+      restartPolicy: Always
+      volumes:
+        - name: configmap1
+          configMap:
+            name: configmap1
+  selector:
+    matchLabels:
+      app: nginx-demo
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap1
+  annotations:
+    k8s.io/reload: "true"
+data:
+  key: abc123
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap2
+  annotations:
+    k8s.io/reload: "true"
+data:
+  idc: beijing
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret1
+  annotations:
+    k8s.io/reload: "true"
+type: Opaque
+data:
+  storage: Y2VwaGZzCg== # "cephfs"

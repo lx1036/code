@@ -5,9 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
-	"k8s-lx1036/k8s-ui/backend/database/lorm"
 	"k8s-lx1036/k8s-ui/backend/models"
-	"k8s-lx1036/k8s-ui/backend/util"
 	"net/http"
 )
 

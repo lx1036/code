@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	logf "sigs.k8s.io/controller-runtime/pkg/internal/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sync"
 	"time"

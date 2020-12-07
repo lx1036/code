@@ -2,12 +2,8 @@ package kubernetes
 
 import (
 	"encoding/json"
-	"k8s-lx1036/k8s-ui/backend/client"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
 	"k8s-lx1036/k8s-ui/backend/models"
-	"k8s-lx1036/k8s-ui/backend/resources/common"
-	"k8s-lx1036/k8s-ui/backend/resources/namespace"
-	"k8s-lx1036/k8s-ui/backend/util"
 	"k8s.io/apimachinery/pkg/labels"
 	"sync"
 )

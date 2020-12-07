@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	_ "k8s-lx1036/k8s-ui/backend/controllers/auth"
 	"k8s-lx1036/k8s-ui/backend/models"
-	routers_gin "k8s-lx1036/k8s-ui/backend/routers-gin"
 	"net/http"
 	"net/http/httptest"
 	"net/url"

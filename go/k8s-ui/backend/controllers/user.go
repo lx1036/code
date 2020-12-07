@@ -3,7 +3,6 @@ package controllers
 import (
 	"github.com/gin-gonic/gin"
 	"k8s-lx1036/k8s-ui/backend/controllers/base"
-	"k8s-lx1036/k8s-ui/backend/database/lorm"
 	"k8s-lx1036/k8s-ui/backend/models"
 	"net/http"
 )

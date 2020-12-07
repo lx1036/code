@@ -5,7 +5,6 @@ import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
 	"k8s-lx1036/k8s-ui/backend/models/response/errors"
-	"k8s-lx1036/k8s-ui/backend/util/hack"
 	"net/http"
 )
 

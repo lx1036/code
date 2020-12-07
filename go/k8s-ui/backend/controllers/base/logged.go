@@ -2,9 +2,7 @@ package base
 
 import (
 	"github.com/dgrijalva/jwt-go"
-	rsakey "k8s-lx1036/k8s-ui/backend/apikey"
 	"k8s-lx1036/k8s-ui/backend/models"
-	"k8s-lx1036/k8s-ui/backend/util/logs"
 	"net/http"
 	"strings"
 )

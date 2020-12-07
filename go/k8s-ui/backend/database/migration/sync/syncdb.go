@@ -6,7 +6,6 @@ import (
 	"github.com/astaxie/beego/orm"
 	_ "github.com/go-sql-driver/mysql" // import your used driver
 	_ "k8s-lx1036/k8s-ui/backend/models"
-	"k8s-lx1036/k8s-ui/backend/util/logs"
 )
 
 func init() {

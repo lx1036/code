@@ -2,7 +2,6 @@ package builder
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/client/apiutil"
 	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/controller"
 	"k8s-lx1036/k8s/concepts/kubebuilder/controller-runtime/pkg/manager"
 	"k8s.io/apimachinery/pkg/runtime"

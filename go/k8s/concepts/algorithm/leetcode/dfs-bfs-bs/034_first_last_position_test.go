@@ -6,7 +6,7 @@ import (
 )
 
 // https://leetcode-cn.com/problems/find-first-and-last-position-of-element-in-sorted-array/
-
+// https://leetcode-cn.com/leetbook/read/binary-search/xenp13/
 // 时间复杂度O(logN)
 func searchRange(nums []int, target int) []int {
 	n := len(nums)

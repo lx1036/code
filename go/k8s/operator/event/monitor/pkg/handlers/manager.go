@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	"k8s-lx1036/k8s/plugins/event/monitor/pkg/sources/events"
 	"sync"
 	"time"
 )

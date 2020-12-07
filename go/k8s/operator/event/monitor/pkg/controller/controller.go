@@ -1,17 +1,8 @@
 package controller
 
 import (
-	"fmt"
-	log "github.com/sirupsen/logrus"
-	"k8s-lx1036/k8s/plugins/event/monitor/pkg/handlers"
-	"k8s-lx1036/k8s/plugins/event/monitor/pkg/sources"
-	"k8s-lx1036/k8s/plugins/event/monitor/pkg/utils"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
+	"k8s-lx1036/k8s/operator/event/monitor/pkg/handlers"
+	"k8s-lx1036/k8s/operator/event/monitor/pkg/sources"
 	"time"
 )
 
