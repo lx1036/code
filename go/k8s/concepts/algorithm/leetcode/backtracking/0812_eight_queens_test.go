@@ -4,8 +4,7 @@ package backtracking
 
 // 回溯算法经典面试题
 
-
 func solveNQueens(n int) [][]string {
-	
+
 	return nil
 }

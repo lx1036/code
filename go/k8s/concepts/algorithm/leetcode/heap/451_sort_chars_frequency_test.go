@@ -1,6 +1,5 @@
 package heap
 
-
 // 最小堆
 
 // https://leetcode-cn.com/problems/sort-characters-by-frequency/
@@ -8,6 +7,3 @@ package heap
 func frequencySort(s string) string {
 	return ""
 }
-
-
-

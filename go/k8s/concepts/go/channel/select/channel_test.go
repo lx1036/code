@@ -17,17 +17,16 @@ import (
 func TestSelect(test *testing.T) {
 	stop := make(chan os.Signal)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-	
+
 	select {
 	case <-time.Tick(time.Second * 2):
 		fmt.Println("hello")
 	case <-stop:
 		fmt.Println("world")
 	}
-	
+
 	//<-stop
 }
-
 
 func demo2() {
 	stop := make(chan os.Signal)

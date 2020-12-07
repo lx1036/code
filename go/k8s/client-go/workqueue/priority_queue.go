@@ -2,11 +2,11 @@ package workqueue
 
 import "time"
 
-type t interface {}
+type t interface{}
 
 // 包装添加的数据，加上时间
 type waitFor struct {
-	data t
+	data    t
 	readyAt time.Time // 决定priority
 
 	// priority queue(heap)中的索引，即[]*waitFor数组中的索引index
@@ -34,7 +34,7 @@ func (pq waitForPriorityQueue) Peek() interface{} {
 	return pq[0]
 }
 
-func (pq *waitForPriorityQueue) Push(x interface{})  {
+func (pq *waitForPriorityQueue) Push(x interface{}) {
 	n := len(*pq)
 	item := x.(*waitFor)
 	item.index = n
@@ -48,5 +48,3 @@ func (pq *waitForPriorityQueue) Pop() interface{} {
 	*pq = (*pq)[0:(n - 1)]
 	return item
 }
-
-
