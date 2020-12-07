@@ -79,7 +79,7 @@ func (list *skipList) insert(index uint64, value interface{}) {
 	list.mutex.Lock()
 	defer list.mutex.Unlock()
 
-	previousNodes, currentNode := list.searchWithPreviousNodes(index)
+	previousNodes, _ := list.searchWithPreviousNodes(index)
 
 	newNode := newNode(index, value, list.randomLevel())
 

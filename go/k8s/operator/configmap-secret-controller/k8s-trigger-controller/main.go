@@ -5,7 +5,8 @@ import (
 	"os"
 )
 
-// https://github.com/mfojtik/k8s-trigger-controller
+// go run . --debug=true
+// http://localhost:8001/metrics
 func main() {
 	if err := cmd.NewRootCommand().Execute(); err != nil {
 		os.Exit(1)

@@ -1,0 +1,13 @@
+
+filebeat.config.inputs:
+  enabled: true
+  path: ${path.config}/inputs.d/*.yml
+  reload.enabled: true
+  reload.period: 10s
+output.kafka:
+  hosts: ["127.0.0.1"]
+  version: 0.9.0.1
+  topic: '%{[fields.log_topic]}'
+  required_acks: 1
+  compression: gzip
+  max_message_bytes: 1000000

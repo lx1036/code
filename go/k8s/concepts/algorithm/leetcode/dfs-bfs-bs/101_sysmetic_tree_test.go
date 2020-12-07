@@ -7,14 +7,12 @@ import (
 	"testing"
 )
 
-/**
- * Definition for a binary tree node.
- * type TreeNode struct {
- *     Val int
- *     Left *TreeNode
- *     Right *TreeNode
- * }
- */
+type TreeNode struct {
+	Val   int
+	Left  *TreeNode
+	Right *TreeNode
+}
+
 func isSymmetric(root *binary_search_tree.Node) bool {
 	if root == nil {
 		return true

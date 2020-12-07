@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	log "github.com/sirupsen/logrus"
-	"k8s-lx1036/k8s/storage/log/filebeat/daemonset-operator/controller/kubernetes"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	"os"

@@ -5,7 +5,6 @@ import (
 	"os"
 )
 
-// https://github.com/fabric8io/configmapcontroller
 func main() {
 	if err := cmd.NewRootCommand().Execute(); err != nil {
 		os.Exit(1)

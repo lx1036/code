@@ -1,0 +1,39 @@
+
+- type: log
+  hosts: http://1.2.3.4
+  paths:
+  
+  - /var/lib/docker/containers/1/1-json.log
+  
+  - /var/lib/docker/containers/2/2-json.log
+  
+  - /var/lib/docker/containers/3/3-json.log
+  
+  fields:
+    log_topic: "topic_1"
+    app_field: IDC=beijing
+  
+  tail_files: true
+  scan_frequency: 1s
+  max_backoff: 1s
+  backoff: 2s
+
+- type: log
+  hosts: http://2.3.4.5
+  paths:
+  
+  - /var/lib/docker/containers/1/1-json.log
+  
+  - /var/lib/docker/containers/2/2-json.log
+  
+  - /var/lib/docker/containers/3/3-json.log
+  
+  fields:
+    log_topic: "topic_2"
+    app_field: IDC=shanghai
+  
+  tail_files: true
+  scan_frequency: 1s
+  max_backoff: 1s
+  backoff: 2s
+
