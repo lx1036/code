@@ -1,0 +1,49 @@
+
+
+# https://github.com/cnych/kubeapp/blob/master/prometheus/prometheus-deploy.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  labels:
+    app: prometheus
+  namespace: kube-ops
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: prometheus
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http
+            - containerPort: 22
+              name: ssh
+          volumeMounts:
+            - mountPath: /home/git/data
+              name: data
+          livenessProbe:
+            httpGet:
+              port: 80
+              path: /
+            initialDelaySeconds: 180
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              port: 80
+              path: /
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+      volumes:
+        - name: data
+          emptyDir: {}
+  selector:
+    matchLabels:
+      app: prometheus
+---
