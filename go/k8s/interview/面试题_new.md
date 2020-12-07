@@ -74,6 +74,7 @@ redis setnx + expire 有什么缺点，如何优化？
 # 数据库
 建议：
 * 数据库和网络一定要重点复习。最重要的肯定是 Mysql，Mysql中比较重要的就是隔离级别和索引，一定一定要弄懂。然后就是 redis，也是经常会问的一个东西。
+* redis所有面试题，包含答案：https://leetcode-cn.com/circle/article/pLsmO2/
 
 
 
@@ -87,6 +88,35 @@ redis setnx + expire 有什么缺点，如何优化？
 
 
 (4)(头条面试题)Mysql 集群如何保证数据的一致性。分别回答了弱一致性和强一致性
+
+
+(5)[延迟队列]使用过 Redis 做异步队列么，你是怎么用的？redis如何实现延时队列？(学习时，记得参考k8s client-go workqueue包的delaying_queue)
+延时队列：延迟队列用途，比如我指定本技术文章在下周一发布，就需要把这篇文章的id和time消息加入延迟队列中，下周一才会pop item，进入文章发布程序。
+使用sortedset，拿时间戳作为 score，消息内容ID作为 key 调用 zadd 来生产消息，消费者用 zrangebyscore 指令获取 N 秒之前的数据轮询进行处理。
+```shell
+# https://medium.com/@cheukfung/redis%E5%BB%B6%E8%BF%9F%E9%98%9F%E5%88%97-c940850a264f
+# https://redis.io/commands/zadd zadd key score member [score member...]
+# 消费者通过ZRANGEBYSCORE获取消息。如果时间未到，将得不到消息；当时间已到或已超时，都可以得到消息
+ZADD delay-queue 1520985600 "publish article"
+ZRANGEBYSCORE delay-queue -inf 1520985599 WITHSCORES
+# (empty array)
+ZRANGEBYSCORE delay-queue -inf 1520985600 WITHSCORES
+# 1) "publish article"
+# 2) "1520985600"
+
+# 使用ZRANGEBYSCORE取得消息后，消息并没有从集合中删出，需要调用ZREM删除消息
+ZREM delay-queue "publish article"
+```
+
+golang实现delaying_queue: https://mp.weixin.qq.com/s/aZC2MXQFuUu00TgmOozwKQ
+
+
+
+
+(6)[分布式锁]使用过 Redis 分布式锁么，它是什么回事？如果在 setnx 之后执行 expire 之前进程意外 crash 或者要重启维护了，那会怎么样？
+先拿 setnx 来争抢锁，抢到之后，再用 expire 给锁加一个过期时间防止锁忘记了释放。
+set 指令有非常复杂的参数，这个应该是可以同时把 setnx 和 expire 合成一条指令来用的！
+
 
 
 
