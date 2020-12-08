@@ -39,6 +39,8 @@ redis setnx + expire 有什么缺点，如何优化？
 
 
 (1)(头条面试题)GMP 调度模型，很多面试官都会问这个，一定要好好复习，要讲出亮点，讲出其他同学讲不出的东西？
+典藏版Golang调度器GPM原理与调度全分析: https://www.jianshu.com/p/fa696563c38a
+
 
 
 (2)(头条面试题)Context 的用法?
@@ -48,6 +50,7 @@ redis setnx + expire 有什么缺点，如何优化？
 
 
 (4)(头条面试题)go的垃圾回收以及调度模型?go的垃圾回收，哪种机制?好在哪里，不好在哪里？
+典藏版Golang三色标记、混合写屏障GC模式图文全分析: https://www.jianshu.com/p/4c5a303af470
 
 
 (5)描述一下go的协程实现?
