@@ -1,6 +1,7 @@
 
 
-(1)Create a new ClusterRole named deployment-clusterrole that only allows the creation of the following resource types:
+(1) https://blog.csdn.net/shenhonglei1234/article/details/109413090
+Create a new ClusterRole named deployment-clusterrole that only allows the creation of the following resource types:
 Deployment
 StatefulSet
 DaemonSet
@@ -60,6 +61,7 @@ subjects:
 ```
 
 
-(2)Set the node named ek8s-node-1 as unavaliable and reschedule all the pods running on it.
+(2) https://blog.csdn.net/shenhonglei1234/article/details/109413090
+Set the node named ek8s-node-1 as unavaliable and reschedule all the pods running on it.
 
 
