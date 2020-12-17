@@ -6,7 +6,7 @@
 # Kubernetes学习笔记之namespace controller源码解析
 
 ## Overview
-本文章基于k8s release-1.17分支代码，代码位于 pkg/controller/namespace 目录。
+本文章基于k8s release-1.17分支代码，代码位于`pkg/controller/namespace`目录。
 namespace controller的主要作用是：删除一个namespace时，会删除该namespace下的所有资源对象，包括custom resource等资源。
 
 比如删除一个namespace，该namespace下内置的k8s资源对象role，也会被删除：
@@ -70,6 +70,7 @@ kubectl apply -f ./cr.yaml
 kubectl get crontab my-new-cron-object -n liuxiang3
 kubectl delete ns liuxiang3
 kubectl get crontab my-new-cron-object -n liuxiang3
+#报错： Error from server (NotFound): namespaces "liuxiang3" not found
 kubectl delete -f ./crd.yaml
 ```
 
@@ -79,7 +80,7 @@ kubectl delete -f ./crd.yaml
 
 
 ## 源码解析
-NamespaceController也是遵循生产者-消费者模式，分两步：生产者，注册特定资源的事件监听器，并把事件存入队列queue对象里；消费者，启动多个goroutine消费queue对象里的数据，执行相应的业务逻辑。
+NamespaceController也是遵循生产者-消费者模式，分两步：生产者，注册特定资源的事件监听器，并把事件存入队列queue对象里；消费者，启动多个goroutine消费queue对象里的数据，执行相应的业务逻辑，即删除该namespace下的所有资源对象。
 
 ### 注册事件监听器
 当kube-controller-manager进程启动时，会实例化一批controller，其中包括NamespaceController对象，代码见**[L447-L478](https://github.com/kubernetes/kubernetes/blob/release-1.17/cmd/kube-controller-manager/app/core.go#L447-L478)**:
@@ -208,7 +209,10 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 
 
 ### 业务逻辑
-该业务逻辑主要解决两个关键问题：
+该业务逻辑主要解决两个关键问题：如何找到该namespace下的所有资源对象；如何高效率地删除这些资源对象。
+
+
+
 
 
 

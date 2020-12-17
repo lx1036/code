@@ -9,9 +9,3 @@ import (
 func TestProcess(test *testing.T) {
 	fmt.Println(runtime.GOMAXPROCS(runtime.NumCPU()))
 }
-
-
-
-
-
-
