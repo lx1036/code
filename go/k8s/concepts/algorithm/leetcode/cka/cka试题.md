@@ -65,3 +65,34 @@ subjects:
 Set the node named ek8s-node-1 as unavaliable and reschedule all the pods running on it.
 
 
+# CKA Curriculum: https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.19.pdf
+
+
+## Module 1 - Cluster Architecture, Installation, and Configuration
+https://rx-m.com/cka-online-training/ckav2-online-training-module-1/
+
+
+
+
+## Module 2 - Workloads and Scheduling
+https://rx-m.com/cka-online-training/ckav2-online-training-module-2/
+
+
+
+## Module 3 - Services and Networking
+https://rx-m.com/cka-online-training/ckav2-online-training-module-3/
+
+
+
+
+## Module 4 - Storage
+https://rx-m.com/cka-online-training/ckav2-online-training-module-4/
+
+
+
+
+## Module 5 - Troubleshooting
+https://rx-m.com/cka-online-training/ckav2-online-training-module-5/
+
+
+
