@@ -2,6 +2,8 @@ package controller
 
 import (
 	"fmt"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/metadata"
 	"time"
 
 	"k8s-lx1036/k8s/concepts/components/controller-manager/namespace-controller/pkg/kube"
@@ -30,12 +32,20 @@ func NewNamespaceController() *NamespaceController {
 	informerFactory := informers.NewSharedInformerFactory(clientset, time.Minute*10)
 	namespaceInformer := informerFactory.Core().V1().Namespaces()
 	discoverResourcesFn := clientset.Discovery().ServerPreferredNamespacedResources
+	metadataClient, err := metadata.NewForConfig(kube.GetConfig())
+	if err != nil {
+		panic(err)
+	}
 
 	namespaceController := &NamespaceController{
-		queue:                      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
-		namespacedResourcesDeleter: NewNamespacedResourcesDeleter(discoverResourcesFn),
-		namespaceLister:            namespaceInformer.Lister(),
-		namespaceListerSynced:      namespaceInformer.Informer().HasSynced,
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
+		namespacedResourcesDeleter: NewNamespacedResourcesDeleter(discoverResourcesFn,
+			clientset.CoreV1().Namespaces(),
+			v1.FinalizerKubernetes,
+			metadataClient,
+		),
+		namespaceLister:       namespaceInformer.Lister(),
+		namespaceListerSynced: namespaceInformer.Informer().HasSynced,
 	}
 
 	return namespaceController
