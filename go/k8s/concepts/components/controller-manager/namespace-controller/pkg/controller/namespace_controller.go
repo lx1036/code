@@ -23,6 +23,8 @@ type NamespaceController struct {
 	queue                      workqueue.RateLimitingInterface
 	namespacedResourcesDeleter NamespacedResourcesDeleterInterface
 
+	informerFactory informers.SharedInformerFactory
+
 	namespaceLister       corev1.NamespaceLister
 	namespaceListerSynced cache.InformerSynced
 }
@@ -46,6 +48,7 @@ func NewNamespaceController() *NamespaceController {
 		),
 		namespaceLister:       namespaceInformer.Lister(),
 		namespaceListerSynced: namespaceInformer.Informer().HasSynced,
+		informerFactory:       informerFactory,
 	}
 
 	return namespaceController
@@ -53,10 +56,10 @@ func NewNamespaceController() *NamespaceController {
 
 func (controller *NamespaceController) Run(workers int, stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
-	defer controller.queue.ShutDown()
+
+	go controller.informerFactory.Start(stopCh)
 
 	log.Infof("Starting namespace controller")
-	defer log.Infof("Shutting down namespace controller")
 
 	if !cache.WaitForNamedCacheSync("namespace", stopCh, controller.namespaceListerSynced) {
 		return fmt.Errorf("kubernetes informer is unable to sync cache")
