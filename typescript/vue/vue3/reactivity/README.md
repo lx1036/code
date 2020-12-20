@@ -8,3 +8,5 @@
 ../../../node_modules/.bin/jest reactive.spec.ts
 ../../../node_modules/.bin/jest .
 ```
+
+阅读顺序：reactive -> ref -> effect -> computed -> readonly -> collections

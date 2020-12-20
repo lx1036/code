@@ -16,8 +16,8 @@ func main() {
 	log.SetOutput(os.Stdout)
 	log.SetFormatter(&log.JSONFormatter{})
 
-	sig := make(chan os.Signal)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	stop := make(chan os.Signal, 2)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{"127.0.0.1:2379"},
@@ -77,5 +77,5 @@ func main() {
 		time.Sleep(time.Second * 3)
 	}()
 
-	<-sig
+	<-stop
 }

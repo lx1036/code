@@ -2,15 +2,16 @@ package prometheus
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -70,18 +71,21 @@ func Init(options Options) {
 			},
 			[]string{"app", "module", "api", "method", "code", "idc"},
 		),
-		Histogram: prometheus.NewHistogramVec( // P95/P99
+		Histogram: prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
-				Name:    "response_duration_milliseconds",
-				Help:    "HTTP latency distributions",
-				Buckets: options.HistogramBuckets,
+				Namespace:   "",
+				Subsystem:   "",
+				Name:        "response_duration_milliseconds",
+				Help:        "HTTP latency distributions",
+				ConstLabels: nil,
+				//Buckets:     options.HistogramBuckets,
 			},
 			[]string{"app", "module", "api", "method", "idc"},
 		),
 	}
 
 	prometheus.MustRegister(Metrics.Counter)
-	prometheus.MustRegister(Metrics.Histogram)
+	//prometheus2.MustRegister(Metrics.Histogram)
 }
 
 // QPS
@@ -175,5 +179,23 @@ func MiddlewarePrometheusAccessLogger() gin.HandlerFunc {
 				log.Warn("need to init prometheus!!!")
 			}
 		}()
+
+		if _, ok := Metrics.WatchPath[context.Request.URL.Path]; ok {
+			latency := float64(time.Since(start).Milliseconds())
+			/*Metrics.LatencyLog(LatencyRecord{
+				Time:   latency,
+				Api:    context.Request.URL.Path,
+				Method: context.Request.Method,
+				Code:   context.Writer.Status(),
+			})*/
+
+			Metrics.QpsCounterLog(QpsRecord{
+				Api:    context.Request.URL.Path,
+				Method: context.Request.Method,
+				Code:   context.Writer.Status(),
+			})
+
+			fmt.Println(context.Request.URL.Path, context.Request.Method, context.Writer.Status(), latency)
+		}
 	}
 }

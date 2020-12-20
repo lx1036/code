@@ -939,8 +939,8 @@ https://kubernetes.io/docs/tasks/inject-data-application/define-environment-vari
 https://kubernetes.io/docs/concepts/storage/volumes/
 
 16.使node1节点不可调度，并重新分配该节点上的pod
-kubectldrain nodex
-kubectluncordon nodex
+kubectl drain nodex
+kubectl uncordon nodex
 https://kubernetes.io/docs/concepts/architecture/nodes/
 
 17.使用etcd 备份功能备份etcd（提供enpoints，ca、cert、key）

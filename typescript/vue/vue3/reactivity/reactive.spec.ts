@@ -5,17 +5,17 @@ import {reactive, isReactive} from './reactive';
  * @see [Vue3响应式系统源码解析(上)](https://zhuanlan.zhihu.com/p/85678790)
  */
 describe('reactive', () => {
-  mockWarn()
+  mockWarn();
   
   test('Object', () => {
-    const original = { foo: 1 }
-    const observed = reactive(original)
-    expect(observed).not.toBe(original)
-    expect(isReactive(observed)).toBe(true)
-    expect(isReactive(original)).toBe(false)
+    const original = { foo: 1 };
+    const observed = reactive(original);
+    expect(observed).not.toBe(original);
+    expect(isReactive(observed)).toBe(true);
+    expect(isReactive(original)).toBe(false);
     // get
-    console.log(observed.foo)
-    expect(observed.foo).toBe(1)
+    console.log(observed)
+    expect(observed['foo']).toBe(1)
     // has
     expect('foo' in observed).toBe(true)
     // ownKeys
