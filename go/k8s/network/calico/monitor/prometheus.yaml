@@ -1,0 +1,127 @@
+
+# https://docs.projectcalico.org/archive/v3.17/maintenance/monitor/monitor-component-metrics
+
+# calicoctl patch felixConfiguration default -p '{"spec":{"prometheusMetricsEnabled": true}}'
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: felix-metrics-svc
+  namespace: kube-system
+spec:
+  selector:
+    k8s-app: calico-node
+  ports:
+    - port: 9091
+      targetPort: 9091
+
+---
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: calico-monitoring
+  labels:
+    app:  ns-calico-monitoring
+    role: monitoring
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: calico-prometheus-user
+rules:
+  - apiGroups: [""]
+    resources:
+      - endpoints
+      - services
+      - pods
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: calico-prometheus-user
+  namespace: calico-monitoring
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: calico-prometheus-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: calico-prometheus-user
+subjects:
+  - kind: ServiceAccount
+    name: calico-prometheus-user
+    namespace: calico-monitoring
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: calico-monitoring
+data:
+  prometheus.yml: |-
+    global:
+      scrape_interval:   15s
+      external_labels:
+        monitor: 'tutorial-monitor'
+    scrape_configs:
+    - job_name: 'prometheus'
+      scrape_interval: 5s
+      static_configs:
+      - targets: ['localhost:9090']
+    - job_name: 'felix_metrics'
+      scrape_interval: 5s
+      scheme: http
+      kubernetes_sd_configs:
+      - role: endpoints
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        regex: felix-metrics-svc
+        replacement: $1
+        action: keep
+
+---
+
+# kubectl port-forward pod/prometheus-pod 9090:9090 -n calico-monitoring
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: prometheus-pod
+  namespace: calico-monitoring
+  labels:
+    app: prometheus-pod
+    role: monitoring
+spec:
+  serviceAccountName: calico-prometheus-user
+  containers:
+    - name: prometheus-pod
+      image: prom/prometheus
+      resources:
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
+      volumeMounts:
+        - name: config-volume
+          mountPath: /etc/prometheus/prometheus.yml
+          subPath: prometheus.yml
+      ports:
+        - containerPort: 9090
+  volumes:
+    - name: config-volume
+      configMap:
+        name: prometheus-config
+
