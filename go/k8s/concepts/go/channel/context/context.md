@@ -4,6 +4,8 @@
 **[6.1 上下文 Context](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-context/)**
 **[proposal: context: new package for standard library](https://github.com/golang/go/issues/14660)**
 
+**[golang context的一些思考](https://tech.ipalfish.com/blog/2020/03/30/golang-context/)**
+
 # Context 设计目的
 Golang核心库context的设计目的和使用，context库的设计目的主要是跟踪goroutine调用树，并在树中传递通知和数据:
 * (1)退出/过期通知，可以链式给树中每一个goroutine传递退出机制，集体退出。

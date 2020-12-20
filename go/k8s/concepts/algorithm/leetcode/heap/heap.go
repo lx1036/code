@@ -23,7 +23,7 @@ func Push(data Interface, x interface{}) {
 	up(data, data.Len()-1)
 }
 
-// 首先把最末端的结点与要删除节点的交换位置
+// 删除，首先把最末端的结点与要删除节点的交换位置
 func Pop(data Interface) interface{} {
 
 	// TODO: 为何要交换首位元素后，在下沉，最后才pop，感觉交换后下沉不是变回原来的tree么
@@ -35,6 +35,13 @@ func Pop(data Interface) interface{} {
 	return data.Pop()
 }
 
+// 删除堆中位置为i的元素
+func Remove(data Interface, i int) {
+	n := data.Len() - 1
+	data.Swap(i, n) // 用最后元素和待删除元素交换
+
+}
+
 func Fix(data Interface, i int) {
 
 }
@@ -42,6 +49,7 @@ func Fix(data Interface, i int) {
 // 自下而上比较和交换新节点和父节点位置，直到满足最小堆性质，即子节点小于等于父节点
 func up(data Interface, child int) {
 	for {
+		// slice里的i位置，左子节点为2i+1，右子节点2i+2
 		parent := (child - 1) / 2                        // 父节点位置
 		if child == parent || data.Less(parent, child) { // 要么升到最小堆顶端，要么父节点值比新插入的节点小
 			break
@@ -61,7 +69,7 @@ func down(data Interface, a, n int) {
 			break // current已经是叶子节点
 		}
 
-		// 求解min(left, child)
+		// 求解child=min(left, right)
 		child := left
 		if right := left + 1; right < n && data.Less(right, left) {
 			child = right

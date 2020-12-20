@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Node
+metadata:
+  name: docker4401
+spec:
+  podCIDR: 10.244.3.0/24
+  podCIDRs:
+    - 10.244.3.0/24
