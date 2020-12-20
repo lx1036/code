@@ -1,10 +1,9 @@
 package controller
 
 import (
-	"context"
 	"fmt"
-
 	"sync"
+	"time"
 
 	"k8s-lx1036/k8s/concepts/components/controller-manager/namespace-controller/pkg/debug"
 
@@ -18,7 +17,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
-	clientsetv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 )
 
@@ -65,7 +64,7 @@ type namespacedResourcesDeleter struct {
 
 	opCache *operationNotSupportedCache
 
-	namespaceClient clientsetv1.NamespaceInterface
+	clientset *kubernetes.Clientset
 
 	// The finalizer token that should be removed from the namespace
 	// when all resources in that namespace have been deleted.
@@ -77,14 +76,14 @@ type namespacedResourcesDeleter struct {
 
 func NewNamespacedResourcesDeleter(
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
-	namespaceClient clientsetv1.NamespaceInterface,
+	clientset *kubernetes.Clientset,
 	finalizerToken v1.FinalizerName,
 	metadataClient metadata.Interface,
 ) NamespacedResourcesDeleterInterface {
 
 	deleter := &namespacedResourcesDeleter{
 		discoverResourcesFn: discoverResourcesFn,
-		namespaceClient:     namespaceClient,
+		clientset:           clientset,
 		finalizerToken:      finalizerToken,
 		metadataClient:      metadataClient,
 	}
@@ -150,7 +149,7 @@ func (deleter *namespacedResourcesDeleter) retryOnConflictError(namespace *v1.Na
 			return nil, err
 		}
 		prevNamespace := latestNamespace
-		latestNamespace, err = deleter.namespaceClient.Get(context.TODO(), latestNamespace.Name, metav1.GetOptions{})
+		latestNamespace, err = deleter.clientset.CoreV1().Namespaces().Get(latestNamespace.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +168,7 @@ func (deleter *namespacedResourcesDeleter) updateNamespaceStatusFunc(namespace *
 	newNamespace := namespace.DeepCopy()
 	newNamespace.Status.Phase = v1.NamespaceTerminating
 
-	return deleter.namespaceClient.UpdateStatus(context.TODO(), newNamespace, metav1.UpdateOptions{})
+	return deleter.clientset.CoreV1().Namespaces().UpdateStatus(newNamespace)
 }
 
 // finalized returns true if the namespace.Spec.Finalizers is an empty list
@@ -197,7 +196,7 @@ func (deleter *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Names
 	}
 
 	// 调用api更新spec.finalizers字段
-	namespace, err := deleter.namespaceClient.Finalize(context.TODO(), &namespaceFinalize, metav1.UpdateOptions{})
+	namespace, err := deleter.clientset.CoreV1().Namespaces().Finalize(&namespaceFinalize)
 	if err != nil {
 		// it was removed already, so life is good
 		if errors.IsNotFound(err) {
@@ -225,7 +224,7 @@ func (deleter *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVers
 	// namespace itself.
 	background := metav1.DeletePropagationBackground
 	opts := metav1.DeleteOptions{PropagationPolicy: &background}
-	err := deleter.metadataClient.Resource(gvr).Namespace(namespace).DeleteCollection(context.TODO(), opts, metav1.ListOptions{})
+	err := deleter.metadataClient.Resource(gvr).Namespace(namespace).DeleteCollection(&opts, metav1.ListOptions{})
 	if err == nil {
 		return true, nil
 	}
@@ -249,16 +248,16 @@ func (deleter *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVers
 //  the list of items in the collection (if found)
 //  a boolean if the operation is supported
 //  an error if the operation is supported but could not be completed.
-func (d *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResource, namespace string) (*metav1.PartialObjectMetadataList, bool, error) {
+func (deleter *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResource, namespace string) (*metav1.PartialObjectMetadataList, bool, error) {
 	log.Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
 
 	key := operationKey{operation: operationList, gvr: gvr}
-	if !d.opCache.isSupported(key) {
+	if !deleter.opCache.isSupported(key) {
 		log.Infof("namespace controller - listCollection ignored since not supported - namespace: %s, gvr: %v", namespace, gvr)
 		return nil, false, nil
 	}
 
-	partialList, err := d.metadataClient.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{})
+	partialList, err := deleter.metadataClient.Resource(gvr).Namespace(namespace).List(metav1.ListOptions{})
 	if err == nil {
 		return partialList, true, nil
 	}
@@ -285,13 +284,63 @@ func (deleter *namespacedResourcesDeleter) deleteEachItem(gvr schema.GroupVersio
 	for _, item := range unstructuredList.Items {
 		background := metav1.DeletePropagationBackground
 		opts := metav1.DeleteOptions{PropagationPolicy: &background}
-		err = deleter.metadataClient.Resource(gvr).Namespace(namespace).Delete(context.TODO(), item.GetName(), opts)
+		err = deleter.metadataClient.Resource(gvr).Namespace(namespace).Delete(item.GetName(), &opts)
 		if err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (deleter *namespacedResourcesDeleter) estimateGracefulTerminationForPods(namespace string) (int64, error) {
+	log.Infof("namespace controller - estimateGracefulTerminationForPods - namespace %s", namespace)
+
+	podList, err := deleter.clientset.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return 0, err
+	}
+
+	// 找出所有pod.Spec.TerminationGracePeriodSeconds最大值
+	estimate := int64(0)
+	for _, pod := range podList.Items {
+		// filter out terminal pods
+		if v1.PodSucceeded == pod.Status.Phase || v1.PodFailed == pod.Status.Phase {
+			continue
+		}
+		if pod.Spec.TerminationGracePeriodSeconds != nil {
+			grace := *pod.Spec.TerminationGracePeriodSeconds
+			if grace > estimate {
+				estimate = grace
+			}
+		}
+	}
+
+	return estimate, nil
+}
+
+// 评估下graceful termination该namespace下所有pod资源所需要的时间
+func (deleter *namespacedResourcesDeleter) estimateGracefulTermination(gvr schema.GroupVersionResource, namespace string, namespaceDeletedAt metav1.Time) (int64, error) {
+	groupResource := gvr.GroupResource()
+	log.Infof("namespace controller - estimateGracefulTermination - group %s, resource: %s", groupResource.Group, groupResource.Resource)
+
+	estimate := int64(0)
+	var err error
+	switch groupResource {
+	case schema.GroupResource{Group: "", Resource: "pods"}:
+		estimate, err = deleter.estimateGracefulTerminationForPods(namespace)
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	// determine if the estimate is greater than the deletion timestamp
+	duration := time.Since(namespaceDeletedAt.Time)
+	allowedEstimate := time.Duration(estimate) * time.Second
+	if duration >= allowedEstimate {
+		estimate = int64(0)
+	}
+	return estimate, nil
 }
 
 type gvrDeletionMetadata struct {
@@ -304,8 +353,7 @@ type gvrDeletionMetadata struct {
 	finalizersToNumRemaining map[string]int
 }
 
-func (deleter *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(gvr schema.GroupVersionResource,
-	namespace string, namespaceDeletedAt metav1.Time) (gvrDeletionMetadata, error) {
+func (deleter *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(gvr schema.GroupVersionResource, namespace string, namespaceDeletedAt metav1.Time) (gvrDeletionMetadata, error) {
 	log.Infof("namespace controller - deleteAllContentForGroupVersionResource - namespace: %s, gvr: %v", namespace, gvr)
 
 	// 评估下删除该gvr所需要的时间
@@ -383,8 +431,18 @@ func (deleter *namespacedResourcesDeleter) deleteAllContentForGroupVersionResour
 	}, fmt.Errorf("unexpected items still remain in namespace: %s for gvr: %v", namespace, gvr)
 }
 
+type allGVRDeletionMetadata struct {
+	// gvrToNumRemaining is how many instances of the gvr remain
+	gvrToNumRemaining map[schema.GroupVersionResource]int
+	// finalizersToNumRemaining maps finalizers to how many resources are stuck on them
+	finalizersToNumRemaining map[string]int
+}
+
 func (deleter *namespacedResourcesDeleter) deleteAllContent(namespace *v1.Namespace) (int64, error) {
 	log.Infof("namespace controller - deleteAllContent - namespace: %s", namespace.Name)
+
+	estimate := int64(0)
+	conditionUpdater := namespaceConditionUpdater{}
 
 	var errs []error
 	resources, err := deleter.discoverResourcesFn()
@@ -403,7 +461,12 @@ func (deleter *namespacedResourcesDeleter) deleteAllContent(namespace *v1.Namesp
 		conditionUpdater.ProcessGroupVersionErr(err)
 	}
 
+	numRemainingTotals := allGVRDeletionMetadata{
+		gvrToNumRemaining:        map[schema.GroupVersionResource]int{},
+		finalizersToNumRemaining: map[string]int{},
+	}
 	for gvr := range groupVersionResources {
+		// 根据gvr删除资源，有的资源支持批量删除，有的资源需要一个个删除
 		gvrDeletionMetadata, err := deleter.deleteAllContentForGroupVersionResource(gvr, namespace.Name, *namespace.DeletionTimestamp)
 		if err != nil {
 			// If there is an error, hold on to it but proceed with all the remaining
@@ -433,7 +496,7 @@ func (deleter *namespacedResourcesDeleter) deleteAllContent(namespace *v1.Namesp
 	// we need to reflect that information.  Recall that additional finalizers can be set on namespaces, so this finalizer may clear itself and
 	// NOT remove the resource instance.
 	if hasChanged := conditionUpdater.Update(namespace); hasChanged {
-		if _, err = deleter.namespaceClient.UpdateStatus(context.TODO(), namespace, metav1.UpdateOptions{}); err != nil {
+		if _, err = deleter.clientset.CoreV1().Namespaces().UpdateStatus(namespace); err != nil {
 			utilruntime.HandleError(fmt.Errorf("couldn't update status condition for namespace %q: %v", namespace, err))
 		}
 	}
@@ -448,7 +511,7 @@ func (deleter *namespacedResourcesDeleter) deleteAllContent(namespace *v1.Namesp
 // 删除后：移除namespace.Spec.Finalizers并finalize下namespace
 func (deleter *namespacedResourcesDeleter) Delete(namespaceName string) error {
 	// 首先从etcd中捞出namespace对象最新状态，防止已经被删除了
-	namespace, err := deleter.namespaceClient.Get(context.TODO(), namespaceName, metav1.GetOptions{})
+	namespace, err := deleter.clientset.CoreV1().Namespaces().Get(namespaceName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil

@@ -2,19 +2,19 @@ package controller
 
 import (
 	"fmt"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/metadata"
 	"time"
 
 	"k8s-lx1036/k8s/concepts/components/controller-manager/namespace-controller/pkg/kube"
 
 	log "github.com/sirupsen/logrus"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	corev1 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -42,7 +42,7 @@ func NewNamespaceController() *NamespaceController {
 	namespaceController := &NamespaceController{
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
 		namespacedResourcesDeleter: NewNamespacedResourcesDeleter(discoverResourcesFn,
-			clientset.CoreV1().Namespaces(),
+			clientset,
 			v1.FinalizerKubernetes,
 			metadataClient,
 		),
