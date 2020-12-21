@@ -70,6 +70,11 @@ Set the node named ek8s-node-1 as unavaliable and reschedule all the pods runnin
 
 ## Module 1 - Cluster Architecture, Installation, and Configuration
 https://rx-m.com/cka-online-training/ckav2-online-training-module-1/
+第一部分主要考察内容：
+* RBAC
+* [我的k8s升级原则]控制组件kube-apiserver/kube-controller-manager/kube-scheduler版本保持一致；计算组件kubelet/kube-proxy版本保持一致，且必须比控制组件小一个版本。
+
+
 
 
 
