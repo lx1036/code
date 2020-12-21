@@ -19,7 +19,7 @@ kubectl get role roletest -o yaml -n liuxiang3
 #报错： Error from server (NotFound): namespaces "liuxiang3" not found
 ```
 
-![del_ns_resource](./img/del_ns_resource.png)
+![del_ns_resource](./imgs/del_ns_resource.png)
 
 或者删除一个namespace，该namespace下的custom resource对象也会被删除：
 
@@ -74,7 +74,7 @@ kubectl get crontab my-new-cron-object -n liuxiang3
 kubectl delete -f ./crd.yaml
 ```
 
-![del_ns_crd](./img/del_ns_crd.png)
+![del_ns_crd](./imgs/del_ns_crd.png)
 
 那么，namespace controller是如何做到删除一个namespace，会迭代删除该namespace下所有资源对象，包括k8s内置资源对象和custom resource对象的呢？
 
