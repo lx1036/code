@@ -6,7 +6,7 @@
 # Kubernetes学习笔记之namespace controller源码解析
 
 ## Overview
-本文章基于k8s release-1.17分支代码，代码位于`pkg/controller/namespace`目录。
+本文章基于k8s release-1.17分支代码，代码位于`pkg/controller/namespace`目录，代码在 **[namespace_controller.go](https://github.com/kubernetes/kubernetes/blob/release-1.17/pkg/controller/namespace/namespace_controller.go)** 。
 namespace controller的主要作用是：删除一个namespace时，会删除该namespace下的所有资源对象，包括custom resource等资源。
 
 比如删除一个namespace，该namespace下内置的k8s资源对象role，也会被删除：

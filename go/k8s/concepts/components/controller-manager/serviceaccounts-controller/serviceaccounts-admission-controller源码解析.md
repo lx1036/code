@@ -2,7 +2,7 @@
 # Kubernetes学习笔记之ServiceAccount AdmissionController源码解析
 
 ## Overview
-本文章基于k8s release-1.17分支代码，代码位于`plugin/pkg/admission/serviceaccount`目录，代码：**[admission.go](https://github.com/kubernetes/kubernetes/blob/release-1.17/plugin/pkg/admission/serviceaccount/admission.go)**。
+本文章基于k8s release-1.17分支代码，代码位于`plugin/pkg/admission/serviceaccount`目录，代码：**[admission.go](https://github.com/kubernetes/kubernetes/blob/release-1.17/plugin/pkg/admission/serviceaccount/admission.go)** 。
 
 api-server作为常用的服务端应用，包含认证模块Authentication、授权模块Authorization和准入模块Admission Plugin(可以理解为请求中间件模块middleware pipeline)，以及存储依赖Etcd。
 其中，针对准入插件，在api-server进程启动时，启动参数`--enable-admission-plugins`需要包含`ServiceAccount`准入控制器来开启该中间件，可以见官方文档：**[enable-admission-plugins](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/)** 。
