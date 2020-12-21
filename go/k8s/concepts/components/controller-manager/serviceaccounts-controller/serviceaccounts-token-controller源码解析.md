@@ -4,7 +4,7 @@
 本文章基于k8s release-1.17分支代码，代码位于`pkg/controller/serviceaccount`目录，代码：**[tokens_controller.go](https://github.com/kubernetes/kubernetes/blob/release-1.17/pkg/controller/serviceaccount/tokens_controller.go)** 。
 
 ## Overview
-在**[Kubernetes学习笔记之ServiceAccount AdmissionController源码解析]()**文章中知道一个ServiceAccount对象都会引用一个
+在**[Kubernetes学习笔记之ServiceAccount AdmissionController源码解析]()**文章中，知道一个ServiceAccount对象都会引用一个
 `type="kubernetes.io/service-account-token"` 的secret对象，这个secret对象内的`ca.crt`、`namespace`和`token`数据会被挂载到pod内的
 每一个容器，供调用api-server时认证授权使用。
 
@@ -23,7 +23,7 @@ kubectl get secret test-sa1-token-jg6lm -o yaml
 ## 源码解析
 
 ### TokensController实例化
-实际上这是由kube-controller-manager的TokenController实现的，该kube-controller-manager进程在启动时参数有`--root-ca-file`和`--service-account-private-key-file`，
+实际上这是由kube-controller-manager的TokenController实现的，kube-controller-manager进程的启动参数有`--root-ca-file`和`--service-account-private-key-file`，
 其中，`--root-ca-file`就是上图中的`ca.crt`数据，`--service-account-private-key-file`是用来签名上图中的jwt token数据，即`token`字段值。
 
 当kube-controller-manager进程在启动时，会首先实例化TokensController，并传递实例化所需相关参数。
@@ -152,6 +152,7 @@ func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 ```go
 func (e *TokensController) syncServiceAccount() {
 	// ...
+	// 
 	sa, err := e.getServiceAccount(saInfo.namespace, saInfo.name, saInfo.uid, false)
 	switch {
 	case err != nil:
@@ -180,4 +181,12 @@ func (e *TokensController) syncServiceAccount() {
 #### Secret的增删改查
 
 
+
+
+# 参考文献
+
+
+# 学习点
+https://github.com/kubernetes/kubernetes/blob/release-1.17/pkg/controller/serviceaccount/tokens_controller.go#L106 使用了
+LRU cache。
 
