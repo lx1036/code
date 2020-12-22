@@ -1,8 +1,6 @@
 package basicauth
 
-import (
-	"github.com/caddyserver/caddy/caddyhttp/httpserver"
-)
+import "github.com/caddyserver/caddy/caddyhttp/httpserver"
 
 func init() {
 	caddy.RegisterPlugin("basicauth", caddy.Plugin{
