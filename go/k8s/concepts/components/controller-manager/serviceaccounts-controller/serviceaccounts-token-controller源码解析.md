@@ -170,23 +170,199 @@ func (e *TokensController) syncServiceAccount() {
 }
 ```
 
-先看如何删除其引用的secret对象的业务逻辑：
+先看如何删除其引用的secret对象的业务逻辑，删除逻辑也很简单：
+
+```go
+func (e *TokensController) deleteTokens(serviceAccount *v1.ServiceAccount) ( /*retry*/ bool, error) {
+	// list出该serviceAccount所引用的所有secret
+	tokens, err := e.listTokenSecrets(serviceAccount)
+	// ...
+	for _, token := range tokens {
+		// 在一个个删除secret对象
+		r, err := e.deleteToken(token.Namespace, token.Name, token.UID)
+		// ...
+	}
+	// ...
+}
+func (e *TokensController) deleteToken(ns, name string, uid types.UID) ( /*retry*/ bool, error) {
+    // ...
+	// 对api-server发起删除secret对象资源的请求
+    err := e.client.CoreV1().Secrets(ns).Delete(name, opts)
+    // ...
+}
+```
+
+这里关键是如何找到serviceAccount所引用的所有secret对象，不能通过serviceAccount.secrets字段来查找，因为这个字段值只是所有secrets的部分值。
+实际上，从缓存中，首先list出该serviceAccount对象所在的namespace下所有secrets，然后过滤出type=kubernetes.io/service-account-token类型的
+secret，然后查找secret annotation中的`kubernetes.io/service-account.name`应该是serviceAccount.Name值，和`kubernetes.io/service-account.uid`
+应该是serviceAccount.UID值。只有满足以上条件，才是该serviceAccount所引用的secrets。
+首先从缓存中找出该namespace下所有secrets，这里需要注意的是缓存对象updatedSecrets使用的是LRU(Least Recently Used) Cache最少使用缓存，提高查找效率：
+```go
+func (e *TokensController) listTokenSecrets(serviceAccount *v1.ServiceAccount) ([]*v1.Secret, error) {
+	// 从LRU cache中查找出该namespace下所有secrets
+	namespaceSecrets, err := e.updatedSecrets.ByIndex("namespace", serviceAccount.Namespace)
+	// ...
+	items := []*v1.Secret{}
+	for _, obj := range namespaceSecrets {
+		secret := obj.(*v1.Secret)
+		// 判断只有符合相应条件才是该serviceAccount所引用的secret
+		if serviceaccount.IsServiceAccountToken(secret, serviceAccount) {
+			items = append(items, secret)
+		}
+	}
+	return items, nil
+}
+// 判断条件
+func IsServiceAccountToken(secret *v1.Secret, sa *v1.ServiceAccount) bool {
+    if secret.Type != v1.SecretTypeServiceAccountToken {
+        return false
+    }
+    name := secret.Annotations[v1.ServiceAccountNameKey]
+    uid := secret.Annotations[v1.ServiceAccountUIDKey]
+    if name != sa.Name {
+        return false
+    }
+    if len(uid) > 0 && uid != string(sa.UID) {
+        return false
+    }
+    return true
+}
+```
+
+所以，当ServiceAccount对象删除时，需要删除其所引用的所有Secrets对象。
 
 
+再看如何新建secret对象的业务逻辑。当新建或更新ServiceAccount对象时，需要确保其引用的Secrets对象存在，不存在就需要新建个secret对象：
+```go
+// 检查该ServiceAccount对象引用的secrets对象存在，不存在则新建
+func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccount) (bool, error) {
+	// 首先确保serviceAccount.secrets字段值中的secret都存在
+	if hasToken, err := e.hasReferencedToken(serviceAccount); err != nil {
+		return false, err
+	} else if hasToken {
+		return false, nil
+	}
 
-再看如何新建secret对象的业务逻辑：
+	// 对api-server发起请求查找该serviceAccount对象
+	serviceAccounts := e.client.CoreV1().ServiceAccounts(serviceAccount.Namespace)
+	liveServiceAccount, err := serviceAccounts.Get(serviceAccount.Name, metav1.GetOptions{})
+	// ...
+	if liveServiceAccount.ResourceVersion != serviceAccount.ResourceVersion {
+		return true, nil
+	}
 
+	// 如果是新建的ServiceAccount，则给ServiceAccount.secrets字段值添加个默认生成的secret对象
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secret.Strategy.GenerateName(fmt.Sprintf("%s-token-", serviceAccount.Name)),
+			Namespace: serviceAccount.Namespace,
+			Annotations: map[string]string{
+				v1.ServiceAccountNameKey: serviceAccount.Name, // 这里使用serviceAccount.Name来作为annotation
+				v1.ServiceAccountUIDKey:  string(serviceAccount.UID), // 这里使用serviceAccount.UID来作为annotation
+			},
+		},
+		Type: v1.SecretTypeServiceAccountToken,
+		Data: map[string][]byte{},
+	}
+
+	// 生成jwt token，该token是用私钥签名的
+	token, err := e.token.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *secret))
+	// ...
+	secret.Data[v1.ServiceAccountTokenKey] = []byte(token)
+	secret.Data[v1.ServiceAccountNamespaceKey] = []byte(serviceAccount.Namespace)
+	if e.rootCA != nil && len(e.rootCA) > 0 {
+		secret.Data[v1.ServiceAccountRootCAKey] = e.rootCA
+	}
+
+	// 向api-server中创建该secret对象
+	createdToken, err := e.client.CoreV1().Secrets(serviceAccount.Namespace).Create(secret)
+	// ...
+	// 写入LRU cache中
+	e.updatedSecrets.Mutation(createdToken)
+
+	err = clientretry.RetryOnConflict(clientretry.DefaultRetry, func() error {
+		// ...
+		// 把新建的secrets对象放入ServiceAccount.Secrets字段中，然后更新ServiceAccount对象
+		liveServiceAccount.Secrets = append(liveServiceAccount.Secrets, v1.ObjectReference{Name: secret.Name})
+		if _, err := serviceAccounts.Update(liveServiceAccount); err != nil {
+			return err
+		}
+		// ...
+	})
+
+	// ...
+}
+```
+
+所以，当ServiceAccount对象新建时，需要新建个新的Secret对象作为ServiceAccount对象的引用。业务代码还是比较简单的。
 
 
 #### Secret的增删改查
+当增删改查secret时，删除secret时同时需要删除serviceAccount对象下的secrets字段引用；
+
+```go
+func (e *TokensController) syncSecret() {
+	// ...
+	// 从LRU Cache中查找该secret
+	secret, err := e.getSecret(secretInfo.namespace, secretInfo.name, secretInfo.uid, false)
+	switch {
+	case err != nil:
+		klog.Error(err)
+		retry = true
+	case secret == nil:
+		// 删除secret时：
+		// 查找serviceAccount对象是否存在
+		if sa, saErr := e.getServiceAccount(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, false); saErr == nil && sa != nil {
+			// 从service中删除其secret引用
+			if err := clientretry.RetryOnConflict(RemoveTokenBackoff, func() error {
+				return e.removeSecretReference(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, secretInfo.name)
+			}); err != nil {
+				klog.Error(err)
+			}
+		}
+	default:
+		// 新建或更新secret时：
+		// 查找serviceAccount对象是否存在
+		sa, saErr := e.getServiceAccount(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, true)
+		switch {
+		case saErr != nil:
+			klog.Error(saErr)
+			retry = true
+		case sa == nil:
+			// 如果serviceAccount都已经不存在，删除secret
+			if retriable, err := e.deleteToken(secretInfo.namespace, secretInfo.name, secretInfo.uid); err != nil {
+                // ...
+			}
+		default:
+			// 新建或更新secret时，且serviceAccount存在时，查看是否需要更新secret中的ca/namespace/token字段值
+			// 当然，新建secret时，肯定需要更新
+			if retriable, err := e.generateTokenIfNeeded(sa, secret); err != nil {
+				// ...
+			}
+		}
+	}
+}
+```
+
+所以，对kubernetes.io/service-account-token type的Secret增删改查的业务逻辑，也比较简单。重点是学习下官方golang代码编写和一些有关k8s api
+的使用，对自己二次开发k8s大有裨益。
 
 
+## 总结
+本文主要学习TokensController是如何监听ServiceAccount对象和"kubernetes.io/service-account-token"类型Secret对象的增删改查，并做了相应的业务逻辑处理，
+比如新建ServiceAccount时需要新建对应的Secret对象，删除ServiceAccount需要删除对应的Secret对象，以及新建Secret对象时，还需要给该Secret对象补上ca.crt/namespace/token
+字段值，以及一些边界条件的处理逻辑等等。
+
+同时，官方的TokensController代码编写规范，以及对k8s api的应用，边界条件的处理，以及使用了LRU Cache缓存等等，都值得在自己的项目里参(chao)考(xi)。
 
 
-# 参考文献
-
-
-# 学习点
-https://github.com/kubernetes/kubernetes/blob/release-1.17/pkg/controller/serviceaccount/tokens_controller.go#L106 使用了
+## 学习要点
+**[tokens_controller.go L106](https://github.com/kubernetes/kubernetes/blob/release-1.17/pkg/controller/serviceaccount/tokens_controller.go#L106) 使用了
 LRU cache。
+
+
+## 参考文献
+**[为 Pod 配置服务账户](https://kubernetes.io/zh/docs/tasks/configure-pod-container/configure-service-account/)**
+**[服务账号令牌 Secret](https://kubernetes.io/zh/docs/concepts/configuration/secret/#service-account-token-secrets)**
+
 
