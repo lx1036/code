@@ -11,6 +11,7 @@ data:
   typha_service_name: "none"
   # Configure the backend to use.
   calico_backend: "bird"
+
   # Configure the MTU to use for workload interfaces and the
   # tunnels.  For IPIP, set to your network MTU - 20; for VXLAN
   # set to your network MTU - 50.
@@ -26,6 +27,7 @@ data:
         {
           "type": "calico",
           "log_level": "info",
+          "log_file_path": "/var/log/calico/cni/cni.log",
           "datastore_type": "kubernetes",
           "nodename": "__KUBERNETES_NODE_NAME__",
           "mtu": __CNI_MTU__,

@@ -4,7 +4,6 @@ namespace: kube-system
 resources:
   - crd.yml
   - configmap.yml
-  - serviceaccount.yml
   - clusterrole.yml
   - deployment.yml
   - daemonset.yml
