@@ -17,3 +17,10 @@ Calico can run BGP in three modes:
 > https://docs.projectcalico.org/reference/architecture/design/l2-interconnect-fabric
 
 > ToR Switch: Top of Rack，机顶交换机；Spine Switch: 机柜间交换机，在上一层可以认为是机房交换机。
+
+
+交换机开启BGP过程：
+如果是一台新的交换机的话 它上面是没有开启BGP的 我得手动给他弄一下
+1. 在TOR交换机（直连服务器的那台）开启BGP
+2. 把TOR和核心建立BGP邻居
+3. 把新TOR交换机加到NOSA(Network Operation Standard API)数据库里，然后同步数据
