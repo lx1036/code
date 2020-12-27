@@ -13,10 +13,37 @@ import (
 func TestLRU(test *testing.T) {
 	l, _ := tslru.New(128)
 	for i := 0; i < 256; i++ {
-		l.Add(i, nil)
+		l.Add(i, i)
 	}
 	if l.Len() != 128 {
 		panic(fmt.Sprintf("bad len: %v", l.Len()))
+	}
+}
+
+func TestLRU2(test *testing.T) {
+	l, _ := NewLRU(128)
+	for i := 0; i < 256; i++ {
+		l.Add(i, i)
+	}
+	if l.Len() != 128 {
+		panic(fmt.Sprintf("bad len: %v", l.Len()))
+	}
+}
+
+func TestSimpleLRU2(test *testing.T) {
+	l, _ := NewLRU(128)
+	for i := 0; i < 256; i++ {
+		l.Add(i, i)
+	}
+	if l.Len() != 128 {
+		panic(fmt.Sprintf("bad len: %v", l.Len()))
+	}
+
+	// 这里v==i+128才正确，0-127已经被删除了
+	for i, k := range l.Keys() {
+		if v, ok := l.Get(k); !ok || v != k || v != i+128 {
+			test.Fatalf("bad key: %v", k)
+		}
 	}
 }
 

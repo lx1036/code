@@ -12,11 +12,15 @@ type Element struct {
 	Value interface{}
 }
 
+// root这个设计很巧妙，连着双向链表的head和tail，可以看Front()和Back()函数
+// 获取双向链表的第一个和最后一个元素。root类似一个占位元素
 type list struct {
 	root Element
 	len  int
 }
 
+// root是一个empty Element，作为补位元素使得list为一个ring
+// list.root.next 是双向链表的第一个元素；list.root.prev 是双向链表的最后一个元素
 func (l *list) Init() *list {
 	l.root.prev = &l.root
 	l.root.next = &l.root
@@ -102,9 +106,18 @@ func (l *list) Remove(e *Element) {
 	l.len--
 }
 
+func (l *list) Prev(e *Element) *Element {
+	p := e.prev
+	if p != &l.root {
+		return p
+	}
+
+	return nil
+}
+
 type LRU struct {
 	// 指定LRU固定长度，超过的旧数据则移除
-	size int
+	capacity int
 
 	// 双向链表，链表存储每一个*list.Element
 	cache *list
@@ -118,15 +131,15 @@ type Entry struct {
 	value interface{}
 }
 
-func NewLRU(size int) (*LRU, error) {
-	if size <= 0 {
-		return nil, fmt.Errorf("size must be positive")
+func NewLRU(capacity int) (*LRU, error) {
+	if capacity <= 0 {
+		return nil, fmt.Errorf("capacity must be positive")
 	}
 
 	cache := &LRU{
-		size:  size,
-		cache: new(list).Init(),
-		items: make(map[interface{}]*Element),
+		capacity: capacity,
+		cache:    new(list).Init(),
+		items:    make(map[interface{}]*Element),
 	}
 
 	return cache, nil
@@ -140,17 +153,17 @@ func (c *LRU) Purge() {
 func (c *LRU) Add(key, value interface{}) (evicted bool) {
 	// (key,value)已经存在LRU中
 	if element, ok := c.items[key]; ok {
-		c.cache.MoveToFront(element)         // 从双向链表中置前
+		c.cache.MoveToFront(element)         // 从双向链表中置前，从原有位置删除，然后置最前
 		element.Value.(*Entry).value = value // 更新值
 
 		return false
 	}
 
 	entry := &Entry{key: key, value: value}
-	ent := c.cache.PushFront(entry)
+	ent := c.cache.PushFront(entry) // 新元素置最前
 	c.items[key] = ent
 
-	evict := c.cache.Len() > c.size
+	evict := c.cache.Len() > c.capacity
 	if evict {
 		// 如果超过指定长度，移除旧数据
 		c.removeOldest()
@@ -184,4 +197,21 @@ func (c *LRU) removeElement(element *Element) {
 	key := element.Value.(*Entry).key
 	// 别忘了从哈希表中删除Entry.key
 	delete(c.items, key)
+}
+
+// 双向链表的长度
+func (c *LRU) Len() int {
+	return c.cache.Len()
+}
+
+// Keys returns a slice of the keys in the cache, from oldest to newest.
+func (c *LRU) Keys() []interface{} {
+	keys := make([]interface{}, len(c.items))
+	i := 0
+	for ent := c.cache.Back(); ent != nil; ent = c.cache.Prev(ent) {
+		keys[i] = ent.Value.(*Entry).key
+		i++
+	}
+
+	return keys
 }

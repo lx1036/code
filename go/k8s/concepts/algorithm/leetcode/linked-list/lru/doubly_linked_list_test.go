@@ -1,14 +1,14 @@
 package lru
 
 import (
-	"container/list"
+	golist "container/list"
 	"fmt"
 	"testing"
 )
 
 func TestDoublyLinkedList(test *testing.T) {
 	// Create a new list and put some numbers in it.
-	l := list.New()
+	l := golist.New()
 	e4 := l.PushBack(4)
 	e1 := l.PushFront(1)
 	l.InsertBefore(3, e4)
