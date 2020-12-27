@@ -1,6 +1,6 @@
 
 
-**[浅谈 Kubernetes Namespace Controller 及其工作原理](https://mp.weixin.qq.com/s/PLDwYkrySNw5M8tEPkVjng)**
+
 
 
 # Kubernetes学习笔记之namespace controller源码解析
@@ -220,4 +220,3 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 
 ## 参考文献
 **[浅谈 Kubernetes Namespace Controller 及其工作原理](https://mp.weixin.qq.com/s/PLDwYkrySNw5M8tEPkVjng)**
-

@@ -45,6 +45,49 @@ func TestSimpleLRU2(test *testing.T) {
 			test.Fatalf("bad key: %v", k)
 		}
 	}
+
+	for i := 0; i < 128; i++ {
+		_, ok := l.Get(i)
+		if ok {
+			test.Fatalf("should be evicted")
+		}
+	}
+	for i := 128; i < 256; i++ {
+		_, ok := l.Get(i)
+		if !ok {
+			test.Fatalf("should not be evicted")
+		}
+	}
+
+	for i := 128; i < 192; i++ {
+		ok := l.Remove(i)
+		if !ok {
+			test.Fatalf("should be contained")
+		}
+		ok = l.Remove(i)
+		if ok {
+			test.Fatalf("should not be contained")
+		}
+		_, ok = l.Get(i)
+		if ok {
+			test.Fatalf("should be deleted")
+		}
+	}
+	l.Get(192) // expect 192 to be last key in l.Keys()
+
+	for i, k := range l.Keys() {
+		if (i < 63 && k != i+193) || (i == 63 && k != 192) {
+			test.Fatalf("out of order key: %v", k)
+		}
+	}
+
+	l.Purge()
+	if l.Len() != 0 {
+		test.Fatalf("bad len: %v", l.Len())
+	}
+	if _, ok := l.Get(200); ok {
+		test.Fatalf("should contain nothing")
+	}
 }
 
 func TestSimpleLRU(test *testing.T) {

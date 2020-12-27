@@ -29,6 +29,7 @@ func (l *list) Init() *list {
 	return l
 }
 
+// 把e置双向链表最前面
 func (l *list) MoveToFront(e *Element) {
 	if e == l.root.next {
 		return
@@ -57,6 +58,7 @@ func (l *list) Len() int {
 	return l.len
 }
 
+// element置于newest位置，置于最前
 func (l *list) PushFront(v interface{}) *Element {
 	e := &Element{
 		Value: v,
@@ -65,6 +67,7 @@ func (l *list) PushFront(v interface{}) *Element {
 	return l.insert(e, &l.root)
 }
 
+// e插入at的位置，at/e/at.next指针需要重新赋值
 func (l *list) insert(e, at *Element) *Element {
 	// 插入当前位置
 	e.prev = at
@@ -146,7 +149,9 @@ func NewLRU(capacity int) (*LRU, error) {
 }
 
 func (c *LRU) Purge() {
-
+	c.cache.Init()
+	c.items = make(map[interface{}]*Element)
+	c.capacity = 0
 }
 
 // 添加一个Entry，O(1)
@@ -214,4 +219,17 @@ func (c *LRU) Keys() []interface{} {
 	}
 
 	return keys
+}
+
+func (c *LRU) Remove(key interface{}) bool {
+	e, ok := c.items[key]
+	if !ok {
+		return false
+	}
+
+	// 从双向链表中删除element，复杂度O(1)，同时从哈希表items中删除
+	c.cache.Remove(e)
+	delete(c.items, key)
+
+	return true
 }
