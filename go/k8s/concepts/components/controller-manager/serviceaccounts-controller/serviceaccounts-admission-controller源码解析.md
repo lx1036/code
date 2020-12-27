@@ -198,3 +198,5 @@ kube-controller-manager启动时必须带上私钥参数 `--service-account-priv
 **[服务账号令牌 Secret](https://kubernetes.io/zh/docs/concepts/configuration/secret/#service-account-token-secrets)**
 
 **[admission.go](https://github.com/kubernetes/kubernetes/blob/v1.17.0/plugin/pkg/admission/serviceaccount/admission.go)**
+
+**[Kubernetes Proposal - Admission Control](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/admission_control.md)**
