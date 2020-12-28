@@ -1,11 +1,12 @@
 
 
 # Kubernetes学习笔记之ServiceAccount TokensController源码解析
-本文章基于k8s release-1.17分支代码，代码位于`pkg/controller/serviceaccount`目录，代码：**[tokens_controller.go](https://github.com/kubernetes/kubernetes/blob/release-1.17/pkg/controller/serviceaccount/tokens_controller.go)** 。
 
 ## Overview
-在**[Kubernetes学习笔记之ServiceAccount AdmissionController源码解析]()**文章中，知道一个ServiceAccount对象都会引用一个
-`type="kubernetes.io/service-account-token"` 的secret对象，这个secret对象内的`ca.crt`、`namespace`和`token`数据会被挂载到pod内的
+本文章基于k8s release-1.17分支代码，代码位于`pkg/controller/serviceaccount`目录，代码：**[tokens_controller.go](https://github.com/kubernetes/kubernetes/blob/release-1.17/pkg/controller/serviceaccount/tokens_controller.go)** 。
+
+在 **[Kubernetes学习笔记之ServiceAccount AdmissionController源码解析](https://juejin.cn/post/6910117940436303879)** 文章中，知道一个ServiceAccount对象都会引用一个
+`type="kubernetes.io/service-account-token"` 的secret对象，这个secret对象内的 `ca.crt` 、 `namespace` 和 `token` 数据会被挂载到pod内的
 每一个容器，供调用api-server时认证授权使用。
 
 当创建一个ServiceAccount对象时，引用的 `type="kubernetes.io/service-account-token"` 的secret对象会自动创建。比如：
@@ -23,12 +24,13 @@ kubectl get secret test-sa1-token-jg6lm -o yaml
 ## 源码解析
 
 ### TokensController实例化
-实际上这是由kube-controller-manager的TokenController实现的，kube-controller-manager进程的启动参数有`--root-ca-file`和`--service-account-private-key-file`，
-其中，`--root-ca-file`就是上图中的`ca.crt`数据，`--service-account-private-key-file`是用来签名上图中的jwt token数据，即`token`字段值。
+实际上这是由kube-controller-manager的TokenController实现的，kube-controller-manager进程的启动参数有 `--root-ca-file` 和 `--service-account-private-key-file` ，
+其中， `--root-ca-file` 就是上图中的 `ca.crt` 数据， `--service-account-private-key-file` 是用来签名上图中的jwt token数据，即 `token` 字段值。
 
 当kube-controller-manager进程在启动时，会首先实例化TokensController，并传递实例化所需相关参数。
-其中，从启动参数中读取ca根证书和私钥文件内容，并且使用`serviceaccount.JWTTokenGenerator()`函数生成jwt token，
-代码在 **[L546-L592](https://github.com/kubernetes/kubernetes/blob/release-1.17/cmd/kube-controller-manager/app/controllermanager.go#L546-L592)**：
+其中，从启动参数中读取ca根证书和私钥文件内容，并且使用 `serviceaccount.JWTTokenGenerator()` 函数生成jwt token，
+代码在 **[L546-L592](https://github.com/kubernetes/kubernetes/blob/release-1.17/cmd/kube-controller-manager/app/controllermanager.go#L546-L592)** ：
+
 ```go
 func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (http.Handler, bool, error) {
 	// ...
@@ -73,7 +75,8 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 }
 ```
 
-TokensController实例化时，会去监听ServiceAccount和`kubernetes.io/service-account-token`类型的Secret对象，并设置监听器：
+TokensController实例化时，会去监听ServiceAccount和 `kubernetes.io/service-account-token` 类型的Secret对象，并设置监听器：
+
 ```go
 func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
     e := &TokensController{
@@ -85,6 +88,7 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 	// ...
 	e.serviceAccounts = serviceAccounts.Lister()
 	e.serviceAccountSynced = serviceAccounts.Informer().HasSynced
+	// 注册service account资源对象的事件监听，把事件放入syncServiceAccountQueue限速队列中
 	serviceAccounts.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    e.queueServiceAccountSync,
@@ -106,6 +110,7 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 					return false
 				}
 			},
+			// 同理，注册secret资源对象的事件监听，把事件放入syncSecretQueue限速队列中
 			Handler: cache.ResourceEventHandlerFuncs{
 				AddFunc:    e.queueSecretSync,
 				UpdateFunc: e.queueSecretUpdateSync,
@@ -132,6 +137,7 @@ func (e *TokensController) queueSecretSync(obj interface{}) {
 ```
 
 把数据存入队列后，goroutine调用controller.Run()来消费队列数据，执行具体业务逻辑：
+
 ```go
 func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 	// ...
@@ -149,10 +155,11 @@ func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 #### ServiceAccount的增删改查
 当用户增删改查ServiceAccount时，需要判断两个业务逻辑：当删除ServiceAccount时，需要删除其引用的Secret对象；当添加/更新ServiceAccount时，
 需要确保引用的Secret对象存在，如果不存在，则创建个新Secret对象。可见代码：
+
 ```go
 func (e *TokensController) syncServiceAccount() {
 	// ...
-	// 
+	// 从本地缓存中查询service account对象
 	sa, err := e.getServiceAccount(saInfo.namespace, saInfo.name, saInfo.uid, false)
 	switch {
 	case err != nil:
@@ -173,12 +180,13 @@ func (e *TokensController) syncServiceAccount() {
 先看如何删除其引用的secret对象的业务逻辑，删除逻辑也很简单：
 
 ```go
+// 删除service account引用的secret对象
 func (e *TokensController) deleteTokens(serviceAccount *v1.ServiceAccount) ( /*retry*/ bool, error) {
-	// list出该serviceAccount所引用的所有secret
+	// list出该service account所引用的所有secret
 	tokens, err := e.listTokenSecrets(serviceAccount)
 	// ...
 	for _, token := range tokens {
-		// 在一个个删除secret对象
+		// 再一个个删除secret对象
 		r, err := e.deleteToken(token.Namespace, token.Name, token.UID)
 		// ...
 	}
@@ -194,9 +202,10 @@ func (e *TokensController) deleteToken(ns, name string, uid types.UID) ( /*retry
 
 这里关键是如何找到serviceAccount所引用的所有secret对象，不能通过serviceAccount.secrets字段来查找，因为这个字段值只是所有secrets的部分值。
 实际上，从缓存中，首先list出该serviceAccount对象所在的namespace下所有secrets，然后过滤出type=kubernetes.io/service-account-token类型的
-secret，然后查找secret annotation中的`kubernetes.io/service-account.name`应该是serviceAccount.Name值，和`kubernetes.io/service-account.uid`
+secret，然后查找secret annotation中的 `kubernetes.io/service-account.name` 应该是serviceAccount.Name值，和 `kubernetes.io/service-account.uid`
 应该是serviceAccount.UID值。只有满足以上条件，才是该serviceAccount所引用的secrets。
-首先从缓存中找出该namespace下所有secrets，这里需要注意的是缓存对象updatedSecrets使用的是LRU(Least Recently Used) Cache最少使用缓存，提高查找效率：
+首先从缓存中找出该namespace下所有secrets，这里需要注意的是缓存对象updatedSecrets使用的是LRU(Least Recently Used) Cache最少使用缓存，减少内存使用：
+
 ```go
 func (e *TokensController) listTokenSecrets(serviceAccount *v1.ServiceAccount) ([]*v1.Secret, error) {
 	// 从LRU cache中查找出该namespace下所有secrets
@@ -233,6 +242,7 @@ func IsServiceAccountToken(secret *v1.Secret, sa *v1.ServiceAccount) bool {
 
 
 再看如何新建secret对象的业务逻辑。当新建或更新ServiceAccount对象时，需要确保其引用的Secrets对象存在，不存在就需要新建个secret对象：
+
 ```go
 // 检查该ServiceAccount对象引用的secrets对象存在，不存在则新建
 func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccount) (bool, error) {
@@ -344,25 +354,28 @@ func (e *TokensController) syncSecret() {
 }
 ```
 
-所以，对kubernetes.io/service-account-token type的Secret增删改查的业务逻辑，也比较简单。重点是学习下官方golang代码编写和一些有关k8s api
+所以，对 `kubernetes.io/service-account-token` 类型的secret增删改查的业务逻辑，也比较简单。重点是学习下官方golang代码编写和一些有关k8s api
 的使用，对自己二次开发k8s大有裨益。
 
 
 ## 总结
-本文主要学习TokensController是如何监听ServiceAccount对象和"kubernetes.io/service-account-token"类型Secret对象的增删改查，并做了相应的业务逻辑处理，
+本文主要学习TokensController是如何监听ServiceAccount对象和 `kubernetes.io/service-account-token` 类型Secret对象的增删改查，并做了相应的业务逻辑处理，
 比如新建ServiceAccount时需要新建对应的Secret对象，删除ServiceAccount需要删除对应的Secret对象，以及新建Secret对象时，还需要给该Secret对象补上ca.crt/namespace/token
 字段值，以及一些边界条件的处理逻辑等等。
 
-同时，官方的TokensController代码编写规范，以及对k8s api的应用，边界条件的处理，以及使用了LRU Cache缓存等等，都值得在自己的项目里参(chao)考(xi)。
+同时，官方的TokensController代码编写规范，以及对k8s api的应用，边界条件的处理，以及使用了LRU Cache缓存等等，都值得在自己的项目里参考。
 
 
 ## 学习要点
-**[tokens_controller.go L106](https://github.com/kubernetes/kubernetes/blob/release-1.17/pkg/controller/serviceaccount/tokens_controller.go#L106) 使用了
+**[tokens_controller.go L106](https://github.com/kubernetes/kubernetes/blob/release-1.17/pkg/controller/serviceaccount/tokens_controller.go#L106)** 使用了
 LRU cache。
 
 
 ## 参考文献
 **[为 Pod 配置服务账户](https://kubernetes.io/zh/docs/tasks/configure-pod-container/configure-service-account/)**
+
 **[服务账号令牌 Secret](https://kubernetes.io/zh/docs/concepts/configuration/secret/#service-account-token-secrets)**
+
+**[serviceaccounts-controller源码官网解析](https://kubernetes.io/zh/docs/reference/access-authn-authz/service-accounts-admin/)**
 
 
