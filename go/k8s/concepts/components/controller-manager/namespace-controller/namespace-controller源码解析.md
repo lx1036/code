@@ -1,12 +1,12 @@
 
 
-**[浅谈 Kubernetes Namespace Controller 及其工作原理](https://mp.weixin.qq.com/s/PLDwYkrySNw5M8tEPkVjng)**
+
 
 
 # Kubernetes学习笔记之namespace controller源码解析
 
 ## Overview
-本文章基于k8s release-1.17分支代码，代码位于`pkg/controller/namespace`目录。
+本文章基于k8s release-1.17分支代码，代码位于`pkg/controller/namespace`目录，代码在 **[namespace_controller.go](https://github.com/kubernetes/kubernetes/blob/release-1.17/pkg/controller/namespace/namespace_controller.go)** 。
 namespace controller的主要作用是：删除一个namespace时，会删除该namespace下的所有资源对象，包括custom resource等资源。
 
 比如删除一个namespace，该namespace下内置的k8s资源对象role，也会被删除：
@@ -19,7 +19,7 @@ kubectl get role roletest -o yaml -n liuxiang3
 #报错： Error from server (NotFound): namespaces "liuxiang3" not found
 ```
 
-![del_ns_resource](./img/del_ns_resource.png)
+![del_ns_resource](./imgs/del_ns_resource.png)
 
 或者删除一个namespace，该namespace下的custom resource对象也会被删除：
 
@@ -74,7 +74,7 @@ kubectl get crontab my-new-cron-object -n liuxiang3
 kubectl delete -f ./crd.yaml
 ```
 
-![del_ns_crd](./img/del_ns_crd.png)
+![del_ns_crd](./imgs/del_ns_crd.png)
 
 那么，namespace controller是如何做到删除一个namespace，会迭代删除该namespace下所有资源对象，包括k8s内置资源对象和custom resource对象的呢？
 
@@ -220,4 +220,3 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 
 ## 参考文献
 **[浅谈 Kubernetes Namespace Controller 及其工作原理](https://mp.weixin.qq.com/s/PLDwYkrySNw5M8tEPkVjng)**
-

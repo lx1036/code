@@ -6,7 +6,6 @@ require (
 	bou.ke/monkey v1.0.2
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/Azure/go-autorest/autorest v0.11.15 // indirect
-	github.com/Azure/go-autorest/autorest/to v0.4.0 // indirect
 	github.com/Shopify/sarama v1.19.0
 	github.com/astaxie/beego v1.12.1
 	github.com/bep/debounce v1.2.0
@@ -27,6 +26,7 @@ require (
 	github.com/google/btree v1.0.0
 	github.com/google/go-querystring v1.0.0
 	github.com/google/uuid v1.1.1
+	github.com/hashicorp/golang-lru v0.5.4
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jinzhu/gorm v1.9.11
 	github.com/julienschmidt/httprouter v1.3.0
@@ -51,14 +51,12 @@ require (
 	github.com/robfig/cron v1.1.0
 	github.com/romanyx/polluter v1.2.2
 	github.com/rs/cors v1.7.0
-	github.com/sclevine/agouti v3.0.0+incompatible // indirect
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/sirupsen/logrus v1.5.0
 	github.com/spf13/cast v1.3.0
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
-	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71 // indirect
 	github.com/stretchr/testify v1.4.0
 	github.com/tidwall/evio v1.0.2
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
@@ -67,7 +65,6 @@ require (
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
 	go.etcd.io/bbolt v1.3.3
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200401174654-e694b7bb0875
-	go.opencensus.io v0.22.2 // indirect
 	go.uber.org/zap v1.14.1
 	golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
