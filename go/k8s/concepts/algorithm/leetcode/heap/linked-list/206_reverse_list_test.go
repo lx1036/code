@@ -44,8 +44,39 @@ func TestReverse(test *testing.T) {
 	}
 }
 
-func reverseList(root *ListNode) *ListNode {
-	current := root
+func TestReverseList(test *testing.T) {
+	a1 := &ListNode{Val: 3, Next: nil}
+	a2 := &ListNode{Val: 4, Next: a1}
+	a3 := &ListNode{Val: 2, Next: a2}
+
+	c := reverseList(a3)
+	for c != nil {
+		fmt.Println(c.Val)
+		c = c.Next
+	}
+}
+
+func reverseList(head *ListNode) *ListNode {
+
+	if head == nil || head.Next == nil {
+		return head
+	}
+
+	prev := head
+	prev.Next = nil
+
+	current := head.Next
+	for current != nil {
+		next := current.Next
+		current.Next = prev
+		prev = current
+		current = next
+	}
+
+	return prev
+
+	// 这个也不对，会打印出最后的空节点
+	/*current := root
 	prev := &ListNode{}
 
 	for current != nil {
@@ -55,5 +86,5 @@ func reverseList(root *ListNode) *ListNode {
 		current = next
 	}
 
-	return prev
+	return prev*/
 }

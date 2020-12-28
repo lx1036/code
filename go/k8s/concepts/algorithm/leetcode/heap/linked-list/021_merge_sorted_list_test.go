@@ -15,6 +15,7 @@ func mergeTwoLists(l1 *ListNode, l2 *ListNode) *ListNode {
 	root2 := l2
 	root := &ListNode{}
 	prev := root
+	// 只是迭代两个链表的min(root1, root2)长度
 	for root1 != nil && root2 != nil {
 		if root1.Val <= root2.Val {
 			prev.Next = root1
@@ -27,6 +28,7 @@ func mergeTwoLists(l1 *ListNode, l2 *ListNode) *ListNode {
 		prev = prev.Next
 	}
 
+	// 谁先迭代完成，后面节点直接合并就行，不用迭代
 	if root1 == nil {
 		prev.Next = root2
 	} else {

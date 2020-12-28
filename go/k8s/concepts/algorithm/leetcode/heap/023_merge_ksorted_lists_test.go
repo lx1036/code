@@ -58,7 +58,6 @@ func (l *List) Reverse() *List {
 		current.next = prev
 		prev = current
 		current = next
-
 	}
 
 	l.root.next = prev
