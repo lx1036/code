@@ -57,15 +57,15 @@ func TestReverseList(test *testing.T) {
 }
 
 func reverseList(head *ListNode) *ListNode {
-
 	if head == nil || head.Next == nil {
 		return head
 	}
 
+	// head先赋值，下面会改变head.Next指针
+	current := head.Next
+	// head赋值给prev，修改prev.Next，同时也是修改head.Next
 	prev := head
 	prev.Next = nil
-
-	current := head.Next
 	for current != nil {
 		next := current.Next
 		current.Next = prev

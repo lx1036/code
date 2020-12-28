@@ -8,13 +8,33 @@ import (
 // 剑指 Offer 22. 链表中倒数第k个节点
 // https://leetcode-cn.com/problems/lian-biao-zhong-dao-shu-di-kge-jie-dian-lcof/
 
+// 解法1：或者遍历链表获得长度n，再以n-k+1为头结点
+
+// 解法2：双指针，p2先走k，然后p1、p2一起同速度走，直至p2走到尾结点，p1就是第k个节点
+func getKthFromEnd2(head *ListNode, k int) *ListNode {
+	p2 := head
+	for i := 0; i < k; i++ {
+		p2 = p2.Next
+	}
+
+	p1 := head
+	for p2 != nil {
+		p1 = p1.Next
+		p2 = p2.Next
+	}
+
+	return p1
+}
+
+// 解法3：反转链表，p1走k步
 func reverse(head *ListNode) *ListNode {
-	if head.Next == nil {
+	if head == nil || head.Next == nil {
 		return head
 	}
 
-	prev := head
 	current := head.Next
+	prev := head
+	prev.Next = nil
 	for current != nil {
 		next := current.Next
 		current.Next = prev
@@ -25,27 +45,22 @@ func reverse(head *ListNode) *ListNode {
 	return prev
 }
 
+// 两次反转链表
 func getKthFromEnd(head *ListNode, k int) *ListNode {
 	root := head
 	r := reverse(root)
 
-	tmp := r
+	p1 := r
 
-	var knode *ListNode
-	for i := 0; i < k; i++ {
-		knode = tmp
-		tmp = tmp.Next
+	// 这里i从1开始计数
+	for i := 1; i < k; i++ {
+		p1 = p1.Next
 	}
 
-	if knode == nil {
-		return nil
-	}
-
-	knode.Next = nil
+	// 这个赋值很重要，设置kth为尾节点
+	p1.Next = nil
 
 	return reverse(r)
-
-	//return reverse(r, knode)
 }
 
 func TestGetKthFromEnd(test *testing.T) {
@@ -68,7 +83,6 @@ func TestGetKthFromEnd(test *testing.T) {
 		Val:  1,
 		Next: n4,
 	}
-
 	list := getKthFromEnd(n5, 2)
 	current := list
 	for current != nil {
@@ -76,4 +90,31 @@ func TestGetKthFromEnd(test *testing.T) {
 		current = current.Next
 	}
 
+	fmt.Println()
+
+	m1 := &ListNode{
+		Val: 5,
+	}
+	m2 := &ListNode{
+		Val:  4,
+		Next: m1,
+	}
+	m3 := &ListNode{
+		Val:  3,
+		Next: m2,
+	}
+	m4 := &ListNode{
+		Val:  2,
+		Next: m3,
+	}
+	m5 := &ListNode{
+		Val:  1,
+		Next: m4,
+	}
+	list2 := getKthFromEnd2(m5, 2)
+	current2 := list2
+	for current2 != nil {
+		fmt.Println(current2.Val)
+		current2 = current2.Next
+	}
 }
