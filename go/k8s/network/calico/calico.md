@@ -79,3 +79,20 @@ watch api-server，读取 `Pod events`，然后 sync pod label changes，写入�
 
 (5)node controller 
 node controller 会 watch api-server，读取 `Node events`，用来更新有关Node的配置(比如: crud node)。必须通过 `ENABLED_CONTROLLERS` 环境变量显示开启。
+
+
+
+
+
+
+
+
+
+## 参考文献
+Calico网络方案: https://www.cnblogs.com/netonline/p/9720279.html
+
+docker 容器网络方案：calico 网络模型: https://cizixs.com/2017/10/19/docker-calico-network/
+
+
+
+

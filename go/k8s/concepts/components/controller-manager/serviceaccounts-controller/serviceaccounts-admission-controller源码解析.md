@@ -9,9 +9,9 @@ api-server作为常用的服务端应用，包含认证模块Authentication、�
 ServiceAccount Admission Plugin主要作用包含：
 * 如果提交的pod yaml里没有指定spec.serviceAccountName字段值，该插件会添加默认的 `default` ServiceAccount；
 * 判断spec.serviceAccountName指定的service account是否存在，不存在就拒绝请求；
-* 为该pod创建个volume，且该volume source是SecretVolumeSource，该secret来自于service account对象引用的secret；
-* 如果提交的pod yaml里没有指定spec.ImagePullSecrets字段值，那就将service account对象引用的ImagePullSecrets字段值来补位，并且该volume会被
+* 为该pod创建个volume，且该volume source是SecretVolumeSource，该secret来自于service account对象引用的secret，并且该volume会被
   mount到pod的 `/var/run/secrets/kubernetes.io/serviceaccount` 目录中；
+* 如果提交的pod yaml里没有指定spec.ImagePullSecrets字段值，那就将service account对象引用的ImagePullSecrets字段值来补位；
 
 比如，往api-server进程提交个pod对象：
 
