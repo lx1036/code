@@ -4,31 +4,29 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	
+
 	log "github.com/sirupsen/logrus"
+)
+
+var (
+	stats = map[string]map[string]interface{}{}
 )
 
 func main() {
 	log.SetOutput(os.Stdout)
 	log.SetFormatter(&log.JSONFormatter{})
-	
+
 	stopCh := Signal()
-	
-	redisStorage := storage.NewRedis()
-	
-	console := reporter.NewConsole(redisStorage)
-	console.StartRepeatedReport(60,60)
-	email := reporter.NewMail(redisStorage)
-	email.AddToAddress([]string{"example@example.com"})
-	email.StartDailyReport()
-	
-	collector := metrics.NewCollector(redisStorage)
-	collector.RecordRequest(metrics.RequestInfo{})
-	
-	
+
+	metrics := NewMetrics(stopCh)
+	controller := UserController{metrics: metrics}
+	controller.register()
+	controller.register()
+	controller.login("admin1", "password1")
+	controller.login("admin2", "password2")
+
 	<-stopCh
 }
-
 
 func Signal() (stopCh <-chan struct{}) {
 	stop := make(chan struct{})
@@ -40,6 +38,6 @@ func Signal() (stopCh <-chan struct{}) {
 		<-c
 		os.Exit(1)
 	}()
-	
+
 	return stop
 }
