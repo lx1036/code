@@ -7,11 +7,9 @@ import (
 
 // https://leetcode-cn.com/problems/delete-node-in-a-linked-list/
 
-
-
 func deleteNode(head, node *ListNode) *ListNode {
 	p1 := head
-	
+
 	for p1 != nil {
 		if p1.Val == node.Val {
 			if p1.Next == nil {
@@ -23,13 +21,12 @@ func deleteNode(head, node *ListNode) *ListNode {
 				p1.Next = p1.Next.Next
 			}
 		}
-		
+
 		p1 = p1.Next
 	}
-	
+
 	return head
 }
-
 
 func TestDeleteNode(test *testing.T) {
 	n1 := &ListNode{
@@ -62,11 +59,10 @@ func TestDeleteNode(test *testing.T) {
 	l1 := deleteNode(n7, &ListNode{Val: 6})
 	for l1 != nil {
 		fmt.Println(l1.Val)
-		
+
 		l1 = l1.Next
 	}
-	
-	
+
 	m1 := &ListNode{
 		Val: 1,
 	}
@@ -81,7 +77,7 @@ func TestDeleteNode(test *testing.T) {
 	l2 := deleteNode(m3, &ListNode{Val: 1})
 	for l2 != nil {
 		fmt.Println(l2.Val)
-		
+
 		l2 = l2.Next
 	}
 }

@@ -7,12 +7,9 @@ import (
 
 // https://leetcode-cn.com/problems/remove-linked-list-elements/
 
-
-
-
 func removeElements(head *ListNode, val int) *ListNode {
 	p1 := head
-	
+
 	if p1 == nil {
 		return p1
 	}
@@ -23,28 +20,25 @@ func removeElements(head *ListNode, val int) *ListNode {
 			return p1
 		}
 	}
-	
+
 	for p1 != nil {
 		if p1.Val == val {
 			p1 = p1.Next
 			head = p1
 		}
-		
-		
-		
-		
+
 		next := p1.Next
 		if next != nil && next.Val == val {
 			p1.Next = next.Next
 		}
-		
+
 		p1 = p1.Next
 	}
-	
+
 	if head.Next == nil && head.Val == val {
 		return nil
 	}
-	
+
 	return head
 }
 
@@ -79,11 +73,10 @@ func TestRemoveElements(test *testing.T) {
 	l1 := removeElements(n7, 6)
 	for l1 != nil {
 		fmt.Println(l1.Val)
-		
+
 		l1 = l1.Next
 	}
-	
-	
+
 	m1 := &ListNode{
 		Val: 1,
 	}
@@ -98,12 +91,7 @@ func TestRemoveElements(test *testing.T) {
 	l2 := removeElements(m3, 1)
 	for l2 != nil {
 		fmt.Println(l2.Val)
-		
+
 		l2 = l2.Next
 	}
 }
-
-
-
-
-
