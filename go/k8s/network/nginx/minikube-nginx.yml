@@ -12,7 +12,7 @@ metadata:
   annotations:
     lx1036/controller-kind: filebeat
 spec:
-  replicas: 1
+  replicas: 2
   template:
     metadata:
       name: nginx-demo-1
@@ -48,5 +48,20 @@ spec:
       targetPort: 80
       protocol: TCP
   type: ClusterIP
+  externalIPs:
+    - 192.168.64.57
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-demo-2
+spec:
+  selector:
+    app: nginx-demo-1
+  ports:
+    - port: 8089
+      targetPort: 80
+  type: NodePort
 
 ---
