@@ -4,6 +4,7 @@ import "sort"
 
 // **[堆 堆排序 优先队列 图文详解](https://www.cnblogs.com/yahuian/p/11945144.html)**
 
+// Heap的接口，既要实现sort接口，又要实现Push/Pop方法
 type Interface interface {
 	sort.Interface
 

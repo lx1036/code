@@ -115,7 +115,6 @@ func (h Heap) up(i int) {
 		h.Swap(i, parent)
 		i = parent
 	}
-
 }
 
 // Push and Pop use pointer receivers because they modify the slice's length,

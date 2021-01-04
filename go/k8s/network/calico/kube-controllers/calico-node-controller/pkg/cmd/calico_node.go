@@ -4,8 +4,8 @@ import (
 	"os"
 	"time"
 
-	"k8s-lx1036/k8s/concepts/components/controller-manager/calico-node-controller/pkg/controller"
-	"k8s-lx1036/k8s/concepts/components/controller-manager/calico-node-controller/pkg/signals"
+	"k8s-lx1036/k8s/network/calico/kube-controllers/calico-node-controller/pkg/controller"
+	"k8s-lx1036/k8s/network/calico/kube-controllers/calico-node-controller/pkg/signals"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

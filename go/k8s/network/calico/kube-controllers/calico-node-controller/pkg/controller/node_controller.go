@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s-lx1036/k8s/concepts/components/controller-manager/calico-node-controller/pkg/calico"
-	"k8s-lx1036/k8s/concepts/components/controller-manager/calico-node-controller/pkg/kube"
+	"k8s-lx1036/k8s/network/calico/kube-controllers/calico-node-controller/pkg/calico"
+	"k8s-lx1036/k8s/network/calico/kube-controllers/calico-node-controller/pkg/kube"
 
 	log "github.com/sirupsen/logrus"
 

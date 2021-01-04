@@ -1,7 +1,7 @@
 package main
 
 import (
-	"k8s-lx1036/k8s/concepts/components/controller-manager/calico-node-controller/pkg/cmd"
+	"k8s-lx1036/k8s/network/calico/kube-controllers/calico-node-controller/pkg/cmd"
 	"os"
 )
 
@@ -13,3 +13,5 @@ func main() {
 	}
 	os.Exit(0)
 }
+
+// k8s/network/calico/kube-controllers/calico-node-controller
