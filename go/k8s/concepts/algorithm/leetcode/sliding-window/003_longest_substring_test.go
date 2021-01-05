@@ -1,4 +1,4 @@
-package leetcode
+package sliding_window
 
 import (
 	"fmt"
@@ -10,30 +10,26 @@ import (
 
 func lengthOfLongestSubstring(s string) int {
 	l := len(s)
-
-	hashTable := map[byte]int{}
+	hashTable := map[byte]bool{}
 	result := 0
 
+	j := 0
 	for i := 0; i < l; i++ {
+		for j < l {
+			if _, ok := hashTable[s[j]]; !ok {
+				hashTable[s[j]] = true
+				j++
 
-		if value, ok := hashTable[s[i]]; ok {
-			/*if len(hashTable) > result {
-				result = len(hashTable)
-			}*/
-			hashTable = map[byte]int{}
-			hashTable[s[i]] = value
-		} else {
-			hashTable[s[i]] = i
+				if len(hashTable) > result {
+					result = len(hashTable)
+				}
+			} else {
+				break
+			}
 		}
 
-		if len(hashTable) > result {
-			result = len(hashTable)
-		}
+		delete(hashTable, s[i])
 	}
-
-	/*if len(hashTable) > result {
-		result = len(hashTable)
-	}*/
 
 	return result
 }
