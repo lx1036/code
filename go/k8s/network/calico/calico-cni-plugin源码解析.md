@@ -777,6 +777,17 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 ```
 
+以上代码重点是调用IPAM模块的AutoAssign()函数来自动分配IP地址，看下 **[AutoAssign()]()** 代码：
+
+```go
+
+
+
+
+
+```
+
+
 
 
 ## 总结
