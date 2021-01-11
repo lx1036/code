@@ -24,7 +24,7 @@ kubelet进程在开始启动时，会调用容器运行时的 **[SyncPod](https:
 * 创建ephemeral containers、init containers和普通的containers。
 
 这里只关注创建sandbox container过程，只有这一步会创建pod network，这个sandbox container创建好后，其余container都会和其共享同一个network namespace，
-所以一个pod内各个容器看到的网络协议栈是同一个，ip地址都是相同的，通过pod来区分各个容器。
+所以一个pod内各个容器看到的网络协议栈是同一个，ip地址都是相同的，通过port来区分各个容器。
 具体创建过程，会调用容器运行时服务创建容器，这里会先准备好pod的相关配置数据，创建network namespace时也需要这些配置数据 **[L36-L138](https://github.com/kubernetes/kubernetes/blob/release-1.17/pkg/kubelet/kuberuntime/kuberuntime_sandbox.go#L36-L138)** ：
 
 ```go
@@ -243,13 +243,13 @@ cni相关代码是个标准骨架，核心还是需要调用第三方网络插�
 并配有文档说明见 **[plugins docs](https://www.cni.dev/plugins/)** ，比如可以参考学习官网提供的 **[static IP address management plugin](https://www.cni.dev/plugins/ipam/static/)** 。
 
 ## 总结
-
-
 总之，kubelet在创建sandbox container时候，会先调用cni插件命令，如 `calico ADD` 命令并通过环境变量传递相关命令参数，来给sandbox container创建network相关资源对象，比如calico会创建
 route和virtual interface，以及为pod分配ip地址，和从集群网段cluster cidr中为当前worker节点分配pod cidr网段，并且会把这些数据写入到calico datastore数据库里。
 
 所以，关键问题，还是得看calico插件代码是如何做的。
 
+
+## 参考文献
 
 
 
@@ -289,6 +289,16 @@ func Main(version string) {
 * 在容器端和宿主机端创建路由。在容器端，设置默认网关为 `169.254.1.1` ，该网关地址代码写死的；在宿主机端，添加路由如 `10.217.120.85 dev calid0bda9976d5 scope link` ，
   其中 `10.217.120.85` 是pod ip地址，`calid0bda9976d5` 是该pod在宿主机端的网卡，也就是veth pair在宿主机这端的virtual ethernet interface虚拟网络设备。
   
+
+一个WorkloadEndpoint对象示例如下，一个k8s pod对象对应着calico中的一个workloadendpoint对象，可以通过 `calicoctl get wep -o wide` 查看所有 workloadendpoint。
+记得配置calico datastore为kubernetes的，为方便可以在 `~/.zshrc` 里配置环境变量：
+
+```shell
+# calico
+export CALICO_DATASTORE_TYPE=kubernetes
+export  CALICO_KUBECONFIG=~/.kube/config
+```
+
 ```yaml
 
 apiVersion: projectcalico.org/v3
@@ -327,7 +337,8 @@ spec:
 func cmdAdd(args *skel.CmdArgs) (err error) {
     // ...
 	// 从args.StdinData里加载配置数据，这些配置数据其实就是
-	// `--cni-conf-dir` 传进来的文件内容，即cni配置参数，见上文
+	// `--cni-conf-dir` 传进来的文件内容，即cni配置参数，见第一篇文章
+	// types.NetConf 结构体数据结构也对应着cni配置文件里的数据
 	conf := types.NetConf{}
 	if err := json.Unmarshal(args.StdinData, &conf); err != nil {
 		return fmt.Errorf("failed to load netconf: %v", err)
@@ -363,6 +374,9 @@ func cmdAdd(args *skel.CmdArgs) (err error) {
 	if err != nil {
 		return
 	}
+
+	// 对于新建的pod，最后会在calico datastore里写一个对应的新的workloadendpoint对象
+    var endpoint *api.WorkloadEndpoint
 
 	// 这里因为我们是新建的pod，数据库里也不会有对应的workloadEndpoint对象，所以endpoints必然是nil的
 	if len(endpoints.Items) > 0 {
@@ -444,6 +458,7 @@ func CmdAddK8s(ctx context.Context, args *skel.CmdArgs, conf types.NetConf, epID
 	ipAddrs := annot["cni.projectcalico.org/ipAddrs"]
 	
 	switch {
+	// 主要走这个逻辑：调用calico-ipam插件分配一个IP地址
 	case ipAddrs == "" && ipAddrsNoIpam == "":
 		// 我们的pod没有设置annotation "cni.projectcalico.org/ipAddrsNoIpam"和"cni.projectcalico.org/ipAddrs"值
 		// 这里调用calico-ipam插件获取pod ip值
@@ -499,7 +514,7 @@ func CmdAddK8s(ctx context.Context, args *skel.CmdArgs, conf types.NetConf, epID
 
 	// ...
 
-	// 创建或更新WorkloadEndpoint对象
+	// 创建或更新WorkloadEndpoint对象，至此到这里，会根据新建的一个pod对象，往calico datastore里写一个对应的workloadendpoint对象
 	if _, err := utils.CreateOrUpdate(ctx, calicoClient, endpoint); err != nil {
 		// ...
 	}
@@ -514,8 +529,10 @@ func CmdAddK8s(ctx context.Context, args *skel.CmdArgs, conf types.NetConf, epID
 
 ```
 
+以上代码最后会创建个workloadendpoint对象，同时DoNetworking()函数很重要，这个函数里会创建路由和veth pair。
 然后看下linuxDataplane对象的 **[DoNetworking()](https://github.com/projectcalico/cni-plugin/blob/release-v3.17/pkg/dataplane/linux/dataplane_linux.go#L52-L352)** 函数，是如何创建veth pair和routes的。
-这里主要调用了 `github.com/vishvananda/netlink` golang包来增删改查网卡和路由等操作，等同于执行 `ip link add/delete/set xxx` 等命令，该golang包也是个很好用的包，被很多主要项目如k8s使用：
+这里主要调用了 `github.com/vishvananda/netlink` golang包来增删改查网卡和路由等操作，等同于执行 `ip link add/delete/set xxx` 等命令，
+该golang包也是个很好用的包，被很多主要项目如k8s项目使用，在学习linux网络相关知识时可以利用这个包写一写相关demo，效率也高很多。这里看看calico如何使用netlink这个包来创建routes和veth pair的：
 
 ```go
 
@@ -597,6 +614,9 @@ func (d *linuxDataplane) DoNetworking(
 		return nil
 	})
 
+    // 设置veth pair宿主机端的网卡sysctls配置，设置这个网卡可以转发和arp_proxy
+    err = d.configureSysctls(hostVethName, hasIPv4, hasIPv6)
+
 	// ip link set up起来宿主机这端的veth pair的网卡
 	hostVeth, err := netlink.LinkByName(hostVethName)
 	if err = netlink.LinkSetUp(hostVeth); err != nil {
@@ -624,12 +644,149 @@ func SetupRoutes(hostVeth netlink.Link, result *current.Result) error {
 	return nil
 }
 
+// 这里英文就不翻译解释了，英文备注说的更详细通透。
+
+// configureSysctls configures necessary sysctls required for the host side of the veth pair for IPv4 and/or IPv6.
+func (d *linuxDataplane) configureSysctls(hostVethName string, hasIPv4, hasIPv6 bool) error {
+  var err error
+  if hasIPv4 {
+    // Normally, the kernel has a delay before responding to proxy ARP but we know
+    // that's not needed in a Calico network so we disable it.
+    if err = writeProcSys(fmt.Sprintf("/proc/sys/net/ipv4/neigh/%s/proxy_delay", hostVethName), "0"); err != nil {
+        return fmt.Errorf("failed to set net.ipv4.neigh.%s.proxy_delay=0: %s", hostVethName, err)
+    }
+    
+    // Enable proxy ARP, this makes the host respond to all ARP requests with its own
+    // MAC. We install explicit routes into the containers network
+    // namespace and we use a link-local address for the gateway.  Turing on proxy ARP
+    // means that we don't need to assign the link local address explicitly to each
+    // host side of the veth, which is one fewer thing to maintain and one fewer
+    // thing we may clash over.
+    if err = writeProcSys(fmt.Sprintf("/proc/sys/net/ipv4/conf/%s/proxy_arp", hostVethName), "1"); err != nil {
+        return fmt.Errorf("failed to set net.ipv4.conf.%s.proxy_arp=1: %s", hostVethName, err)
+    }
+    
+    // Enable IP forwarding of packets coming _from_ this interface.  For packets to
+    // be forwarded in both directions we need this flag to be set on the fabric-facing
+    // interface too (or for the global default to be set).
+    if err = writeProcSys(fmt.Sprintf("/proc/sys/net/ipv4/conf/%s/forwarding", hostVethName), "1"); err != nil {
+        return fmt.Errorf("failed to set net.ipv4.conf.%s.forwarding=1: %s", hostVethName, err)
+    }
+  }
+
+  if hasIPv6 {
+     // ...	
+  }
+  
+  return nil
+}
 ```
 
 
 
+## 总结
+至此，calico二进制插件就为一个sandbox container创建好了网络资源，即创建了一个veth pair，并分别为宿主机端和容器端网卡设置好对应MAC地址，以及为容器段配置好了IP地址，同时
+还在容器端配置好了路由默认网关，以及宿主机端配置好路由，让目标地址是sandbox container ip的进入宿主机端veth pair网卡，同时还为宿主机端网卡配置arp proxy和packet forwarding功能，
+最后，会根据这些网络数据生成一个workloadendpoint对象存入calico datastore里。
+
+但是，还是缺少了一个关键逻辑，calico-ipam是如何分配IP地址的，后续有空在学习记录。
+
+
+## 参考文献
+
+
+
+
+# Kubernetes学习笔记之Calico CNI Plugin源码解析(三)
+
+## Overview
+从第二篇文章知道calico二进制插件会调用calico-ipam二进制插件，来为sandbox container分配一个IP地址，接下来重点看看 **[calico-ipam]()** 插件代码。
+
 
 ## calico ipam plugin源码解析
+同样道理，calico-ipam插件也会注册cni的 `ADD` 和 `DEL` 命令，这里重点看看 `ADD` 命令都做了哪些工作 **[]()**：
+
+```go
+
+func Main(version string) {
+	// ...
+	skel.PluginMain(cmdAdd, nil, cmdDel,
+		cniSpecVersion.PluginSupports("0.1.0", "0.2.0", "0.3.0", "0.3.1"),
+		"Calico CNI IPAM "+version)
+}
+
+type ipamArgs struct {
+	cnitypes.CommonArgs
+	IP net.IP `json:"ip,omitempty"`
+}
+
+func cmdAdd(args *skel.CmdArgs) error {
+	// types.NetConf 也就是cni配置文件里的内容，具体内容可见第一篇文章
+	conf := types.NetConf{}
+	if err := json.Unmarshal(args.StdinData, &conf); err != nil {
+		return fmt.Errorf("failed to load netconf: %v", err)
+	}
+
+	// 准备好相关参数
+	nodename := utils.DetermineNodename(conf)
+	utils.ConfigureLogging(conf)
+	calicoClient, err := utils.CreateClient(conf)
+	epIDs, err := utils.GetIdentifiers(args, nodename)
+	epIDs.WEPName, err = epIDs.CalculateWorkloadEndpointName(false)
+	handleID := utils.GetHandleID(conf.Name, args.ContainerID, epIDs.WEPName)
+	ipamArgs := ipamArgs{}
+	if err = cnitypes.LoadArgs(args.Args, &ipamArgs); err != nil {
+		return err
+	}
+
+	r := &current.Result{}
+	if ipamArgs.IP != nil {
+        // 这里分配指定IP，我们创建pod并没有通过annotation指定IP，而且一般都没有去指定
+		// ...
+	} else {
+		// 没有指定IP，让calico-ipam帮我们从节点的pod cidr里去分配一个
+
+        // 这里如果cni配置文件没有指定conf.IPAM.IPv4Pools，则从calico datastore数据库查询可以使用的ippool
+        // ippool是calico在启动时就已经写入数据库的，值是可以我们根据生产环境配置的
+        // 因为会从这个ippool，即集群大网段cluster cidr切分出节点子网段node cidr，再从node cidr中allocate出一个pod ip地址，
+        // 所以先查询出我们集群的ippool是啥
+		v4pools, err := utils.ResolvePools(ctx, calicoClient, conf.IPAM.IPv4Pools, true)
+		var maxBlocks int
+		assignArgs := ipam.AutoAssignArgs{
+			Num4:             num4,
+			Num6:             num6,
+			HandleID:         &handleID,
+			Hostname:         nodename,
+			IPv4Pools:        v4pools,
+			IPv6Pools:        v6pools,
+			MaxBlocksPerHost: maxBlocks,
+			Attrs:            attrs,
+		}
+		
+		autoAssignWithLock := func(calicoClient client.Interface, ctx context.Context, assignArgs ipam.AutoAssignArgs) ([]cnet.IPNet, []cnet.IPNet, error) {
+			// ...
+			// 这里会调用IPAM模块，来从node cidr中随机分配一个还未分配的IP地址
+			return calicoClient.IPAM().AutoAssign(ctx, assignArgs)
+		}
+		assignedV4, assignedV6, err := autoAssignWithLock(calicoClient, ctx, assignArgs)
+	}
+
+	// Print result to stdout, in the format defined by the requested cniVersion.
+	return cnitypes.PrintResult(r, conf.CNIVersion)
+}
+
+```
+
+以上代码重点是调用IPAM模块的AutoAssign()函数来自动分配IP地址，看下 **[AutoAssign()]()** 代码：
+
+```go
+
+
+
+
+
+```
+
 
 
 
