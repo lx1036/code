@@ -6,7 +6,7 @@
 我们生产k8s对外暴露服务有多种方式，其中一种使用 **[external-ips clusterip service](https://kubernetes.io/docs/concepts/services-networking/service/#external-ips)** ClusterIP Service方式对外暴露服务，kube-proxy使用iptables mode。
 这样external ips可以指定固定几台worker节点的IP地址(worker节点服务已经被驱逐，作为流量转发节点不作为计算节点)，并作为lvs vip下的rs来负载均衡。根据vip:port来
 访问服务，并且根据port不同来区分业务。相比于NodePort Service那样可以通过所有worker节点的node_ip:port来访问更高效，也更容易落地生产。
-但是，traffic packet是怎么根据worker节点的node_ip:port或者cluster_ip:port访问方式找到pod ip的？
+但是，traffic packet是怎么根据集群外worker节点的node_ip:port或者集群内cluster_ip:port访问方式找到pod ip的？
 
 并且，我们生产k8s使用calico来作为cni插件，采用 **[Peered with TOR (Top of Rack) routers](https://docs.projectcalico.org/networking/determine-best-networking#on-prem)**
 方式部署，每一个worker node和其置顶交换机建立bgp peer配对，置顶交换机会继续和上层核心交换机建立bgp peer配对，这样可以保证pod ip在公司内网可以直接被访问。
@@ -134,14 +134,14 @@ sudo iptables -v -n -t nat -L KUBE-NODEPORTS
 ```
 
 可以看到，如果在集群内通过cluster_ip:port即10.196.52.1:8088，或者在集群外通过external_ip:port即192.168.64.57:8088方式访问服务，都会在内核里匹配到 
-`KUBE-SVC-JKOCBQALQGD3X3RT` chain的规则，这个对应nginx-demo-1 service；如果是在集群外通过nodeport_ip:port即192.168.64.57:31755方式访问服务，
-会匹配到 `KUBE-SVC-6JCCLZMUQSW27LLD` chain的规则，这个对应nginx-demo-2 service：
+`KUBE-SVC-JKOCBQALQGD3X3RT` chain的规则，这个对应nginx-demo-1 service；如果是在集群内通过cluster_ip:port即10.196.89.31:8089，或者
+集群外通过nodeport_ip:port即192.168.64.57:31755方式访问服务，会匹配到 `KUBE-SVC-6JCCLZMUQSW27LLD` chain的规则，这个对应nginx-demo-2 service：
 
 ![clusterip-externalip-service](./imgs/clusterip-externalip-service.png)
 
 然后继续查找 `KUBE-SVC-JKOCBQALQGD3X3RT` chain和 `KUBE-SVC-6JCCLZMUQSW27LLD` chain的规则，发现每一个 `KUBE-SVC-xxx` 都会跳转到 `KUBE-SEP-xxx` chain上，
 并且因为pod副本数是2，这里就会有两个 `KUBE-SEP-xxx` chain，并且以50%概率跳转到任何一个 `KUBE-SEP-xxx` chain，即rr(round robin)负载均衡算法，这里kube-proxy使用iptables statistic module来设置的，
-最后，就会跳转到pod ip 10.217.120.72:80(这里假设访问这个pod)。总之，经过kube-proxy调用iptables命令，根据service/endpoint设置对应的chain，最终一步步跳转到pod ip，从而数据包packet下一跳是该pod ip：
+最后就会跳转到pod ip 10.217.120.72:80(这里假设访问这个pod)。总之，经过kube-proxy调用iptables命令，根据service/endpoint设置对应的chain，最终一步步跳转到pod ip，从而数据包packet下一跳是该pod ip：
 
 ```shell
 sudo iptables -v -n -t nat -L KUBE-SVC-JKOCBQALQGD3X3RT
@@ -198,4 +198,8 @@ ip -c addr
 
 **[About Kubernetes Services](https://docs.projectcalico.org/about/about-kubernetes-services)**
 
+**[Kube-Proxy 的设计与实现](https://mp.weixin.qq.com/s/bYZJ1ipx7iBPw6JXiZ3Qug)**
 
+**[Kube-Proxy Iptables 的设计与实现](https://mp.weixin.qq.com/s/oaW87xLnlUYYrwVjBnqeew)**
+
+**[Kube-Proxy IPVS模式的原理与实现](https://mp.weixin.qq.com/s/RziLRPYqNoQEQuncm47rHg)**
