@@ -12,7 +12,7 @@ metadata:
   annotations:
     lx1036/controller-kind: filebeat
 spec:
-  replicas: 2
+  replicas: 1
   template:
     metadata:
       name: nginx-demo-1
