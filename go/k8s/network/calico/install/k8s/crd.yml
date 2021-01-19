@@ -1,6 +1,24 @@
 
 # 来源于 `wget https://docs.projectcalico.org/manifests/calico.yaml`
 
+# crd:
+# bgpconfiguration
+# bgppeer
+# blockaffinity
+# clusterinformation
+# felixconfiguration
+# globalnetworkpolicy
+# globalnetworkset
+# hostendpoint
+# ipamblock
+# ipamconfig
+# ipamhandle
+# ippool
+# kubecontrollersconfiguration
+# networkpolicy
+# networkset
+
+
 ---
 # Source: calico/templates/kdd-crds.yaml
 

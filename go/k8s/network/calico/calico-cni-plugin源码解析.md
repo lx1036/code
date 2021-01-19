@@ -700,11 +700,11 @@ func (d *linuxDataplane) configureSysctls(hostVethName string, hasIPv4, hasIPv6 
 # Kubernetes学习笔记之Calico CNI Plugin源码解析(三)
 
 ## Overview
-从第二篇文章知道calico二进制插件会调用calico-ipam二进制插件，来为sandbox container分配一个IP地址，接下来重点看看 **[calico-ipam]()** 插件代码。
+从第二篇文章知道calico二进制插件会调用calico-ipam二进制插件，来为sandbox container分配一个IP地址，接下来重点看看 **[calico-ipam](https://github.com/projectcalico/cni-plugin/blob/release-v3.17/pkg/ipamplugin/ipam_plugin.go)** 插件代码。
 
 
 ## calico ipam plugin源码解析
-同样道理，calico-ipam插件也会注册cni的 `ADD` 和 `DEL` 命令，这里重点看看 `ADD` 命令都做了哪些工作 **[]()**：
+同样道理，calico-ipam插件也会注册cni的 `ADD` 和 `DEL` 命令，这里重点看看 `ADD` 命令都做了哪些工作 **[L115-L286)](https://github.com/projectcalico/cni-plugin/blob/release-v3.17/pkg/ipamplugin/ipam_plugin.go#L115-L286)**：
 
 ```go
 
@@ -744,12 +744,12 @@ func cmdAdd(args *skel.CmdArgs) error {
         // 这里分配指定IP，我们创建pod并没有通过annotation指定IP，而且一般都没有去指定
 		// ...
 	} else {
-		// 没有指定IP，让calico-ipam帮我们从节点的pod cidr里去分配一个
+		// 没有指定IP，让calico-ipam帮我们从节点的pod cidr里去分配一个IP，我们生产calico会走这个逻辑
 
         // 这里如果cni配置文件没有指定conf.IPAM.IPv4Pools，则从calico datastore数据库查询可以使用的ippool
         // ippool是calico在启动时就已经写入数据库的，值是可以我们根据生产环境配置的
         // 因为会从这个ippool，即集群大网段cluster cidr切分出节点子网段node cidr，再从node cidr中allocate出一个pod ip地址，
-        // 所以先查询出我们集群的ippool是啥
+        // 所以先查询出我们集群的ippool是什么
 		v4pools, err := utils.ResolvePools(ctx, calicoClient, conf.IPAM.IPv4Pools, true)
 		var maxBlocks int
 		assignArgs := ipam.AutoAssignArgs{
@@ -777,15 +777,29 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 ```
 
-以上代码重点是调用IPAM模块的AutoAssign()函数来自动分配IP地址，看下 **[AutoAssign()]()** 代码：
+以上代码重点是调用IPAM模块的AutoAssign()函数来自动分配IP地址，看下 **[AutoAssign()](https://github.com/projectcalico/libcalico-go/blob/release-v3.17/lib/ipam/ipam.go#L80-L127)** 代码，
+代码在 **projectcalico/libcalico-go** 代码仓库里，该仓库作为公共基础仓库，被 **projectcalico/cni-plugin** 和 **projectcalico/calicoctl** 等仓库引用：
 
 ```go
 
-
-
-
+// 从AutoAssignArgs.IPv4Pools中自动分配一个IP
+func (c ipamClient) AutoAssign(ctx context.Context, args AutoAssignArgs) ([]net.IPNet, []net.IPNet, error) {
+	hostname, err := decideHostname(args.Hostname)
+	// ...
+	if args.Num4 != 0 {
+		v4list, err = c.autoAssign(ctx, args.Num4, args.HandleID, args.Attrs, args.IPv4Pools, 4, hostname, args.MaxBlocksPerHost, args.HostReservedAttrIPv4s)
+	}
+	// ...
+	return v4list, v6list, nil
+}
 
 ```
+
+
+
+
+
+
 
 
 
