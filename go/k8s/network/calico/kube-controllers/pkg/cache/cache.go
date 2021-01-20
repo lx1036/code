@@ -3,10 +3,11 @@ package cache
 import (
 	"reflect"
 	"sync"
-	
-	log "github.com/sirupsen/logrus"
+	"time"
+
 	"github.com/patrickmn/go-cache"
-	
+	log "github.com/sirupsen/logrus"
+
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -17,35 +18,53 @@ type ResourceCache interface {
 	// Set sets the key to the provided value, and generates an update
 	// on the queue the value has changed.
 	Set(key string, value interface{})
-	
+
 	// Get gets the value associated with the given key.  Returns nil
 	// if the key is not present.
 	Get(key string) (interface{}, bool)
-	
+
 	// Prime sets the key to the provided value, but does not generate
 	// and update on the queue ever.
 	Prime(key string, value interface{})
-	
+
 	// Delete deletes the value identified by the given key from the cache, and
 	// generates an update on the queue if a value was deleted.
 	Delete(key string)
-	
+
 	// Clean removes the object identified by the given key from the cache.
 	// It does not generate an update on the queue.
 	Clean(key string)
-	
+
 	// ListKeys lists the keys currently in the cache.
 	ListKeys() []string
-	
+
 	// Run enables the generation of events on the output queue starts
 	// cache reconciliation.
 	Run(reconcilerPeriod string)
-	
+
 	// GetQueue returns the cache's output queue, which emits a stream
 	// of any keys which have been created, modified, or deleted.
 	GetQueue() workqueue.RateLimitingInterface
 }
 
+// ReconcilerConfig contains configuration for the periodic reconciler.
+type ReconcilerConfig struct {
+	// DisableUpdateOnChange disables the queuing of updates when the reconciler
+	// detects that a value has changed in the datastore.
+	DisableUpdateOnChange bool
+
+	// DisableMissingInDatastore disables queueing of updates when the reconciler
+	// detects that a value is no longer in the datastore but still exists in the cache.
+	DisableMissingInDatastore bool
+
+	// DisableMissingInCache disables queueing of updates when reconciler detects
+	// that a value that is still in the datastore no longer is in the cache.
+	DisableMissingInCache bool
+}
+
+// 如果没有cache和db的sync，这时手动修改了db，比如calicoctl手动修改，那cache就没法知道。
+// 所以必须两边reconcile，设计很精妙，很有道理。
+// 所以，Cache必须是可以同步cache和db的Cache对象。
 
 // calicoCache implements the ResourceCache interface
 type calicoCache struct {
@@ -59,21 +78,22 @@ type calicoCache struct {
 	reconcilerConfig ReconcilerConfig
 }
 
-
-
 // ResourceCacheArgs struct passed to constructor of ResourceCache.
 // Groups togather all the arguments to pass in single struct.
 type ResourceCacheArgs struct {
+	// name workqueue
+	Name string
+
 	// ListFunc returns a mapping of keys to objects from the Calico datastore.
 	ListFunc func() (map[string]interface{}, error)
-	
+
 	// ObjectType is the type of object which is to be stored in this cache.
 	ObjectType reflect.Type
-	
+
 	// LogTypeDesc (optional) to log the type of object stored in the cache.
 	// If not provided it is derived from the ObjectType.
 	LogTypeDesc string
-	
+
 	ReconcilerConfig ReconcilerConfig
 }
 
@@ -82,7 +102,7 @@ func NewResourceCache(args ResourceCacheArgs) ResourceCache {
 	// Make sure logging is context aware.
 	return &calicoCache{
 		threadSafeCache: cache.New(cache.NoExpiration, cache.DefaultExpiration),
-		workqueue:       workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		workqueue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), args.Name),
 		ListFunc:        args.ListFunc,
 		ObjectType:      args.ObjectType,
 		log: func() *log.Entry {
@@ -96,13 +116,38 @@ func NewResourceCache(args ResourceCacheArgs) ResourceCache {
 	}
 }
 
+func (c *calicoCache) Set(key string, newObj interface{}) {
+	if reflect.TypeOf(newObj) != c.ObjectType {
+		c.log.Fatalf("Wrong object type recieved to store in cache. Expected: %s, Found: %s", c.ObjectType, reflect.TypeOf(newObj))
+	}
 
-func (c *calicoCache) Set(key string, value interface{}) {
-	panic("implement me")
+	// Check if the object exists in the cache already.  If it does and hasn't changed,
+	// then we don't need to send an update on the queue.
+	if existingObj, found := c.threadSafeCache.Get(key); found {
+		c.log.Debugf("%#v already exists in cache - comparing.", existingObj)
+		if !reflect.DeepEqual(existingObj, newObj) {
+			// The objects do not match - send an update over the queue.
+			c.threadSafeCache.Set(key, newObj, cache.NoExpiration)
+			if c.isRunning() {
+				c.log.Debugf("Queueing update - %#v and %#v do not match.", newObj, existingObj)
+				c.workqueue.Add(key)
+			}
+		}
+	} else {
+		c.threadSafeCache.Set(key, newObj, cache.NoExpiration)
+		if c.isRunning() {
+			c.log.Debugf("%#v not found in cache, adding it + queuing update.", newObj)
+			c.workqueue.Add(key)
+		}
+	}
 }
 
 func (c *calicoCache) Get(key string) (interface{}, bool) {
-	panic("implement me")
+	obj, found := c.threadSafeCache.Get(key)
+	if found {
+		return obj, true
+	}
+	return nil, false
 }
 
 func (c *calicoCache) Prime(key string, value interface{}) {
@@ -110,7 +155,9 @@ func (c *calicoCache) Prime(key string, value interface{}) {
 }
 
 func (c *calicoCache) Delete(key string) {
-	panic("implement me")
+	c.log.Debugf("Deleting %s from cache", key)
+	c.threadSafeCache.Delete(key)
+	c.workqueue.Add(key)
 }
 
 func (c *calicoCache) Clean(key string) {
@@ -121,13 +168,108 @@ func (c *calicoCache) ListKeys() []string {
 	panic("implement me")
 }
 
-func (c *calicoCache) Run(reconcilerPeriod string) {
-	panic("implement me")
-}
-
+// GetQueue returns the output queue from the cache.  Whenever a key/value pair
+// is modified, an event will appear on this queue.
 func (c *calicoCache) GetQueue() workqueue.RateLimitingInterface {
-	panic("implement me")
+	return c.workqueue
 }
 
+func (c *calicoCache) isRunning() bool {
+	c.mut.Lock()
+	defer c.mut.Unlock()
+	return c.running
+}
 
+// Run starts the cache.  Any Set() calls prior to calling Run() will
+// prime the cache, but not trigger any updates on the output queue.
+func (c *calicoCache) Run(reconcilerPeriod string) {
+	go c.reconcile(reconcilerPeriod)
 
+	// Indicate that the cache is running, and so updates
+	// can be queued.
+	c.mut.Lock()
+	c.running = true
+	c.mut.Unlock()
+}
+
+// reconcile ensures a reconciliation is run every `reconcilerPeriod` in order to bring the datastore
+// in sync with the cache. This is to correct any manual changes made in the datastore
+// without the cache being aware.
+func (c *calicoCache) reconcile(reconcilerPeriod string) {
+	duration, err := time.ParseDuration(reconcilerPeriod)
+	if err != nil {
+		c.log.Fatalf("Invalid time duration format for reconciler: %s. Some valid examples: 5m, 30s, 2m30s etc.", reconcilerPeriod)
+	}
+
+	// If user has set duration to 0 then disable the reconciler job.
+	if duration.Nanoseconds() == 0 {
+		c.log.Infof("Reconciler period set to %d. Disabling reconciler.", duration.Nanoseconds())
+		return
+	}
+
+	// Loop forever, performing a datastore reconciliation periodically.
+	for {
+		c.log.Debugf("Performing reconciliation")
+		err := c.performDatastoreSync()
+		if err != nil {
+			c.log.WithError(err).Error("Reconciliation failed")
+			continue
+		}
+
+		// Reconciliation was successful, sleep the configured duration.
+		c.log.Debugf("Reconciliation complete, %+v until next one.", duration)
+		time.Sleep(duration)
+	}
+}
+
+func (c *calicoCache) performDatastoreSync() error {
+	// Get all the objects we care about from the datastore using ListFunc.
+	objMap, err := c.ListFunc()
+	if err != nil {
+		c.log.WithError(err).Errorf("unable to list objects from datastore while reconciling.")
+		return err
+	}
+
+	// Build a map of existing keys in the datastore.
+	allKeys := map[string]bool{}
+	for key := range objMap {
+		allKeys[key] = true
+	}
+
+	// Also add all existing keys in the cache.
+	for _, key := range c.ListKeys() {
+		allKeys[key] = true
+	}
+
+	c.log.Debugf("Reconciling %d keys in total", len(allKeys))
+
+	for key := range allKeys {
+		cachedObj, existsInCache := c.Get(key)
+		if !existsInCache {
+			// Key does not exist in the cache, queue an update to
+			// remove it from the datastore if configured to do so.
+			if !c.reconcilerConfig.DisableMissingInCache {
+				c.log.WithField("key", key).Warn("Value for key should not exist, queueing update to remove")
+				c.workqueue.Add(key)
+			}
+			continue
+		}
+
+		datastoreObj, existsInDatastore := objMap[key]
+		if !existsInDatastore {
+			// Key exists in the cache but not in the datastore - queue an update
+			// to re-add it if configured to do so.
+			if !c.reconcilerConfig.DisableMissingInDatastore {
+				c.log.WithField("key", key).Warn("Value for key is missing in datastore, queueing update to reprogram")
+				c.workqueue.Add(key)
+			}
+			continue
+		}
+
+		if !reflect.DeepEqual(datastoreObj, cachedObj) {
+
+		}
+	}
+
+	return nil
+}
