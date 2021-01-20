@@ -1,7 +1,7 @@
 package main
 
 import (
-	"k8s-lx1036/k8s/network/calico/kube-controllers/calico-node-controller/pkg/cmd"
+	"k8s-lx1036/k8s/network/calico/kube-controllers/pkg/cmd"
 	"os"
 )
 

@@ -4,8 +4,8 @@ import (
 	"os"
 	"time"
 
-	"k8s-lx1036/k8s/network/calico/kube-controllers/calico-node-controller/pkg/controller"
-	"k8s-lx1036/k8s/network/calico/kube-controllers/calico-node-controller/pkg/signals"
+	"k8s-lx1036/k8s/network/calico/kube-controllers/pkg/controller/node"
+	"k8s-lx1036/k8s/network/calico/kube-controllers/pkg/signals"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -53,7 +53,7 @@ func startNodeControllerCmd(cmd *cobra.Command, args []string) {
 
 	stopCh := signals.SetupSignalHandler()
 
-	namespaceController := controller.NewNodeController()
+	namespaceController := node.NewNodeController()
 
 	if err := namespaceController.Run(1, stopCh); err != nil {
 		log.Fatalf("Error running controller: %s", err.Error())

@@ -39,7 +39,7 @@ func main() {
 	calicoClient := getCalicoClientOrDie(*kubeconfig, *datastoreType)
 	k8sClientset := getKubernetesClientOrDie(*kubeconfig)
 
-	k8sNodes, err := k8sClientset.CoreV1().Nodes().List(metav1.ListOptions{})
+	k8sNodes, err := k8sClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		log.WithError(err).Error("Error listing K8s nodes")
 		os.Exit(1)

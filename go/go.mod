@@ -90,6 +90,7 @@ require (
 	k8s.io/kubernetes v1.18.3
 	k8s.io/sample-controller v0.19.7
 	sigs.k8s.io/controller-runtime v0.6.2
+	github.com/patrickmn/go-cache v0.0.0-20180815053127-5633e0862627
 )
 
 replace (

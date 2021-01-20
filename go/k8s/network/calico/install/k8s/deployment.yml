@@ -1,6 +1,8 @@
 
 # Source: calico/templates/calico-kube-controllers.yaml
 # See https://github.com/projectcalico/kube-controllers
+# 配置：https://docs.projectcalico.org/reference/kube-controllers/configuration
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -44,6 +46,10 @@ spec:
               value: node
             - name: DATASTORE_TYPE
               value: kubernetes
+            - name: LOG_LEVEL
+              value: debug
+            - name: SYNC_NODE_LABELS # When enabled, Kubernetes node labels will be copied to Calico node objects
+              value: "true"
           readinessProbe:
             exec:
               command:

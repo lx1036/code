@@ -1,4 +1,4 @@
-package controller
+package node
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s-lx1036/k8s/network/calico/kube-controllers/calico-node-controller/pkg/calico"
-	"k8s-lx1036/k8s/network/calico/kube-controllers/calico-node-controller/pkg/kube"
+	"k8s-lx1036/k8s/network/calico/kube-controllers/pkg/calico"
+	"k8s-lx1036/k8s/network/calico/kube-controllers/pkg/kube"
 
 	log "github.com/sirupsen/logrus"
 
@@ -49,11 +49,11 @@ func NewNodeController() *NodeController {
 	kubeClientset := kube.GetKubernetesClientset()
 	calicoClient := calico.GetCalicoClientOrDie()
 
-	factory := informers.NewSharedInformerFactory(kubeClientset, time.Minute*10)
+	factory := informers.NewSharedInformerFactory(kubeClientset, time.Minute*2)
 
 	nodeController := &NodeController{
 		informerFactory: factory,
-		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
+		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "node"),
 		calicoClient:    calicoClient,
 		kubeClientset:   kubeClientset,
 		ctx:             context.TODO(),
@@ -197,7 +197,7 @@ func (controller *NodeController) syncDeleteEtcd() error {
 		return err
 	}
 
-	k8sNodes, err := controller.kubeClientset.CoreV1().Nodes().List(metav1.ListOptions{})
+	k8sNodes, err := controller.kubeClientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		log.WithError(err).Error("Error listing K8s nodes")
 		return err
