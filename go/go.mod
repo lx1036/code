@@ -22,6 +22,7 @@ require (
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gohouse/gorose/v2 v2.1.3
+	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf v1.4.2
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/btree v1.0.0
@@ -44,6 +45,7 @@ require (
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.1
 	github.com/operator-framework/operator-sdk v0.17.1
+	github.com/patrickmn/go-cache v0.0.0-20180815053127-5633e0862627
 	github.com/pkg/errors v0.9.1
 	github.com/projectcalico/libcalico-go v1.7.2-0.20201119205058-b367043ede58
 	github.com/prometheus/client_golang v1.7.1
@@ -90,7 +92,6 @@ require (
 	k8s.io/kubernetes v1.18.3
 	k8s.io/sample-controller v0.19.7
 	sigs.k8s.io/controller-runtime v0.6.2
-	github.com/patrickmn/go-cache v0.0.0-20180815053127-5633e0862627
 )
 
 replace (
