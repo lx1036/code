@@ -11,6 +11,7 @@ require (
 	github.com/bep/debounce v1.2.0
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
+	github.com/container-storage-interface/spec v1.3.0
 	github.com/containerd/containerd v1.3.2
 	github.com/containernetworking/cni v0.8.0
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
