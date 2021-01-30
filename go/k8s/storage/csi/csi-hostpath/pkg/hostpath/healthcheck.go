@@ -3,13 +3,13 @@ package hostpath
 import (
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
-	
+
 	"github.com/golang/glog"
-	
+
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
@@ -72,16 +72,16 @@ func checkMountPointExist(sourcePath string) (bool, error) {
 		glog.V(3).Infof("failed to execute command: %+v", cmdPath)
 		return false, err
 	}
-	
+
 	if len(out) < 1 {
 		return false, fmt.Errorf("mount point info is nil")
 	}
-	
+
 	mountInfos, err := parseMountInfo([]byte(out))
 	if err != nil {
 		return false, fmt.Errorf("failed to parse the mount infos: %+v", err)
 	}
-	
+
 	mountInfosOfPod := MountPointInfo{}
 	for _, mountInfo := range mountInfos {
 		if mountInfo.Target == podVolumeTargetPath {
@@ -89,24 +89,24 @@ func checkMountPointExist(sourcePath string) (bool, error) {
 			break
 		}
 	}
-	
+
 	for _, mountInfo := range mountInfosOfPod.ContainerFileSystem {
 		if !strings.Contains(mountInfo.Source, sourcePath) {
 			continue
 		}
-		
+
 		_, err = os.Stat(mountInfo.Target)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return false, nil
 			}
-			
+
 			return false, err
 		}
-		
+
 		return true, nil
 	}
-	
+
 	return false, nil
 }
 
@@ -125,11 +125,11 @@ func doHealthCheckInNodeSide(volumeHandle string) (bool, string) {
 	if err != nil {
 		return false, err.Error()
 	}
-	
+
 	if !mpExist {
 		return false, "The volume isn't mounted"
 	}
-	
+
 	return true, ""
 }
 
@@ -141,10 +141,10 @@ func checkSourcePathExist(volumeHandle string) (bool, error) {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
-		
+
 		return false, err
 	}
-	
+
 	return true, nil
 }
 
@@ -154,7 +154,7 @@ func checkPVCapacityValid(volumeHandle string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to get capacity info: %+v", err)
 	}
-	
+
 	volumeCapacity := hostPathVolumes[volumeHandle].VolSize
 	glog.V(3).Infof("volume capacity: %+v fs capacity:%+v", volumeCapacity, fscapacity)
 	return fscapacity >= volumeCapacity, nil
@@ -166,7 +166,7 @@ func checkPVUsage(volumeHandle string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	
+
 	glog.V(3).Infof("fs available: %+v", fsavailable)
 	return fsavailable > 0, nil
 }
@@ -176,28 +176,28 @@ func doHealthCheckInControllerSide(volumeHandle string) (bool, string) {
 	if err != nil {
 		return false, err.Error()
 	}
-	
+
 	if !spExist {
 		return false, "The source path of the volume doesn't exist"
 	}
-	
+
 	capValid, err := checkPVCapacityValid(volumeHandle)
 	if err != nil {
 		return false, err.Error()
 	}
-	
+
 	if !capValid {
 		return false, "The capacity of volume is greater than actual storage"
 	}
-	
+
 	available, err := checkPVUsage(volumeHandle)
 	if err != nil {
 		return false, err.Error()
 	}
-	
+
 	if !available {
 		return false, "The free space of the volume is insufficient"
 	}
-	
+
 	return true, ""
 }

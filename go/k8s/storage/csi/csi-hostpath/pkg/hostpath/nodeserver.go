@@ -2,9 +2,9 @@ package hostpath
 
 import (
 	"fmt"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/utils/mount"
@@ -30,7 +30,7 @@ func (ns nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	if req.GetVolumeCapability() == nil {
 		return nil, status.Error(codes.InvalidArgument, "Volume Capability missing in request")
 	}
-	
+
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
@@ -42,7 +42,7 @@ func (ns nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 	if len(req.GetStagingTargetPath()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
-	
+
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
@@ -57,17 +57,16 @@ func (ns nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	if len(req.GetTargetPath()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
-	
-	
+
 	targetPath := req.GetTargetPath()
 	ephemeralVolume := ns.ephemeral && req.GetVolumeContext()["csi.storage.k8s.io/ephemeral"] == "true" ||
-		req.GetVolumeContext()["csi.storage.k8s.io/ephemeral"] == ""  // Kubernetes 1.15 doesn't have csi.storage.k8s.io/ephemeral.
-	
+		req.GetVolumeContext()["csi.storage.k8s.io/ephemeral"] == "" // Kubernetes 1.15 doesn't have csi.storage.k8s.io/ephemeral.
+
 	if req.GetVolumeCapability().GetBlock() != nil &&
 		req.GetVolumeCapability().GetMount() != nil {
 		return nil, status.Error(codes.InvalidArgument, "cannot have both block and mount access type")
 	}
-	
+
 	// if ephemeral is specified, create volume here to avoid errors
 	if ephemeralVolume {
 		volID := req.GetVolumeId()
@@ -79,24 +78,18 @@ func (ns nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		}
 		glog.V(4).Infof("ephemeral mode: created volume: %s", vol.VolPath)
 	}
-	
+
 	vol, err := getVolumeByID(req.GetVolumeId())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
-	
+
 	if req.GetVolumeCapability().GetBlock() != nil {
-	
-	
-	
-	
+
 	} else if req.GetVolumeCapability().GetMount() != nil {
-	
-	
-	
+
 	}
-	
-	
+
 	volume := hostPathVolumes[req.GetVolumeId()]
 	volume.NodeID = ns.nodeID
 	hostPathVolumes[req.GetVolumeId()] = volume
@@ -111,14 +104,14 @@ func (ns nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	if len(req.GetTargetPath()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
-	
+
 	targetPath := req.GetTargetPath()
 	volumeID := req.GetVolumeId()
 	vol, err := getVolumeByID(volumeID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
-	
+
 	// Unmount only if the target path is really a mount point.
 	if notMnt, err := mount.IsNotMountPoint(mount.New(""), targetPath); err != nil {
 		if !os.IsNotExist(err) {
@@ -131,21 +124,21 @@ func (ns nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	
+
 	// Delete the mount point.
 	// Does not return error for non-existent path, repeated calls OK for idempotency幂等性.
 	if err = os.RemoveAll(targetPath); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	glog.V(4).Infof("hostpath: volume %s has been unpublished.", targetPath)
-	
+
 	if vol.Ephemeral {
 		glog.V(4).Infof("deleting volume %s", volumeID)
 		if err := deleteHostpathVolume(volumeID); err != nil && !os.IsNotExist(err) {
 			return nil, status.Error(codes.Internal, fmt.Sprintf("failed to delete volume: %s", err))
 		}
 	}
-	
+
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
@@ -154,15 +147,14 @@ func (ns nodeServer) NodeGetVolumeStats(ctx context.Context, in *csi.NodeGetVolu
 	if !ok {
 		return nil, status.Error(codes.NotFound, "The volume not found")
 	}
-	
-	
+
 	healthy, msg := doHealthCheckInNodeSide(in.GetVolumeId())
 	glog.V(3).Infof("Healthy state: %+v Volume: %+v", volume.VolName, healthy)
 	available, capacity, used, err := getPVCapacity(in.GetVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Get volume capacity failed: %+v", err)
 	}
-	
+
 	glog.V(3).Infof("Capacity: %+v Used: %+v Available: %+v", capacity, used, available)
 	return &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
@@ -217,7 +209,7 @@ func (ns nodeServer) NodeGetInfo(ctx context.Context, request *csi.NodeGetInfoRe
 	topology := &csi.Topology{
 		Segments: map[string]string{TopologyKeyNode: ns.nodeID},
 	}
-	
+
 	return &csi.NodeGetInfoResponse{
 		NodeId:             ns.nodeID,
 		MaxVolumesPerNode:  ns.maxVolumesPerNode,
@@ -232,4 +224,3 @@ func NewNodeServer(nodeId string, ephemeral bool, maxVolumesPerNode int64) *node
 		maxVolumesPerNode: maxVolumesPerNode,
 	}
 }
-

@@ -18,9 +18,9 @@ func NewNonBlockingGRPCServer() *nonBlockingGRPCServer {
 
 func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
 	s.wg.Add(1)
-	
+
 	go s.serve(endpoint, ids, cs, ns)
-	
+
 	return
 }
 

@@ -1,10 +1,10 @@
 package hostpath
 
 import (
-	"github.com/google/uuid"
-	"golang.org/x/net/context"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
+	"github.com/google/uuid"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"strconv"
@@ -32,7 +32,7 @@ func (cs controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		glog.V(3).Infof("invalid create volume req: %v", req)
 		return nil, err
 	}
-	
+
 	// Check arguments
 	if len(req.GetName()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Name missing in request")
@@ -41,7 +41,7 @@ func (cs controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	if caps == nil {
 		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
 	}
-	
+
 	// Keep a record of the requested access types.
 	var accessTypeMount, accessTypeBlock bool
 	for _, ca := range caps {
@@ -52,39 +52,38 @@ func (cs controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			accessTypeMount = true
 		}
 	}
-	
+
 	// A real driver would also need to check that the other
 	// fields in VolumeCapabilities are sane. The check above is
 	// just enough to pass the "[Testpattern: Dynamic PV (block
 	// volmode)] volumeMode should fail in binding dynamic
 	// provisioned PV to PVC" storage E2E test.
-	
-	
+
 	if accessTypeBlock && accessTypeMount {
 		return nil, status.Error(codes.InvalidArgument, "cannot have both block and mount access type")
 	}
-	
+
 	var requestedAccessType accessType
-	
+
 	if accessTypeBlock {
 		requestedAccessType = blockAccess
 	} else {
 		// Default to mount.
 		requestedAccessType = mountAccess
 	}
-	
+
 	// Check for maximum available capacity
 	capacity := int64(req.GetCapacityRange().GetRequiredBytes())
 	if capacity >= maxStorageCapacity {
 		return nil, status.Errorf(codes.OutOfRange, "Requested capacity %d exceeds maximum allowed %d", capacity, maxStorageCapacity)
 	}
-	
+
 	topologies := []*csi.Topology{
 		&csi.Topology{
 			Segments: map[string]string{TopologyKeyNode: cs.nodeID},
 		},
 	}
-	
+
 	// Need to check for already existing volume name, and if found
 	// check for the requested capacity and already allocated capacity
 	if exVol, err := getVolumeByName(req.GetName()); err == nil {
@@ -120,16 +119,14 @@ func (cs controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			},
 		}, nil
 	}
-	
-	
+
 	volumeID := uuid.New().String()
 	vol, err := createHostpathVolume(volumeID, req.GetName(), capacity, requestedAccessType, false /* ephemeral */)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create volume %v: %v", volumeID, err)
 	}
 	glog.V(4).Infof("created volume %s at path %s", vol.VolID, vol.VolPath)
-	
-	
+
 	if req.GetVolumeContentSource() != nil {
 		path := getVolumePath(volumeID)
 		volumeSource := req.VolumeContentSource
@@ -156,7 +153,7 @@ func (cs controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		}
 		glog.V(4).Infof("successfully populated volume %s", vol.VolID)
 	}
-	
+
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:           volumeID,
@@ -166,7 +163,7 @@ func (cs controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 			AccessibleTopology: topologies,
 		},
 	}, nil
-	
+
 }
 
 func (cs controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
@@ -178,14 +175,14 @@ func (cs controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 		glog.V(3).Infof("invalid delete volume req: %v", req)
 		return nil, err
 	}
-	
+
 	volId := req.GetVolumeId()
 	if err := deleteHostpathVolume(volId); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete volume %v: %v", volId, err)
 	}
-	
+
 	glog.V(4).Infof("volume %v successfully deleted", volId)
-	
+
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
@@ -205,7 +202,7 @@ func (cs controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumes
 	volumeRes := &csi.ListVolumesResponse{
 		Entries: []*csi.ListVolumesResponse_Entry{},
 	}
-	
+
 	var (
 		startIdx, volumesLength, maxLength int64
 		hpVolume                           hostPathVolume
@@ -214,19 +211,19 @@ func (cs controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumes
 	if req.StartingToken == "" {
 		req.StartingToken = "1"
 	}
-	
+
 	startIdx, err := strconv.ParseInt(req.StartingToken, 10, 32)
 	if err != nil {
 		return nil, status.Error(codes.Aborted, "The type of startingToken should be integer")
 	}
-	
+
 	volumesLength = int64(len(volumeIds))
 	maxLength = int64(req.MaxEntries)
-	
+
 	if maxLength > volumesLength || maxLength <= 0 {
 		maxLength = volumesLength
 	}
-	
+
 	for index := startIdx - 1; index < volumesLength && index < maxLength; index++ {
 		hpVolume = hostPathVolumes[volumeIds[index]]
 		healthy, msg := doHealthCheckInControllerSide(volumeIds[index])
@@ -245,7 +242,7 @@ func (cs controllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumes
 			},
 		})
 	}
-	
+
 	glog.V(5).Infof("Volumes are: %+v", *volumeRes)
 	return volumeRes, nil
 }
@@ -300,7 +297,7 @@ func NewControllerServer(ephemeral bool, nodeID string) *controllerServer {
 
 func getControllerServiceCapabilities(cl []csi.ControllerServiceCapability_RPC_Type) []*csi.ControllerServiceCapability {
 	var csc []*csi.ControllerServiceCapability
-	
+
 	for _, ca := range cl {
 		glog.Infof("Enabling controller service capability: %v", ca.String())
 		csc = append(csc, &csi.ControllerServiceCapability{
@@ -311,7 +308,7 @@ func getControllerServiceCapabilities(cl []csi.ControllerServiceCapability_RPC_T
 			},
 		})
 	}
-	
+
 	return csc
 }
 
@@ -319,7 +316,7 @@ func (cs *controllerServer) validateControllerServiceRequest(c csi.ControllerSer
 	if c == csi.ControllerServiceCapability_RPC_UNKNOWN {
 		return nil
 	}
-	
+
 	for _, ca := range cs.caps {
 		if c == ca.GetRpc().GetType() {
 			return nil

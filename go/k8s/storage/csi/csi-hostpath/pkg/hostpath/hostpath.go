@@ -8,18 +8,18 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
-	"os/exec"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	
+
 	"k8s.io/kubernetes/pkg/volume/util/fs"
-	utilexec "k8s.io/utils/exec"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilexec "k8s.io/utils/exec"
 )
 
 const (
@@ -30,7 +30,6 @@ const (
 	tib    int64 = gib * 1024
 	tib100 int64 = tib * 100
 )
-
 
 type hostPath struct {
 	name              string
@@ -122,16 +121,16 @@ func (hp *hostPath) Run() error {
 	if err := discoveryExistingVolumes(); err != nil {
 		return err
 	}
-	
+
 	hp.ids = NewIdentityServer(hp.name, hp.version)
 	hp.ns = NewNodeServer(hp.nodeID, hp.ephemeral, hp.maxVolumesPerNode)
 	hp.cs = NewControllerServer(hp.ephemeral, hp.nodeID)
-	
+
 	discoverExistingSnapshots()
 	s := NewNonBlockingGRPCServer()
 	s.Start(hp.endpoint, hp.ids, hp.cs, hp.ns)
 	s.Wait()
-	
+
 	return nil
 }
 
@@ -235,7 +234,7 @@ func loadFromSnapshot(size int64, snapshotId, destPath string, mode accessType) 
 		return status.Errorf(codes.InvalidArgument, "snapshot %v size %v is greater than requested volume size %v", snapshotId, snapshot.SizeBytes, size)
 	}
 	snapshotPath := snapshot.Path
-	
+
 	var cmd []string
 	switch mode {
 	case mountAccess:
@@ -245,7 +244,7 @@ func loadFromSnapshot(size int64, snapshotId, destPath string, mode accessType) 
 	default:
 		return status.Errorf(codes.InvalidArgument, "unknown accessType: %d", mode)
 	}
-	
+
 	executor := utilexec.New()
 	glog.V(4).Infof("Command Start: %v", cmd)
 	out, err := executor.Command(cmd[0], cmd[1:]...).CombinedOutput()
@@ -268,7 +267,7 @@ func loadFromVolume(size int64, srcVolumeId, destPath string, mode accessType) e
 	if mode != hostPathVolume.VolAccessType {
 		return status.Errorf(codes.InvalidArgument, "volume %v mode is not compatible with requested mode", srcVolumeId)
 	}
-	
+
 	switch mode {
 	case mountAccess:
 		return loadFromFilesystemVolume(hostPathVolume, destPath)
@@ -287,12 +286,12 @@ func hostPathIsEmpty(p string) (bool, error) {
 		return true, fmt.Errorf("unable to open hostpath volume, error: %v", err)
 	}
 	defer f.Close()
-	
+
 	_, err = f.Readdir(1)
 	if err == io.EOF {
 		return true, nil
 	}
-	
+
 	return false, err
 }
 
@@ -302,7 +301,7 @@ func loadFromFilesystemVolume(hostPathVolume hostPathVolume, destPath string) er
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed verification check of source hostpath volume %v: %v", hostPathVolume.VolID, err)
 	}
-	
+
 	// If the source hostpath volume is empty it's a noop and we just move along, otherwise the cp call will fail with a a file stat error DNE
 	if !isEmpty {
 		args := []string{"-a", srcPath + "/.", destPath + "/"}
@@ -339,14 +338,14 @@ func parseVolumeInfo(volume MountPointInfo) (*hostPathVolume, error) {
 	volumeName := filterVolumeName(volume.Target)
 	volumeID := filterVolumeID(volume.Source)
 	sourcePath := getSourcePath(volumeID)
-	
+
 	glog.V(4).Infof("parseVolumeInfo: volumeName %s, volumeID %s, sourcePath %s", volumeName, volumeID, sourcePath)
-	
+
 	_, fscapacity, _, _, _, _, err := fs.FsInfo(sourcePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get capacity info: %+v", err)
 	}
-	
+
 	hp := hostPathVolume{
 		VolName:       volumeName,
 		VolID:         volumeID,
@@ -354,7 +353,7 @@ func parseVolumeInfo(volume MountPointInfo) (*hostPathVolume, error) {
 		VolPath:       getVolumePath(volumeID),
 		VolAccessType: mountAccess,
 	}
-	
+
 	return &hp, nil
 }
 
@@ -363,7 +362,7 @@ func filterVolumeName(targetPath string) string {
 	if len(pathItems) < 2 {
 		return ""
 	}
-	
+
 	return strings.TrimSuffix(pathItems[1], "/mount")
 }
 
@@ -373,20 +372,20 @@ func filterVolumeID(sourcePath string) string {
 	if volumeSP == "" {
 		return ""
 	}
-	
+
 	return strings.TrimSuffix(strings.TrimPrefix(volumeSP, "[/var/lib/csi-hostpath-data/"), "]")
 }
 
 // deleteVolume deletes the directory for the hostpath volume.
 func deleteHostpathVolume(volID string) error {
 	glog.V(4).Infof("deleting hostpath volume: %s", volID)
-	
+
 	vol, err := getVolumeByID(volID)
 	if err != nil {
 		// Return OK if the volume is not found.
 		return nil
 	}
-	
+
 	if vol.VolAccessType == blockAccess {
 		volPathHandler := volumepathhandler.VolumePathHandler{}
 		path := getVolumePath(volID)
@@ -395,12 +394,12 @@ func deleteHostpathVolume(volID string) error {
 			return fmt.Errorf("failed to remove loop device for file %s: %v", path, err)
 		}
 	}
-	
+
 	path := getVolumePath(volID)
 	if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	
+
 	delete(hostPathVolumes, volID)
 	return nil
 }
@@ -424,7 +423,7 @@ func getSortedVolumeIDs() []string {
 		ids[index] = volId
 		index += 1
 	}
-	
+
 	sort.Strings(ids)
 	return ids
 }
@@ -433,7 +432,7 @@ func getSortedVolumeIDs() []string {
 // It returns the volume path or err if one occurs.
 func createHostpathVolume(volID, name string, cap int64, volAccessType accessType, ephemeral bool) (*hostPathVolume, error) {
 	path := getVolumePath(volID)
-	
+
 	switch volAccessType {
 	case mountAccess:
 		err := os.MkdirAll(path, 0777)
@@ -455,7 +454,7 @@ func createHostpathVolume(volID, name string, cap int64, volAccessType accessTyp
 				return nil, fmt.Errorf("failed to stat block device: %v, %v", path, err)
 			}
 		}
-		
+
 		// Associate block file with the loop device.
 		volPathHandler := volumepathhandler.VolumePathHandler{}
 		_, err = volPathHandler.AttachFileDevice(path)
@@ -469,7 +468,7 @@ func createHostpathVolume(volID, name string, cap int64, volAccessType accessTyp
 	default:
 		return nil, fmt.Errorf("unsupported access type %v", volAccessType)
 	}
-	
+
 	hostpathVol := hostPathVolume{
 		VolID:         volID,
 		VolName:       name,

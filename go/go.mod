@@ -35,6 +35,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/kavu/go_reuseport v1.5.0 // indirect
 	github.com/klauspost/cpuid v1.2.0
+	github.com/kubernetes-csi/csi-lib-utils v0.9.0
 	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
 	github.com/mholt/certmagic v0.8.3
@@ -61,7 +62,7 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.5.1
 	github.com/tidwall/evio v1.0.2
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
 	github.com/urfave/cli v1.22.2
@@ -75,7 +76,7 @@ require (
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/grpc v1.27.0
+	google.golang.org/grpc v1.29.0
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -92,6 +93,7 @@ require (
 	k8s.io/klog/v2 v2.2.0
 	k8s.io/kubernetes v1.18.3
 	k8s.io/sample-controller v0.19.7
+	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 	sigs.k8s.io/controller-runtime v0.6.2
 )
 
