@@ -1,6 +1,7 @@
 package hostpath
 
 import (
+	"fmt"
 	csicommon "k8s-lx1036/k8s/storage/csi/csi-drivers/pkg/csi-common"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -87,4 +88,29 @@ func (hp *hostPath) Run(driverName, nodeID, endpoint string) {
 	s := csicommon.NewNonBlockingGRPCServer()
 	s.Start(endpoint, hp.ids, hp.cs, hp.ns)
 	s.Wait()
+}
+
+func getVolumeByID(volumeID string) (hostPathVolume, error) {
+	if hostPathVol, ok := hostPathVolumes[volumeID]; ok {
+		return hostPathVol, nil
+	}
+	return hostPathVolume{}, fmt.Errorf("volume id %s does not exit in the volumes list", volumeID)
+}
+
+func getVolumeByName(volName string) (hostPathVolume, error) {
+	for _, hostPathVol := range hostPathVolumes {
+		if hostPathVol.VolName == volName {
+			return hostPathVol, nil
+		}
+	}
+	return hostPathVolume{}, fmt.Errorf("volume name %s does not exit in the volumes list", volName)
+}
+
+func getSnapshotByName(name string) (hostPathSnapshot, error) {
+	for _, snapshot := range hostPathVolumeSnapshots {
+		if snapshot.Name == name {
+			return snapshot, nil
+		}
+	}
+	return hostPathSnapshot{}, fmt.Errorf("snapshot name %s does not exit in the snapshots list", name)
 }

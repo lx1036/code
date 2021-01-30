@@ -1,8 +1,12 @@
 package csicommon
 
 import (
+	"fmt"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type CSIDriver struct {
@@ -75,4 +79,17 @@ func (d *CSIDriver) AddVolumeCapabilityAccessModes(vc []csi.VolumeCapability_Acc
 	}
 	d.vc = vca
 	return vca
+}
+
+func (d *CSIDriver) ValidateControllerServiceRequest(c csi.ControllerServiceCapability_RPC_Type) error {
+	if c == csi.ControllerServiceCapability_RPC_UNKNOWN {
+		return nil
+	}
+
+	for _, capability := range d.cap {
+		if c == capability.GetRpc().GetType() {
+			return nil
+		}
+	}
+	return status.Error(codes.InvalidArgument, fmt.Sprintf("%s", c))
 }
