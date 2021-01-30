@@ -19,7 +19,7 @@ type CSIDriver struct {
 
 // Creates a NewCSIDriver object. Assumes vendor version is equal to driver version &
 // does not support optional driver plugin info manifest field. Refer to CSI spec for more details.
-func NewCSIDriver(name string, v string, nodeID string) *CSIDriver {
+func NewCSIDriver(name string, version string, nodeID string) *CSIDriver {
 	if name == "" {
 		glog.Errorf("Driver name missing")
 		return nil
@@ -30,14 +30,14 @@ func NewCSIDriver(name string, v string, nodeID string) *CSIDriver {
 		return nil
 	}
 	// TODO version format and validation
-	if len(v) == 0 {
+	if len(version) == 0 {
 		glog.Errorf("Version argument missing")
 		return nil
 	}
 
 	driver := CSIDriver{
 		name:    name,
-		version: v,
+		version: version,
 		nodeID:  nodeID,
 	}
 

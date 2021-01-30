@@ -37,13 +37,13 @@ type hostPathVolume struct {
 }
 
 type hostPathSnapshot struct {
-	Name         string              `json:"name"`
-	Id           string              `json:"id"`
-	VolID        string              `json:"volID"`
-	Path         string              `json:"path"`
-	CreationTime timestamp.Timestamp `json:"creationTime"`
-	SizeBytes    int64               `json:"sizeBytes"`
-	ReadyToUse   bool                `json:"readyToUse"`
+	Name         string               `json:"name"`
+	Id           string               `json:"id"`
+	VolID        string               `json:"volID"`
+	Path         string               `json:"path"`
+	CreationTime *timestamp.Timestamp `json:"creationTime"`
+	SizeBytes    int64                `json:"sizeBytes"`
+	ReadyToUse   bool                 `json:"readyToUse"`
 }
 
 var hostPathVolumes map[string]hostPathVolume
@@ -78,7 +78,10 @@ func (hp *hostPath) Run(driverName, nodeID, endpoint string) {
 			csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
 			csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 		})
-	hp.driver.AddVolumeCapabilityAccessModes([]csi.VolumeCapability_AccessMode_Mode{csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER})
+	hp.driver.AddVolumeCapabilityAccessModes(
+		[]csi.VolumeCapability_AccessMode_Mode{
+			csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		})
 
 	// Create GRPC servers
 	hp.ids = NewIdentityServer(hp.driver)

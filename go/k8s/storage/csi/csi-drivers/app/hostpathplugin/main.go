@@ -2,8 +2,9 @@ package main
 
 import (
 	"flag"
-	"k8s-lx1036/k8s/storage/csi/csi-drivers/pkg/hostpath"
 	"os"
+
+	"k8s-lx1036/k8s/storage/csi/csi-drivers/pkg/hostpath"
 )
 
 func init() {

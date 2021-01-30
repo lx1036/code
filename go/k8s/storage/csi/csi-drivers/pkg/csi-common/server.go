@@ -59,7 +59,10 @@ func ParseEndpoint(ep string) (string, string, error) {
 	return "", "", fmt.Errorf("Invalid endpoint: %v", ep)
 }
 
-func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
+func (s *nonBlockingGRPCServer) serve(endpoint string,
+	identityServer csi.IdentityServer,
+	controllerServer csi.ControllerServer,
+	nodeServer csi.NodeServer) {
 	proto, addr, err := ParseEndpoint(endpoint)
 	if err != nil {
 		glog.Fatal(err.Error())
@@ -83,14 +86,14 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 	server := grpc.NewServer(opts...)
 	s.server = server
 
-	if ids != nil {
-		csi.RegisterIdentityServer(server, ids)
+	if identityServer != nil {
+		csi.RegisterIdentityServer(server, identityServer)
 	}
-	if cs != nil {
-		csi.RegisterControllerServer(server, cs)
+	if controllerServer != nil {
+		csi.RegisterControllerServer(server, controllerServer)
 	}
-	if ns != nil {
-		csi.RegisterNodeServer(server, ns)
+	if nodeServer != nil {
+		csi.RegisterNodeServer(server, nodeServer)
 	}
 
 	glog.Infof("Listening for connections on address: %#v", listener.Addr())
