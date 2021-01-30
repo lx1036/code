@@ -10,6 +10,8 @@ import (
 	"html/template"
 )
 
+// @see https://github.com/rexray/gocsi/blob/master/csc/README.md
+
 var (
 	ClientConn *grpc.ClientConn
 	Tpl        *template.Template
@@ -30,6 +32,8 @@ var (
 			switch cmd.Name() {
 			case pluginInfoCmd.Name():
 				format = pluginInfoFormat
+			case pluginCapabilityCmd.Name():
+				format = pluginCapsFormat
 			}
 			tpl, err := template.New("t").Funcs(template.FuncMap{
 				"isa": func(o interface{}, t string) bool {
@@ -47,7 +51,6 @@ var (
 	}
 )
 
-// debug: go run . identity plugin-info
 func main() {
 	flag.Parse()
 

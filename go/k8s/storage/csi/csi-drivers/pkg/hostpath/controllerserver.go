@@ -2,7 +2,6 @@ package hostpath
 
 import (
 	"fmt"
-	"github.com/golang/protobuf/ptypes"
 	"math"
 	"os"
 	"sort"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/google/uuid"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -84,6 +84,7 @@ func (cs controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	volumeID := uuid.New().String()
 	path := provisionRoot + volumeID
+	// 创建hostpath dir
 	err := os.MkdirAll(path, 0777)
 	if err != nil {
 		glog.V(3).Infof("failed to create volume: %v", err)
@@ -193,10 +194,11 @@ func (cs controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSn
 		return nil, status.Error(codes.Internal, "volumeID is not exist")
 	}
 
+	// 使用tar czf /tmp/xxxx.tgz -C /tmp/335cf2b4-9edd-46fa-bfd5-af1db124ddf1 .
 	snapshotID := uuid.New().String()
 	creationTime := ptypes.TimestampNow()
 	volPath := hostPathVol.VolPath
-	file := snapshotRoot + snapshotID + ".tgz"
+	file := snapshotRoot + volumeID + "/" + req.GetName() + ".tgz"
 	args := []string{"czf", file, "-C", volPath, "."}
 	executor := utilexec.New()
 	out, err := executor.Command("tar", args...).CombinedOutput()
