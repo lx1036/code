@@ -52,9 +52,9 @@ var (
 )
 
 func main() {
-	flag.Parse()
-
 	flag.Set("logtostderr", "true")
+
+	flag.Parse()
 
 	err := RootCmd.Execute()
 	if err != nil {
