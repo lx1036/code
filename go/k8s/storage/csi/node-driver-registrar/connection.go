@@ -14,6 +14,17 @@ import (
 	"k8s.io/klog/v2"
 )
 
+
+const (
+	// Interval of logging connection errors
+	connectionLoggingInterval = 10 * time.Second
+
+	// Interval of trying to call Probe() until it succeeds
+	probeInterval = 1 * time.Second
+)
+
+const terminationLogPath = "/dev/termination-log"
+
 type options struct {
 	reconnect func() bool
 }
@@ -56,7 +67,6 @@ func connect(
 
 	dialOptions = append(dialOptions,
 		grpc.WithInsecure(),                   // Don't use TLS, it's usually local Unix domain socket in a container.
-		grpc.WithBackoffMaxDelay(time.Second), // Retry every second after failure.
 		grpc.WithBlock(),                      // Block until connection succeeds.
 		grpc.WithChainUnaryInterceptor(
 			LogGRPC, // Log all messages.
@@ -127,6 +137,31 @@ func connect(
 		}
 	}
 }
+
+type ExtendedCSIMetricsManager struct {
+	CSIMetricsManager
+}
+
+// RecordMetricsClientInterceptor is a gPRC unary interceptor for recording metrics for CSI operations
+// in a gRPC client.
+func (cmm ExtendedCSIMetricsManager) RecordMetricsClientInterceptor(
+	ctx context.Context,
+	method string,
+	req, reply interface{},
+	cc *grpc.ClientConn,
+	invoker grpc.UnaryInvoker,
+	opts ...grpc.CallOption) error {
+	start := time.Now()
+	err := invoker(ctx, method, req, reply, cc, opts...)
+	duration := time.Since(start)
+	cmm.RecordMetrics(
+		method,   /* operationName */
+		err,      /* operationErr */
+		duration, /* operationDuration */
+	)
+	return err
+}
+
 
 // LogGRPC is gPRC unary interceptor for logging of CSI messages at level 5. It removes any secrets from the message.
 func LogGRPC(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
