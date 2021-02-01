@@ -1,16 +1,20 @@
 package main
 
 import (
+	"context"
 	goflag "flag"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"k8s-lx1036/k8s/storage/csi/csi-lib-utils/leaderelection"
 	"k8s-lx1036/k8s/storage/csi/csi-lib-utils/metrics"
 	"k8s-lx1036/k8s/storage/csi/external-provisioner/external-provisioner-lib/pkg/controller"
+	"k8s-lx1036/k8s/storage/csi/external-provisioner/pkg/capacity"
 	ctrl "k8s-lx1036/k8s/storage/csi/external-provisioner/pkg/controller"
 
 	flag "github.com/spf13/pflag"
@@ -20,10 +24,13 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	listersv1 "k8s.io/client-go/listers/core/v1"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/workqueue"
 	utilflag "k8s.io/component-base/cli/flag"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 )
 
@@ -186,13 +193,6 @@ func main() {
 		klog.Fatalf("Error getting CSI driver capabilities: %s", err)
 	}
 
-	// Generate a unique ID for this provisioner
-	timeStamp := time.Now().UnixNano() / int64(time.Millisecond)
-	identity := strconv.FormatInt(timeStamp, 10) + "-" + strconv.Itoa(rand.Intn(10000)) + "-" + provisionerName
-	if *enableNodeDeployment {
-		identity = identity + "-" + node
-	}
-
 	// -------------------------------
 	// Listers
 	// Create informer to prevent hit the API server for all resource request
@@ -224,4 +224,141 @@ func main() {
 		nodeDeployment.NodeInfo = *nodeInfo
 	}
 
+	// topology
+	var nodeLister listersv1.NodeLister
+	var csiNodeLister storagelistersv1.CSINodeLister
+	if ctrl.SupportsTopology(pluginCapabilities) {
+		nodeLister, csiNodeLister = getNodeLister(nodeDeployment, factory, clientset, provisionerName)
+	}
+
+	// -------------------------------
+	// PersistentVolumeClaims informer
+	rateLimiter := workqueue.NewItemExponentialFailureRateLimiter(*retryIntervalStart, *retryIntervalMax)
+	claimInformer := factory.Core().V1().PersistentVolumeClaims().Informer()
+	// Setup options
+	provisionerOptions := []func(*controller.ProvisionController) error{
+		controller.LeaderElection(false), // Always disable leader election in provisioner lib. Leader election should be done here in the CSI provisioner level instead.
+		controller.FailedProvisionThreshold(0),
+		controller.FailedDeleteThreshold(0),
+		controller.RateLimiter(rateLimiter),
+		controller.Threadiness(int(*workerThreads)),
+		controller.CreateProvisionedPVLimiter(workqueue.DefaultControllerRateLimiter()),
+		controller.ClaimsInformer(claimInformer),
+		controller.NodesLister(nodeLister),
+	}
+
+	translator := csitrans.New()
+	supportsMigrationFromInTreePluginName := ""
+	if translator.IsMigratedCSIDriverByName(provisionerName) {
+		supportsMigrationFromInTreePluginName, err = translator.GetInTreeNameFromCSIName(provisionerName)
+		if err != nil {
+			klog.Fatalf("Failed to get InTree plugin name for migrated CSI plugin %s: %v", provisionerName, err)
+		}
+		klog.V(2).Infof("Supports migration from in-tree plugin: %s", supportsMigrationFromInTreePluginName)
+		provisionerOptions = append(provisionerOptions, controller.AdditionalProvisionerNames([]string{supportsMigrationFromInTreePluginName}))
+	}
+
+	// Generate a unique ID for this provisioner
+	timeStamp := time.Now().UnixNano() / int64(time.Millisecond)
+	identity := strconv.FormatInt(timeStamp, 10) + "-" + strconv.Itoa(rand.Intn(10000)) + "-" + provisionerName
+	if *enableNodeDeployment {
+		identity = identity + "-" + node
+	}
+	// Create the provisioner: it implements the Provisioner interface expected by
+	// the controller
+	csiProvisioner := ctrl.NewCSIProvisioner(
+		clientset,
+		*operationTimeout,
+		identity,
+		*volumeNamePrefix,
+		*volumeNameUUIDLength,
+		grpcClient,
+		snapClient,
+		provisionerName,
+		pluginCapabilities,
+		controllerCapabilities,
+		supportsMigrationFromInTreePluginName,
+		*strictTopology,
+		*immediateTopology,
+		translator,
+		scLister,
+		csiNodeLister,
+		nodeLister,
+		claimLister,
+		vaLister,
+		*extraCreateMetadata,
+		*defaultFSType,
+		nodeDeployment,
+	)
+
+	provisionController = controller.NewProvisionController(
+		clientset,
+		provisionerName,
+		csiProvisioner,
+		serverVersion.GitVersion,
+		provisionerOptions...,
+	)
+
+	csiClaimController := ctrl.NewCloningProtectionController(
+		clientset,
+		claimLister,
+		claimInformer,
+		workqueue.NewNamedRateLimitingQueue(rateLimiter, "claims"),
+		controllerCapabilities,
+	)
+
+	var capacityController *capacity.Controller
+	if *enableCapacity {
+		capacityController, factoryForNamespace = getCapacityController(grpcClient, rateLimiter, provisionerName, config, factory, clientset, nodeDeployment)
+	}
+
+	run := func(ctx context.Context) {
+		factory.Start(ctx.Done())
+		if factoryForNamespace != nil {
+			// Starting is enough, the capacity controller will wait for sync.
+			factoryForNamespace.Start(ctx.Done())
+		}
+		cacheSyncResult := factory.WaitForCacheSync(ctx.Done())
+		for _, v := range cacheSyncResult {
+			if !v {
+				klog.Fatalf("Failed to sync Informers!")
+			}
+		}
+
+		if capacityController != nil {
+			go capacityController.Run(ctx, int(*capacityThreads))
+		}
+		if csiClaimController != nil {
+			go csiClaimController.Run(ctx, int(*finalizerThreads))
+		}
+
+		provisionController.Run(ctx)
+	}
+
+	if !*enableLeaderElection {
+		run(context.TODO())
+	} else {
+		// this lock name pattern is also copied from sigs.k8s.io/sig-storage-lib-external-provisioner/v6/controller
+		// to preserve backwards compatibility
+		lockName := strings.Replace(provisionerName, "/", "-", -1)
+
+		// create a new clientset for leader election
+		leClientset, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			klog.Fatalf("Failed to create leaderelection client: %v", err)
+		}
+
+		le := leaderelection.NewLeaderElection(leClientset, lockName, run)
+		if *httpEndpoint != "" {
+			le.PrepareHealthCheck(mux, leaderelection.DefaultHealthCheckTimeout)
+		}
+
+		if *leaderElectionNamespace != "" {
+			le.WithNamespace(*leaderElectionNamespace)
+		}
+
+		if err := le.Run(); err != nil {
+			klog.Fatalf("failed to initialize leader election: %v", err)
+		}
+	}
 }
