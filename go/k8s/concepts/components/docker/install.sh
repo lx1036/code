@@ -24,3 +24,5 @@ sudo yum -y install docker-ce
 sudo systemctl start docker
 sudo systemctl status docker
 echo '{"debug":true,"registry-mirrors":["https://wvtedxym.mirror.aliyuncs.com"],"experimental":true}' > /etc/docker/daemon.json
+sudo systemctl daemon-reload
+sudo systemctl restart docker

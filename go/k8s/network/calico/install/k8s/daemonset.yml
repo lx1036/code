@@ -81,6 +81,7 @@ spec:
             - name: CNI_CONF_NAME
               value: "10-calico.conflist"
             # The CNI network config to install on each node.
+            # /etc/cni/net.d/10-calico.conflist
             - name: CNI_NETWORK_CONFIG
               valueFrom:
                 configMapKeyRef:
