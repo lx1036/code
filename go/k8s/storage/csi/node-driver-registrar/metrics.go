@@ -10,9 +10,6 @@ import (
 	"k8s.io/component-base/metrics"
 )
 
-
-
-
 const (
 	// SubsystemSidecar is the default subsystem name in a metrics
 	// (= the prefix in the final metrics name). It is to be used
@@ -39,9 +36,6 @@ const (
 var (
 	operationsLatencyBuckets = []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600}
 )
-
-
-
 
 // Server represents any type that could serve HTTP requests for the metrics
 // endpoint.
@@ -281,7 +275,6 @@ func (cmmv *csiMetricsManagerWithValues) RecordMetrics(
 	operationDuration time.Duration) {
 	cmmv.recordMetricsWithLabels(operationName, operationErr, operationDuration, cmmv.additionalValues)
 }
-
 
 func getErrorCode(err error) string {
 	if err == nil {
