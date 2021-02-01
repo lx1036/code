@@ -11,6 +11,7 @@ require (
 	github.com/bep/debounce v1.2.0
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
+	github.com/container-storage-interface/spec v1.3.0
 	github.com/containerd/containerd v1.3.2
 	github.com/containernetworking/cni v0.8.0
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
@@ -22,6 +23,7 @@ require (
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gohouse/gorose/v2 v2.1.3
+	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf v1.4.2
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/btree v1.0.0
@@ -33,6 +35,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/kavu/go_reuseport v1.5.0 // indirect
 	github.com/klauspost/cpuid v1.2.0
+	github.com/kubernetes-csi/csi-lib-utils v0.9.0
 	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
 	github.com/mholt/certmagic v0.8.3
@@ -44,6 +47,7 @@ require (
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.1
 	github.com/operator-framework/operator-sdk v0.17.1
+	github.com/patrickmn/go-cache v0.0.0-20180815053127-5633e0862627
 	github.com/pkg/errors v0.9.1
 	github.com/projectcalico/libcalico-go v1.7.2-0.20201119205058-b367043ede58
 	github.com/prometheus/client_golang v1.7.1
@@ -58,7 +62,7 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.5.1
 	github.com/tidwall/evio v1.0.2
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
 	github.com/urfave/cli v1.22.2
@@ -72,7 +76,7 @@ require (
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/grpc v1.27.0
+	google.golang.org/grpc v1.29.0
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -85,12 +89,14 @@ require (
 	k8s.io/apiextensions-apiserver v0.19.7
 	k8s.io/apimachinery v0.19.7
 	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/component-base v0.19.7
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.2.0
+	k8s.io/kubelet v0.0.0
 	k8s.io/kubernetes v1.18.3
 	k8s.io/sample-controller v0.19.7
+	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 	sigs.k8s.io/controller-runtime v0.6.2
-	github.com/patrickmn/go-cache v0.0.0-20180815053127-5633e0862627
 )
 
 replace (
