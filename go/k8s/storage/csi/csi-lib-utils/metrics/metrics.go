@@ -1,4 +1,4 @@
-package main
+package metrics
 
 import (
 	"fmt"
@@ -80,6 +80,9 @@ type CSIMetricsManager interface {
 	// given server at the specified address/path.
 	RegisterToServer(s Server, metricsPath string)
 }
+
+// NewCSIMetricsManager is provided for backwards-compatibility.
+var NewCSIMetricsManager = NewCSIMetricsManagerForSidecar
 
 // NewCSIMetricsManagerForSidecar creates and registers metrics for CSI Sidecars and
 // returns an object that can be used to trigger the metrics. It uses "csi_sidecar"

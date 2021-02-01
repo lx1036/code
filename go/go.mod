@@ -36,6 +36,7 @@ require (
 	github.com/kavu/go_reuseport v1.5.0 // indirect
 	github.com/klauspost/cpuid v1.2.0
 	github.com/kubernetes-csi/csi-lib-utils v0.9.0
+	github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0
 	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
 	github.com/mholt/certmagic v0.8.3
@@ -75,7 +76,7 @@ require (
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
-	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+	golang.org/x/time v0.0.0-20200416051211-89c76fbcd5d1
 	google.golang.org/grpc v1.29.0
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
@@ -88,6 +89,7 @@ require (
 	k8s.io/api v0.19.7
 	k8s.io/apiextensions-apiserver v0.19.7
 	k8s.io/apimachinery v0.19.7
+	k8s.io/apiserver v0.19.7
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/component-base v0.19.7
 	k8s.io/klog v1.0.0

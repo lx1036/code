@@ -7,7 +7,10 @@ import (
 	"strconv"
 	"time"
 
+	"k8s-lx1036/k8s/storage/csi/csi-lib-utils/metrics"
+
 	"golang.org/x/net/context"
+
 	"k8s.io/klog/v2"
 )
 
@@ -59,7 +62,7 @@ func main() {
 	}
 
 	// Unused metrics manager, necessary for connection.Connect below
-	csiMetricsMgr := NewCSIMetricsManagerForSidecar("")
+	csiMetricsMgr := metrics.NewCSIMetricsManagerForSidecar("")
 
 	// Once https://github.com/container-storage-interface/spec/issues/159 is
 	// resolved, if plugin does not support PUBLISH_UNPUBLISH_VOLUME, then we
