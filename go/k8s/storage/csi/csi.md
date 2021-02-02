@@ -28,3 +28,21 @@ Volume就是一个目录。
 # **[详解 Kubernetes Volume 的实现原理](https://draveness.me/kubernetes-volume)**
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+## CSI 原理
+plugin_manager pkg 主要去监听 /var/lib/kubelet/plugins socket的注册和注销，代码在 pkg/kubelet/pluginmanager/plugin_manager.go
+csi_plugin 主要实现csi定义的方法，如 NodeGetInfo/NodeStageVolume/NodePublishVolume 等方法，而这些方法通过rpc调用 node-driver-registrar
+方法，来注册自己写的csi plugin。代码在 pkg/volume/csi/csi_plugin.go。
+其中，csi-external-provisioner和csi-external-attacher controller会watch pvc/pv/storageclass 再去调用自己写的csi plugin方法实现create/delete volume，
+和attach/detach volume。
