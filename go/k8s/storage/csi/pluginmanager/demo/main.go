@@ -1,16 +1,17 @@
 package main
 
 import (
-	"k8s-lx1036/k8s/storage/csi/pluginmanager"
-	csi_handler "k8s-lx1036/k8s/storage/csi/pluginmanager/demo/csi-handler"
-	"k8s.io/klog"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"k8s-lx1036/k8s/storage/csi/pluginmanager"
+	"k8s-lx1036/k8s/storage/csi/pluginmanager/demo/csi-plugin"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 )
 
@@ -43,7 +44,7 @@ func main() {
 	stopCh := SetupSignalHandler()
 	sockDir := "/tmp/csi"
 	pluginMgr := pluginmanager.NewPluginManager(sockDir, record.NewFakeRecorder(100))
-	pluginMgr.AddHandler("csi", csi_handler.PluginHandler)
+	pluginMgr.AddHandler("csi", csi_plugin.PluginHandler)
 
 	go pluginMgr.Run(config.NewSourcesReady(SeenAllSources), wait.NeverStop)
 

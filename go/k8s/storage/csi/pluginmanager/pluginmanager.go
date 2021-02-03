@@ -91,7 +91,7 @@ func NewPluginManager(
 func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
-	// 运行plugin_watcher来watch sockDir目录下socket的创建和删除，并去更新desiredStateOfWorld
+	// 运行plugin_watcher来watch sockDir目录下socket的创建和删除，并去更新desiredStateOfWorld.socketFileToInfo
 	klog.V(2).Infof("The desired_state_of_world populator (plugin watcher) starts")
 	pm.desiredStateOfWorldPopulator.Start(stopCh)
 

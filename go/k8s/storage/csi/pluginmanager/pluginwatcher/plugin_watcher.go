@@ -198,5 +198,4 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 	}(fsWatcher)
 
 	return nil
-
 }
