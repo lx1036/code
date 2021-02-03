@@ -82,6 +82,7 @@ func (rc *reconciler) reconcile() {
 	}
 
 	// Ensure plugins that should be registered are registered
+	// dial RegistrationClient.GetInfo()
 	for _, pluginToRegister := range rc.desiredStateOfWorld.GetPluginsToRegister() {
 		if !rc.actualStateOfWorld.PluginExistsWithCorrectTimestamp(pluginToRegister) {
 			klog.V(5).Infof(pluginToRegister.GenerateMsgDetailed("Starting operationExecutor.RegisterPlugin", ""))

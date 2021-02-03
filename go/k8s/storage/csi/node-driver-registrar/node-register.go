@@ -24,7 +24,7 @@ type registrationServer struct {
 	version    []string
 }
 
-func (e registrationServer) GetInfo(c context.Context, req *registerapi.InfoRequest) (*registerapi.PluginInfo, error) {
+func (e *registrationServer) GetInfo(c context.Context, req *registerapi.InfoRequest) (*registerapi.PluginInfo, error) {
 	klog.Infof("Received GetInfo call: %+v", req)
 	return &registerapi.PluginInfo{
 		Type:              registerapi.CSIPlugin,
@@ -34,7 +34,7 @@ func (e registrationServer) GetInfo(c context.Context, req *registerapi.InfoRequ
 	}, nil
 }
 
-func (e registrationServer) NotifyRegistrationStatus(c context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
+func (e *registrationServer) NotifyRegistrationStatus(c context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
 	klog.Infof("Received NotifyRegistrationStatus call: %+v", status)
 	if !status.PluginRegistered {
 		klog.Errorf("Registration process failed with error: %+v, restarting registration container.", status.Error)
@@ -43,8 +43,6 @@ func (e registrationServer) NotifyRegistrationStatus(c context.Context, status *
 
 	return &registerapi.RegistrationStatusResponse{}, nil
 }
-
-var _ registerapi.RegistrationServer = registrationServer{}
 
 // NewregistrationServer returns an initialized registrationServer instance
 func newRegistrationServer(driverName string, endpoint string, versions []string) registerapi.RegistrationServer {
