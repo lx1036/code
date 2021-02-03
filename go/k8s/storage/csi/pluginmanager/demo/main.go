@@ -1,17 +1,18 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
-
+	
 	"k8s-lx1036/k8s/storage/csi/pluginmanager"
-	"k8s-lx1036/k8s/storage/csi/pluginmanager/demo/csi-plugin"
-
+	example_plugin "k8s-lx1036/k8s/storage/csi/pluginmanager/demo/example-plugin"
+	
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 )
 
@@ -40,13 +41,40 @@ func SetupSignalHandler() (stopCh <-chan struct{}) {
 	return stop
 }
 
+func newTestPluginManager(sockDir string) pluginmanager.PluginManager {
+	pm := pluginmanager.NewPluginManager(
+		sockDir,
+		&record.FakeRecorder{},
+	)
+	return pm
+}
+
 func main() {
 	stopCh := SetupSignalHandler()
-	sockDir := "/tmp/csi"
-	pluginMgr := pluginmanager.NewPluginManager(sockDir, record.NewFakeRecorder(100))
-	pluginMgr.AddHandler("csi", csi_plugin.PluginHandler)
+	
+	socketDir := "/tmp/csi"
+	pluginMgr := newTestPluginManager(socketDir)
+	
+	go func() {
+		sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
+		pluginMgr.Run(sourcesReady, stopCh)
+	}()
+	//pluginMgr.AddHandler(registerapi.CSIPlugin, csi_plugin.PluginHandler)
 
-	go pluginMgr.Run(config.NewSourcesReady(SeenAllSources), wait.NeverStop)
+	exampleHandler := example_plugin.NewExampleHandler([]string{"v1beta1", "v1beta2"}, true)
+	pluginMgr.AddHandler(registerapi.CSIPlugin, exampleHandler)
+	
+	
+	// 启动gRPC服务端
+	supportedVersions := []string{"v1beta1", "v1beta2"}
+	socketPath := fmt.Sprintf("%s/plugin.sock", socketDir)
+	pluginName := "example-plugin"
+	plugin := example_plugin.NewTestExamplePlugin(pluginName, registerapi.CSIPlugin, socketPath, supportedVersions...)
+	if err := plugin.Serve("v1beta1", "v1beta2"); err != nil {
+		panic(err)
+	}
+	
+	
 
 	<-stopCh
 	klog.Info("shutdown the csi plugin manager")

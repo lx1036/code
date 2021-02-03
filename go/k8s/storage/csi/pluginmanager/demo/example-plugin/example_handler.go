@@ -9,7 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"k8s-lx1036/k8s/storage/csi/pluginmanager/demo/example-plugin/v1beta1"
+	"k8s-lx1036/k8s/storage/csi/pluginmanager/demo/example-plugin/v1beta2"
+
 	"google.golang.org/grpc"
+	"k8s.io/klog"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
@@ -32,13 +36,55 @@ type exampleHandler struct {
 	permitDeprecatedDir bool
 }
 
+func (p *exampleHandler) SendEvent(pluginName string, event examplePluginEvent) {
+	klog.V(2).Infof("Sending %v for plugin %s over chan %v", event, pluginName, p.eventChans[pluginName])
+	p.eventChans[pluginName] <- event
+}
+
+func (p *exampleHandler) EventChan(pluginName string) chan examplePluginEvent {
+	return p.eventChans[pluginName]
+}
+
+func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string, versions []string) error {
+	p.SendEvent(pluginName, exampleEventRegister)
+
+	// Verifies the grpcServer is ready to serve services.
+	_, conn, err := dial(endpoint, time.Second)
+	if err != nil {
+		return fmt.Errorf("failed dialing endpoint (%s): %v", endpoint, err)
+	}
+	defer conn.Close()
+
+	// The plugin handler should be able to use any listed service API version.
+	v1beta1Client := v1beta1.NewExampleClient(conn)
+	v1beta2Client := v1beta2.NewExampleClient(conn)
+
+	// Tests v1beta1 GetExampleInfo
+	_, err = v1beta1Client.GetExampleInfo(context.Background(), &v1beta1.ExampleRequest{})
+	if err != nil {
+		return fmt.Errorf("failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
+	}
+
+	// Tests v1beta1 GetExampleInfo
+	_, err = v1beta2Client.GetExampleInfo(context.Background(), &v1beta2.ExampleRequest{})
+	if err != nil {
+		return fmt.Errorf("failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
+	}
+
+	return nil
+}
+
+func (p *exampleHandler) DeRegisterPlugin(pluginName string) {
+	p.SendEvent(pluginName, exampleEventDeRegister)
+}
+
 func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	p.SendEvent(pluginName, exampleEventValidate)
 
-	n, ok := p.DecreasePluginCount(pluginName)
+	/*n, ok := p.DecreasePluginCount(pluginName)
 	if !ok && n > 0 {
 		return fmt.Errorf("pluginName('%s') wasn't expected (count is %d)", pluginName, n)
-	}
+	}*/
 
 	if !reflect.DeepEqual(versions, p.SupportedVersions) {
 		return fmt.Errorf("versions('%v') != supported versions('%v')", versions, p.SupportedVersions)
