@@ -1,4 +1,4 @@
-package main
+package csi_handler
 
 import (
 	"context"
@@ -49,6 +49,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	klog.Infof("NodeGetInfo: ")
 
+	return nil
 }
 
 // DeRegisterPlugin is called when a plugin removed its socket, signaling

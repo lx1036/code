@@ -1,12 +1,23 @@
 package pluginmanager
 
 import (
+	"time"
+
 	"k8s-lx1036/k8s/storage/csi/pluginmanager/cache"
+	"k8s-lx1036/k8s/storage/csi/pluginmanager/operationexecutor"
 	"k8s-lx1036/k8s/storage/csi/pluginmanager/pluginwatcher"
 	"k8s-lx1036/k8s/storage/csi/pluginmanager/reconciler"
-	"k8s.io/client-go/tools/record"
 
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+)
+
+const (
+	// loopSleepDuration is the amount of time the reconciler loop waits
+	// between successive executions
+	loopSleepDuration = 1 * time.Second
 )
 
 // PluginManager runs a set of asynchronous loops that figure out which plugins
@@ -55,14 +66,43 @@ func NewPluginManager(
 	asw := cache.NewActualStateOfWorld()
 	dsw := cache.NewDesiredStateOfWorld()
 
+	r := reconciler.NewReconciler(
+		operationexecutor.NewOperationExecutor(
+			operationexecutor.NewOperationGenerator(
+				recorder,
+			),
+		),
+		loopSleepDuration,
+		dsw,
+		asw)
+
 	pm := &pluginManager{
 		desiredStateOfWorldPopulator: pluginwatcher.NewWatcher(
 			sockDir,
 			dsw,
 		),
-		reconciler:          reconciler,
+		reconciler:          r,
 		desiredStateOfWorld: dsw,
 		actualStateOfWorld:  asw,
 	}
 	return pm
+}
+
+func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+	defer runtime.HandleCrash()
+
+	// 运行plugin_watcher来watch sockDir目录下socket的创建和删除，并去更新desiredStateOfWorld
+	klog.V(2).Infof("The desired_state_of_world populator (plugin watcher) starts")
+	pm.desiredStateOfWorldPopulator.Start(stopCh)
+
+	//
+	klog.Infof("Starting Kubelet Plugin Manager")
+	go pm.reconciler.Run(stopCh)
+
+	<-stopCh
+	klog.Infof("Shutting down Kubelet Plugin Manager")
+}
+
+func (pm *pluginManager) AddHandler(pluginType string, handler cache.PluginHandler) {
+	pm.reconciler.AddHandler(pluginType, handler)
 }

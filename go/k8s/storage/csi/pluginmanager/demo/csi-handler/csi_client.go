@@ -1,4 +1,4 @@
-package main
+package csi_handler
 
 import (
 	"context"
