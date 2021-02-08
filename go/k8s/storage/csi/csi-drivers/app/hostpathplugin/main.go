@@ -2,14 +2,11 @@ package main
 
 import (
 	"flag"
-	"os"
 
 	"k8s-lx1036/k8s/storage/csi/csi-drivers/pkg/hostpath"
-)
 
-func init() {
-	flag.Set("logtostderr", "true")
-}
+	"k8s.io/klog/v2"
+)
 
 var (
 	endpoint   = flag.String("endpoint", "unix://tmp/csi.sock", "CSI endpoint")
@@ -17,15 +14,12 @@ var (
 	nodeID     = flag.String("nodeid", "", "node id")
 )
 
-//debug: go run . --endpoint tcp://127.0.0.1:10000 --nodeid CSINode -v=5
+//debug: go run . --endpoint tcp://127.0.0.1:10000 --nodeid minikube
 func main() {
+	klog.InitFlags(nil)
+	flag.Set("logtostderr", "true")
 	flag.Parse()
 
-	handle()
-	os.Exit(0)
-}
-
-func handle() {
 	driver := hostpath.GetHostPathDriver()
 	driver.Run(*driverName, *nodeID, *endpoint)
 }

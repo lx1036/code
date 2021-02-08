@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"github.com/golang/glog"
-	"os"
-
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/spf13/cobra"
+	"k8s.io/klog/v2"
 )
 
 var node struct {
@@ -29,7 +27,7 @@ var nodeCmd = &cobra.Command{
 	},
 }
 
-// debug: go run . node get-info
+// debug: go run . node get-info --endpoint 127.0.0.1:10000
 var nodeGetInfoCmd = &cobra.Command{
 	Use:     "get-info",
 	Aliases: []string{"info"},
@@ -40,9 +38,9 @@ var nodeGetInfoCmd = &cobra.Command{
 			return err
 		}
 
-		glog.Infof("NodeGetInfo response: %v", rep)
+		klog.Infof("NodeGetInfo response: %v", rep)
 
-		return Tpl.Execute(os.Stdout, rep)
+		return nil
 	},
 }
 
@@ -56,7 +54,7 @@ var nodePublishVolume struct {
 	caps              volumeCapabilitySliceArg
 }
 
-// debug: go run . node publish --target-path /mnt/hostpath1 --cap SINGLE_NODE_WRITER,block 335cf2b4-9edd-46fa-bfd5-af1db124ddf1
+// debug: go run . node publish --target-path /mnt/hostpath1 --cap SINGLE_NODE_WRITER,block 335cf2b4-9edd-46fa-bfd5-af1db124ddf1 --endpoint 127.0.0.1:10000
 var nodePublishVolumeCmd = &cobra.Command{
 	Use:     "publish",
 	Aliases: []string{"mnt", "mount"},
@@ -87,13 +85,13 @@ USAGE
 			// Set the volume ID for the current request.
 			req.VolumeId = args[i]
 
-			glog.Infof("mounting volume %v", req)
+			klog.Infof("mounting volume %v", req)
 			_, err := node.client.NodePublishVolume(context.TODO(), &req)
 			if err != nil {
 				return err
 			}
 
-			glog.Infof("mounted volume %s", args[i])
+			klog.Infof("mounted volume %s", args[i])
 		}
 
 		return nil
@@ -104,7 +102,7 @@ var nodeUnpublishVolume struct {
 	targetPath string
 }
 
-// debug: go run . node unpublish --target-path /mnt/hostpath1 335cf2b4-9edd-46fa-bfd5-af1db124ddf1
+// debug: go run . node unpublish --target-path /mnt/hostpath1 335cf2b4-9edd-46fa-bfd5-af1db124ddf1 --endpoint 127.0.0.1:10000
 var nodeUnpublishVolumeCmd = &cobra.Command{
 	Use:     "unpublish",
 	Aliases: []string{"umount", "unmount"},
@@ -124,13 +122,13 @@ USAGE
 			// Set the volume ID for the current request.
 			req.VolumeId = args[i]
 
-			glog.Infof("unmounting volume %v", req)
+			klog.Infof("unmounting volume %v", req)
 			_, err := node.client.NodeUnpublishVolume(context.TODO(), &req)
 			if err != nil {
 				return err
 			}
 
-			glog.Infof("unmounted volume %s", args[i])
+			klog.Infof("unmounted volume %s", args[i])
 		}
 
 		return nil
