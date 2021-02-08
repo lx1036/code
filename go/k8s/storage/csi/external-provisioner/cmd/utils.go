@@ -66,7 +66,7 @@ func getCapacityController(
 			}
 		}
 		klog.Infof("producing CSIStorageCapacity objects with fixed topology segment %s", segment)
-		topologyInformer = topology.NewFixedNodeTopology(&segment)
+		//topologyInformer = topology.NewFixedNodeTopology(&segment)
 	}
 
 	// We only need objects from our own namespace. The normal factory would give

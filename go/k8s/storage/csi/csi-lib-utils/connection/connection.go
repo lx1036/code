@@ -3,13 +3,15 @@ package connection
 import (
 	"context"
 	"errors"
+	"io/ioutil"
 	"net"
 	"strings"
 	"time"
 
-	"google.golang.org/grpc"
+	"k8s-lx1036/k8s/storage/csi/csi-lib-utils/metrics"
 
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
+	"google.golang.org/grpc"
 
 	"k8s.io/klog/v2"
 )
@@ -31,6 +33,29 @@ type options struct {
 // Option is the type of all optional parameters for Connect.
 type Option func(o *options)
 
+// OnConnectionLoss registers a callback that will be invoked when the
+// connection got lost. If that callback returns true, the connection
+// is reestablished. Otherwise the connection is left as it is and
+// all future gRPC calls using it will fail with status.Unavailable.
+func OnConnectionLoss(reconnect func() bool) Option {
+	return func(o *options) {
+		o.reconnect = reconnect
+	}
+}
+
+// ExitOnConnectionLoss returns callback for OnConnectionLoss() that writes
+// an error to /dev/termination-log and exits.
+func ExitOnConnectionLoss() func() bool {
+	return func() bool {
+		terminationMsg := "Lost connection to CSI driver, exiting"
+		if err := ioutil.WriteFile(terminationLogPath, []byte(terminationMsg), 0644); err != nil {
+			klog.Errorf("%s: %s", terminationLogPath, err)
+		}
+		klog.Fatalf(terminationMsg)
+		return false
+	}
+}
+
 // Connect opens insecure gRPC connection to a CSI driver. Address must be either absolute path to UNIX domain socket
 // file or have format '<protocol>://', following gRPC name resolution mechanism at
 // https://github.com/grpc/grpc/blob/master/doc/naming.md.
@@ -50,14 +75,14 @@ type Option func(o *options)
 //
 // For other connections, the default behavior from gRPC is used and
 // loss of connection is not detected reliably.
-func Connect(address string, metricsManager CSIMetricsManager, options ...Option) (*grpc.ClientConn, error) {
+func Connect(address string, metricsManager metrics.CSIMetricsManager, options ...Option) (*grpc.ClientConn, error) {
 	return connect(address, metricsManager, []grpc.DialOption{}, options)
 }
 
 // connect is the internal implementation of Connect. It has more options to enable testing.
 func connect(
 	address string,
-	metricsManager CSIMetricsManager,
+	metricsManager metrics.CSIMetricsManager,
 	dialOptions []grpc.DialOption, connectOptions []Option) (*grpc.ClientConn, error) {
 	var o options
 	for _, option := range connectOptions {
@@ -138,7 +163,7 @@ func connect(
 }
 
 type ExtendedCSIMetricsManager struct {
-	CSIMetricsManager
+	metrics.CSIMetricsManager
 }
 
 // RecordMetricsClientInterceptor is a gPRC unary interceptor for recording metrics for CSI operations

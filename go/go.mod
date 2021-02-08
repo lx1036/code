@@ -89,19 +89,20 @@ require (
 	gopkg.in/yaml.v2 v2.3.0
 	gopkg.in/yaml.v3 v3.0.0-20190905181640-827449938966
 	gotest.tools v2.2.0+incompatible
-	k8s.io/api v0.19.7
+	k8s.io/api v0.20.2
 	k8s.io/apiextensions-apiserver v0.19.7
-	k8s.io/apimachinery v0.19.7
+	k8s.io/apimachinery v0.20.2
 	k8s.io/apiserver v0.19.7
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/component-base v0.19.7
-	k8s.io/csi-translation-lib v0.19.7
+	k8s.io/component-helpers v0.20.2
+	k8s.io/csi-translation-lib v0.19.7 // indirect
 	k8s.io/klog v1.0.0
-	k8s.io/klog/v2 v2.2.0
+	k8s.io/klog/v2 v2.4.0
 	k8s.io/kubelet v0.0.0
 	k8s.io/kubernetes v1.19.7
 	k8s.io/sample-controller v0.19.7
-	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
+	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/controller-runtime v0.6.2
 )
 

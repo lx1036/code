@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"k8s-lx1036/k8s/storage/csi/external-provisioner/external-provisioner-lib/pkg/controller"
 	v1 "k8s.io/api/core/v1"
 	"time"
 
@@ -69,11 +68,11 @@ func (p *CloningProtectionController) Run(ctx context.Context, threadiness int) 
 		AddFunc:    func(obj interface{}) { p.enqueueClaimUpdate(ctx, obj) },
 		UpdateFunc: func(_ interface{}, newObj interface{}) { p.enqueueClaimUpdate(ctx, newObj) },
 	}
-	p.claimInformer.AddEventHandlerWithResyncPeriod(claimHandler, controller.DefaultResyncPeriod)
+	p.claimInformer.AddEventHandlerWithResyncPeriod(claimHandler, DefaultResyncPeriod)
 
 	for i := 0; i < threadiness; i++ {
 		go wait.Until(func() {
-			p.runClaimWorker(ctx)
+			//p.runClaimWorker(ctx)
 		}, time.Second, ctx.Done())
 	}
 

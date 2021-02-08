@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"time"
 
+	"k8s-lx1036/k8s/storage/csi/csi-lib-utils/connection"
 	"k8s-lx1036/k8s/storage/csi/csi-lib-utils/metrics"
+	"k8s-lx1036/k8s/storage/csi/csi-lib-utils/rpc"
 
 	"golang.org/x/net/context"
 
@@ -69,7 +71,7 @@ func main() {
 	// can skip adding mapping to "csi.volume.kubernetes.io/nodeid" annotation.
 
 	klog.V(1).Infof("Attempting to open a gRPC connection with: %q", *csiAddress)
-	csiConn, err := Connect(*csiAddress, csiMetricsMgr)
+	csiConn, err := connection.Connect(*csiAddress, csiMetricsMgr)
 	if err != nil {
 		klog.Errorf("error connecting to CSI driver: %v", err)
 		os.Exit(1)
@@ -79,7 +81,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), *operationTimeout)
 	defer cancel()
 
-	csiDriverName, err := GetDriverName(ctx, csiConn)
+	csiDriverName, err := rpc.GetDriverName(ctx, csiConn)
 	if err != nil {
 		klog.Errorf("error retreiving CSI driver name: %v", err)
 		os.Exit(1)

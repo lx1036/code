@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	storageapis "k8s.io/api/storage/v1"
@@ -76,4 +77,41 @@ type Provisioner interface {
 	// May return IgnoredError to indicate that the call has been ignored and no
 	// action taken.
 	Delete(context.Context, *v1.PersistentVolume) error
+}
+
+// Qualifier is an optional interface implemented by provisioners to determine
+// whether a claim should be provisioned as early as possible (e.g. prior to
+// leader election).
+type Qualifier interface {
+	// ShouldProvision returns whether provisioning for the claim should
+	// be attempted.
+	ShouldProvision(context.Context, *v1.PersistentVolumeClaim) bool
+}
+
+// BlockProvisioner is an optional interface implemented by provisioners to determine
+// whether it supports block volume.
+type BlockProvisioner interface {
+	Provisioner
+	// SupportsBlock returns whether provisioner supports block volume.
+	SupportsBlock(context.Context) bool
+}
+
+// IgnoredError is the value for Delete to return to indicate that the call has
+// been ignored and no action taken. In case multiple provisioners are serving
+// the same storage class, provisioners may ignore PVs they are not responsible
+// for (e.g. ones they didn't create). The controller will act accordingly,
+// i.e. it won't emit a misleading VolumeFailedDelete event.
+type IgnoredError struct {
+	Reason string
+}
+
+func (e *IgnoredError) Error() string {
+	return fmt.Sprintf("ignored because %s", e.Reason)
+}
+
+// DeletionGuard is an optional interface implemented by provisioners to determine
+// whether a PV should be deleted.
+type DeletionGuard interface {
+	// ShouldDelete returns whether deleting the PV should be attempted.
+	ShouldDelete(context.Context, *v1.PersistentVolume) bool
 }
