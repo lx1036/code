@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    deprecated.daemonset.template.generation: "7"
+  name: sunnyfs-csi-share-node
+  namespace: sunnyfs
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: sunnyfs-csi-share-node
+  template:
+    metadata:
+      labels:
+        app: sunnyfs-csi-share-node
+    spec:
+      containers:
+        - args:
+            - --csi-address=/csi/sunnyfs-csi-share.sock
+            - --kubelet-registration-path=/csi/sunnyfs-csi-share.sock
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          image: quay.io/k8scsi/csi-node-driver-registrar:v2.1.0
+          imagePullPolicy: IfNotPresent
+          name: node-driver-registrar
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4000Mi
+            requests:
+              cpu: "1"
+              memory: 4000Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /registration
+              name: registration-dir
+            - mountPath: /csi
+              name: socket-dir
+        - args:
+            - --v=5
+            - --endpoint=unix:///csi/sunnyfs-csi-share.sock
+            - --nodeid=$(NODE_ID)
+            - --drivername=csi.sunnyfs.share.com
+            - --version=v1.0.0
+          env:
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          image: r.addops.soft.360.cn/admin/sunnyfs-csi-driver:v1.0.4
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - rm -rf /csi/sunnyfs-csi-share.sock /registration/csi.sunnyfs.share.com-reg.sock
+          name: node
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4000Mi
+            requests:
+              cpu: "1"
+              memory: 4000Mi
+          securityContext:
+            privileged: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /registration
+              name: registration-dir
+            - mountPath: /csi
+              name: socket-dir
+            - mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
+              name: mountpoint-dir
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      imagePullSecrets:
+        - name: regcred
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - operator: Exists
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins/csi.sunnyfs.share.com
+            type: DirectoryOrCreate
+          name: socket-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: Directory
+          name: registration-dir
+        - hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+          name: mountpoint-dir
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate

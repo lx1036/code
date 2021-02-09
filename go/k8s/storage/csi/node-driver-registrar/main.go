@@ -22,9 +22,9 @@ import (
 var (
 	connectionTimeout       = flag.Duration("connection-timeout", 0, "The --connection-timeout flag is deprecated")
 	operationTimeout        = flag.Duration("timeout", time.Second, "Timeout for waiting for communication with driver")
-	csiAddress              = flag.String("csi-address", "/run/csi/socket", "Path of the CSI driver socket that the node-driver-registrar will connect to.")
-	pluginRegistrationPath  = flag.String("plugin-registration-path", "/tmp", "Path to Kubernetes plugin registration directory.")
-	kubeletRegistrationPath = flag.String("kubelet-registration-path", "/tmp", "Path of the CSI driver socket on the Kubernetes host machine.")
+	csiAddress              = flag.String("csi-address", "/tmp/plugins/csi_example/csi-hostpath.sock", "Path of the CSI driver socket that the node-driver-registrar will connect to.")
+	pluginRegistrationPath  = flag.String("plugin-registration-path", "/tmp/plugins_registry", "Path to Kubernetes plugin registration directory.")
+	kubeletRegistrationPath = flag.String("kubelet-registration-path", "/tmp/plugins/csi_example/csi-hostpath.sock", "Path of the CSI driver socket on the Kubernetes host machine.")
 	healthzPort             = flag.Int("health-port", 8081, "(deprecated) TCP port for healthz requests. Set to 0 to disable the healthz server. Only one of `--health-port` and `--http-endpoint` can be set.")
 	httpEndpoint            = flag.String("http-endpoint", "", "The TCP network address where the HTTP server for diagnostics, including the health check indicating whether the registration socket exists, will listen (example: `:8080`). The default is empty string, which means the server is disabled. Only one of `--health-port` and `--http-endpoint` can be set.")
 	showVersion             = flag.Bool("version", false, "Show version.")
@@ -94,8 +94,9 @@ func main() {
 	klog.Infof("CSI driver name: %q", csiDriverName)
 	csiMetricsMgr.SetDriverName(csiDriverName)
 
-	// kubelet pluginswatcher 会通过socket ${kubeletRegistrationPath}/${csiDriverName}-reg.sock ，来调用该node-driver-registrar server
-	// 所以csi-node-registrar调用顺序：
+	// kubelet pluginswatcher 会通过socket ${kubeletRegistrationPath}/${csiDriverName}-reg.sock,
+	// 即/var/lib/kubelet/plugins_registry/csi-hostpath-reg.sock
+	// 来调用该node-driver-registrar server, 所以csi-node-registrar调用顺序：
 	// kubelet pluginswatcher -> csi-node-registrar server -> csi-driver server
 
 	// When kubeletRegistrationPath is specified then driver-registrar ONLY acts
