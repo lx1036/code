@@ -12,7 +12,7 @@ import (
 
 	"google.golang.org/grpc"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
@@ -44,23 +44,6 @@ type operationGenerator struct {
 	recorder record.EventRecorder
 }
 
-// Dial establishes the gRPC communication with the picked up plugin socket. https://godoc.org/google.golang.org/grpc#Dial
-func dial(unixSocketPath string, timeout time.Duration) (registerapi.RegistrationClient, *grpc.ClientConn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	c, err := grpc.DialContext(ctx, unixSocketPath, grpc.WithInsecure(), grpc.WithBlock(),
-		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
-		}),
-	)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to dial socket %s, err: %v", unixSocketPath, err)
-	}
-
-	return registerapi.NewRegistrationClient(c), c, nil
-}
 
 func (og operationGenerator) GenerateRegisterPluginFunc(
 	socketPath string,
@@ -71,6 +54,7 @@ func (og operationGenerator) GenerateRegisterPluginFunc(
 	registerPluginFunc := func() error {
 		client, conn, err := dial(socketPath, dialTimeoutDuration)
 		if err != nil {
+			klog.Errorf("RegisterPlugin error -- dial failed at socket %s, err: %v", socketPath, err)
 			return fmt.Errorf("RegisterPlugin error -- dial failed at socket %s, err: %v", socketPath, err)
 		}
 		defer conn.Close()
@@ -80,14 +64,18 @@ func (og operationGenerator) GenerateRegisterPluginFunc(
 
 		infoResp, err := client.GetInfo(ctx, &registerapi.InfoRequest{})
 		if err != nil {
+			klog.Errorf("RegisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %v", socketPath, err)
 			return fmt.Errorf("RegisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %v", socketPath, err)
 		}
 
 		handler, ok := pluginHandlers[infoResp.Type]
 		if !ok {
 			if err := og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)); err != nil {
+				klog.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
 				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
 			}
+			
+			klog.Errorf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)
 			return fmt.Errorf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)
 		}
 
@@ -96,8 +84,11 @@ func (og operationGenerator) GenerateRegisterPluginFunc(
 		}
 		if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 			if err = og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin validation failed with err: %v", err)); err != nil {
+				klog.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
 				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
 			}
+			
+			klog.Errorf("RegisterPlugin error -- pluginHandler.ValidatePluginFunc failed")
 			return fmt.Errorf("RegisterPlugin error -- pluginHandler.ValidatePluginFunc failed")
 		}
 
@@ -141,7 +132,7 @@ func (og operationGenerator) GenerateUnregisterPluginFunc(
 
 		pluginInfo.Handler.DeRegisterPlugin(pluginInfo.Name)
 
-		klog.V(4).Infof("DeRegisterPlugin called for %s on %v", pluginInfo.Name, pluginInfo.Handler)
+		klog.Infof("DeRegisterPlugin called for %s on %v", pluginInfo.Name, pluginInfo.Handler)
 		return nil
 	}
 

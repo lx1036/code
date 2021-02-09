@@ -35,11 +35,11 @@ func (e *examplePlugin) GetInfo(context context.Context, request *registerapi.In
 }
 
 func (e *examplePlugin) NotifyRegistrationStatus(context context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
-	klog.Errorf("Registration is: %v\n", status)
+	klog.Infof("Registration is: %v\n", status)
 
-	if e.registrationStatus != nil {
-		e.registrationStatus <- *status
-	}
+	//if e.registrationStatus != nil {
+	//	e.registrationStatus <- *status
+	//}
 
 	return &registerapi.RegistrationStatusResponse{}, nil
 }
@@ -90,6 +90,7 @@ func (e *examplePlugin) Serve(services ...string) error {
 	e.wg.Add(1)
 	go func() {
 		defer e.wg.Done()
+		defer e.grpcServer.Stop()
 		// Blocking call to accept incoming connections.
 		if err := e.grpcServer.Serve(lis); err != nil {
 			klog.Errorf("example server stopped serving: %v", err)

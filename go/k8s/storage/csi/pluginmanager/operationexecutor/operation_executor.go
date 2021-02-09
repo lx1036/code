@@ -1,11 +1,19 @@
 package operationexecutor
 
 import (
+	"fmt"
+	"errors"
+	"net"
 	"time"
-
+	"context"
+	
 	"k8s-lx1036/k8s/storage/csi/pluginmanager/cache"
-
+	
+	"google.golang.org/grpc"
+	
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
+	"k8s.io/klog/v2"
 )
 
 // OperationExecutor defines a set of operations for registering and unregistering
@@ -57,27 +65,7 @@ type operationExecutor struct {
 	operationGenerator OperationGenerator
 }
 
-func (oe operationExecutor) RegisterPlugin(
-	socketPath string,
-	timestamp time.Time,
-	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorld ActualStateOfWorldUpdater) error {
-	generatedOperation :=
-		oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, timestamp, pluginHandlers, actualStateOfWorld)
 
-	return oe.pendingOperations.Run(
-		socketPath, generatedOperation)
-}
-
-func (oe operationExecutor) UnregisterPlugin(
-	pluginInfo cache.PluginInfo,
-	actualStateOfWorld ActualStateOfWorldUpdater) error {
-	generatedOperation :=
-		oe.operationGenerator.GenerateUnregisterPluginFunc(pluginInfo, actualStateOfWorld)
-
-	return oe.pendingOperations.Run(
-		pluginInfo.SocketPath, generatedOperation)
-}
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
 func NewOperationExecutor(operationGenerator OperationGenerator) OperationExecutor {

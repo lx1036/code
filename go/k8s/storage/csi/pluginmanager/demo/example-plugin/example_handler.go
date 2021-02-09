@@ -37,8 +37,9 @@ type exampleHandler struct {
 }
 
 func (p *exampleHandler) SendEvent(pluginName string, event examplePluginEvent) {
-	klog.V(2).Infof("Sending %v for plugin %s over chan %v", event, pluginName, p.eventChans[pluginName])
 	p.eventChans[pluginName] <- event
+	
+	klog.Infof("Sending %v for plugin %s over chan %v", event, pluginName, p.eventChans[pluginName])
 }
 
 func (p *exampleHandler) EventChan(pluginName string) chan examplePluginEvent {
@@ -46,7 +47,9 @@ func (p *exampleHandler) EventChan(pluginName string) chan examplePluginEvent {
 }
 
 func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string, versions []string) error {
-	p.SendEvent(pluginName, exampleEventRegister)
+	klog.Infof("calling exampleHandler RegisterPlugin...")
+	
+	//p.SendEvent(pluginName, exampleEventRegister)
 
 	// Verifies the grpcServer is ready to serve services.
 	_, conn, err := dial(endpoint, time.Second)
@@ -70,16 +73,23 @@ func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string, versions []
 	if err != nil {
 		return fmt.Errorf("failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
 	}
-
+	
+	klog.Infof("called exampleHandler RegisterPlugin...")
+	
+	
 	return nil
 }
 
 func (p *exampleHandler) DeRegisterPlugin(pluginName string) {
-	p.SendEvent(pluginName, exampleEventDeRegister)
+	klog.Infof("calling exampleHandler DeRegisterPlugin...")
+	
+	//p.SendEvent(pluginName, exampleEventDeRegister)
 }
 
 func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	p.SendEvent(pluginName, exampleEventValidate)
+	klog.Infof("calling exampleHandler ValidatePlugin with %s, %s, %v", pluginName, endpoint, versions)
+	
+	//p.SendEvent(pluginName, exampleEventValidate)
 
 	/*n, ok := p.DecreasePluginCount(pluginName)
 	if !ok && n > 0 {
@@ -87,14 +97,18 @@ func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, vers
 	}*/
 
 	if !reflect.DeepEqual(versions, p.SupportedVersions) {
+		klog.Errorf("versions is not equal, %v %v", versions, p.SupportedVersions)
 		return fmt.Errorf("versions('%v') != supported versions('%v')", versions, p.SupportedVersions)
 	}
 
 	// this handler expects non-empty endpoint as an example
 	if len(endpoint) == 0 {
+		klog.Errorf("expecting non empty endpoint")
 		return errors.New("expecting non empty endpoint")
 	}
-
+	
+	klog.Infof("called exampleHandler ValidatePlugin...")
+	
 	return nil
 }
 

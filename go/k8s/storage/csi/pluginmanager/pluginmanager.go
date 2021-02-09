@@ -17,7 +17,7 @@ import (
 const (
 	// loopSleepDuration is the amount of time the reconciler loop waits
 	// between successive executions
-	loopSleepDuration = 1 * time.Second
+	loopSleepDuration = 60 * time.Second
 )
 
 // PluginManager runs a set of asynchronous loops that figure out which plugins

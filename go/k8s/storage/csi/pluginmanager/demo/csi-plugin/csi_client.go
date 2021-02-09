@@ -85,7 +85,7 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	maxVolumePerNode int64,
 	accessibleTopology map[string]string,
 	err error) {
-	klog.V(4).Info("calling NodeGetInfo rpc")
+	klog.Info("calling NodeGetInfo rpc")
 
 	var getNodeInfoError error
 	nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV1(ctx)
@@ -121,7 +121,7 @@ func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context) (
 
 func newGrpcConn(addr csiAddr) (*grpc.ClientConn, error) {
 	network := "unix"
-	klog.V(4).Infof("creating new gRPC connection for [%s://%s]", network, addr)
+	klog.Infof("creating new gRPC connection for [%s://%s]", network, addr)
 
 	return grpc.Dial(
 		string(addr),

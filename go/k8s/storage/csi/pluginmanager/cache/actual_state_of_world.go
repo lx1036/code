@@ -65,12 +65,14 @@ func NewActualStateOfWorld() ActualStateOfWorld {
 func (asw *actualStateOfWorld) AddPlugin(pluginInfo PluginInfo) error {
 	asw.Lock()
 	defer asw.Unlock()
+	
+	klog.Infof("add plugin SocketPath %s at time %s into actualStateOfWorld map", pluginInfo.SocketPath, pluginInfo.Timestamp.String())
 
 	if pluginInfo.SocketPath == "" {
 		return fmt.Errorf("socket path is empty")
 	}
 	if _, ok := asw.socketFileToInfo[pluginInfo.SocketPath]; ok {
-		klog.V(2).Infof("Plugin (Path %s) exists in actual state cache", pluginInfo.SocketPath)
+		klog.Infof("Plugin (Path %s) exists in actual state cache", pluginInfo.SocketPath)
 	}
 	asw.socketFileToInfo[pluginInfo.SocketPath] = pluginInfo
 	return nil
