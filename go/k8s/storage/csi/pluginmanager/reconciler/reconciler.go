@@ -1,21 +1,20 @@
 package reconciler
 
 import (
-	"fmt"
 	"context"
+	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
-	"errors"
 
 	"k8s-lx1036/k8s/storage/csi/pluginmanager/cache"
-	
+
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
-	
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/goroutinemap"
-	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
@@ -53,13 +52,30 @@ func (rc *reconciler) getHandlers() map[string]cache.PluginHandler {
 	return rc.handlers
 }
 
+func (rc *reconciler) logDesiredActualStateOfWorld() {
+	var desiredSocketPath []string
+	for _, pluginToRegister := range rc.desiredStateOfWorld.GetPluginsToRegister() {
+		desiredSocketPath = append(desiredSocketPath, pluginToRegister.SocketPath)
+	}
+
+	klog.Infof("desiredSocketPaths in current reconcile: %s", strings.Join(desiredSocketPath, ","))
+
+	var actualSocketPath []string
+	for _, registeredPlugin := range rc.actualStateOfWorld.GetRegisteredPlugins() {
+		actualSocketPath = append(actualSocketPath, registeredPlugin.SocketPath)
+	}
+
+	klog.Infof("actualSocketPaths in current reconcile: %s", strings.Join(actualSocketPath, ","))
+}
+
 func (rc *reconciler) reconcile() {
 	// Unregisterations are triggered before registrations
 	klog.Infof("reconcile in every time %s", rc.loopSleepDuration.String())
 
+	rc.logDesiredActualStateOfWorld()
+
 	// Ensure plugins that should be unregistered are unregistered.
 	for _, registeredPlugin := range rc.actualStateOfWorld.GetRegisteredPlugins() {
-		klog.Infof("registeredPlugin in actualStateOfWorld with SocketPath: %s", registeredPlugin.SocketPath)
 		unregisterPlugin := false
 		if !rc.desiredStateOfWorld.PluginExists(registeredPlugin.SocketPath) {
 			unregisterPlugin = true
@@ -70,7 +86,7 @@ func (rc *reconciler) reconcile() {
 			// with the same socket path but different timestamp.
 			for _, dswPlugin := range rc.desiredStateOfWorld.GetPluginsToRegister() {
 				if dswPlugin.SocketPath == registeredPlugin.SocketPath && dswPlugin.Timestamp != registeredPlugin.Timestamp {
-					klog.Infof(registeredPlugin.GenerateMsgDetailed("An updated version of plugin has been found, unregistering the plugin first before reregistering", ""))
+					klog.Infof("An updated version of plugin has been found: plugin %s created at %s", dswPlugin.SocketPath, dswPlugin.Timestamp.String())
 					unregisterPlugin = true
 					break
 				}
@@ -78,99 +94,72 @@ func (rc *reconciler) reconcile() {
 		}
 
 		if unregisterPlugin {
-			klog.Infof(registeredPlugin.GenerateMsgDetailed("Starting operationExecutor.UnregisterPlugin", ""))
 			err := rc.UnregisterPlugin(registeredPlugin, rc.actualStateOfWorld)
-			if err != nil &&
-				!goroutinemap.IsAlreadyExists(err) &&
-				!exponentialbackoff.IsExponentialBackoff(err) {
-				// Ignore goroutinemap.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
-				// Log all other errors.
-				klog.Errorf(registeredPlugin.GenerateErrorDetailed("operationExecutor.UnregisterPlugin failed", err).Error())
+			if err != nil {
+				klog.Errorf("failed to unregister plugin: %v", err)
+				continue
 			}
-			if err == nil {
-				klog.Infof(registeredPlugin.GenerateMsgDetailed("operationExecutor.UnregisterPlugin started", ""))
-			}
+
+			klog.Infof("unregister plugin %s successfully", registeredPlugin.SocketPath)
 		}
 	}
 
 	// Ensure plugins that should be registered are registered
-	// dial RegistrationClient.GetInfo()
 	for _, pluginToRegister := range rc.desiredStateOfWorld.GetPluginsToRegister() {
-		klog.Infof("pluginToRegister in desiredStateOfWorld with SocketPath: %s", pluginToRegister.SocketPath)
-		
 		if !rc.actualStateOfWorld.PluginExistsWithCorrectTimestamp(pluginToRegister) {
-			klog.Infof(pluginToRegister.GenerateMsgDetailed("Starting operationExecutor.RegisterPlugin", ""))
-			err := rc.RegisterPlugin(
-				pluginToRegister.SocketPath,
-				pluginToRegister.Timestamp,
-				rc.getHandlers(),
-				rc.actualStateOfWorld)
+			err := rc.RegisterPlugin(pluginToRegister.SocketPath, pluginToRegister.Timestamp, rc.getHandlers(), rc.actualStateOfWorld)
 			if err != nil {
 				klog.Errorf("failed to register plugin with %v", err)
+				continue
 			}
-			if err != nil &&
-				!goroutinemap.IsAlreadyExists(err) &&
-				!exponentialbackoff.IsExponentialBackoff(err) {
-				// Ignore goroutinemap.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
-				klog.Errorf(pluginToRegister.GenerateErrorDetailed("operationExecutor.RegisterPlugin failed", err).Error())
-			}
-			if err == nil {
-				klog.Infof(pluginToRegister.GenerateMsgDetailed("operationExecutor.RegisterPlugin started", ""))
-			}
+
+			klog.Infof("register plugin %s created at %s successfully", pluginToRegister.SocketPath, pluginToRegister.Timestamp.String())
 		}
 	}
 }
 
-func (rc *reconciler) RegisterPlugin(
-	socketPath string,
-	timestamp time.Time,
-	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorld ActualStateOfWorldUpdater) error {
-	//generatedOperation :=
-	//	oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, timestamp, pluginHandlers, actualStateOfWorld)
-	//
-	
-	
+// dial RegistrationClient.GetInfo()
+func (rc *reconciler) RegisterPlugin(socketPath string, timestamp time.Time, pluginHandlers map[string]cache.PluginHandler, actualStateOfWorld cache.ActualStateOfWorld) error {
 	client, conn, err := dial(socketPath, dialTimeoutDuration)
 	if err != nil {
 		klog.Errorf("RegisterPlugin error -- dial failed at socket %s, err: %v", socketPath, err)
 		return fmt.Errorf("RegisterPlugin error -- dial failed at socket %s, err: %v", socketPath, err)
 	}
 	defer conn.Close()
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	
+
 	infoResp, err := client.GetInfo(ctx, &registerapi.InfoRequest{})
 	if err != nil {
 		klog.Errorf("RegisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %v", socketPath, err)
-		return fmt.Errorf("RegisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %v", socketPath, err)
+		return err
 	}
-	
+
 	handler, ok := pluginHandlers[infoResp.Type]
 	if !ok {
-		if err := rc.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)); err != nil {
+		if err = rc.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)); err != nil {
 			klog.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
-			return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
+			return err
 		}
-		
+
 		klog.Errorf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)
-		return fmt.Errorf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)
+		return err
 	}
-	
+
 	if infoResp.Endpoint == "" {
 		infoResp.Endpoint = socketPath
 	}
-	if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
+	if err = handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 		if err = rc.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin validation failed with err: %v", err)); err != nil {
 			klog.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
-			return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
+			return err
 		}
-		
+
 		klog.Errorf("RegisterPlugin error -- pluginHandler.ValidatePluginFunc failed")
-		return fmt.Errorf("RegisterPlugin error -- pluginHandler.ValidatePluginFunc failed")
+		return err
 	}
-	
+
 	// We add the plugin to the actual state of world cache before calling a plugin consumer's Register handle
 	// so that if we receive a delete event during Register Plugin, we can process it as a DeRegister call.
 	err = actualStateOfWorld.AddPlugin(cache.PluginInfo{
@@ -182,54 +171,49 @@ func (rc *reconciler) RegisterPlugin(
 	if err != nil {
 		klog.Errorf("RegisterPlugin error -- failed to add plugin at socket %s, err: %v", socketPath, err)
 	}
-	if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
+	if err = handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 		return rc.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
 	}
-	
+
 	// Notify is called after register to guarantee that even if notify throws an error Register will always be called after validate
 	if err := rc.notifyPlugin(client, true, ""); err != nil {
 		return fmt.Errorf("RegisterPlugin error -- failed to send registration status at socket %s, err: %v", socketPath, err)
 	}
-	
+
 	return nil
 }
 
-func (rc *reconciler) UnregisterPlugin(
-	pluginInfo cache.PluginInfo,
-	actualStateOfWorld ActualStateOfWorldUpdater) error {
-	
+func (rc *reconciler) UnregisterPlugin(pluginInfo cache.PluginInfo, actualStateOfWorld cache.ActualStateOfWorld) error {
 	if pluginInfo.Handler == nil {
 		return fmt.Errorf("UnregisterPlugin error -- failed to get plugin handler for %s", pluginInfo.SocketPath)
 	}
-	
+
 	// We remove the plugin to the actual state of world cache before calling a plugin consumer's Unregister handle
 	// so that if we receive a register event during Register Plugin, we can process it as a Register call.
 	actualStateOfWorld.RemovePlugin(pluginInfo.SocketPath)
-	
 	pluginInfo.Handler.DeRegisterPlugin(pluginInfo.Name)
-	
+
 	klog.Infof("DeRegisterPlugin called for %s on %v", pluginInfo.Name, pluginInfo.Handler)
 	return nil
 }
 
-
 func (rc *reconciler) notifyPlugin(client registerapi.RegistrationClient, registered bool, errStr string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), notifyTimeoutDuration)
 	defer cancel()
-	
+
 	status := &registerapi.RegistrationStatus{
 		PluginRegistered: registered,
 		Error:            errStr,
 	}
-	
+
 	if _, err := client.NotifyRegistrationStatus(ctx, status); err != nil {
 		return errors.Wrap(err, errStr)
 	}
-	
+
 	if errStr != "" {
 		return errors.New(errStr)
 	}
-	
+
 	return nil
 }
 
@@ -237,20 +221,19 @@ func (rc *reconciler) notifyPlugin(client registerapi.RegistrationClient, regist
 func dial(unixSocketPath string, timeout time.Duration) (registerapi.RegistrationClient, *grpc.ClientConn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	
+
 	c, err := grpc.DialContext(ctx, unixSocketPath, grpc.WithInsecure(), grpc.WithBlock(),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}),
 	)
-	
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial socket %s, err: %v", unixSocketPath, err)
 	}
-	
+
 	return registerapi.NewRegistrationClient(c), c, nil
 }
-
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
 	wait.Until(func() {

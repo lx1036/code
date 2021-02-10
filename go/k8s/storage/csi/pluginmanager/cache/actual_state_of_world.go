@@ -13,7 +13,6 @@ import (
 // This cache contains a map of socket file path to plugin information of
 // all plugins attached to this node.
 type ActualStateOfWorld interface {
-
 	// GetRegisteredPlugins generates and returns a list of plugins
 	// that are successfully registered plugins in the current actual state of world.
 	GetRegisteredPlugins() []PluginInfo
@@ -65,7 +64,7 @@ func NewActualStateOfWorld() ActualStateOfWorld {
 func (asw *actualStateOfWorld) AddPlugin(pluginInfo PluginInfo) error {
 	asw.Lock()
 	defer asw.Unlock()
-	
+
 	klog.Infof("add plugin SocketPath %s at time %s into actualStateOfWorld map", pluginInfo.SocketPath, pluginInfo.Timestamp.String())
 
 	if pluginInfo.SocketPath == "" {
@@ -89,7 +88,7 @@ func (asw *actualStateOfWorld) GetRegisteredPlugins() []PluginInfo {
 	asw.RLock()
 	defer asw.RUnlock()
 
-	currentPlugins := []PluginInfo{}
+	var currentPlugins []PluginInfo
 	for _, pluginInfo := range asw.socketFileToInfo {
 		currentPlugins = append(currentPlugins, pluginInfo)
 	}

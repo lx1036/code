@@ -2,12 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"k8s-lx1036/k8s/storage/csi/pluginmanager"
-	example_plugin "k8s-lx1036/k8s/storage/csi/pluginmanager/demo/example-plugin"
 
 	"k8s.io/klog/v2"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
@@ -18,6 +16,14 @@ var (
 
 	onlyOneSignalHandler = make(chan struct{})
 )
+
+// TODO: reconcile还有个bug，使用os.RemoveAll(socketPath)删除socket时候，因为fsnotify没有上报删除事件，plugin-watcher没有从desiredStateOfWorld中删除plugin
+func cleanup(socketPath string) {
+	klog.Infof("cleanup socketDir %s ...", socketPath)
+	os.RemoveAll(socketPath)
+	//os.RemoveAll(*socketDir)
+	//os.MkdirAll(*socketDir, 0755)
+}
 
 // SetupSignalHandler registered for SIGTERM and SIGINT. A stop channel is returned
 // which is closed on one of these signals. If a second signal is caught, the program
@@ -31,32 +37,36 @@ func SetupSignalHandler() (stopCh <-chan struct{}) {
 	go func() {
 		<-c
 		close(stop)
-		//<-c
+		<-c
 		os.Exit(1) // second signal. Exit directly.
 	}()
 
 	return stop
 }
 
-func newTestPluginManager(sockDir string) pluginmanager.PluginManager {
-	return pluginmanager.NewPluginManager(sockDir)
-}
-
-// (1)第一步启动pluginmanager，等待plugin来注册，并注册一个csi plugin的handler，用来消费csi plugin
+// (2)第二步注册一个csi plugin，该plugin会被pluginmanager框架内的csi plugin handler消费
 // debug: go run . --socketDir=/tmp/csi_example
 func main() {
+	//defer cleanup()
+
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 
 	stopCh := SetupSignalHandler()
-	pluginMgr := newTestPluginManager(*socketDir)
-	go pluginMgr.Run(stopCh)
-	//pluginMgr.AddHandler(registerapi.CSIPlugin, csi_plugin.PluginHandler)
 
-	exampleHandler := example_plugin.NewExampleHandler([]string{"v1beta1", "v1beta2"}, true)
-	pluginMgr.AddHandler(registerapi.CSIPlugin, exampleHandler)
+	// 启动gRPC服务端
+	supportedVersions := []string{"v1beta1", "v1beta2"}
+	socketPath := fmt.Sprintf("%s/plugin.sock", *socketDir)
+	defer cleanup(socketPath)
+	pluginName := "example-plugin"
+	plugin := NewTestExamplePlugin(pluginName, registerapi.CSIPlugin, socketPath, supportedVersions...)
+	if err := plugin.Serve("v1beta1", "v1beta2"); err != nil {
+		klog.Error(err)
+		return
+	}
 
 	<-stopCh
-	klog.Info("shutdown the csi plugin manager")
+	//cleanup(socketPath)
+	klog.Info("shutdown the csi plugin server")
 }

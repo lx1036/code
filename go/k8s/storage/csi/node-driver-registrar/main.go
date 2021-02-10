@@ -20,9 +20,12 @@ import (
 )
 
 var (
-	connectionTimeout       = flag.Duration("connection-timeout", 0, "The --connection-timeout flag is deprecated")
-	operationTimeout        = flag.Duration("timeout", time.Second, "Timeout for waiting for communication with driver")
-	csiAddress              = flag.String("csi-address", "/tmp/plugins/csi_example/csi-hostpath.sock", "Path of the CSI driver socket that the node-driver-registrar will connect to.")
+	connectionTimeout = flag.Duration("connection-timeout", 0, "The --connection-timeout flag is deprecated")
+	operationTimeout  = flag.Duration("timeout", time.Second, "Timeout for waiting for communication with driver")
+	csiAddress        = flag.String("csi-address", "/tmp/plugins/csi_example/csi-hostpath.sock", "Path of the CSI driver socket that the node-driver-registrar will connect to.")
+
+	// 官方这里使用"/registration"目录，部署daemonset时也是mount到pod内这个目录，宿主机上的目录/var/lib/kubelet/plugins_registry
+	// pluginRegistrationPath  = flag.String("plugin-registration-path", "/registration", "Path to Kubernetes plugin registration directory.")
 	pluginRegistrationPath  = flag.String("plugin-registration-path", "/tmp/plugins_registry", "Path to Kubernetes plugin registration directory.")
 	kubeletRegistrationPath = flag.String("kubelet-registration-path", "/tmp/plugins/csi_example/csi-hostpath.sock", "Path of the CSI driver socket on the Kubernetes host machine.")
 	healthzPort             = flag.Int("health-port", 8081, "(deprecated) TCP port for healthz requests. Set to 0 to disable the healthz server. Only one of `--health-port` and `--http-endpoint` can be set.")

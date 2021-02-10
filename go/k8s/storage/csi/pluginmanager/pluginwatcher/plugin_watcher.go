@@ -3,7 +3,6 @@ package pluginwatcher
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -62,6 +61,8 @@ func (w *Watcher) traversePluginDir(dir string) error {
 			if err := w.fsWatcher.Add(path); err != nil {
 				return fmt.Errorf("failed to watch %s, err: %v", path, err)
 			}
+
+			klog.Infof("filesystem watcher path %s", path)
 		case mode&os.ModeSocket != 0:
 			event := fsnotify.Event{
 				Name: path,
@@ -112,15 +113,6 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 }
 
 func (w *Watcher) handlePluginRegistration(socketPath string) error {
-	if runtime.GOOS == "windows" {
-		socketPath = util.NormalizePath(socketPath)
-	}
-	//TODO: Implement rate limiting to mitigate any DOS kind of attacks.
-	// Update desired state of world list of plugins
-	// If the socket path does exist in the desired world cache, there's still
-	// a possibility that it has been deleted and recreated again before it is
-	// removed from the desired world cache, so we still need to call AddOrUpdatePlugin
-	// in this case to update the timestamp
 	klog.Infof("Adding socket path or updating timestamp %s to desired state cache", socketPath)
 	err := w.desiredStateOfWorld.AddOrUpdatePlugin(socketPath)
 	if err != nil {

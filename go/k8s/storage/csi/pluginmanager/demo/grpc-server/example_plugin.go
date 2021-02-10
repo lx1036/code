@@ -1,13 +1,13 @@
-package example_plugin
+package main
 
 import (
 	"context"
 	"fmt"
-	"k8s-lx1036/k8s/storage/csi/pluginmanager/demo/example-plugin/v1beta2"
 	"net"
 	"sync"
 
 	"k8s-lx1036/k8s/storage/csi/pluginmanager/demo/example-plugin/v1beta1"
+	"k8s-lx1036/k8s/storage/csi/pluginmanager/demo/example-plugin/v1beta2"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog"
@@ -96,6 +96,8 @@ func (e *examplePlugin) Serve(services ...string) error {
 			klog.Errorf("example server stopped serving: %v", err)
 		}
 	}()
+
+	//e.wg.Wait()
 
 	return nil
 }

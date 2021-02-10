@@ -38,7 +38,7 @@ type exampleHandler struct {
 
 func (p *exampleHandler) SendEvent(pluginName string, event examplePluginEvent) {
 	p.eventChans[pluginName] <- event
-	
+
 	klog.Infof("Sending %v for plugin %s over chan %v", event, pluginName, p.eventChans[pluginName])
 }
 
@@ -47,8 +47,8 @@ func (p *exampleHandler) EventChan(pluginName string) chan examplePluginEvent {
 }
 
 func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string, versions []string) error {
-	klog.Infof("calling exampleHandler RegisterPlugin...")
-	
+	klog.Infof("calling exampleHandler RegisterPlugin with %s, %s, %v", pluginName, endpoint, versions)
+
 	//p.SendEvent(pluginName, exampleEventRegister)
 
 	// Verifies the grpcServer is ready to serve services.
@@ -63,32 +63,31 @@ func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string, versions []
 	v1beta2Client := v1beta2.NewExampleClient(conn)
 
 	// Tests v1beta1 GetExampleInfo
-	_, err = v1beta1Client.GetExampleInfo(context.Background(), &v1beta1.ExampleRequest{})
+	_, err = v1beta1Client.GetExampleInfo(context.Background(), &v1beta1.ExampleRequest{V1Beta1Field: "V1_Beta1_Field"})
 	if err != nil {
 		return fmt.Errorf("failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
 	}
 
 	// Tests v1beta1 GetExampleInfo
-	_, err = v1beta2Client.GetExampleInfo(context.Background(), &v1beta2.ExampleRequest{})
+	_, err = v1beta2Client.GetExampleInfo(context.Background(), &v1beta2.ExampleRequest{V1Beta2Field: "V1_Beta2_Field"})
 	if err != nil {
 		return fmt.Errorf("failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
 	}
-	
-	klog.Infof("called exampleHandler RegisterPlugin...")
-	
-	
+
+	klog.Infof("called exampleHandler RegisterPlugin with %s, %s, %v", pluginName, endpoint, versions)
+
 	return nil
 }
 
 func (p *exampleHandler) DeRegisterPlugin(pluginName string) {
 	klog.Infof("calling exampleHandler DeRegisterPlugin...")
-	
+
 	//p.SendEvent(pluginName, exampleEventDeRegister)
 }
 
 func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	klog.Infof("calling exampleHandler ValidatePlugin with %s, %s, %v", pluginName, endpoint, versions)
-	
+
 	//p.SendEvent(pluginName, exampleEventValidate)
 
 	/*n, ok := p.DecreasePluginCount(pluginName)
@@ -106,9 +105,9 @@ func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, vers
 		klog.Errorf("expecting non empty endpoint")
 		return errors.New("expecting non empty endpoint")
 	}
-	
-	klog.Infof("called exampleHandler ValidatePlugin...")
-	
+
+	klog.Infof("called exampleHandler ValidatePlugin with %s, %s, %v", pluginName, endpoint, versions)
+
 	return nil
 }
 
