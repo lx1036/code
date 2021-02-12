@@ -755,6 +755,7 @@ func (p *csiProvisioner) Provision(ctx context.Context, options ProvisionOptions
 	pvName := req.Name
 	provisionerCredentials := req.Secrets
 
+	// rpc调用csi-driver，创建volume
 	createCtx, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
 	klog.V(5).Infof("CreateVolumeRequest %+v", req)
@@ -809,21 +810,6 @@ func (p *csiProvisioner) Provision(ctx context.Context, options ProvisionOptions
 		}
 		// use InBackground to retry the call, hoping the volume is deleted correctly next time.
 		return nil, ProvisioningInBackground, capErr
-	}
-
-	if options.PVC.Spec.DataSource != nil {
-		contentSource := rep.GetVolume().ContentSource
-		if contentSource == nil {
-			sourceErr := fmt.Errorf("volume content source missing")
-			delReq := &csi.DeleteVolumeRequest{
-				VolumeId: rep.GetVolume().GetVolumeId(),
-			}
-			err = cleanupVolume(ctx, p, delReq, provisionerCredentials)
-			if err != nil {
-				sourceErr = fmt.Errorf("%v. cleanup of volume %s failed, volume is orphaned: %v", sourceErr, pvName, err)
-			}
-			return nil, ProvisioningInBackground, sourceErr
-		}
 	}
 
 	if options.PVC.Spec.DataSource != nil {

@@ -1,28 +1,63 @@
 
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-demo
+data:
+  default.conf: |-
+    server {
+        listen       8080;
+        server_name  localhost;
+
+        #charset koi8-r;
+        #access_log  /var/log/nginx/host.access.log  main;
+
+        location / {
+            root   /usr/share/nginx/html;
+            index  index.html index.htm;
+        }
+
+        #error_page  404              /404.html;
+
+        # redirect server error pages to the static page /50x.html
+        #
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   /usr/share/nginx/html;
+        }
+    }
 
 ---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-demo-1
+  name: nginx-demo
   labels:
-    app: nginx-demo-1
-    restartCount: test
-    log-filebeat: filebeat
+    app: nginx-demo
   annotations:
-    lx1036/controller-kind: filebeat
+    log/controller-kind: filebeat
 spec:
-  replicas: 1
+  replicas: 3
   template:
     metadata:
-      name: nginx-demo-1
+      name: nginx-demo
       labels:
-        app: nginx-demo-1
+        app1: nginx-demo-1
+        app2: nginx-demo-2
     spec:
+      volumes:
+        - name: default-conf
+          configMap:
+            name: nginx-demo
       containers:
         - name: nginx-demo-1
           image: nginx:1.17.8
           imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
           livenessProbe:
             httpGet:
               port: 80
@@ -30,10 +65,26 @@ spec:
             failureThreshold: 10
             initialDelaySeconds: 10
             periodSeconds: 10
+        - name: nginx-demo-2
+          image: nginx:1.17.8
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - mountPath: /etc/nginx/conf.d/default.conf
+              name: default-conf
+              subPath: default.conf
+          livenessProbe:
+            httpGet:
+              port: 8080
+              path: /index.html # /status(会不断重启), /index.html(正确的) 测试 RestartCount
+            failureThreshold: 10
+            initialDelaySeconds: 10
+            periodSeconds: 10
       restartPolicy: Always
   selector:
     matchLabels:
-      app: nginx-demo-1
+      app1: nginx-demo-1
 
 ---
 apiVersion: v1
@@ -42,14 +93,14 @@ metadata:
   name: nginx-demo-1
 spec:
   selector:
-    app: nginx-demo-1
+    app1: nginx-demo-1
   ports:
     - port: 8088
       targetPort: 80
       protocol: TCP
   type: ClusterIP
   externalIPs:
-    - 192.168.64.57
+    - 192.168.64.65
 ---
 
 apiVersion: v1
@@ -58,7 +109,7 @@ metadata:
   name: nginx-demo-2
 spec:
   selector:
-    app: nginx-demo-1
+    app2: nginx-demo-2
   ports:
     - port: 8089
       targetPort: 80
