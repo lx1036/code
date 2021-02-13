@@ -54,7 +54,7 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-          image: r.addops.soft.360.cn/admin/sunnyfs-csi-driver:v1.0.4
+          image: sunnyfs-csi-driver:v1.0.4
           imagePullPolicy: IfNotPresent
           lifecycle:
             preStop:
@@ -63,7 +63,7 @@ spec:
                   - /bin/sh
                   - -c
                   - rm -rf /csi/sunnyfs-csi-share.sock /registration/csi.sunnyfs.share.com-reg.sock
-          name: node
+          name: sunnyfs-csi-driver
           resources:
             limits:
               cpu: "2"
