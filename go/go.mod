@@ -26,7 +26,7 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/gohouse/gorose/v2 v2.1.3
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
-	github.com/golang/protobuf v1.4.2
+	github.com/golang/protobuf v1.4.3
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/btree v1.0.0
 	github.com/google/go-querystring v1.0.0
