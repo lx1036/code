@@ -4,7 +4,7 @@
 
 ## Overview
 最近在维护组内K8s CSI plugin代码时，一直对其内部原理好奇，故趁机深入学习熟悉K8s CSI相关原理。
-部署K8s持久化存储插件时，需要按照CSI官网说明，部署一个插件注册daemonset pod，部署yaml类似如下：
+部署K8s持久化存储插件时，需要按照CSI官网说明，部署一个daemonset pod实现插件注册，该pod内容器包含 **[node-driver-registrar](https://kubernetes-csi.github.io/docs/node-driver-registrar.html)** ，部署yaml类似如下：
 
 ```yaml
 
@@ -118,8 +118,6 @@ spec:
     rollingUpdate:
       maxUnavailable: 1
     type: RollingUpdate
-
-
 
 ```
 

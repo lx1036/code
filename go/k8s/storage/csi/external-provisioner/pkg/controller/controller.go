@@ -332,167 +332,51 @@ func (ctrl *ProvisionController) syncClaimHandler(ctx context.Context, key strin
 	return ctrl.syncClaim(ctx, claimObj)
 }
 
-var (
-	errStopProvision = errors.New("stop provisioning")
-)
-
-// knownProvisioner checks if provisioner name has been
-// configured to provision volumes for
-func (ctrl *ProvisionController) knownProvisioner(provisioner string) bool {
-	if provisioner == ctrl.provisionerName {
-		return true
+// syncClaim checks if the claim should have a volume provisioned for it and
+// provisions one if so. Returns an error if the claim is to be requeued.
+func (ctrl *ProvisionController) syncClaim(ctx context.Context, obj interface{}) error {
+	claim, ok := obj.(*v1.PersistentVolumeClaim)
+	if !ok {
+		return fmt.Errorf("expected claim but got %+v", obj)
 	}
-	for _, p := range ctrl.additionalProvisionerNames {
-		if p == provisioner {
-			return true
-		}
-	}
-	return false
-}
 
-// getStorageClass retrives storage class object by name.
-func (ctrl *ProvisionController) getStorageClass(name string) (*storage.StorageClass, error) {
-	classObj, found, err := ctrl.classes.GetByKey(name)
+	should, err := ctrl.shouldProvision(ctx, claim)
 	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, fmt.Errorf("storageClass %q not found", name)
-	}
-	switch class := classObj.(type) {
-	case *storage.StorageClass:
-		return class, nil
-	case *storagebeta.StorageClass:
-		// convert storagebeta.StorageClass to storage.StorageClass
-		return &storage.StorageClass{
-			ObjectMeta:           class.ObjectMeta,
-			Provisioner:          class.Provisioner,
-			Parameters:           class.Parameters,
-			ReclaimPolicy:        class.ReclaimPolicy,
-			MountOptions:         class.MountOptions,
-			AllowVolumeExpansion: class.AllowVolumeExpansion,
-			VolumeBindingMode:    (*storage.VolumeBindingMode)(class.VolumeBindingMode),
-			AllowedTopologies:    class.AllowedTopologies,
-		}, nil
-	}
-	return nil, fmt.Errorf("cannot convert object to StorageClass: %+v", classObj)
-}
+		ctrl.updateProvisionStats(claim, err, time.Time{})
+		return err
+	} else if should {
+		startTime := time.Now()
 
-// shouldProvision returns whether a claim should have a volume provisioned for
-// it, i.e. whether a Provision is "desired"
-func (ctrl *ProvisionController) shouldProvision(ctx context.Context, claim *v1.PersistentVolumeClaim) (bool, error) {
-	if claim.Spec.VolumeName != "" {
-		return false, nil
-	}
-
-	if qualifier, ok := ctrl.provisioner.(Qualifier); ok {
-		if !qualifier.ShouldProvision(ctx, claim) {
-			return false, nil
-		}
-	}
-
-	if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
-		if ctrl.knownProvisioner(provisioner) {
-			claimClass := GetPersistentVolumeClaimClass(claim)
-			class, err := ctrl.getStorageClass(claimClass)
-			if err != nil {
-				return false, err
+		status, err := ctrl.provisionClaimOperation(ctx, claim)
+		ctrl.updateProvisionStats(claim, err, startTime)
+		if err == nil || status == ProvisioningFinished {
+			// Provisioning is 100% finished / not in progress.
+			switch err {
+			case nil:
+				klog.V(5).Infof("Claim processing succeeded, removing PVC %s from claims in progress", claim.UID)
+			case errStopProvision:
+				klog.V(5).Infof("Stop provisioning, removing PVC %s from claims in progress", claim.UID)
+				// Our caller would requeue if we pass on this special error; return nil instead.
+				err = nil
+			default:
+				klog.V(2).Infof("Final error received, removing PVC %s from claims in progress", claim.UID)
 			}
-			if class.VolumeBindingMode != nil && *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
-				// When claim is in delay binding mode, annSelectedNode is
-				// required to provision volume.
-				// Though PV controller set annStorageProvisioner only when
-				// annSelectedNode is set, but provisioner may remove
-				// annSelectedNode to notify scheduler to reschedule again.
-				if selectedNode, ok := claim.Annotations[annSelectedNode]; ok && selectedNode != "" {
-					return true, nil
-				}
-				return false, nil
-			}
-			return true, nil
+			ctrl.claimsInProgress.Delete(string(claim.UID))
+			return err
 		}
-	}
-
-	return false, nil
-}
-
-func (ctrl *ProvisionController) updateProvisionStats(claim *v1.PersistentVolumeClaim, err error, startTime time.Time) {
-	class := ""
-	if claim.Spec.StorageClassName != nil {
-		class = *claim.Spec.StorageClassName
-	}
-	if err != nil {
-		ctrl.metrics.PersistentVolumeClaimProvisionFailedTotal.WithLabelValues(class).Inc()
-	} else {
-		ctrl.metrics.PersistentVolumeClaimProvisionDurationSeconds.WithLabelValues(class).Observe(time.Since(startTime).Seconds())
-		ctrl.metrics.PersistentVolumeClaimProvisionTotal.WithLabelValues(class).Inc()
-	}
-}
-
-// getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
-// The name must be unique.
-func (ctrl *ProvisionController) getProvisionedVolumeNameForClaim(claim *v1.PersistentVolumeClaim) string {
-	return "pvc-" + string(claim.UID)
-}
-
-// canProvision returns error if provisioner can't provision claim.
-func (ctrl *ProvisionController) canProvision(ctx context.Context, claim *v1.PersistentVolumeClaim) error {
-	// Check if this provisioner supports Block volume
-	if util.CheckPersistentVolumeClaimModeBlock(claim) && !ctrl.supportsBlock(ctx) {
-		return fmt.Errorf("%s does not support block volume provisioning", ctrl.provisionerName)
-	}
-
-	return nil
-}
-
-// supportsBlock returns whether a provisioner supports block volume.
-// Provisioners that implement BlockProvisioner interface and return true to SupportsBlock
-// will be regarded as supported for block volume.
-func (ctrl *ProvisionController) supportsBlock(ctx context.Context) bool {
-	if blockProvisioner, ok := ctrl.provisioner.(BlockProvisioner); ok {
-		return blockProvisioner.SupportsBlock(ctx)
-	}
-	return false
-}
-
-// rescheduleProvisioning signal back to the scheduler to retry dynamic provisioning
-// by removing the annSelectedNode annotation
-func (ctrl *ProvisionController) rescheduleProvisioning(ctx context.Context, claim *v1.PersistentVolumeClaim) error {
-	if _, ok := claim.Annotations[annSelectedNode]; !ok {
-		// Provisioning not triggered by the scheduler, skip
-		return nil
-	}
-
-	// The claim from method args can be pointing to watcher cache. We must not
-	// modify these, therefore create a copy.
-	newClaim := claim.DeepCopy()
-	delete(newClaim.Annotations, annSelectedNode)
-	// Try to update the PVC object
-	if _, err := ctrl.client.CoreV1().PersistentVolumeClaims(newClaim.Namespace).Update(ctx, newClaim, metav1.UpdateOptions{}); err != nil {
-		return fmt.Errorf("delete annotation 'annSelectedNode' for PersistentVolumeClaim %q: %v", claimToClaimKey(newClaim), err)
-	}
-
-	// Save updated claim into informer cache to avoid operations on old claim.
-	if err := ctrl.claimInformer.GetStore().Update(newClaim); err != nil {
-		// This shouldn't happen because it is a local
-		// operation. The only situation in which Update fails
-		// is when the object is invalid, which isn't the case
-		// here
-		// (https://github.com/kubernetes/client-go/blob/eb0bad8167df60e402297b26e2cee1bddffde108/tools/cache/store.go#L154-L162).
-		// Log the error and hope that a regular cache update will resolve it.
-		klog.Warningf("update claim informer cache for PersistentVolumeClaim %q: %v", claimToClaimKey(newClaim), err)
-	}
-
-	return nil
-}
-
-func (ctrl *ProvisionController) checkFinalizer(volume *v1.PersistentVolume, finalizer string) bool {
-	for _, f := range volume.ObjectMeta.Finalizers {
-		if f == finalizer {
-			return true
+		if status == ProvisioningInBackground {
+			// Provisioning is in progress in background.
+			klog.V(2).Infof("Temporary error received, adding PVC %s to claims in progress", claim.UID)
+			ctrl.claimsInProgress.Store(string(claim.UID), claim)
+		} else {
+			// status == ProvisioningNoChange.
+			// Don't change claimsInProgress:
+			// - the claim is already there if previous status was ProvisioningInBackground.
+			// - the claim is not there if if previous status was ProvisioningFinished.
 		}
+		return err
 	}
-	return false
+	return nil
 }
 
 // provisionClaimOperation attempts to provision a volume for the given claim.
@@ -637,51 +521,167 @@ func (ctrl *ProvisionController) provisionClaimOperation(ctx context.Context, cl
 	return ProvisioningFinished, nil
 }
 
-// syncClaim checks if the claim should have a volume provisioned for it and
-// provisions one if so. Returns an error if the claim is to be requeued.
-func (ctrl *ProvisionController) syncClaim(ctx context.Context, obj interface{}) error {
-	claim, ok := obj.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return fmt.Errorf("expected claim but got %+v", obj)
-	}
+// getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
+// The name must be unique.
+func (ctrl *ProvisionController) getProvisionedVolumeNameForClaim(claim *v1.PersistentVolumeClaim) string {
+	return "pvc-" + string(claim.UID)
+}
 
-	should, err := ctrl.shouldProvision(ctx, claim)
+var (
+	errStopProvision = errors.New("stop provisioning")
+)
+
+// knownProvisioner checks if provisioner name has been
+// configured to provision volumes for
+func (ctrl *ProvisionController) knownProvisioner(provisioner string) bool {
+	if provisioner == ctrl.provisionerName {
+		return true
+	}
+	for _, p := range ctrl.additionalProvisionerNames {
+		if p == provisioner {
+			return true
+		}
+	}
+	return false
+}
+
+// getStorageClass retrives storage class object by name.
+func (ctrl *ProvisionController) getStorageClass(name string) (*storage.StorageClass, error) {
+	classObj, found, err := ctrl.classes.GetByKey(name)
 	if err != nil {
-		ctrl.updateProvisionStats(claim, err, time.Time{})
-		return err
-	} else if should {
-		startTime := time.Now()
-
-		status, err := ctrl.provisionClaimOperation(ctx, claim)
-		ctrl.updateProvisionStats(claim, err, startTime)
-		if err == nil || status == ProvisioningFinished {
-			// Provisioning is 100% finished / not in progress.
-			switch err {
-			case nil:
-				klog.V(5).Infof("Claim processing succeeded, removing PVC %s from claims in progress", claim.UID)
-			case errStopProvision:
-				klog.V(5).Infof("Stop provisioning, removing PVC %s from claims in progress", claim.UID)
-				// Our caller would requeue if we pass on this special error; return nil instead.
-				err = nil
-			default:
-				klog.V(2).Infof("Final error received, removing PVC %s from claims in progress", claim.UID)
-			}
-			ctrl.claimsInProgress.Delete(string(claim.UID))
-			return err
-		}
-		if status == ProvisioningInBackground {
-			// Provisioning is in progress in background.
-			klog.V(2).Infof("Temporary error received, adding PVC %s to claims in progress", claim.UID)
-			ctrl.claimsInProgress.Store(string(claim.UID), claim)
-		} else {
-			// status == ProvisioningNoChange.
-			// Don't change claimsInProgress:
-			// - the claim is already there if previous status was ProvisioningInBackground.
-			// - the claim is not there if if previous status was ProvisioningFinished.
-		}
-		return err
+		return nil, err
 	}
+	if !found {
+		return nil, fmt.Errorf("storageClass %q not found", name)
+	}
+	switch class := classObj.(type) {
+	case *storage.StorageClass:
+		return class, nil
+	case *storagebeta.StorageClass:
+		// convert storagebeta.StorageClass to storage.StorageClass
+		return &storage.StorageClass{
+			ObjectMeta:           class.ObjectMeta,
+			Provisioner:          class.Provisioner,
+			Parameters:           class.Parameters,
+			ReclaimPolicy:        class.ReclaimPolicy,
+			MountOptions:         class.MountOptions,
+			AllowVolumeExpansion: class.AllowVolumeExpansion,
+			VolumeBindingMode:    (*storage.VolumeBindingMode)(class.VolumeBindingMode),
+			AllowedTopologies:    class.AllowedTopologies,
+		}, nil
+	}
+	return nil, fmt.Errorf("cannot convert object to StorageClass: %+v", classObj)
+}
+
+// shouldProvision returns whether a claim should have a volume provisioned for
+// it, i.e. whether a Provision is "desired"
+func (ctrl *ProvisionController) shouldProvision(ctx context.Context, claim *v1.PersistentVolumeClaim) (bool, error) {
+	if claim.Spec.VolumeName != "" {
+		return false, nil
+	}
+
+	if qualifier, ok := ctrl.provisioner.(Qualifier); ok {
+		if !qualifier.ShouldProvision(ctx, claim) {
+			return false, nil
+		}
+	}
+
+	if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
+		if ctrl.knownProvisioner(provisioner) {
+			claimClass := GetPersistentVolumeClaimClass(claim)
+			class, err := ctrl.getStorageClass(claimClass)
+			if err != nil {
+				return false, err
+			}
+			if class.VolumeBindingMode != nil && *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
+				// When claim is in delay binding mode, annSelectedNode is
+				// required to provision volume.
+				// Though PV controller set annStorageProvisioner only when
+				// annSelectedNode is set, but provisioner may remove
+				// annSelectedNode to notify scheduler to reschedule again.
+				if selectedNode, ok := claim.Annotations[annSelectedNode]; ok && selectedNode != "" {
+					return true, nil
+				}
+				return false, nil
+			}
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (ctrl *ProvisionController) updateProvisionStats(claim *v1.PersistentVolumeClaim, err error, startTime time.Time) {
+	class := ""
+	if claim.Spec.StorageClassName != nil {
+		class = *claim.Spec.StorageClassName
+	}
+	if err != nil {
+		ctrl.metrics.PersistentVolumeClaimProvisionFailedTotal.WithLabelValues(class).Inc()
+	} else {
+		ctrl.metrics.PersistentVolumeClaimProvisionDurationSeconds.WithLabelValues(class).Observe(time.Since(startTime).Seconds())
+		ctrl.metrics.PersistentVolumeClaimProvisionTotal.WithLabelValues(class).Inc()
+	}
+}
+
+// canProvision returns error if provisioner can't provision claim.
+func (ctrl *ProvisionController) canProvision(ctx context.Context, claim *v1.PersistentVolumeClaim) error {
+	// Check if this provisioner supports Block volume
+	if util.CheckPersistentVolumeClaimModeBlock(claim) && !ctrl.supportsBlock(ctx) {
+		return fmt.Errorf("%s does not support block volume provisioning", ctrl.provisionerName)
+	}
+
 	return nil
+}
+
+// supportsBlock returns whether a provisioner supports block volume.
+// Provisioners that implement BlockProvisioner interface and return true to SupportsBlock
+// will be regarded as supported for block volume.
+func (ctrl *ProvisionController) supportsBlock(ctx context.Context) bool {
+	if blockProvisioner, ok := ctrl.provisioner.(BlockProvisioner); ok {
+		return blockProvisioner.SupportsBlock(ctx)
+	}
+	return false
+}
+
+// rescheduleProvisioning signal back to the scheduler to retry dynamic provisioning
+// by removing the annSelectedNode annotation
+func (ctrl *ProvisionController) rescheduleProvisioning(ctx context.Context, claim *v1.PersistentVolumeClaim) error {
+	if _, ok := claim.Annotations[annSelectedNode]; !ok {
+		// Provisioning not triggered by the scheduler, skip
+		return nil
+	}
+
+	// The claim from method args can be pointing to watcher cache. We must not
+	// modify these, therefore create a copy.
+	newClaim := claim.DeepCopy()
+	delete(newClaim.Annotations, annSelectedNode)
+	// Try to update the PVC object
+	if _, err := ctrl.client.CoreV1().PersistentVolumeClaims(newClaim.Namespace).Update(ctx, newClaim, metav1.UpdateOptions{}); err != nil {
+		return fmt.Errorf("delete annotation 'annSelectedNode' for PersistentVolumeClaim %q: %v", claimToClaimKey(newClaim), err)
+	}
+
+	// Save updated claim into informer cache to avoid operations on old claim.
+	if err := ctrl.claimInformer.GetStore().Update(newClaim); err != nil {
+		// This shouldn't happen because it is a local
+		// operation. The only situation in which Update fails
+		// is when the object is invalid, which isn't the case
+		// here
+		// (https://github.com/kubernetes/client-go/blob/eb0bad8167df60e402297b26e2cee1bddffde108/tools/cache/store.go#L154-L162).
+		// Log the error and hope that a regular cache update will resolve it.
+		klog.Warningf("update claim informer cache for PersistentVolumeClaim %q: %v", claimToClaimKey(newClaim), err)
+	}
+
+	return nil
+}
+
+func (ctrl *ProvisionController) checkFinalizer(volume *v1.PersistentVolume, finalizer string) bool {
+	for _, f := range volume.ObjectMeta.Finalizers {
+		if f == finalizer {
+			return true
+		}
+	}
+	return false
 }
 
 // processNextVolumeWorkItem processes items from volumeQueue
