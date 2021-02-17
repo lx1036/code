@@ -121,12 +121,12 @@ spec:
 
 ```
 
-pod内部署了自定义的csi-plugin如sunnyfs-csi-driver，该csi-plugin后端实际存储引擎是一个自研的分部署文件类型存储系统，和一个sidecar container **[node-driver-registrar](https://kubernetes-csi.github.io/docs/node-driver-registrar.html)** ，该pod主要实现了自定义的csi-plugin的注册。
+pod内部署了自定义的csi-plugin如sunnyfs-csi-driver，该csi-plugin后端实际存储引擎是一个自研的文件类型存储系统；和一个sidecar container **[node-driver-registrar](https://kubernetes-csi.github.io/docs/node-driver-registrar.html)** ，该容器主要实现了自定义的csi-plugin的注册。
 
 重要问题是，是如何做到csi-plugin注册的？
 
-答案很简单：daemonset中的 **[node-driver-registrar](https://github.com/kubernetes-csi/node-driver-registrar)** 作为一个sidecar container，会被kubelet plugin-mamanger模块调用，
-而 node-driver-registrar sidecar container又会去调用我们自研的csi-plugin即sunnyfs-csi-driver container。而kubelet在启动时就会往plugin-mamanger模块
+答案很简单：daemonset中的 **[node-driver-registrar](https://github.com/kubernetes-csi/node-driver-registrar)** 作为一个sidecar container，会被kubelet plugin-manager模块调用，
+node-driver-registrar sidecar container又会去调用我们自研的csi-plugin即sunnyfs-csi-driver container。而kubelet在启动时就会往plugin-manager模块
 中注册一个csi plugin handler，该handler获取sunnyfs-csi-driver container基本信息后，会做一些操作，如更新node的annotation以及创建/更新CSINode对象。
 
 ## 源码解析
