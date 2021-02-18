@@ -13,7 +13,7 @@ import (
 	"k8s-lx1036/k8s/storage/csi/pluginmanager/demo/example-plugin/v1beta2"
 
 	"google.golang.org/grpc"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 

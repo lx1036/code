@@ -8,7 +8,7 @@ import (
 	"k8s-lx1036/k8s/storage/csi/pluginmanager/reconciler"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
