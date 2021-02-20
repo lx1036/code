@@ -197,7 +197,11 @@ func (le *lessor) runLoop() {
 	defer close(le.doneC)
 
 	for {
+		// 定时检查是否有过期 Lease，发起撤销过期的 Lease 操作
 		le.revokeExpiredLeases()
+
+		// 定时触发更新 Lease 的剩余到期时间的操作
+		le.checkpointScheduledLeases()
 
 		select {
 		case <-time.After(500 * time.Millisecond):
