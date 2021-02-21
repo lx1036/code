@@ -27,6 +27,28 @@ func (treeIdx *treeIndex) Put(key []byte, rev revision) {
 	item.(*keyIndex).put(rev.main, rev.sub)
 }
 
+// 检查内存b-tree里是否存在keyIndex
+func (treeIdx *treeIndex) keyIndex(keyIdx *keyIndex) *keyIndex {
+	if item := treeIdx.tree.Get(keyIdx); item != nil {
+		return item.(*keyIndex)
+	}
+
+	return nil
+}
+
+func (treeIdx *treeIndex) Get(key []byte, rev int64) (modified, created revision, ver int64, err error) {
+	keyIdx := &keyIndex{key: key}
+
+	treeIdx.Lock()
+	defer treeIdx.Unlock()
+	// 检查内存里b-tree是否存在keyIndex
+	if keyIdx = treeIdx.keyIndex(keyIdx); keyIdx == nil {
+		return revision{}, revision{}, 0, ErrRevisionNotFound
+	}
+
+	return keyIdx.get(rev)
+}
+
 func (treeIdx *treeIndex) Tombstone(key []byte, rev revision) error {
 	keyIdx := &keyIndex{key: key}
 
@@ -37,7 +59,7 @@ func (treeIdx *treeIndex) Tombstone(key []byte, rev revision) error {
 		return ErrRevisionNotFound
 	}
 
-	item.(*keyIndex).tombstone(rev.main, rev.sub)
+	return item.(*keyIndex).tombstone(rev.main, rev.sub)
 }
 
 func newTreeIndex() *treeIndex {

@@ -24,7 +24,19 @@ func TestTreeIndexGet(test *testing.T) {
 		{6, revision{}, revision{}, 0, ErrRevisionNotFound},
 	}
 
-	for _, fixture := range fixtures {
-		treeIdx.Get([]byte("foo"), fixture.rev)
+	for i, fixture := range fixtures {
+		rev, created, ver, err := treeIdx.Get([]byte("foo"), fixture.rev)
+		if err != fixture.werr {
+			test.Errorf("#%d: err = %v, want %v", i, err, fixture.werr)
+		}
+		if rev != fixture.wrev {
+			test.Errorf("#%d: rev = %+v, want %+v", i, rev, fixture.wrev)
+		}
+		if created != fixture.wcreated {
+			test.Errorf("#%d: created = %+v, want %+v", i, created, fixture.wcreated)
+		}
+		if ver != fixture.wver {
+			test.Errorf("#%d: ver = %d, want %d", i, ver, fixture.wver)
+		}
 	}
 }

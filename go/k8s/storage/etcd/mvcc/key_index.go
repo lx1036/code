@@ -37,6 +37,26 @@ func (keyIdx *keyIndex) Less(than btree.Item) bool {
 	return bytes.Compare(keyIdx.key, than.(*keyIndex).key) == -1 // check if keyIdx.key < than.(*keyIndex).key
 }
 
+// findGeneration finds out the generation of the keyIndex that the
+// given rev belongs to. If the given rev is at the gap of two generations,
+// which means that the key does not exist at the given rev, it returns nil.
+func (keyIdx *keyIndex) findGeneration(rev int64) *generation {
+	//lastg := len(keyIdx.generations) - 1
+	//cg := lastg
+
+	return nil
+}
+
+func (keyIdx *keyIndex) get(rev int64) (modified, created revision, ver int64, err error) {
+	if keyIdx.isEmpty() {
+		klog.Errorf("'get' got an unexpected empty keyIndex key %s", string(keyIdx.key))
+	}
+
+	//g := keyIdx.findGeneration(rev)
+
+	return revision{}, revision{}, 0, err
+}
+
 // put puts a revision to the keyIndex.
 func (keyIdx *keyIndex) put(main, sub int64) {
 	rev := revision{main: main, sub: sub}
