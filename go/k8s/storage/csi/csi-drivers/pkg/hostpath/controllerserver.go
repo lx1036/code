@@ -10,13 +10,13 @@ import (
 	csicommon "k8s-lx1036/k8s/storage/csi/csi-drivers/pkg/csi-common"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/google/uuid"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -31,9 +31,9 @@ type controllerServer struct {
 	*csicommon.DefaultControllerServer
 }
 
-func (cs controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		glog.V(3).Infof("invalid create volume req: %v", req)
+		klog.Infof("invalid create volume req: %v", req)
 		return nil, err
 	}
 
@@ -87,7 +87,7 @@ func (cs controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	// 创建hostpath dir
 	err := os.MkdirAll(path, 0777)
 	if err != nil {
-		glog.V(3).Infof("failed to create volume: %v", err)
+		klog.Infof("failed to create volume: %v", err)
 		return nil, err
 	}
 
@@ -111,7 +111,7 @@ func (cs controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		}
 	}
 
-	glog.V(4).Infof("create volume %s", path)
+	klog.Infof("create volume %s", path)
 	hostPathVol := hostPathVolume{}
 	hostPathVol.VolName = req.GetName()
 	hostPathVol.VolID = volumeID
@@ -128,19 +128,19 @@ func (cs controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}, nil
 }
 
-func (cs controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	// Check arguments
 	if len(req.GetVolumeId()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
 	}
 
 	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		glog.V(3).Infof("invalid delete volume req: %v", req)
+		klog.Infof("invalid delete volume req: %v", req)
 		return nil, err
 	}
 
 	volumeID := req.VolumeId
-	glog.V(4).Infof("deleting volume %s", volumeID)
+	klog.Infof("deleting volume %s", volumeID)
 	path := provisionRoot + volumeID
 	os.RemoveAll(path)
 	delete(hostPathVolumes, volumeID)
@@ -148,15 +148,15 @@ func (cs controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
-func (cs controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	return cs.DefaultControllerServer.ValidateVolumeCapabilities(ctx, req)
 }
 
 // CreateSnapshot uses tar command to create snapshot for hostpath volume. The tar command can quickly create
 // archives of entire directories. The host image must have "tar" binaries in /bin, /usr/sbin, or /usr/bin.
-func (cs controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
+func (cs *controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
 	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT); err != nil {
-		glog.V(3).Infof("invalid create snapshot req: %v", req)
+		klog.Infof("invalid create snapshot req: %v", req)
 		return nil, err
 	}
 
@@ -206,7 +206,7 @@ func (cs controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSn
 		return nil, status.Error(codes.Internal, fmt.Sprintf("failed create snapshot: %v: %s", err, out))
 	}
 
-	glog.V(4).Infof("create volume snapshot %s", file)
+	klog.Infof("create volume snapshot %s", file)
 	snapshot := hostPathSnapshot{}
 	snapshot.Name = req.GetName()
 	snapshot.Id = snapshotID
@@ -230,27 +230,27 @@ func (cs controllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSn
 
 }
 
-func (cs controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
+func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
 	// Check arguments
 	if len(req.GetSnapshotId()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Snapshot ID missing in request")
 	}
 
 	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT); err != nil {
-		glog.V(3).Infof("invalid delete snapshot req: %v", req)
+		klog.Infof("invalid delete snapshot req: %v", req)
 		return nil, err
 	}
 	snapshotID := req.GetSnapshotId()
-	glog.V(4).Infof("deleting volume %s", snapshotID)
+	klog.Infof("deleting volume %s", snapshotID)
 	path := snapshotRoot + snapshotID + ".tgz"
 	os.RemoveAll(path)
 	delete(hostPathVolumeSnapshots, snapshotID)
 	return &csi.DeleteSnapshotResponse{}, nil
 }
 
-func (cs controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+func (cs *controllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS); err != nil {
-		glog.V(3).Infof("invalid list snapshot req: %v", req)
+		klog.Infof("invalid list snapshot req: %v", req)
 		return nil, err
 	}
 
@@ -370,11 +370,11 @@ func convertSnapshot(snap hostPathSnapshot) *csi.ListSnapshotsResponse {
 	return rsp
 }
 
-func (cs controllerServer) ControllerExpandVolume(ctx context.Context, request *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, request *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (cs controllerServer) ControllerGetVolume(ctx context.Context, request *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+func (cs *controllerServer) ControllerGetVolume(ctx context.Context, request *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 

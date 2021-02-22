@@ -3,14 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/klog/v2"
 )
 
 var controller struct {
@@ -149,7 +148,7 @@ var controllerCmd = &cobra.Command{
 	},
 }
 
-// debug: go run . controller create-volume --cap 1,mount,xfs,uid=500 myvolume1 myvolume2
+// debug: go run . controller create-volume --cap 1,mount,xfs,uid=500 myvolume1 myvolume2 --endpoint 127.0.0.1:10000
 var createVolumeCmd = &cobra.Command{
 	Use:     "create-volume",
 	Aliases: []string{"new"},
@@ -179,30 +178,26 @@ var createVolumeCmd = &cobra.Command{
 			req.CapacityRange.LimitBytes = createVolume.limBytes
 		}
 
-		glog.Infof("create %d number volumes", len(args))
+		klog.Infof("create %d number volumes", len(args))
 
 		for i := range args {
 			// Set the volume name for the current request.
 			req.Name = args[i]
 
-			glog.Infof("creating volume request %v", req)
+			klog.Infof("creating volume request %v", req)
 			response, err := controller.client.CreateVolume(context.TODO(), &req)
 			if err != nil {
 				return err
 			}
 
-			glog.Infof("CreateVolume response: %v", response)
-
-			if err := Tpl.Execute(os.Stdout, response.Volume); err != nil {
-				return err
-			}
+			klog.Infof("CreateVolume response: %v", response)
 		}
 
 		return nil
 	},
 }
 
-// debug: go run . controller delete-volume a53dd461-634f-4dbb-a10c-38de39de4396
+// debug: go run . controller delete-volume a53dd461-634f-4dbb-a10c-38de39de4396 --endpoint 127.0.0.1:10000
 var deleteVolumeCmd = &cobra.Command{
 	Use:     "delete-volume",
 	Aliases: []string{"d", "rm", "del", "delete"},
@@ -223,13 +218,13 @@ USAGE
 			// Set the volume ID for the current request.
 			req.VolumeId = args[i]
 
-			glog.Infof("deleting volume request %v", req)
+			klog.Infof("deleting volume request %v", req)
 			_, err := controller.client.DeleteVolume(context.TODO(), &req)
 			if err != nil {
 				return err
 			}
 
-			glog.Infof("deleted volume id: %s", args[i])
+			klog.Infof("deleted volume id: %s", args[i])
 		}
 
 		return nil
@@ -241,7 +236,7 @@ var createSnapshot struct {
 	params    mapOfStringArg
 }
 
-// debug: go run . controller create-snapshot --source-volume 335cf2b4-9edd-46fa-bfd5-af1db124ddf1 mysnap1 mysnap2
+// debug: go run . controller create-snapshot --source-volume 335cf2b4-9edd-46fa-bfd5-af1db124ddf1 mysnap1 mysnap2 --endpoint 127.0.0.1:10000
 var createSnapshotCmd = &cobra.Command{
 	Use: "create-snapshot",
 	Example: `
@@ -269,17 +264,15 @@ CREATING MULTIPLE SNAPSHOTS
 				return fmt.Errorf("--source-volume MUST be provided")
 			}
 
-			glog.Infof("creating snapshot request %v", req)
+			klog.Infof("creating snapshot request %v", req)
 			response, err := controller.client.CreateSnapshot(context.TODO(), &req)
 			if err != nil {
 				return err
 			}
 
-			glog.Infof("CreateSnapshot response: %v", response)
+			klog.Infof("CreateSnapshot response: %v", response)
 
-			if err := Tpl.Execute(os.Stdout, response.Snapshot); err != nil {
-				return err
-			}
+			return nil
 		}
 
 		return nil
@@ -287,7 +280,7 @@ CREATING MULTIPLE SNAPSHOTS
 	},
 }
 
-// debug: go run . controller delete-snapshot a58191fd-9791-4fc6-8e83-206dbb92a832
+// debug: go run . controller delete-snapshot a58191fd-9791-4fc6-8e83-206dbb92a832 --endpoint 127.0.0.1:10000
 var deleteSnapshotCmd = &cobra.Command{
 	Use:     "delete-snapshot",
 	Aliases: []string{"ds", "delsnap"},
@@ -308,13 +301,13 @@ USAGE
 			// Set the snapshot ID for the current request.
 			req.SnapshotId = args[i]
 
-			glog.Infof("deleting snapshot request %v", req)
+			klog.Infof("deleting snapshot request %v", req)
 			_, err := controller.client.DeleteSnapshot(context.TODO(), &req)
 			if err != nil {
 				return err
 			}
 
-			glog.Infof("deleted snapshot id: %s", args[i])
+			klog.Infof("deleted snapshot id: %s", args[i])
 		}
 
 		return nil
@@ -327,7 +320,7 @@ var valVolCaps struct {
 	caps   volumeCapabilitySliceArg
 }
 
-// debug: go run . controller validate-volume-capabilities --cap 1,mount,xfs,uid=500 335cf2b4-9edd-46fa-bfd5-af1db124ddf1
+// debug: go run . controller validate-volume-capabilities --cap 1,mount,xfs,uid=500 335cf2b4-9edd-46fa-bfd5-af1db124ddf1 --endpoint 127.0.0.1:10000
 var valVolCapsCmd = &cobra.Command{
 	Use:     "validate-volume-capabilities",
 	Aliases: []string{"validate"},
@@ -348,13 +341,13 @@ USAGE
 			// Set the volume name for the current request.
 			req.VolumeId = args[i]
 
-			glog.Infof("validating volume capabilities %v", req)
+			klog.Infof("validating volume capabilities %v", req)
 			rep, err := controller.client.ValidateVolumeCapabilities(context.TODO(), &req)
 			if err != nil {
 				return err
 			}
 
-			glog.Infof("validated volume capabilities %s with confirmed: %v", rep.Message, rep.Confirmed)
+			klog.Infof("validated volume capabilities %s with confirmed: %v", rep.Message, rep.Confirmed)
 		}
 
 		return nil

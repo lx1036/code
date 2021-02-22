@@ -11,4 +11,5 @@ https://kubernetes-csi.github.io/docs/node-driver-registrar.html
 
 
 
+## CSI Plugin 注册机制以及带来的结果？
 

@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"os"
+	"k8s.io/klog/v2"
 )
 
 // pluginInfoFormat is the default Go template for emitting a
@@ -46,7 +46,7 @@ var identityCmd = &cobra.Command{
 	},
 }
 
-// debug: go run . identity plugin-info
+// debug: go run . identity plugin-info --endpoint 127.0.0.1:10000
 var pluginInfoCmd = &cobra.Command{
 	Use: "plugin-info",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -55,13 +55,13 @@ var pluginInfoCmd = &cobra.Command{
 			return err
 		}
 
-		glog.Infof("GetPluginInfo response: %v", response)
+		klog.Infof("GetPluginInfo response: %v", response)
 
-		return Tpl.Execute(os.Stdout, response)
+		return nil
 	},
 }
 
-// debug: go run . identity plugin-capability
+// debug: go run . identity plugin-capability --endpoint 127.0.0.1:10000
 var pluginCapabilityCmd = &cobra.Command{
 	Use: "plugin-capability",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -70,9 +70,9 @@ var pluginCapabilityCmd = &cobra.Command{
 			return err
 		}
 
-		glog.Infof("%v", response)
+		klog.Infof("%v", response)
 
-		return Tpl.Execute(os.Stdout, response)
+		return nil
 	},
 }
 
