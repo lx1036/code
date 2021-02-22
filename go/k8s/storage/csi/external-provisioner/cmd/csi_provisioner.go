@@ -13,9 +13,7 @@ import (
 
 	"k8s-lx1036/k8s/storage/csi/csi-lib-utils/leaderelection"
 	"k8s-lx1036/k8s/storage/csi/csi-lib-utils/metrics"
-	"k8s-lx1036/k8s/storage/csi/external-provisioner/external-provisioner-lib/pkg/controller"
-	"k8s-lx1036/k8s/storage/csi/external-provisioner/pkg/capacity"
-	ctrl "k8s-lx1036/k8s/storage/csi/external-provisioner/pkg/controller"
+	"k8s-lx1036/k8s/storage/csi/external-provisioner/pkg/controller"
 
 	flag "github.com/spf13/pflag"
 
@@ -30,7 +28,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
 	utilflag "k8s.io/component-base/cli/flag"
-	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 )
 
@@ -155,20 +152,20 @@ func main() {
 	}
 
 	metricsManager := metrics.NewCSIMetricsManager("" /* driverName */)
-	grpcClient, err := ctrl.Connect(*csiEndpoint, metricsManager)
+	grpcClient, err := controller.Connect(*csiEndpoint, metricsManager)
 	if err != nil {
 		klog.Error(err.Error())
 		os.Exit(1)
 	}
 
-	err = ctrl.Probe(grpcClient, *operationTimeout)
+	err = controller.Probe(grpcClient, *operationTimeout)
 	if err != nil {
 		klog.Error(err.Error())
 		os.Exit(1)
 	}
 
 	// Autodetect provisioner name
-	provisionerName, err := ctrl.GetDriverName(grpcClient, *operationTimeout)
+	provisionerName, err := controller.GetDriverName(grpcClient, *operationTimeout)
 	if err != nil {
 		klog.Fatalf("Error getting CSI driver name: %s", err)
 	}
@@ -188,7 +185,7 @@ func main() {
 		}()
 	}
 
-	pluginCapabilities, controllerCapabilities, err := ctrl.GetDriverCapabilities(grpcClient, *operationTimeout)
+	pluginCapabilities, controllerCapabilities, err := controller.GetDriverCapabilities(grpcClient, *operationTimeout)
 	if err != nil {
 		klog.Fatalf("Error getting CSI driver capabilities: %s", err)
 	}
@@ -196,7 +193,7 @@ func main() {
 	// -------------------------------
 	// Listers
 	// Create informer to prevent hit the API server for all resource request
-	factory := informers.NewSharedInformerFactory(clientset, ctrl.ResyncPeriodOfCsiNodeInformer)
+	factory := informers.NewSharedInformerFactory(clientset, controller.ResyncPeriodOfCsiNodeInformer)
 	var factoryForNamespace informers.SharedInformerFactory // usually nil, only used for CSIStorageCapacity
 	scLister := factory.Storage().V1().StorageClasses().Lister()
 	claimLister := factory.Core().V1().PersistentVolumeClaims().Lister()
@@ -208,16 +205,16 @@ func main() {
 		klog.Info("CSI driver does not support PUBLISH_UNPUBLISH_VOLUME, not watching VolumeAttachments")
 	}
 
-	var nodeDeployment *ctrl.NodeDeployment
+	var nodeDeployment *controller.NodeDeployment
 	if *enableNodeDeployment {
-		nodeDeployment = &ctrl.NodeDeployment{
+		nodeDeployment = &controller.NodeDeployment{
 			NodeName:         node,
 			ClaimInformer:    factory.Core().V1().PersistentVolumeClaims(),
 			ImmediateBinding: *nodeDeploymentImmediateBinding,
 			BaseDelay:        *nodeDeploymentBaseDelay,
 			MaxDelay:         *nodeDeploymentMaxDelay,
 		}
-		nodeInfo, err := ctrl.GetNodeInfo(grpcClient, *operationTimeout)
+		nodeInfo, err := controller.GetNodeInfo(grpcClient, *operationTimeout)
 		if err != nil {
 			klog.Fatalf("Failed to get node info from CSI driver: %v", err)
 		}
@@ -227,8 +224,8 @@ func main() {
 	// topology
 	var nodeLister listersv1.NodeLister
 	var csiNodeLister storagelistersv1.CSINodeLister
-	if ctrl.SupportsTopology(pluginCapabilities) {
-		nodeLister, csiNodeLister = getNodeLister(nodeDeployment, factory, clientset, provisionerName)
+	if controller.SupportsTopology(pluginCapabilities) {
+		//nodeLister, csiNodeLister = getNodeLister(nodeDeployment, factory, clientset, provisionerName)
 	}
 
 	// -------------------------------
@@ -247,17 +244,6 @@ func main() {
 		controller.NodesLister(nodeLister),
 	}
 
-	translator := csitrans.New()
-	supportsMigrationFromInTreePluginName := ""
-	if translator.IsMigratedCSIDriverByName(provisionerName) {
-		supportsMigrationFromInTreePluginName, err = translator.GetInTreeNameFromCSIName(provisionerName)
-		if err != nil {
-			klog.Fatalf("Failed to get InTree plugin name for migrated CSI plugin %s: %v", provisionerName, err)
-		}
-		klog.V(2).Infof("Supports migration from in-tree plugin: %s", supportsMigrationFromInTreePluginName)
-		provisionerOptions = append(provisionerOptions, controller.AdditionalProvisionerNames([]string{supportsMigrationFromInTreePluginName}))
-	}
-
 	// Generate a unique ID for this provisioner
 	timeStamp := time.Now().UnixNano() / int64(time.Millisecond)
 	identity := strconv.FormatInt(timeStamp, 10) + "-" + strconv.Itoa(rand.Intn(10000)) + "-" + provisionerName
@@ -266,7 +252,7 @@ func main() {
 	}
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	csiProvisioner := ctrl.NewCSIProvisioner(
+	csiProvisioner := controller.NewCSIProvisioner(
 		clientset,
 		*operationTimeout,
 		identity,
@@ -277,10 +263,8 @@ func main() {
 		provisionerName,
 		pluginCapabilities,
 		controllerCapabilities,
-		supportsMigrationFromInTreePluginName,
 		*strictTopology,
 		*immediateTopology,
-		translator,
 		scLister,
 		csiNodeLister,
 		nodeLister,
@@ -299,18 +283,18 @@ func main() {
 		provisionerOptions...,
 	)
 
-	csiClaimController := ctrl.NewCloningProtectionController(
+	/*csiClaimController := controller.NewCloningProtectionController(
 		clientset,
 		claimLister,
 		claimInformer,
 		workqueue.NewNamedRateLimitingQueue(rateLimiter, "claims"),
 		controllerCapabilities,
-	)
+	)*/
 
-	var capacityController *capacity.Controller
+	/*var capacityController *capacity.Controller
 	if *enableCapacity {
 		capacityController, factoryForNamespace = getCapacityController(grpcClient, rateLimiter, provisionerName, config, factory, clientset, nodeDeployment)
-	}
+	}*/
 
 	run := func(ctx context.Context) {
 		factory.Start(ctx.Done())
@@ -325,12 +309,13 @@ func main() {
 			}
 		}
 
-		if capacityController != nil {
-			go capacityController.Run(ctx, int(*capacityThreads))
-		}
-		if csiClaimController != nil {
-			go csiClaimController.Run(ctx, int(*finalizerThreads))
-		}
+		/*if capacityController != nil {
+			go capacitycontrollerutils.Run(ctx, int(*capacityThreads))
+		}*/
+
+		/*if csiClaimController != nil {
+			go csiClaimcontrollerutils.Run(ctx, int(*finalizerThreads))
+		}*/
 
 		provisionController.Run(ctx)
 	}

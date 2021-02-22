@@ -96,10 +96,7 @@ type Server interface {
 // allowed before reporting unhealthy.
 // The caller sidecar should document the handler address in appropriate flag
 // descriptions.
-func (l *leaderElection) PrepareHealthCheck(
-	s Server,
-	healthCheckTimeout time.Duration) {
-
+func (l *leaderElection) PrepareHealthCheck(s Server, healthCheckTimeout time.Duration) {
 	l.healthCheck = leaderelection.NewLeaderHealthzAdaptor(healthCheckTimeout)
 
 	s.Handle(HealthCheckerAddress, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

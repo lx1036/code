@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/klog/v2"
 )
 
 type CSIDriver struct {
@@ -21,17 +21,17 @@ type CSIDriver struct {
 // does not support optional driver plugin info manifest field. Refer to CSI spec for more details.
 func NewCSIDriver(name string, version string, nodeID string) *CSIDriver {
 	if name == "" {
-		glog.Errorf("Driver name missing")
+		klog.Errorf("Driver name missing")
 		return nil
 	}
 
 	if nodeID == "" {
-		glog.Errorf("NodeID missing")
+		klog.Errorf("NodeID missing")
 		return nil
 	}
 	// TODO version format and validation
 	if len(version) == 0 {
-		glog.Errorf("Version argument missing")
+		klog.Errorf("Version argument missing")
 		return nil
 	}
 
@@ -58,7 +58,7 @@ func (d *CSIDriver) AddControllerServiceCapabilities(cl []csi.ControllerServiceC
 	var csc []*csi.ControllerServiceCapability
 
 	for _, c := range cl {
-		glog.Infof("Enabling controller service capability: %v", c.String())
+		klog.Infof("Enabling controller service capability: %v", c.String())
 		csc = append(csc, NewControllerServiceCapability(c))
 	}
 
@@ -74,7 +74,7 @@ func NewVolumeCapabilityAccessMode(mode csi.VolumeCapability_AccessMode_Mode) *c
 func (d *CSIDriver) AddVolumeCapabilityAccessModes(vc []csi.VolumeCapability_AccessMode_Mode) []*csi.VolumeCapability_AccessMode {
 	var vca []*csi.VolumeCapability_AccessMode
 	for _, c := range vc {
-		glog.Infof("Enabling volume access mode: %v", c.String())
+		klog.Infof("Enabling volume access mode: %v", c.String())
 		vca = append(vca, NewVolumeCapabilityAccessMode(c))
 	}
 	d.vc = vca

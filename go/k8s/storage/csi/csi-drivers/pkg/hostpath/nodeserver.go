@@ -2,7 +2,6 @@ package hostpath
 
 import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -10,6 +9,7 @@ import (
 	"os"
 
 	csicommon "k8s-lx1036/k8s/storage/csi/csi-drivers/pkg/csi-common"
+	"k8s.io/klog/v2"
 )
 
 type nodeServer struct {
@@ -90,7 +90,7 @@ func (n *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	attrib := req.GetVolumeContext()
 	mountFlags := req.GetVolumeCapability().GetMount().GetMountFlags()
 
-	glog.V(4).Infof("target %v\nfstype %v\ndevice %v\nreadonly %v\nvolumeId %v\nattributes %v\nmountflags %v\n",
+	klog.Infof("target %v\nfstype %v\ndevice %v\nreadonly %v\nvolumeId %v\nattributes %v\nmountflags %v\n",
 		targetPath, fsType, deviceId, readOnly, volumeId, attrib, mountFlags)
 
 	options := []string{"bind"}
@@ -122,7 +122,7 @@ func (n *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	glog.V(4).Infof("hostpath: volume %s/%s has been unmounted.", targetPath, volumeID)
+	klog.Infof("hostpath: volume %s/%s has been unmounted.", targetPath, volumeID)
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }

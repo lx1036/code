@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ActualStateOfWorld defines a set of thread-safe operations for the kubelet
@@ -13,7 +13,6 @@ import (
 // This cache contains a map of socket file path to plugin information of
 // all plugins attached to this node.
 type ActualStateOfWorld interface {
-
 	// GetRegisteredPlugins generates and returns a list of plugins
 	// that are successfully registered plugins in the current actual state of world.
 	GetRegisteredPlugins() []PluginInfo
@@ -66,11 +65,13 @@ func (asw *actualStateOfWorld) AddPlugin(pluginInfo PluginInfo) error {
 	asw.Lock()
 	defer asw.Unlock()
 
+	klog.Infof("add plugin SocketPath %s at time %s into actualStateOfWorld map", pluginInfo.SocketPath, pluginInfo.Timestamp.String())
+
 	if pluginInfo.SocketPath == "" {
 		return fmt.Errorf("socket path is empty")
 	}
 	if _, ok := asw.socketFileToInfo[pluginInfo.SocketPath]; ok {
-		klog.V(2).Infof("Plugin (Path %s) exists in actual state cache", pluginInfo.SocketPath)
+		klog.Infof("Plugin (Path %s) exists in actual state cache", pluginInfo.SocketPath)
 	}
 	asw.socketFileToInfo[pluginInfo.SocketPath] = pluginInfo
 	return nil
@@ -87,7 +88,7 @@ func (asw *actualStateOfWorld) GetRegisteredPlugins() []PluginInfo {
 	asw.RLock()
 	defer asw.RUnlock()
 
-	currentPlugins := []PluginInfo{}
+	var currentPlugins []PluginInfo
 	for _, pluginInfo := range asw.socketFileToInfo {
 		currentPlugins = append(currentPlugins, pluginInfo)
 	}

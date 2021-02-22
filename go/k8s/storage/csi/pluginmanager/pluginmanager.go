@@ -4,27 +4,24 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/storage/csi/pluginmanager/cache"
-	"k8s-lx1036/k8s/storage/csi/pluginmanager/operationexecutor"
 	"k8s-lx1036/k8s/storage/csi/pluginmanager/pluginwatcher"
 	"k8s-lx1036/k8s/storage/csi/pluginmanager/reconciler"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/klog/v2"
 )
 
 const (
 	// loopSleepDuration is the amount of time the reconciler loop waits
 	// between successive executions
-	loopSleepDuration = 1 * time.Second
+	loopSleepDuration = 5 * time.Second
 )
 
 // PluginManager runs a set of asynchronous loops that figure out which plugins
 // need to be registered/deregistered and makes it so.
 type PluginManager interface {
 	// Starts the plugin manager and all the asynchronous loops that it controls
-	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
+	Run(stopCh <-chan struct{})
 
 	// AddHandler adds the given plugin handler for a specific plugin type, which
 	// will be added to the actual state of world cache so that it can be passed to
@@ -57,45 +54,30 @@ type pluginManager struct {
 	desiredStateOfWorld cache.DesiredStateOfWorld
 }
 
-// NewPluginManager returns a new concrete instance implementing the
-// PluginManager interface.
-func NewPluginManager(
-	sockDir string,
-	recorder record.EventRecorder) PluginManager {
-
+// TODO: reconcile还有个bug，使用os.RemoveAll(socketPath)删除socket时候，因为fsnotify没有上报删除事件，plugin-watcher没有从desiredStateOfWorld中删除plugin
+func NewPluginManager(sockDir string) PluginManager {
 	asw := cache.NewActualStateOfWorld()
 	dsw := cache.NewDesiredStateOfWorld()
-
-	r := reconciler.NewReconciler(
-		operationexecutor.NewOperationExecutor(
-			operationexecutor.NewOperationGenerator(
-				recorder,
-			),
-		),
-		loopSleepDuration,
-		dsw,
-		asw)
-
 	pm := &pluginManager{
 		desiredStateOfWorldPopulator: pluginwatcher.NewWatcher(
 			sockDir,
 			dsw,
 		),
-		reconciler:          r,
+		reconciler:          reconciler.NewReconciler(loopSleepDuration, dsw, asw),
 		desiredStateOfWorld: dsw,
 		actualStateOfWorld:  asw,
 	}
+
 	return pm
 }
 
-func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+func (pm *pluginManager) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
 	// 运行plugin_watcher来watch sockDir目录下socket的创建和删除，并去更新desiredStateOfWorld.socketFileToInfo
 	klog.Infof("The desired_state_of_world populator (plugin watcher) starts")
 	pm.desiredStateOfWorldPopulator.Start(stopCh)
 
-	//
 	klog.Infof("Starting Kubelet Plugin Manager")
 	go pm.reconciler.Run(stopCh)
 

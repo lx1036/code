@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // DesiredStateOfWorld defines a set of thread-safe operations for the kubelet
@@ -83,7 +83,7 @@ func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string) error {
 		return fmt.Errorf("socket path is empty")
 	}
 	if _, ok := dsw.socketFileToInfo[socketPath]; ok {
-		klog.V(2).Infof("Plugin (Path %s) exists in actual state cache, timestamp will be updated", socketPath)
+		klog.Infof("Plugin (Path %s) exists in actual state cache, timestamp will be updated", socketPath)
 	}
 
 	// Update the PluginInfo object.
@@ -95,39 +95,4 @@ func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string) error {
 		Timestamp:  time.Now(),
 	}
 	return nil
-}
-
-// Generate a detailed error msg for logs
-func generatePluginMsgDetailed(prefixMsg, suffixMsg, socketPath, details string) (detailedMsg string) {
-	return fmt.Sprintf("%v for plugin at %q %v %v", prefixMsg, socketPath, details, suffixMsg)
-}
-
-// Generate a simplified error msg for events and a detailed error msg for logs
-func generatePluginMsg(prefixMsg, suffixMsg, socketPath, details string) (simpleMsg, detailedMsg string) {
-	simpleMsg = fmt.Sprintf("%v for plugin at %q %v", prefixMsg, socketPath, suffixMsg)
-	return simpleMsg, generatePluginMsgDetailed(prefixMsg, suffixMsg, socketPath, details)
-}
-
-// GenerateMsgDetailed returns detailed msgs for plugins to register
-// that can be used in logs.
-// The msg format follows the pattern "<prefixMsg> <plugin details> <suffixMsg>"
-func (plugin *PluginInfo) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {
-	detailedStr := fmt.Sprintf("(plugin details: %v)", plugin)
-	return generatePluginMsgDetailed(prefixMsg, suffixMsg, plugin.SocketPath, detailedStr)
-}
-
-// GenerateErrorDetailed returns detailed errors for plugins to register
-// that can be used in logs.
-// The msg format follows the pattern "<prefixMsg> <plugin details>: <err> ",
-func (plugin *PluginInfo) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(plugin.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
-}
-
-// Generates an error string with the format ": <err>" if err exists
-func errSuffix(err error) string {
-	errStr := ""
-	if err != nil {
-		errStr = fmt.Sprintf(": %v", err)
-	}
-	return errStr
 }

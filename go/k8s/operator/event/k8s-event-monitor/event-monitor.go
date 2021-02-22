@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"k8s-lx1036/k8s/operator/event/k8s-event-monitor/common/flags"
 	"k8s-lx1036/k8s/operator/event/k8s-event-monitor/sources"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"net"
 	"net/http"
 	"os"

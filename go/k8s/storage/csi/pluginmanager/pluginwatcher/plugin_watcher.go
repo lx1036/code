@@ -3,7 +3,6 @@ package pluginwatcher
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -11,7 +10,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 )
@@ -35,7 +34,7 @@ func NewWatcher(sockDir string, desiredStateOfWorld cache.DesiredStateOfWorld) *
 }
 
 func (w *Watcher) init() error {
-	klog.V(4).Infof("Ensuring Plugin directory at %s ", w.path)
+	klog.Infof("Ensuring Plugin directory at %s ", w.path)
 
 	if err := w.fs.MkdirAll(w.path, 0755); err != nil {
 		return fmt.Errorf("error (re-)creating root %s: %v", w.path, err)
@@ -62,6 +61,8 @@ func (w *Watcher) traversePluginDir(dir string) error {
 			if err := w.fsWatcher.Add(path); err != nil {
 				return fmt.Errorf("failed to watch %s, err: %v", path, err)
 			}
+
+			klog.Infof("filesystem watcher path %s", path)
 		case mode&os.ModeSocket != 0:
 			event := fsnotify.Event{
 				Name: path,
@@ -72,7 +73,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 				klog.Errorf("error %v when handling create event: %s", err, event)
 			}
 		default:
-			klog.V(5).Infof("Ignoring file %s with mode %v", path, mode)
+			klog.Infof("Ignoring file %s with mode %v", path, mode)
 		}
 
 		return nil
@@ -83,7 +84,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 // Files names:
 // - MUST NOT start with a '.'
 func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
-	klog.V(6).Infof("Handling create event: %v", event)
+	klog.Infof("Handling create event: %v", event)
 
 	fileInfo, err := os.Stat(event.Name)
 	if err != nil {
@@ -91,7 +92,7 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	}
 
 	if strings.HasPrefix(fileInfo.Name(), ".") {
-		klog.V(5).Infof("Ignoring file (starts with '.'): %s", fileInfo.Name())
+		klog.Infof("Ignoring file (starts with '.'): %s", fileInfo.Name())
 		return nil
 	}
 
@@ -101,7 +102,7 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 			return fmt.Errorf("failed to determine if file: %s is a unix domain socket: %v", event.Name, err)
 		}
 		if !isSocket {
-			klog.V(5).Infof("Ignoring non socket file %s", fileInfo.Name())
+			klog.Infof("Ignoring non socket file %s", fileInfo.Name())
 			return nil
 		}
 
@@ -112,16 +113,7 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 }
 
 func (w *Watcher) handlePluginRegistration(socketPath string) error {
-	if runtime.GOOS == "windows" {
-		socketPath = util.NormalizePath(socketPath)
-	}
-	//TODO: Implement rate limiting to mitigate any DOS kind of attacks.
-	// Update desired state of world list of plugins
-	// If the socket path does exist in the desired world cache, there's still
-	// a possibility that it has been deleted and recreated again before it is
-	// removed from the desired world cache, so we still need to call AddOrUpdatePlugin
-	// in this case to update the timestamp
-	klog.V(2).Infof("Adding socket path or updating timestamp %s to desired state cache", socketPath)
+	klog.Infof("Adding socket path or updating timestamp %s to desired state cache", socketPath)
 	err := w.desiredStateOfWorld.AddOrUpdatePlugin(socketPath)
 	if err != nil {
 		return fmt.Errorf("error adding socket path %s or updating timestamp to desired state cache: %v", socketPath, err)
@@ -130,10 +122,10 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 }
 
 func (w *Watcher) handleDeleteEvent(event fsnotify.Event) {
-	klog.V(6).Infof("Handling delete event: %v", event)
+	klog.Infof("Handling delete event: %v", event)
 
 	socketPath := event.Name
-	klog.V(2).Infof("Removing socket path %s from desired state cache", socketPath)
+	klog.Infof("Removing socket path %s from desired state cache", socketPath)
 	w.desiredStateOfWorld.RemovePlugin(socketPath)
 }
 
@@ -141,7 +133,7 @@ func (w *Watcher) handleDeleteEvent(event fsnotify.Event) {
 
 // Start watches for the creation and deletion of plugin sockets at the path
 func (w *Watcher) Start(stopCh <-chan struct{}) error {
-	klog.V(2).Infof("Plugin Watcher Start at %s", w.path)
+	klog.Infof("Plugin Watcher Start at %s", w.path)
 
 	w.stopped = make(chan struct{})
 

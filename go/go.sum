@@ -2075,6 +2075,8 @@ k8s.io/cluster-bootstrap v0.19.7/go.mod h1:W2WG13ZOrQrdydjS2nUyHYWVP+VckZNjwfG8l
 k8s.io/code-generator v0.19.7/go.mod h1:lwEq3YnLYb/7uVXLorOJfxg+cUu2oihFhHZ0n9NIla0=
 k8s.io/component-base v0.19.7 h1:ZXS2VRWOWBOc2fTd1zjzhi/b/mkqFT9FDqiNsn1cH30=
 k8s.io/component-base v0.19.7/go.mod h1:YX8spPBgwl3I6UGcSdQiEMAqRMSUsGQOW7SEr4+Qa3U=
+k8s.io/component-helpers v0.20.2 h1:UM92JwXHAd2fN/LoJtm0zayIEypCYHxNBKaGhNRT7YE=
+k8s.io/component-helpers v0.20.2/go.mod h1:qeM6iAWGqIr+WE8n2QW2OK9XkpZkPNTxAoEv9jl40/I=
 k8s.io/cri-api v0.19.7 h1:IlT+FOLwuX6JOdWQVcf5EamezpJG7m2C0/gts+hM6Ms=
 k8s.io/cri-api v0.19.7/go.mod h1:PE0eMB8nJJvRigJuZEyqgYvRqL8mBowlvw0g8F/L1LY=
 k8s.io/csi-translation-lib v0.19.7 h1:Spr0XWqXufEUQA47axmPTm1xOabdMYG9MUbJVaRRb0g=
@@ -2097,6 +2099,8 @@ k8s.io/klog/v2 v2.0.0 h1:Foj74zO6RbjjP4hBEKjnYtjjAhGg4jNynUdYF6fJrok=
 k8s.io/klog/v2 v2.0.0/go.mod h1:PBfzABfn139FHAV07az/IF9Wp1bkk3vpT2XSJ76fSDE=
 k8s.io/klog/v2 v2.2.0 h1:XRvcwJozkgZ1UQJmfMGpvRthQHOvihEhYtDfAaxMz/A=
 k8s.io/klog/v2 v2.2.0/go.mod h1:Od+F08eJP+W3HUb4pSrPpgp9DGU4GzlpG/TmITuYh/Y=
+k8s.io/klog/v2 v2.4.0 h1:7+X0fUguPyrKEC4WjH8iGDg3laWgMo5tMnRTIGTTxGQ=
+k8s.io/klog/v2 v2.4.0/go.mod h1:Od+F08eJP+W3HUb4pSrPpgp9DGU4GzlpG/TmITuYh/Y=
 k8s.io/kube-aggregator v0.19.7/go.mod h1:kA6tIyq3iJ8HJ/Yz9xY6ifceJNp/l/Eym0H1jRRAjMk=
 k8s.io/kube-controller-manager v0.19.7/go.mod h1:A5dw0l+rRB/vDLEWscsbZjuHjig8dex+9v+wigKmnRA=
 k8s.io/kube-openapi v0.0.0-20190320154901-5e45bb682580/go.mod h1:BXM9ceUBTj2QnfH2MK1odQs778ajze1RxcmP6S8RVVc=
@@ -2139,6 +2143,8 @@ k8s.io/utils v0.0.0-20200603063816-c1c6865ac451 h1:v8ud2Up6QK1lNOKFgiIVrZdMg7Mpm
 k8s.io/utils v0.0.0-20200603063816-c1c6865ac451/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20200729134348-d5654de09c73 h1:uJmqzgNWG7XyClnU/mLPBWwfKKF1K8Hf8whTseBgJcg=
 k8s.io/utils v0.0.0-20200729134348-d5654de09c73/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
+k8s.io/utils v0.0.0-20201110183641-67b214c5f920 h1:CbnUZsM497iRC5QMVkHwyl8s2tB3g7yaSHkYPkpgelw=
+k8s.io/utils v0.0.0-20201110183641-67b214c5f920/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 modernc.org/cc v1.0.0/go.mod h1:1Sk4//wdnYJiUIxnW8ddKpaOJCF37yAdqYnkxUpaYxw=
 modernc.org/golex v1.0.0/go.mod h1:b/QX9oBD/LhixY6NDh+IdGv17hgB+51fET1i2kPSmvk=
 modernc.org/mathutil v1.0.0/go.mod h1:wU0vUrJsVWBZ4P6e7xtFJEhFSNsfRLJ8H458uRjg03k=

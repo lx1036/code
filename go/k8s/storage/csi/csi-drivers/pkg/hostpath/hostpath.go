@@ -5,8 +5,8 @@ import (
 	csicommon "k8s-lx1036/k8s/storage/csi/csi-drivers/pkg/csi-common"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -64,13 +64,13 @@ func GetHostPathDriver() *hostPath {
 }
 
 func (hp *hostPath) Run(driverName, nodeID, endpoint string) {
-	glog.Infof("Driver: %v ", driverName)
-	glog.Infof("Version: %s", vendorVersion)
+	klog.Infof("Driver: %v ", driverName)
+	klog.Infof("Version: %s", vendorVersion)
 
 	// Initialize default library driver
 	hp.driver = csicommon.NewCSIDriver(driverName, vendorVersion, nodeID)
 	if hp.driver == nil {
-		glog.Fatalln("Failed to initialize CSI Driver.")
+		klog.Fatalln("Failed to initialize CSI Driver.")
 	}
 	hp.driver.AddControllerServiceCapabilities(
 		[]csi.ControllerServiceCapability_RPC_Type{
@@ -90,7 +90,6 @@ func (hp *hostPath) Run(driverName, nodeID, endpoint string) {
 
 	s := csicommon.NewNonBlockingGRPCServer()
 	s.Start(endpoint, hp.ids, hp.cs, hp.ns)
-	s.Wait()
 }
 
 func getVolumeByID(volumeID string) (hostPathVolume, error) {
