@@ -80,10 +80,7 @@ func Connect(address string, metricsManager metrics.CSIMetricsManager, options .
 }
 
 // connect is the internal implementation of Connect. It has more options to enable testing.
-func connect(
-	address string,
-	metricsManager metrics.CSIMetricsManager,
-	dialOptions []grpc.DialOption, connectOptions []Option) (*grpc.ClientConn, error) {
+func connect(address string, metricsManager metrics.CSIMetricsManager, dialOptions []grpc.DialOption, connectOptions []Option) (*grpc.ClientConn, error) {
 	var o options
 	for _, option := range connectOptions {
 		option(&o)
@@ -94,7 +91,7 @@ func connect(
 		grpc.WithBlock(),    // Block until connection succeeds.
 		grpc.WithChainUnaryInterceptor(
 			LogGRPC, // Log all messages.
-			ExtendedCSIMetricsManager{metricsManager}.RecordMetricsClientInterceptor, // Record metrics for each gRPC call.
+			//ExtendedCSIMetricsManager{metricsManager}.RecordMetricsClientInterceptor, // Record metrics for each gRPC call.
 		),
 	)
 	unixPrefix := "unix://"

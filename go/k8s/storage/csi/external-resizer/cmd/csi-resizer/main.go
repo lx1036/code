@@ -8,6 +8,7 @@ import (
 
 	"k8s-lx1036/k8s/storage/csi/csi-lib-utils/leaderelection"
 	"k8s-lx1036/k8s/storage/csi/external-resizer/pkg/controller"
+	"k8s-lx1036/k8s/storage/csi/external-resizer/pkg/csi"
 	"k8s-lx1036/k8s/storage/csi/external-resizer/pkg/resizer"
 
 	"k8s.io/apimachinery/pkg/util/wait"
