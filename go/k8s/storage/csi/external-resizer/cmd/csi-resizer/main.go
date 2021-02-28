@@ -28,6 +28,9 @@ var (
 
 	csiAddress = flag.String("csi-address", "/run/csi/socket", "Address of the CSI driver socket.")
 	timeout    = flag.Duration("timeout", 10*time.Second, "Timeout for waiting for CSI driver socket.")
+
+	enableLeaderElection    = flag.Bool("leader-election", true, "Enable leader election.")
+	leaderElectionNamespace = flag.String("leader-election-namespace", "default", "Namespace where the leader election resource lives. Defaults to the pod namespace if not set.")
 )
 
 func main() {
@@ -75,7 +78,7 @@ func main() {
 
 	resizerName := csiResizer.Name()
 	rc := controller.NewResizeController(resizerName, csiResizer, kubeClient, *resyncPeriod, informerFactory,
-		workqueue.NewItemExponentialFailureRateLimiter(*retryIntervalStart, *retryIntervalMax),
+		workqueue.NewItemExponentialFailureRateLimiter(time.Second, time.Minute),
 		*handleVolumeInUseError)
 	run := func(ctx context.Context) {
 		informerFactory.Start(wait.NeverStop)

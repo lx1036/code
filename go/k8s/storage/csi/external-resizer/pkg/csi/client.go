@@ -11,13 +11,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-type client struct {
+type Client struct {
 	conn       *grpc.ClientConn
 	nodeClient csi.NodeClient
 	ctrlClient csi.ControllerClient
 }
 
-func New(address string, timeout time.Duration) (*client, error) {
+func New(address string, timeout time.Duration) (*Client, error) {
 	conn, err := connection.Connect(address, nil, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to CSI driver: %v", err)

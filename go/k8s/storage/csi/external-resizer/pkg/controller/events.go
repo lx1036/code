@@ -1,4 +1,4 @@
-package util
+package controller
 
 // These constants are PVC condition types related to resize operation.
 const (
