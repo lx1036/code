@@ -1,0 +1,41 @@
+
+
+
+# ansible-playbook -i inventory/zsh.conf main.yaml -e "group=zsh"
+- hosts: "{{ group }}"
+  tasks:
+    - name: 批量ssh-copy-id
+      authorized_key: user=liuxiang3 state=present key="{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+
+    - name: 安装zsh git
+      yum:
+        name: ["git", "zsh"]
+        state: latest
+
+#    - name: 安装oh-my-zsh
+#      shell: 'sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"'
+#  become: yes
+
+    - name: Check if .zshrc exists
+      stat:
+        path: ~/.zshrc
+      register: stat_rc_result
+
+    - name: Check if .oh-my-zsh exists
+      stat:
+        path: ~/.oh-my-zsh
+      register: stat_oh_my_zsh_result
+
+    - name: Cloning oh-my-zsh
+      git:
+        repo=https://github.com/robbyrussell/oh-my-zsh
+        dest=~/.oh-my-zsh
+      when: not stat_oh_my_zsh_result.stat.exists
+
+    - name: Creating new ~/.zshrc
+      copy:
+        src=~/.oh-my-zsh/templates/zshrc.zsh-template
+        dest=~/.zshrc
+      when: not stat_rc_result.stat.exists
+
+
