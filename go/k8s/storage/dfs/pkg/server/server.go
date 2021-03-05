@@ -1,6 +1,6 @@
 package server
 
-import "k8s-lx1036/k8s/storage/dfs/pkg/config"
+import "k8s-lx1036/k8s/storage/dfs/pkg/util/config"
 
 type Server interface {
 	Start(cfg *config.Config) error

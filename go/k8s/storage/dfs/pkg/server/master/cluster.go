@@ -1,8 +1,9 @@
 package master
 
 import (
-	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
 	"sync"
+
+	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
 )
 
 // Cluster stores all the cluster-level information.

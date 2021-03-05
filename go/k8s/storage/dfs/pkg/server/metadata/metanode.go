@@ -1,10 +1,14 @@
 package metadata
 
 import (
-	"k8s-lx1036/k8s/storage/dfs/pkg/config"
-	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
+	"os"
 	"sync"
 	"sync/atomic"
+
+	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
+	"k8s-lx1036/k8s/storage/dfs/pkg/util/config"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -57,12 +61,66 @@ func (m *MetaNode) Start(cfg *config.Config) (err error) {
 	return
 }
 
+func (m *MetaNode) onStart(cfg *config.Config) (err error) {
+	if err = m.parseConfig(cfg); err != nil {
+		return
+	}
+	if err = m.register(); err != nil {
+		return
+	}
+	if err = m.startRaftServer(); err != nil {
+		return
+	}
+	if err = m.registerAPIHandler(); err != nil {
+		return
+	}
+	if err = m.startMetaManager(); err != nil {
+		return
+	}
+
+	// check local partition compare with master ,if lack,then not start
+	if err = m.checkLocalPartitionMatchWithMaster(); err != nil {
+		klog.Error(err)
+		return
+	}
+
+	if err = m.startServer(); err != nil {
+		return
+	}
+
+	return
+}
+
+func (m *MetaNode) startMetaManager() (err error) {
+	if _, err = os.Stat(m.metadataDir); err != nil {
+		if err = os.MkdirAll(m.metadataDir, 0755); err != nil {
+			return
+		}
+	}
+	// load metadataManager
+	conf := MetadataManagerConfig{
+		NodeID:    m.nodeId,
+		RootDir:   m.metadataDir,
+		RaftStore: m.raftStore,
+	}
+	m.metadataManager = NewMetadataManager(conf)
+	if err = m.metadataManager.Start(); err == nil {
+		klog.Infof("[startMetaManager] manager start finish.")
+	}
+	return
+}
+
 func (m *MetaNode) Shutdown() {
-	panic("implement me")
+	// shutdown node and release the resource
+	m.stopServer()
+	m.stopMetaManager()
+	m.stopRaftServer()
 }
 
 func (m *MetaNode) Sync() {
-	panic("implement me")
+	if atomic.LoadUint32(&m.state) == StateRunning {
+		m.wg.Wait()
+	}
 }
 
 // NewServer creates a new meta node instance.

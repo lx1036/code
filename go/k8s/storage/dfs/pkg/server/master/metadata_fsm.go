@@ -1,9 +1,10 @@
 package master
 
 import (
+	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
+
 	"github.com/tiglabs/raft"
 	"github.com/tiglabs/raft/proto"
-	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
 )
 
 type raftLeaderChangeHandler func(leader uint64)

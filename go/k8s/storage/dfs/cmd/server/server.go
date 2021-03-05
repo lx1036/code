@@ -6,10 +6,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/config"
 	"k8s-lx1036/k8s/storage/dfs/pkg/server"
 	"k8s-lx1036/k8s/storage/dfs/pkg/server/master"
 	"k8s-lx1036/k8s/storage/dfs/pkg/server/metadata"
+	"k8s-lx1036/k8s/storage/dfs/pkg/util/config"
 
 	"k8s.io/klog/v2"
 )

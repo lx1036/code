@@ -8,6 +8,7 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.15 // indirect
 	github.com/Shopify/sarama v1.19.0
 	github.com/astaxie/beego v1.12.1
+	github.com/aws/aws-sdk-go v1.28.2
 	github.com/bep/debounce v1.2.0
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
@@ -32,6 +33,7 @@ require (
 	github.com/google/go-querystring v1.0.0
 	github.com/google/uuid v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/jacobsa/fuse v0.0.0-20201216155545-e0296dec955f
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jinzhu/gorm v1.9.11
 	github.com/julienschmidt/httprouter v1.3.0

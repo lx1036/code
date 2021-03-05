@@ -2,12 +2,11 @@ package master
 
 import (
 	"fmt"
-	"github.com/pingcap/errors"
 	"net/http/httputil"
 	"sync"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/config"
 	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
+	"k8s-lx1036/k8s/storage/dfs/pkg/util/config"
 
 	"k8s.io/klog/v2"
 )
