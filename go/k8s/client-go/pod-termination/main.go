@@ -4,9 +4,9 @@ import (
 	"context"
 	"flag"
 	"os"
-	"time"
 	"path/filepath"
-	
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -21,17 +21,16 @@ import (
 func main() {
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
-	
+
 	var kubeconfig *string
 	if home, _ := os.UserHomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "absolute path to kubeconfig file")
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to kubeconfig file")
 	}
-	
+
 	flag.Parse()
-	
-	
+
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err)
@@ -40,15 +39,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	
-	
+
 	informerFactory := informers.NewSharedInformerFactory(k8sClient, time.Minute)
 
-   podsQueue := workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(time.Second*5, time.Minute*5), "pods")
-   endpointsQueue := workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(time.Second*5, time.Minute*5), "endpoints")
-	
+	podsQueue := workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(time.Second*5, time.Minute*5), "pods")
+	endpointsQueue := workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(time.Second*5, time.Minute*5), "endpoints")
+
 	informerFactory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    nil,
+		AddFunc: nil,
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			oldPod, ok := oldObj.(*corev1.Pod)
 			if !ok {
@@ -61,17 +59,17 @@ func main() {
 			if oldPod.ResourceVersion == newPod.ResourceVersion {
 				return
 			}
-			
+
 			if newPod.Namespace != "default" {
 				return
 			}
-			
+
 			if newPod.DeletionTimestamp != nil {
 				klog.Infof("pod %s/%s deleting", newPod.Namespace, newPod.Name)
-				
+
 				return
 			}
-			
+
 			klog.Infof("pod %s/%s updated", newPod.Namespace, newPod.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -79,15 +77,14 @@ func main() {
 			if !ok {
 				return
 			}
-			
-			
+
 			klog.Infof("pod %s/%s deleted", pod.Namespace, pod.Name)
-			
+
 		},
 	})
-	
+
 	informerFactory.Core().V1().Endpoints().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    nil,
+		AddFunc: nil,
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			oldEndpoint, ok := oldObj.(*corev1.Endpoints)
 			if !ok {
@@ -100,11 +97,11 @@ func main() {
 			if newEndpoint.ResourceVersion == oldEndpoint.ResourceVersion {
 				return
 			}
-			
+
 			if newEndpoint.Namespace != "default" {
 				return
 			}
-			
+
 			klog.Infof("endpoints %s/%s updated", newEndpoint.Namespace, newEndpoint.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -112,47 +109,41 @@ func main() {
 			if !ok {
 				return
 			}
-			
-			
+
 			klog.Infof("endpoints %s/%s deleted", endpoint.Namespace, endpoint.Name)
-			
+
 		},
 	})
-	
-	
+
 	stopCh := context.TODO().Done()
-	
-	
+
 	informerFactory.Start(stopCh)
- 
-	
-	
+
 	defer podsQueue.ShutDown()
 	defer endpointsQueue.ShutDown()
-	
-	
+
 	informersSyncd := []cache.InformerSynced{
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
 		informerFactory.Core().V1().Endpoints().Informer().HasSynced,
 	}
-	
+
 	if !cache.WaitForCacheSync(stopCh, informersSyncd...) {
 		klog.Errorf("Cannot sync pod, pv or pvc caches")
 		return
 	}
-	
+
 	/*go wait.Until(func() {
 		key, quit := podsQueue.Get()
 		if quit {
 			return
 		}
 		defer podsQueue.Done(key)
-		
+
 		pod, ok := key.(*corev1.Pod)
 		if !ok {
 			return
 		}
-		
+
 		klog.Infof("pod %s/%s deleted", pod.Namespace, pod.Name)
 	}, time.Second, stopCh)
 	go wait.Until(func() {
@@ -161,17 +152,16 @@ func main() {
 			return
 		}
 		defer endpointsQueue.Done(key)
-		
+
 		endpoints, ok := key.(*corev1.Endpoints)
 		if !ok {
 			return
 		}
-		
+
 		klog.Infof("endpoints %s/%s updated", endpoints.Namespace, endpoints.Name)
 	}, time.Second, stopCh)*/
-	
+
 	klog.Infof("cache synced...")
-	
+
 	<-stopCh
 }
-

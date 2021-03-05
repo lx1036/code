@@ -66,7 +66,9 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
 	github.com/stretchr/testify v1.5.1
+	github.com/tecbot/gorocksdb v0.0.0-20191217155057-f0fad39f321c
 	github.com/tidwall/evio v1.0.2
+	github.com/tiglabs/raft v0.0.0-20200304095606-b25a44ad8b33
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
 	github.com/urfave/cli v1.22.2
 	github.com/vishvananda/netlink v1.1.0
