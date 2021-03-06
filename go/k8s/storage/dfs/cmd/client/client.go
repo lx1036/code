@@ -4,17 +4,16 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/jacobsa/fuse"
-	"github.com/pingcap/errors"
-	"k8s-lx1036/k8s/storage/dfs/pkg/client"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strconv"
 	"syscall"
 
+	"k8s-lx1036/k8s/storage/dfs/pkg/client"
 	"k8s-lx1036/k8s/storage/dfs/pkg/util/config"
 
+	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseutil"
 
 	"k8s.io/klog/v2"

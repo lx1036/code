@@ -41,3 +41,34 @@ const (
 
 	GetTopologyView = "/topo/get"
 )
+
+type ClientInfo struct {
+	Id         uint64
+	Ip         string
+	Hostname   string
+	Version    string
+	MemoryUsed string
+	MountVol   string
+	MountPoint string
+	System     string
+	Expiration string
+}
+
+// SimpleVolView defines the simple view of a volume
+type SimpleVolView struct {
+	ID            uint64
+	Name          string
+	Owner         string
+	MpReplicaNum  uint8
+	Status        uint8
+	Capacity      uint64 // GB
+	MpCnt         int
+	S3Endpoint    string
+	BucketDeleted bool
+}
+
+// HeartBeatRequest define the heartbeat request.
+type HeartBeatRequest struct {
+	CurrTime   int64
+	MasterAddr string
+}

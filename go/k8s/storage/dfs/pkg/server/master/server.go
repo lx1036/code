@@ -6,9 +6,15 @@ import (
 	"sync"
 
 	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
+	"k8s-lx1036/k8s/storage/dfs/pkg/util"
 	"k8s-lx1036/k8s/storage/dfs/pkg/util/config"
 
 	"k8s.io/klog/v2"
+)
+
+const (
+	LRUCacheSize    = 3 << 30
+	WriteBufferSize = 4 * util.MB
 )
 
 // Server represents the server in a cluster
@@ -35,70 +41,73 @@ type Server struct {
 	metaReady    bool
 }
 
-func (m *Server) createRaftServer() (err error) {
+func (server *Server) createRaftServer() error {
+	var err error
 	raftCfg := &raftstore.Config{
-		NodeID:            m.id,
-		RaftPath:          m.walDir,
-		NumOfLogsToRetain: m.retainLogs,
-		HeartbeatPort:     int(m.config.heartbeatPort),
-		ReplicaPort:       int(m.config.replicaPort),
-		TickInterval:      m.tickInterval,
-		ElectionTick:      m.electionTick,
+		NodeID:            server.id,
+		RaftPath:          server.walDir,
+		NumOfLogsToRetain: server.retainLogs,
+		HeartbeatPort:     int(server.config.heartbeatPort),
+		ReplicaPort:       int(server.config.replicaPort),
+		TickInterval:      server.tickInterval,
+		ElectionTick:      server.electionTick,
 	}
-	if m.raftStore, err = raftstore.NewRaftStore(raftCfg); err != nil {
-		return fmt.Errorf("NewRaftStore failed! id[%v] walPath[%v] err: %v", m.id, m.walDir, err)
+	if server.raftStore, err = raftstore.NewRaftStore(raftCfg); err != nil {
+		return fmt.Errorf("NewRaftStore failed! id[%v] walPath[%v] err: %v", server.id, server.walDir, err)
 	}
 
-	klog.Infof("peers[%v],tickInterval[%v],electionTick[%v]\n", m.config.peers, m.tickInterval, m.electionTick)
-	m.fsm = newMetadataFsm(m.rocksDBStore, m.retainLogs, m.raftStore.RaftServer())
-	m.fsm.registerLeaderChangeHandler(m.handleLeaderChange)
-	m.fsm.registerPeerChangeHandler(m.handlePeerChange)
+	klog.Infof("peers[%v],tickInterval[%v],electionTick[%v]\n", server.config.peers, server.tickInterval, server.electionTick)
+	server.fsm = newMetadataFsm(server.rocksDBStore, server.retainLogs, server.raftStore.RaftServer())
+	server.fsm.registerLeaderChangeHandler(server.handleLeaderChange)
+	server.fsm.registerPeerChangeHandler(server.handlePeerChange)
 
 	// register the handlers for the interfaces defined in the Raft library
-	m.fsm.registerApplySnapshotHandler(m.handleApplySnapshot)
-	m.fsm.restore()
+	server.fsm.registerApplySnapshotHandler(server.handleApplySnapshot)
+	server.fsm.restore()
 	partitionCfg := &raftstore.PartitionConfig{
 		ID:      GroupID,
-		Peers:   m.config.peers,
-		Applied: m.fsm.applied,
-		SM:      m.fsm,
+		Peers:   server.config.peers,
+		Applied: server.fsm.applied,
+		SM:      server.fsm,
 	}
-	if m.partition, err = m.raftStore.CreatePartition(partitionCfg); err != nil {
-		return errors.Trace(err, "CreatePartition failed")
+	if server.partition, err = server.raftStore.CreatePartition(partitionCfg); err != nil {
+		return fmt.Errorf("CreatePartition failed err %v", err)
 	}
-	return
+
+	return nil
 }
 
-func (srv *Server) Start(cfg *config.Config) error {
+func (server *Server) Start(cfg *config.Config) error {
 
-	srv.rocksDBStore, err = raftstore.NewRocksDBStore(srv.storeDir, LRUCacheSize, WriteBufferSize)
+	var err error
+	server.rocksDBStore, err = raftstore.NewRocksDBStore(server.storeDir, LRUCacheSize, WriteBufferSize)
 	if err != nil {
 		klog.Errorf("NewRocksDBStore error: %v", err)
 		return err
 	}
 
-	if err = srv.createRaftServer(); err != nil {
+	if err = server.createRaftServer(); err != nil {
 		klog.Error(err)
 		return err
 	}
 
-	srv.cluster = newCluster(srv.clusterName, srv.leaderInfo, srv.fsm, srv.partition, srv.config)
-	srv.cluster.retainLogs = srv.retainLogs
-	srv.cluster.partition = srv.partition
-	srv.cluster.idAlloc.partition = srv.partition
-	srv.cluster.scheduleTask()
-	srv.startHTTPService()
+	server.cluster = NewCluster(server.clusterName, server.leaderInfo, server.fsm, server.partition, server.config)
+	server.cluster.retainLogs = server.retainLogs
+	server.cluster.partition = server.partition
+	server.cluster.idAlloc.partition = server.partition
+	server.cluster.scheduleTask()
+	server.startHTTPService()
 
-	srv.wg.Add(1)
+	server.wg.Add(1)
 	return nil
 }
 
-func (srv *Server) Shutdown() {
-	srv.wg.Done()
+func (server *Server) Shutdown() {
+	server.wg.Done()
 }
 
-func (srv *Server) Sync() {
-	srv.wg.Wait()
+func (server *Server) Sync() {
+	server.wg.Wait()
 }
 
 // NewServer creates a new server

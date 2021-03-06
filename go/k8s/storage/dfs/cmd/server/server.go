@@ -71,8 +71,7 @@ func main() {
 	case RoleMeta:
 		srv = metadata.NewServer()
 	case RoleMaster:
-		sr := master.NewServer()
-		srv = sr
+		srv = master.NewServer()
 	default:
 		klog.Errorf("Fatal: role mismatch: %v", role)
 		os.Exit(1)
@@ -93,10 +92,10 @@ func main() {
 func interceptSignal(s server.Server) {
 	sigC := make(chan os.Signal, 1)
 	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
-	syslog.Println("action[interceptSignal] register system signal.")
+	klog.Infof("action[interceptSignal] register system signal.")
 	go func() {
 		sig := <-sigC
-		syslog.Printf("action[interceptSignal] received signal: %s.", sig.String())
+		klog.Infof("action[interceptSignal] received signal: %s.", sig.String())
 		s.Shutdown()
 	}()
 }
