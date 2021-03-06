@@ -6,6 +6,7 @@ require (
 	bou.ke/monkey v1.0.2
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/Azure/go-autorest/autorest v0.11.15 // indirect
+	github.com/BurntSushi/toml v0.3.1
 	github.com/Shopify/sarama v1.19.0
 	github.com/astaxie/beego v1.12.1
 	github.com/aws/aws-sdk-go v1.28.2
@@ -32,6 +33,7 @@ require (
 	github.com/google/btree v1.0.0
 	github.com/google/go-querystring v1.0.0
 	github.com/google/uuid v1.1.1
+	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/jacobsa/fuse v0.0.0-20201216155545-e0296dec955f
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
@@ -68,6 +70,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
 	github.com/stretchr/testify v1.5.1
+	github.com/syndtr/goleveldb v0.0.0-20181127023241-353a9fca669c
 	github.com/tecbot/gorocksdb v0.0.0-20191217155057-f0fad39f321c
 	github.com/tidwall/evio v1.0.2
 	github.com/tiglabs/raft v0.0.0-20200304095606-b25a44ad8b33
