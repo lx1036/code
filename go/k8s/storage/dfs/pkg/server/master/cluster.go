@@ -117,7 +117,7 @@ type Cluster struct {
 	createVolMutex      sync.RWMutex // create volume mutex
 
 	DisableAutoAllocate bool
-	fsm                 *MetadataFsm
+	fsm                 *raftstore.FilesystemStateMachine
 	partition           raftstore.Partition
 }
 

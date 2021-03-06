@@ -47,7 +47,7 @@ type Server struct {
 	cluster      *Cluster
 	rocksDBStore *raftstore.RocksDBStore
 	raftStore    raftstore.RaftStore
-	fsm          *MetadataFsm
+	fsm          *raftstore.FilesystemStateMachine
 	partition    raftstore.Partition
 	wg           sync.WaitGroup
 	reverseProxy *httputil.ReverseProxy
@@ -70,17 +70,16 @@ func (server *Server) createRaftServer() error {
 	}
 
 	klog.Infof("peers[%v],tickInterval[%v],electionTick[%v]\n", server.config.peers, server.tickInterval, server.electionTick)
-	server.fsm = newMetadataFsm(server.rocksDBStore, server.retainLogs, server.raftStore.RaftServer())
-	server.fsm.registerLeaderChangeHandler(server.handleLeaderChange)
-	server.fsm.registerPeerChangeHandler(server.handlePeerChange)
-
+	server.fsm = raftstore.NewFilesystemStateMachine(server.rocksDBStore, server.retainLogs, server.raftStore.RaftServer())
+	//server.fsm.registerLeaderChangeHandler(server.handleLeaderChange)
+	//server.fsm.registerPeerChangeHandler(server.handlePeerChange)
 	// register the handlers for the interfaces defined in the Raft library
-	server.fsm.registerApplySnapshotHandler(server.handleApplySnapshot)
-	server.fsm.restore()
+	//server.fsm.registerApplySnapshotHandler(server.handleApplySnapshot)
+	server.fsm.Restore()
 	partitionCfg := &raftstore.PartitionConfig{
 		ID:      GroupID,
 		Peers:   server.config.peers,
-		Applied: server.fsm.applied,
+		Applied: server.fsm.GetApply(),
 		SM:      server.fsm,
 	}
 	if server.partition, err = server.raftStore.CreatePartition(partitionCfg); err != nil {

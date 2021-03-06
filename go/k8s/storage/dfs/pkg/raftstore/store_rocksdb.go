@@ -41,6 +41,106 @@ func (rs *RocksDBStore) Get(key interface{}) (result interface{}, err error) {
 	return rs.db.GetBytes(ro, []byte(key.(string)))
 }
 
+// Put adds a new key-value pair to the RocksDB.
+func (rs *RocksDBStore) Put(key, value interface{}, isSync bool) (result interface{}, err error) {
+	wo := gorocksdb.NewDefaultWriteOptions()
+	wb := gorocksdb.NewWriteBatch()
+	wo.SetSync(isSync)
+	defer func() {
+		wo.Destroy()
+		wb.Destroy()
+	}()
+	wb.Put([]byte(key.(string)), value.([]byte))
+	if err := rs.db.Write(wo, wb); err != nil {
+		return nil, err
+	}
+	result = value
+	return result, nil
+}
+
+// Del deletes a key-value pair.
+func (rs *RocksDBStore) Del(key interface{}, isSync bool) (result interface{}, err error) {
+	ro := gorocksdb.NewDefaultReadOptions()
+	wo := gorocksdb.NewDefaultWriteOptions()
+	wb := gorocksdb.NewWriteBatch()
+	wo.SetSync(isSync)
+	defer func() {
+		wo.Destroy()
+		ro.Destroy()
+		wb.Destroy()
+	}()
+	slice, err := rs.db.Get(ro, []byte(key.(string)))
+	if err != nil {
+		return
+	}
+	result = slice.Data()
+	err = rs.db.Delete(wo, []byte(key.(string)))
+	return
+}
+
+// DeleteKeyAndPutIndex deletes the key-value pair based on the given key and put other keys in the cmdMap to RocksDB.
+// TODO explain
+func (rs *RocksDBStore) DeleteKeyAndPutIndex(key string, cmdMap map[string][]byte, isSync bool) error {
+	wo := gorocksdb.NewDefaultWriteOptions()
+	wo.SetSync(isSync)
+	wb := gorocksdb.NewWriteBatch()
+	defer func() {
+		wo.Destroy()
+		wb.Destroy()
+	}()
+	wb.Delete([]byte(key))
+	for otherKey, value := range cmdMap {
+		if otherKey == key {
+			continue
+		}
+		wb.Put([]byte(otherKey), value)
+	}
+
+	if err := rs.db.Write(wo, wb); err != nil {
+		err = fmt.Errorf("action[deleteFromRocksDB],err:%v", err)
+		return err
+	}
+	return nil
+}
+
+// BatchPut puts the key-value pairs in batch.
+func (rs *RocksDBStore) BatchPut(cmdMap map[string][]byte, isSync bool) error {
+	wo := gorocksdb.NewDefaultWriteOptions()
+	wo.SetSync(isSync)
+	wb := gorocksdb.NewWriteBatch()
+	defer func() {
+		wo.Destroy()
+		wb.Destroy()
+	}()
+	for key, value := range cmdMap {
+		wb.Put([]byte(key), value)
+	}
+	if err := rs.db.Write(wo, wb); err != nil {
+		err = fmt.Errorf("action[batchPutToRocksDB],err:%v", err)
+		return err
+	}
+	return nil
+}
+
+// ReleaseSnapshot releases the snapshot and its resources.
+func (rs *RocksDBStore) ReleaseSnapshot(snapshot *gorocksdb.Snapshot) {
+	rs.db.ReleaseSnapshot(snapshot)
+}
+
+// RocksDBSnapshot returns the RocksDB snapshot.
+func (rs *RocksDBStore) RocksDBSnapshot() *gorocksdb.Snapshot {
+	return rs.db.NewSnapshot()
+}
+
+// Iterator returns the iterator of the snapshot.
+func (rs *RocksDBStore) Iterator(snapshot *gorocksdb.Snapshot) *gorocksdb.Iterator {
+	ro := gorocksdb.NewDefaultReadOptions()
+	ro.SetFillCache(false)
+	ro.SetSnapshot(snapshot)
+
+	return rs.db.NewIterator(ro)
+}
+
 // NewRocksDBStore returns a new RocksDB instance.
 func NewRocksDBStore(dir string, lruCacheSize, writeBufferSize int) (store *RocksDBStore,
 	err error) {

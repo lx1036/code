@@ -22,7 +22,7 @@ func (server *Server) startHTTPService() {
 }
 
 func (server *Server) handleFunctions() {
-	http.HandleFunc(proto.AdminGetIP, server.getIPAddr)
+	//http.HandleFunc(proto.AdminGetIP, server.getIPAddr)
 	http.Handle(proto.AdminGetCluster, server.handlerWithInterceptor())
 	http.Handle(proto.AdminGetVolMountClient, server.handlerWithInterceptor())
 	http.Handle(proto.AdminCreateVol, server.handlerWithInterceptor())
@@ -78,15 +78,15 @@ func (server *Server) handlerWithInterceptor() http.Handler {
 func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	klog.Infof("URL[%v],remoteAddr[%v]", r.URL, r.RemoteAddr)
 	switch r.URL.Path {
-	case proto.AdminGetCluster:
+	/*case proto.AdminGetCluster:
 		server.getCluster(w, r)
 	case proto.AdminGetVolMountClient:
 		server.getVolMountClient(w, r)
 	case proto.AdminCreateVol:
-		server.createVol(w, r)
+		server.createVol(w, r)*/
 	case proto.AdminGetVol:
 		server.getVolSimpleInfo(w, r)
-	case proto.AdminDeleteVol:
+	/*case proto.AdminDeleteVol:
 		server.markDeleteVol(w, r)
 	case proto.AdminUpdateVol:
 		server.updateVol(w, r)
@@ -131,7 +131,7 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case proto.AdminSetMetaNodeThreshold:
 		server.setMetaNodeThreshold(w, r)
 	case proto.GetTopologyView:
-		server.getTopology(w, r)
+		server.getTopology(w, r)*/
 	default:
 		http.Error(w, fmt.Sprintf("unsupported url %s", r.URL.String()), http.StatusBadRequest)
 	}

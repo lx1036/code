@@ -3,10 +3,8 @@ package raftstore
 import (
 	"github.com/tiglabs/raft"
 	"github.com/tiglabs/raft/proto"
+	"os"
 )
-
-// PartitionStatus is a type alias of raft.Status
-type PartitionStatus = raft.Status
 
 // PartitionFsm wraps necessary methods include both FSM implementation
 // and data storage operation for raft store partition.
@@ -34,7 +32,7 @@ type Partition interface {
 	Delete() error
 
 	// Status returns the current raft status.
-	Status() (status *PartitionStatus)
+	Status() (status *raft.Status)
 
 	// LeaderTerm returns the current term of leader in the raft group. TODO what is term?
 	LeaderTerm() (leaderID, term uint64)
@@ -76,52 +74,83 @@ func (p *partition) Submit(cmd []byte) (resp interface{}, err error) {
 	return p.raft.Submit(p.id, cmd).Response()
 }
 
-func (p partition) ChangeMember(changeType proto.ConfChangeType, peer proto.Peer, context []byte) (resp interface{}, err error) {
-	panic("implement me")
+// ChaneMember submits member change event and information to raft log.
+func (p *partition) ChangeMember(changeType proto.ConfChangeType, peer proto.Peer, context []byte) (interface{}, error) {
+	if !p.IsRaftLeader() {
+		return nil, raft.ErrNotLeader
+	}
+
+	return p.raft.ChangeMember(p.id, changeType, peer, context).Response()
 }
 
-func (p partition) Stop() error {
-	panic("implement me")
+// Stop removes the raft partition from raft server and shuts down this partition.
+func (p *partition) Stop() error {
+	return p.raft.RemoveRaft(p.id)
 }
 
-func (p partition) Delete() error {
-	panic("implement me")
+// Delete stops and deletes the partition.
+func (p *partition) Delete() error {
+	if err := p.Stop(); err != nil {
+		return err
+	}
+
+	return os.RemoveAll(p.walPath)
 }
 
-func (p partition) Status() (status *PartitionStatus) {
-	panic("implement me")
+// Status returns the current raft status.
+func (p *partition) Status() (status *raft.Status) {
+	return p.raft.Status(p.id)
 }
 
-func (p partition) LeaderTerm() (leaderID, term uint64) {
-	panic("implement me")
+// LeaderTerm returns the current term of leader in the raft group.
+func (p *partition) LeaderTerm() (leader, term uint64) {
+	return p.raft.LeaderTerm(p.id)
 }
 
+// IsRaftLeader returns true if this node is the leader of the raft group it belongs to.
 func (p *partition) IsRaftLeader() bool {
 	return p.raft != nil && p.raft.IsLeader(p.id)
 }
 
-func (p partition) AppliedIndex() uint64 {
-	panic("implement me")
+// AppliedIndex returns the current index of the applied raft log in the raft store partition.
+func (p *partition) AppliedIndex() uint64 {
+	return p.raft.AppliedIndex(p.id)
 }
 
-func (p partition) CommittedIndex() uint64 {
-	panic("implement me")
+// CommittedIndex returns the current index of the committed raft log in the raft store partition.
+func (p *partition) CommittedIndex() uint64 {
+	return p.raft.CommittedIndex(p.id)
 }
 
-func (p partition) FirstCommittedIndex() uint64 {
-	panic("implement me")
+func (p *partition) FirstCommittedIndex() uint64 {
+	return p.raft.FirstCommittedIndex(p.id)
 }
 
-func (p partition) Truncate(index uint64) {
-	panic("implement me")
+// Truncate truncates the raft log
+func (p *partition) Truncate(index uint64) {
+	if p.raft != nil {
+		p.raft.Truncate(p.id, index)
+	}
 }
 
-func (p partition) TryToLeader(nodeID uint64) error {
-	panic("implement me")
+func (p *partition) TryToLeader(nodeID uint64) error {
+	_, err := p.raft.TryToLeader(nodeID).Response()
+
+	return err
 }
 
-func (p partition) IsOfflinePeer() bool {
-	panic("implement me")
+func (p *partition) IsOfflinePeer() bool {
+	status := p.Status()
+	active := 0
+	sumPeers := 0
+	for _, peer := range status.Replicas {
+		if peer.Active == true {
+			active++
+		}
+		sumPeers++
+	}
+
+	return active >= (int(sumPeers)/2 + 1)
 }
 
 func newPartition(cfg *PartitionConfig, raft *raft.RaftServer, walPath string) Partition {
