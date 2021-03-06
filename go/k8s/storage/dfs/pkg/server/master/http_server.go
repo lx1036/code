@@ -3,6 +3,7 @@ package master
 import (
 	"fmt"
 	"net/http"
+	"net/http/httputil"
 
 	"k8s-lx1036/k8s/storage/dfs/pkg/util/proto"
 
@@ -164,4 +165,11 @@ func (server *Server) getVolSimpleInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendOkReply(w, r, newSuccessHTTPReply(volView))
+}
+
+func (server *Server) newReverseProxy() *httputil.ReverseProxy {
+	return &httputil.ReverseProxy{Director: func(request *http.Request) {
+		request.URL.Scheme = "http"
+		request.URL.Host = server.leaderInfo.addr
+	}}
 }

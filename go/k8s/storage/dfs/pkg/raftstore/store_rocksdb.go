@@ -33,6 +33,14 @@ func (rs *RocksDBStore) Open(lruCacheSize, writeBufferSize int) error {
 	return nil
 }
 
+// Get returns the value based on the given key.
+func (rs *RocksDBStore) Get(key interface{}) (result interface{}, err error) {
+	ro := gorocksdb.NewDefaultReadOptions()
+	ro.SetFillCache(false)
+	defer ro.Destroy()
+	return rs.db.GetBytes(ro, []byte(key.(string)))
+}
+
 // NewRocksDBStore returns a new RocksDB instance.
 func NewRocksDBStore(dir string, lruCacheSize, writeBufferSize int) (store *RocksDBStore,
 	err error) {

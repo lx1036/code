@@ -83,6 +83,11 @@ const (
 	clientPrefix          = keySeparator + clientAcronym + keySeparator
 )
 
+const (
+	normal     uint8 = 0
+	markDelete uint8 = 1
+)
+
 // AddrDatabase is a map that stores the address of a given host (e.g., the leader)
 var AddrDatabase = make(map[uint64]string)
 
@@ -129,6 +134,10 @@ func (cluster *Cluster) scheduleToCheckHeartbeat() {
 			cluster.checkMetaNodeHeartbeat()
 		}
 	}, time.Second*defaultIntervalToCheckHeartbeat)
+}
+
+func (cluster *Cluster) masterAddr() (addr string) {
+	return cluster.leaderInfo.addr
 }
 
 func (cluster *Cluster) addMetaNode(nodeAddr string) (uint64, error) {
@@ -196,13 +205,48 @@ func (cluster *Cluster) checkMetaNodeHeartbeat() {
 	cluster.addMetaNodeTasks(tasks)
 }
 
+func (cluster *Cluster) scheduleToCheckMetaPartitions() {
+	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
+		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
+			cluster.checkMetaPartitions()
+		}
+	}, time.Second*defaultIntervalToCheckMetaPartition)
+}
+
+// Return all the volumes except the ones that have been marked to be deleted.
+func (cluster *Cluster) allVols() map[string]*Volume {
+	vols := make(map[string]*Volume, 0)
+	cluster.volMutex.RLock()
+	defer cluster.volMutex.RUnlock()
+	for name, vol := range cluster.vols {
+		if vol.Status == normal {
+			vols[name] = vol
+		}
+	}
+
+	return vols
+}
+
+func (cluster *Cluster) checkMetaPartitions() {
+	defer func() {
+		if r := recover(); r != nil {
+			klog.Warningf("checkMetaPartitions occurred panic,err[%v]", r)
+		}
+	}()
+
+	volumes := cluster.allVols()
+	for _, vol := range volumes {
+		vol.checkMetaPartitions(cluster)
+	}
+}
+
 func (cluster *Cluster) scheduleTask() {
 	cluster.scheduleToCheckHeartbeat()
 	cluster.scheduleToCheckMetaPartitions()
-	cluster.scheduleToUpdateStatInfo()
-	cluster.scheduleToCheckVolStatus()
-	cluster.scheduleToLoadMetaPartitions()
-	cluster.scheduleToCheckVolMountClients()
+	//cluster.scheduleToUpdateStatInfo()
+	//cluster.scheduleToCheckVolStatus()
+	//cluster.scheduleToLoadMetaPartitions()
+	//cluster.scheduleToCheckVolMountClients()
 }
 
 func (cluster *Cluster) getVolume(volName string) (*Volume, error) {

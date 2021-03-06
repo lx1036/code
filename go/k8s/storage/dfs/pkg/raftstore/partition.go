@@ -58,3 +58,77 @@ type Partition interface {
 
 	IsOfflinePeer() bool
 }
+
+// Default implementation of the Partition interface.
+type partition struct {
+	id      uint64
+	raft    *raft.RaftServer
+	walPath string
+	config  *PartitionConfig
+}
+
+// Submit submits command data to raft log.
+func (p *partition) Submit(cmd []byte) (resp interface{}, err error) {
+	if !p.IsRaftLeader() {
+		return nil, raft.ErrNotLeader
+	}
+
+	return p.raft.Submit(p.id, cmd).Response()
+}
+
+func (p partition) ChangeMember(changeType proto.ConfChangeType, peer proto.Peer, context []byte) (resp interface{}, err error) {
+	panic("implement me")
+}
+
+func (p partition) Stop() error {
+	panic("implement me")
+}
+
+func (p partition) Delete() error {
+	panic("implement me")
+}
+
+func (p partition) Status() (status *PartitionStatus) {
+	panic("implement me")
+}
+
+func (p partition) LeaderTerm() (leaderID, term uint64) {
+	panic("implement me")
+}
+
+func (p *partition) IsRaftLeader() bool {
+	return p.raft != nil && p.raft.IsLeader(p.id)
+}
+
+func (p partition) AppliedIndex() uint64 {
+	panic("implement me")
+}
+
+func (p partition) CommittedIndex() uint64 {
+	panic("implement me")
+}
+
+func (p partition) FirstCommittedIndex() uint64 {
+	panic("implement me")
+}
+
+func (p partition) Truncate(index uint64) {
+	panic("implement me")
+}
+
+func (p partition) TryToLeader(nodeID uint64) error {
+	panic("implement me")
+}
+
+func (p partition) IsOfflinePeer() bool {
+	panic("implement me")
+}
+
+func newPartition(cfg *PartitionConfig, raft *raft.RaftServer, walPath string) Partition {
+	return &partition{
+		id:      cfg.ID,
+		raft:    raft,
+		walPath: walPath,
+		config:  cfg,
+	}
+}

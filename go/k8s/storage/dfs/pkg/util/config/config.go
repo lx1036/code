@@ -36,6 +36,18 @@ func (c *Config) GetString(key string) string {
 	return ""
 }
 
+// GetFloat returns a float value for the config key.
+func (c *Config) GetFloat(key string) float64 {
+	x, present := c.data[key]
+	if !present {
+		return -1
+	}
+	if result, isFloat := x.(float64); isFloat {
+		return result
+	}
+	return 0
+}
+
 // GetStringWithDefault returns a default value if key not present
 func (c *Config) GetStringWithDefault(key string, defaultVal string) string {
 	x, present := c.data[key]
