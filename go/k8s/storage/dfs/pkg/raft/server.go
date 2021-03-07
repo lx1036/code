@@ -15,6 +15,9 @@ var (
 	fatalStopc = make(chan uint64)
 )
 
+// NoLeader is a placeholder nodeID used when there is no leader.
+const NoLeader uint64 = 0
+
 type RaftServer struct {
 	config *Config
 	ticker *time.Ticker
@@ -90,6 +93,38 @@ func (rs *RaftServer) sendHeartbeat() {
 	}
 }
 
+// ReadIndex read index
+func (rs *RaftServer) ReadIndex(id uint64) (future *Future) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+
+	raft, ok := rs.rafts[id]
+	future = newFuture()
+	if !ok {
+		future.respond(nil, ErrRaftNotExists)
+		return
+	}
+
+	raft.readIndex(future)
+	return
+}
+
+// Write 向 raft 状态机里提交 cmd
+func (rs *RaftServer) Submit(id uint64, cmd []byte) (future *Future) {
+	rs.mu.RLock()
+	raft, ok := rs.rafts[id]
+	rs.mu.RUnlock()
+
+	future = newFuture()
+	if !ok {
+		future.respond(nil, ErrRaftNotExists)
+		return
+	}
+
+	raft.propose(cmd, future)
+	return
+}
+
 // 创建 RaftServer.rafts
 func (rs *RaftServer) CreateRaft(raftConfig *RaftConfig) error {
 	var (
@@ -107,8 +142,7 @@ func (rs *RaftServer) CreateRaft(raftConfig *RaftConfig) error {
 		return err
 	}
 	if raft == nil {
-		err = errors.New("CreateRaft return nil, maybe occur panic.")
-		return err
+		return errors.New("CreateRaft return nil, maybe occur panic.")
 	}
 
 	rs.mu.Lock()
@@ -122,7 +156,18 @@ func (rs *RaftServer) CreateRaft(raftConfig *RaftConfig) error {
 	// 创建rafts实例
 	rs.rafts[raftConfig.ID] = raft
 	return nil
+}
 
+func (rs *RaftServer) LeaderTerm(id uint64) (leader, term uint64) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+
+	raft, ok := rs.rafts[id]
+	if ok {
+		return raft.leaderTerm()
+	}
+
+	return NoLeader, 0
 }
 
 func NewRaftServer(config *Config) (*RaftServer, error) {

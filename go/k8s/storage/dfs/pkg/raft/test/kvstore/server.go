@@ -9,11 +9,12 @@ import (
 	"path"
 	"time"
 
+	"k8s-lx1036/k8s/storage/dfs/pkg/raft"
+	"k8s-lx1036/k8s/storage/dfs/pkg/raft/proto"
+
 	"github.com/gorilla/mux"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-	"github.com/tiglabs/raft"
-	"github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/raft/storage/wal"
 	"k8s.io/klog/v2"
 )
@@ -204,6 +205,7 @@ func (s *Server) process(w http.ResponseWriter, op CmdType, key, value []byte) {
 		return
 	}
 
+	// 提交 cmd 到 raft propose channel
 	future := s.raftServer.Submit(DefaultClusterID, data)
 	respCh, errCh := future.AsyncResponse()
 	select {

@@ -35,6 +35,14 @@ func RunWorkerUtilStop(f func(), stopCh <-chan struct{}, handlers ...func(interf
 	}()
 }
 
+func RunWorker(f func(), handlers ...func(interface{})) {
+	go func() {
+		defer HandleCrash(handlers...)
+
+		f()
+	}()
+}
+
 func logPanic(r interface{}) {
 	callers := ""
 	for i := 0; true; i++ {

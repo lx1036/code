@@ -26,6 +26,18 @@ const (
 	RespCheckQuorum
 )
 
+const (
+	ConfAddNode    ConfChangeType = 0
+	ConfRemoveNode ConfChangeType = 1
+	ConfUpdateNode ConfChangeType = 2
+
+	EntryNormal     EntryType = 0
+	EntryConfChange EntryType = 1
+
+	PeerNormal  PeerType = 0
+	PeerArbiter PeerType = 1
+)
+
 // Entry is the repl log entry.
 type Entry struct {
 	Type  EntryType

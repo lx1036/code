@@ -9,6 +9,20 @@ import (
 	"k8s-lx1036/k8s/storage/dfs/pkg/raft/util"
 )
 
+type proposal struct {
+	cmdType proto.EntryType
+	future  *Future
+	data    []byte
+}
+
+type apply struct {
+	term        uint64
+	index       uint64
+	future      *Future
+	command     interface{}
+	readIndexes []*Future
+}
+
 type softState struct {
 	leader uint64
 	term   uint64
@@ -113,6 +127,49 @@ func (r *Raft) doStop() {
 	default:
 		close(r.stopc)
 		r.restoringSnapshot.Set(false)
+	}
+}
+
+// Read
+func (r *Raft) readIndex(future *Future) {
+	if !r.isLeader() {
+		future.respond(nil, ErrNotLeader)
+		return
+	}
+
+	select {
+	case <-r.stopc:
+		future.respond(nil, ErrStopped)
+	case r.readIndexC <- future: // 写给 readIndexC channel
+	}
+}
+
+// Write 提交个 propose 到 propose channel
+func (r *Raft) propose(cmd []byte, future *Future) {
+	if !r.isLeader() {
+		future.respond(nil, ErrNotLeader)
+		return
+	}
+
+	pr := pool.getProposal()
+	pr.cmdType = proto.EntryNormal
+	pr.data = cmd
+	pr.future = future
+
+	select {
+	case <-r.stopc:
+		future.respond(nil, ErrStopped)
+	case r.propc <- pr: // 向 propose channel 里提交 cmd，会在 run() 函数里读 propose channel 数据
+	}
+}
+
+func (r *Raft) run() {
+
+	for {
+		select {
+		case propose := <-r.propc: // 读取 cmd 然后处理数据
+
+		}
 	}
 }
 

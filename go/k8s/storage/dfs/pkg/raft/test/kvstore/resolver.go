@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/tiglabs/raft"
+	"k8s-lx1036/k8s/storage/dfs/pkg/raft"
 )
 
 // ClusterResolver implement raft Resolver
