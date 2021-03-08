@@ -1,6 +1,8 @@
 package raft
 
-import "github.com/tiglabs/raft/proto"
+import (
+	"k8s-lx1036/k8s/storage/dfs/pkg/raft/proto"
+)
 
 // The StateMachine interface is supplied by the application to persist/snapshot data of application.
 type StateMachine interface {

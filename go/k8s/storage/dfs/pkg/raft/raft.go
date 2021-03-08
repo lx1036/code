@@ -168,7 +168,36 @@ func (r *Raft) run() {
 	for {
 		select {
 		case propose := <-r.propc: // 读取 cmd 然后处理数据
+			if r.raftFsm.leader != r.config.NodeID {
+				propose.future.respond(nil, ErrNotLeader)
+				pool.returnProposal(propose)
+				break
+			}
 
+			msg := proto.GetMessage()
+			msg.Type = proto.LocalMsgProp
+			msg.From = r.config.NodeID
+			starti := r.raftFsm.raftLog.lastIndex() + 1
+			r.pending[starti] = propose.future
+			msg.Entries = append(msg.Entries, &proto.Entry{Term: r.raftFsm.term, Index: starti, Type: propose.cmdType, Data: propose.data})
+			pool.returnProposal(propose)
+
+			flag := false
+			for i := 1; i < 64; i++ {
+				starti = starti + 1
+				select {
+				case pr := <-r.propc:
+					r.pending[starti] = pr.future
+					msg.Entries = append(msg.Entries, &proto.Entry{Term: r.raftFsm.term, Index: starti, Type: pr.cmdType, Data: pr.data})
+					pool.returnProposal(pr)
+				default:
+					flag = true
+				}
+				if flag {
+					break
+				}
+			}
+			r.raftFsm.Step(msg)
 		}
 	}
 }

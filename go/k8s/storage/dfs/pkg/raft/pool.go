@@ -16,6 +16,12 @@ func (f *poolFactory) getProposal() *proposal {
 	return p
 }
 
+func (f *poolFactory) returnProposal(p *proposal) {
+	if p != nil {
+		f.proposalPool.Put(p)
+	}
+}
+
 func newPoolFactory() *poolFactory {
 	return &poolFactory{
 		applyPool: &sync.Pool{

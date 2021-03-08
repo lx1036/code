@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"runtime"
 
+	"k8s-lx1036/k8s/storage/dfs/pkg/raft/proto"
+
 	"github.com/tiglabs/raft"
-	"github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/raft/util"
 	"k8s.io/klog/v2"
 )
@@ -17,6 +18,8 @@ type fsm interface {
 
 // This storage is circular storage in memory and truncate when over capacity,
 // but keep it a high capacity.
+
+// TODO: MemoryStorage 是内存版本的 Storage, 持久化磁盘版本 Storage 后续实现
 type MemoryStorage struct {
 	fsm fsm
 	id  uint64
@@ -34,6 +37,9 @@ type MemoryStorage struct {
 	// ents[i] has raft log position i+snapshot.Metadata.Index
 	ents      []*proto.Entry
 	hardState proto.HardState
+}
+
+func (ms *MemoryStorage) Close() {
 }
 
 func (ms *MemoryStorage) InitialState() (proto.HardState, error) {

@@ -8,6 +8,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// TODO raftFsm 是一个 state machine 么？
 type raftFsm struct {
 	id               uint64
 	term             uint64

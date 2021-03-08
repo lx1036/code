@@ -71,28 +71,28 @@ type Server struct {
 	leader uint64
 }
 
-func (s *Server) initLeveldb() {
-	dbPath := path.Join(s.cfg.ServerCfg.DataPath, "db")
+func (server *Server) initLeveldb() {
+	dbPath := path.Join(server.cfg.ServerCfg.DataPath, "db")
 	db, err := leveldb.OpenFile(dbPath, &opt.Options{})
 	if err != nil {
 		klog.Fatalf("init leveldb failed: %v, path: %v", err, dbPath)
 	}
-	s.db = db
+	server.db = db
 	klog.Infof("init leveldb sucessfully. path: %v", dbPath)
 }
 
-func (s *Server) startHTTPServer() {
+func (server *Server) startHTTPServer() {
 	router := mux.NewRouter()
-	router.HandleFunc("/kvs/{key}", s.Get).Methods("GET")
-	router.HandleFunc("/kvs/{key}", s.Put).Methods("PUT")
-	router.HandleFunc("/kvs/{key}", s.Delete).Methods("DELETE")
+	router.HandleFunc("/kvs/{key}", server.Get).Methods("GET")
+	router.HandleFunc("/kvs/{key}", server.Put).Methods("PUT")
+	router.HandleFunc("/kvs/{key}", server.Delete).Methods("DELETE")
 
-	addr := fmt.Sprintf(":%d", s.node.HTTPPort)
-	s.hs = &http.Server{
+	addr := fmt.Sprintf(":%d", server.node.HTTPPort)
+	server.hs = &http.Server{
 		Addr:    addr,
 		Handler: router,
 	}
-	err := s.hs.ListenAndServe()
+	err := server.hs.ListenAndServe()
 	if err != nil {
 		klog.Fatalf("listen http on %v failed: %v", addr, err)
 	}
@@ -101,7 +101,7 @@ func (s *Server) startHTTPServer() {
 }
 
 // Get get a key
-func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
+func (server *Server) Get(w http.ResponseWriter, r *http.Request) {
 	key := mux.Vars(r)["key"]
 
 	if err := r.ParseForm(); err != nil {
@@ -113,13 +113,13 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 	klog.Infof("[Get]level %s", level)
 	switch level {
 	case "log":
-		s.process(w, CmdQuorumGet, []byte(key), nil)
+		server.process(w, CmdQuorumGet, []byte(key), nil)
 		return
 	case "index":
-		s.getByReadIndex(w, key)
+		server.getByReadIndex(w, key)
 		return
 	default:
-		value, err := s.db.Get([]byte(key), nil)
+		value, err := server.db.Get([]byte(key), nil)
 		if err == leveldb.ErrNotFound {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
@@ -129,20 +129,20 @@ func (s *Server) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // Put put
-func (s *Server) Put(w http.ResponseWriter, r *http.Request) {
+func (server *Server) Put(w http.ResponseWriter, r *http.Request) {
 	key := mux.Vars(r)["key"]
 	buf, _ := ioutil.ReadAll(r.Body)
-	s.process(w, CmdPut, []byte(key), buf)
+	server.process(w, CmdPut, []byte(key), buf)
 }
 
 // Delete delete a key
-func (s *Server) Delete(w http.ResponseWriter, r *http.Request) {
+func (server *Server) Delete(w http.ResponseWriter, r *http.Request) {
 	key := mux.Vars(r)["key"]
-	s.process(w, CmdDelete, []byte(key), nil)
+	server.process(w, CmdDelete, []byte(key), nil)
 }
 
-func (s *Server) getByReadIndex(w http.ResponseWriter, key string) {
-	future := s.raftServer.ReadIndex(DefaultClusterID)
+func (server *Server) getByReadIndex(w http.ResponseWriter, key string) {
+	future := server.raftServer.ReadIndex(DefaultClusterID)
 	respCh, errCh := future.AsyncResponse()
 	select {
 	case resp := <-respCh:
@@ -150,7 +150,7 @@ func (s *Server) getByReadIndex(w http.ResponseWriter, key string) {
 			klog.Errorf("process get %s failed: unexpected resp type: %T", key, resp)
 			return
 		}
-		value, err := s.db.Get([]byte(key), nil)
+		value, err := server.db.Get([]byte(key), nil)
 		if err == leveldb.ErrNotFound {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
@@ -160,7 +160,7 @@ func (s *Server) getByReadIndex(w http.ResponseWriter, key string) {
 	case err := <-errCh:
 		klog.Errorf("process get %s failed: %v", key, err)
 		if err == raft.ErrNotLeader {
-			s.replyNotLeader(w)
+			server.replyNotLeader(w)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
@@ -170,11 +170,11 @@ func (s *Server) getByReadIndex(w http.ResponseWriter, key string) {
 	}
 }
 
-func (s *Server) replyNotLeader(w http.ResponseWriter) {
-	leader, term := s.raftServer.LeaderTerm(DefaultClusterID)
+func (server *Server) replyNotLeader(w http.ResponseWriter) {
+	leader, term := server.raftServer.LeaderTerm(DefaultClusterID)
 	w.Header().Add("leader", fmt.Sprintf("%d", leader))
 	w.Header().Add("term", fmt.Sprintf("%d", term))
-	node := s.cfg.FindClusterNode(leader)
+	node := server.cfg.FindClusterNode(leader)
 	if node != nil {
 		w.Header().Add("leader-host", node.Host)
 		w.Header().Add("leader-addr", fmt.Sprintf("%s:%d", node.Host, node.HTTPPort))
@@ -185,7 +185,7 @@ func (s *Server) replyNotLeader(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusMovedPermanently)
 }
 
-func (s *Server) process(w http.ResponseWriter, op CmdType, key, value []byte) {
+func (server *Server) process(w http.ResponseWriter, op CmdType, key, value []byte) {
 	cmd := &Command{
 		OP:    op,
 		Key:   key,
@@ -193,8 +193,8 @@ func (s *Server) process(w http.ResponseWriter, op CmdType, key, value []byte) {
 	}
 	klog.Infof("start process command: %v", cmd)
 
-	if s.leader != s.nodeID {
-		s.replyNotLeader(w)
+	if server.leader != server.nodeID {
+		server.replyNotLeader(w)
 		return
 	}
 
@@ -206,7 +206,7 @@ func (s *Server) process(w http.ResponseWriter, op CmdType, key, value []byte) {
 	}
 
 	// 提交 cmd 到 raft propose channel
-	future := s.raftServer.Submit(DefaultClusterID, data)
+	future := server.raftServer.Submit(DefaultClusterID, data)
 	respCh, errCh := future.AsyncResponse()
 	select {
 	case resp := <-respCh:
@@ -224,7 +224,7 @@ func (s *Server) process(w http.ResponseWriter, op CmdType, key, value []byte) {
 			klog.Infof("process %v not found", cmd.String())
 			w.WriteHeader(http.StatusNotFound)
 		} else if err == raft.ErrNotLeader {
-			s.replyNotLeader(w)
+			server.replyNotLeader(w)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
@@ -235,7 +235,7 @@ func (s *Server) process(w http.ResponseWriter, op CmdType, key, value []byte) {
 }
 
 // Apply implement raft StateMachine Apply method
-func (s *Server) Apply(command []byte, index uint64) (interface{}, error) {
+func (server *Server) Apply(command []byte, index uint64) (interface{}, error) {
 	klog.Infof("apply command at index(%v): %v", index, string(command))
 
 	cmd := new(Command)
@@ -245,70 +245,71 @@ func (s *Server) Apply(command []byte, index uint64) (interface{}, error) {
 	}
 	switch cmd.OP {
 	case CmdQuorumGet:
-		return s.db.Get(cmd.Key, nil)
+		return server.db.Get(cmd.Key, nil)
 	case CmdPut:
-		return nil, s.db.Put(cmd.Key, cmd.Value, nil)
+		return nil, server.db.Put(cmd.Key, cmd.Value, nil)
 	case CmdDelete:
-		return nil, s.db.Delete(cmd.Key, nil)
+		return nil, server.db.Delete(cmd.Key, nil)
 	default:
 		return nil, fmt.Errorf("invalid cmd type: %v", cmd.OP)
 	}
 }
 
 // ApplyMemberChange implement raft.StateMachine
-func (s *Server) ApplyMemberChange(confChange *proto.ConfChange, index uint64) (interface{}, error) {
+func (server *Server) ApplyMemberChange(confChange *proto.ConfChange, index uint64) (interface{}, error) {
 	return nil, errors.New("not supported")
 }
 
 // Snapshot implement raft.StateMachine
-func (s *Server) Snapshot() (proto.Snapshot, error) {
+func (server *Server) Snapshot() (proto.Snapshot, error) {
 	return nil, errors.New("not supported")
 }
 
 // ApplySnapshot implement raft.StateMachine
-func (s *Server) ApplySnapshot(peers []proto.Peer, iter proto.SnapIterator) error {
+func (server *Server) ApplySnapshot(peers []proto.Peer, iter proto.SnapIterator) error {
 	return errors.New("not supported")
 }
 
 // HandleFatalEvent implement raft.StateMachine
-func (s *Server) HandleFatalEvent(err *raft.FatalError) {
+func (server *Server) HandleFatalEvent(err *raft.FatalError) {
 	klog.Fatalf("raft fatal error: %v", err)
 }
 
 // HandleLeaderChange implement raft.StateMachine
-func (s *Server) HandleLeaderChange(leader uint64) {
+func (server *Server) HandleLeaderChange(leader uint64) {
 	klog.Infof("raft leader change to %v", leader)
-	s.leader = leader
+	server.leader = leader
 }
 
-func (s *Server) startRaft() {
+func (server *Server) startRaft() {
 	// start raft server
 	serverConfig := raft.DefaultConfig()
-	serverConfig.NodeID = s.nodeID
-	serverConfig.Resolver = newClusterResolver(s.cfg)
+	serverConfig.NodeID = server.nodeID
+	serverConfig.Resolver = newClusterResolver(server.cfg)
 	serverConfig.TickInterval = time.Millisecond * 500
-	serverConfig.ReplicateAddr = fmt.Sprintf(":%d", s.node.ReplicatePort)
-	serverConfig.HeartbeatAddr = fmt.Sprintf(":%d", s.node.HeartbeatPort)
+	serverConfig.ReplicateAddr = fmt.Sprintf(":%d", server.node.ReplicatePort)
+	serverConfig.HeartbeatAddr = fmt.Sprintf(":%d", server.node.HeartbeatPort)
 	raftServer, err := raft.NewRaftServer(serverConfig)
 	if err != nil {
 		klog.Fatalf("start raft server failed: %v", err)
 	}
-	s.raftServer = raftServer
+	server.raftServer = raftServer
 	klog.Infof("raft server started.")
 
 	// create raft
-	walPath := path.Join(s.cfg.ServerCfg.DataPath, "wal")
+	walPath := path.Join(server.cfg.ServerCfg.DataPath, "wal")
 	// raftStore := storage.NewMemoryStorage(raftServer, 1, 8192)
 	raftStore, err := wal.NewStorage(walPath, &wal.Config{})
 	if err != nil {
 		klog.Fatalf("init raft log storage failed: %v", err)
 	}
 	rc := &raft.RaftConfig{
-		ID:           DefaultClusterID,
+		ID: DefaultClusterID,
+		// TODO 暂时使用 github.com/tiglabs/raft/storage/wal ，后续写个自己的wal库
 		Storage:      raftStore, // 后端存储，可以是boltdb, leveldb or memory
-		StateMachine: s,         // server 就是 state machine
+		StateMachine: server,    // server 就是 state machine
 	}
-	for _, node := range s.cfg.ClusterCfg.Nodes {
+	for _, node := range server.cfg.ClusterCfg.Nodes {
 		rc.Peers = append(rc.Peers, proto.Peer{
 			Type:   proto.PeerNormal,
 			ID:     node.NodeID,
@@ -316,7 +317,7 @@ func (s *Server) startRaft() {
 		})
 	}
 
-	err = s.raftServer.CreateRaft(rc)
+	err = server.raftServer.CreateRaft(rc)
 	if err != nil {
 		klog.Fatalf("create raft failed: %v", err)
 	}
@@ -324,18 +325,18 @@ func (s *Server) startRaft() {
 }
 
 // Run run server
-func (s *Server) Run() {
+func (server *Server) Run() {
 	// init store
-	s.initLeveldb()
+	server.initLeveldb()
 	// start raft
-	s.startRaft()
+	server.startRaft()
 	// start http server
-	s.startHTTPServer()
+	server.startHTTPServer()
 }
 
 // NewServer create kvs
 func NewServer(nodeID uint64, cfg *Config) *Server {
-	s := &Server{
+	server := &Server{
 		nodeID: nodeID,
 		cfg:    cfg,
 	}
@@ -343,6 +344,6 @@ func NewServer(nodeID uint64, cfg *Config) *Server {
 	if node == nil {
 		klog.Fatalf("could not find self node(%v) in cluster config: \n(%v)", nodeID, cfg.String())
 	}
-	s.node = node
-	return s
+	server.node = node
+	return server
 }
