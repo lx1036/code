@@ -1,4 +1,4 @@
-package raft
+package log_replication
 
 import (
 	"k8s-lx1036/k8s/storage/dfs/pkg/raft/proto"
@@ -12,26 +12,4 @@ type StateMachine interface {
 	ApplySnapshot(peers []proto.Peer, iter proto.SnapIterator) error
 	HandleFatalEvent(err *FatalError)
 	HandleLeaderChange(leader uint64)
-}
-
-// The SocketResolver interface is supplied by the application to resolve NodeID to net.Addr addresses.
-type SocketResolver interface {
-	NodeAddress(nodeID uint64, stype SocketType) (addr string, err error)
-}
-
-type SocketType byte
-
-const (
-	HeartBeat SocketType = 0
-	Replicate SocketType = 1
-)
-
-func (t SocketType) String() string {
-	switch t {
-	case 0:
-		return "HeartBeat"
-	case 1:
-		return "Replicate"
-	}
-	return "unkown"
 }

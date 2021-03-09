@@ -1,9 +1,11 @@
-package raft
+package log_replication
 
 import (
 	"fmt"
 	"math/rand"
 	"strings"
+
+	"k8s-lx1036/k8s/storage/dfs/pkg/raft/proto"
 
 	"k8s.io/klog/v2"
 )
@@ -21,22 +23,22 @@ type raftFsm struct {
 	randElectionTick int
 	// New configuration is ignored if there exists unapplied configuration.
 	pendingConf bool
-	state       fsmState
+	state       FsmState
 	sm          StateMachine
 	config      *Config
-	raftLog     *raftLog
+	raftLog     *RaftLog
 	rand        *rand.Rand
 	votes       map[uint64]bool
 	acks        map[uint64]bool
-	replicas    map[uint64]*replica
+	replicas    map[uint64]*Replica
 	readOnly    *readOnly
 	msgs        []*proto.Message
 	step        stepFunc
 	tick        func()
 }
 
-func newRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
-	raftlog, err := newRaftLog(raftConfig.Storage)
+func NewRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
+	raftlog, err := NewRaftLog(raftConfig.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -51,19 +53,19 @@ func newRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
 		config:   config,
 		leader:   NoLeader,
 		raftLog:  raftlog,
-		replicas: make(map[uint64]*replica),
+		replicas: make(map[uint64]*Replica),
 		readOnly: newReadOnly(raftConfig.ID, config.ReadOnlyOption),
 	}
 	r.rand = rand.New(rand.NewSource(int64(config.NodeID + r.id)))
 	for _, p := range raftConfig.Peers {
-		r.replicas[p.ID] = newReplica(p, 0)
+		r.replicas[p.ID] = NewReplica(p, 0)
 	}
 	if !hs.IsEmpty() {
-		if raftConfig.Applied > r.raftLog.lastIndex() {
-			raftConfig.Applied = r.raftLog.lastIndex()
+		if raftConfig.Applied > r.raftLog.LastIndex() {
+			raftConfig.Applied = r.raftLog.LastIndex()
 		}
-		if hs.Commit > r.raftLog.lastIndex() {
-			hs.Commit = r.raftLog.lastIndex()
+		if hs.Commit > r.raftLog.LastIndex() {
+			hs.Commit = r.raftLog.LastIndex()
 		}
 		if err := r.loadState(hs); err != nil {
 			return nil, err
@@ -73,7 +75,7 @@ func newRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
 	klog.Info("newRaft[%v] [commit: %d, applied: %d, lastindex: %d]", r.id, raftlog.committed, raftConfig.Applied, raftlog.lastIndex())
 
 	if raftConfig.Applied > 0 {
-		lasti := raftlog.lastIndex()
+		lasti := raftlog.LastIndex()
 		if lasti == 0 {
 			// If there is application data but no raft log, then restore to initial state.
 			raftlog.committed = 0

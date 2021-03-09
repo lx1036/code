@@ -1,4 +1,4 @@
-package log
+package log_replication
 
 import (
 	"errors"
@@ -20,14 +20,14 @@ var (
 
 // raftLog is responsible for the operation of the log.
 // raftLog 主要用来持久化 operation log
-type raftLog struct {
+type RaftLog struct {
 	unstable           unstable
 	storage            storage.Storage
 	committed, applied uint64
 }
 
 // 获取 raftlog 的 last index
-func (log *raftLog) lastIndex() uint64 {
+func (log *RaftLog) LastIndex() uint64 {
 	if i, ok := log.unstable.maybeLastIndex(); ok {
 		return i
 	}
@@ -40,9 +40,9 @@ func (log *raftLog) lastIndex() uint64 {
 	return i
 }
 
-func (log *raftLog) append(ents ...*proto.Entry) uint64 {
+func (log *RaftLog) append(ents ...*proto.Entry) uint64 {
 	if len(ents) == 0 {
-		return log.lastIndex()
+		return log.LastIndex()
 	}
 
 	if after := ents[0].Index - 1; after < log.committed {
@@ -54,18 +54,18 @@ func (log *raftLog) append(ents ...*proto.Entry) uint64 {
 	// unstable 存储还未提交到 Storage 的 entry
 	log.unstable.truncateAndAppend(ents)
 
-	return log.lastIndex()
+	return log.LastIndex()
 }
 
-func (log *raftLog) entries(i uint64, maxsize uint64) ([]*proto.Entry, error) {
-	if i > log.lastIndex() {
+func (log *RaftLog) entries(i uint64, maxsize uint64) ([]*proto.Entry, error) {
+	if i > log.LastIndex() {
 		return nil, nil
 	}
 
-	return log.slice(i, log.lastIndex()+1, maxsize)
+	return log.slice(i, log.LastIndex()+1, maxsize)
 }
 
-func (log *raftLog) firstIndex() uint64 {
+func (log *RaftLog) firstIndex() uint64 {
 	index, err := log.storage.FirstIndex()
 	if err != nil {
 		errMsg := fmt.Sprintf("[raftLog->firstIndex]get firstindex from storage err:[%v].", err)
@@ -76,7 +76,7 @@ func (log *raftLog) firstIndex() uint64 {
 }
 
 // log.firstIndex <= lo <= hi <= log.firstIndex + len(log.entries)
-func (log *raftLog) mustCheckOutOfBounds(lo, hi uint64) error {
+func (log *RaftLog) mustCheckOutOfBounds(lo, hi uint64) error {
 	if lo > hi {
 		errMsg := fmt.Sprintf("[raftLog->mustCheckOutOfBounds]invalid slice %d > %d", lo, hi)
 		klog.Error(errMsg)
@@ -86,7 +86,7 @@ func (log *raftLog) mustCheckOutOfBounds(lo, hi uint64) error {
 	if lo < fi {
 		return ErrCompacted
 	}
-	lastIndex := log.lastIndex()
+	lastIndex := log.LastIndex()
 	if hi > lastIndex+1 {
 		errMsg := fmt.Sprintf("[raftLog->mustCheckOutOfBounds]slice[%d,%d) out of bound [%d,%d]", lo, hi, fi, lastIndex)
 		klog.Error(errMsg)
@@ -96,7 +96,7 @@ func (log *raftLog) mustCheckOutOfBounds(lo, hi uint64) error {
 	return nil
 }
 
-func (log *raftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error) {
+func (log *RaftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error) {
 	if lo == hi {
 		return nil, nil
 	}
@@ -139,8 +139,8 @@ func (log *raftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error)
 	return limitSize(ents, maxSize), nil
 }
 
-func NewRaftLog(storage storage.Storage) (*raftLog, error) {
-	log := &raftLog{
+func NewRaftLog(storage storage.Storage) (*RaftLog, error) {
+	log := &RaftLog{
 		storage: storage,
 	}
 
