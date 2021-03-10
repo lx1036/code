@@ -14,10 +14,12 @@ require (
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
 	github.com/container-storage-interface/spec v1.3.0
-	github.com/containerd/containerd v1.3.3
+	github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
+	github.com/containerd/containerd v1.4.4
 	github.com/containernetworking/cni v0.8.0
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
 	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
@@ -28,6 +30,7 @@ require (
 	github.com/go-logr/logr v0.2.0
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.4.1
+	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/gogo/protobuf v1.3.1
 	github.com/gohouse/gorose/v2 v2.1.3
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
