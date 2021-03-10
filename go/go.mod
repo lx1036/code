@@ -19,6 +19,9 @@ require (
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/emicklei/go-restful v2.9.5+incompatible
+	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
+	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
+	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/getsentry/sentry-go v0.3.0
 	github.com/gin-gonic/gin v1.5.0
@@ -53,6 +56,7 @@ require (
 	github.com/olivere/elastic/v7 v7.0.9
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.1
+	github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
 	github.com/operator-framework/operator-sdk v0.17.1
 	github.com/patrickmn/go-cache v0.0.0-20180815053127-5633e0862627
 	github.com/pkg/errors v0.9.1
@@ -103,7 +107,6 @@ require (
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/component-base v0.19.7
 	k8s.io/component-helpers v0.20.2
-	k8s.io/csi-translation-lib v0.19.7 // indirect
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/kubelet v0.0.0
 	k8s.io/kubernetes v1.19.7

@@ -38,7 +38,6 @@ func IsCgroup2UnifiedMode() bool {
 		}
 		isUnified = st.Type == unix.CGROUP2_SUPER_MAGIC
 	})
-	
+
 	return isUnified
 }
-
