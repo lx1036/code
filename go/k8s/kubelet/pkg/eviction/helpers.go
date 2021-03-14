@@ -2,6 +2,7 @@ package eviction
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -10,7 +11,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 )
 
 const (
@@ -423,6 +426,17 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations, enfo
 	return results
 }
 
+// getReclaimableThreshold finds the threshold and resource to reclaim
+func getReclaimableThreshold(thresholds []Threshold) (Threshold, v1.ResourceName, bool) {
+	for _, thresholdToReclaim := range thresholds {
+		if resourceToReclaim, ok := signalToResource[thresholdToReclaim.Signal]; ok {
+			return thresholdToReclaim, resourceToReclaim, true
+		}
+		klog.V(3).Infof("eviction manager: threshold %s was crossed, but reclaim is not implemented for this threshold.", thresholdToReclaim.Signal)
+	}
+	return Threshold{}, "", false
+}
+
 // byEvictionPriority implements sort.Interface for []v1.ResourceName.
 type byEvictionPriority []Threshold
 
@@ -433,4 +447,144 @@ func (a byEvictionPriority) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a byEvictionPriority) Less(i, j int) bool {
 	_, jSignalHasResource := signalToResource[a[j].Signal]
 	return a[i].Signal == SignalMemoryAvailable || a[i].Signal == SignalAllocatableMemoryAvailable || !jSignalHasResource
+}
+
+// Cmp compares p1 and p2 and returns:
+//
+//   -1 if p1 <  p2
+//    0 if p1 == p2
+//   +1 if p1 >  p2
+//
+type cmpFunc func(p1, p2 *v1.Pod) int
+
+// multiSorter implements the Sort interface, sorting changes within.
+type multiSorter struct {
+	pods []*v1.Pod
+	cmp  []cmpFunc
+}
+
+// Sort sorts the argument slice according to the less functions passed to OrderedBy.
+func (ms *multiSorter) Sort(pods []*v1.Pod) {
+	ms.pods = pods
+	sort.Sort(ms)
+}
+
+// OrderedBy returns a Sorter that sorts using the cmp functions, in order.
+// Call its Sort method to sort the data.
+func orderedBy(cmp ...cmpFunc) *multiSorter {
+	return &multiSorter{
+		cmp: cmp,
+	}
+}
+
+// Len is part of sort.Interface.
+func (ms *multiSorter) Len() int {
+	return len(ms.pods)
+}
+
+// Swap is part of sort.Interface.
+func (ms *multiSorter) Swap(i, j int) {
+	ms.pods[i], ms.pods[j] = ms.pods[j], ms.pods[i]
+}
+
+// Less is part of sort.Interface.
+func (ms *multiSorter) Less(i, j int) bool {
+	p1, p2 := ms.pods[i], ms.pods[j]
+	var k int
+	for k = 0; k < len(ms.cmp)-1; k++ {
+		cmpResult := ms.cmp[k](p1, p2)
+		// p1 is less than p2
+		if cmpResult < 0 {
+			return true
+		}
+		// p1 is greater than p2
+		if cmpResult > 0 {
+			return false
+		}
+		// we don't know yet
+	}
+	// the last cmp func is the final decider
+	return ms.cmp[k](p1, p2) < 0
+}
+
+// priority compares pods by Priority, if priority is enabled.
+func priority(p1, p2 *v1.Pod) int {
+	priority1 := corev1helpers.PodPriority(p1)
+	priority2 := corev1helpers.PodPriority(p2)
+	if priority1 == priority2 {
+		return 0
+	}
+	if priority1 > priority2 {
+		return 1
+	}
+	return -1
+}
+
+// exceedMemoryRequests compares whether or not pods' memory usage exceeds their requests
+func exceedMemoryRequests(stats statsFunc) cmpFunc {
+	return func(p1, p2 *v1.Pod) int {
+		p1Stats, p1Found := stats(p1)
+		p2Stats, p2Found := stats(p2)
+		if !p1Found || !p2Found {
+			// prioritize evicting the pod for which no stats were found
+			return cmpBool(!p1Found, !p2Found)
+		}
+
+		p1Memory := memoryUsage(p1Stats.Memory)
+		p2Memory := memoryUsage(p2Stats.Memory)
+		p1ExceedsRequests := p1Memory.Cmp(v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)) == 1
+		p2ExceedsRequests := p2Memory.Cmp(v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)) == 1
+		// prioritize evicting the pod which exceeds its requests
+		return cmpBool(p1ExceedsRequests, p2ExceedsRequests)
+	}
+}
+
+// memory compares pods by largest consumer of memory relative to request.
+func memory(stats statsFunc) cmpFunc {
+	return func(p1, p2 *v1.Pod) int {
+		p1Stats, p1Found := stats(p1)
+		p2Stats, p2Found := stats(p2)
+		if !p1Found || !p2Found {
+			// prioritize evicting the pod for which no stats were found
+			return cmpBool(!p1Found, !p2Found)
+		}
+
+		// adjust p1, p2 usage relative to the request (if any)
+		p1Memory := memoryUsage(p1Stats.Memory)
+		p1Request := v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)
+		p1Memory.Sub(p1Request)
+
+		p2Memory := memoryUsage(p2Stats.Memory)
+		p2Request := v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)
+		p2Memory.Sub(p2Request)
+
+		// prioritize evicting the pod which has the larger consumption of memory
+		return p2Memory.Cmp(*p1Memory)
+	}
+}
+
+// exceedDiskRequests compares whether or not pods' disk usage exceeds their requests
+func exceedDiskRequests(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.ResourceName) cmpFunc {
+	return func(p1, p2 *v1.Pod) int {
+		p1Stats, p1Found := stats(p1)
+		p2Stats, p2Found := stats(p2)
+		if !p1Found || !p2Found {
+			// prioritize evicting the pod for which no stats were found
+			return cmpBool(!p1Found, !p2Found)
+		}
+
+		p1Usage, p1Err := podDiskUsage(p1Stats, p1, fsStatsToMeasure)
+		p2Usage, p2Err := podDiskUsage(p2Stats, p2, fsStatsToMeasure)
+		if p1Err != nil || p2Err != nil {
+			// prioritize evicting the pod which had an error getting stats
+			return cmpBool(p1Err != nil, p2Err != nil)
+		}
+
+		p1Disk := p1Usage[diskResource]
+		p2Disk := p2Usage[diskResource]
+		p1ExceedsRequests := p1Disk.Cmp(v1resource.GetResourceRequestQuantity(p1, diskResource)) == 1
+		p2ExceedsRequests := p2Disk.Cmp(v1resource.GetResourceRequestQuantity(p2, diskResource)) == 1
+		// prioritize evicting the pod which exceeds its requests
+		return cmpBool(p1ExceedsRequests, p2ExceedsRequests)
+	}
 }
