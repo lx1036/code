@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 
@@ -45,6 +46,20 @@ func init() {
 
 	fs.DurationVar(&c.EvictionPressureTransitionPeriod.Duration, "eviction-pressure-transition-period", c.EvictionPressureTransitionPeriod.Duration, "Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.")
 	c.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
+
+	fs.DurationVar(&c.VolumeStatsAggPeriod.Duration, "volume-stats-agg-period", c.VolumeStatsAggPeriod.Duration,
+		"Specifies interval for kubelet to calculate and cache the volume disk usage for all pods and volumes.  To disable volume calculations, set to 0.")
+	c.VolumeStatsAggPeriod = metav1.Duration{Duration: 1 * time.Minute}
+
+	fs.DurationVar(&c.ImageMinimumGCAge.Duration, "minimum-image-ttl-duration", c.ImageMinimumGCAge.Duration, "Minimum age for an unused image before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'.")
+	fs.Int32Var(&c.ImageGCHighThresholdPercent, "image-gc-high-threshold", c.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Values must be within the range [0, 100], To disable image garbage collection, set to 100. ")
+	fs.Int32Var(&c.ImageGCLowThresholdPercent, "image-gc-low-threshold", c.ImageGCLowThresholdPercent, "The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to. Values must be within the range [0, 100] and should not be larger than that of --image-gc-high-threshold.")
+	c.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
+	c.ImageGCHighThresholdPercent = 85
+	c.ImageGCLowThresholdPercent = 80
+
+	fs.StringVar(&c.PodSandboxImage, "pod-infra-container-image", c.PodSandboxImage, fmt.Sprintf("The image whose network/ipc namespaces containers in each pod will use. %s", "This docker-specific flag only works when container-runtime is set to docker."))
+	c.PodSandboxImage = "k8s.gcr.io/pause:3.2"
 
 	flag.Set("logtostderr", "true")
 	flag.Parse()

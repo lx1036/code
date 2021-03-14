@@ -1,6 +1,8 @@
 package eviction
 
 import (
+	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -87,3 +89,27 @@ type ThresholdValue struct {
 	// Percentage represents the usage percentage over the total resource that is evaluated against the specified operator.
 	Percentage float32
 }
+
+// KillPodFunc kills a pod.
+// The pod status is updated, and then it is killed with the specified grace period.
+// This function must block until either the pod is killed or an error is encountered.
+// Arguments:
+// pod - the pod to kill
+// status - the desired status to associate with the pod (i.e. why its killed)
+// gracePeriodOverride - the grace period override to use instead of what is on the pod spec
+type KillPodFunc func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error
+
+// ImageGC is responsible for performing garbage collection of unused images.
+type ImageGC interface {
+	// DeleteUnusedImages deletes unused images.
+	DeleteUnusedImages() error
+}
+
+// ContainerGC is responsible for performing garbage collection of unused containers.
+type ContainerGC interface {
+	// DeleteAllUnusedContainers deletes all unused containers, even those that belong to pods that are terminated, but not deleted.
+	DeleteAllUnusedContainers() error
+}
+
+// statsFunc returns the usage stats if known for an input pod.
+type statsFunc func(pod *v1.Pod) (statsapi.PodStats, bool)

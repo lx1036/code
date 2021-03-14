@@ -2,11 +2,15 @@ package eviction
 
 import (
 	"fmt"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"strconv"
 	"strings"
 	"time"
+
+	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/v1alpha1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -275,4 +279,158 @@ func parseThresholdStatement(signal Signal, val string) (*Threshold, error) {
 			Quantity: &quantity,
 		},
 	}, nil
+}
+
+// hasNodeCondition returns true if the node condition is in the input list
+func hasNodeCondition(inputs []v1.NodeConditionType, item v1.NodeConditionType) bool {
+	for _, input := range inputs {
+		if input == item {
+			return true
+		}
+	}
+	return false
+}
+
+// signalObservation is the observed resource usage
+type signalObservation struct {
+	// The resource capacity
+	capacity *resource.Quantity
+	// The available resource
+	available *resource.Quantity
+	// Time at which the observation was taken
+	time metav1.Time
+}
+
+// signalObservations maps a signal to an observed quantity
+type signalObservations map[Signal]signalObservation
+
+// makeSignalObservations derives observations using the specified summary provider.
+func makeSignalObservations(summary *statsapi.Summary) (signalObservations, statsFunc) {
+	// build an evaluation context for current eviction signals
+	result := signalObservations{}
+	if memory := summary.Node.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
+		result[SignalMemoryAvailable] = signalObservation{
+			available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
+			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
+			time:      memory.Time,
+		}
+	}
+
+	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
+		klog.Errorf("eviction manager: failed to construct signal: %q error: %v", SignalAllocatableMemoryAvailable, err)
+	} else {
+		if memory := allocatableContainer.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
+			result[SignalAllocatableMemoryAvailable] = signalObservation{
+				available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
+				capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
+				time:      memory.Time,
+			}
+		}
+	}
+
+	if nodeFs := summary.Node.Fs; nodeFs != nil {
+		if nodeFs.AvailableBytes != nil && nodeFs.CapacityBytes != nil {
+			result[SignalNodeFsAvailable] = signalObservation{
+				available: resource.NewQuantity(int64(*nodeFs.AvailableBytes), resource.BinarySI),
+				capacity:  resource.NewQuantity(int64(*nodeFs.CapacityBytes), resource.BinarySI),
+				time:      nodeFs.Time,
+			}
+		}
+		if nodeFs.InodesFree != nil && nodeFs.Inodes != nil {
+			result[SignalNodeFsInodesFree] = signalObservation{
+				available: resource.NewQuantity(int64(*nodeFs.InodesFree), resource.DecimalSI),
+				capacity:  resource.NewQuantity(int64(*nodeFs.Inodes), resource.DecimalSI),
+				time:      nodeFs.Time,
+			}
+		}
+	}
+
+	if summary.Node.Runtime != nil {
+		if imageFs := summary.Node.Runtime.ImageFs; imageFs != nil {
+			if imageFs.AvailableBytes != nil && imageFs.CapacityBytes != nil {
+				result[SignalImageFsAvailable] = signalObservation{
+					available: resource.NewQuantity(int64(*imageFs.AvailableBytes), resource.BinarySI),
+					capacity:  resource.NewQuantity(int64(*imageFs.CapacityBytes), resource.BinarySI),
+					time:      imageFs.Time,
+				}
+				if imageFs.InodesFree != nil && imageFs.Inodes != nil {
+					result[SignalImageFsInodesFree] = signalObservation{
+						available: resource.NewQuantity(int64(*imageFs.InodesFree), resource.DecimalSI),
+						capacity:  resource.NewQuantity(int64(*imageFs.Inodes), resource.DecimalSI),
+						time:      imageFs.Time,
+					}
+				}
+			}
+		}
+	}
+
+	if rlimit := summary.Node.Rlimit; rlimit != nil {
+		if rlimit.NumOfRunningProcesses != nil && rlimit.MaxPID != nil {
+			available := int64(*rlimit.MaxPID) - int64(*rlimit.NumOfRunningProcesses)
+			result[SignalPIDAvailable] = signalObservation{
+				available: resource.NewQuantity(available, resource.DecimalSI),
+				capacity:  resource.NewQuantity(int64(*rlimit.MaxPID), resource.DecimalSI),
+				time:      rlimit.Time,
+			}
+		}
+	}
+
+	// build the function to work against for pod stats
+	statsFunc := cachedStatsFunc(summary.Pods)
+	return result, statsFunc
+}
+
+// cachedStatsFunc returns a statsFunc based on the provided pod stats.
+func cachedStatsFunc(podStats []statsapi.PodStats) statsFunc {
+	uid2PodStats := map[string]statsapi.PodStats{}
+	for i := range podStats {
+		uid2PodStats[podStats[i].PodRef.UID] = podStats[i]
+	}
+	return func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		stats, found := uid2PodStats[string(pod.UID)]
+		return stats, found
+	}
+}
+
+// thresholdsMet returns the set of thresholds that were met independent of grace period
+// 比较实际观察值observations，和限定条件thresholds，判断是否有threshold满足条件了
+func thresholdsMet(thresholds []Threshold, observations signalObservations, enforceMinReclaim bool) []Threshold {
+	var results []Threshold
+	for i := range thresholds {
+		threshold := thresholds[i]
+		observed, found := observations[threshold.Signal]
+		if !found {
+			klog.Warningf("eviction manager: no observation found for eviction signal %v", threshold.Signal)
+			continue
+		}
+		// determine if we have met the specified threshold
+		thresholdMet := false
+		quantity := GetThresholdQuantity(threshold.Value, observed.capacity)
+		// if enforceMinReclaim is specified, we compare relative to value - minreclaim
+		if enforceMinReclaim && threshold.MinReclaim != nil {
+			quantity.Add(*GetThresholdQuantity(*threshold.MinReclaim, observed.capacity))
+		}
+		thresholdResult := quantity.Cmp(*observed.available)
+		switch threshold.Operator {
+		case OpLessThan:
+			thresholdMet = thresholdResult > 0
+		}
+		if thresholdMet {
+			results = append(results, threshold)
+		}
+	}
+
+	return results
+}
+
+// byEvictionPriority implements sort.Interface for []v1.ResourceName.
+type byEvictionPriority []Threshold
+
+func (a byEvictionPriority) Len() int      { return len(a) }
+func (a byEvictionPriority) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+
+// Less ranks memory before all other resources, and ranks thresholds with no resource to reclaim last
+func (a byEvictionPriority) Less(i, j int) bool {
+	_, jSignalHasResource := signalToResource[a[j].Signal]
+	return a[i].Signal == SignalMemoryAvailable || a[i].Signal == SignalAllocatableMemoryAvailable || !jSignalHasResource
 }
