@@ -28,3 +28,12 @@ type PodVolumeStats struct {
 	EphemeralVolumes  []stats.VolumeStats
 	PersistentVolumes []stats.VolumeStats
 }
+
+// getLatest returns the most recent PodVolumeStats from the cache
+func (s *volumeStatCalculator) GetLatest() (PodVolumeStats, bool) {
+	result := s.latest.Load()
+	if result == nil {
+		return PodVolumeStats{}, false
+	}
+	return result.(PodVolumeStats), true
+}

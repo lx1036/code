@@ -179,7 +179,7 @@ func NewMainKubelet(
 	}
 	klet.StatsProvider = stats.NewCRIStatsProvider(cAdvisorInterface)
 
-	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet.StatsProvider, kubeCfg.VolumeStatsAggPeriod.Duration)
+	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet.StatsProvider, time.Minute)
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
 	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 

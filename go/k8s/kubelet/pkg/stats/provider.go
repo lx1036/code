@@ -4,6 +4,8 @@ import (
 	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/v1alpha1"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor"
 	"k8s-lx1036/k8s/kubelet/pkg/server/stats"
+
+	internalapi "k8s.io/cri-api/pkg/apis"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
