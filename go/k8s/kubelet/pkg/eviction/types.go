@@ -134,3 +134,6 @@ type ContainerGC interface {
 
 // statsFunc returns the usage stats if known for an input pod.
 type statsFunc func(pod *v1.Pod) (statsapi.PodStats, bool)
+
+// ActivePodsFunc returns pods bound to the kubelet that are active (i.e. non-terminal state)
+type ActivePodsFunc func() []*v1.Pod
