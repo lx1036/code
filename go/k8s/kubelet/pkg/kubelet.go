@@ -2,26 +2,27 @@ package pkg
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/kubelet/pkg/images"
-	"k8s-lx1036/k8s/kubelet/pkg/stats"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/tools/record"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"time"
 
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor"
 	"k8s-lx1036/k8s/kubelet/pkg/eviction"
+	"k8s-lx1036/k8s/kubelet/pkg/images"
 	serverstats "k8s-lx1036/k8s/kubelet/pkg/server/stats"
+	"k8s-lx1036/k8s/kubelet/pkg/stats"
 	"k8s-lx1036/k8s/kubelet/pkg/util/queue"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/record"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 )
@@ -171,7 +172,14 @@ func NewMainKubelet(
 	}
 	klet.imageManager = imageManager
 
-	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration)
+	imageFsInfoProvider := cadvisor.NewImageFsInfoProvider("docker", "unix:///var/run/dockershim.sock")
+	cAdvisorInterface, err := cadvisor.New(imageFsInfoProvider, "/var/lib/kubelet", cgroupRoots, false)
+	if err != nil {
+		return nil, err
+	}
+	klet.StatsProvider = stats.NewCRIStatsProvider(cAdvisorInterface)
+
+	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet.StatsProvider, kubeCfg.VolumeStatsAggPeriod.Duration)
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
 	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 

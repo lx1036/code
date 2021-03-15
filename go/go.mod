@@ -1,6 +1,6 @@
 module k8s-lx1036
 
-go 1.14
+go 1.15
 
 require (
 	bou.ke/monkey v1.0.2
@@ -111,6 +111,7 @@ require (
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/component-base v0.19.7
 	k8s.io/component-helpers v0.20.2
+	k8s.io/cri-api v0.0.0
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/kubelet v0.0.0
 	k8s.io/kubernetes v1.19.7
