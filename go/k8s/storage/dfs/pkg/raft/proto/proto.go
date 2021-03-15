@@ -46,6 +46,11 @@ type Entry struct {
 	Data  []byte
 }
 
+// Entry codec
+func (e *Entry) Size() uint64 {
+	return entry_header + uint64(len(e.Data))
+}
+
 // Message is the transport message.
 type Message struct {
 	Type         MsgType
@@ -97,4 +102,10 @@ type HardState struct {
 	Term   uint64
 	Commit uint64
 	Vote   uint64
+}
+
+type ConfChange struct {
+	Type    ConfChangeType
+	Peer    Peer
+	Context []byte
 }

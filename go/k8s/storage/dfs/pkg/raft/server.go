@@ -18,6 +18,7 @@ var (
 // NoLeader is a placeholder nodeID used when there is no leader.
 const NoLeader uint64 = 0
 
+// RaftServer 只是一个包装Raft对象的类，关键是rafts属性
 type RaftServer struct {
 	config *Config
 	ticker *time.Ticker
@@ -27,6 +28,7 @@ type RaftServer struct {
 	rafts  map[uint64]*Raft
 }
 
+// raftServer.run 主要发送心跳来确认存活
 func (rs *RaftServer) run() {
 	ticks := 0
 	for {
