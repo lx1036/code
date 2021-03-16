@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	// http://swagger.qihoo.cloud/?url=https://raw.githubusercontent.com/wiki/Qihoo360/wayne/config/openapi.swagger.json#/deploy/UpgradeDeploymentParam
 	K8SUpgradeDeployment     = "http://localhost:8080/openapi/v1/gateway/action/upgrade_deployment"
 	K8SCheckDeploymentStatus = "http://localhost:8080/openapi/v1/gateway/action/get_deployment_status"
 )

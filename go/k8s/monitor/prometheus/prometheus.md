@@ -1,6 +1,5 @@
 # prometheus docs
 **[官方文档中文版](https://ryanyang.gitbook.io/prometheus/di-san-zhang-prometheus/storage)**
-**[prometheus 监控接入流程](http://wiki.so.corp.qihoo.net/pages/viewpage.action?pageId=13398570)**
 
 # Go client
 **[prometheus go-client](https://github.com/prometheus/client_golang)**
