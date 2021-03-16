@@ -109,3 +109,58 @@ type PodReference struct {
 	Namespace string `json:"namespace"`
 	UID       string `json:"uid"`
 }
+
+// VolumeStats contains data about Volume filesystem usage.
+type VolumeStats struct {
+	// Embedded FsStats
+	FsStats `json:",inline"`
+	// Name is the name given to the Volume
+	// +optional
+	Name string `json:"name,omitempty"`
+	// Reference to the PVC, if one exists
+	// +optional
+	PVCRef *PVCReference `json:"pvcRef,omitempty"`
+}
+
+// PVCReference contains enough information to describe the referenced PVC.
+type PVCReference struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+}
+
+// FsStats contains data about filesystem usage.
+type FsStats struct {
+	// The time at which these stats were updated.
+	Time metav1.Time `json:"time"`
+	// AvailableBytes represents the storage space available (bytes) for the filesystem.
+	// +optional
+	AvailableBytes *uint64 `json:"availableBytes,omitempty"`
+	// CapacityBytes represents the total capacity (bytes) of the filesystems underlying storage.
+	// +optional
+	CapacityBytes *uint64 `json:"capacityBytes,omitempty"`
+	// UsedBytes represents the bytes used for a specific task on the filesystem.
+	// This may differ from the total bytes used on the filesystem and may not equal CapacityBytes - AvailableBytes.
+	// e.g. For ContainerStats.Rootfs this is the bytes used by the container rootfs on the filesystem.
+	// +optional
+	UsedBytes *uint64 `json:"usedBytes,omitempty"`
+	// InodesFree represents the free inodes in the filesystem.
+	// +optional
+	InodesFree *uint64 `json:"inodesFree,omitempty"`
+	// Inodes represents the total inodes in the filesystem.
+	// +optional
+	Inodes *uint64 `json:"inodes,omitempty"`
+	// InodesUsed represents the inodes used by the filesystem
+	// This may not equal Inodes - InodesFree because this filesystem may share inodes with other "filesystems"
+	// e.g. For ContainerStats.Rootfs, this is the inodes used only by that container, and does not count inodes used by other containers.
+	InodesUsed *uint64 `json:"inodesUsed,omitempty"`
+}
+
+// RlimitStats are stats rlimit of OS.
+type RlimitStats struct {
+	Time metav1.Time `json:"time"`
+
+	// The max PID of OS.
+	MaxPID *int64 `json:"maxpid,omitempty"`
+	// The number of running process in the OS.
+	NumOfRunningProcesses *int64 `json:"curproc,omitempty"`
+}

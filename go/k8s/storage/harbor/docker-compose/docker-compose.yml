@@ -49,7 +49,6 @@ services:
     container_name: harbor-proxy
     volumes:
     - ./nginx/nginx.https.conf:/etc/nginx/nginx.conf
-    - ./nginx/ssl/so-qihoo-net/:/etc/nginx/ssl/
     ports:
     - 80:80
     - 443:443

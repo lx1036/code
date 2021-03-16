@@ -24,8 +24,6 @@ https://prometheus.io/
 
 部署须知
 监控数据请求的 path 必须是 /metrics，比如：http://10.202.129.195:80/metrics
-k8s 部署的项目，需要给 Deployment 添加标签 qihoo-pmonitor-port，value 是监控单独配置的端口号，用于服务发现，如下图：
-![qihoo-pmonitor-port](./imgs/qihoo-pmonitor-port.jpg)
 
 hulk 或者物理机器部署的项目，需提供各机房的 ip list，用于在 prometheus.yml 文件配置中直接写死。
 

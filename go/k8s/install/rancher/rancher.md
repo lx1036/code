@@ -70,7 +70,7 @@ brew install rke
 # If you intened to deploy Kubernetes in an air-gapped environment,
 # please consult the documentation on how to configure custom RKE images.
 nodes:
-  - address: p46282v.hulk.zzzc.qihoo.net
+  - address: 
     port: "22"
     internal_address: 10.174.224.180
     role:
@@ -86,7 +86,7 @@ nodes:
     ssh_cert_path: ""
     labels: {}
     taints: []
-  - address: p46284v.hulk.shbt.qihoo.net
+  - address: 
     port: "22"
     internal_address: 10.202.148.133
     role:
