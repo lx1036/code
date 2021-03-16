@@ -12,6 +12,9 @@ https://kubernetes.io/docs/tasks/administer-cluster/out-of-resource
 
 ### Pod QoS(Quality of Service)
 参考源码逻辑：https://github.com/kubernetes/kubernetes/blob/release-1.20/pkg/apis/core/v1/helper/qos/qos.go#L35-L102
+QoS 设计文档：https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/resource-qos.md :
+主要通过pod request/limit 来判定pod QoS: Guaranteed/Burstable/Best Effort
+
 
 **[k8s 应用优先级，驱逐，波动，动态资源调整](https://my.oschina.net/u/4330952/blog/3371457)**
 
@@ -22,6 +25,8 @@ https://kubernetes.io/docs/tasks/administer-cluster/out-of-resource
 | 是  | 否  |                     | Burstable | 只要有容器配置cpu/memory的request就行 |
 | 否  | 是  |   | Burstable/Guaranteed | 如果只是配置了limit，k8s会自动补充request，和limit值一样。所以，如果所有容器都配置了limit，则Guaranteed；只有部分容器配置limit，则是Burstable|
 | 否 | 否 |  | Best Effort |  所有容器都没配置request/limit | 
+
+
 
 
 ### Eviction Signals

@@ -8,7 +8,8 @@
 
 
 
-
+## cadvisor安装时所需mount目录
+* /proc: 
 
 
 
