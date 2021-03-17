@@ -1,0 +1,30 @@
+
+# https://kubernetes.io/zh/docs/reference/scheduling/config/
+# k8s.io/kube-scheduler/config/v1beta1/types.go
+
+apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: /Users/liuxiang/.kube/config
+leaderElection:
+  leaderElect: true
+  resourceName: sample-scheduler
+  resourceNamespace: kube-system
+profiles:
+  - schedulerName: sample-scheduler
+    plugins:
+      preFilter:
+        enabled:
+          - name: "sample-plugin"
+      filter:
+        enabled:
+          - name: "sample-plugin"
+      preBind:
+        enabled:
+          - name: "sample-plugin"
+    pluginConfig:
+      - name: "sample-plugin"
+        args:
+          favorite_color: "#326CE5"
+          favorite_number: 7
+          thanks_to: "lx1036"
