@@ -2,10 +2,9 @@ package cache
 
 import (
 	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
-	
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 )
 
 // Snapshot is a snapshot of cache NodeInfo and NodeTree order. The scheduler takes a
@@ -65,9 +64,7 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 		nodeInfo.SetNode(node)
 		nodeInfo.ImageStates = getNodeImageStates(node, imageExistenceMap)
 	}
-	
-	
-	
+
 	nodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithAffinityNodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithRequiredAntiAffinityNodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
@@ -80,22 +77,20 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 			havePodsWithRequiredAntiAffinityNodeInfoList = append(havePodsWithRequiredAntiAffinityNodeInfoList, v)
 		}
 	}
-	
-	
-	
+
 	s := NewEmptySnapshot()
 	s.nodeInfoMap = nodeInfoMap
 	s.nodeInfoList = nodeInfoList
 	s.havePodsWithAffinityNodeInfoList = havePodsWithAffinityNodeInfoList
 	s.havePodsWithRequiredAntiAffinityNodeInfoList = havePodsWithRequiredAntiAffinityNodeInfoList
-	
+
 	return s
 }
 
 // getNodeImageStates returns the given node's image states based on the given imageExistence map.
 func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String) map[string]*framework.ImageStateSummary {
 	imageStates := make(map[string]*framework.ImageStateSummary)
-	
+
 	for _, image := range node.Status.Images {
 		for _, name := range image.Names {
 			imageStates[name] = &framework.ImageStateSummary{
@@ -104,6 +99,6 @@ func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String)
 			}
 		}
 	}
-	
+
 	return imageStates
 }

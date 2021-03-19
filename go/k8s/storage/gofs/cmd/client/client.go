@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"syscall"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/client"
-	"k8s-lx1036/k8s/storage/dfs/pkg/util/config"
+	"k8s-lx1036/k8s/storage/gofs/pkg/client"
+	"k8s-lx1036/k8s/storage/gofs/pkg/util/config"
 
 	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseutil"

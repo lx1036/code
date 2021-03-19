@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
-	"k8s-lx1036/k8s/storage/dfs/pkg/util"
-	"k8s-lx1036/k8s/storage/dfs/pkg/util/config"
+	"k8s-lx1036/k8s/storage/gofs/pkg/raftstore"
+	"k8s-lx1036/k8s/storage/gofs/pkg/util"
+	"k8s-lx1036/k8s/storage/gofs/pkg/util/config"
 
 	"k8s.io/klog/v2"
 )

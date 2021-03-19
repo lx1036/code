@@ -2,50 +2,49 @@ package scheduler
 
 import (
 	"fmt"
-	
-	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
-	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
+
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/core"
-	
-	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
+	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
+
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	"k8s.io/kubernetes/pkg/scheduler/profile"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-
+	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
 
 // Configurator defines I/O, caching, and other functionality needed to
 // construct a new scheduler.
 type Configurator struct {
 	client clientset.Interface
-	
+
 	recorderFactory profile.RecorderFactory
-	
+
 	informerFactory informers.SharedInformerFactory
-	
+
 	podInformer coreinformers.PodInformer
-	
+
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
-	
+
 	schedulerCache internalcache.Cache
-	
+
 	// Disable pod preemption or not.
 	disablePreemption bool
-	
+
 	// Always check all predicates even if the middle of one predicate fails.
 	alwaysCheckAllPredicates bool
-	
+
 	// percentageOfNodesToScore specifies percentage of all nodes to score in each scheduling cycle.
 	percentageOfNodesToScore int32
-	
+
 	podInitialBackoffSeconds int64
-	
+
 	podMaxBackoffSeconds int64
-	
+
 	profiles          []schedulerapi.KubeSchedulerProfile
 	registry          frameworkruntime.Registry
 	nodeInfoSnapshot  *internalcache.Snapshot
@@ -61,7 +60,7 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 	if !exist {
 		return nil, fmt.Errorf("algorithm provider %q is not registered", providerName)
 	}
-	
+
 	for i := range c.profiles {
 		prof := &c.profiles[i]
 		plugins := &config.Plugins{}
@@ -69,14 +68,13 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 		plugins.Apply(prof.Plugins)
 		prof.Plugins = plugins
 	}
-	
+
 	return c.create()
 }
 
 // create a scheduler from a set of registered plugins.
 func (c *Configurator) create() (*Scheduler, error) {
-	
-	
+
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
 		c.nodeInfoSnapshot,
@@ -85,7 +83,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
 	)
-	
+
 	return &Scheduler{
 		SchedulerCache:  c.schedulerCache,
 		Algorithm:       algo,

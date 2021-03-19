@@ -3,7 +3,7 @@ package log_replication
 import (
 	"time"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/raft/proto"
+	"k8s-lx1036/k8s/storage/gofs/pkg/raft/proto"
 )
 
 // replication represents a follower’s progress of replicate in the view of the leader.

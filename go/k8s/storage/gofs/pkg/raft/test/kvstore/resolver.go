@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/raft"
+	"k8s-lx1036/k8s/storage/gofs/pkg/raft"
 )
 
 // ClusterResolver implement raft Resolver

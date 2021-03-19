@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/backend"
-	"k8s-lx1036/k8s/storage/dfs/pkg/client/meta"
-	"k8s-lx1036/k8s/storage/dfs/pkg/util/config"
+	"k8s-lx1036/k8s/storage/gofs/pkg/backend"
+	"k8s-lx1036/k8s/storage/gofs/pkg/client/meta"
+	"k8s-lx1036/k8s/storage/gofs/pkg/util/config"
 
 	"github.com/jacobsa/fuse/fuseops"
 

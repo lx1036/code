@@ -1,30 +1,27 @@
 package core
 
 import (
-	"fmt"
-	"testing"
 	"context"
+	"fmt"
 	"reflect"
+	"testing"
 	"time"
-	
-	st "k8s-lx1036/k8s/scheduler/pkg/scheduler/testing"
+
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
-	
-	
+	st "k8s-lx1036/k8s/scheduler/pkg/scheduler/testing"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
-	"k8s.io/apimachinery/pkg/util/wait"
-
-	
 )
 
 func TestGenericScheduler(test *testing.T) {
-	
+
 	fixtures := []struct {
 		name            string
 		registerPlugins []st.RegisterPluginFunc
@@ -471,15 +468,14 @@ func TestGenericScheduler(test *testing.T) {
 			wErr:          fmt.Errorf(`prefilter plugin "FakePreFilter" failed for pod "test-prefilter": injected error status`),
 		},
 	}
-	
+
 	for _, fixture := range fixtures {
-		
+
 		test.Run(fixture.name, func(t *testing.T) {
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
-			
-			
+
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
-			
+
 			scheduler := NewGenericScheduler(
 				cache,
 				snapshot,
@@ -491,14 +487,9 @@ func TestGenericScheduler(test *testing.T) {
 			if !reflect.DeepEqual(err, fixture.wErr) {
 				t.Errorf("want: %v, got: %v", fixture.wErr, err)
 			}
-			
-			
-			
-		})
-		
-	}
-	
-	
-	
-}
 
+		})
+
+	}
+
+}

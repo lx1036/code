@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
-	internalqueue "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/queue"
 	frameworkplugins "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
+	internalqueue "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/queue"
 
 	v1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -93,10 +93,12 @@ var defaultSchedulerOptions = schedulerOptions{
 	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 }
+
 func defaultAlgorithmSourceProviderName() *string {
 	provider := config.SchedulerDefaultProviderName
 	return &provider
 }
+
 // New returns a Scheduler
 func New(client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
@@ -122,8 +124,7 @@ func New(client clientset.Interface,
 
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 	snapshot := internalcache.NewEmptySnapshot()
-	
-	
+
 	configurator := &Configurator{
 		client:                   client,
 		recorderFactory:          recorderFactory,
@@ -140,8 +141,7 @@ func New(client clientset.Interface,
 		extenders:                options.extenders,
 		frameworkCapturer:        options.frameworkCapturer,
 	}
-	
-	
+
 	var scheduler *Scheduler
 	source := options.schedulerAlgorithmSource
 	switch {

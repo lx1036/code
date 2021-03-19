@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/raft/proto"
+	"k8s-lx1036/k8s/storage/gofs/pkg/raft/proto"
 
 	"github.com/tiglabs/raft"
 	"github.com/tiglabs/raft/util"

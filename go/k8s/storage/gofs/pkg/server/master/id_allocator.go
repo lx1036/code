@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
+	"k8s-lx1036/k8s/storage/gofs/pkg/raftstore"
 
 	"k8s.io/klog/v2"
 )

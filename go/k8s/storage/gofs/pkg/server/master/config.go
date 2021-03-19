@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
+	"k8s-lx1036/k8s/storage/gofs/pkg/raftstore"
 
 	"github.com/tiglabs/raft/proto"
 

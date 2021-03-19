@@ -62,18 +62,18 @@ type SchedulingQueue interface {
 type PriorityQueue struct {
 	// PodNominator abstracts the operations to maintain nominated Pods.
 	framework.PodNominator
-	
+
 	stop  chan struct{}
 	clock util.Clock
-	
+
 	// pod initial backoff duration.
 	podInitialBackoffDuration time.Duration
 	// pod maximum backoff duration.
 	podMaxBackoffDuration time.Duration
-	
+
 	lock sync.RWMutex
 	cond sync.Cond
-	
+
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
 	activeQ *heap.Heap
@@ -90,9 +90,8 @@ type PriorityQueue struct {
 	// cycle will be put back to activeQueue if we were trying to schedule them
 	// when we received move request.
 	moveRequestCycle int64
-	
+
 	// closed indicates that the queue is closed.
 	// It is mainly used to let Pop() exit its control loop while waiting for an item.
 	closed bool
 }
-

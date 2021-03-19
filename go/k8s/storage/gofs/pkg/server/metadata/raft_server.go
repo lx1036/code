@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/raftstore"
+	"k8s-lx1036/k8s/storage/gofs/pkg/raftstore"
 )
 
 // StartRaftServer initializes the address resolver and the raftStore server instance.

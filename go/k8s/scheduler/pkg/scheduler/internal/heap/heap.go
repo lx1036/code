@@ -25,7 +25,7 @@ type data struct {
 	// according to the heap invariant. The queue keeps the keys of objects stored
 	// in "items".
 	queue []string
-	
+
 	// keyFunc is used to make the key used for queued item insertion and retrieval, and
 	// should be deterministic.
 	keyFunc KeyFunc
@@ -43,4 +43,3 @@ type Heap struct {
 	// removed, and it does nothing if it's nil
 	metricRecorder metrics.MetricRecorder
 }
-

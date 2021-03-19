@@ -1,7 +1,7 @@
 package raft
 
 import (
-	"k8s-lx1036/k8s/storage/dfs/pkg/raft/proto"
+	"k8s-lx1036/k8s/storage/gofs/pkg/raft/proto"
 )
 
 // Transport raft server transport

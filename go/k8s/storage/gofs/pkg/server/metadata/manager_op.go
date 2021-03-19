@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net"
 
-	"k8s-lx1036/k8s/storage/dfs/pkg/util/proto"
+	"k8s-lx1036/k8s/storage/gofs/pkg/util/proto"
 
 	"k8s.io/klog/v2"
 )
