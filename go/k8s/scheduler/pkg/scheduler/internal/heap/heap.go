@@ -1,9 +1,17 @@
 package heap
 
-import "k8s.io/kubernetes/pkg/scheduler/metrics"
+import (
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/metrics"
+
+	"k8s.io/client-go/tools/cache"
+)
 
 // KeyFunc is a function type to get the key from an object.
 type KeyFunc func(obj interface{}) (string, error)
+
+// lessFunc is a function that receives two items and returns true if the first
+// item should be placed before the second one when the list is sorted.
+type lessFunc = func(item1, item2 interface{}) bool
 
 type heapItem struct {
 	obj   interface{} // The object which is stored in the heap.
@@ -33,6 +41,7 @@ type data struct {
 	lessFunc lessFunc
 }
 
+// 最小堆
 // Heap is a producer/consumer queue that implements a heap data structure.
 // It can be used to implement priority queues and similar data structures.
 type Heap struct {
@@ -42,4 +51,37 @@ type Heap struct {
 	// metricRecorder updates the counter when elements of a heap get added or
 	// removed, and it does nothing if it's nil
 	metricRecorder metrics.MetricRecorder
+}
+
+// Add inserts an item, and puts it in the queue. The item is updated if it
+// already exists.
+func (h *Heap) Add(obj interface{}) error {
+	key, err := h.data.keyFunc(obj)
+	if err != nil {
+		return cache.KeyError{Obj: obj, Err: err}
+	}
+
+	if _, exists := h.data.items[key]; exists {
+
+	} else {
+
+	}
+}
+
+// New returns a Heap which can be used to queue up items to process.
+func New(keyFn KeyFunc, lessFn lessFunc) *Heap {
+	return NewWithRecorder(keyFn, lessFn, nil)
+}
+
+// NewWithRecorder wraps an optional metricRecorder to compose a Heap object.
+func NewWithRecorder(keyFn KeyFunc, lessFn lessFunc, metricRecorder metrics.MetricRecorder) *Heap {
+	return &Heap{
+		data: &data{
+			items:    map[string]*heapItem{},
+			queue:    []string{},
+			keyFunc:  keyFn,
+			lessFunc: lessFn,
+		},
+		metricRecorder: metricRecorder,
+	}
 }

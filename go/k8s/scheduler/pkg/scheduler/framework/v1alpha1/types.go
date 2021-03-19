@@ -1,8 +1,10 @@
 package v1alpha1
 
 import (
-	v1 "k8s.io/api/core/v1"
 	"sync/atomic"
+	"time"
+	
+	v1 "k8s.io/api/core/v1"
 )
 
 // NodeInfo is node level aggregated information.
@@ -86,4 +88,31 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		ni.AddPod(pod)
 	}
 	return ni
+}
+
+// QueuedPodInfo is a Pod wrapper with additional information related to
+// the pod's status in the scheduling queue, such as the timestamp when
+// it's added to the queue.
+type QueuedPodInfo struct {
+	Pod *v1.Pod
+	// The time pod added to the scheduling queue.
+	Timestamp time.Time
+	// Number of schedule attempts before successfully scheduled.
+	// It's used to record the # attempts metric.
+	Attempts int
+	// The time when the pod is added to the queue for the first time. The pod may be added
+	// back to the queue multiple times before it's successfully scheduled.
+	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
+	// latency for a pod.
+	InitialAttemptTimestamp time.Time
+}
+
+// DeepCopy returns a deep copy of the QueuedPodInfo object.
+func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
+	return &QueuedPodInfo{
+		Pod:                     pqi.Pod.DeepCopy(),
+		Timestamp:               pqi.Timestamp,
+		Attempts:                pqi.Attempts,
+		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
+	}
 }

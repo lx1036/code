@@ -2,11 +2,13 @@ package scheduler
 
 import (
 	"fmt"
+	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/core"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
+	internalqueue "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/queue"
 
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -75,6 +77,13 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 // create a scheduler from a set of registered plugins.
 func (c *Configurator) create() (*Scheduler, error) {
 
+	podQueue := internalqueue.NewSchedulingQueue(
+		lessFn,
+		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
+		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
+		internalqueue.WithPodNominator(nominator),
+	)
+
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
 		c.nodeInfoSnapshot,
@@ -88,7 +97,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		SchedulerCache:  c.schedulerCache,
 		Algorithm:       algo,
 		Profiles:        profiles,
-		NextPod:         internalqueue.MakeNextPodFunc(podQueue),
+		NextPod:         internalqueue.MakeNextPodFunc(podQueue), // 从scheduling queue里pop pod
 		Error:           MakeDefaultErrorFunc(c.client, c.informerFactory.Core().V1().Pods().Lister(), podQueue, c.schedulerCache),
 		StopEverything:  c.StopEverything,
 		SchedulingQueue: podQueue,

@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/core"
 	frameworkplugins "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
 	internalqueue "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/queue"
 
@@ -18,7 +20,6 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
 
@@ -64,6 +65,13 @@ func (scheduler *Scheduler) Run(ctx context.Context) {
 	scheduler.SchedulingQueue.Run()
 	wait.UntilWithContext(ctx, scheduler.scheduleOne, 0)
 	scheduler.SchedulingQueue.Close()
+}
+
+// scheduleOne does the entire scheduling workflow for a single pod.
+// It is serialized on the scheduling algorithm's host fitting.
+func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
+	podInfo := scheduler.NextPod()
+
 }
 
 type schedulerOptions struct {
