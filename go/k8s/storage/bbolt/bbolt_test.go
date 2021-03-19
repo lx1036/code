@@ -51,6 +51,12 @@ func TestBbolt(test *testing.T) {
 		// 从 bucket 中获取对应的 key（即上面写入的 key-value）
 		value := bucket.Get(key)
 		fmt.Printf("%s: %s\n", string(key), string(value))
+
+		cursor := bucket.Cursor()
+		for key, value := cursor.First(); key != nil; key, value = cursor.Next() {
+			fmt.Printf("key=%s, value=%s\n", key, value)
+		}
+
 		return nil
 	})
 	if err != nil {
