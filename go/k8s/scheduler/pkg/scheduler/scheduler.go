@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
+	internalqueue "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/queue"
 	frameworkplugins "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
@@ -81,18 +82,21 @@ type schedulerOptions struct {
 type Option func(*schedulerOptions)
 
 var defaultSchedulerOptions = schedulerOptions{
-	profiles: []schedulerapi.KubeSchedulerProfile{
+	profiles: []config.KubeSchedulerProfile{
 		// Profiles' default plugins are set from the algorithm provider.
 		{SchedulerName: v1.DefaultSchedulerName},
 	},
-	schedulerAlgorithmSource: schedulerapi.SchedulerAlgorithmSource{
+	schedulerAlgorithmSource: config.SchedulerAlgorithmSource{
 		Provider: defaultAlgorithmSourceProviderName(),
 	},
-	percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+	percentageOfNodesToScore: config.DefaultPercentageOfNodesToScore,
 	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 }
-
+func defaultAlgorithmSourceProviderName() *string {
+	provider := config.SchedulerDefaultProviderName
+	return &provider
+}
 // New returns a Scheduler
 func New(client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
@@ -118,7 +122,26 @@ func New(client clientset.Interface,
 
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 	snapshot := internalcache.NewEmptySnapshot()
-
+	
+	
+	configurator := &Configurator{
+		client:                   client,
+		recorderFactory:          recorderFactory,
+		informerFactory:          informerFactory,
+		podInformer:              podInformer,
+		schedulerCache:           schedulerCache,
+		StopEverything:           stopEverything,
+		percentageOfNodesToScore: options.percentageOfNodesToScore,
+		podInitialBackoffSeconds: options.podInitialBackoffSeconds,
+		podMaxBackoffSeconds:     options.podMaxBackoffSeconds,
+		profiles:                 append([]config.KubeSchedulerProfile(nil), options.profiles...),
+		registry:                 registry,
+		nodeInfoSnapshot:         snapshot,
+		extenders:                options.extenders,
+		frameworkCapturer:        options.frameworkCapturer,
+	}
+	
+	
 	var scheduler *Scheduler
 	source := options.schedulerAlgorithmSource
 	switch {

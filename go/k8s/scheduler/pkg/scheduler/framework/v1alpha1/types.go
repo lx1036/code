@@ -1,5 +1,10 @@
 package v1alpha1
 
+import (
+	v1 "k8s.io/api/core/v1"
+	"sync/atomic"
+)
+
 // NodeInfo is node level aggregated information.
 type NodeInfo struct {
 	// Overall node information.
@@ -42,4 +47,43 @@ type NodeInfo struct {
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	Generation int64
+}
+
+// Resource is a collection of compute resource.
+type Resource struct {
+	MilliCPU         int64
+	Memory           int64
+	EphemeralStorage int64
+	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
+	// explicitly as int, to avoid conversions and improve performance.
+	AllowedPodNumber int
+	// ScalarResources
+	ScalarResources map[v1.ResourceName]int64
+}
+
+// nextGeneration: Let's make sure history never forgets the name...
+// Increments the generation number monotonically ensuring that generation numbers never collide.
+// Collision of the generation numbers would be particularly problematic if a node was deleted and
+// added back with the same name. See issue#63262.
+func nextGeneration() int64 {
+	return atomic.AddInt64(&generation, 1)
+}
+
+// NewNodeInfo returns a ready to use empty NodeInfo object.
+// If any pods are given in arguments, their information will be aggregated in
+// the returned object.
+func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
+	ni := &NodeInfo{
+		Requested:        &Resource{},
+		NonZeroRequested: &Resource{},
+		Allocatable:      &Resource{},
+		TransientInfo:    NewTransientSchedulerInfo(),
+		Generation:       nextGeneration(),
+		UsedPorts:        make(HostPortInfo),
+		ImageStates:      make(map[string]*ImageStateSummary),
+	}
+	for _, pod := range pods {
+		ni.AddPod(pod)
+	}
+	return ni
 }

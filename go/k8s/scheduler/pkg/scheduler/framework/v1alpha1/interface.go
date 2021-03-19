@@ -2,7 +2,8 @@ package v1alpha1
 
 import (
 	"context"
-
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -42,6 +43,105 @@ type FrameworkHandle interface {
 
 	// TODO: unroll the wrapped interfaces to FrameworkHandle.
 	PreemptHandle() PreemptHandle
+}
+
+// Framework manages the set of plugins in use by the scheduling framework.
+// Configured plugins are called at specified points in a scheduling context.
+type Framework interface {
+	FrameworkHandle
+	// QueueSortFunc returns the function to sort pods in scheduling queue
+	QueueSortFunc() LessFunc
+	
+	// RunPreFilterPlugins runs the set of configured prefilter plugins. It returns
+	// *Status and its code is set to non-success if any of the plugins returns
+	// anything but Success. If a non-success status is returned, then the scheduling
+	// cycle is aborted.
+	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) *Status
+	
+	// RunFilterPlugins runs the set of configured filter plugins for pod on
+	// the given node. Note that for the node being evaluated, the passed nodeInfo
+	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods
+	// considered to be running on the node could be different). For example, during
+	// preemption, we may pass a copy of the original nodeInfo object that has some pods
+	// removed from it to evaluate the possibility of preempting them to
+	// schedule the target pod.
+	RunFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *NodeInfo) PluginToStatus
+	
+	// RunPostFilterPlugins runs the set of configured PostFilter plugins.
+	// PostFilter plugins can either be informational, in which case should be configured
+	// to execute first and return Unschedulable status, or ones that try to change the
+	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
+	RunPostFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusMap) (*PostFilterResult, *Status)
+	
+	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
+	// PreFilter plugins. It returns directly if any of the plugins return any
+	// status other than Success.
+	RunPreFilterExtensionAddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *NodeInfo) *Status
+	
+	// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured
+	// PreFilter plugins. It returns directly if any of the plugins return any
+	// status other than Success.
+	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *NodeInfo) *Status
+	
+	// RunPreScorePlugins runs the set of configured pre-score plugins. If any
+	// of these plugins returns any status other than "Success", the given pod is rejected.
+	RunPreScorePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status
+	
+	// RunScorePlugins runs the set of configured scoring plugins. It returns a map that
+	// stores for each scoring plugin name the corresponding NodeScoreList(s).
+	// It also returns *Status, which is set to non-success if any of the plugins returns
+	// a non-success status.
+	RunScorePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScores, *Status)
+	
+	// RunPreBindPlugins runs the set of configured prebind plugins. It returns
+	// *Status and its code is set to non-success if any of the plugins returns
+	// anything but Success. If the Status code is "Unschedulable", it is
+	// considered as a scheduling check failure, otherwise, it is considered as an
+	// internal error. In either case the pod is not going to be bound.
+	RunPreBindPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) *Status
+	
+	// RunPostBindPlugins runs the set of configured postbind plugins.
+	RunPostBindPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string)
+	
+	// RunReservePluginsReserve runs the Reserve method of the set of
+	// configured reserve plugins. If any of these calls returns an error, it
+	// does not continue running the remaining ones and returns the error. In
+	// such case, pod will not be scheduled.
+	RunReservePluginsReserve(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) *Status
+	
+	// RunReservePluginsUnreserve runs the Unreserve method of the set of
+	// configured reserve plugins.
+	RunReservePluginsUnreserve(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string)
+	
+	// RunPermitPlugins runs the set of configured permit plugins. If any of these
+	// plugins returns a status other than "Success" or "Wait", it does not continue
+	// running the remaining plugins and returns an error. Otherwise, if any of the
+	// plugins returns "Wait", then this function will create and add waiting pod
+	// to a map of currently waiting pods and return status with "Wait" code.
+	// Pod will remain waiting pod for the minimum duration returned by the permit plugins.
+	RunPermitPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) *Status
+	
+	// WaitOnPermit will block, if the pod is a waiting pod, until the waiting pod is rejected or allowed.
+	WaitOnPermit(ctx context.Context, pod *v1.Pod) *Status
+	
+	// RunBindPlugins runs the set of configured bind plugins. A bind plugin may choose
+	// whether or not to handle the given Pod. If a bind plugin chooses to skip the
+	// binding, it should return code=5("skip") status. Otherwise, it should return "Error"
+	// or "Success". If none of the plugins handled binding, RunBindPlugins returns
+	// code=5("skip") status.
+	RunBindPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) *Status
+	
+	// HasFilterPlugins returns true if at least one filter plugin is defined.
+	HasFilterPlugins() bool
+	
+	// HasPostFilterPlugins returns true if at least one postFilter plugin is defined.
+	HasPostFilterPlugins() bool
+	
+	// HasScorePlugins returns true if at least one score plugin is defined.
+	HasScorePlugins() bool
+	
+	// ListPlugins returns a map of extension point name to list of configured Plugins.
+	ListPlugins() map[string][]config.Plugin
 }
 
 // WaitingPod represents a pod currently waiting in the permit phase.
