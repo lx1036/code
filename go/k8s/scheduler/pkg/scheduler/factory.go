@@ -6,7 +6,6 @@ import (
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/core"
-	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
 	internalqueue "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/queue"
 
@@ -47,22 +46,23 @@ type Configurator struct {
 
 	podMaxBackoffSeconds int64
 
-	profiles          []schedulerapi.KubeSchedulerProfile
+	profiles          []config.KubeSchedulerProfile
 	registry          frameworkruntime.Registry
 	nodeInfoSnapshot  *internalcache.Snapshot
-	extenders         []schedulerapi.Extender
+	extenders         []config.Extender
 	frameworkCapturer FrameworkCapturer
 }
 
 // createFromProvider creates a scheduler from the name of a registered algorithm provider.
 func (c *Configurator) createFromProvider(providerName string) (*Scheduler, error) {
-	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
+	klog.Infof("Creating scheduler from algorithm provider '%v'", providerName)
 	r := algorithmprovider.NewRegistry()
 	defaultPlugins, exist := r[providerName]
 	if !exist {
 		return nil, fmt.Errorf("algorithm provider %q is not registered", providerName)
 	}
 
+	// 通过指针修改 plugins 值
 	for i := range c.profiles {
 		prof := &c.profiles[i]
 		plugins := &config.Plugins{}
@@ -76,7 +76,6 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 
 // create a scheduler from a set of registered plugins.
 func (c *Configurator) create() (*Scheduler, error) {
-
 	podQueue := internalqueue.NewSchedulingQueue(
 		lessFn,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),

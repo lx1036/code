@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
@@ -88,6 +89,11 @@ type schedulerOptions struct {
 
 // Option configures a Scheduler
 type Option func(*schedulerOptions)
+
+func defaultAlgorithmSourceProviderName() *string {
+	provider := config.SchedulerDefaultProviderName
+	return &provider
+}
 
 var defaultSchedulerOptions = schedulerOptions{
 	profiles: []config.KubeSchedulerProfile{

@@ -57,6 +57,16 @@ type KubeSchedulerProfile struct {
 	PluginConfig []PluginConfig
 }
 
+// PluginConfig specifies arguments that should be passed to a plugin at the time of initialization.
+// A plugin that is invoked at multiple extension points is initialized once. Args can have arbitrary structure.
+// It is up to the plugin to process these Args.
+type PluginConfig struct {
+	// Name defines the name of plugin being configured
+	Name string
+	// Args defines the arguments passed to the plugins at the time of initialization. Args can have arbitrary structure.
+	Args runtime.Object
+}
+
 // Plugins include multiple extension points. When specified, the list of plugins for
 // a particular extension point are the only ones enabled. If an extension point is
 // omitted from the config, then the default set of plugins is used for that extension point.
@@ -116,16 +126,6 @@ type Plugin struct {
 	Name string
 	// Weight defines the weight of plugin, only used for Score plugins.
 	Weight int32
-}
-
-// PluginConfig specifies arguments that should be passed to a plugin at the time of initialization.
-// A plugin that is invoked at multiple extension points is initialized once. Args can have arbitrary structure.
-// It is up to the plugin to process these Args.
-type PluginConfig struct {
-	// Name defines the name of plugin being configured
-	Name string
-	// Args defines the arguments passed to the plugins at the time of initialization. Args can have arbitrary structure.
-	Args runtime.Object
 }
 
 // SchedulerAlgorithmSource is the source of a scheduler algorithm. One source

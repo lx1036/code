@@ -154,3 +154,14 @@ func MakeNextPodFunc(queue SchedulingQueue) func() *framework.QueuedPodInfo {
 		return nil
 	}
 }
+
+// UnschedulablePodsMap holds pods that cannot be scheduled. This data structure
+// is used to implement unschedulableQ.
+type UnschedulablePodsMap struct {
+	// podInfoMap is a map key by a pod's full-name and the value is a pointer to the QueuedPodInfo.
+	podInfoMap map[string]*framework.QueuedPodInfo
+	keyFunc    func(*v1.Pod) string
+	// metricRecorder updates the counter when elements of an unschedulablePodsMap
+	// get added or removed, and it does nothing if it's nil
+	metricRecorder metrics.MetricRecorder
+}
