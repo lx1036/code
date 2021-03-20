@@ -3,7 +3,6 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
@@ -21,6 +20,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
 
@@ -47,7 +47,7 @@ type Scheduler struct {
 	StopEverything <-chan struct{}
 
 	// SchedulingQueue holds pods to be scheduled
-	SchedulingQueue internalqueue.SchedulingQueue
+	SchedulingQueue internalqueue.PriorityQueue
 
 	// Profiles are the scheduling profiles.
 	Profiles profile.Map
@@ -72,6 +72,27 @@ func (scheduler *Scheduler) Run(ctx context.Context) {
 // It is serialized on the scheduling algorithm's host fitting.
 func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 	podInfo := scheduler.NextPod()
+
+}
+
+func (scheduler *Scheduler) addPodToCache(obj interface{}) {
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		klog.Errorf("cannot convert to *v1.Pod: %v", obj)
+		return
+	}
+	klog.Infof("add event for scheduled pod %s/%s ", pod.Namespace, pod.Name)
+
+	// 存入scheduler的cache
+	if err := scheduler.SchedulerCache.AddPod(pod); err != nil {
+		klog.Errorf("scheduler cache AddPod failed: %v", err)
+	}
+
+	// 存入PriorityQueue
+	scheduler.SchedulingQueue.AssignedPodAdded(pod)
+}
+
+func (scheduler *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 
 }
 
@@ -106,11 +127,6 @@ var defaultSchedulerOptions = schedulerOptions{
 	percentageOfNodesToScore: config.DefaultPercentageOfNodesToScore,
 	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
-}
-
-func defaultAlgorithmSourceProviderName() *string {
-	provider := config.SchedulerDefaultProviderName
-	return &provider
 }
 
 // New returns a Scheduler
@@ -178,18 +194,18 @@ func New(client clientset.Interface,
 	// scheduled pod cache
 	podInformer.Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
-			FilterFunc: func(obj interface{}) bool {
+			FilterFunc: func(obj interface{}) bool { // 只watch已经被scheduled的pod
 				switch t := obj.(type) {
 				case *v1.Pod:
-					return assignedPod(t)
+					return len(t.Spec.NodeName) != 0
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return assignedPod(pod)
+						return len(pod.Spec.NodeName) != 0
 					}
-					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
+					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, scheduler))
 					return false
 				default:
-					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
+					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", scheduler, obj))
 					return false
 				}
 			},

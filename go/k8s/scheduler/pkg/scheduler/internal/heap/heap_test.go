@@ -11,17 +11,17 @@ func mkHeapObj(name string, val interface{}) testHeapObject {
 	return testHeapObject{name: name, val: val}
 }
 
-func testHeapObjectKeyFunc(obj interface{}) (string, error) {
+func keyFunc(obj interface{}) (string, error) {
 	return obj.(testHeapObject).name, nil
 }
-func compareInts(val1 interface{}, val2 interface{}) bool {
+func compareFunc(val1 interface{}, val2 interface{}) bool {
 	first := val1.(testHeapObject).val.(int)
 	second := val2.(testHeapObject).val.(int)
 	return first < second
 }
 
 func TestHeapBasic(test *testing.T) {
-	h := New(testHeapObjectKeyFunc, compareInts)
+	h := New(keyFunc, compareFunc)
 
 	const amount = 500
 	var i int
@@ -38,6 +38,7 @@ func TestHeapBasic(test *testing.T) {
 		if err != nil || prevNum > num {
 			test.Errorf("got %v out of order, last was %v", obj, prevNum)
 		}
+
 		prevNum = num
 	}
 }

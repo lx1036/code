@@ -24,7 +24,62 @@ const (
 	DefaultPodMaxBackoffDuration time.Duration = 10 * time.Second
 )
 
-// SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
+// Events that trigger scheduler queue to change.
+const (
+	// Unknown event
+	Unknown = "Unknown"
+	// PodAdd is the event when a new pod is added to API server.
+	PodAdd = "PodAdd"
+	// NodeAdd is the event when a new node is added to the cluster.
+	NodeAdd = "NodeAdd"
+	// ScheduleAttemptFailure is the event when a schedule attempt fails.
+	ScheduleAttemptFailure = "ScheduleAttemptFailure"
+	// BackoffComplete is the event when a pod finishes backoff.
+	BackoffComplete = "BackoffComplete"
+	// UnschedulableTimeout is the event when a pod stays in unschedulable for longer than timeout.
+	UnschedulableTimeout = "UnschedulableTimeout"
+	// AssignedPodAdd is the event when a pod is added that causes pods with matching affinity terms
+	// to be more schedulable.
+	AssignedPodAdd = "AssignedPodAdd"
+	// AssignedPodUpdate is the event when a pod is updated that causes pods with matching affinity
+	// terms to be more schedulable.
+	AssignedPodUpdate = "AssignedPodUpdate"
+	// AssignedPodDelete is the event when a pod is deleted that causes pods with matching affinity
+	// terms to be more schedulable.
+	AssignedPodDelete = "AssignedPodDelete"
+	// PvAdd is the event when a persistent volume is added in the cluster.
+	PvAdd = "PvAdd"
+	// PvUpdate is the event when a persistent volume is updated in the cluster.
+	PvUpdate = "PvUpdate"
+	// PvcAdd is the event when a persistent volume claim is added in the cluster.
+	PvcAdd = "PvcAdd"
+	// PvcUpdate is the event when a persistent volume claim is updated in the cluster.
+	PvcUpdate = "PvcUpdate"
+	// StorageClassAdd is the event when a StorageClass is added in the cluster.
+	StorageClassAdd = "StorageClassAdd"
+	// ServiceAdd is the event when a service is added in the cluster.
+	ServiceAdd = "ServiceAdd"
+	// ServiceUpdate is the event when a service is updated in the cluster.
+	ServiceUpdate = "ServiceUpdate"
+	// ServiceDelete is the event when a service is deleted in the cluster.
+	ServiceDelete = "ServiceDelete"
+	// CSINodeAdd is the event when a CSI node is added in the cluster.
+	CSINodeAdd = "CSINodeAdd"
+	// CSINodeUpdate is the event when a CSI node is updated in the cluster.
+	CSINodeUpdate = "CSINodeUpdate"
+	// NodeSpecUnschedulableChange is the event when unschedulable node spec is changed.
+	NodeSpecUnschedulableChange = "NodeSpecUnschedulableChange"
+	// NodeAllocatableChange is the event when node allocatable is changed.
+	NodeAllocatableChange = "NodeAllocatableChange"
+	// NodeLabelsChange is the event when node label is changed.
+	NodeLabelChange = "NodeLabelChange"
+	// NodeTaintsChange is the event when node taint is changed.
+	NodeTaintChange = "NodeTaintChange"
+	// NodeConditionChange is the event when node condition is changed.
+	NodeConditionChange = "NodeConditionChange"
+)
+
+/*// SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
 // The interface follows a pattern similar to cache.FIFO and cache.Heap and
 // makes it easy to use those data structures as a SchedulingQueue.
 type SchedulingQueue interface {
@@ -54,7 +109,7 @@ type SchedulingQueue interface {
 	NumUnschedulablePods() int
 	// Run starts the goroutines managing the queue.
 	Run()
-}
+}*/
 
 // PriorityQueue implements a scheduling queue.
 // The head of PriorityQueue is the highest priority pending pod. This structure
@@ -100,16 +155,20 @@ type PriorityQueue struct {
 	closed bool
 }
 
-// NewSchedulingQueue initializes a priority queue as a new scheduling queue.
-func NewSchedulingQueue(lessFn framework.LessFunc, opts ...Option) SchedulingQueue {
-	return NewPriorityQueue(lessFn, opts...)
+// ???
+func (p *PriorityQueue) AssignedPodAdded(pod *v1.Pod) {
+	p.lock.Lock()
+	p.movePodsToActiveOrBackoffQueue(p.getUnschedulablePodsWithMatchingAffinityTerm(pod), AssignedPodAdd)
+	p.lock.Unlock()
 }
 
+// NewSchedulingQueue initializes a priority queue as a new scheduling queue.
+/*func NewSchedulingQueue(lessFn framework.LessFunc, opts ...Option) PriorityQueue {
+	return NewPriorityQueue(lessFn, opts...)
+}*/
+
 // NewPriorityQueue creates a PriorityQueue object.
-func NewPriorityQueue(
-	lessFn framework.LessFunc,
-	opts ...Option,
-) *PriorityQueue {
+func NewPriorityQueue(lessFn framework.LessFunc, opts ...Option) *PriorityQueue {
 	options := defaultPriorityQueueOptions
 	for _, opt := range opts {
 		opt(&options)

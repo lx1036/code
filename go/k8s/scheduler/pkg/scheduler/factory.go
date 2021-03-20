@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"fmt"
+	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
@@ -76,7 +77,7 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 
 // create a scheduler from a set of registered plugins.
 func (c *Configurator) create() (*Scheduler, error) {
-	podQueue := internalqueue.NewSchedulingQueue(
+	podQueue := internalqueue.NewPriorityQueue(
 		lessFn,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),

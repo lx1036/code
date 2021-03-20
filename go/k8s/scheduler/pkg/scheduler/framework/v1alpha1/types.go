@@ -3,7 +3,7 @@ package v1alpha1
 import (
 	"sync/atomic"
 	"time"
-	
+
 	v1 "k8s.io/api/core/v1"
 )
 
