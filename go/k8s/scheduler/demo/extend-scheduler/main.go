@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"k8s-lx1036/k8s/scheduler/sample-scheduler-framework/pkg/plugins"
+	"k8s-lx1036/k8s/scheduler/demo/extend-scheduler/pkg/plugins/priorityclass"
 
 	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
@@ -17,7 +17,7 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	command := app.NewSchedulerCommand(
-		app.WithPlugin(plugins.Name, plugins.New),
+		app.WithPlugin(priorityclass.Name, priorityclass.New),
 	)
 
 	logs.InitLogs()

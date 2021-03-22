@@ -1,8 +1,9 @@
-package plugins
+package priorityclass
 
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/labels"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,9 +15,10 @@ import (
 const Name = "sample-plugin"
 
 type Args struct {
-	FavoriteColor  string `json:"favorite_color,omitempty"`
-	FavoriteNumber int    `json:"favorite_number,omitempty"`
-	ThanksTo       string `json:"thanks_to,omitempty"`
+	FavoriteColor     string `json:"favorite_color,omitempty"`
+	FavoriteNumber    int    `json:"favorite_number,omitempty"`
+	ThanksTo          string `json:"thanks_to,omitempty"`
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 // @see k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/interface.go
@@ -52,15 +54,49 @@ func (s *Sample) PreBind(pc context.Context, state *v1alpha1.CycleState, pod *v1
 	}
 }
 
-func New(configuration runtime.Object, f v1alpha1.FrameworkHandle) (v1alpha1.Plugin, error) {
+// 在 pkg/scheduler/framework/v1alpha1/interface.go 定义
+func (s *Sample) Score(ctx context.Context, state *v1alpha1.CycleState, pod *v1.Pod, nodeName string) (int64, *v1alpha1.Status) {
+	if pod.Spec.PriorityClassName != s.args.PriorityClassName {
+		return 0, v1alpha1.NewStatus(v1alpha1.Success)
+	}
+
+	nodeInfo, err := s.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil || nodeInfo.Node() == nil {
+		return 0, v1alpha1.NewStatus(v1alpha1.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+	}
+	node := nodeInfo.Node()
+
+	pods, err := s.handle.SharedInformerFactory().Core().V1().Pods().Lister().Pods("").List(labels.Everything())
+	/*podList, err := s.handle.ClientSet().CoreV1().Pods("").List(ctx, metav1.ListOptions{
+		FieldSelector:        fmt.Sprintf("spec.nodeName=%s", node.Name),
+	})*/
+	if err != nil {
+		return 0, v1alpha1.NewStatus(v1alpha1.Error, fmt.Sprintf("list pods with node %q from Snapshot: %v", nodeName, err))
+	}
+
+	score := 0
+	for _, item := range pods {
+		if item.Spec.NodeName == node.Name && item.Spec.PriorityClassName == s.args.PriorityClassName {
+			score++
+		}
+	}
+
+	return int64(score), v1alpha1.NewStatus(v1alpha1.Success)
+}
+
+func New(configuration runtime.Object, handle v1alpha1.FrameworkHandle) (v1alpha1.Plugin, error) {
 	args := &Args{}
 	if err := frameworkRuntime.DecodeInto(configuration, args); err != nil {
 		return nil, err
 	}
 
+	if len(args.PriorityClassName) == 0 {
+		return nil, fmt.Errorf("")
+	}
+
 	klog.Infof("get plugin config args: %+v", args)
 	return &Sample{
 		args:   args,
-		handle: f,
+		handle: handle,
 	}, nil
 }

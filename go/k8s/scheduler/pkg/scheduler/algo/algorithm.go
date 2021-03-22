@@ -70,7 +70,6 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 	trace.Step("Computing predicates done")
 
 	// 2. Score plugins
-	// 2.
 	priorityList, err := g.prioritizeNodes(ctx, prof, state, pod, feasibleNodes)
 	if err != nil {
 		return result, err

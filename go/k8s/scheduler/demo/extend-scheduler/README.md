@@ -2,6 +2,8 @@
 
 
 
+New() -> EventHandler(PriorityQueue) -> Schedule(Algorithm Schedule)
+
 
 
 

@@ -25,6 +25,7 @@ profiles:
     pluginConfig:
       - name: "sample-plugin"
         args:
+          priorityClassName: "vip"
           favorite_color: "#326CE5"
           favorite_number: 7
           thanks_to: "lx1036"

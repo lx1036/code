@@ -296,6 +296,7 @@ func (scheduler *Scheduler) onServiceDelete(obj interface{}) {
 ////////////////////// PriorityQueue ////////////////////////////
 
 ////////////////////// Run ////////////////////////////
+
 // Run begins watching and scheduling.
 // It waits for cache to be synced, then starts scheduling and blocked until the context is done.
 func (scheduler *Scheduler) Run(ctx context.Context) {
