@@ -1,7 +1,10 @@
 package profile
 
 import (
+	"fmt"
+	"github.com/google/cadvisor/integration/framework"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
+	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 
 	"k8s.io/client-go/tools/events"
@@ -33,4 +36,27 @@ func NewProfile(cfg config.KubeSchedulerProfile, frameworkFact FrameworkFactory,
 		Framework: fwk,
 		Recorder:  recorder,
 	}, nil
+}
+
+type Map map[string]*Profile
+
+// HandlesSchedulerName returns whether a profile handles the given scheduler name.
+func (m Map) HandlesSchedulerName(name string) bool {
+	_, ok := m[name]
+	return ok
+}
+
+func NewMap(cfgs []config.KubeSchedulerProfile, frameworkFact FrameworkFactory,
+	recorderFact RecorderFactory, opts ...frameworkruntime.Option) (Map, error) {
+	m := make(Map)
+
+	for _, cfg := range cfgs {
+		p, err := NewProfile(cfg, frameworkFact, recorderFact, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("creating profile for scheduler name %s: %v", cfg.SchedulerName, err)
+		}
+		m[cfg.SchedulerName] = p
+	}
+
+	return m, nil
 }

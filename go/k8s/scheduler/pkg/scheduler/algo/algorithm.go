@@ -1,4 +1,4 @@
-package core
+package algo
 
 import (
 	"context"
@@ -35,8 +35,8 @@ type ScheduleResult struct {
 }
 
 type genericScheduler struct {
-	cache                    internalcache.Cache
-	extenders                []v1alpha1.Extender
+	cache internalcache.Cache
+	//extenders                []v1alpha1.Extender
 	nodeInfoSnapshot         *internalcache.Snapshot
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	disablePreemption        bool
@@ -117,13 +117,13 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, prof *p
 func NewGenericScheduler(
 	cache internalcache.Cache,
 	nodeInfoSnapshot *internalcache.Snapshot,
-	extenders []v1alpha1.Extender,
+	//extenders []v1alpha1.Extender,
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	disablePreemption bool,
 	percentageOfNodesToScore int32) ScheduleAlgorithm {
 	return &genericScheduler{
-		cache:                    cache,
-		extenders:                extenders,
+		cache: cache,
+		//extenders:                extenders,
 		nodeInfoSnapshot:         nodeInfoSnapshot,
 		pvcLister:                pvcLister,
 		disablePreemption:        disablePreemption,

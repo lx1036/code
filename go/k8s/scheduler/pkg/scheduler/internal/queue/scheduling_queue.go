@@ -9,6 +9,7 @@ import (
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/metrics"
 
 	v1 "k8s.io/api/core/v1"
+	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -223,4 +224,44 @@ type UnschedulablePodsMap struct {
 	// metricRecorder updates the counter when elements of an unschedulablePodsMap
 	// get added or removed, and it does nothing if it's nil
 	metricRecorder metrics.MetricRecorder
+}
+
+// nominatedPodMap is a structure that stores pods nominated to run on nodes.
+// It exists because nominatedNodeName of pod objects stored in the structure
+// may be different than what scheduler has here. We should be able to find pods
+// by their UID and update/delete them.
+type nominatedPodMap struct {
+	// nominatedPods is a map keyed by a node name and the value is a list of
+	// pods which are nominated to run on the node. These are pods which can be in
+	// the activeQ or unschedulableQ.
+	nominatedPods map[string][]*v1.Pod
+	// nominatedPodToNode is map keyed by a Pod UID to the node name where it is
+	// nominated.
+	nominatedPodToNode map[ktypes.UID]string
+
+	sync.RWMutex
+}
+
+func (n *nominatedPodMap) AddNominatedPod(pod *v1.Pod, nodeName string) {
+	panic("implement me")
+}
+
+func (n *nominatedPodMap) DeleteNominatedPodIfExists(pod *v1.Pod) {
+	panic("implement me")
+}
+
+func (n *nominatedPodMap) UpdateNominatedPod(oldPod, newPod *v1.Pod) {
+	panic("implement me")
+}
+
+func (n *nominatedPodMap) NominatedPodsForNode(nodeName string) []*v1.Pod {
+	panic("implement me")
+}
+
+// NewPodNominator creates a nominatedPodMap as a backing of framework.PodNominator.
+func NewPodNominator() framework.PodNominator {
+	return &nominatedPodMap{
+		nominatedPods:      make(map[string][]*v1.Pod),
+		nominatedPodToNode: make(map[ktypes.UID]string),
+	}
 }
