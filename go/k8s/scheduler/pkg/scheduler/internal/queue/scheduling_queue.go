@@ -163,6 +163,28 @@ func (p *PriorityQueue) AssignedPodAdded(pod *v1.Pod) {
 	p.lock.Unlock()
 }
 
+// AssignedPodUpdated is called when a bound pod is updated. Change of labels
+// may make pending pods with matching affinity terms schedulable.
+func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
+	p.lock.Lock()
+	p.movePodsToActiveOrBackoffQueue(p.getUnschedulablePodsWithMatchingAffinityTerm(pod), AssignedPodUpdate)
+	p.lock.Unlock()
+}
+
+// MoveAllToActiveOrBackoffQueue moves all pods from unschedulableQ to activeQ or backoffQ.
+// This function adds all pods and then signals the condition variable to ensure that
+// if Pop() is waiting for an item, it receives it after all the pods are in the
+// queue and the head is the highest priority pod.
+func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulableQ.podInfoMap))
+	for _, pInfo := range p.unschedulableQ.podInfoMap {
+		unschedulablePods = append(unschedulablePods, pInfo)
+	}
+	p.movePodsToActiveOrBackoffQueue(unschedulablePods, event)
+}
+
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
 /*func NewSchedulingQueue(lessFn framework.LessFunc, opts ...Option) PriorityQueue {
 	return NewPriorityQueue(lessFn, opts...)

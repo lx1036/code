@@ -2,7 +2,7 @@ package profile
 
 import (
 	"fmt"
-	"github.com/google/cadvisor/integration/framework"
+
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
@@ -38,6 +38,7 @@ func NewProfile(cfg config.KubeSchedulerProfile, frameworkFact FrameworkFactory,
 	}, nil
 }
 
+// Map holds profiles indexed by scheduler name.
 type Map map[string]*Profile
 
 // HandlesSchedulerName returns whether a profile handles the given scheduler name.

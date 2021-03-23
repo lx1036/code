@@ -8,6 +8,7 @@ import (
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/algo"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/core"
 	frameworkplugins "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
 	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
@@ -43,6 +44,9 @@ type Scheduler struct {
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
 	Error func(*framework.QueuedPodInfo, error)
+
+	// Close this to shut down the scheduler.
+	StopEverything <-chan struct{}
 
 	// PriorityQueue holds pods to be scheduled
 	PriorityQueue internalqueue.PriorityQueue
@@ -380,6 +384,13 @@ func (scheduler *Scheduler) profileForPod(pod *v1.Pod) (*profile.Profile, error)
 func (scheduler *Scheduler) skipPodSchedule(prof *profile.Profile, pod *v1.Pod) bool {
 	// ...
 	return false
+	// 存入PriorityQueue
+	scheduler.PriorityQueue.AssignedPodAdded(pod)
+}
+
+// responsibleForPod returns true if the pod has asked to be scheduled by the given scheduler.
+func responsibleForPod(pod *v1.Pod, profiles profile.Map) bool {
+	return profiles.HandlesSchedulerName(pod.Spec.SchedulerName)
 }
 
 type schedulerOptions struct {
@@ -533,7 +544,7 @@ func New(client clientset.Interface,
 					return !(len(t.Spec.NodeName) != 0) && scheduler.Profiles.HandlesSchedulerName(t.Spec.SchedulerName)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return !(len(pod.Spec.NodeName) != 0) && scheduler.Profiles.HandlesSchedulerName(pod.Spec.SchedulerName)
+						return !(len(pod.Spec.NodeName) != 0) && responsibleForPod(pod, scheduler.Profiles)
 					}
 					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, scheduler))
 					return false
