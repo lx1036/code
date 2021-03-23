@@ -14,3 +14,5 @@ read-only transaction 没有锁文件，性能好。
 
 ## 参考文献
 **[bbolt github](https://github.com/etcd-io/bbolt)**
+
+**[阿里二面：什么是mmap？](https://zhuanlan.zhihu.com/p/357820303)**

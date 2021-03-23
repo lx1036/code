@@ -52,6 +52,13 @@ type Options struct {
 // All data access is performed through transactions which can be obtained through the DB.
 // All the functions on DB will return a ErrDatabaseNotOpen if accessed before Open() is called.
 type DB struct {
+	// basic
+	opened   bool
+	NoSync bool
+	NoGrowSync bool
+	MmapFlags int
+	NoFreelistSync bool
+	
 	// file 相关字段
 	file     *os.File
 	openFile func(string, int, os.FileMode) (*os.File, error)
@@ -171,10 +178,7 @@ var DefaultOptions = &Options{
 	NoGrowSync:   false,
 	FreelistType: FreelistArrayType,
 }
-
-// Open creates and opens a database at the given path.
-// If the file does not exist then it will be created automatically.
-// Passing in nil options will cause Bolt to open the database with the default options.
+// 打开一个文件用来保存数据，如果不存在则创建
 func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	db := &DB{
 		opened: true,
