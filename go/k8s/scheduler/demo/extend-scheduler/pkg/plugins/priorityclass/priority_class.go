@@ -3,8 +3,6 @@ package priorityclass
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/labels"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -66,17 +64,9 @@ func (s *Sample) Score(ctx context.Context, state *v1alpha1.CycleState, pod *v1.
 	}
 	node := nodeInfo.Node()
 
-	pods, err := s.handle.SharedInformerFactory().Core().V1().Pods().Lister().Pods("").List(labels.Everything())
-	/*podList, err := s.handle.ClientSet().CoreV1().Pods("").List(ctx, metav1.ListOptions{
-		FieldSelector:        fmt.Sprintf("spec.nodeName=%s", node.Name),
-	})*/
-	if err != nil {
-		return 0, v1alpha1.NewStatus(v1alpha1.Error, fmt.Sprintf("list pods with node %q from Snapshot: %v", nodeName, err))
-	}
-
 	score := 0
-	for _, item := range pods {
-		if item.Spec.NodeName == node.Name && item.Spec.PriorityClassName == s.args.PriorityClassName {
+	for _, item := range nodeInfo.Pods {
+		if item.Pod.Spec.NodeName == node.Name && item.Pod.Spec.PriorityClassName == s.args.PriorityClassName {
 			score++
 		}
 	}
