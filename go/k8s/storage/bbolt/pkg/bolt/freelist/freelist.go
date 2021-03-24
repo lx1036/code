@@ -27,6 +27,7 @@ type txPending struct {
 }
 
 // freelist表示可以未被分配/已经被释放的[]pages
+// 空闲列表
 type freelist struct {
 	freelistType   FreelistType                // freelist type
 	ids            []pgid                      // all free and available free page ids.
@@ -51,7 +52,7 @@ func (f *freelist) hashmapAllocate(txid txid, n int) pgid {
 // arrayAllocate returns the starting page id of a contiguous list of pages of a given size.
 // If a contiguous block cannot be found then 0 is returned.
 func (f *freelist) arrayAllocate(txid txid, n int) pgid {
-
+	return 0
 }
 
 // hashmapFreeCount returns count of free pages(hashmap version)
@@ -61,7 +62,7 @@ func (f *freelist) hashmapFreeCount() int {
 
 // arrayFreeCount returns count of free pages(array version)
 func (f *freelist) arrayFreeCount() int {
-
+	return 0
 }
 
 // hashmapMergeSpans try to merge list of pages(represented by pgids) with existing spans
