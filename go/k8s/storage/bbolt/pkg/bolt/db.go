@@ -1,20 +1,24 @@
 package bolt
 
 import (
+	"fmt"
+	"hash/fnv"
 	"os"
 	"sync"
 	"time"
+	"unsafe"
+
+	"k8s.io/klog/v2"
 )
 
-// FreelistType is the type of the freelist backend
-type FreelistType string
+// maxMapSize represents the largest mmap size supported by Bolt.
+const maxMapSize = 0xFFFFFFFFFFFF // 256TB
 
-const (
-	// FreelistArrayType indicates backend freelist type is array
-	FreelistArrayType = FreelistType("array")
-	// FreelistMapType indicates backend freelist type is hashmap
-	FreelistMapType = FreelistType("hashmap")
-)
+// Represents a marker value to indicate that a file is a Bolt DB.
+const magic uint32 = 0xED0CDAED
+
+// The data file format version.
+const version = 2
 
 type meta struct {
 	magic    uint32
@@ -28,6 +32,23 @@ type meta struct {
 	checksum uint64
 }
 
+// validate checks the marker bytes and version of the meta page to ensure it matches this binary.
+func (m *meta) validate() error {
+	if m.magic != magic {
+		return ErrInvalid
+	} else if m.version != version {
+		return ErrVersionMismatch
+	} else if m.checksum != 0 && m.checksum != m.sum64() {
+		return ErrChecksum
+	}
+	return nil
+}
+func (m *meta) sum64() uint64 {
+	var h = fnv.New64a()
+	_, _ = h.Write((*[unsafe.Offsetof(meta{}.checksum)]byte)(unsafe.Pointer(m))[:])
+	return h.Sum64()
+}
+
 // Options represents the options that can be set when opening a database.
 type Options struct {
 	opened bool
@@ -39,6 +60,7 @@ type Options struct {
 
 	// Sets the DB.NoGrowSync flag before memory mapping the file.
 	NoGrowSync bool
+	NoSync     bool
 
 	// FreelistType sets the backend freelist type. There are two options. Array which is simple but endures
 	// dramatic performance degradation if database is large and framentation in freelist is common.
@@ -46,6 +68,27 @@ type Options struct {
 	// but it doesn't guarantee that it offers the smallest page id available. In normal case it is safe.
 	// The default type is array
 	FreelistType FreelistType
+
+	OpenFile func(string, int, os.FileMode) (*os.File, error)
+
+	MmapFlags      int
+	NoFreelistSync bool
+	ReadOnly       bool
+}
+
+// Stats represents statistics about the database.
+type Stats struct {
+	// Freelist stats
+	FreePageN     int // total number of free pages on the freelist
+	PendingPageN  int // total number of pending pages on the freelist
+	FreeAlloc     int // total bytes allocated in free pages
+	FreelistInuse int // total bytes used by the freelist
+
+	// Transaction stats
+	TxN     int // total number of started read transactions
+	OpenTxN int // number of currently open read transactions
+
+	TxStats TxStats // global, ongoing stats.
 }
 
 // DB represents a collection of buckets persisted to a file on disk.
@@ -53,19 +96,31 @@ type Options struct {
 // All the functions on DB will return a ErrDatabaseNotOpen if accessed before Open() is called.
 type DB struct {
 	// basic
-	opened         bool
-	NoSync         bool
-	NoGrowSync     bool
-	MmapFlags      int
-	NoFreelistSync bool
+	opened     bool
+	NoSync     bool
+	NoGrowSync bool
+	MmapFlags  int
+
+	// data
+	dataref []byte // mmap'ed readonly, write throws SEGV
+	data    *[maxMapSize]byte
+	datasz  int
 
 	// file 相关字段
-	file     *os.File
-	openFile func(string, int, os.FileMode) (*os.File, error)
+	file          *os.File
+	openFile      func(string, int, os.FileMode) (*os.File, error)
+	path          string
+	MaxBatchDelay time.Duration
+	MaxBatchSize  int
+	AllocSize     int
+	ops           struct {
+		writeAt func(b []byte, off int64) (n int, err error)
+	}
 
 	// lock 相关字段
 	rwlock   sync.Mutex // Allows only one writer at a time.
 	metalock sync.Mutex // Protects meta page access.
+	readOnly bool
 
 	// transaction 相关字段
 	rwtx *Tx
@@ -73,6 +128,15 @@ type DB struct {
 	// meta
 	meta0 *meta
 	meta1 *meta
+
+	// b+tree
+	freelistLoad   sync.Once
+	FreelistType   FreelistType
+	NoFreelistSync bool
+	freelist       *freelist
+
+	// statistics
+	stats Stats
 }
 
 // Begin starts a new transaction.
@@ -170,6 +234,68 @@ func (db *DB) meta() *meta {
 	// on mmap() and we do fsync() on every write.
 	panic("bolt.DB.meta(): invalid meta pages")
 }
+func (db *DB) hasSyncedFreelist() bool {
+	return db.meta().freelist != pgidNoFreelist
+}
+
+// loadFreelist reads tFreelistArrayTypehe freelist if it is synced, or reconstructs it
+// by scanning the DB if it is not synced. It assumes there are no
+// concurrent accesses being made to the freelist.
+func (db *DB) loadFreelist() {
+	db.freelistLoad.Do(func() {
+		db.freelist = newFreelist(db.FreelistType)
+		if !db.hasSyncedFreelist() {
+			// Reconstruct free list by scanning the DB.
+			db.freelist.readIDs(db.freepages())
+		} else {
+			// Read free list from freelist page.
+			db.freelist.read(db.page(db.meta().freelist))
+		}
+		db.stats.FreePageN = db.freelist.free_count()
+	})
+}
+func (db *DB) close() error {
+	if !db.opened {
+		return nil
+	}
+
+	db.opened = false
+	db.freelist = nil
+	// Clear ops.
+	db.ops.writeAt = nil
+	// Close the mmap.
+	if err := db.munmap(); err != nil {
+		return err
+	}
+
+	// Close file handles.
+	if db.file != nil {
+		// No need to unlock read-only file.
+		if !db.readOnly {
+			// Unlock the file.
+			if err := funlock(db); err != nil {
+				klog.Infof("bolt.Close(): funlock error: %s", err)
+			}
+		}
+
+		// Close the file descriptor.
+		if err := db.file.Close(); err != nil {
+			return fmt.Errorf("db file close: %s", err)
+		}
+		db.file = nil
+	}
+
+	db.path = ""
+	return nil
+}
+
+// munmap unmaps the data file from memory.
+func (db *DB) munmap() error {
+	if err := munmap(db); err != nil {
+		return fmt.Errorf("unmap error: " + err.Error())
+	}
+	return nil
+}
 
 // DefaultOptions represent the options used if nil options are passed into Open().
 // No timeout is used which will cause Bolt to wait indefinitely for a lock.
@@ -178,6 +304,13 @@ var DefaultOptions = &Options{
 	NoGrowSync:   false,
 	FreelistType: FreelistArrayType,
 }
+
+// Default values if not set in a DB instance.
+const (
+	DefaultMaxBatchSize  int = 1000
+	DefaultMaxBatchDelay     = 10 * time.Millisecond
+	DefaultAllocSize         = 16 * 1024 * 1024
+)
 
 // 打开一个文件用来保存数据，如果不存在则创建
 func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
