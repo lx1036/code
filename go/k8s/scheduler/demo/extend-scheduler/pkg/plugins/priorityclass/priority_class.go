@@ -67,7 +67,7 @@ func (s *Sample) Score(ctx context.Context, state *v1alpha1.CycleState, pod *v1.
 	score := 0
 	for _, item := range nodeInfo.Pods {
 		if item.Pod.Spec.NodeName == node.Name && item.Pod.Spec.PriorityClassName == s.args.PriorityClassName {
-			score++
+			score-- // 高优先级pod数量越多，分数越低
 		}
 	}
 
