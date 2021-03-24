@@ -8,24 +8,19 @@ clientConnection:
   kubeconfig: /Users/liuxiang/.kube/config
 leaderElection:
   leaderElect: true
-  resourceName: sample-scheduler
+  resourceName: priority-class-fit-scheduler
   resourceNamespace: kube-system
 profiles:
-  - schedulerName: sample-scheduler
+  - schedulerName: priority-class-fit-scheduler
     plugins:
-      preFilter:
-        enabled:
-          - name: "sample-plugin"
       filter:
         enabled:
-          - name: "sample-plugin"
-      preBind:
+          - name: "priority-class-fit"
+      score:
         enabled:
-          - name: "sample-plugin"
+          - name: "priority-class-fit"
     pluginConfig:
-      - name: "sample-plugin"
+      - name: "priority-class-fit"
         args:
           priorityClassName: "vip"
-          favorite_color: "#326CE5"
-          favorite_number: 7
-          thanks_to: "lx1036"
+          ratio: 2
