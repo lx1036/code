@@ -7,7 +7,7 @@ kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: /Users/liuxiang/.kube/config
 leaderElection:
-  leaderElect: true
+  leaderElect: false
   resourceName: priority-class-fit-scheduler
   resourceNamespace: kube-system
 profiles:

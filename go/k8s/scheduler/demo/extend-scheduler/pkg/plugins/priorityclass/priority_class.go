@@ -53,14 +53,14 @@ func (s *PriorityClassFit) Filter(c context.Context, state *v1alpha1.CycleState,
 	}
 	cpu = cpu * 1000 * int64(s.args.Ratio)
 	sumCores := resource.MustParse(fmt.Sprintf("%dm", cpu))
-	klog.Infof("sum * ration: milliCores = %v (%v) in node %s", sumCores.MilliValue(), sumCores.Format, nodeInfo.Node().Name)
+	klog.Infof("sum * ratio: milliCores = %v (%v) in node %s", sumCores.MilliValue(), sumCores.Format, nodeInfo.Node().Name)
 	memoryStr, ok := node.Annotations[MemoryAllocateAnnotation] // e.g. "122991640Ki"
 	if !ok {
 		return nil
 	}
 	memory := resource.MustParse(memoryStr)
 	sumMemory := resource.NewQuantity(memory.Value()*int64(s.args.Ratio), resource.BinarySI)
-	klog.Infof("sum * ration: memorySize = %v (%v) in node %s", sumMemory.Value(), sumMemory.Format, nodeInfo.Node().Name)
+	klog.Infof("sum * ratio: memorySize = %v (%v) in node %s", sumMemory.Value(), sumMemory.Format, nodeInfo.Node().Name)
 
 	consumedCores := resource.NewMilliQuantity(0, resource.DecimalSI)
 	consumedMemory := resource.NewQuantity(0, resource.BinarySI)
@@ -112,14 +112,19 @@ func (s *PriorityClassFit) Score(ctx context.Context, state *v1alpha1.CycleState
 	}
 	node := nodeInfo.Node()
 
-	score := 0
+	score := v1alpha1.MaxNodeScore
 	for _, item := range nodeInfo.Pods {
 		if item.Pod.Spec.NodeName == node.Name && item.Pod.Spec.PriorityClassName == s.args.PriorityClassName {
 			score-- // 高优先级pod数量越多，分数越低
 		}
 	}
 
-	return int64(score), nil
+	return score, nil
+}
+
+// ScoreExtensions of the Score plugin.
+func (s *PriorityClassFit) ScoreExtensions() v1alpha1.ScoreExtensions {
+	return nil
 }
 
 func New(configuration runtime.Object, handle v1alpha1.FrameworkHandle) (v1alpha1.Plugin, error) {

@@ -15,7 +15,7 @@ spec:
       labels:
         app: test-scheduler
     spec:
-      schedulerName: sample-scheduler
+      schedulerName: priority-class-fit-scheduler
       containers:
         - image: nginx:1.17.8
           imagePullPolicy: IfNotPresent

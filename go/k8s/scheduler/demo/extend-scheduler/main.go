@@ -13,6 +13,7 @@ import (
 )
 
 // debug in local: `make dev`
+// debug in idea ide: Program arguments加上 --config=/Users/liuxiang/Code/lx1036/code/go/k8s/scheduler/demo/extend-scheduler/scheduler-config.yaml --v=3
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
