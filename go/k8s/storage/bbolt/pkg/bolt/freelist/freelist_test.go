@@ -3,6 +3,7 @@ package freelist
 import (
 	"reflect"
 	"testing"
+	"unsafe"
 )
 
 // Ensure that a page is added to a transaction's freelist.
@@ -41,8 +42,7 @@ func TestFreelist_release(t *testing.T) {
 	}
 }
 
-// ??????????????
-// Ensure that a freelist can find contiguous blocks of pages.
+// allocate用来分配page id连续的page出去
 func TestFreelist_allocate(t *testing.T) {
 	f := &freelist{ids: []pgid{3, 4, 5, 6, 7, 9, 12, 13, 18}}
 	if id := int(f.allocate(3)); id != 3 {
@@ -60,7 +60,7 @@ func TestFreelist_allocate(t *testing.T) {
 	if id := int(f.allocate(1)); id != 7 {
 		t.Fatalf("exp=7; got=%v", id)
 	}
-	if id := int(f.allocate(0)); id != 0 {
+	if id := int(f.allocate(0)); id != 0 { // 分配0个出去，会依次遍历所有page ids
 		t.Fatalf("exp=0; got=%v", id)
 	}
 	if id := int(f.allocate(0)); id != 0 {
@@ -81,6 +81,29 @@ func TestFreelist_allocate(t *testing.T) {
 		t.Fatalf("exp=0; got=%v", id)
 	}
 	if exp := []pgid{}; !reflect.DeepEqual(exp, f.ids) {
+		t.Fatalf("exp=%v; got=%v", exp, f.ids)
+	}
+}
+
+// Ensure that a freelist can deserialize from a freelist page.
+func TestFreelist_read(t *testing.T) {
+	// Create a page.
+	var buf [4096]byte
+	page := (*page)(unsafe.Pointer(&buf[0]))
+	page.flags = freelistPageFlag
+	page.count = 2
+
+	// Insert 2 page ids.
+	ids := (*[3]pgid)(unsafe.Pointer(&page.ptr))
+	ids[0] = 23
+	ids[1] = 50
+
+	// Deserialize page into a freelist.
+	f := newFreelist()
+	f.read(page)
+
+	// Ensure that there are two page ids in the freelist.
+	if exp := []pgid{23, 50}; !reflect.DeepEqual(exp, f.ids) {
 		t.Fatalf("exp=%v; got=%v", exp, f.ids)
 	}
 }

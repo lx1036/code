@@ -27,7 +27,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/getsentry/sentry-go v0.3.0
 	github.com/gin-gonic/gin v1.5.0
-	github.com/go-logr/logr v0.2.0
+	github.com/go-logr/logr v0.4.0
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gogo/googleapis v1.4.0 // indirect
@@ -90,10 +90,12 @@ require (
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
 	go.uber.org/zap v1.14.1
 	golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
+	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
-	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
+	golang.org/x/sys v0.0.0-20210324051608-47abb6519492
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
+	golang.org/x/tools v0.1.0 // indirect
 	google.golang.org/grpc v1.29.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/go-playground/validator.v8 v8.18.2
@@ -109,10 +111,13 @@ require (
 	k8s.io/apimachinery v0.20.2
 	k8s.io/apiserver v0.19.7
 	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/code-generator v0.20.5 // indirect
 	k8s.io/component-base v0.19.7
 	k8s.io/component-helpers v0.20.2
 	k8s.io/cri-api v0.0.0
-	k8s.io/klog/v2 v2.4.0
+	k8s.io/gengo v0.0.0-20210203185629-de9496dff47b // indirect
+	k8s.io/klog/v2 v2.8.0
+	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubelet v0.0.0
 	k8s.io/kubernetes v1.19.7
 	k8s.io/sample-controller v0.19.7

@@ -3,6 +3,7 @@ package freelist
 import (
 	"fmt"
 	"sort"
+	"unsafe"
 )
 
 //******************************
@@ -98,9 +99,8 @@ func (f *freelist) release(txid txid) {
 	f.ids = pgids(f.ids).merge(m) // merge之后还是排序好的
 }
 
-// allocate returns the starting page id of a contiguous list of pages of a given size.
-// If a contiguous block cannot be found then 0 is returned.
-// 分配连续的page
+// 分配连续的n个page，这里连续意思是：pgid,pgid+1,pgid+2
+// 比如{1,2,3,5,6,7,8,10}，allocate(4)就是分配了{5,6,7,8}出去，剩下{1,2,3}
 func (f *freelist) allocate(n int) pgid {
 	if len(f.ids) == 0 {
 		return 0
@@ -112,16 +112,18 @@ func (f *freelist) allocate(n int) pgid {
 			panic(fmt.Sprintf("invalid page allocation: %d", id))
 		}
 
-		// Reset initial page if this is not contiguous.
 		if previd == 0 || id-previd != 1 {
-			initial = id
+			initial = id // initial是分配段初始值
 		}
 
-		if id-initial+1 == pgid(n) {
+		tmp := id - initial + 1
+		if tmp == pgid(n) {
 			if i+1 == n {
 				f.ids = f.ids[i+1:] // 3,4,5被分配出去了
 			} else {
+				// {7,9,12,13,18} => 拿{18}去覆盖{12,13,18} => {7,9,18}
 				copy(f.ids[i+1-n:], f.ids[i+1:])
+				f.ids = f.ids[:len(f.ids)-n]
 			}
 
 			// Remove from the free cache.
@@ -136,6 +138,18 @@ func (f *freelist) allocate(n int) pgid {
 	}
 
 	return 0
+}
+
+// read initializes the freelist from a freelist page.
+func (f *freelist) read(p *page) {
+	// If the page.count is at the max uint16 value (64k) then it's considered
+	// an overflow and the size of the freelist is stored as the first element.
+	idx, count := 0, int(p.count)
+	if count == 0xFFFF {
+		idx = 1
+		count = int(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0])
+	}
+
 }
 
 // hashmapAllocate serves the same purpose as arrayAllocate, but use hashmap as backend

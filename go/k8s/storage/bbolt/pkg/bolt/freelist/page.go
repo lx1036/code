@@ -82,8 +82,8 @@ func mergepgids(dst, a, b pgids) {
 // page 是操作系统页大小，读写数据最小原子单位
 type page struct {
 	id       pgid
-	flags    uint16
-	count    uint16
+	flags    uint16 // 这块内容标识：可以为元数据、空闲列表、树枝、叶子 这四种中的一种
+	count    uint16 // 存储数据的数量
 	overflow uint32 // 溢出的页数量
 
 	ptr uintptr // 内存中存储数据的指针，没有落盘
