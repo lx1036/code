@@ -79,12 +79,14 @@ func mergepgids(dst, a, b pgids) {
 	_ = append(merged, follow...)
 }
 
-// page 是
+// page 是操作系统页大小，读写数据最小原子单位
 type page struct {
 	id       pgid
 	flags    uint16
 	count    uint16
-	overflow uint32
+	overflow uint32 // 溢出的页数量
+
+	ptr uintptr // 内存中存储数据的指针，没有落盘
 }
 
 // typ returns a human readable page type string used for debugging.
