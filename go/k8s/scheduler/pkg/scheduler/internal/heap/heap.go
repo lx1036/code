@@ -144,6 +144,10 @@ func (h *Heap) Pop() (interface{}, error) {
 	return nil, fmt.Errorf("object was removed from heap data")
 }
 
+func (h *Heap) Len() int {
+	return len(h.data.queue)
+}
+
 // New returns a Heap which can be used to queue up items to process.
 func New(keyFn KeyFunc, lessFn lessFunc) *Heap {
 	return NewWithRecorder(keyFn, lessFn, nil)

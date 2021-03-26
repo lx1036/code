@@ -1,19 +1,19 @@
 package queue
 
 import (
-	"k8s.io/apimachinery/pkg/types"
 	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 func newDefaultQueueSort() framework.LessFunc {
 	sort := &queuesort.PrioritySort{}
-	return sort.Less
+	return sort.Less // pod Priority 高则排在最前面，最大堆
 }
 
 var lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
@@ -107,4 +107,16 @@ func TestPriorityQueueAdd(test *testing.T) {
 		test.Errorf("Unexpected nominated map after adding pods. Expected: %v, got: %v", expectedNominatedPods, q.PodNominator)
 	}
 
+	if p, err := q.Pop(); err != nil || p.Pod != &highPriorityPod {
+		test.Errorf("Expected: %v after Pop, but got: %v", highPriorityPod.Name, p.Pod.Name)
+	}
+	if p, err := q.Pop(); err != nil || p.Pod != &medPriorityPod {
+		test.Errorf("Expected: %v after Pop, but got: %v", medPriorityPod.Name, p.Pod.Name)
+	}
+	if p, err := q.Pop(); err != nil || p.Pod != &unschedulablePod {
+		test.Errorf("Expected: %v after Pop, but got: %v", unschedulablePod.Name, p.Pod.Name)
+	}
+	if len(q.PodNominator.(*nominatedPodMap).nominatedPods["node1"]) != 2 {
+		test.Errorf("Expected medPriorityPod and unschedulablePod to be still present in nomindatePods: %v", q.PodNominator.(*nominatedPodMap).nominatedPods["node1"])
+	}
 }

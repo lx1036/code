@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"fmt"
 	"k8s.io/client-go/tools/cache"
 	"sync"
 	"time"
@@ -158,6 +159,32 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	p.cond.Broadcast()
 
 	return nil
+}
+
+const queueClosed = "scheduling queue is closed"
+
+// 最大堆activeQ中pop一个pod出来，没有则一直block等待，同时p.schedulingCycle++
+func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	for p.activeQ.Len() == 0 {
+		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
+		// When Close() is called, the p.closed is set and the condition is broadcast,
+		// which causes this loop to continue and return from the Pop().
+		if p.closed {
+			return nil, fmt.Errorf(queueClosed)
+		}
+		p.cond.Wait()
+	}
+
+	obj, err := p.activeQ.Pop()
+	if err != nil {
+		return nil, err
+	}
+	pInfo := obj.(*framework.QueuedPodInfo)
+	pInfo.Attempts++
+	p.schedulingCycle++
+	return pInfo, err
 }
 
 // ???
