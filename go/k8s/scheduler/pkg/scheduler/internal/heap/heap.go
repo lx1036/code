@@ -120,6 +120,19 @@ func (h *Heap) Add(obj interface{}) error {
 	return nil
 }
 
+func (h *Heap) Delete(obj interface{}) error {
+	key, err := h.data.keyFunc(obj)
+	if err != nil {
+		return cache.KeyError{Obj: obj, Err: err}
+	}
+	if item, ok := h.data.items[key]; ok {
+		heap.Remove(h.data, item.index)
+		return nil
+	}
+
+	return fmt.Errorf("object not found")
+}
+
 func (h *Heap) Pop() (interface{}, error) {
 	obj := heap.Pop(h.data)
 	if obj != nil {
