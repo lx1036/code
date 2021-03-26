@@ -1,15 +1,20 @@
+// *********************************************************************
+// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-scheduling/scheduler_queues.md
+// *********************************************************************
+
 package queue
 
 import (
 	"fmt"
-	"k8s.io/client-go/tools/cache"
 	"sync"
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/heap"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -91,7 +96,7 @@ const (
 // unschedulable queues and will be moved to active queue when backoff are completed.
 type PriorityQueue struct {
 	// PodNominator abstracts the operations to maintain nominated Pods.
-	framework.PodNominator
+	PodNominator *nominatedPodMap
 
 	stop  chan struct{}
 	clock util.Clock
@@ -135,6 +140,11 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod) *framework.QueuedPodInfo {
 		InitialAttemptTimestamp: now,
 	}
 }
+func newQueuedPodInfoNoTimestamp(pod *v1.Pod) *framework.QueuedPodInfo {
+	return &framework.QueuedPodInfo{
+		Pod: pod,
+	}
+}
 
 // add pod to activeQ
 func (p *PriorityQueue) Add(pod *v1.Pod) error {
@@ -161,9 +171,40 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	return nil
 }
 
+func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	pod := pInfo.Pod
+	if p.unschedulableQ.get(pod) != nil {
+		return fmt.Errorf("pod: %s/%s is already present in unschedulable queue", pod.Namespace, pod.Name)
+	}
+
+	// Refresh the timestamp since the pod is re-added.
+	pInfo.Timestamp = p.clock.Now()
+	if _, exists, _ := p.activeQ.Get(pInfo); exists {
+		return fmt.Errorf("pod: %s/%s is already present in the active queue", pod.Namespace, pod.Name)
+	}
+	if _, exists, _ := p.podBackoffQ.Get(pInfo); exists {
+		return fmt.Errorf("pod %s/%s is already present in the backoff queue", pod.Namespace, pod.Name)
+	}
+
+	// If a move request has been received, move it to the BackoffQ, otherwise move it to unschedulableQ.
+	if p.moveRequestCycle >= podSchedulingCycle {
+		if err := p.podBackoffQ.Add(pInfo); err != nil {
+			return fmt.Errorf("error adding pod %v to the backoff queue: %v", pod.Name, err)
+		}
+	} else {
+		p.unschedulableQ.addOrUpdate(pInfo)
+	}
+
+	p.PodNominator.AddNominatedPod(pod, "")
+	return nil
+}
+
 const queueClosed = "scheduling queue is closed"
 
 // 最大堆activeQ中pop一个pod出来，没有则一直block等待，同时p.schedulingCycle++
+// Pop() 函数会阻塞，这点很重要！！！
 func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -187,25 +228,37 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	return pInfo, err
 }
 
-// ???
-/*func (p *PriorityQueue) AssignedPodAdded(pod *v1.Pod) {
+// 该pod会把unschedulableQ中与其affinity匹配的pod放到activeQ中
+// 这样可以使得两个亲和性pod优先被调度起来
+func (p *PriorityQueue) AssignedPodAdded(pod *v1.Pod) {
 	p.lock.Lock()
 	p.movePodsToActiveOrBackoffQueue(p.getUnschedulablePodsWithMatchingAffinityTerm(pod), AssignedPodAdd)
 	p.lock.Unlock()
 }
 
-// AssignedPodUpdated is called when a bound pod is updated. Change of labels
-// may make pending pods with matching affinity terms schedulable.
-func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
-	p.lock.Lock()
-	p.movePodsToActiveOrBackoffQueue(p.getUnschedulablePodsWithMatchingAffinityTerm(pod), AssignedPodUpdate)
-	p.lock.Unlock()
+// 从 unschedulableQ 中寻找pods，该pods需要match到输入的pod affinity
+func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod) []*framework.QueuedPodInfo {
+	var podsToMove []*framework.QueuedPodInfo
+	for _, pInfo := range p.unschedulableQ.podInfoMap {
+		up := pInfo.Pod
+		terms := util.GetPodAffinityTerms(up.Spec.Affinity)
+		for _, term := range terms {
+			namespaces := util.GetNamespacesFromPodAffinityTerm(up, &term)
+			selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+			if err != nil {
+				klog.Errorf("Error getting label selectors for pod: %v.", up.Name)
+			}
+			if util.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
+				podsToMove = append(podsToMove, pInfo)
+				break
+			}
+		}
+	}
+
+	return podsToMove
 }
 
-// MoveAllToActiveOrBackoffQueue moves all pods from unschedulableQ to activeQ or backoffQ.
-// This function adds all pods and then signals the condition variable to ensure that
-// if Pop() is waiting for an item, it receives it after all the pods are in the
-// queue and the head is the highest priority pod.
+// 把 unschedulableQ 和 podBackoffQ 全部 move 到 activeQ
 func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -214,24 +267,32 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string) {
 		unschedulablePods = append(unschedulablePods, pInfo)
 	}
 	p.movePodsToActiveOrBackoffQueue(unschedulablePods, event)
-}*/
+}
+func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.QueuedPodInfo, event string) {
+	for _, pInfo := range podInfoList {
+		pod := pInfo.Pod
+		if p.isPodBackingoff(pInfo) { // unschedulableQ -> podBackoffQ
+			if err := p.podBackoffQ.Add(pInfo); err != nil {
+				klog.Errorf("Error adding pod %v to the backoff queue: %v", pod.Name, err)
+			} else {
+				p.unschedulableQ.delete(pod)
+			}
+		} else { // unschedulableQ -> activeQ
+			if err := p.activeQ.Add(pInfo); err != nil {
+				klog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
+			} else {
+				p.unschedulableQ.delete(pod)
+			}
+		}
+	}
 
-// NewSchedulingQueue initializes a priority queue as a new scheduling queue.
-/*func NewSchedulingQueue(lessFn framework.LessFunc, opts ...Option) PriorityQueue {
-	return NewPriorityQueue(lessFn, opts...)
-}*/
-
-type priorityQueueOptions struct {
-	clock                     util.Clock
-	podInitialBackoffDuration time.Duration
-	podMaxBackoffDuration     time.Duration
-	podNominator              framework.PodNominator
+	p.moveRequestCycle = p.schedulingCycle
+	p.cond.Broadcast()
 }
 
-var defaultPriorityQueueOptions = priorityQueueOptions{
-	clock:                     util.RealClock{},
-	podInitialBackoffDuration: DefaultPodInitialBackoffDuration,
-	podMaxBackoffDuration:     DefaultPodMaxBackoffDuration,
+// 判断是不是 podBackoff pod
+func (p *PriorityQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
+	return p.getBackoffTime(podInfo).After(p.clock.Now())
 }
 
 func podInfoKeyFunc(obj interface{}) (string, error) {
@@ -264,12 +325,38 @@ func (p *PriorityQueue) calculateBackoffDuration(podInfo *framework.QueuedPodInf
 	return duration
 }
 
+func (p *PriorityQueue) SchedulingCycle() int64 {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	return p.schedulingCycle
+}
+
+type priorityQueueOptions struct {
+	clock                     util.Clock
+	podInitialBackoffDuration time.Duration
+	podMaxBackoffDuration     time.Duration
+	podNominator              *nominatedPodMap
+}
+type Option func(*priorityQueueOptions)
+
+func WithClock(clock util.Clock) Option {
+	return func(o *priorityQueueOptions) {
+		o.clock = clock
+	}
+}
+
+var defaultPriorityQueueOptions = priorityQueueOptions{
+	clock:                     util.RealClock{},
+	podInitialBackoffDuration: DefaultPodInitialBackoffDuration,
+	podMaxBackoffDuration:     DefaultPodMaxBackoffDuration,
+}
+
 // NewPriorityQueue creates a PriorityQueue object.
-func NewPriorityQueue(lessFn framework.LessFunc /*opts ...Option*/) *PriorityQueue {
+func NewPriorityQueue(lessFn framework.LessFunc, opts ...Option) *PriorityQueue {
 	options := defaultPriorityQueueOptions
-	/*for _, opt := range opts {
+	for _, opt := range opts {
 		opt(&options)
-	}*/
+	}
 
 	comp := func(podInfo1, podInfo2 interface{}) bool {
 		pInfo1 := podInfo1.(*framework.QueuedPodInfo)
@@ -328,6 +415,10 @@ func newUnschedulablePodsMap(metricRecorder metrics.MetricRecorder) *Unschedulab
 		keyFunc:        util.GetPodFullName,
 		metricRecorder: metricRecorder,
 	}
+}
+
+func (u *UnschedulablePodsMap) addOrUpdate(pInfo *framework.QueuedPodInfo) {
+	u.podInfoMap[u.keyFunc(pInfo.Pod)] = pInfo
 }
 
 func (u *UnschedulablePodsMap) get(pod *v1.Pod) *framework.QueuedPodInfo {

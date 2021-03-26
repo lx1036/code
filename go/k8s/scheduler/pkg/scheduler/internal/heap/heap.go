@@ -144,6 +144,24 @@ func (h *Heap) Pop() (interface{}, error) {
 	return nil, fmt.Errorf("object was removed from heap data")
 }
 
+// Get returns the requested item, or sets exists=false.
+func (h *Heap) Get(obj interface{}) (interface{}, bool, error) {
+	key, err := h.data.keyFunc(obj)
+	if err != nil {
+		return nil, false, cache.KeyError{Obj: obj, Err: err}
+	}
+	return h.GetByKey(key)
+}
+
+// GetByKey returns the requested item, or sets exists=false.
+func (h *Heap) GetByKey(key string) (interface{}, bool, error) {
+	item, exists := h.data.items[key]
+	if !exists {
+		return nil, false, nil
+	}
+	return item.obj, true, nil
+}
+
 func (h *Heap) Len() int {
 	return len(h.data.queue)
 }
