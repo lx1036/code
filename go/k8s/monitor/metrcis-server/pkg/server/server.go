@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"k8s-lx1036/k8s/monitor/metrcis-server/pkg/api"
 	"k8s-lx1036/k8s/monitor/metrcis-server/pkg/scraper"
 	"k8s-lx1036/k8s/monitor/metrcis-server/pkg/storage"
 
@@ -89,11 +90,16 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	store := storage.NewStorage()
+	if err := api.Install(store, informer.Core().V1(), genericServer); err != nil {
+		return nil, err
+	}
+
 	return &Server{
 		sync:             nodes.Informer().HasSynced,
 		informer:         informer,
 		GenericAPIServer: genericServer,
-		storage:          storage.NewStorage(),
+		storage:          store,
 		scraper:          scraper.NewScraper(nodes.Lister(), kubeletClient, config.ScrapeTimeout),
 		resolution:       config.MetricResolution,
 	}, nil

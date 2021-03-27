@@ -40,7 +40,6 @@ func NewKubeletClient(config *rest.Config) (*KubeletClient, error) {
 			},
 		},
 	}, nil
-
 }
 
 func (kubeletClient *KubeletClient) getBuffer() *bytes.Buffer {
