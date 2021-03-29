@@ -393,3 +393,5 @@ func (p *csiProvisioner) Provision(ctx context.Context, options controller.Provi
 **[Kubernetes Container Storage Interface (CSI) Documentation](https://kubernetes-csi.github.io/docs/introduction.html)**
 
 **[node-driver-registrar](https://github.com/kubernetes-csi/node-driver-registrar)**
+
+**[external-provisioner设计文档](https://github.com/kubernetes-csi/external-provisioner/blob/master/doc/design.md)**

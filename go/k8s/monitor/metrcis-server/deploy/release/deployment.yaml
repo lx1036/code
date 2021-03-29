@@ -1,0 +1,93 @@
+
+
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+spec:
+  ports:
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: https
+  selector:
+    k8s-app: metrics-server
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: metrics-server
+  name: metrics-server
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        k8s-app: metrics-server
+    spec:
+      containers:
+        - args:
+            - --cert-dir=/tmp
+#            - --kubelet-certificate-authority=/tmp/ca.crt
+#            - --kubelet-client-certificate=/tmp/tls.crt
+#            - --kubelet-client-key=/tmp/tls.key
+            - --kubelet-insecure-tls
+            - --secure-port=4443
+            - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+            - --kubelet-use-node-status-port
+          image: k8s.gcr.io/metrics-server/metrics-server:v0.4.2
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            initialDelaySeconds: 180
+            failureThreshold: 3
+            httpGet:
+              path: /livez
+              port: https
+              scheme: HTTPS
+            periodSeconds: 10
+          name: metrics-server
+          ports:
+            - containerPort: 4443
+              name: https
+              protocol: TCP
+          readinessProbe:
+            initialDelaySeconds: 180
+            failureThreshold: 3
+            httpGet:
+              path: /readyz
+              port: https
+              scheme: HTTPS
+            periodSeconds: 10
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp-dir
+#              name: service-certs
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: system-cluster-critical
+      serviceAccountName: metrics-server
+      volumes:
+        - emptyDir: {}
+          name: tmp-dir
+        - name: service-certs
+          secret:
+            secretName: metrics-server

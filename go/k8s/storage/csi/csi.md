@@ -46,3 +46,6 @@ csi_plugin 主要实现csi定义的方法，如 NodeGetInfo/NodeStageVolume/Node
 方法，来注册自己写的csi plugin。代码在 pkg/volume/csi/csi_plugin.go。
 其中，csi-external-provisioner和csi-external-attacher controller会watch pvc/pv/storageclass 再去调用自己写的csi plugin方法实现create/delete volume，
 和attach/detach volume。
+
+### mount propagation
+设计文档： https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/propagation.md

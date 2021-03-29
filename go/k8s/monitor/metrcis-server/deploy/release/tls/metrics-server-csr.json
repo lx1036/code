@@ -1,0 +1,15 @@
+{
+  "CN": "metrics-server.kube-system.svc",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "CN",
+      "L": "BeiJing",
+      "O": "QC",
+      "ST": "BeiJing"
+    }
+  ]
+}

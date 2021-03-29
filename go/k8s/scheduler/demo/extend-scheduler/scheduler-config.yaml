@@ -1,0 +1,26 @@
+
+# https://kubernetes.io/zh/docs/reference/scheduling/config/
+# k8s.io/kube-scheduler/config/v1beta1/types.go
+
+apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: /Users/liuxiang/.kube/config
+leaderElection:
+  leaderElect: false
+  resourceName: priority-class-fit-scheduler
+  resourceNamespace: kube-system
+profiles:
+  - schedulerName: priority-class-fit-scheduler
+    plugins:
+      filter:
+        enabled:
+          - name: "priority-class-fit"
+      score:
+        enabled:
+          - name: "priority-class-fit"
+    pluginConfig:
+      - name: "priority-class-fit"
+        args:
+          priorityClassName: "vip"
+          ratio: 2
