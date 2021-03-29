@@ -9,3 +9,6 @@ https://github.com/kubernetes/kubernetes/blob/v1.19.7/cmd/kube-controller-manage
 
 
 
+## 参考文献
+**[Kubernetes HPA 使用详解](https://www.qikqiak.com/post/k8s-hpa-usage/)**
+
