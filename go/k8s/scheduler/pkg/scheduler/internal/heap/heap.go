@@ -120,6 +120,19 @@ func (h *Heap) Add(obj interface{}) error {
 	return nil
 }
 
+func (h *Heap) Delete(obj interface{}) error {
+	key, err := h.data.keyFunc(obj)
+	if err != nil {
+		return cache.KeyError{Obj: obj, Err: err}
+	}
+	if item, ok := h.data.items[key]; ok {
+		heap.Remove(h.data, item.index)
+		return nil
+	}
+
+	return fmt.Errorf("object not found")
+}
+
 func (h *Heap) Pop() (interface{}, error) {
 	obj := heap.Pop(h.data)
 	if obj != nil {
@@ -129,6 +142,28 @@ func (h *Heap) Pop() (interface{}, error) {
 		return obj, nil
 	}
 	return nil, fmt.Errorf("object was removed from heap data")
+}
+
+// Get returns the requested item, or sets exists=false.
+func (h *Heap) Get(obj interface{}) (interface{}, bool, error) {
+	key, err := h.data.keyFunc(obj)
+	if err != nil {
+		return nil, false, cache.KeyError{Obj: obj, Err: err}
+	}
+	return h.GetByKey(key)
+}
+
+// GetByKey returns the requested item, or sets exists=false.
+func (h *Heap) GetByKey(key string) (interface{}, bool, error) {
+	item, exists := h.data.items[key]
+	if !exists {
+		return nil, false, nil
+	}
+	return item.obj, true, nil
+}
+
+func (h *Heap) Len() int {
+	return len(h.data.queue)
 }
 
 // New returns a Heap which can be used to queue up items to process.

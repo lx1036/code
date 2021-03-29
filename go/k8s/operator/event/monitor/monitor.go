@@ -5,6 +5,7 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"k8s-lx1036/k8s/operator/event/monitor/pkg/sources"
 	corev1 "k8s.io/api/core/v1"
 	"net"
 	"net/http"
@@ -277,10 +278,10 @@ type Message struct {
 //		return "", nil
 //	}
 //
-//	url := "http://10.202.5.72:20082/360home/send_custom_message?from=oom-monitor"
+//	url := "xxx"
 //	body := Message{
 //		ToUser:  strings.Split(users, ","),
-//		Content: viper.GetString("QIHOO_IDC") + ":\n" + message,
+//		Content: viper.GetString("IDC") + ":\n" + message,
 //	}
 //	request, _ := httplib.Post(url).JSONBody(body)
 //	request.SetBasicAuth("360home", "bd57affdeb559fd28592be2560b3bb78")

@@ -8,7 +8,6 @@ import (
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/algo"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
-	"k8s-lx1036/k8s/scheduler/pkg/scheduler/core"
 	frameworkplugins "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
 	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"

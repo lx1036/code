@@ -41,7 +41,7 @@ lua_shared_dict prometheus_metrics 10m;
 init_by_lua_block {
     local ok, err = require("prometheus.wrapper"):init({
         app = "m_so_com", -- 建议配置成 git 项目名
-        idc = QIHOO_IDC,
+        idc = lx1036_IDC,
         monitor_switch = {
             METRIC_COUNTER_RESPONSES = {"/s?type=obx", "/status.html"}, -- 支持带参数
             METRIC_COUNTER_SENT_BYTES = {"/s"},

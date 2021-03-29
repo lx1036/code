@@ -120,6 +120,7 @@ require (
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubelet v0.0.0
 	k8s.io/kubernetes v1.19.7
+	k8s.io/metrics v0.19.7
 	k8s.io/sample-controller v0.19.7
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/controller-runtime v0.6.2
