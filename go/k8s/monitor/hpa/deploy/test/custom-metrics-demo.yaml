@@ -1,0 +1,50 @@
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hpa-prom-demo
+  namespace: cattle-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: nginx-server
+  template:
+    metadata:
+      labels:
+        app: nginx-server
+    spec:
+      containers:
+        - name: nginx-demo
+          image: cnych/nginx-vts:v1.0
+          resources:
+            limits:
+              cpu: 50m
+            requests:
+              cpu: 50m
+          ports:
+            - containerPort: 80
+              name: http
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: hpa-prom-demo
+  namespace: cattle-prometheus
+  labels:
+    app: hpa-prom-demo
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "80"
+    prometheus.io/path: "/status/format/prometheus"
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+      name: http
+  selector:
+    app: nginx-server
+  type: NodePort
