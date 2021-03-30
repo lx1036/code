@@ -16,8 +16,8 @@ import (
 const Name = "priority-class-fit"
 
 const (
-	CPUAllocateAnnotation    = "allocatable.resource/cpu"
-	MemoryAllocateAnnotation = "allocatable.resource/memory"
+	CPUAllocateAnnotation    = "allocatable.resource/cpu"    // node实际值的剩余值
+	MemoryAllocateAnnotation = "allocatable.resource/memory" // node实际值的剩余值
 )
 
 type Args struct {
@@ -35,8 +35,27 @@ func (s *PriorityClassFit) Name() string {
 	return Name
 }
 
+func (s *PriorityClassFit) CmpPriority(priorityOne, priorityTwo string) int {
+	podPriorityClass, err := s.handle.SharedInformerFactory().Scheduling().V1().PriorityClasses().Lister().Get(priorityOne)
+	if err != nil {
+		return 0
+	}
+	argsPriorityClass, err := s.handle.SharedInformerFactory().Scheduling().V1().PriorityClasses().Lister().Get(priorityTwo)
+	if err != nil {
+		return 0
+	}
+	if podPriorityClass.Value == argsPriorityClass.Value {
+		return 0
+	} else if podPriorityClass.Value > argsPriorityClass.Value {
+		return 1
+	}
+
+	return -1
+}
+
 func (s *PriorityClassFit) Filter(c context.Context, state *v1alpha1.CycleState, pod *v1.Pod, nodeInfo *v1alpha1.NodeInfo) *v1alpha1.Status {
-	if pod.Spec.PriorityClassName != s.args.PriorityClassName {
+	// 只考虑低优先级pod
+	if s.CmpPriority(pod.Spec.PriorityClassName, s.args.PriorityClassName) >= 0 { // pod >= args
 		return nil
 	}
 
@@ -101,8 +120,7 @@ func (s *PriorityClassFit) Filter(c context.Context, state *v1alpha1.CycleState,
 
 // 在 pkg/scheduler/framework/v1alpha1/interface.go 定义
 func (s *PriorityClassFit) Score(ctx context.Context, state *v1alpha1.CycleState, pod *v1.Pod, nodeName string) (int64, *v1alpha1.Status) {
-	// 只考虑 "PriorityClassName" pod
-	if pod.Spec.PriorityClassName != s.args.PriorityClassName {
+	if s.CmpPriority(pod.Spec.PriorityClassName, s.args.PriorityClassName) >= 0 { // pod >= args
 		return 0, nil
 	}
 
@@ -112,15 +130,25 @@ func (s *PriorityClassFit) Score(ctx context.Context, state *v1alpha1.CycleState
 	}
 	node := nodeInfo.Node()
 
-	score := v1alpha1.MaxNodeScore
-	for _, item := range nodeInfo.Pods {
+	//score := v1alpha1.MaxNodeScore
+	/*for _, item := range nodeInfo.Pods {
 		if item.Pod.Spec.NodeName == node.Name && item.Pod.Spec.PriorityClassName == s.args.PriorityClassName {
 			// TODO: 通过 pod resource 来打分，而不是个数，参考下 kube-scheduler 源码
 			score-- // 高优先级pod数量越多，分数越低
 		}
+	}*/
+	cpuStr, ok := node.Annotations[CPUAllocateAnnotation] // e.g. "30"
+	if !ok {
+		return 0, nil
+	}
+	cpu, err := strconv.ParseInt(cpuStr, 10, 0) // e.g. 30
+	if err != nil {
+		klog.Errorf("parse int err %v", err)
+		return 0, nil
 	}
 
-	return score, nil
+	// cpu剩余最大，分数最大，为简化未考虑内存
+	return cpu, nil
 }
 
 // ScoreExtensions of the Score plugin.

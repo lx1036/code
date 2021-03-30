@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"os"
 
 	"k8s.io/client-go/tools/clientcmd"
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
@@ -24,6 +26,20 @@ func main() {
 	clientConfig, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err)
+	}
+
+	clientSet, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	hpa, err := clientSet.AutoscalingV2beta2().HorizontalPodAutoscalers(metav1.NamespaceDefault).Get(context.TODO(), "hpa-test-memory", metav1.GetOptions{})
+	if err != nil {
+		panic(err)
+	}
+	if hpa != nil {
+		klog.Infof("hpa behavior", hpa.Spec.Behavior.String())
+		os.Exit(0)
 	}
 
 	resourceMetricsClient := resourceclient.NewForConfigOrDie(clientConfig)

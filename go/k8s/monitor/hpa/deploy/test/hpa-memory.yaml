@@ -54,7 +54,9 @@ spec:
 
 ---
 
-apiVersion: autoscaling/v2beta1
+# @see [如何根据不同业务场景调节 HPA 扩缩容灵敏度](https://mp.weixin.qq.com/s/mRwvZBVfWPYvE7hERbGMTA)
+
+apiVersion: autoscaling/v2beta2
 kind: HorizontalPodAutoscaler
 metadata:
   name: hpa-test-memory
@@ -69,4 +71,23 @@ spec:
     - type: Resource
       resource:
         name: memory
-        targetAverageUtilization: 20
+        target:
+          type: Utilization
+          averageUtilization: 20
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 20
+  behavior:
+    scaleUp:
+      policies:
+        - type: Percent
+          value: 200
+          periodSeconds: 600 # 10min
+    scaleDown:
+      policies:
+        - type: Percent
+          value: 200
+          periodSeconds: 600
