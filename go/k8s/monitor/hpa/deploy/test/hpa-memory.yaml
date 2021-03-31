@@ -80,14 +80,14 @@ spec:
         target:
           type: Utilization
           averageUtilization: 20
-  behavior:
+  behavior: # 测试精细化控制扩缩容
     scaleUp:
       policies:
         - type: Percent
           value: 200
-          periodSeconds: 600 # 10min
+          periodSeconds: 60 # 1min
     scaleDown:
       policies:
         - type: Percent
           value: 200
-          periodSeconds: 600
+          periodSeconds: 60
