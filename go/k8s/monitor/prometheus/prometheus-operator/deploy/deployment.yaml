@@ -1,0 +1,63 @@
+
+
+# https://github.com/prometheus-operator/prometheus-operator/blob/master/bundle.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: prometheus-operator
+  name: prometheus-operator-monitoring-operator
+  namespace: kube-system
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: prometheus-operator
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: prometheus-operator
+    spec:
+      containers:
+        - args:
+            - --kubelet-service=cattle-prometheus/expose-kubelets-metrics
+            - --log-format=logfmt
+            - --log-level=info
+            - --prometheus-config-reloader=rancher/coreos-prometheus-config-reloader:v0.38.1
+            - --config-reloader-image=rancher/jimmidyson-configmap-reload:v0.3.0
+            - --labels=monitoring.coreos.com=true
+            - --manage-crds=false
+            - --with-validation=true
+          image: rancher/coreos-prometheus-operator:v0.38.1
+          imagePullPolicy: IfNotPresent
+          name: prometheus-operator
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 200m
+              memory: 500Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/os: linux
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccountName: prometheus-operator
+      terminationGracePeriodSeconds: 30
+
