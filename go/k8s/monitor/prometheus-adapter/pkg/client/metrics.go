@@ -53,6 +53,7 @@ func (c *instrumentedGenericClient) Do(ctx context.Context, verb, endpoint strin
 
 }
 
+// 计算request延迟
 func InstrumentGenericAPIClient(client GenericAPIClient, serverName string) GenericAPIClient {
 	return &instrumentedGenericClient{
 		serverName: serverName,

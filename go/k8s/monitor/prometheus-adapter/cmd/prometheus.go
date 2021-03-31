@@ -13,7 +13,8 @@ import (
 
 	basecmd "github.com/kubernetes-sigs/custom-metrics-apiserver/pkg/cmd"
 	"github.com/kubernetes-sigs/custom-metrics-apiserver/pkg/provider"
-	"k8s.io/klog/v2"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type PrometheusAdapter struct {
@@ -25,6 +26,7 @@ type PrometheusAdapter struct {
 	PrometheusAuthInCluster bool
 	// PrometheusAuthConf is the kubeconfig file that contains auth details used to connect to Prometheus
 	PrometheusAuthConf string
+	Kubeconfig         string
 	// PrometheusCAFile points to the file containing the ca-root for connecting with Prometheus
 	PrometheusCAFile string
 	// PrometheusClientTLSCertFile points to the file containing the client TLS cert for connecting with Prometheus
@@ -50,6 +52,7 @@ func (cmd *PrometheusAdapter) addFlags() {
 		"use auth details from the in-cluster kubeconfig when connecting to prometheus.")
 	cmd.Flags().StringVar(&cmd.PrometheusAuthConf, "prometheus-auth-config", cmd.PrometheusAuthConf,
 		"kubeconfig file used to configure auth when connecting to Prometheus.")
+	cmd.Flags().StringVar(&cmd.Kubeconfig, "kubeconfig", cmd.Kubeconfig, "kubeconfig file")
 	cmd.Flags().StringVar(&cmd.PrometheusCAFile, "prometheus-ca-file", cmd.PrometheusCAFile,
 		"Optional CA file to use when connecting with Prometheus")
 	cmd.Flags().StringVar(&cmd.PrometheusClientTLSCertFile, "prometheus-client-tls-cert-file", cmd.PrometheusClientTLSCertFile,
@@ -67,22 +70,33 @@ func (cmd *PrometheusAdapter) addFlags() {
 		"period for which to query the set of available metrics from Prometheus")
 }
 
+// makeKubeconfigHTTPClient constructs an HTTP for connecting with the given auth options.
+func makeKubeconfigHTTPClient(kubeconfig string) (*http.Client, error) {
+	clientConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		panic(err)
+	}
+
+	roundTripper, err := rest.TransportFor(clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to construct client transport for connecting to Prometheus: %v", err)
+	}
+
+	return &http.Client{Transport: roundTripper}, nil
+}
+
 func (cmd *PrometheusAdapter) makePromClient() (client.Client, error) {
 	baseURL, err := url.Parse(cmd.PrometheusURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid Prometheus URL %q: %v", baseURL, err)
 	}
 
-	var httpClient *http.Client
-
-	kubeconfigHTTPClient, err := makeKubeconfigHTTPClient(cmd.PrometheusAuthInCluster, cmd.PrometheusAuthConf)
+	kubeconfigHTTPClient, err := makeKubeconfigHTTPClient(cmd.Kubeconfig)
 	if err != nil {
 		return nil, err
 	}
-	httpClient = kubeconfigHTTPClient
-	klog.Info("successfully using in-cluster auth")
 
-	genericPromClient := client.NewGenericAPIClient(httpClient, baseURL)
+	genericPromClient := client.NewGenericAPIClient(kubeconfigHTTPClient, baseURL)
 	instrumentedGenericPromClient := client.InstrumentGenericAPIClient(genericPromClient, baseURL.String())
 	return client.NewClientForAPI(instrumentedGenericPromClient), nil
 }
@@ -91,7 +105,7 @@ func (cmd *PrometheusAdapter) addResourceMetricsAPI(promClient client.Client) er
 
 }
 
-func (cmd *PrometheusAdapter) makeProvider(promClient client.Client, stopCh <-chan struct{}) (provider.CustomMetricsProvider, error) {
+func (cmd *PrometheusAdapter) makeCustomProvider(promClient client.Client, stopCh <-chan struct{}) (provider.CustomMetricsProvider, error) {
 
 	// construct the provider and start it
 	cmProvider, runner := custom_provider.NewPrometheusProvider(mapper, dynClient, promClient, namers, cmd.MetricsRelistInterval, cmd.MetricsMaxAge)

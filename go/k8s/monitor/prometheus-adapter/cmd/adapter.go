@@ -50,23 +50,23 @@ func main() {
 	// stop channel closed on SIGTERM and SIGINT
 	stopCh := genericapiserver.SetupSignalHandler()
 	// construct the provider
-	cmProvider, err := cmd.makeProvider(promClient, stopCh)
+	customProvider, err := cmd.makeCustomProvider(promClient, stopCh)
 	if err != nil {
 		klog.Fatalf("unable to construct custom metrics provider: %v", err)
 	}
 	// attach the provider to the server, if it's needed
-	if cmProvider != nil {
-		cmd.WithCustomMetrics(cmProvider)
+	if customProvider != nil {
+		cmd.WithCustomMetrics(customProvider)
 	}
 
 	// construct the external provider
-	emProvider, err := cmd.makeExternalProvider(promClient, stopCh)
+	externalProvider, err := cmd.makeExternalProvider(promClient, stopCh)
 	if err != nil {
 		klog.Fatalf("unable to construct external metrics provider: %v", err)
 	}
 	// attach the provider to the server, if it's needed
-	if emProvider != nil {
-		cmd.WithExternalMetrics(emProvider)
+	if externalProvider != nil {
+		cmd.WithExternalMetrics(externalProvider)
 	}
 
 	// attach resource metrics support, if it's needed
