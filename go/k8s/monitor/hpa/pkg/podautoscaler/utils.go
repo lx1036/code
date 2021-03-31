@@ -19,15 +19,12 @@ func calculatePodRequests(pods []*v1.Pod, resource v1.ResourceName) (map[string]
 		}
 		requests[pod.Name] = podSum
 	}
-	
+
 	return requests, nil
 }
-
-
 
 func removeMetricsForPods(metrics metrics.PodMetricsInfo, pods sets.String) {
 	for _, pod := range pods.UnsortedList() {
 		delete(metrics, pod)
 	}
 }
-

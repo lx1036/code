@@ -1,5 +1,7 @@
 
 
+# 资源视图隔离 lxcfs
+https://github.com/lxc/lxcfs
 
 
 ## 证书生成
@@ -18,5 +20,6 @@ https://github.com/denverdino/lxcfs-admission-webhook
 
 https://github.com/xigang/lxcfs-admission-webhook
 
-
 https://xigang.github.io/2019/11/09/lxcfs-admission-webhook/
+
+**[lxcfs 是什么？ lxcfs 实现对容器资源视图隔离的最佳实践](https://juejin.cn/post/6847902216511356936)**

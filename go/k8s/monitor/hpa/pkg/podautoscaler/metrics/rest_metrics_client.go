@@ -1,19 +1,18 @@
 package metrics
 
 import (
-	"fmt"
 	"context"
+	"fmt"
 	"k8s.io/klog/v2"
 	"time"
-	
-	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
-	customclient "k8s.io/metrics/pkg/client/custom_metrics"
-	externalclient "k8s.io/metrics/pkg/client/external_metrics"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+	customclient "k8s.io/metrics/pkg/client/custom_metrics"
+	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 )
-
 
 // PodMetric contains pod metric value (the metric values are expected to be the metric as a milli-value)
 type PodMetric struct {
@@ -24,8 +23,6 @@ type PodMetric struct {
 
 // PodMetricsInfo contains pod metrics as a map from pod names to PodMetricsInfo
 type PodMetricsInfo map[string]PodMetric
-
-
 
 // restMetricsClient is a client which supports fetching
 // metrics from both the resource metrics API and the
@@ -59,7 +56,7 @@ func NewRESTMetricsClient(resourceClient resourceclient.PodMetricsesGetter,
 }
 
 func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName,
-	namespace string, selector labels.Selector)(PodMetricsInfo, time.Time, error) {
+	namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	metrics, err := c.client.PodMetricses(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from resource metrics API: %v", err)
@@ -67,7 +64,7 @@ func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName,
 	if len(metrics.Items) == 0 {
 		return nil, time.Time{}, fmt.Errorf("no metrics returned from resource metrics API")
 	}
-	
+
 	res := make(PodMetricsInfo, len(metrics.Items))
 	for _, m := range metrics.Items {
 		podSum := int64(0)
@@ -81,7 +78,7 @@ func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName,
 			}
 			podSum += resValue.MilliValue()
 		}
-		
+
 		if !missing {
 			res[m.Name] = PodMetric{
 				Timestamp: m.Timestamp.Time,
@@ -90,8 +87,7 @@ func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName,
 			}
 		}
 	}
-	
+
 	timestamp := metrics.Items[0].Timestamp.Time
 	return res, timestamp, nil
 }
-

@@ -1,18 +1,18 @@
 package podautoscaler
 
 import (
+	"context"
 	"fmt"
 	"k8s.io/apimachinery/pkg/labels"
 	"time"
-	"context"
-	
+
 	"k8s-lx1036/k8s/monitor/hpa/pkg/podautoscaler/metrics"
-	
-	
+
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -21,12 +21,10 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	autoscalinglisters "k8s.io/client-go/listers/autoscaling/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	scaleclient "k8s.io/client-go/scale"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
-
 )
 
 type HorizontalController struct {
@@ -39,11 +37,10 @@ type HorizontalController struct {
 	scaleNamespacer scaleclient.ScalesGetter
 
 	queue workqueue.RateLimitingInterface
-	
-	mapper          apimeta.RESTMapper
-	
-	replicaCalc   *ReplicaCalculator
-	
+
+	mapper apimeta.RESTMapper
+
+	replicaCalc *ReplicaCalculator
 }
 
 // NewHorizontalController creates a new HorizontalController.
@@ -57,20 +54,18 @@ func NewHorizontalController(
 
 	hpaController := &HorizontalController{
 		// @see pkg/controller/podautoscaler/config/v1alpha1/defaults.go
-		queue: workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(time.Second*15), "horizontalpodautoscaler"),
+		queue:           workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(time.Second*15), "horizontalpodautoscaler"),
 		scaleNamespacer: scaleNamespacer,
-		mapper:                       mapper,
-		
+		mapper:          mapper,
 	}
-	
-	
+
 	// @see pkg/controller/podautoscaler/config/v1alpha1/defaults.go
 	hpaController.replicaCalc = NewReplicaCalculator(
 		metricsClient,
 		hpaController.podLister,
 		0.1,
-		time.Minute * 5,
-		time.Second * 30,
+		time.Minute*5,
+		time.Second*30,
 	)
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -220,11 +215,11 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			rescaleMetric = metricName
 		}
 		if hpa.Spec.Behavior == nil {
-		
+
 		} else {
 			desiredReplicas = a.normalizeDesiredReplicasWithBehaviors(hpa, key, currentReplicas, desiredReplicas, minReplicas)
 		}
-		
+
 		// 期望副本数量不等于当前副本数量
 		rescale = desiredReplicas != currentReplicas
 	}
@@ -252,20 +247,19 @@ func (a *HorizontalController) scaleForResourceMappings(namespace, name string, 
 		if err == nil {
 			return scale, targetGR, nil
 		}
-		
+
 		if i == 0 {
 			firstErr = err
 		}
 	}
-	
+
 	// make sure we handle an empty set of mappings
 	if firstErr == nil {
 		firstErr = fmt.Errorf("unrecognized resource")
 	}
-	
+
 	return nil, schema.GroupResource{}, firstErr
 }
-
 
 func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.HorizontalPodAutoscaler, scale *autoscalingv1.Scale,
 	metricSpecs []autoscalingv2.MetricSpec) (replicas int32, metric string, statuses []autoscalingv2.MetricStatus, timestamp time.Time, err error) {
@@ -275,19 +269,19 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 	}
 
 	/*
-	metrics:
-		- type: Resource
-	      resource:
-				name: memory
-				target:
-					type: Utilization
-					averageUtilization: 20
-		- type: Resource
-			resource:
-				name: cpu
-	            target:
-			      type: Utilization
-		          averageUtilization: 20
+		metrics:
+			- type: Resource
+		      resource:
+					name: memory
+					target:
+						type: Utilization
+						averageUtilization: 20
+			- type: Resource
+				resource:
+					name: cpu
+		            target:
+				      type: Utilization
+			          averageUtilization: 20
 	*/
 	specReplicas := scale.Spec.Replicas
 	statusReplicas := scale.Status.Replicas
@@ -295,11 +289,9 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 	for i, metricSpec := range metricSpecs {
 		replicaCountProposal, metricNameProposal, timestampProposal, condition, err := a.computeReplicasForMetric(hpa,
 			metricSpec, specReplicas, statusReplicas, selector, &statuses[i])
-		
-		
+
 	}
-	
-	
+
 }
 
 // Computes the desired number of replicas for a specific hpa and metric specification,
@@ -310,8 +302,7 @@ func (a *HorizontalController) computeReplicasForMetric(hpa *autoscalingv2.Horiz
 	selector labels.Selector,
 	status *autoscalingv2.MetricStatus) (replicaCountProposal int32, metricNameProposal string,
 	timestampProposal time.Time, condition autoscalingv2.HorizontalPodAutoscalerCondition, err error) {
-	
-	
+
 	switch spec.Type {
 	case autoscalingv2.ResourceMetricSourceType:
 		replicaCountProposal, timestampProposal, metricNameProposal, condition, err = a.computeStatusForResourceMetric(specReplicas, spec, hpa, selector, status)
@@ -319,8 +310,7 @@ func (a *HorizontalController) computeReplicasForMetric(hpa *autoscalingv2.Horiz
 			return 0, "", time.Time{}, condition, err
 		}
 	}
-	
-	
+
 	return replicaCountProposal, metricNameProposal, timestampProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 }
 
@@ -330,7 +320,7 @@ func (a *HorizontalController) computeStatusForResourceMetric(currentReplicas in
 	selector labels.Selector,
 	status *autoscalingv2.MetricStatus) (replicaCountProposal int32, timestampProposal time.Time, metricNameProposal string,
 	condition autoscalingv2.HorizontalPodAutoscalerCondition, err error) {
-	
+
 	if metricSpec.Resource.Target.AverageValue != nil {
 		// 忽略 averageValue
 		return 0, time.Time{}, "", autoscalingv2.HorizontalPodAutoscalerCondition{}, err
@@ -344,10 +334,9 @@ func (a *HorizontalController) computeStatusForResourceMetric(currentReplicas in
 	if err != nil {
 		return 0, time.Time{}, "", autoscalingv2.HorizontalPodAutoscalerCondition{}, err
 	}
-	
+
 	return replicaCountProposal, timestampProposal, metricNameProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 }
-
 
 // normalizeDesiredReplicasWithBehaviors takes the metrics desired replicas value and normalizes it:
 // 1. Apply the basic conditions (i.e. < maxReplicas, > minReplicas, etc...)
@@ -356,6 +345,5 @@ func (a *HorizontalController) computeStatusForResourceMetric(currentReplicas in
 // 4. Apply the stabilization (i.e. add no more than 4 pods per minute, and pick the smallest recommendation during last 5 minutes)
 func (a *HorizontalController) normalizeDesiredReplicasWithBehaviors(hpa *autoscalingv2.HorizontalPodAutoscaler, key string,
 	currentReplicas, prenormalizedDesiredReplicas, minReplicas int32) int32 {
-	
-	
+
 }

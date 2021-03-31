@@ -53,6 +53,7 @@ require (
 	github.com/kubernetes-sigs/custom-metrics-apiserver v0.0.0-20210311094424-0ca2b1909cdc
 	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
+	github.com/mattbaird/jsonpatch v0.0.0-20200820163806-098863c1fc24
 	github.com/mholt/certmagic v0.8.3
 	github.com/miekg/dns v1.1.22
 	github.com/mitchellh/mapstructure v1.1.2
