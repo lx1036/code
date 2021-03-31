@@ -4,12 +4,17 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 	"os"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
@@ -33,6 +38,62 @@ func main() {
 		panic(err)
 	}
 
+	// 1. curl 127.0.0.1:8001/apis/apps/v1/namespaces/default/deployments/hpa-mem-demo/scale (运行 `kubectl proxy`)
+	/*
+		{
+			"kind": "Scale",
+			"apiVersion": "autoscaling/v1",
+			"metadata": {
+			"name": "hpa-mem-demo",
+				"namespace": "default",
+				"selfLink": "/apis/apps/v1/namespaces/default/deployments/hpa-mem-demo/scale",
+				"uid": "9af63c94-b36b-48d6-a1d2-37e1bc2aeb88",
+				"resourceVersion": "28498561",
+				"creationTimestamp": "2021-03-30T04:04:36Z"
+			},
+			"spec": {
+				"replicas": 1
+			},
+			"status": {
+				"replicas": 1,
+				"selector": "app=nginx"
+			}
+		}
+	*/
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(clientSet.Discovery())
+	cachedClient := cacheddiscovery.NewMemCacheClient(clientSet.Discovery())
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedClient)
+	scaleClient, err := scale.NewForConfig(clientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	if err != nil {
+		panic(err)
+	}
+	if scaleClient != nil {
+		targetGV, err := schema.ParseGroupVersion("apps/v1")
+		if err != nil {
+			panic(err)
+		}
+		targetGK := schema.GroupKind{
+			Group: targetGV.Group,
+			Kind:  "Deployment",
+		}
+		mappings, err := restMapper.RESTMappings(targetGK)
+		if err != nil {
+			panic(err)
+		}
+		for _, mapping := range mappings {
+			targetGR := mapping.Resource.GroupResource()
+			deploymentName := "hpa-mem-demo"
+			scales, err := scaleClient.Scales(metav1.NamespaceDefault).Get(context.TODO(), targetGR, deploymentName, metav1.GetOptions{})
+			if err != nil {
+				panic(err)
+			}
+
+			klog.Infof("%v", scales)
+		}
+
+		os.Exit(0)
+	}
+
 	hpa, err := clientSet.AutoscalingV2beta2().HorizontalPodAutoscalers(metav1.NamespaceDefault).Get(context.TODO(), "hpa-test-memory", metav1.GetOptions{})
 	if err != nil {
 		panic(err)
@@ -42,9 +103,8 @@ func main() {
 		os.Exit(0)
 	}
 
+	// 3. 等于 curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/nodes (kubectl proxy，该集群得部署 metrics-server deployment)
 	resourceMetricsClient := resourceclient.NewForConfigOrDie(clientConfig)
-
-	// 等于 http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/nodes (kubectl proxy，该集群得部署 metrics-server deployment)
 	nodeMetricsList, err := resourceMetricsClient.NodeMetricses().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		panic(err)
@@ -55,7 +115,7 @@ func main() {
 			nodeMetrics.Usage.Cpu().String(), nodeMetrics.Usage.Memory().String())
 	}
 
-	// http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/pods
+	// 4. curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/pods
 	// metrics-server pod
 	podMetricsList, err := resourceMetricsClient.PodMetricses("kube-system").List(context.TODO(), metav1.ListOptions{
 		LabelSelector: "k8s-app=metrics-server",
