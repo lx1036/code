@@ -42,18 +42,22 @@ spec:
     spec:
       containers:
         - args:
+            # k8s集群的 ca.crt/ca.key 一般在 /data/kubernetes/etc/kubernetes/ssl/ 目录下
             - --cert-dir=/tmp
+            - --v=5
 #            - --kubelet-certificate-authority=/tmp/ca.crt
 #            - --kubelet-client-certificate=/tmp/tls.crt
 #            - --kubelet-client-key=/tmp/tls.key
             - --kubelet-insecure-tls
+#            - --tls-cert-file=/tmp/tls.crt
+#            - --tls-private-key-file=/tmp/tls.key
             - --secure-port=4443
             - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
             - --kubelet-use-node-status-port
           image: k8s.gcr.io/metrics-server/metrics-server:v0.4.2
           imagePullPolicy: IfNotPresent
           livenessProbe:
-            initialDelaySeconds: 180
+            initialDelaySeconds: 60
             failureThreshold: 3
             httpGet:
               path: /livez
@@ -66,7 +70,7 @@ spec:
               name: https
               protocol: TCP
           readinessProbe:
-            initialDelaySeconds: 180
+            initialDelaySeconds: 60
             failureThreshold: 3
             httpGet:
               path: /readyz

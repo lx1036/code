@@ -1,0 +1,63 @@
+
+# [Kubernetes HPA 使用详解](https://www.qikqiak.com/post/k8s-hpa-usage/)
+
+# 压测 cpu:
+# kubectl run -it --image busybox hpa-pressure --restart=Never --rm /bin/sh
+# while true; do wget -q -O- http://{pod_ip}:80; done
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hpa-test
+  labels:
+    app: hpa-test
+  annotations:
+    log/controller-kind: filebeat
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: hpa-test
+      labels:
+        app1: hpa-test-1
+        app2: hpa-test-2
+    spec:
+      containers:
+        - name: hpa-test-1
+          image: nginx:1.17.8
+          resources:
+            requests:
+              cpu: 50m
+              memory: 50Mi
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          livenessProbe:
+            httpGet:
+              port: 80
+              path: /index.html # /status(会不断重启), /index.html(正确的) 测试 RestartCount
+            failureThreshold: 10
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app1: hpa-test-1
+
+---
+
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-test
+  namespace: default
+spec:
+  maxReplicas: 10
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hpa-test
+  targetCPUUtilizationPercentage: 10
+
+

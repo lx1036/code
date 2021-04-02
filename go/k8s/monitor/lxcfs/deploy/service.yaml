@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lxcfs-webhook
+  namespace: kube-system
+spec:
+  selector:
+    app: lxcfs-webhook
+  ports:
+    - port: 443
+      targetPort: 8443
+      protocol: TCP
+  type: ClusterIP

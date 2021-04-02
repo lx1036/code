@@ -1,5 +1,8 @@
 
 # Install & Upgrade
+安装文档：https://cert-manager.io/docs/installation/kubernetes/
+github: https://github.com/jetstack/cert-manager
+
 ```shell script
 kubectl create namespace cert-manager
 kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v0.13.1/cert-manager.yaml

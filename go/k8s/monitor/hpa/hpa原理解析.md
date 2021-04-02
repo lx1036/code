@@ -9,3 +9,11 @@ https://github.com/kubernetes/kubernetes/blob/v1.19.7/cmd/kube-controller-manage
 
 
 
+
+## HPA 设计文档
+**[HPA V2设计文档](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/autoscaling/hpa-v2.md)**
+
+
+## 参考文献
+**[Kubernetes HPA 使用详解](https://www.qikqiak.com/post/k8s-hpa-usage/)**
+

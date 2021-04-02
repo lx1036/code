@@ -20,7 +20,7 @@ require (
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
-	github.com/emicklei/go-restful v2.9.5+incompatible
+	github.com/emicklei/go-restful v2.14.3+incompatible
 	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
 	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
 	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
@@ -50,8 +50,10 @@ require (
 	github.com/klauspost/cpuid v1.2.0
 	github.com/kubernetes-csi/csi-lib-utils v0.9.0
 	github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0
+	github.com/kubernetes-sigs/custom-metrics-apiserver v0.0.0-20210311094424-0ca2b1909cdc
 	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
+	github.com/mattbaird/jsonpatch v0.0.0-20200820163806-098863c1fc24
 	github.com/mholt/certmagic v0.8.3
 	github.com/miekg/dns v1.1.22
 	github.com/mitchellh/mapstructure v1.1.2
@@ -66,6 +68,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectcalico/libcalico-go v1.7.2-0.20201119205058-b367043ede58
 	github.com/prometheus/client_golang v1.7.1
+	github.com/prometheus/common v0.10.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 	github.com/robfig/cron v1.1.0
@@ -103,16 +106,16 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/sohlich/elogrus.v7 v7.0.0
 	gopkg.in/square/go-jose.v2 v2.3.1
-	gopkg.in/yaml.v2 v2.3.0
-	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 	gotest.tools v2.2.0+incompatible
 	k8s.io/api v0.20.2
 	k8s.io/apiextensions-apiserver v0.19.7
 	k8s.io/apimachinery v0.20.2
-	k8s.io/apiserver v0.19.7
+	k8s.io/apiserver v0.20.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/code-generator v0.20.5 // indirect
-	k8s.io/component-base v0.19.7
+	k8s.io/component-base v0.20.0
 	k8s.io/component-helpers v0.20.2
 	k8s.io/cri-api v0.0.0
 	k8s.io/gengo v0.0.0-20210203185629-de9496dff47b // indirect
@@ -120,7 +123,7 @@ require (
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubelet v0.0.0
 	k8s.io/kubernetes v1.19.7
-	k8s.io/metrics v0.19.7
+	k8s.io/metrics v0.20.0
 	k8s.io/sample-controller v0.19.7
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/controller-runtime v0.6.2

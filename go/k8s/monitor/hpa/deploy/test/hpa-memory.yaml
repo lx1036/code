@@ -1,0 +1,94 @@
+
+# 压测内存，pod内执行：
+# kubectl exec -it hpa-mem-demo-5bcbcc6896-cvcq4 -- bash
+# source /etc/script/increase-mem.sh
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: increase-mem-config
+data:
+  increase-mem.sh: |
+    #!/bin/bash
+    mkdir /tmp/memory
+    mount -t tmpfs -o size=40M tmpfs /tmp/memory
+    dd if=/dev/zero of=/tmp/memory/block
+    sleep 60
+    rm /tmp/memory/block
+    umount /tmp/memory
+    rmdir /tmp/memory
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hpa-mem-demo
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      volumes:
+        - name: increase-mem-script
+          configMap:
+            name: increase-mem-config
+      containers:
+        - name: nginx
+          image: nginx:1.17.8
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: increase-mem-script
+              mountPath: /etc/script
+          resources:
+            requests:
+              memory: 50Mi
+              cpu: 50m
+          securityContext:
+            privileged: true
+
+---
+
+# @see [如何根据不同业务场景调节 HPA 扩缩容灵敏度](https://mp.weixin.qq.com/s/mRwvZBVfWPYvE7hERbGMTA)
+# kubectl get hpa.v2beta2.autoscaling -A
+
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-test-memory
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hpa-mem-demo
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 20
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 20
+  behavior: # 测试精细化控制扩缩容
+    scaleUp:
+      policies:
+        - type: Percent # 可以选择Pods，这样value就是pods绝对数量
+          value: 200
+          periodSeconds: 60 # 1min
+    scaleDown:
+      policies:
+        - type: Percent
+          value: 200
+          periodSeconds: 60
