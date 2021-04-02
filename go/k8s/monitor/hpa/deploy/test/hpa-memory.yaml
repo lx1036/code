@@ -55,6 +55,7 @@ spec:
 ---
 
 # @see [如何根据不同业务场景调节 HPA 扩缩容灵敏度](https://mp.weixin.qq.com/s/mRwvZBVfWPYvE7hERbGMTA)
+# kubectl get hpa.v2beta2.autoscaling -A
 
 apiVersion: autoscaling/v2beta2
 kind: HorizontalPodAutoscaler
@@ -83,7 +84,7 @@ spec:
   behavior: # 测试精细化控制扩缩容
     scaleUp:
       policies:
-        - type: Percent
+        - type: Percent # 可以选择Pods，这样value就是pods绝对数量
           value: 200
           periodSeconds: 60 # 1min
     scaleDown:

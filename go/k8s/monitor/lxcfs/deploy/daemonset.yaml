@@ -21,7 +21,7 @@ spec:
       containers:
         - name: lxcfs
           image: registry.cn-hangzhou.aliyuncs.com/denverdino/lxcfs:3.1.2
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true
           volumeMounts:
