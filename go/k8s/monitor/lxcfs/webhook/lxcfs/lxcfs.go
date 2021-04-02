@@ -160,7 +160,7 @@ func MutatePod(ar v1.AdmissionReview) *v1.AdmissionResponse {
 		return &v1.AdmissionResponse{Allowed: true}
 	}
 
-	klog.Info("need to mutate pod %s/%s", pod.Namespace, pod.Name)
+	klog.Infof("need to mutate pod %s/%s", pod.Namespace, pod.Name)
 	reviewResponse := v1.AdmissionResponse{
 		Allowed: true,
 	}
