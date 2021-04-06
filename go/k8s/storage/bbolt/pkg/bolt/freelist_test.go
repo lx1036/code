@@ -1,4 +1,4 @@
-package freelist
+package bolt
 
 import (
 	"reflect"
@@ -16,7 +16,7 @@ func TestFreelistFree(test *testing.T) {
 }
 
 // Ensure that a page and its overflow is added to a transaction's freelist.
-func TestFreelist_free_overflow(t *testing.T) {
+func TestFreelistFreeOverflow(t *testing.T) {
 	f := newFreelist()
 	f.free(100, &page{id: 12, overflow: 3})
 	if exp := []pgid{12, 13, 14, 15}; !reflect.DeepEqual(exp, f.pending[100]) {
@@ -25,7 +25,7 @@ func TestFreelist_free_overflow(t *testing.T) {
 }
 
 // Ensure that a transaction's free pages can be released.
-func TestFreelist_release(t *testing.T) {
+func TestFreelistRelease(t *testing.T) {
 	f := newFreelist()
 	f.free(100, &page{id: 12, overflow: 1}) // 12,12+1
 	f.free(100, &page{id: 9})
@@ -43,7 +43,7 @@ func TestFreelist_release(t *testing.T) {
 }
 
 // allocate用来分配page id连续的page出去
-func TestFreelist_allocate(t *testing.T) {
+func TestFreelistAllocate(t *testing.T) {
 	f := &freelist{ids: []pgid{3, 4, 5, 6, 7, 9, 12, 13, 18}}
 	if id := int(f.allocate(3)); id != 3 {
 		t.Fatalf("exp=3; got=%v", id)
@@ -86,7 +86,7 @@ func TestFreelist_allocate(t *testing.T) {
 }
 
 // Ensure that a freelist can deserialize from a freelist page.
-func TestFreelist_read(t *testing.T) {
+func TestFreelistRead(t *testing.T) {
 	// Create a page.
 	var buf [4096]byte
 	page := (*page)(unsafe.Pointer(&buf[0]))
@@ -105,5 +105,23 @@ func TestFreelist_read(t *testing.T) {
 	// Ensure that there are two page ids in the freelist.
 	if exp := []pgid{23, 50}; !reflect.DeepEqual(exp, f.ids) {
 		t.Fatalf("exp=%v; got=%v", exp, f.ids)
+	}
+}
+
+func TestFreelistWrite(test *testing.T) {
+	var buf [4096]byte
+	f := &freelist{ids: []pgid{12, 39}, pending: make(map[txid][]pgid)}
+	f.pending[100] = []pgid{28, 11}
+	f.pending[101] = []pgid{3}
+	p := (*page)(unsafe.Pointer(&buf[0]))
+	if err := f.write(p); err != nil { // write应该是把f.ids和f.pending都写入page里
+		test.Fatal(err)
+	}
+
+	f2 := newFreelist()
+	f2.read(p) // 然后从page里读取数据，f2.ids里应该是{3,11,12,28,39}
+
+	if exp := []pgid{3, 11, 12, 28, 39}; !reflect.DeepEqual(exp, f2.ids) {
+		test.Fatalf("exp=%v; got=%v", exp, f2.ids)
 	}
 }

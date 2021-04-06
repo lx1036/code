@@ -1,6 +1,7 @@
 package bolt
 
 import (
+	"fmt"
 	"sort"
 	"time"
 	"unsafe"
@@ -43,7 +44,7 @@ func (tx *Tx) init(db *DB) {
 
 	// Copy the meta page since it can be changed by the writer.
 	tx.meta = &meta{}
-	db.meta().copy(tx.meta)
+	//db.meta().copy(tx.meta)
 
 	// Copy over the root bucket.
 	tx.root = newBucket(tx)
@@ -101,6 +102,7 @@ func (tx *Tx) write() error {
 		}
 	}
 
+	return nil
 }
 
 // Commit writes all changes to disk and updates the meta page.
@@ -110,7 +112,7 @@ func (tx *Tx) write() error {
 // called on a read-only transaction.
 func (tx *Tx) Commit() error {
 
-	tx.root.rebalance()
+	/*tx.root.rebalance()
 
 	if err := tx.root.spill(); err != nil {
 		//tx.rollback()
@@ -137,9 +139,128 @@ func (tx *Tx) Commit() error {
 	// Execute commit handlers now that the locks have been removed.
 	for _, fn := range tx.commitHandlers {
 		fn()
-	}
+	}*/
 
 	return nil
+}
+
+// Check performs several consistency checks on the database for this transaction.
+// An error is returned if any inconsistency is found.
+//
+// It can be safely run concurrently on a writable transaction. However, this
+// incurs a high cost for large databases and databases with a lot of subbuckets
+// because of caching. This overhead can be removed if running on a read-only
+// transaction, however, it is not safe to execute other writer transactions at
+// the same time.
+func (tx *Tx) Check() <-chan error {
+	ch := make(chan error)
+
+	// goroutine来做check工作，err channel来发送数据
+	go tx.check(ch)
+
+	return ch
+}
+func (tx *Tx) check(ch chan error) {
+	// Check if any pages are double freed.
+	freed := make(map[pgid]bool)
+	all := make([]pgid, tx.db.freelist.count())
+	tx.db.freelist.copyall(all)
+	for _, id := range all {
+		if freed[id] {
+			ch <- fmt.Errorf("page %d: already freed", id)
+		}
+		freed[id] = true
+	}
+
+	// Track every reachable page.
+	reachable := make(map[pgid]*page)
+	reachable[0] = tx.page(0) // meta0
+	reachable[1] = tx.page(1) // meta1
+	for i := uint32(0); i <= tx.page(tx.meta.freelist).overflow; i++ {
+		reachable[tx.meta.freelist+pgid(i)] = tx.page(tx.meta.freelist)
+	}
+
+	// Recursively check buckets.
+	tx.checkBucket(&tx.root, reachable, freed, ch)
+
+	// Ensure all pages below high water mark are either reachable or freed.
+	for i := pgid(0); i < tx.meta.pgid; i++ {
+		_, isReachable := reachable[i]
+		if !isReachable && !freed[i] {
+			ch <- fmt.Errorf("page %d: unreachable unfreed", int(i))
+		}
+	}
+
+	// Close the channel to signal completion.
+	close(ch)
+}
+func (tx *Tx) checkBucket(b *Bucket, reachable map[pgid]*page, freed map[pgid]bool, ch chan error) {
+	// Ignore inline buckets.
+	if b.root == 0 {
+		return
+	}
+
+	// Check every page used by this bucket.
+	b.tx.forEachPage(b.root, 0, func(p *page, _ int) {
+		if p.id > tx.meta.pgid {
+			ch <- fmt.Errorf("page %d: out of bounds: %d", int(p.id), int(b.tx.meta.pgid))
+		}
+
+		// Ensure each page is only referenced once.
+		for i := pgid(0); i <= pgid(p.overflow); i++ {
+			var id = p.id + i
+			if _, ok := reachable[id]; ok {
+				ch <- fmt.Errorf("page %d: multiple references", int(id))
+			}
+			reachable[id] = p
+		}
+
+		// We should only encounter un-freed leaf and branch pages.
+		if freed[p.id] {
+			ch <- fmt.Errorf("page %d: reachable freed", int(p.id))
+		} else if (p.flags&branchPageFlag) == 0 && (p.flags&leafPageFlag) == 0 {
+			ch <- fmt.Errorf("page %d: invalid type: %s", int(p.id), p.typ())
+		}
+	})
+
+	// Check each bucket within this bucket.
+	_ = b.ForEach(func(k, v []byte) error {
+		if child := b.Bucket(k); child != nil {
+			tx.checkBucket(child, reachable, freed, ch)
+		}
+		return nil
+	})
+}
+
+// forEachPage iterates over every page within a given page and executes a function.
+// 递归迭代
+func (tx *Tx) forEachPage(pgid pgid, depth int, fn func(*page, int)) {
+	p := tx.page(pgid)
+
+	// Execute function.
+	fn(p, depth)
+
+	// Recursively loop over children.
+	if (p.flags & branchPageFlag) != 0 {
+		for i := 0; i < int(p.count); i++ {
+			elem := p.branchPageElement(uint16(i))
+			tx.forEachPage(elem.pgid, depth+1, fn)
+		}
+	}
+}
+
+// page returns a reference to the page with a given id.
+// If page has been written to then a temporary buffered page is returned.
+func (tx *Tx) page(id pgid) *page {
+	// Check the dirty pages first.
+	if tx.pages != nil {
+		if p, ok := tx.pages[id]; ok {
+			return p
+		}
+	}
+
+	// Otherwise return directly from the mmap.
+	return tx.db.page(id)
 }
 
 // TxStats represents statistics about the actions performed by the transaction.

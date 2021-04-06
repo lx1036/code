@@ -1,4 +1,4 @@
-package freelist
+package bolt
 
 import (
 	"reflect"

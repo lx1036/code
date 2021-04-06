@@ -1,4 +1,4 @@
-package freelist
+package bolt
 
 import (
 	"fmt"
@@ -21,9 +21,6 @@ const (
 	// FreelistMapType indicates backend freelist type is hashmap
 	FreelistMapType = FreelistType("hashmap")
 )
-
-// txid represents the internal transaction identifier.
-type txid uint64
 
 // pidSet holds the set of starting pgids which have the same span size
 type pidSet map[pgid]struct{}
@@ -150,6 +147,84 @@ func (f *freelist) read(p *page) {
 		count = int(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0])
 	}
 
+	// Copy the list of page ids from the freelist.
+	if count == 0 {
+		f.ids = nil
+	} else {
+		ids := ((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[idx:count]
+		f.ids = make([]pgid, len(ids))
+		copy(f.ids, ids)
+
+		// Make sure they're sorted.
+		sort.Sort(pgids(f.ids))
+	}
+
+	// Rebuild the page cache.
+	f.reindex()
+}
+
+// reindex rebuilds the free cache based on available and pending free lists.
+func (f *freelist) reindex() {
+	f.cache = make(map[pgid]bool, len(f.ids))
+	for _, id := range f.ids {
+		f.cache[id] = true
+	}
+	for _, pendingIDs := range f.pending {
+		for _, pendingID := range pendingIDs {
+			f.cache[pendingID] = true
+		}
+	}
+}
+
+func (f *freelist) write(p *page) error {
+
+	p.flags |= freelistPageFlag
+
+	// The page.count can only hold up to 64k elements so if we overflow that
+	// number then we handle it by putting the size in the first element.
+	lenids := f.count()
+	if lenids == 0 {
+		p.count = uint16(lenids)
+	} else if lenids < 0xFFFF {
+		p.count = uint16(lenids)
+		f.copyall(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[:])
+	} else {
+		p.count = 0xFFFF
+		((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0] = pgid(lenids)
+		f.copyall(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[1:])
+	}
+
+	return nil
+}
+
+// count returns count of pages on the freelist
+func (f *freelist) count() int {
+	return f.free_count() + f.pending_count()
+}
+
+// free_count returns count of free pages
+func (f *freelist) free_count() int {
+	return len(f.ids)
+}
+
+// pending_count returns count of pending pages
+func (f *freelist) pending_count() int {
+	var count int
+	for _, list := range f.pending {
+		count += len(list)
+	}
+	return count
+}
+
+// copyall copies into dst a list of all free ids and all pending ids in one sorted list.
+// f.count returns the minimum length required for dst.
+func (f *freelist) copyall(dst []pgid) {
+	m := make(pgids, 0, f.pending_count())
+	for _, list := range f.pending {
+		m = append(m, list...)
+	}
+	sort.Sort(m)
+	mergepgids(dst, f.ids, m)
 }
 
 // hashmapAllocate serves the same purpose as arrayAllocate, but use hashmap as backend
