@@ -1,6 +1,9 @@
 package bolt
 
-import "bytes"
+import (
+	"bytes"
+	"unsafe"
+)
 
 const (
 	minFillPercent = 0.1
@@ -90,6 +93,76 @@ func (b *Bucket) Bucket(name []byte) *Bucket {
 	}
 
 	return child
+}
+
+// CreateBucket creates a new bucket at the given key and returns the new bucket.
+// Returns an error if the key already exists, if the bucket name is blank, or if the bucket name is too long.
+// The bucket instance is only valid for the lifetime of the transaction.
+func (b *Bucket) CreateBucket(key []byte) (*Bucket, error) {
+	if b.tx.db == nil {
+		return nil, ErrTxClosed
+	} else if !b.tx.writable {
+		return nil, ErrTxNotWritable
+	} else if len(key) == 0 {
+		return nil, ErrBucketNameRequired
+	}
+
+	// Move cursor to correct position.
+	c := b.Cursor()
+	k, _, flags := c.seek(key)
+
+	// Return an error if there is an existing key.
+	if bytes.Equal(key, k) {
+		if (flags & bucketLeafFlag) != 0 {
+			return nil, ErrBucketExists
+		}
+		return nil, ErrIncompatibleValue
+	}
+
+	// Create empty, inline bucket.
+	var bucket = Bucket{
+		bucket:      &bucket{},
+		rootNode:    &node{isLeaf: true},
+		FillPercent: DefaultFillPercent,
+	}
+	var value = bucket.write()
+
+	// Insert into node.
+	key = cloneBytes(key)
+	c.node().put(key, key, value, 0, bucketLeafFlag)
+
+	// Since subbuckets are not allowed on inline buckets, we need to
+	// dereference the inline page, if it exists. This will cause the bucket
+	// to be treated as a regular, non-inline bucket for the rest of the tx.
+	b.page = nil
+
+	return b.Bucket(key), nil
+}
+
+// cloneBytes returns a copy of a given slice.
+func cloneBytes(v []byte) []byte {
+	var clone = make([]byte, len(v))
+	copy(clone, v)
+	return clone
+}
+
+const bucketHeaderSize = int(unsafe.Sizeof(bucket{}))
+
+// write allocates and writes a bucket to a byte slice.
+func (b *Bucket) write() []byte {
+	// Allocate the appropriate size.
+	var n = b.rootNode
+	var value = make([]byte, bucketHeaderSize+n.size())
+
+	// Write a bucket header.
+	var bucket = (*bucket)(unsafe.Pointer(&value[0]))
+	*bucket = *b.bucket
+
+	// Convert byte slice to a fake page and write the root node.
+	var p = (*page)(unsafe.Pointer(&value[bucketHeaderSize]))
+	n.write(p)
+
+	return value
 }
 
 // DefaultFillPercent is the percentage that split pages are filled.

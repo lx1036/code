@@ -240,6 +240,16 @@ func (n *node) sizeLessThan(v int) bool {
 	return true
 }
 
+// size returns the size of the node after serialization.
+func (n *node) size() int {
+	sz, elsz := pageHeaderSize, n.pageElementSize()
+	for i := 0; i < len(n.inodes); i++ {
+		item := &n.inodes[i]
+		sz += elsz + len(item.key) + len(item.value)
+	}
+	return sz
+}
+
 // inode represents an internal node inside of a node.
 // It can be used to point to elements in a page or point
 // to an element which hasn't been added to a page yet.

@@ -10,4 +10,15 @@ func TestTxCommit(test *testing.T) {
 		test.Fatal(err)
 	}
 
+	if _, err := tx.CreateBucket([]byte("foo")); err != nil {
+		test.Fatal(err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		test.Fatal(err)
+	}
+
+	if err := tx.Commit(); err != ErrTxClosed {
+		test.Fatalf("unexpected error: %s", err)
+	}
 }

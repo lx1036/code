@@ -130,6 +130,11 @@ func (p *page) branchPageElement(index uint16) *branchPageElement {
 	return &((*[0x7FFFFFF]branchPageElement)(unsafe.Pointer(&p.ptr)))[index]
 }
 
+// meta returns a pointer to the metadata section of the page.
+func (p *page) meta() *meta {
+	return (*meta)(unsafe.Pointer(&p.ptr))
+}
+
 type pages []*page
 
 func (s pages) Len() int           { return len(s) }
