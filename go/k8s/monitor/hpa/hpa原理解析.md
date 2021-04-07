@@ -12,6 +12,7 @@ https://github.com/kubernetes/kubernetes/blob/v1.19.7/cmd/kube-controller-manage
 
 ## HPA 设计文档
 **[HPA V2设计文档](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/autoscaling/hpa-v2.md)**
+**[HPA UCloud 使用文档](https://docs.ucloud.cn/uk8s/bestpractice/autoscaling/hpa)**
 
 
 ## 参考文献
