@@ -21,15 +21,15 @@ const magic uint32 = 0xED0CDAED
 const version = 2
 
 type meta struct {
-	magic    uint32
-	version  uint32
-	pageSize uint32
-	flags    uint32
-	root     bucket
-	freelist pgid
-	pgid     pgid
-	txid     txid
-	checksum uint64
+	magic    uint32 // 文件标识
+	version  uint32 // 版本号
+	pageSize uint32 // 页大小
+	flags    uint32 // 页类型
+	root     bucket // 根bucket
+	freelist pgid // freelist页面id
+	pgid     pgid // 总的页面数量
+	txid     txid // 上一次写事务id
+	checksum uint64 // 校验码
 }
 
 // validate checks the marker bytes and version of the meta page to ensure it matches this binary.
