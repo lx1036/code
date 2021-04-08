@@ -26,9 +26,9 @@ type meta struct {
 	pageSize uint32 // 页大小
 	flags    uint32 // 页类型
 	root     bucket // 根bucket
-	freelist pgid // freelist页面id
-	pgid     pgid // 总的页面数量
-	txid     txid // 上一次写事务id
+	freelist pgid   // freelist页面id
+	pgid     pgid   // 总的页面数量
+	txid     txid   // 上一次写事务id
 	checksum uint64 // 校验码
 }
 
