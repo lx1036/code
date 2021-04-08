@@ -3,12 +3,12 @@ package nodeutilization
 import (
 	"context"
 
-	"k8s-lx1036/k8s/scheduler/descheduler/pkg/utils"
-
 	"k8s-lx1036/k8s/scheduler/descheduler/pkg/api"
 	"k8s-lx1036/k8s/scheduler/descheduler/pkg/evictions"
 	nodeutil "k8s-lx1036/k8s/scheduler/descheduler/pkg/node"
+	"k8s-lx1036/k8s/scheduler/descheduler/pkg/utils"
 
+	podutil "k8s-lx1036/k8s/scheduler/descheduler/pkg/pod"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	clientset "k8s.io/client-go/kubernetes"
@@ -110,7 +110,7 @@ func LowNodeUtilization(ctx context.Context, client clientset.Interface,
 		"CPU", targetThresholds[v1.ResourceCPU], "Mem", targetThresholds[v1.ResourceMemory], "Pods", targetThresholds[v1.ResourcePods])
 	klog.V(1).InfoS("Number of nodes above target utilization", "totalNumber", len(highNodes))
 
-	// evict
+	// evict驱逐 pod
 	evictable := podEvictor.Evictable(evictions.WithPriorityThreshold(thresholdPriority))
 	evictPodsFromHighNodes(ctx, highNodes, lowNodes, podEvictor, evictable.IsEvictable)
 	klog.V(1).InfoS("Total number of pods evicted", "evictedPods", podEvictor.TotalEvicted())
@@ -171,6 +171,7 @@ func evictPodsFromHighNodes(ctx context.Context, targetNodes, lowNodes []NodeUsa
 
 	for _, node := range targetNodes {
 		klog.V(3).InfoS("Evicting pods from node", "node", klog.KObj(node.node), "usage", node.usage)
+		// podFilter函数会判断哪些pod是需要驱逐的
 		nonRemovablePods, removablePods := classifyPods(node.allPods, podFilter)
 		klog.V(2).InfoS("Pods on node", "node", klog.KObj(node.node), "allPods", len(node.allPods), "nonRemovablePods", len(nonRemovablePods), "removablePods", len(removablePods))
 		if len(removablePods) == 0 {
@@ -185,5 +186,4 @@ func evictPodsFromHighNodes(ctx context.Context, targetNodes, lowNodes []NodeUsa
 		evictPods(ctx, removablePods, node, totalAvailableUsage, taintsOfLowNodes, podEvictor)
 		klog.V(1).InfoS("Evicted pods from node", "node", klog.KObj(node.node), "evictedPods", podEvictor.NodeEvicted(node.node), "usage", node.usage)
 	}
-
 }

@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 
 	"k8s-lx1036/k8s/scheduler/descheduler/pkg/api"
 
 	clientset "k8s.io/client-go/kubernetes"
 )
-
-const SystemCriticalPriority = 2 * int32(1000000000) // == "system-cluster-critical"
 
 // GetPriorityFromStrategyParams gets priority from the given StrategyParameters.
 // It will return SystemCriticalPriority by default.
@@ -18,7 +17,7 @@ func GetPriorityFromStrategyParams(ctx context.Context, client clientset.Interfa
 	params *api.StrategyParameters) (priority int32, err error) {
 
 	if params == nil {
-		return SystemCriticalPriority, nil
+		return scheduling.SystemCriticalPriority, nil
 	}
 
 	if params.ThresholdPriority != nil {
@@ -29,8 +28,8 @@ func GetPriorityFromStrategyParams(ctx context.Context, client clientset.Interfa
 			return
 		}
 	}
-	if priority > SystemCriticalPriority {
-		return 0, fmt.Errorf("priority threshold can't be greater than %d", SystemCriticalPriority)
+	if priority > scheduling.SystemCriticalPriority {
+		return 0, fmt.Errorf("priority threshold can't be greater than %d", scheduling.SystemCriticalPriority)
 	}
 
 	return
@@ -46,5 +45,5 @@ func GetPriorityFromPriorityClass(ctx context.Context, client clientset.Interfac
 		return priorityClass.Value, nil
 	}
 
-	return SystemCriticalPriority, nil
+	return scheduling.SystemCriticalPriority, nil
 }

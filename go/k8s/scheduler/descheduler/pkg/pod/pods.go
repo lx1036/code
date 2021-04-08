@@ -2,17 +2,19 @@ package pod
 
 import (
 	"context"
+	"fmt"
+	"sort"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
-
-	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
-
-// Enables PodOverhead, for accounting pod overheads which are specific to a given RuntimeClass
-const PodOverhead featuregate.Feature = "PodOverhead"
 
 type Options struct {
 	filter             func(pod *v1.Pod) bool
@@ -92,7 +94,7 @@ func ListPodsOnNode(
 	return pods, nil
 }
 
-// TODO: 计算pod 各种资源总和，可以直接复用
+// TODO: 计算pod 各种资源request/limit总和，可以直接复用
 func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
 	reqs, limits = v1.ResourceList{}, v1.ResourceList{}
 	// addResourceList依次累加到reqs, limits
@@ -106,7 +108,7 @@ func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
 	}
 
 	// 如果有PodOverhead继续累加
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(PodOverhead) {
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
 		addResourceList(reqs, pod.Spec.Overhead)
 
 		for name, quantity := range pod.Spec.Overhead {
@@ -144,4 +146,93 @@ func maxResourceList(list, new v1.ResourceList) {
 			}
 		}
 	}
+}
+
+// 根据 pod 优先级升序排序，优先级相等则根据QoS(BestEffort, Burstable, Guaranteed)升序排序
+func SortPodsBasedOnPriorityLowToHigh(pods []*v1.Pod) {
+	sort.Slice(pods, func(i, j int) bool {
+		// i 没有 Priority, j 有，则 i 在前
+		if pods[i].Spec.Priority == nil && pods[j].Spec.Priority != nil {
+			return true
+		}
+		// j 没有 Priority, i 有，则 j 在前
+		if pods[j].Spec.Priority == nil && pods[i].Spec.Priority != nil {
+			return false
+		}
+		// 都没有 Priority 或者相等
+		if (pods[j].Spec.Priority == nil && pods[i].Spec.Priority == nil) ||
+			(*pods[i].Spec.Priority == *pods[j].Spec.Priority) {
+			// i 是 BestEffort pod，i 在前
+			if IsBestEffortPod(pods[i]) {
+				return true
+			}
+			// i 是 Burstable 且 j 是 Guaranteed，i 在前
+			if IsBurstablePod(pods[i]) && IsGuaranteedPod(pods[j]) {
+				return true
+			}
+			// j 在前
+			return false
+		}
+
+		// 谁 Priority 优先级小谁在前
+		return *pods[i].Spec.Priority < *pods[j].Spec.Priority
+	})
+}
+
+func IsBestEffortPod(pod *v1.Pod) bool {
+	return v1qos.GetPodQOS(pod) == v1.PodQOSBestEffort
+}
+
+func IsBurstablePod(pod *v1.Pod) bool {
+	return v1qos.GetPodQOS(pod) == v1.PodQOSBurstable
+}
+
+func IsGuaranteedPod(pod *v1.Pod) bool {
+	return v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed
+}
+
+// 不驱逐 static pod，mirror pod 和 高优先级system-cluster-critical pod
+func IsCriticalPod(pod *v1.Pod) bool {
+	if IsStaticPod(pod) {
+		return true
+	}
+
+	if IsMirrorPod(pod) {
+		return true
+	}
+
+	if pod.Spec.Priority != nil && *pod.Spec.Priority >= scheduling.SystemCriticalPriority {
+		return true
+	}
+
+	return false
+}
+
+func IsStaticPod(pod *v1.Pod) bool {
+	source, err := GetPodSource(pod)
+	return err == nil && source != "api"
+}
+
+// GetPodSource returns the source of the pod based on the annotation.
+func GetPodSource(pod *v1.Pod) (string, error) {
+	if pod.Annotations != nil {
+		if source, ok := pod.Annotations[types.ConfigSourceAnnotationKey]; ok {
+			return source, nil
+		}
+	}
+	return "", fmt.Errorf("cannot get source of pod %q", pod.UID)
+}
+
+func IsMirrorPod(pod *v1.Pod) bool {
+	_, ok := pod.Annotations[v1.MirrorPodAnnotationKey]
+	return ok
+}
+
+func IsDaemonsetPod(ownerRefList []metav1.OwnerReference) bool {
+	for _, ownerRef := range ownerRefList {
+		if ownerRef.Kind == "DaemonSet" {
+			return true
+		}
+	}
+	return false
 }

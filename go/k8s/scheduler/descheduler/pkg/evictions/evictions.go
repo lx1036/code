@@ -2,7 +2,11 @@ package evictions
 
 import (
 	"fmt"
+
+	podutil "k8s-lx1036/k8s/scheduler/descheduler/pkg/pod"
+
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
@@ -150,4 +154,48 @@ func SupportEviction(client clientset.Interface) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+// critical pod, daemonset pod, mirror pod 不驱逐
+func (ev *evictable) IsEvictable(pod *v1.Pod) bool {
+	var checkErrs []error
+
+	// 不驱逐 static pod，mirror pod 和 高优先级system-cluster-critical pod
+	if podutil.IsCriticalPod(pod) {
+		checkErrs = append(checkErrs, fmt.Errorf("pod is critical"))
+	}
+
+	ownerRefList := pod.ObjectMeta.GetOwnerReferences()
+	if podutil.IsDaemonsetPod(ownerRefList) {
+		checkErrs = append(checkErrs, fmt.Errorf("pod is a DaemonSet pod"))
+	}
+
+	// 无主pod
+	if len(ownerRefList) == 0 {
+		checkErrs = append(checkErrs, fmt.Errorf("pod does not have any ownerrefs"))
+	}
+
+	// 经过ev.constraints check之后
+	for _, c := range ev.constraints {
+		if err := c(pod); err != nil {
+			checkErrs = append(checkErrs, err)
+		}
+	}
+
+	if len(checkErrs) > 0 && !HaveEvictAnnotation(pod) { // 根据标记判断，之前没有被驱逐过
+		klog.V(4).InfoS("Pod lacks an eviction annotation and fails the following checks", "pod", klog.KObj(pod), "checks", errors.NewAggregate(checkErrs).Error())
+		return false
+	}
+
+	return true
+}
+
+const (
+	evictPodAnnotationKey = "descheduler.alpha.kubernetes.io/evict"
+)
+
+// pod 已经被驱逐过了
+func HaveEvictAnnotation(pod *v1.Pod) bool {
+	_, found := pod.ObjectMeta.Annotations[evictPodAnnotationKey]
+	return found
 }

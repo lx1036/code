@@ -75,6 +75,7 @@ func validateThresholds(thresholds api.ResourceThresholds) error {
 	return nil
 }
 
+// 统计node信息，包括pod数量，资源使用request/limit总和
 func getNodeUsage(ctx context.Context, client clientset.Interface, nodes []*v1.Node,
 	lowThreshold, highThreshold api.ResourceThresholds) []NodeUsage {
 
@@ -96,16 +97,22 @@ func getNodeUsage(ctx context.Context, client clientset.Interface, nodes []*v1.N
 			node:    node,
 			usage:   nodeUtilization(node, pods),
 			allPods: pods,
-			// A threshold is in percentages but in <0;100> interval.
-			// Performing `threshold * 0.01` will convert <0;100> interval into <0;1>.
-			// Multiplying it with capacity will give fraction of the capacity corresponding to the given high/low resource threshold in Quantity units.
+			/*
+				// thresholds 值得小于 targetThresholds
+				params:
+					nodeResourceUtilizationThresholds:
+					thresholds:
+						"memory": 20
+					targetThresholds:
+						"memory": 70
+			*/
+			// lowThreshold阈值(0-100)得乘以 0.01，然后才能乘以当前node容量值，才是最小阈值
 			lowResourceThreshold: map[v1.ResourceName]*resource.Quantity{
 				v1.ResourceCPU:    resource.NewMilliQuantity(int64(float64(lowThreshold[v1.ResourceCPU])*float64(nodeCapacity.Cpu().MilliValue())*0.01), resource.DecimalSI),
 				v1.ResourceMemory: resource.NewQuantity(int64(float64(lowThreshold[v1.ResourceMemory])*float64(nodeCapacity.Memory().Value())*0.01), resource.BinarySI),
 				v1.ResourcePods:   resource.NewQuantity(int64(float64(lowThreshold[v1.ResourcePods])*float64(nodeCapacity.Pods().Value())*0.01), resource.DecimalSI),
 			},
 			highResourceThreshold: map[v1.ResourceName]*resource.Quantity{
-				// TODO: 这里 `threshold * 0.01` ???
 				v1.ResourceCPU:    resource.NewMilliQuantity(int64(float64(highThreshold[v1.ResourceCPU])*float64(nodeCapacity.Cpu().MilliValue())*0.01), resource.DecimalSI),
 				v1.ResourceMemory: resource.NewQuantity(int64(float64(highThreshold[v1.ResourceMemory])*float64(nodeCapacity.Memory().Value())*0.01), resource.BinarySI),
 				v1.ResourcePods:   resource.NewQuantity(int64(float64(highThreshold[v1.ResourcePods])*float64(nodeCapacity.Pods().Value())*0.01), resource.DecimalSI),
@@ -116,7 +123,31 @@ func getNodeUsage(ctx context.Context, client clientset.Interface, nodes []*v1.N
 	return nodeUsageList
 }
 
-// 计算 node 上 cpu/memory/pod 资源使用总和
+// 判断是否处于lowResourceThreshold低阈值之下
+func isNodeWithLowUtilization(usage NodeUsage) bool {
+	for name, nodeValue := range usage.usage {
+		// usage.lowResourceThreshold[name] < nodeValue, 在低阈值之上
+		if usage.lowResourceThreshold[name].Cmp(*nodeValue) == -1 {
+			return false
+		}
+	}
+
+	return true
+}
+
+// 判断是否处于lowResourceThreshold高阈值之上
+func isNodeAboveTargetUtilization(usage NodeUsage) bool {
+	for name, nodeValue := range usage.usage {
+		// usage.highResourceThreshold[name] < nodeValue, 在高阈值之上
+		if usage.highResourceThreshold[name].Cmp(*nodeValue) == -1 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// 计算 node 上 cpu/memory/pod 资源使用总和，计算的是request/limit值，而不是pod真实使用率
 func nodeUtilization(node *v1.Node, pods []*v1.Pod) map[v1.ResourceName]*resource.Quantity {
 	totalReqs := map[v1.ResourceName]*resource.Quantity{
 		v1.ResourceCPU:    resource.NewMilliQuantity(0, resource.DecimalSI),
@@ -146,4 +177,37 @@ func sortNodesByUsage(nodes []NodeUsage) {
 		// To return sorted in descending order
 		return ti > tj
 	})
+}
+
+// 根据filter函数过滤哪些pod是需要驱逐的
+func classifyPods(pods []*v1.Pod, filter func(pod *v1.Pod) bool) ([]*v1.Pod, []*v1.Pod) {
+	var nonRemovablePods, removablePods []*v1.Pod
+
+	for _, pod := range pods {
+		if !filter(pod) {
+			nonRemovablePods = append(nonRemovablePods, pod)
+		} else {
+			removablePods = append(removablePods, pod)
+		}
+	}
+
+	return nonRemovablePods, removablePods
+}
+
+// 计算各个资源使用百分比
+func resourceUsagePercentages(nodeUsage NodeUsage) map[v1.ResourceName]float64 {
+	nodeCapacity := nodeUsage.node.Status.Capacity
+	if len(nodeUsage.node.Status.Allocatable) > 0 {
+		nodeCapacity = nodeUsage.node.Status.Allocatable
+	}
+
+	resourceUsagePercentage := map[v1.ResourceName]float64{}
+	for resourceName, resourceUsage := range nodeUsage.usage {
+		c := nodeCapacity[resourceName]
+		if !c.IsZero() {
+			resourceUsagePercentage[resourceName] = 100 * float64(resourceUsage.Value()) / float64(c.Value())
+		}
+	}
+
+	return resourceUsagePercentage
 }
