@@ -8,7 +8,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// TODO: 这个方法更全面，直接复用以后
+// INFO: 这个方法更全面，直接复用以后
 
 func CreateClient(kubeconfig string) (clientset.Interface, error) {
 	var cfg *rest.Config

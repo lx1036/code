@@ -39,7 +39,7 @@ type Runtime interface {
 	// behavior such as removing all containers of unrecognized pods (yet).
 	// If evictNonDeletedPods is set to true, containers and sandboxes belonging to pods
 	// that are terminated, but not deleted will be evicted.  Otherwise, only deleted pods will be GC'd.
-	// TODO: Revisit this method and make it cleaner.
+	// INFO: Revisit this method and make it cleaner.
 	GarbageCollect(gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// Syncs the running pod into the desired pod.
 	SyncPod(pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult

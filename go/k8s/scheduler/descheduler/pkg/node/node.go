@@ -13,7 +13,7 @@ import (
 
 // ReadyNodes returns ready nodes irrespective of whether they are
 // schedulable or not.
-// TODO: 根据nodeSelector筛选[]Node，可以直接复用以后
+// INFO: 根据nodeSelector筛选[]Node，可以直接复用以后
 func ReadyNodes(ctx context.Context, client clientset.Interface,
 	nodeInformer coreinformers.NodeInformer, nodeSelector string) ([]*v1.Node, error) {
 

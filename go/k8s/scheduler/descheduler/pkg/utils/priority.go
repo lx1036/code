@@ -3,12 +3,12 @@ package utils
 import (
 	"context"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
 
 	"k8s-lx1036/k8s/scheduler/descheduler/pkg/api"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
 // GetPriorityFromStrategyParams gets priority from the given StrategyParameters.

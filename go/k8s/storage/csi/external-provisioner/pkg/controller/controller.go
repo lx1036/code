@@ -185,7 +185,7 @@ type ProvisionController struct {
 
 	// Whether to add a finalizer marking the provisioner as the owner of the PV
 	// with clean up duty.
-	// TODO: upstream and we may have a race b/w applying reclaim policy and not if pv has protection finalizer
+	// INFO: upstream and we may have a race b/w applying reclaim policy and not if pv has protection finalizer
 	addFinalizer bool
 
 	// Whether to do kubernetes leader election at all. It should basically

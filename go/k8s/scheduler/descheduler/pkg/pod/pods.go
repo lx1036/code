@@ -10,6 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
@@ -22,7 +24,7 @@ type Options struct {
 	excludedNamespaces []string
 }
 
-// TODO: list node上的pods，同时带有过滤功能，可以直接复用。注意，这里是直接从apiserver取值，没有
+// INFO: list node上的pods，同时带有过滤功能，可以直接复用。注意，这里是直接从apiserver取值，没有
 // Usually this is podEvictor.Evictable().IsEvictable, 可以用来list the evictable pods on a node
 func ListPodsOnNode(
 	ctx context.Context,
@@ -73,7 +75,7 @@ func ListPodsOnNode(
 		return []*v1.Pod{}, err
 	}
 	// 从 apiserver 中取pods
-	// TODO: field selectors do not work properly with listers
+	// INFO: field selectors do not work properly with listers
 	podList, err := client.CoreV1().Pods(v1.NamespaceAll).List(ctx,
 		metav1.ListOptions{FieldSelector: fieldSelector.String()})
 	if err != nil {
@@ -94,7 +96,7 @@ func ListPodsOnNode(
 	return pods, nil
 }
 
-// TODO: 计算pod 各种资源request/limit总和，可以直接复用
+// INFO: 计算pod 各种资源request/limit总和，可以直接复用
 func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
 	reqs, limits = v1.ResourceList{}, v1.ResourceList{}
 	// addResourceList依次累加到reqs, limits
@@ -234,5 +236,22 @@ func IsDaemonsetPod(ownerRefList []metav1.OwnerReference) bool {
 			return true
 		}
 	}
+	return false
+}
+
+// 如果pod能容忍node taints则返回true
+func PodToleratesTaints(pod *v1.Pod, taintsOfNodes map[string][]v1.Taint) bool {
+	for nodeName, taintsForNode := range taintsOfNodes {
+		// 判断pod.Spec.Tolerations是否可以容忍[]v1.Taint
+		if len(pod.Spec.Tolerations) >= len(taintsForNode) {
+			_, isUntolerated := helper.FindMatchingUntoleratedTaint(taintsForNode, pod.Spec.Tolerations, nil)
+			if !isUntolerated {
+				return true
+			}
+		}
+
+		klog.V(5).InfoS("Pod doesn't tolerate nodes taint", "pod", klog.KObj(pod), "nodeName", nodeName)
+	}
+
 	return false
 }

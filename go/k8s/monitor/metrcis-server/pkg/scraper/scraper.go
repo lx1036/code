@@ -42,7 +42,7 @@ func (scraper *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, 
 	defer close(responseChannel)
 	defer close(errChannel)
 
-	// TODO: 这个通过 channel 并发 collect metrics 数据方式值得抄抄
+	// INFO: 这个通过 channel 并发 collect metrics 数据方式值得抄抄
 	res := &storage.MetricsBatch{}
 	for _, node := range nodes {
 		go func(node *corev1.Node) {

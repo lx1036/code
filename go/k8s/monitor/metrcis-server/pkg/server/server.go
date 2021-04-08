@@ -81,7 +81,7 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// TODO: 这里得研究下 metrics-server 是怎么通过 api-aggregator 来扩展 apiserver 的
+	// INFO: 这里得研究下 metrics-server 是怎么通过 api-aggregator 来扩展 apiserver 的
 	// https://kubernetes.io/zh/docs/tasks/extend-kubernetes/configure-aggregation-layer/
 	// Disable default metrics handler and create custom one
 	config.ApiserverConfig.EnableMetrics = false

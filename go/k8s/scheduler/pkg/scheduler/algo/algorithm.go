@@ -15,7 +15,7 @@ import (
 
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
 // onto machines.
-// TODO: Rename this type.
+// INFO: Rename this type.
 type ScheduleAlgorithm interface {
 	Schedule(context.Context, *profile.Profile, *v1alpha1.CycleState, *v1.Pod) (scheduleResult ScheduleResult, err error)
 	// Extenders returns a slice of extender config. This is exposed for

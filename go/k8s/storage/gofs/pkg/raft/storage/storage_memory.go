@@ -19,7 +19,7 @@ type fsm interface {
 // This storage is circular storage in memory and truncate when over capacity,
 // but keep it a high capacity.
 
-// TODO: MemoryStorage 是内存版本的 Storage, 持久化磁盘版本 Storage 后续实现
+// INFO: MemoryStorage 是内存版本的 Storage, 持久化磁盘版本 Storage 后续实现
 type MemoryStorage struct {
 	fsm fsm
 	id  uint64

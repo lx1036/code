@@ -54,7 +54,7 @@ type pluginManager struct {
 	desiredStateOfWorld cache.DesiredStateOfWorld
 }
 
-// TODO: reconcile还有个bug，使用os.RemoveAll(socketPath)删除socket时候，因为fsnotify没有上报删除事件，plugin-watcher没有从desiredStateOfWorld中删除plugin
+// INFO: reconcile还有个bug，使用os.RemoveAll(socketPath)删除socket时候，因为fsnotify没有上报删除事件，plugin-watcher没有从desiredStateOfWorld中删除plugin
 func NewPluginManager(sockDir string) PluginManager {
 	asw := cache.NewActualStateOfWorld()
 	dsw := cache.NewDesiredStateOfWorld()

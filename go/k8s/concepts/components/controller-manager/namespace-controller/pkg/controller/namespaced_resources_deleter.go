@@ -230,7 +230,7 @@ func (deleter *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVers
 	}
 
 	// this is strange, but we need to special case for both MethodNotSupported and NotFound errors
-	// TODO: https://github.com/kubernetes/kubernetes/issues/22413
+	// INFO: https://github.com/kubernetes/kubernetes/issues/22413
 	// we have a resource returned in the discovery API that supports no top-level verbs:
 	//  /apis/extensions/v1beta1/namespaces/default/replicationcontrollers
 	// when working with this resource type, we will get a literal not found error rather than expected method not supported
