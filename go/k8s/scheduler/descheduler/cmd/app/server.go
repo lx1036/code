@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"k8s-lx1036/k8s/scheduler/descheduler/pkg/descheduler"
 	"os"
 
 	"k8s-lx1036/k8s/scheduler/descheduler/cmd/app/options"
@@ -89,6 +90,8 @@ func NewDeschedulerCommand() *cobra.Command {
 		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
 	})
 
+	_ = cmd.MarkFlagFilename("policy-config-file", "yaml", "yml", "json")
+
 	return cmd
 }
 
@@ -98,5 +101,5 @@ func runCommand(cmd *cobra.Command, opts *options.Options) error {
 
 	klog.Infof("opts: %v", opts.KubeconfigFile)
 
-	return nil
+	return descheduler.Run(opts)
 }
