@@ -85,8 +85,7 @@ func IsReady(node *v1.Node) bool {
 	return true
 }
 
-// IsNodeUnschedulable checks if the node is unschedulable. This is helper function to check only in case of
-// underutilized node so that they won't be accounted for.
+// 判断node是不可调度
 func IsNodeUnschedulable(node *v1.Node) bool {
 	return node.Spec.Unschedulable
 }

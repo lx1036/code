@@ -24,7 +24,7 @@ type Options struct {
 	excludedNamespaces []string
 }
 
-// INFO: list node上的pods，同时带有过滤功能，可以直接复用。注意，这里是直接从apiserver取值，没有
+// INFO: list node上的pods，同时带有过滤功能，可以直接复用。注意，这里是直接从apiserver取值，没有从本地缓存list
 // Usually this is podEvictor.Evictable().IsEvictable, 可以用来list the evictable pods on a node
 func ListPodsOnNode(
 	ctx context.Context,
@@ -241,11 +241,12 @@ func IsDaemonsetPod(ownerRefList []metav1.OwnerReference) bool {
 
 // 如果pod能容忍node taints则返回true
 func PodToleratesTaints(pod *v1.Pod, taintsOfNodes map[string][]v1.Taint) bool {
+	// INFO: 过滤每一个 lowNode，直到找到 pod 能容忍一个 node
 	for nodeName, taintsForNode := range taintsOfNodes {
 		// 判断pod.Spec.Tolerations是否可以容忍[]v1.Taint
 		if len(pod.Spec.Tolerations) >= len(taintsForNode) {
 			_, isUntolerated := helper.FindMatchingUntoleratedTaint(taintsForNode, pod.Spec.Tolerations, nil)
-			if !isUntolerated {
+			if !isUntolerated { // 表示pod能容忍
 				return true
 			}
 		}

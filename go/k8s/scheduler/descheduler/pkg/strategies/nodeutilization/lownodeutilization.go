@@ -46,7 +46,7 @@ func LowNodeUtilization(ctx context.Context, client clientset.Interface,
 		return
 	}
 
-	// 从配置中获取 priority threshold
+	// 从配置中获取 priority threshold，只有该优先级以下的pod才会被驱逐
 	thresholdPriority, err := utils.GetPriorityFromStrategyParams(ctx, client, strategy.Params)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get threshold priority from strategy's params")
@@ -59,7 +59,8 @@ func LowNodeUtilization(ctx context.Context, client clientset.Interface,
 		klog.ErrorS(err, "LowNodeUtilization config is not valid")
 		return
 	}
-	// check if Pods/CPU/Mem are set, if not, set them to 100
+
+	// 阈值没有配置的，设置最大默认值
 	if _, ok := thresholds[v1.ResourcePods]; !ok {
 		thresholds[v1.ResourcePods] = MaxResourcePercentage
 		targetThresholds[v1.ResourcePods] = MaxResourcePercentage
@@ -73,37 +74,38 @@ func LowNodeUtilization(ctx context.Context, client clientset.Interface,
 		targetThresholds[v1.ResourceMemory] = MaxResourcePercentage
 	}
 
+	// 分类哪些是 lowNodes/highNodes, 这里不考虑不可调度node
 	lowNodes, highNodes := classifyNodes(
 		getNodeUsage(ctx, client, nodes, thresholds, targetThresholds),
-		// The node has to be schedulable (to be able to move workload there)
-		func(node *v1.Node, usage NodeUsage) bool {
+		func(node *v1.Node, usage NodeUsage) bool { // node 是否是 低利用率 node
 			if nodeutil.IsNodeUnschedulable(node) {
 				klog.V(2).InfoS("Node is unschedulable, thus not considered as underutilized", "node", klog.KObj(node))
 				return false
 			}
 			return isNodeWithLowUtilization(usage)
 		},
-		func(node *v1.Node, usage NodeUsage) bool {
+		func(node *v1.Node, usage NodeUsage) bool { // node 是否是 高利用率 node
 			return isNodeAboveTargetUtilization(usage)
 		},
 	)
 
+	// INFO: 如果 "低利用率" nodes为 0, <NumberOfNodes或者全是，如果没有 "高利用率" nodes，则不驱逐任何pods
 	klog.V(1).InfoS("Criteria for a node under utilization",
 		"CPU", thresholds[v1.ResourceCPU], "Mem", thresholds[v1.ResourceMemory], "Pods", thresholds[v1.ResourcePods])
-	if len(lowNodes) == 0 {
+	if len(lowNodes) == 0 { // 没有 "低利用率" nodes
 		klog.V(1).InfoS("No node is underutilized, nothing to do here, you might tune your thresholds further")
 		return
 	}
 	klog.V(1).InfoS("Total number of underutilized nodes", "totalNumber", len(lowNodes))
-	if len(lowNodes) < strategy.Params.NodeResourceUtilizationThresholds.NumberOfNodes {
+	if len(lowNodes) < strategy.Params.NodeResourceUtilizationThresholds.NumberOfNodes { // 低利用率 nodes 数量如果小于 NumberOfNodes，可以不考虑驱逐
 		klog.V(1).InfoS("Number of nodes underutilized is less than NumberOfNodes, nothing to do here", "underutilizedNodes", len(lowNodes), "numberOfNodes", strategy.Params.NodeResourceUtilizationThresholds.NumberOfNodes)
 		return
 	}
-	if len(lowNodes) == len(nodes) {
+	if len(lowNodes) == len(nodes) { // 所有 nodes 都是低利用率
 		klog.V(1).InfoS("All nodes are underutilized, nothing to do here")
 		return
 	}
-	if len(highNodes) == 0 {
+	if len(highNodes) == 0 { // 没有 "高利用率" nodes
 		klog.V(1).InfoS("All nodes are under target utilization, nothing to do here")
 		return
 	}
@@ -111,14 +113,14 @@ func LowNodeUtilization(ctx context.Context, client clientset.Interface,
 		"CPU", targetThresholds[v1.ResourceCPU], "Mem", targetThresholds[v1.ResourceMemory], "Pods", targetThresholds[v1.ResourcePods])
 	klog.V(1).InfoS("Number of nodes above target utilization", "totalNumber", len(highNodes))
 
-	// evict驱逐 pod
+	// evict驱逐pod，只有该优先级以下的pod才会被驱逐
 	evictable := podEvictor.Evictable(evictions.WithPriorityThreshold(thresholdPriority))
 	evictPodsFromHighNodes(ctx, highNodes, lowNodes, podEvictor, evictable.IsEvictable)
 	klog.V(1).InfoS("Total number of pods evicted", "evictedPods", podEvictor.TotalEvicted())
 }
 
-// classifyNodes classifies the nodes into low-utilization or high-utilization nodes. If a node lies between
-// low and high thresholds, it is simply ignored.
+// nodeUsages 已经拿到了所有nodes的 total_request_limit 资源使用总量，这时可以调用 lowThresholdFilter/highThresholdFilter
+// function 进行分类，哪些是 lowNodes/highNodes
 func classifyNodes(nodeUsages []NodeUsage, lowThresholdFilter,
 	highThresholdFilter func(node *v1.Node, usage NodeUsage) bool) ([]NodeUsage, []NodeUsage) {
 	var lowNodes, highNodes []NodeUsage
@@ -141,43 +143,43 @@ func classifyNodes(nodeUsages []NodeUsage, lowThresholdFilter,
 	return lowNodes, highNodes
 }
 
-// evictPodsFromTargetNodes evicts pods based on priority, if all the pods on the node have priority, if not
-// evicts them based on QoS as fallback option.
-func evictPodsFromHighNodes(ctx context.Context, targetNodes, lowNodes []NodeUsage,
+// 开始驱逐highNodes上pod，根据优先级从低到高驱逐
+func evictPodsFromHighNodes(ctx context.Context, highNodesUsage, lowNodesUsage []NodeUsage,
 	podEvictor *evictions.PodEvictor, podFilter func(pod *v1.Pod) bool) {
 	// 按照资源和降序排序
-	sortNodesByUsage(targetNodes)
+	sortNodesByUsage(highNodesUsage)
 
-	// upper bound on total number of pods/cpu/memory to be moved
-	// 日志一下可用资源总和
-	totalAvailableUsage := map[v1.ResourceName]*resource.Quantity{
+	// 这里统计下 lowNodes 还可以多少资源可用
+	lowNodesTotalAvailableUsage := map[v1.ResourceName]*resource.Quantity{
 		v1.ResourcePods:   {},
 		v1.ResourceCPU:    {},
 		v1.ResourceMemory: {},
 	}
-	var taintsOfLowNodes = make(map[string][]v1.Taint, len(lowNodes))
-	for _, node := range lowNodes {
-		taintsOfLowNodes[node.node.Name] = node.node.Spec.Taints
-		for name := range totalAvailableUsage {
-			totalAvailableUsage[name].Add(*node.highResourceThreshold[name])
-			totalAvailableUsage[name].Sub(*node.usage[name])
+	var taintsOfLowNodes = make(map[string][]v1.Taint, len(lowNodesUsage))
+	for _, lowNodeUsage := range lowNodesUsage {
+		// 把 利用率低
+		taintsOfLowNodes[lowNodeUsage.node.Name] = lowNodeUsage.node.Spec.Taints
+		for name := range lowNodesTotalAvailableUsage {
+			lowNodesTotalAvailableUsage[name].Add(*lowNodeUsage.highResourceThreshold[name])
+			lowNodesTotalAvailableUsage[name].Sub(*lowNodeUsage.usage[name]) // INFO: 最高阈值-已经使用量=剩余量，这里用最高阈值而不是node allocatable来统计，很精妙
 		}
 	}
 	klog.V(1).InfoS(
 		"Total capacity to be moved",
-		"CPU", totalAvailableUsage[v1.ResourceCPU].MilliValue(),
-		"Mem", totalAvailableUsage[v1.ResourceMemory].Value(),
-		"Pods", totalAvailableUsage[v1.ResourcePods].Value(),
+		"CPU", lowNodesTotalAvailableUsage[v1.ResourceCPU].MilliValue(),
+		"Mem", lowNodesTotalAvailableUsage[v1.ResourceMemory].Value(),
+		"Pods", lowNodesTotalAvailableUsage[v1.ResourcePods].Value(),
 	)
 
-	for _, node := range targetNodes {
-		klog.V(3).InfoS("Evicting pods from node", "node", klog.KObj(node.node), "usage", node.usage)
+	// INFO: 开始驱逐highNodes上的pods
+	for _, highNodeUsage := range highNodesUsage {
+		klog.V(3).InfoS("Evicting pods from node", "node", klog.KObj(highNodeUsage.node), "usage", highNodeUsage.usage)
 		// podFilter函数会判断哪些pod是需要驱逐的
-		nonRemovablePods, removablePods := classifyPods(node.allPods, podFilter)
-		klog.V(2).InfoS("Pods on node", "node", klog.KObj(node.node),
-			"allPods", len(node.allPods), "nonRemovablePods", len(nonRemovablePods), "removablePods", len(removablePods))
+		nonRemovablePods, removablePods := classifyPods(highNodeUsage.allPods, podFilter)
+		klog.V(2).InfoS("Pods on node", "node", klog.KObj(highNodeUsage.node),
+			"allPods", len(highNodeUsage.allPods), "nonRemovablePods", len(nonRemovablePods), "removablePods", len(removablePods))
 		if len(removablePods) == 0 {
-			klog.V(1).InfoS("No removable pods on node, try next node", "node", klog.KObj(node.node))
+			klog.V(1).InfoS("No removable pods on node, try next node", "node", klog.KObj(highNodeUsage.node))
 			continue
 		}
 
@@ -185,29 +187,28 @@ func evictPodsFromHighNodes(ctx context.Context, targetNodes, lowNodes []NodeUsa
 		klog.V(1).InfoS("Evicting pods based on priority, if they have same priority, they'll be evicted based on QoS tiers")
 		// 根据 pod 优先级升序排序，优先级相等则根据QoS(BestEffort, Burstable, Guaranteed)升序排序
 		podutil.SortPodsBasedOnPriorityLowToHigh(removablePods)
-		evictPods(ctx, removablePods, node, totalAvailableUsage, taintsOfLowNodes, podEvictor)
-		klog.V(1).InfoS("Evicted pods from node", "node", klog.KObj(node.node),
-			"evictedPods", podEvictor.NodeEvicted(node.node), "usage", node.usage)
+		evictPods(ctx, removablePods, highNodeUsage, lowNodesTotalAvailableUsage, taintsOfLowNodes, podEvictor)
+		klog.V(1).InfoS("Evicted pods from node", "node", klog.KObj(highNodeUsage.node),
+			"evictedPods", podEvictor.NodeEvicted(highNodeUsage.node), "usage", highNodeUsage.usage)
 	}
 }
 
 // 驱逐pod时也讲究策略，每次驱逐一个pod，判断下是否处于 high threshold 之下，达到了 < highThreshold 了就停止驱逐pod
-func evictPods(ctx context.Context, removablePods []*v1.Pod, nodeUsage NodeUsage,
-	totalAvailableUsage map[v1.ResourceName]*resource.Quantity, taintsOfLowNodes map[string][]v1.Taint,
+func evictPods(ctx context.Context, removablePods []*v1.Pod, highNodeUsage NodeUsage,
+	lowNodesTotalAvailableUsage map[v1.ResourceName]*resource.Quantity, taintsOfLowNodes map[string][]v1.Taint,
 	podEvictor *evictions.PodEvictor) {
-	// stop if node utilization drops below target threshold or any of required capacity (cpu, memory, pods) is moved
 	continueCond := func() bool {
 		// 判断是否处于lowResourceThreshold高阈值之上
-		if !isNodeAboveTargetUtilization(nodeUsage) {
+		if !isNodeAboveTargetUtilization(highNodeUsage) {
 			return false
 		}
-		if totalAvailableUsage[v1.ResourcePods].CmpInt64(0) < 1 {
+		if lowNodesTotalAvailableUsage[v1.ResourcePods].CmpInt64(0) < 1 {
 			return false
 		}
-		if totalAvailableUsage[v1.ResourceCPU].CmpInt64(0) < 1 {
+		if lowNodesTotalAvailableUsage[v1.ResourceCPU].CmpInt64(0) < 1 {
 			return false
 		}
-		if totalAvailableUsage[v1.ResourceMemory].CmpInt64(0) < 1 {
+		if lowNodesTotalAvailableUsage[v1.ResourceMemory].CmpInt64(0) < 1 {
 			return false
 		}
 		return true
@@ -216,13 +217,14 @@ func evictPods(ctx context.Context, removablePods []*v1.Pod, nodeUsage NodeUsage
 	// true表示就继续驱逐pod
 	if continueCond() {
 		for _, pod := range removablePods { // 一个个驱逐pod，每次判断 nodeUsage 是否 < highThreshold，达到了就不驱逐了
-			if !podutil.PodToleratesTaints(pod, taintsOfLowNodes) { // 如果pod能容忍node taints则返回true
+			if !podutil.PodToleratesTaints(pod, taintsOfLowNodes) {
+				// INFO: 这里有个重要逻辑，如果所有的 lowNodes，pod都不能容忍其 taints，则这个pod不用驱逐了
 				klog.V(3).InfoS("Skipping eviction for pod, doesn't tolerate node taint", "pod", klog.KObj(pod))
 
 				continue
 			}
 
-			success, err := podEvictor.EvictPod(ctx, pod, nodeUsage.node, "LowNodeUtilization")
+			success, err := podEvictor.EvictPod(ctx, pod, highNodeUsage.node, "LowNodeUtilization")
 			if err != nil {
 				klog.ErrorS(err, "Error evicting pod", "pod", klog.KObj(pod))
 				break
@@ -231,21 +233,22 @@ func evictPods(ctx context.Context, removablePods []*v1.Pod, nodeUsage NodeUsage
 				klog.V(3).InfoS("Evicted pods", "pod", klog.KObj(pod), "err", err)
 
 				// INFO: 为何是 Sub() ???
+				// 因为lowNodesTotalAvailableUsage表示的是 lowNodes 的剩余可用资源量，这里从 highNodes 驱逐pods，当然lowNodesTotalAvailableUsage 可用量就会减少
 
 				// 获取 pod cpu request quantity值
 				cpuQuantity := podResource.GetResourceRequestQuantity(pod, v1.ResourceCPU)
-				nodeUsage.usage[v1.ResourceCPU].Sub(cpuQuantity)
-				totalAvailableUsage[v1.ResourceCPU].Sub(cpuQuantity)
+				highNodeUsage.usage[v1.ResourceCPU].Sub(cpuQuantity)
+				lowNodesTotalAvailableUsage[v1.ResourceCPU].Sub(cpuQuantity)
 
 				// 获取 pod memory request quantity值
 				memoryQuantity := podResource.GetResourceRequestQuantity(pod, v1.ResourceMemory)
-				nodeUsage.usage[v1.ResourceMemory].Sub(memoryQuantity)
-				totalAvailableUsage[v1.ResourceMemory].Sub(memoryQuantity)
+				highNodeUsage.usage[v1.ResourceMemory].Sub(memoryQuantity)
+				lowNodesTotalAvailableUsage[v1.ResourceMemory].Sub(memoryQuantity)
 
-				nodeUsage.usage[v1.ResourcePods].Sub(*resource.NewQuantity(1, resource.DecimalSI))     // pod - 1
-				totalAvailableUsage[v1.ResourcePods].Sub(*resource.NewQuantity(1, resource.DecimalSI)) // pod - 1
+				highNodeUsage.usage[v1.ResourcePods].Sub(*resource.NewQuantity(1, resource.DecimalSI))         // pod - 1
+				lowNodesTotalAvailableUsage[v1.ResourcePods].Sub(*resource.NewQuantity(1, resource.DecimalSI)) // pod - 1
 
-				klog.V(3).InfoS("Updated node usage", "updatedUsage", nodeUsage)
+				klog.V(3).InfoS("Updated node usage", "updatedUsage", highNodeUsage)
 
 				if !continueCond() { // 如果已经达到了highThreshold就不需要驱逐
 					break

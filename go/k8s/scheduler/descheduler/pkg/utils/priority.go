@@ -11,8 +11,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
-// GetPriorityFromStrategyParams gets priority from the given StrategyParameters.
-// It will return SystemCriticalPriority by default.
+// 从传参中获取 pod priority
 func GetPriorityFromStrategyParams(ctx context.Context, client clientset.Interface,
 	params *api.StrategyParameters) (priority int32, err error) {
 

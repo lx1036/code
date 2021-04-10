@@ -91,8 +91,7 @@ func (pe *PodEvictor) Evictable(opts ...func(opts *Options)) *evictable {
 	return ev
 }
 
-// TotalEvicted gives a number of pods evicted through all nodes
-// 所有nodes
+// 所有nodes总共驱逐了多少pods
 func (pe *PodEvictor) TotalEvicted() int {
 	var total int
 	for _, count := range pe.nodepodCount {
@@ -101,6 +100,7 @@ func (pe *PodEvictor) TotalEvicted() int {
 	return total
 }
 
+// INFO: 这里是最核心的逻辑：驱逐pod其实就是创建个子资源 pods/eviction
 func (pe *PodEvictor) EvictPod(ctx context.Context, pod *v1.Pod, node *v1.Node, reasons ...string) (bool, error) {
 	var reason string
 	if len(reasons) > 0 {
@@ -193,7 +193,7 @@ func (ev *evictable) IsEvictable(pod *v1.Pod) bool {
 		checkErrs = append(checkErrs, fmt.Errorf("pod does not have any ownerrefs"))
 	}
 
-	// 经过ev.constraints check之后
+	// 经过ev.constraints check之后，这里的 constraints 其实就是: pod优先级判断
 	for _, c := range ev.constraints {
 		if err := c(pod); err != nil {
 			checkErrs = append(checkErrs, err)
@@ -201,7 +201,8 @@ func (ev *evictable) IsEvictable(pod *v1.Pod) bool {
 	}
 
 	if len(checkErrs) > 0 && !HaveEvictAnnotation(pod) { // 根据标记判断，之前没有被驱逐过
-		klog.V(4).InfoS("Pod lacks an eviction annotation and fails the following checks", "pod", klog.KObj(pod), "checks", errors.NewAggregate(checkErrs).Error())
+		klog.V(4).InfoS("Pod lacks an eviction annotation and fails the following checks",
+			"pod", klog.KObj(pod), "checks", errors.NewAggregate(checkErrs).Error())
 		return false
 	}
 
@@ -212,8 +213,6 @@ type Options struct {
 	priority *int32
 }
 
-// WithPriorityThreshold sets a threshold for pod's priority class.
-// Any pod whose priority class is lower is evictable.
 func WithPriorityThreshold(priority int32) func(opts *Options) {
 	return func(opts *Options) {
 		var p int32 = priority

@@ -68,9 +68,9 @@ type Percentage float64
 type ResourceThresholds map[v1.ResourceName]Percentage
 
 type NodeResourceUtilizationThresholds struct {
-	Thresholds       ResourceThresholds
-	TargetThresholds ResourceThresholds
-	NumberOfNodes    int
+	Thresholds       ResourceThresholds // 最小阈值，如 cpu_usage/cpu_request 低于 30
+	TargetThresholds ResourceThresholds // 目标阈值，如 cpu_usage/cpu_request 达到 50
+	NumberOfNodes    int                // 低利用率 nodes 数量如果小于 NumberOfNodes，可以不考虑驱逐
 }
 
 type PodsHavingTooManyRestarts struct {

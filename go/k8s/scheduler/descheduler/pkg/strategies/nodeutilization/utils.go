@@ -3,15 +3,15 @@ package nodeutilization
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog/v2"
 	"sort"
 
 	"k8s-lx1036/k8s/scheduler/descheduler/pkg/api"
 	podutil "k8s-lx1036/k8s/scheduler/descheduler/pkg/pod"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 )
 
 func validateLowNodeUtilizationParams(params *api.StrategyParameters) error {
@@ -95,7 +95,7 @@ func getNodeUsage(ctx context.Context, client clientset.Interface, nodes []*v1.N
 
 		nodeUsageList = append(nodeUsageList, NodeUsage{
 			node:    node,
-			usage:   nodeUtilization(node, pods),
+			usage:   nodeUtilization(node, pods), // 计算node上pods的 total_request_limit，表示已经使用的资源量
 			allPods: pods,
 			/*
 				// thresholds 值得小于 targetThresholds
@@ -168,7 +168,7 @@ func nodeUtilization(node *v1.Node, pods []*v1.Pod) map[v1.ResourceName]*resourc
 	return totalReqs
 }
 
-// sortNodesByUsage sorts nodes based on usage in descending order
+// 根据 cpu/memory/pods 使用量总和降序排序，消耗量大，排前
 func sortNodesByUsage(nodes []NodeUsage) {
 	sort.Slice(nodes, func(i, j int) bool {
 		// INFO: 直接 cpu/memory/pods 求和？？？
