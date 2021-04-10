@@ -426,7 +426,7 @@ func TestLowNodeUtilization(t *testing.T) {
 			}
 			podEvictor := evictions.NewPodEvictor(
 				fakeClient,
-				"v1beta1",
+				"policy/v1beta1",
 				false,
 				fixture.maxPodsToEvictPerNode,
 				nodes,
@@ -569,7 +569,7 @@ func TestLowNodeUtilizationWithTaints(t *testing.T) {
 
 			podEvictor := evictions.NewPodEvictor(
 				fakeClient,
-				"v1beta1",
+				"policy/v1beta1",
 				false,
 				item.evictionsExpected,
 				item.nodes,
