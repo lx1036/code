@@ -95,6 +95,10 @@ func SetNormalOwnerRef(pod *v1.Pod) {
 	pod.ObjectMeta.OwnerReferences = GetNormalPodOwnerRefList()
 }
 
+func SetPodPriority(pod *v1.Pod, priority int32) {
+	pod.Spec.Priority = &priority
+}
+
 func GetNormalPodOwnerRefList() []metav1.OwnerReference {
 	return []metav1.OwnerReference{
 		{Kind: "Pod", APIVersion: "v1"},
@@ -119,4 +123,18 @@ func GetMirrorPodAnnotation() map[string]string {
 		"kubernetes.io/config.source": "api",
 		"kubernetes.io/config.mirror": "mirror",
 	}
+}
+
+func MakeBestEffortPod(pod *v1.Pod) {
+	pod.Spec.Containers[0].Resources.Requests = nil
+	pod.Spec.Containers[0].Resources.Limits = nil
+}
+
+func MakeBurstablePod(pod *v1.Pod) {
+	pod.Spec.Containers[0].Resources.Limits = nil
+}
+
+func MakeGuaranteedPod(pod *v1.Pod) {
+	pod.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU]
+	pod.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory]
 }
