@@ -149,7 +149,7 @@ func GenerateSHA(data string) string {
 }
 
 func (controller *Controller) rollingUpdateDeployment(configMap *ConfigMap, action string) {
-	// TODO: 这里list所有的deployments，并不好
+	// INFO: 这里list所有的deployments，并不好
 	deploymentList, err := controller.client.AppsV1().Deployments(configMap.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		log.Errorf("unable to list deployment in namespace %s with %v", configMap.Namespace, err)

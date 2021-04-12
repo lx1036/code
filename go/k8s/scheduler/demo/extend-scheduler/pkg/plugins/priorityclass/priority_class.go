@@ -133,7 +133,7 @@ func (s *PriorityClassFit) Score(ctx context.Context, state *v1alpha1.CycleState
 	//score := v1alpha1.MaxNodeScore
 	/*for _, item := range nodeInfo.Pods {
 		if item.Pod.Spec.NodeName == node.Name && item.Pod.Spec.PriorityClassName == s.args.PriorityClassName {
-			// TODO: 通过 pod resource 来打分，而不是个数，参考下 kube-scheduler 源码
+			// INFO: 通过 pod resource 来打分，而不是个数，参考下 kube-scheduler 源码
 			score-- // 高优先级pod数量越多，分数越低
 		}
 	}*/

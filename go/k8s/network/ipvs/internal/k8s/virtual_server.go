@@ -55,7 +55,7 @@ func toVirtualServer(service *ipvs.Service) (*VirtualServer, error) {
 		Timeout:   service.Timeout,
 	}
 
-	// TODO: fix flags
+	// INFO: fix flags
 	virtualServer.Flags = service.Flags
 
 	if virtualServer.Address == nil {

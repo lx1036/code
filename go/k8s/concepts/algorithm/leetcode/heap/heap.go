@@ -27,7 +27,7 @@ func Push(data Interface, x interface{}) {
 // 删除，首先把最末端的结点与要删除节点的交换位置
 func Pop(data Interface) interface{} {
 
-	// TODO: 为何要交换首位元素后，在下沉，最后才pop，感觉交换后下沉不是变回原来的tree么
+	// INFO: 为何要交换首位元素后，在下沉，最后才pop，感觉交换后下沉不是变回原来的tree么
 	// 不应该是pop后
 	n := data.Len() - 1
 	data.Swap(0, n) // 0索引是要删除的

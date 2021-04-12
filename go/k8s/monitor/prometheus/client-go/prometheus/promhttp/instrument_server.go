@@ -30,7 +30,7 @@ func InstrumentHandlerInFlight(g prometheus.Gauge, next http.Handler) http.Handl
 }
 
 func checkLabels(c prometheus.Collector) (code bool, method bool) {
-	// TODO: Remove this hacky way to check for instance labels
+	// INFO: Remove this hacky way to check for instance labels
 	// once Descriptors can have their dimensionality queried.
 	var (
 		desc *prometheus.Desc

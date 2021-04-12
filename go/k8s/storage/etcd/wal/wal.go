@@ -193,8 +193,8 @@ func (w *WAL) renameWALUnlock(tmpdirpath string) (*WAL, error) {
 // If it cannot read out the expected snap, it will return ErrSnapshotNotFound.
 // If loaded snap doesn't match with the expected one, it will return
 // all the records and error ErrSnapshotMismatch.
-// TODO: detect not-last-snap error.
-// TODO: maybe loose the checking of match.
+// INFO: detect not-last-snap error.
+// INFO: maybe loose the checking of match.
 // After ReadAll, the WAL will be ready for appending new records.
 func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.Entry, err error) {
 	w.mu.Lock()

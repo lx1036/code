@@ -54,7 +54,7 @@ type strategyFunction func(ctx context.Context, client clientset.Interface, stra
 
 func RunDeschedulerStrategies(ctx context.Context, rs *options.Options, deschedulerPolicy *api.DeschedulerPolicy,
 	evictionPolicyGroupVersion string, stopChannel chan struct{}) error {
-	// TODO: 这里 defaultResync=0，一直没搞明白defaultResync=0用处是啥，这里暂存
+	// INFO: 这里 defaultResync=0，一直没搞明白defaultResync=0用处是啥，这里暂存
 	sharedInformerFactory := informers.NewSharedInformerFactory(rs.Client, 0)
 	nodeInformer := sharedInformerFactory.Core().V1().Nodes()
 	sharedInformerFactory.Start(stopChannel)
@@ -126,7 +126,7 @@ func RunDeschedulerStrategies(ctx context.Context, rs *options.Options, deschedu
 	return nil
 }
 
-// TODO: 读取yaml文件，然后转换成内部版本对象，这个逻辑以后直接复用
+// INFO: 读取yaml文件，然后转换成内部版本对象，这个逻辑以后直接复用
 func LoadPolicyConfig(policyConfigFile string) (*api.DeschedulerPolicy, error) {
 	if policyConfigFile == "" {
 		klog.V(1).InfoS("Policy config file not specified")
