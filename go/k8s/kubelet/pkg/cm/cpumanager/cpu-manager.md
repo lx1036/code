@@ -9,6 +9,7 @@ CPU 管理器不支持运行时下线和上线 CPUs。此外，如果节点上�
 
 ```shell
 cat /var/lib/kubelet/cpu_manager_state
+# 源码中 pkg/kubelet/cm/cpumanager/state/checkpoint.go::CPUManagerCheckpoint{}
 # {"policyName":"none","defaultCpuSet":"","checksum":3242152201}
 ```
 
