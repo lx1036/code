@@ -2,8 +2,12 @@ package bolt
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
 	"syscall"
 	"time"
+	"unsafe"
 )
 
 // The time elapsed between consecutive file locking attempts.
@@ -69,4 +73,117 @@ func munmap(db *DB) error {
 // funlock releases an advisory lock on a file descriptor.
 func funlock(db *DB) error {
 	return syscall.Flock(int(db.file.Fd()), syscall.LOCK_UN)
+}
+
+// maxAllocSize is the size used when creating array pointers.
+const maxAllocSize = 0x7FFFFFFF
+
+func unsafeAdd(base unsafe.Pointer, offset uintptr) unsafe.Pointer {
+	return unsafe.Pointer(uintptr(base) + offset)
+}
+
+func unsafeByteSlice(base unsafe.Pointer, offset uintptr, i, j int) []byte {
+	// See: https://github.com/golang/go/wiki/cgo#turning-c-arrays-into-go-slices
+	//
+	// This memory is not allocated from C, but it is unmanaged by Go's
+	// garbage collector and should behave similarly, and the compiler
+	// should produce similar code.  Note that this conversion allows a
+	// subslice to begin after the base address, with an optional offset,
+	// while the URL above does not cover this case and only slices from
+	// index 0.  However, the wiki never says that the address must be to
+	// the beginning of a C allocation (or even that malloc was used at
+	// all), so this is believed to be correct.
+	return (*[maxAllocSize]byte)(unsafeAdd(base, offset))[i:j:j]
+}
+
+// _assert will panic with a given formatted message if the given condition is false.
+func _assert(condition bool, msg string, v ...interface{}) {
+	if !condition {
+		panic(fmt.Sprintf("assertion failed: "+msg, v...))
+	}
+}
+
+//////////// DBWrapper for test ////////
+type DBWrapper struct {
+	*DB
+}
+
+// tempfile returns a temporary file path.
+func tempfile() string {
+	f, err := ioutil.TempFile("", "bolt-")
+	if err != nil {
+		panic(err)
+	}
+	if err := f.Close(); err != nil {
+		panic(err)
+	}
+	if err := os.Remove(f.Name()); err != nil {
+		panic(err)
+	}
+	return f.Name()
+}
+
+// MustOpenDB returns a new, open DB at a temporary location.
+func MustOpenDB() *DBWrapper {
+	db, err := Open(tempfile(), 0666, nil)
+	if err != nil {
+		panic(err)
+	}
+	return &DBWrapper{DB: db}
+}
+
+// MustClose closes the database and deletes the underlying file. Panic on error.
+func (db *DBWrapper) MustClose() {
+	if err := db.Close(); err != nil {
+		panic(err)
+	}
+}
+
+// Close closes the database and deletes the underlying file.
+func (db *DBWrapper) Close() error {
+	// Check database consistency after every test.
+	db.MustCheck()
+
+	// Close database and remove file.
+	defer os.Remove(db.Path())
+	return db.Close()
+}
+
+// MustCheck runs a consistency check on the database and panics if any errors are found.
+func (db *DBWrapper) MustCheck() {
+	if err := db.Update(func(tx *Tx) error {
+		// Collect all the errors.
+		var errors []error
+		for err := range tx.Check() {
+			errors = append(errors, err)
+			if len(errors) > 10 {
+				break
+			}
+		}
+
+		// If errors occurred, copy the DB and print the errors.
+		// 如果数据一致性错误
+		if len(errors) > 0 {
+			var path = tempfile()
+			if err := tx.CopyFile(path, 0600); err != nil {
+				panic(err)
+			}
+
+			// Print errors.
+			fmt.Print("\n\n")
+			fmt.Printf("consistency check failed (%d errors)\n", len(errors))
+			for _, err := range errors {
+				fmt.Println(err)
+			}
+			fmt.Println("")
+			fmt.Println("db saved to:")
+			fmt.Println(path)
+			fmt.Print("\n\n")
+			os.Exit(-1)
+		}
+
+		return nil
+	}); err != nil && err != ErrDatabaseNotOpen {
+		panic(err)
+	}
 }

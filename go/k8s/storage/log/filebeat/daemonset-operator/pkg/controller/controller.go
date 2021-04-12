@@ -496,15 +496,15 @@ func (controller *Controller) process() bool {
 			log.Infof("adding cache with pod %s/%s", pod.Namespace, pod.Name)
 			controller.cache.Set(entry.key, pod)
 		case Update:
-			// TODO: 多次 {"level":"info","msg":"updating cache with pod default/daemonset-stdout-demo-lx1036-7d8c79f474-zwfzm","time":"2020-12-06T18:10:17+08:00"}
+			// INFO: 多次 {"level":"info","msg":"updating cache with pod default/daemonset-stdout-demo-lx1036-7d8c79f474-zwfzm","time":"2020-12-06T18:10:17+08:00"}
 			// 为何这么多次？
 			// 当pod没有ready时，会多次触发update event，queue里就会多次有update pod加进来
 			// 所以需要过滤，只有ready状态的pod进入queue
 			log.Infof("updating cache with pod %s/%s", pod.Namespace, pod.Name)
 			controller.cache.Set(entry.key, pod)
 		case Delete:
-			// TODO: 当kubectl delete -f deployment.yaml删除deployment时候，居然触发的是update事件
-			// TODO: 现在问题是：删除pod后，inputs.yml文件并没有立即删除pod对应的配置(或许应该这样设计，交给捞底sync去做？)
+			// INFO: 当kubectl delete -f deployment.yaml删除deployment时候，居然触发的是update事件
+			// INFO: 现在问题是：删除pod后，inputs.yml文件并没有立即删除pod对应的配置(或许应该这样设计，交给捞底sync去做？)
 			log.Infof("deleting cache with pod %s/%s", pod.Namespace, pod.Name)
 			controller.cache.Delete(entry.key)
 		}

@@ -80,7 +80,7 @@ func getCapacityController(
 		csi.NewControllerClient(grpcClient),
 		provisionerName,
 		clientset,
-		// TODO: metrics for the queue?!
+		// INFO: metrics for the queue?!
 		workqueue.NewNamedRateLimitingQueue(rateLimiter, "csistoragecapacity"),
 		*controller,
 		namespace,

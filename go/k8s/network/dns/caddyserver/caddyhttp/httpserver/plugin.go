@@ -56,8 +56,8 @@ var directives = []string{
 	"tls",
 
 	// services/utilities, or other directives that don't necessarily inject handlers
-	"startup",  // TODO: Deprecate this directive
-	"shutdown", // TODO: Deprecate this directive
+	"startup",  // INFO: Deprecate this directive
+	"shutdown", // INFO: Deprecate this directive
 	"on",
 	"supervisor", // github.com/lucaslorentz/caddy-supervisor
 	"request_id",

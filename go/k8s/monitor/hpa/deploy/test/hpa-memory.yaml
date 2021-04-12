@@ -79,7 +79,7 @@ spec:
       resource:
         name: cpu
         target:
-          type: Utilization
+          type: Utilization # 这里CPU利用率是指：cpu_usage / cpu_request
           averageUtilization: 20
   behavior: # 测试精细化控制扩缩容
     scaleUp:

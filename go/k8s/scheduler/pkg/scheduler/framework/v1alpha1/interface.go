@@ -41,7 +41,7 @@ type FrameworkHandle interface {
 
 	SharedInformerFactory() informers.SharedInformerFactory
 
-	// TODO: unroll the wrapped interfaces to FrameworkHandle.
+	// INFO: unroll the wrapped interfaces to FrameworkHandle.
 	PreemptHandle() PreemptHandle
 }
 

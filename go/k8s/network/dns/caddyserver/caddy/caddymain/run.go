@@ -313,7 +313,7 @@ func getBuildModule() *debug.Module {
 		// The recommended way to build Caddy involves
 		// creating a separate main module, which
 		// preserves caddy a read-only dependency
-		// TODO: track related Go issue: https://github.com/golang/go/issues/29228
+		// INFO: track related Go issue: https://github.com/golang/go/issues/29228
 		for _, mod := range bi.Deps {
 			if mod.Path == "github.com/caddyserver/caddy" {
 				return mod

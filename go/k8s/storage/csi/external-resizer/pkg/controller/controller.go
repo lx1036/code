@@ -192,7 +192,7 @@ func (controller *resizeController) syncPVC(key string) error {
 
 }
 
-// TODO: patch更新pvc.status.conditions, 可以多多参考
+// INFO: patch更新pvc.status.conditions, 可以多多参考
 func (controller *resizeController) markPVCResizeInProgress(pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	// Mark PVC as Resize Started
 	progressCondition := v1.PersistentVolumeClaimCondition{
@@ -293,7 +293,7 @@ func (controller *resizeController) resizePVC(pvc *v1.PersistentVolumeClaim, pv 
 		pvc = updatedPVC
 	}
 
-	// TODO:
+	// INFO:
 
 	// Record an event to indicate that external resizer is resizing this volume.
 	controller.eventRecorder.Event(pvc, v1.EventTypeNormal, string(v1.PersistentVolumeClaimResizing),

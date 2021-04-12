@@ -21,15 +21,15 @@ const magic uint32 = 0xED0CDAED
 const version = 2
 
 type meta struct {
-	magic    uint32
-	version  uint32
-	pageSize uint32
-	flags    uint32
-	root     bucket
-	freelist pgid
-	pgid     pgid
-	txid     txid
-	checksum uint64
+	magic    uint32 // 文件标识
+	version  uint32 // 版本号
+	pageSize uint32 // 页大小
+	flags    uint32 // 页类型
+	root     bucket // 根bucket
+	freelist pgid   // freelist页面id
+	pgid     pgid   // 总的页面数量
+	txid     txid   // 上一次写事务id
+	checksum uint64 // 校验码
 }
 
 // validate checks the marker bytes and version of the meta page to ensure it matches this binary.
@@ -134,6 +134,7 @@ type DB struct {
 	FreelistType   FreelistType
 	NoFreelistSync bool
 	freelist       *freelist
+	pageSize       int
 
 	// statistics
 	stats Stats
@@ -161,6 +162,7 @@ func (db *DB) Begin(writable bool) (*Tx, error) {
 		return db.beginRWTx()
 	}
 
+	return nil, nil
 	//return db.beginTx()
 }
 
@@ -178,7 +180,7 @@ func (db *DB) beginRWTx() (*Tx, error) {
 	transaction := &Tx{writable: true}
 	transaction.init(db)
 	db.rwtx = transaction
-	db.freePages()
+	//db.freePages()
 
 	return transaction, nil
 }
@@ -243,13 +245,14 @@ func (db *DB) hasSyncedFreelist() bool {
 // concurrent accesses being made to the freelist.
 func (db *DB) loadFreelist() {
 	db.freelistLoad.Do(func() {
-		db.freelist = newFreelist(db.FreelistType)
+		//db.freelist = newFreelist(db.FreelistType)
+		db.freelist = newFreelist()
 		if !db.hasSyncedFreelist() {
 			// Reconstruct free list by scanning the DB.
-			db.freelist.readIDs(db.freepages())
+			//db.freelist.readIDs(db.freepages())
 		} else {
 			// Read free list from freelist page.
-			db.freelist.read(db.page(db.meta().freelist))
+			//db.freelist.read(db.page(db.meta().freelist))
 		}
 		db.stats.FreePageN = db.freelist.free_count()
 	})
@@ -295,6 +298,17 @@ func (db *DB) munmap() error {
 		return fmt.Errorf("unmap error: " + err.Error())
 	}
 	return nil
+}
+
+// Path returns the path to currently open database file.
+func (db *DB) Path() string {
+	return db.path
+}
+
+// page retrieves a page reference from the mmap based on the current page size.
+func (db *DB) page(id pgid) *page {
+	pos := id * pgid(db.pageSize)
+	return (*page)(unsafe.Pointer(&db.data[pos]))
 }
 
 // DefaultOptions represent the options used if nil options are passed into Open().

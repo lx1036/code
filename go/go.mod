@@ -11,6 +11,7 @@ require (
 	github.com/astaxie/beego v1.12.1
 	github.com/aws/aws-sdk-go v1.35.24
 	github.com/bep/debounce v1.2.0
+	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0
 	github.com/container-storage-interface/spec v1.3.0

@@ -43,7 +43,7 @@ type NodeInfo struct {
 
 	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
 	// scheduling cycle.
-	// TODO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
+	// INFO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
 	TransientInfo *TransientSchedulerInfo
 
 	// Whenever NodeInfo changes, generation is bumped.
