@@ -3,6 +3,7 @@ package cpuset
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -81,6 +82,45 @@ func (s CPUSet) Clone() CPUSet {
 	b := NewBuilder()
 	for elem := range s.elems {
 		b.Add(elem)
+	}
+	return b.Result()
+}
+
+func (s CPUSet) Contains(cpu int) bool {
+	_, found := s.elems[cpu]
+	return found
+}
+
+func (s CPUSet) Equals(s2 CPUSet) bool {
+	return reflect.DeepEqual(s.elems, s2.elems)
+}
+
+// 求交集
+func (s CPUSet) Intersection(s2 CPUSet) CPUSet {
+	return s.Filter(func(cpu int) bool { return s2.Contains(cpu) })
+}
+
+// 求并集
+func (s CPUSet) UnionAll(s2 []CPUSet) CPUSet {
+	b := NewBuilder()
+	for cpu := range s.elems {
+		b.Add(cpu)
+	}
+	for _, cs := range s2 {
+		for cpu := range cs.elems {
+			b.Add(cpu)
+		}
+	}
+	return b.Result()
+}
+
+// builder 设计模式
+func (s CPUSet) Filter(predicate func(int) bool) CPUSet {
+	b := NewBuilder()
+	for cpu := range s.elems {
+		if predicate(cpu) {
+			b.Add(cpu)
+		}
 	}
 	return b.Result()
 }
