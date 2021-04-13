@@ -62,7 +62,11 @@ func FindCgroupMountpointAndRoot(cgroupPath, subsystem string) (string, string, 
 		return "", "", fmt.Errorf("mountpoint for %s not found", subsystem)
 	}
 
-	f, err := os.Open("./mock/proc/self/mountinfo")
+	mountinfoFile, err := filepath.Abs("mock/proc/self/mountinfo")
+	if err != nil {
+		panic(err)
+	}
+	f, err := os.Open(mountinfoFile)
 	if err != nil {
 		return "", "", err
 	}
@@ -95,7 +99,11 @@ func findCgroupMountpointAndRootFromReader(reader io.Reader, cgroupPath, subsyst
 }
 
 func isSubsystemAvailable(subsystem string) bool {
-	cgroups, err := ParseCgroupFile("/proc/self/cgroup")
+	cgroupFile, err := filepath.Abs("mock/proc/self/cgroup")
+	if err != nil {
+		panic(err)
+	}
+	cgroups, err := ParseCgroupFile(cgroupFile)
 	if err != nil {
 		return false
 	}
@@ -135,6 +143,9 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 		// For each cgroup hierarchy ... there is one entry
 		// containing three colon-separated fields of the form:
 		//     hierarchy-ID:subsystem-list:cgroup-path
+		if len(strings.Trim(text, " ")) == 0 {
+			continue
+		}
 		parts := strings.SplitN(text, ":", 3)
 		if len(parts) < 3 {
 			return nil, fmt.Errorf("invalid cgroup entry: must contain at least two colons: %v", text)
@@ -162,7 +173,11 @@ func GetOwnCgroupPath(subsystem string) (string, error) {
 
 // GetOwnCgroup returns the relative path to the cgroup docker is running in.
 func GetOwnCgroup(subsystem string) (string, error) {
-	cgroups, err := ParseCgroupFile("./mock/proc/self/cgroup")
+	cgroupFile, err := filepath.Abs("mock/proc/self/cgroup")
+	if err != nil {
+		panic(err)
+	}
+	cgroups, err := ParseCgroupFile(cgroupFile)
 	if err != nil {
 		return "", err
 	}

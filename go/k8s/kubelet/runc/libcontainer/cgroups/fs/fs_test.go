@@ -22,6 +22,40 @@ func TestInvalidCgroupPath(t *testing.T) {
 			test: "invalid cgroup path",
 			path: "../../../../../../../../../../some/path",
 		},
+		{
+			test: "invalid absolute cgroup path",
+			path: "/../../../../../../../../../../some/path",
+		},
+		{
+			test:   "invalid cgroup parent",
+			parent: "../../../../../../../../../../some/path",
+			name:   "name",
+		},
+		{
+			test:   "invalid absolute cgroup parent",
+			parent: "/../../../../../../../../../../some/path",
+			name:   "name",
+		},
+		{
+			test:   "invalid cgroup name",
+			parent: "parent",
+			name:   "../../../../../../../../../../some/path",
+		},
+		{
+			test:   "invalid absolute cgroup name",
+			parent: "parent",
+			name:   "/../../../../../../../../../../some/path",
+		},
+		{
+			test:   "invalid cgroup name and parent",
+			parent: "../../../../../../../../../../some/path",
+			name:   "../../../../../../../../../../some/path",
+		},
+		{
+			test:   "invalid absolute cgroup name and parent",
+			parent: "/../../../../../../../../../../some/path",
+			name:   "/../../../../../../../../../../some/path",
+		},
 	}
 
 	for _, tc := range testCases {
