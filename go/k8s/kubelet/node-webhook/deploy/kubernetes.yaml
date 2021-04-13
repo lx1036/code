@@ -1,0 +1,133 @@
+
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: lxcfs-serving-cert
+  namespace: default
+spec:
+  dnsNames:
+    - lxcfs-webhook.default.svc
+    - lxcfs-webhook.default.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: lxcfs-selfsigned-issuer
+  secretName: lxcfs-webhook-server-cert
+
+---
+
+apiVersion: cert-manager.io/v1alpha2
+kind: Issuer
+metadata:
+  name: lxcfs-selfsigned-issuer
+  namespace: default
+spec:
+  selfSigned: {}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: lxcfs-webhook
+  namespace: default
+spec:
+  selector:
+    app: lxcfs-webhook
+  ports:
+    - port: 443
+      targetPort: 8443
+      protocol: TCP
+  type: ClusterIP
+
+---
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: lxcfs-webhook
+  annotations:
+    cert-manager.io/inject-ca-from: default/lxcfs-serving-cert
+  labels:
+    app: lxcfs-webhook
+webhooks:
+  - name: mutating.lxcfs-webhook.net
+    clientConfig:
+      #      url: "https://3657e7190bfe.ngrok.io" # for debug in local
+      service:
+        name: lxcfs-webhook
+        namespace: default
+        path: "/"
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+        scope: '*'
+    namespaceSelector:
+      matchExpressions:
+        - key: lxcfs-webhook
+          operator: NotIn
+          values:
+            - disable
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 30
+    reinvocationPolicy: Never
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lxcfs-webhook
+  namespace: default
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: lxcfs-webhook
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: lxcfs-webhook
+    spec:
+      imagePullSecrets:
+        - name: docker-registry-addops
+      containers:
+        - args:
+            - --tls-cert-file
+            - /etc/service-webhook/tls.crt
+            - --tls-private-key-file
+            - /etc/service-webhook/tls.key
+          image: r.addops.soft.360.cn/rancher/lxcfs-webhook:1.0.1
+          imagePullPolicy: IfNotPresent
+          name: lxcfs-webhook
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 250m
+              memory: 256Mi
+          volumeMounts:
+            - mountPath: /etc/service-webhook
+              name: service-certs
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: service-certs
+          secret:
+            defaultMode: 420
+            secretName: lxcfs-webhook-server-cert
+
+
+
+
