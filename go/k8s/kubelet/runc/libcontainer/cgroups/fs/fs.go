@@ -1,6 +1,8 @@
 package fs
 
 import (
+	"errors"
+	"path/filepath"
 	"sync"
 
 	"k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups"
@@ -12,18 +14,18 @@ var (
 
 	subsystemsLegacy = subsystemSet{
 		&CpusetGroup{},
-		&DevicesGroup{},
-		&MemoryGroup{},
-		&CpuGroup{},
-		&CpuacctGroup{},
-		&PidsGroup{},
-		&BlkioGroup{},
-		&HugetlbGroup{},
-		&NetClsGroup{},
-		&NetPrioGroup{},
-		&PerfEventGroup{},
-		&FreezerGroup{},
-		&NameGroup{GroupName: "name=systemd", Join: true},
+		//&DevicesGroup{},
+		//&MemoryGroup{},
+		//&CpuGroup{},
+		//&CpuacctGroup{},
+		//&PidsGroup{},
+		//&BlkioGroup{},
+		//&HugetlbGroup{},
+		//&NetClsGroup{},
+		//&NetPrioGroup{},
+		//&PerfEventGroup{},
+		//&FreezerGroup{},
+		//&NameGroup{GroupName: "name=systemd", Join: true},
 	}
 )
 
@@ -34,16 +36,38 @@ type cgroupData struct {
 	pid       int
 }
 
+func (raw *cgroupData) path(subsystem string) (string, error) {
+	// If the cgroup name/path is absolute do not look relative to the cgroup of the init process.
+	if filepath.IsAbs(raw.innerPath) {
+		mnt, err := cgroups.FindCgroupMountpoint(raw.root, subsystem)
+		// If we didn't mount the subsystem, there is no point we make the path.
+		if err != nil {
+			return "", err
+		}
+
+		// Sometimes subsystems can be mounted together as 'cpu,cpuacct'.
+		return filepath.Join(raw.root, filepath.Base(mnt), raw.innerPath), nil
+	}
+
+	// Use GetOwnCgroupPath instead of GetInitCgroupPath, because the creating
+	// process could in container and shared pid namespace with host, and
+	// /proc/1/cgroup could point to whole other world of cgroups.
+	parentPath, err := cgroups.GetOwnCgroupPath(subsystem)
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(parentPath, raw.innerPath), nil
+}
+
 type subsystemSet []subsystem
 type subsystem interface {
 	// Name returns the name of the subsystem.
 	Name() string
 	// Returns the stats, as 'stats', corresponding to the cgroup under 'path'.
 	GetStats(path string, stats *cgroups.Stats) error
-	// Removes the cgroup represented by 'cgroupData'.
-	Remove(*cgroupData) error
 	// Creates and joins the cgroup represented by 'cgroupData'.
-	Apply(*cgroupData) error
+	Apply(c *cgroupData) error
 	// Set the cgroup represented by cgroup.
 	Set(path string, cgroup *configs.Cgroup) error
 }
@@ -57,6 +81,60 @@ type manager struct {
 
 func (m *manager) getSubsystems() subsystemSet {
 	return subsystemsLegacy
+}
+
+// The absolute path to the root of the cgroup hierarchies.
+var cgroupRootLock sync.Mutex
+var cgroupRoot string
+
+const defaultCgroupRoot = "./mock/sys/fs/cgroup"
+
+func tryDefaultCgroupRoot() string {
+	return defaultCgroupRoot
+}
+
+// Gets the cgroupRoot.
+func getCgroupRoot() (string, error) {
+	cgroupRootLock.Lock()
+	defer cgroupRootLock.Unlock()
+
+	if cgroupRoot != "" {
+		return cgroupRoot, nil
+	}
+
+	// fast path
+	cgroupRoot = tryDefaultCgroupRoot()
+	if cgroupRoot != "" {
+		return cgroupRoot, nil
+	}
+
+	return "", nil
+}
+
+func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {
+	root, err := getCgroupRoot()
+	if err != nil {
+		return nil, err
+	}
+
+	if (c.Name != "" || c.Parent != "") && c.Path != "" {
+		return nil, errors.New("cgroup: either Path or Name and Parent should be used")
+	}
+
+	cgPath := filepath.Clean(c.Path)
+	cgParent := filepath.Clean(c.Parent)
+	cgName := filepath.Clean(c.Name)
+	innerPath := cgPath
+	if innerPath == "" {
+		innerPath = filepath.Join(cgParent, cgName)
+	}
+
+	return &cgroupData{
+		root:      root,
+		innerPath: innerPath,
+		config:    c,
+		pid:       pid,
+	}, nil
 }
 
 func (m *manager) Apply(pid int) error {

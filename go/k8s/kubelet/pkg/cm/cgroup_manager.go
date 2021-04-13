@@ -271,6 +271,7 @@ func (cgroupManager *cgroupManagerImpl) toResources(resourceConfig *ResourceConf
 	return resources
 }
 
+// 创建一个cgroup
 func (cgroupManager *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	resources := cgroupManager.toResources(cgroupConfig.ResourceParameters)
 	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
