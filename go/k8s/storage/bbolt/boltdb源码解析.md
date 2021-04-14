@@ -40,6 +40,13 @@ There are only a few types in BoltDB: DB, Bucket, Tx, and Cursor.
 **[boltdb B+ tree](https://youjiali1995.github.io/database/CMU-15445/)**
 
 
+**[boltdb 源码导读（一）：boltdb 数据组织](https://zhuanlan.zhihu.com/p/332439403)**
+
+**[boltdb 源码导读（二）：boltdb 索引设计](https://zhuanlan.zhihu.com/p/341416264)**
+
+**[boltdb 源码导读（三）：boltdb 事务实现](https://zhuanlan.zhihu.com/p/363795675)**
+
+
 
 ## TroubleShooting
 **[database file size not updating?](https://github.com/boltdb/bolt/issues/308)**
