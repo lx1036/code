@@ -3,9 +3,9 @@ package node
 import (
 	"encoding/json"
 	"strings"
-	
+
 	"github.com/mattbaird/jsonpatch"
-	
+
 	v1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -154,10 +154,8 @@ func MutatePod(ar v1.AdmissionReview) *v1.AdmissionResponse {
 		klog.Error(err)
 		return toAdmissionResponse(err)
 	}
-	
-	
-	return &v1.AdmissionResponse{Allowed: true}
 
+	return &v1.AdmissionResponse{Allowed: true}
 
 }
 

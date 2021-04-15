@@ -46,7 +46,7 @@ spec:
 
 ---
 
-apiVersion: autoscaling/v1
+apiVersion: autoscaling/v2beta2
 kind: HorizontalPodAutoscaler
 metadata:
   name: hpa-test
@@ -58,6 +58,12 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: hpa-test
-  targetCPUUtilizationPercentage: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 20
 
 
