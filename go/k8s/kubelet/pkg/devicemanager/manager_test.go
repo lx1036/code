@@ -1,7 +1,6 @@
 package devicemanager
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -11,18 +10,6 @@ import (
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
-
-// socketName: /tmp/device_plugin/server.sock, pluginSocketName: /tmp/device_plugin/device-plugin.sock
-func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) {
-	socketDir, err = ioutil.TempDir("", "device_plugin")
-	if err != nil {
-		return
-	}
-	socketName = socketDir + "/server.sock"
-	pluginSocketName = socketDir + "/device-plugin.sock"
-	os.MkdirAll(socketDir, 0755)
-	return
-}
 
 func TestNewManagerImpl(t *testing.T) {
 	socketDir, socketName, _, err := tmpSocketDir()

@@ -19,12 +19,12 @@ type containerDevices map[string]resourceAllocateInfo   // Keyed by containerNam
 type podDevices map[string]containerDevices             // Keyed by podUID.
 
 // Populates podDevices from the passed in checkpointData.
-func (pdev podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
+func (podDevice podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 
 }
 
 // Returns all of devices allocated to the pods being tracked, keyed by resourceName.
-func (pdev podDevices) devices() map[string]sets.String {
+func (podDevice podDevices) devices() map[string]sets.String {
 	ret := make(map[string]sets.String)
 
 	return ret

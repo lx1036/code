@@ -28,8 +28,8 @@ import (
 )
 
 type endpointInfo struct {
-	e    endpoint
-	opts *pluginapi.DevicePluginOptions
+	endpoint Endpoint
+	opts     *pluginapi.DevicePluginOptions
 }
 
 // PodReusableDevices is a map by pod name of devices to reuse.
@@ -174,7 +174,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 		// will stay zero till the corresponding device plugin re-registers.
 		m.healthyDevices[resource] = sets.NewString()
 		m.unhealthyDevices[resource] = sets.NewString()
-		m.endpoints[resource] = endpointInfo{e: newStoppedEndpointImpl(resource), opts: nil}
+		m.endpoints[resource] = endpointInfo{endpoint: newStoppedEndpointImpl(resource), opts: nil}
 	}
 
 	return nil
@@ -278,7 +278,7 @@ func (m *ManagerImpl) Stop() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	for _, eInfo := range m.endpoints {
-		eInfo.e.stop()
+		eInfo.endpoint.stop()
 	}
 
 	if m.server == nil {
@@ -319,7 +319,8 @@ func (m *ManagerImpl) UpdateAllocatedDevices() {
 	panic("implement me")
 }
 
-// Register registers a device plugin.
+// INFO: 实现接口 k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1/api.pb.go::RegistrationServer
+// 客户端代码在 device_plugin.go::Register(kubeletEndpoint, resourceName string, pluginSockDir string)
 func (m *ManagerImpl) Register(ctx context.Context, request *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
 	klog.Infof("Got registration request from device plugin with resource name %q", request.ResourceName)
 
@@ -338,20 +339,21 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 		klog.Errorf("Failed to dial device plugin with request %v: %v", r, err)
 		return
 	}
+
 	m.registerEndpoint(r.ResourceName, r.Options, e)
 	go func() {
 		m.runEndpoint(r.ResourceName, e)
 	}()
 }
 
-func (m *ManagerImpl) runEndpoint(resourceName string, e endpoint) {
+func (m *ManagerImpl) runEndpoint(resourceName string, e Endpoint) {
 	e.run()
 	e.stop()
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	if old, ok := m.endpoints[resourceName]; ok && old.e == e {
+	if old, ok := m.endpoints[resourceName]; ok && old.endpoint == e {
 		m.markResourceUnhealthy(resourceName)
 	}
 
@@ -371,10 +373,10 @@ func (m *ManagerImpl) markResourceUnhealthy(resourceName string) {
 	m.unhealthyDevices[resourceName] = m.unhealthyDevices[resourceName].Union(healthyDevices)
 }
 
-func (m *ManagerImpl) registerEndpoint(resourceName string, options *pluginapi.DevicePluginOptions, e endpoint) {
+func (m *ManagerImpl) registerEndpoint(resourceName string, options *pluginapi.DevicePluginOptions, e Endpoint) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	m.endpoints[resourceName] = endpointInfo{e: e, opts: options}
+	m.endpoints[resourceName] = endpointInfo{endpoint: e, opts: options}
 	klog.V(2).Infof("Registered endpoint %v", e)
 }

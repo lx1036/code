@@ -1,6 +1,8 @@
 package devicemanager
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"k8s-lx1036/k8s/kubelet/pkg/cm/topologymanager"
@@ -14,6 +16,18 @@ import (
 const (
 	testResourceName = "fake-domain/resource"
 )
+
+// socketName: /tmp/device_plugin/server.sock, pluginSocketName: /tmp/device_plugin/device-plugin.sock
+func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) {
+	socketDir, err = ioutil.TempDir("", "device_plugin")
+	if err != nil {
+		return
+	}
+	socketName = socketDir + "/server.sock"
+	pluginSocketName = socketDir + "/device-plugin.sock"
+	os.MkdirAll(socketDir, 0755)
+	return
+}
 
 func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback,
 	socketName string) (Manager, <-chan interface{}) {
@@ -42,20 +56,20 @@ func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitor
 }
 
 func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback,
-	socketName string, pluginSocketName string) (Manager, <-chan interface{}, *Stub) {
+	socketName string, pluginSocketName string) (Manager, <-chan interface{}, *DevicePlugin) {
 	m, updateChan := setupDeviceManager(t, devs, callback, socketName)
 	p := setupDevicePlugin(t, devs, pluginSocketName)
 	return m, updateChan, p
 }
 
-func setupDevicePlugin(t *testing.T, devs []*pluginapi.Device, pluginSocketName string) *Stub {
-	p := NewDevicePluginStub(devs, pluginSocketName, testResourceName, false, false)
+func setupDevicePlugin(t *testing.T, devs []*pluginapi.Device, pluginSocketName string) *DevicePlugin {
+	p := NewDevicePlugin(devs, pluginSocketName, testResourceName, false, false)
 	err := p.Start()
 	require.NoError(t, err)
 	return p
 }
 
-func cleanup(t *testing.T, m Manager, p *Stub) {
+func cleanup(t *testing.T, m Manager, p *DevicePlugin) {
 	p.Stop()
 	m.Stop()
 }

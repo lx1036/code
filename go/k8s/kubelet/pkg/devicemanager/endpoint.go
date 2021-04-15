@@ -15,7 +15,7 @@ import (
 // endpoint maps to a single registered device plugin. It is responsible
 // for managing gRPC communications with the device plugin and caching
 // device states reported by the device plugin.
-type endpoint interface {
+type Endpoint interface {
 	run()
 	stop()
 	getPreferredAllocation(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error)
@@ -38,8 +38,7 @@ type endpointImpl struct {
 	cb    monitorCallback
 }
 
-// newEndpointImpl creates a new endpoint for the given resourceName.
-// This is to be used during normal device plugin registration.
+// INFO: grpc client，用来 plugin registration
 func newEndpointImpl(socketPath, resourceName string, callback monitorCallback) (*endpointImpl, error) {
 	client, c, err := dial(socketPath)
 	if err != nil {
@@ -67,23 +66,67 @@ func newStoppedEndpointImpl(resourceName string) *endpointImpl {
 	}
 }
 
-func (e *endpointImpl) run() {
+// run initializes ListAndWatch gRPC call for the device plugin and
+// blocks on receiving ListAndWatch gRPC stream updates. Each ListAndWatch
+// stream update contains a new list of device states.
+// It then issues a callback to pass this information to the device manager which
+// will adjust the resource available information accordingly.
+func (endpoint *endpointImpl) run() {
+	stream, err := endpoint.client.ListAndWatch(context.Background(), &pluginapi.Empty{})
+	if err != nil {
+		klog.Errorf("listAndWatch ended unexpectedly for device plugin %s with error %v", endpoint.resourceName, err)
+
+		return
+	}
+
+	for {
+		response, err := stream.Recv()
+		if err != nil {
+			klog.Errorf("listAndWatch ended unexpectedly for device plugin %s with error %v", endpoint.resourceName, err)
+			return
+		}
+
+		devs := response.Devices
+		klog.V(2).Infof("State pushed for device plugin %s", endpoint.resourceName)
+
+		var newDevs []pluginapi.Device
+		for _, d := range devs {
+			newDevs = append(newDevs, *d)
+		}
+
+		endpoint.callback(endpoint.resourceName, newDevs)
+	}
 }
-func (e *endpointImpl) stop() {}
-func (e *endpointImpl) getPreferredAllocation(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+func (endpoint *endpointImpl) stop() {}
+func (endpoint *endpointImpl) getPreferredAllocation(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
 	return nil, nil
 }
-func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
+
+// allocate issues Allocate gRPC call to the device plugin.
+func (endpoint *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
+	if endpoint.isStopped() {
+		return nil, fmt.Errorf("endpoint %v has been stopped", endpoint)
+	}
+
+	return endpoint.client.Allocate(context.Background(), &pluginapi.AllocateRequest{
+		ContainerRequests: []*pluginapi.ContainerAllocateRequest{
+			{DevicesIDs: devs},
+		},
+	})
+}
+func (endpoint *endpointImpl) preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error) {
 	return nil, nil
 }
-func (e *endpointImpl) preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error) {
-	return nil, nil
+func (endpoint *endpointImpl) callback(resourceName string, devices []pluginapi.Device) {
+	endpoint.cb(resourceName, devices)
 }
-func (e *endpointImpl) callback(resourceName string, devices []pluginapi.Device) {}
-func (e *endpointImpl) isStopped() bool {
-	return false
+func (endpoint *endpointImpl) isStopped() bool {
+	endpoint.mutex.Lock()
+	defer endpoint.mutex.Unlock()
+
+	return !endpoint.stopTime.IsZero()
 }
-func (e *endpointImpl) stopGracePeriodExpired() bool {
+func (endpoint *endpointImpl) stopGracePeriodExpired() bool {
 	return false
 }
 
