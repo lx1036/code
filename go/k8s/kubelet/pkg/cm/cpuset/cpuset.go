@@ -151,6 +151,16 @@ func (s CPUSet) Filter(predicate func(int) bool) CPUSet {
 	return b.Result()
 }
 
+// ToSliceNoSort returns a slice of integers that contains all elements from
+// this set.
+func (s CPUSet) ToSliceNoSort() []int {
+	result := []int{}
+	for cpu := range s.elems {
+		result = append(result, cpu)
+	}
+	return result
+}
+
 func NewCPUSet(cpus ...int) CPUSet {
 	b := NewBuilder()
 	for _, c := range cpus {

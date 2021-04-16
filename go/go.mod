@@ -132,6 +132,7 @@ require (
 	k8s.io/sample-controller v0.19.7
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/controller-runtime v0.6.2
+	github.com/moby/sys/mountinfo v0.4.1
 )
 
 replace (

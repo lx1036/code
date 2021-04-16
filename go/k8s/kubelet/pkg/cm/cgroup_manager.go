@@ -358,13 +358,13 @@ func (cgroupManager *cgroupManagerImpl) GetResourceStats(name CgroupName) (*Reso
 	panic("implement me")
 }
 
-func NewCgroupManager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
+func NewCgroupManager(cgroupSubsystems *CgroupSubsystems, cgroupDriver string) CgroupManager {
 	managerType := libcontainerCgroupfs
 	if cgroupDriver == string(libcontainerSystemd) {
 		managerType = libcontainerSystemd
 	}
 	return &cgroupManagerImpl{
-		subsystems: cs,
+		subsystems: cgroupSubsystems,
 		adapter:    newLibcontainerAdapter(managerType),
 	}
 }

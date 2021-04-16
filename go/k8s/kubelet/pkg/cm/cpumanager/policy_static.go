@@ -138,6 +138,7 @@ func (policy *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.C
 		klog.Infof("[cpumanager] Pod %v, Container %v Topology Affinity is: %v", pod.UID, container.Name, hint)
 
 		// Allocate CPUs according to the NUMA affinity contained in the hint.
+		// INFO: 要给container分配numCPUs cpus
 		cset, err := policy.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, policy.cpusToReuse[string(pod.UID)])
 		if err != nil {
 			klog.Errorf("[cpumanager] unable to allocate %d CPUs (pod: %s, container: %s, error: %v)", numCPUs, pod.Name, container.Name, err)
@@ -153,6 +154,34 @@ func (policy *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.C
 	return nil
 }
 
+// INFO:
+func (policy *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, cset cpuset.CPUSet) {
+	// If pod entries to m.cpusToReuse other than the current pod exist, delete them.
+	for podUID := range policy.cpusToReuse {
+		if podUID != string(pod.UID) {
+			delete(policy.cpusToReuse, podUID)
+		}
+	}
+
+	// If no cpuset exists for cpusToReuse by this pod yet, create one.
+	if _, ok := policy.cpusToReuse[string(pod.UID)]; !ok {
+		policy.cpusToReuse[string(pod.UID)] = cpuset.NewCPUSet()
+	}
+
+	// Check if the container is an init container.
+	// If so, add its cpuset to the cpuset of reusable CPUs for any new allocations.
+	for _, initContainer := range pod.Spec.InitContainers {
+		if container.Name == initContainer.Name {
+			policy.cpusToReuse[string(pod.UID)] = policy.cpusToReuse[string(pod.UID)].Union(cset)
+			return
+		}
+	}
+
+	// Otherwise it is an app container.
+	// Remove its cpuset from the cpuset of reusable CPUs for any new allocations.
+	policy.cpusToReuse[string(pod.UID)] = policy.cpusToReuse[string(pod.UID)].Difference(cset)
+}
+
 // 可分配cpu = unassigned - reserved
 func (policy *staticPolicy) assignableCPUs(s state.State) cpuset.CPUSet {
 	return s.GetDefaultCPUSet().Difference(policy.reserved)
@@ -161,7 +190,7 @@ func (policy *staticPolicy) assignableCPUs(s state.State) cpuset.CPUSet {
 func (policy *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bitmask.BitMask, reusableCPUs cpuset.CPUSet) (cpuset.CPUSet, error) {
 	klog.Infof("[cpumanager] allocateCpus: (numCPUs: %d, socket: %v)", numCPUs, numaAffinity)
 
-	// 可分配cpu = unassigned - reserved
+	// 可分配cpu = unassigned - reserved(1,2,3,4,5,6,7), 0 cpu作为reserved cpu
 	assignableCPUs := policy.assignableCPUs(s).Union(reusableCPUs)
 
 	// If there are aligned CPUs in numaAffinity, attempt to take those first.

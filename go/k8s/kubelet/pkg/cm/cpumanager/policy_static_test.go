@@ -165,9 +165,9 @@ func TestStaticPolicyStart(t *testing.T) {
 }
 
 func TestStaticPolicyAllocate(test *testing.T) {
-
 	testCases := []staticPolicyTest{
 		{
+			// INFO: 总共 0-7 八个cpu, 还需要reserved 1个cpu, 要分配出"8000m"，所以报错
 			description:     "GuPodSingleCore, SingleSocketHT, ExpectError",
 			topo:            topoSingleSocketHT,
 			numReservedCPUs: 1,
@@ -182,8 +182,11 @@ func TestStaticPolicyAllocate(test *testing.T) {
 
 	for _, testCase := range testCases {
 		test.Run(testCase.description, func(t *testing.T) {
-			policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs,
-				cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+			policy, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs,
+				cpuset.NewCPUSet(0), topologymanager.NewFakeManager())
+			if err != nil {
+				panic(err)
+			}
 
 			mState := &mockState{
 				assignments:   testCase.stAssignments,
@@ -191,13 +194,37 @@ func TestStaticPolicyAllocate(test *testing.T) {
 			}
 
 			container := &testCase.pod.Spec.Containers[0]
-			err := policy.Allocate(mState, testCase.pod, container)
+			err = policy.Allocate(mState, testCase.pod, container)
 			if !reflect.DeepEqual(err, testCase.expErr) {
 				t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
 					testCase.description, testCase.expErr, err)
 			}
 
+			if testCase.expCPUAlloc {
+				cset, found := mState.assignments[string(testCase.pod.UID)][container.Name]
+				if !found {
+					t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
+						testCase.description, container.Name, mState.assignments)
+				}
+
+				if !reflect.DeepEqual(cset, testCase.expCSet) {
+					t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v but got %v",
+						testCase.description, testCase.expCSet, cset)
+				}
+
+				if !cset.Intersection(mState.defaultCPUSet).IsEmpty() {
+					t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
+						testCase.description, cset, mState.defaultCPUSet)
+				}
+			}
+
+			if !testCase.expCPUAlloc {
+				_, found := mState.assignments[string(testCase.pod.UID)][container.Name]
+				if found {
+					t.Errorf("StaticPolicy Allocate() error (%v). Did not expect container %v to be present in assignments %v",
+						testCase.description, container.Name, mState.assignments)
+				}
+			}
 		})
 	}
-
 }
