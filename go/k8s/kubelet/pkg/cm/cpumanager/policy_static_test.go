@@ -33,6 +33,22 @@ var (
 			11: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
 		},
 	}
+
+	topoSingleSocketHT = &topology.CPUTopology{
+		NumCPUs:    8,
+		NumSockets: 1,
+		NumCores:   4,
+		CPUDetails: map[int]topology.CPUInfo{
+			0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			1: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+			2: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			3: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+			4: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			5: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+			6: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			7: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+		},
+	}
 )
 
 type staticPolicyTest struct {
@@ -144,6 +160,43 @@ func TestStaticPolicyStart(t *testing.T) {
 				t.Errorf("State CPUSet is different than expected. Have %q wants: %q", st.GetDefaultCPUSet(),
 					testCase.expCSet)
 			}
+		})
+	}
+}
+
+func TestStaticPolicyAllocate(test *testing.T) {
+
+	testCases := []staticPolicyTest{
+		{
+			description:     "GuPodSingleCore, SingleSocketHT, ExpectError",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			pod:             makePod("fakePod", "fakeContainer2", "8000m", "8000m"),
+			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
+			expCPUAlloc:     false,
+			expCSet:         cpuset.NewCPUSet(),
+		},
+	}
+
+	for _, testCase := range testCases {
+		test.Run(testCase.description, func(t *testing.T) {
+			policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs,
+				cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+
+			mState := &mockState{
+				assignments:   testCase.stAssignments,
+				defaultCPUSet: testCase.stDefaultCPUSet,
+			}
+
+			container := &testCase.pod.Spec.Containers[0]
+			err := policy.Allocate(mState, testCase.pod, container)
+			if !reflect.DeepEqual(err, testCase.expErr) {
+				t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
+					testCase.description, testCase.expErr, err)
+			}
+
 		})
 	}
 

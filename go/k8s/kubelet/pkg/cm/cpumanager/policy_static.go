@@ -7,9 +7,11 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cm/cpumanager/topology"
 	"k8s-lx1036/k8s/kubelet/pkg/cm/cpuset"
 	"k8s-lx1036/k8s/kubelet/pkg/cm/topologymanager"
+	"k8s-lx1036/k8s/kubelet/pkg/cm/topologymanager/bitmask"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
 const PolicyStatic policyName = "static"
@@ -102,8 +104,85 @@ func (policy *staticPolicy) validateState(s state.State) error {
 	return nil
 }
 
+func (policy *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
+	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed { // 必须是 guaranteed pod
+		return 0
+	}
+
+	// cpu request 必须是整数
+	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
+	if cpuQuantity.Value()*1000 != cpuQuantity.MilliValue() {
+		return 0
+	}
+
+	return int(cpuQuantity.Value())
+}
+
+// 创建容器时，分配cpu
 func (policy *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
-	panic("implement me")
+	if numCPUs := policy.guaranteedCPUs(pod, container); numCPUs != 0 {
+		// INFO: container belongs in an exclusively allocated pool, 容器要绑核独占
+		klog.Infof("[cpumanager] static policy: Allocate %d cpus exclusively for (pod: %s, container: %s)",
+			numCPUs, pod.Name, container.Name)
+
+		// 如果state里已经有该container.Name的分配情况，重复使用
+		if cset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
+			//policy.updateCPUsToReuse(pod, container, cpuset)
+			klog.Infof("[cpumanager] static policy: container already present in state for cpu %s, skipping (pod: %s, container: %s)",
+				cset.String(), pod.Name, container.Name)
+			return nil
+		}
+
+		// Call Topology Manager to get the aligned socket affinity across all hint providers.
+		hint := policy.affinity.GetAffinity(string(pod.UID), container.Name)
+		klog.Infof("[cpumanager] Pod %v, Container %v Topology Affinity is: %v", pod.UID, container.Name, hint)
+
+		// Allocate CPUs according to the NUMA affinity contained in the hint.
+		cset, err := policy.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, policy.cpusToReuse[string(pod.UID)])
+		if err != nil {
+			klog.Errorf("[cpumanager] unable to allocate %d CPUs (pod: %s, container: %s, error: %v)", numCPUs, pod.Name, container.Name, err)
+			return err
+		}
+
+		// 设置哈希表，已经分配出去的 [podUID][container.Name][cpuset]
+		s.SetCPUSet(string(pod.UID), container.Name, cset)
+		policy.updateCPUsToReuse(pod, container, cset)
+	}
+
+	// container belongs in the shared pool (nothing to do; use default cpuset)
+	return nil
+}
+
+// 可分配cpu = unassigned - reserved
+func (policy *staticPolicy) assignableCPUs(s state.State) cpuset.CPUSet {
+	return s.GetDefaultCPUSet().Difference(policy.reserved)
+}
+
+func (policy *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bitmask.BitMask, reusableCPUs cpuset.CPUSet) (cpuset.CPUSet, error) {
+	klog.Infof("[cpumanager] allocateCpus: (numCPUs: %d, socket: %v)", numCPUs, numaAffinity)
+
+	// 可分配cpu = unassigned - reserved
+	assignableCPUs := policy.assignableCPUs(s).Union(reusableCPUs)
+
+	// If there are aligned CPUs in numaAffinity, attempt to take those first.
+	result := cpuset.NewCPUSet()
+	if numaAffinity != nil {
+
+	}
+
+	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
+	remainingCPUs, err := takeByTopology(policy.topology, assignableCPUs.Difference(result), numCPUs-result.Size())
+	if err != nil {
+		return cpuset.NewCPUSet(), err
+	}
+	result = result.Union(remainingCPUs)
+
+	// 从剩余cpu - result(分配出去的cpus)
+	// Remove allocated CPUs from the shared CPUSet.
+	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result))
+
+	klog.Infof("[cpumanager] allocateCPUs: returning %v", result)
+	return result, nil
 }
 
 func (policy *staticPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {

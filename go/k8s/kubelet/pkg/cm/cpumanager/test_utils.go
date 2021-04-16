@@ -4,6 +4,7 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cm/cpumanager/state"
 	"k8s-lx1036/k8s/kubelet/pkg/cm/cpuset"
 	"k8s-lx1036/k8s/kubelet/pkg/cm/topologymanager"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -101,4 +102,30 @@ type mockPodStatusProvider struct {
 
 func (podStatusProvider mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
 	return podStatusProvider.podStatus, podStatusProvider.found
+}
+
+func makePod(podUID, containerName, cpuRequest, cpuLimit string) *v1.Pod {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpuRequest),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpuLimit),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pod.UID = types.UID(podUID)
+	pod.Spec.Containers[0].Name = containerName
+
+	return pod
 }
