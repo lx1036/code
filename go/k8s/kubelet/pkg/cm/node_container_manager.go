@@ -35,3 +35,28 @@ func (containerManager *containerManagerImpl) GetNodeAllocatableReservation() v1
 
 	return result
 }
+
+// getNodeAllocatableAbsolute allocatable = capacity - systemReserved - kubeReserved 获取可分配资源量
+func (containerManager *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
+	return containerManager.getNodeAllocatableAbsoluteImpl(containerManager.capacity)
+}
+func (containerManager *containerManagerImpl) getNodeAllocatableAbsoluteImpl(capacity v1.ResourceList) v1.ResourceList {
+	// INFO: allocatable = capacity - systemReserved - kubeReserved
+	result := make(v1.ResourceList)
+	for resourceName, quantity := range capacity {
+		value := quantity.DeepCopy()
+		if containerManager.NodeConfig.SystemReserved != nil {
+			value.Sub(containerManager.NodeConfig.SystemReserved[resourceName])
+		}
+		if containerManager.NodeConfig.KubeReserved != nil {
+			value.Sub(containerManager.NodeConfig.KubeReserved[resourceName])
+		}
+		if value.Sign() < 0 {
+			// Negative Allocatable resources don't make sense.
+			value.Set(0)
+		}
+		result[resourceName] = value
+	}
+
+	return result
+}
