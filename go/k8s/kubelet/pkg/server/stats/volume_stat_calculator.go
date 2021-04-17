@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	stats "k8s-lx1036/k8s/kubelet/pkg/apis/v1alpha1"
+	stats "k8s-lx1036/k8s/kubelet/pkg/apis/stats/v1alpha1"
 
 	v1 "k8s.io/api/core/v1"
 )

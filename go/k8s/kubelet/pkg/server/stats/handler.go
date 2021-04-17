@@ -1,8 +1,11 @@
 package stats
 
 import (
-	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/v1alpha1"
+	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s-lx1036/k8s/kubelet/pkg/cm"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"

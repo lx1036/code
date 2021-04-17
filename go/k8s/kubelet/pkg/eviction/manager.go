@@ -1,22 +1,20 @@
 package eviction
 
 import (
-	"k8s-lx1036/k8s/kubelet/pkg/lifecycle"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/features"
 	"sort"
 	"sync"
 	"time"
 
+	"k8s-lx1036/k8s/kubelet/pkg/lifecycle"
+	"k8s-lx1036/k8s/kubelet/pkg/server/stats"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-
-	"k8s-lx1036/k8s/kubelet/pkg/server/stats"
 )
 
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
