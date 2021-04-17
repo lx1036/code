@@ -9,8 +9,6 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cm/cpuset"
 )
 
-
-
 // INFO: NUMA架构包含多个nodes，每个node包含多个cpu(core)/memory，每个cpu包含两个processor。`top` 看到的是 processor 数量。
 
 /*
@@ -66,7 +64,6 @@ Tasks: 580 total,   5 running, 360 sleeping,   0 stopped,   0 zombie
 
 */
 
-
 // INFO: 是否开启超线程= 物理cpu数量 * 每块cpu核数 / 总逻辑线程数 == 2
 /*
 
@@ -87,8 +84,7 @@ cpuset: cpuset作为cgroup的子系统，主要用于numa架构，用于设置cp
 cpuset使用sysfs提供用户态接口，可以通过普通文件读写，
 工作流程为：cpuset调用sched_setaffinity来设置进程的cpu、内存的亲和性，调用mbind和set_mempolicy来设置内存的亲和性。
 
- */
-
+*/
 
 type cpuAccumulator struct {
 	topo          *topology.CPUTopology

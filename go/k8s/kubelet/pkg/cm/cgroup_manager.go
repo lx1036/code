@@ -30,35 +30,6 @@ type ResourceStats struct {
 	MemoryStats *MemoryStats
 }
 
-// CgroupManager allows for cgroup management.
-// Supports Cgroup Creation ,Deletion and Updates.
-type CgroupManager interface {
-	// Create creates and applies the cgroup configurations on the cgroup.
-	// It just creates the leaf cgroups.
-	// It expects the parent cgroup to already exist.
-	Create(*CgroupConfig) error
-	// Destroy the cgroup.
-	Destroy(*CgroupConfig) error
-	// Update cgroup configuration.
-	Update(*CgroupConfig) error
-	// Exists checks if the cgroup already exists
-	Exists(name CgroupName) bool
-	// Name returns the literal cgroupfs name on the host after any driver specific conversions.
-	// We would expect systemd implementation to make appropriate name conversion.
-	// For example, if we pass {"foo", "bar"}
-	// then systemd should convert the name to something like
-	// foo.slice/foo-bar.slice
-	Name(name CgroupName) string
-	// CgroupName converts the literal cgroupfs name on the host to an internal identifier.
-	CgroupName(name string) CgroupName
-	// Pids scans through all subsystems to find pids associated with specified cgroup.
-	Pids(name CgroupName) []int
-	// ReduceCPULimits reduces the CPU CFS values to the minimum amount of shares.
-	ReduceCPULimits(cgroupName CgroupName) error
-	// GetResourceStats returns statistics of the specified cgroup as read from the cgroup fs.
-	GetResourceStats(name CgroupName) (*ResourceStats, error)
-}
-
 // ResourceConfig holds information about all the supported cgroup resource parameters.
 type ResourceConfig struct {
 	// Memory limit (in bytes).
@@ -101,7 +72,7 @@ func unescapeSystemdCgroupName(part string) string {
 	return strings.Replace(part, "_", "-", -1)
 }
 
-// cgroupName.ToSystemd converts the internal cgroup name to a systemd name.
+// ToSystemd cgroupName.ToSystemd converts the internal cgroup name to a systemd name.
 // For example, the name {"kubepods", "burstable", "pod1234-abcd-5678-efgh"} becomes
 // "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod1234_abcd_5678_efgh.slice"
 // This function always expands the systemd name into the cgroupfs form. If only
@@ -343,7 +314,11 @@ func (cgroupManager *cgroupManagerImpl) Name(name CgroupName) string {
 }
 
 func (cgroupManager *cgroupManagerImpl) CgroupName(name string) CgroupName {
-	panic("implement me")
+	if cgroupManager.adapter.cgroupManagerType == libcontainerSystemd {
+		return ParseSystemdToCgroupName(name)
+	}
+
+	return ParseCgroupfsToCgroupName(name)
 }
 
 func (cgroupManager *cgroupManagerImpl) Pids(name CgroupName) []int {
@@ -358,7 +333,7 @@ func (cgroupManager *cgroupManagerImpl) GetResourceStats(name CgroupName) (*Reso
 	panic("implement me")
 }
 
-func NewCgroupManager(cgroupSubsystems *CgroupSubsystems, cgroupDriver string) CgroupManager {
+func NewCgroupManager(cgroupSubsystems *CgroupSubsystems, cgroupDriver string) *cgroupManagerImpl {
 	managerType := libcontainerCgroupfs
 	if cgroupDriver == string(libcontainerSystemd) {
 		managerType = libcontainerSystemd
