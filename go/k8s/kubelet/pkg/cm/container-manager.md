@@ -90,6 +90,7 @@ numactl -H
 
 # kubelet 使用 cgroups
 **[kubernetes kubelet组件中cgroup的层层"戒备"](https://www.cnblogs.com/gaorong/p/11716907.html)**
+**[Kubelet从入门到放弃:识透CPU管理](https://mp.weixin.qq.com/s/ViuaEIE0mEaWMJPCJm5-xg)**
 
 ## container level cgroups
 

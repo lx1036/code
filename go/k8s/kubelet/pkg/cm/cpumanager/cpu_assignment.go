@@ -23,8 +23,8 @@ cpu cores	: 8
 cat /proc/cpuinfo | grep "processor" | wc -l # 查看主机总逻辑线程数
 32
 
-是否开启超线程= 物理cpu数量 * 每块cpu核数 / 总逻辑线程数 == 2
-这台机器 2 * 8 / 32 != 2，没有开启超线程
+是否开启超线程= 总逻辑线程数 / 物理cpu数量 * 每块cpu核数 == 2
+这台机器 32/ (2 * 8) == 2，开启了超线程
 
 NUMA(Non-uniform memory access): 主机板上如果插有多块 CPU 的话，那么就是 NUMA 架构。每块 CPU 独占一块面积，一般都有独立风扇。
 查看本机NUMA结构，和上面数据是对应的，并且0-7和16-23 core在node0上，8-15和24-31在node1上。
@@ -80,7 +80,7 @@ Thread: 就是超线程（HyperThreading）的概念，是一个逻辑cpu，共�
 HT: Hyperthreading  使操作系统认为处理器的核心数是实际核心数的2倍，超线程(hyper-threading)本质上就是CPU支持的同时多线程(simultaneous multi-threading)技术，
 简单理解就是对CPU的虚拟化，一颗物理CPU可以被操作系统当做多颗CPU来使用。Hyper-threading只是一种“欺骗”手段
 
-cpuset: cpuset作为cgroup的子系统，主要用于numa架构，用于设置cpu的亲和性，为 cgroup 中的 task 分配独立的 CPU和内存等。
+cpuset: cpuset作为cgroups的子系统，主要用于numa架构，用于设置cpu的亲和性，为 cgroup 中的 task 分配独立的 CPU和内存等。
 cpuset使用sysfs提供用户态接口，可以通过普通文件读写，
 工作流程为：cpuset调用sched_setaffinity来设置进程的cpu、内存的亲和性，调用mbind和set_mempolicy来设置内存的亲和性。
 
