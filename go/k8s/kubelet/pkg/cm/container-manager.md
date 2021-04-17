@@ -9,7 +9,7 @@ kubelet涉及container-manager相关参数：
 * --cgroup-root(CgroupRoot): 默认""，pods的root cgroup
 * --cgroup-driver(CgroupDriver): kubelet用来管理cgroups的driver, 有cgroupfs/systemd, 默认是cgroupfs 
 * --cgroups-per-qos(CgroupsPerQOS): Burstable/BestEffort pods 都在其对应的cgroup目录下: /sys/fs/cgroup/cpuset/kubepods/besteffort
-和 /sys/fs/cgroup/cpuset/kubepods/burstable
+和 /sys/fs/cgroup/cpuset/kubepods/burstable，该参数开启 pod level cgroups
 
 
 # cgroups(control groups)
@@ -86,3 +86,23 @@ numactl -H
 #  0:  10  21
 #  1:  21  10
 ```
+
+
+# kubelet 使用 cgroups
+**[kubernetes kubelet组件中cgroup的层层"戒备"](https://www.cnblogs.com/gaorong/p/11716907.html)**
+
+## container level cgroups
+
+
+
+## pod level cgroups
+
+
+
+## qos level cgroups
+
+
+
+## node level cgroups
+
+
