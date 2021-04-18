@@ -13,17 +13,17 @@ kubelet涉及container-manager相关参数：
 
 
 # cgroups(control groups)
-CGroup是一种资源隔离方案，CGroup提供了一些子系统：
-cpu: 可以限制使用CPU权限。
-memory: 可以限制内存使用量
-blockio: 限制I/O速率
-cpuset: 基于CPU核心进行限制(限制可以使用哪些核)
-cpuacct: 记录进程组使用的资源数量(CPU时间)
-device: 允许或拒绝CGroup中的任务访问设备
-frezzer: 可以控制进程挂起或者恢复(挂起后可以释放资源)
-ns: 名称空间子系统
-net_cls: 可用于标记网络数据包，它不直接控制网络读写。
-net_proi: 可用于设置网络设备的优先级
+cgroups 是一种资源隔离方案，cgroups 提供了一些子系统：
+cpu subsystem: 限制进程的cpu使用率
+cpuacct subsystem: 统计 cgroups 中进程的cpu使用报告
+cpuset subsystem: 为 cgroups 中的进程分配单独的 cpu/memory 节点
+memory subsystem: 限制进程的 memory 使用量
+blkio subsystem: 限制进程的块设备io
+devices subsystem: 控制进程能够访问哪些设备
+net_cls subsystem: 标记 cgroups 中进程的网络数据包，然后可以使用 tc(traffic control) 模块对数据包进行控制
+freezer subsystem: 挂起或者恢复 cgroups 中的进程
+ns subsystem: 不同 cgroups 下面的进程使用不同的 namespace
+
 
 
 **[Cgroups中的CPU资源控制](https://mp.weixin.qq.com/s/O65oX2urY_zaADG22eg_Kw)**
