@@ -62,6 +62,7 @@ require (
 	github.com/miekg/dns v1.1.22
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/moby/ipvs v1.0.1
+	github.com/moby/sys/mountinfo v0.4.1 // indirect
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/olivere/elastic/v7 v7.0.9
 	github.com/onsi/ginkgo v1.14.1

@@ -2,7 +2,7 @@ package stats
 
 import (
 	"fmt"
-	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/v1alpha1"
+	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/stats/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -34,7 +34,7 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node info: %v", err)
 	}
-	nodeConfig := sp.provider.GetNodeConfig()
+	//nodeConfig := sp.provider.GetNodeConfig()
 	rootStats, networkStats, err := sp.provider.GetCgroupStats("/", updateStats)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
@@ -63,15 +63,15 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	}
 
 	nodeStats := statsapi.NodeStats{
-		NodeName:         node.Name,
-		CPU:              rootStats.CPU,
-		Memory:           rootStats.Memory,
-		Network:          networkStats,
-		StartTime:        sp.systemBootTime,
-		Fs:               rootFsStats,
-		Runtime:          &statsapi.RuntimeStats{ImageFs: imageFsStats},
-		Rlimit:           rlimit,
-		SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
+		NodeName:  node.Name,
+		CPU:       rootStats.CPU,
+		Memory:    rootStats.Memory,
+		Network:   networkStats,
+		StartTime: sp.systemBootTime,
+		Fs:        rootFsStats,
+		Runtime:   &statsapi.RuntimeStats{ImageFs: imageFsStats},
+		Rlimit:    rlimit,
+		//SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
 	}
 	summary := statsapi.Summary{
 		Node: nodeStats,
@@ -85,7 +85,7 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats() (*statsapi.Summary, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node info: %v", err)
 	}
-	nodeConfig := sp.provider.GetNodeConfig()
+	//nodeConfig := sp.provider.GetNodeConfig()
 	rootStats, err := sp.provider.GetCgroupCPUAndMemoryStats("/", false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
@@ -97,11 +97,11 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats() (*statsapi.Summary, error)
 	}
 
 	nodeStats := statsapi.NodeStats{
-		NodeName:         node.Name,
-		CPU:              rootStats.CPU,
-		Memory:           rootStats.Memory,
-		StartTime:        rootStats.StartTime,
-		SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(nodeConfig, podStats, false),
+		NodeName:  node.Name,
+		CPU:       rootStats.CPU,
+		Memory:    rootStats.Memory,
+		StartTime: rootStats.StartTime,
+		//SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(nodeConfig, podStats, false),
 	}
 	summary := statsapi.Summary{
 		Node: nodeStats,

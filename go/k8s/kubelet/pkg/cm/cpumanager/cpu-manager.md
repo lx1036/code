@@ -21,8 +21,10 @@ cpu-manager static 策略中，只有 Guaranteed pod 中，指定了整数型 CP
 
 
 ## 参考文献
-设计文档: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cpu-manager.md
+**[cpu-manager 设计文档](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cpu-manager.md)
 
 **[深入理解 Kubernetes CPU Mangager](https://cloud.tencent.com/developer/article/1402119)**
 
 **[控制节点上的 CPU 管理策略](https://kubernetes.io/zh/docs/tasks/administer-cluster/cpu-management-policies/)**
+
+**[kubernetes kubelet组件中cgroup的层层"戒备"](https://www.cnblogs.com/gaorong/p/11716907.html)**

@@ -33,6 +33,22 @@ var (
 			11: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
 		},
 	}
+
+	topoSingleSocketHT = &topology.CPUTopology{
+		NumCPUs:    8,
+		NumSockets: 1,
+		NumCores:   4,
+		CPUDetails: map[int]topology.CPUInfo{
+			0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			1: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+			2: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			3: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+			4: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			5: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+			6: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			7: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+		},
+	}
 )
 
 type staticPolicyTest struct {
@@ -146,5 +162,69 @@ func TestStaticPolicyStart(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestStaticPolicyAllocate(test *testing.T) {
+	testCases := []staticPolicyTest{
+		{
+			// INFO: 总共 0-7 八个cpu, 还需要reserved 1个cpu, 要分配出"8000m"，所以报错
+			description:     "GuPodSingleCore, SingleSocketHT, ExpectError",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			pod:             makePod("fakePod", "fakeContainer2", "8000m", "8000m"),
+			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
+			expCPUAlloc:     false,
+			expCSet:         cpuset.NewCPUSet(),
+		},
+	}
+
+	for _, testCase := range testCases {
+		test.Run(testCase.description, func(t *testing.T) {
+			policy, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs,
+				cpuset.NewCPUSet(0), topologymanager.NewFakeManager())
+			if err != nil {
+				panic(err)
+			}
+
+			mState := &mockState{
+				assignments:   testCase.stAssignments,
+				defaultCPUSet: testCase.stDefaultCPUSet,
+			}
+
+			container := &testCase.pod.Spec.Containers[0]
+			err = policy.Allocate(mState, testCase.pod, container)
+			if !reflect.DeepEqual(err, testCase.expErr) {
+				t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
+					testCase.description, testCase.expErr, err)
+			}
+
+			if testCase.expCPUAlloc {
+				cset, found := mState.assignments[string(testCase.pod.UID)][container.Name]
+				if !found {
+					t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
+						testCase.description, container.Name, mState.assignments)
+				}
+
+				if !reflect.DeepEqual(cset, testCase.expCSet) {
+					t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v but got %v",
+						testCase.description, testCase.expCSet, cset)
+				}
+
+				if !cset.Intersection(mState.defaultCPUSet).IsEmpty() {
+					t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
+						testCase.description, cset, mState.defaultCPUSet)
+				}
+			}
+
+			if !testCase.expCPUAlloc {
+				_, found := mState.assignments[string(testCase.pod.UID)][container.Name]
+				if found {
+					t.Errorf("StaticPolicy Allocate() error (%v). Did not expect container %v to be present in assignments %v",
+						testCase.description, container.Name, mState.assignments)
+				}
+			}
+		})
+	}
 }

@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/v1alpha1"
+	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/stats/v1alpha1"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
-	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 )
 
 const (
@@ -319,7 +319,7 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 		}
 	}
 
-	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
+	/*if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
 		klog.Errorf("eviction manager: failed to construct signal: %q error: %v", SignalAllocatableMemoryAvailable, err)
 	} else {
 		if memory := allocatableContainer.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
@@ -329,7 +329,7 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 				time:      memory.Time,
 			}
 		}
-	}
+	}*/
 
 	if nodeFs := summary.Node.Fs; nodeFs != nil {
 		if nodeFs.AvailableBytes != nil && nodeFs.CapacityBytes != nil {
@@ -521,7 +521,7 @@ func priority(p1, p2 *v1.Pod) int {
 }
 
 // exceedMemoryRequests compares whether or not pods' memory usage exceeds their requests
-func exceedMemoryRequests(stats statsFunc) cmpFunc {
+/*func exceedMemoryRequests(stats statsFunc) cmpFunc {
 	return func(p1, p2 *v1.Pod) int {
 		p1Stats, p1Found := stats(p1)
 		p2Stats, p2Found := stats(p2)
@@ -537,10 +537,10 @@ func exceedMemoryRequests(stats statsFunc) cmpFunc {
 		// prioritize evicting the pod which exceeds its requests
 		return cmpBool(p1ExceedsRequests, p2ExceedsRequests)
 	}
-}
+}*/
 
 // memory compares pods by largest consumer of memory relative to request.
-func memory(stats statsFunc) cmpFunc {
+/*func memory(stats statsFunc) cmpFunc {
 	return func(p1, p2 *v1.Pod) int {
 		p1Stats, p1Found := stats(p1)
 		p2Stats, p2Found := stats(p2)
@@ -587,4 +587,4 @@ func exceedDiskRequests(stats statsFunc, fsStatsToMeasure []fsStatsType, diskRes
 		// prioritize evicting the pod which exceeds its requests
 		return cmpBool(p1ExceedsRequests, p2ExceedsRequests)
 	}
-}
+}*/

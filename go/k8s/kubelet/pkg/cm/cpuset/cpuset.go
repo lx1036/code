@@ -114,6 +114,32 @@ func (s CPUSet) UnionAll(s2 []CPUSet) CPUSet {
 	return b.Result()
 }
 
+func (s CPUSet) Union(s2 CPUSet) CPUSet {
+	b := NewBuilder()
+	for cpu := range s.elems {
+		b.Add(cpu)
+	}
+	for cpu := range s2.elems {
+		b.Add(cpu)
+	}
+	return b.Result()
+}
+
+// s - s2
+func (s CPUSet) Difference(s2 CPUSet) CPUSet {
+	return s.FilterNot(func(cpu int) bool { return s2.Contains(cpu) })
+}
+
+func (s CPUSet) FilterNot(predicate func(int) bool) CPUSet {
+	b := NewBuilder()
+	for cpu := range s.elems {
+		if !predicate(cpu) {
+			b.Add(cpu)
+		}
+	}
+	return b.Result()
+}
+
 // builder 设计模式
 func (s CPUSet) Filter(predicate func(int) bool) CPUSet {
 	b := NewBuilder()
@@ -123,6 +149,16 @@ func (s CPUSet) Filter(predicate func(int) bool) CPUSet {
 		}
 	}
 	return b.Result()
+}
+
+// ToSliceNoSort returns a slice of integers that contains all elements from
+// this set.
+func (s CPUSet) ToSliceNoSort() []int {
+	result := []int{}
+	for cpu := range s.elems {
+		result = append(result, cpu)
+	}
+	return result
 }
 
 func NewCPUSet(cpus ...int) CPUSet {
