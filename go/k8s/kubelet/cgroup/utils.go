@@ -36,6 +36,7 @@ func IsCgroup2UnifiedMode() bool {
 			}
 			panic(fmt.Sprintf("cannot statfs cgroup root: %s", err))
 		}
+		fmt.Println(st.Type)
 		isUnified = st.Type == unix.CGROUP2_SUPER_MAGIC
 	})
 

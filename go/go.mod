@@ -18,9 +18,12 @@ require (
 	github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 	github.com/containerd/containerd v1.4.4
 	github.com/containernetworking/cni v0.8.0
+	github.com/coreos/go-systemd/v22 v22.1.0
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
+	github.com/cyphar/filepath-securejoin v0.2.2
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
+	github.com/docker/go-units v0.4.0
 	github.com/emicklei/go-restful v2.14.3+incompatible
 	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
 	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
@@ -59,11 +62,13 @@ require (
 	github.com/miekg/dns v1.1.22
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/moby/ipvs v1.0.1
+	github.com/moby/sys/mountinfo v0.4.1 // indirect
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/olivere/elastic/v7 v7.0.9
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
+	github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
 	github.com/operator-framework/operator-sdk v0.17.1
 	github.com/patrickmn/go-cache v0.0.0-20180815053127-5633e0862627
 	github.com/pkg/errors v0.9.1
