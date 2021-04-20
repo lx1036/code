@@ -4,6 +4,14 @@
 * Kubelet at a high level should deal with Volumes (Storage CSI), Networking (CNI), Resources (Container Manager), 
 Runtime (CRI), Metrics (cAdvisor) APIs only.
 
+## kubelet architecture(kubelet启动流程解析)
+
+* kubelet在启动的时候，会先初始化Container Runtime启动时需要依赖的kubelet模块(Kubelet::initializeRuntimeDependentModules()):
+  cadvisor,containerManager,evictionManager,containerLogManager,pluginManager,shutdownManager。
+  其中cadvisor模块主要用于收集、聚合、处理和导出有关正在运行的容器的信息,同时也提供了Node MachineInfo Discover。
+  cadvisor manager提供了MachineInfo()方法,可以获取node节点的机器信息，包括：CPU，Mem，操作系统等。
+* 
+
 
 
 
