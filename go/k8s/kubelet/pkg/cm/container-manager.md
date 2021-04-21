@@ -15,7 +15,7 @@ kubelet涉及container-manager相关参数：
 # cgroups(control groups)
 cgroups 是一种资源隔离方案，cgroups 提供了一些子系统：
 cpu subsystem: 限制进程的cpu使用率
-cpuacct subsystem: 统计 cgroups 中进程的cpu使用报告
+cpuacct(cpu account) subsystem: 统计 cgroups 中进程的cpu使用报告
 cpuset subsystem: 为 cgroups 中的进程分配单独的 cpu/memory 节点
 memory subsystem: 限制进程的 memory 使用量
 blkio subsystem: 限制进程的块设备io
@@ -37,6 +37,18 @@ cpu subsystem主要涉及5接口: cpu.cfs_period_us，cpu.cfs_quota_us，cpu.sha
 * cpu.shares: cpu.shares以相对比例限制cgroup的cpu
 * cpu.rt_runtime_us: 以微秒（µs，这里以“us”代表）为单位指定在某个时间段中 cgroup 中的任务对 CPU 资源的最长连续访问时间
 * cpu.rt_period_us: 以微秒（µs，这里以“us”代表）为单位指定在某个时间段中 cgroup 对 CPU 资源访问重新分配的频率
+
+
+## docker cgroups 参数
+见文档：https://docs.docker.com/config/containers/resource_constraints/#cpu
+* --cpus=<value>: 比如2 cpus机器， --cpus="1.5"，等同于 --cpu-period="100000" --cpu-quota="150000"
+* --cpu-period=<value>: CPU CFS scheduler period，默认是 100 ms。指定容器对cpu的使用在多长周期内重新分配cpu时间片
+* --cpu-quota=<value>: CPU CFS quato 限额，指定单个周期内有多少时间来跑这个容器。--cpu-period和--cpu-quota配合使用
+* --cpu-shared: 容器对宿主cpu的使用占比
+* --cpuset-cpus: 绑定容器使用指定的宿主cpu，绑核，比如一台0-23 processor，cpuset.cpus为0-19表示当前容器在0-19 processor上运行
+  不会在20-23 processor上运行。
+
+
 
 ## cpuacct subsystem
 cpuacct子系统（CPU accounting）会自动生成报告来显示cgroup中任务所使用的CPU资源。报告有两大类：cpuacct.stat和cpuacct.usage。

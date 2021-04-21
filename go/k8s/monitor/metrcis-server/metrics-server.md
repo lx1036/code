@@ -8,8 +8,10 @@
 ```shell
 kubectl proxy
 curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/nodes
+curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/nodes/{node_name}
 curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/pods
-curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/namespaces/cattle-prometheus/pods/exporter-node-cluster-monitoring-7zrjz
+curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/namespaces/default/pods
+curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/namespaces/default/pods/example-app-64547d7dc-ffv9k
 ```
 
 
