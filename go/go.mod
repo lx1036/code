@@ -22,6 +22,7 @@ require (
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/cyphar/filepath-securejoin v0.2.2
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-units v0.4.0
 	github.com/emicklei/go-restful v2.14.3+incompatible
@@ -41,7 +42,7 @@ require (
 	github.com/golang/protobuf v1.4.3
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/btree v1.0.0
-	github.com/google/cadvisor v0.37.3
+	github.com/google/cadvisor v0.37.5
 	github.com/google/go-querystring v1.0.0
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.7.3
@@ -68,7 +69,7 @@ require (
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
-	github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
+	github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 	github.com/operator-framework/operator-sdk v0.17.1
 	github.com/patrickmn/go-cache v0.0.0-20180815053127-5633e0862627
 	github.com/pkg/errors v0.9.1
@@ -81,7 +82,7 @@ require (
 	github.com/romanyx/polluter v1.2.2
 	github.com/rs/cors v1.7.0
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
-	github.com/sirupsen/logrus v1.6.0
+	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cast v1.3.0
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
@@ -100,7 +101,7 @@ require (
 	go.uber.org/zap v1.14.1
 	golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
 	golang.org/x/mod v0.4.2 // indirect
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/net v0.0.0-20201224014010-6772e930b67b
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/sys v0.0.0-20210324051608-47abb6519492
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e

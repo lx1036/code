@@ -16,8 +16,8 @@ import (
 var (
 	topoDualSocketHT = &topology.CPUTopology{
 		NumCPUs:    12, // 每个core就1个processor，说明没有开启超线程
-		NumSockets: 2, // 机器上2个cpu，或者是 2 个numa node
-		NumCores:   6, // 每个cpu 6个core
+		NumSockets: 2,  // 机器上2个cpu，或者是 2 个numa node
+		NumCores:   6,  // 每个cpu 6个core
 		CPUDetails: map[int]topology.CPUInfo{
 			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
 			1:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
