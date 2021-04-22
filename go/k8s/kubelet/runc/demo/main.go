@@ -1,13 +1,13 @@
-package demo
+package main
 
 import (
 	"C"
-	"github.com/opencontainers/runc/libcontainer/devices"
 	"os"
 	"runtime"
 
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/devices"
 	_ "github.com/opencontainers/runc/libcontainer/nsenter"
 	"github.com/opencontainers/runc/libcontainer/specconv"
 	"github.com/sirupsen/logrus"
@@ -24,7 +24,9 @@ func init() {
 		}
 		panic("--this line should have never been executed, congratulations--")
 	}
+}
 
+func main() {
 	factory, err := libcontainer.New("/var/lib/container", libcontainer.Cgroupfs, libcontainer.InitArgs(os.Args[0], "init"))
 	if err != nil {
 		logrus.Fatal(err)

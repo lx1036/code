@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/v1alpha1"
+	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor"
 	"k8s-lx1036/k8s/kubelet/pkg/server/stats"
 

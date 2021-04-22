@@ -1,10 +1,10 @@
 package cgroups
 
 import (
-	"k8s.io/klog"
 	"testing"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"k8s.io/klog/v2"
 )
 
 func TestCPUSet(test *testing.T) {

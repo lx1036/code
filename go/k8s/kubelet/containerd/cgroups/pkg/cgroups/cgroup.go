@@ -2,15 +2,16 @@ package cgroups
 
 import (
 	"fmt"
-	v1 "github.com/containerd/cgroups/stats/v1"
-	"github.com/opencontainers/runtime-spec/specs-go"
 	"io/ioutil"
-	"k8s.io/klog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+
+	v1 "github.com/containerd/cgroups/stats/v1"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"k8s.io/klog/v2"
 )
 
 const (
