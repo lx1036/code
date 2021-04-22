@@ -18,7 +18,7 @@ func (i imageFsInfoProvider) ImageFsInfoLabel() (string, error) {
 	case types.DockerContainerRuntime:
 		return cadvisorfs.LabelDockerImages, nil
 	}
-	
+
 	return "", fmt.Errorf("no imagefs label for configured runtime")
 }
 

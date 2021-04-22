@@ -1,15 +1,17 @@
-package main
+package demo
 
 import (
 	"C"
+	"github.com/opencontainers/runc/libcontainer/devices"
+	"os"
+	"runtime"
+
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	_ "github.com/opencontainers/runc/libcontainer/nsenter"
 	"github.com/opencontainers/runc/libcontainer/specconv"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
-	"os"
-	"runtime"
 )
 
 func init() {
@@ -30,9 +32,9 @@ func init() {
 	}
 
 	defaultMountFlags := unix.MS_NOEXEC | unix.MS_NOSUID | unix.MS_NODEV
-	var devices []*configs.DeviceRule
+	var devices []*devices.Rule
 	for _, device := range specconv.AllowedDevices {
-		devices = append(devices, &device.DeviceRule)
+		devices = append(devices, &device.Rule)
 	}
 	config := &configs.Config{
 		Rootfs: "/your/path/to/rootfs",

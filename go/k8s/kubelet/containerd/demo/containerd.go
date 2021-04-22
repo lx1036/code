@@ -31,7 +31,7 @@ func redisExample() error {
 	ctx := namespaces.WithNamespace(context.Background(), "example")
 
 	// pull the redis image from DockerHub
-	image, err := client.Pull(ctx, "docker.io/library/redis:alpine", containerd.WithPullUnpack)
+	image, err := client.Pull(ctx, "nginx:1.17.8", containerd.WithPullUnpack)
 	if err != nil {
 		return err
 	}
@@ -39,9 +39,9 @@ func redisExample() error {
 	// create a container
 	container, err := client.NewContainer(
 		ctx,
-		"redis-server",
+		"nginx-demo",
 		containerd.WithImage(image),
-		containerd.WithNewSnapshot("redis-server-snapshot", image),
+		containerd.WithNewSnapshot("nginx-demo-snapshot", image),
 		containerd.WithNewSpec(oci.WithImageConfig(image)),
 	)
 	if err != nil {
@@ -82,7 +82,7 @@ func redisExample() error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("redis-server exited with status: %d\n", code)
+	fmt.Printf("nginx-demo exited with status: %d\n", code)
 
 	return nil
 }

@@ -23,6 +23,24 @@ cat /sys/fs/cgroup/cpuset/cpuset.cpu # 查看当前cgroup中可以被task使用�
 
 ```
 
+## cgroup cli
+
+```shell
+# 安装 cgroups v2 cli
+# https://github.com/containerd/cgroups/blob/master/cmd/cgctl/main.go
+go get go get github.com/containerd/cgroups/cmd/cgctl
+
+```
+
+**如何判断宿主机 cgroups 是否使用 cgroup v2?**
+答案：查看文件 /sys/fs/cgroup/cgroup.controllers 是否存在。内核版本至少 5.2 以上。
+cgroup v2 强烈建议使用 systemd 作为 cgroup driver，而不是以前的 cgroupfs 。
+目前我们的 k8s 1.19 用的是 4.19 kernel，用的还是 cgroups v1，driver 用的 cgroupfs。且 docker cgroup driver 也是用的 cgroupfs。 
+
+
+## 参考文献
+
+**[containerd cgroups go客户端库](https://github.com/containerd/cgroups)**
 
 
 
