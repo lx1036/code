@@ -68,7 +68,7 @@ require (
 	github.com/olivere/elastic/v7 v7.0.9
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.1
-	github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
+	github.com/opencontainers/runc v1.0.0-rc93
 	github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 	github.com/operator-framework/operator-sdk v0.17.1
 	github.com/patrickmn/go-cache v0.0.0-20180815053127-5633e0862627

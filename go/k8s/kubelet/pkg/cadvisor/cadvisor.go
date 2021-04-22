@@ -16,10 +16,14 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 )
 
 // The amount of time for which to keep stats in memory.
 const statsCacheDuration = 2 * time.Minute
+const maxHousekeepingInterval = 15 * time.Second
+const defaultHousekeepingInterval = 10 * time.Second
+const allowDynamicHousekeeping = true
 
 type cadvisorClient struct {
 	imageFsInfoProvider ImageFsInfoProvider
@@ -79,6 +83,7 @@ func (cc *cadvisorClient) WatchEvents(request *events.Request) (*events.EventCha
 }
 
 // New creates a new cAdvisor Interface for linux systems.
+// rootPath="/var/lib/kubelet" cgroupRoots=["/kubepods"] usingLegacyStats=false
 func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats bool) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
@@ -96,8 +101,14 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
 	}
 
+	duration := maxHousekeepingInterval
+	housekeepingConfig := manager.HouskeepingConfig{
+		Interval:     &duration,
+		AllowDynamic: pointer.BoolPtr(allowDynamicHousekeeping),
+	}
 	// Create the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, housekeepingConfig, includedMetrics, http.DefaultClient, cgroupRoots, "")
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs,
+		housekeepingConfig, includedMetrics, http.DefaultClient, cgroupRoots, "")
 	if err != nil {
 		return nil, err
 	}

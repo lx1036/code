@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"testing"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -15,7 +16,7 @@ var (
 )
 
 // GOOS=linux GOARCH=amd64 go build .
-func main() {
+func TestDockerClient(test *testing.T) {
 	flag.Parse()
 
 	klog.Infof("container ID: %s", *containerID)
@@ -33,6 +34,15 @@ func main() {
 	}
 
 	klog.Infof("%d containers", len(containers))
+
+	imagesSummary, err := dockerClient.ListImages(dockertypes.ImageListOptions{All: true})
+	if err != nil {
+		panic(err)
+	}
+
+	for _, image := range imagesSummary {
+		klog.Infof("image: %v", image)
+	}
 
 	if len(*containerID) == 0 {
 		return

@@ -4,6 +4,16 @@
 * Kubelet at a high level should deal with Volumes (Storage CSI), Networking (CNI), Resources (Container Manager), 
 Runtime (CRI), Metrics (cAdvisor) APIs only.
 
+```shell
+# 查看 kubelet 监听端口
+netstat -tupln | grep kubelet
+#tcp        0      0 127.0.0.1:40109         0.0.0.0:*               LISTEN      13992/kubelet
+#tcp        0      0 0.0.0.0:10255           0.0.0.0:*               LISTEN      13992/kubelet
+#tcp        0      0 127.0.0.1:10248         0.0.0.0:*               LISTEN      13992/kubelet
+#tcp        0      0 0.0.0.0:10250           0.0.0.0:*               LISTEN      13992/kubelet
+```
+
+
 ## kubelet architecture(kubelet启动流程解析)
 
 * kubelet在启动的时候，会先初始化Container Runtime启动时需要依赖的kubelet模块(Kubelet::initializeRuntimeDependentModules()):
