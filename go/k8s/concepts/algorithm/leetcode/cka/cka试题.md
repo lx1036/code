@@ -1,20 +1,28 @@
 
-* 本文档题目全是 CKA 2020-11~12 真题
+# CKA Curriculum: https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.20.pdf
+CKA 考试内容:
+* Application Lifecycle Management 8%
+* Installation, Configuration & Validation 12%
+* Core Concepts 19%
+* Networking 11%
+* Scheduling 5%
+* Security 12%
+* Cluster Maintenance 11%
+* Logging / Monitoring 5%
+* Storage 7%
+* Troubleshooting 10%
 
-
-
-(2) https://blog.csdn.net/shenhonglei1234/article/details/109413090
-Set the node named ek8s-node-1 as unavaliable and reschedule all the pods running on it.
-
-
-# CKA Curriculum: https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.19.pdf
-
+CKAD 考试内容:
+* Core Concepts 13%
+* Configuration 18%
+* Multi-Container Pods 10%
+* Observability 18%
+* Pod Design 20%
+* Services & Networking 13%
+* State Persistence 8%
 
 ## Module 1 - Cluster Architecture, Installation, and Configuration
 https://rx-m.com/cka-online-training/ckav2-online-training-module-1/
-第一部分主要考察内容：
-* RBAC
-* kubeadm k8s 集群升级
 
 (1)RBAC: 创建一个 deployment-clusterrole ClusterRole，只具有创建 "deployments", "statefulsets", "daemonset" 资源的权限，
 并在 Namespace app-team1 创建 cicd-token ServiceAccount，并把 cicd-token ServiceAccount 绑定到 deployment-clusterrole ClusterRole 上。
@@ -49,6 +57,12 @@ kubectl scale --current-replicas=1 --replicas=3 deployment/nginx
 ```shell
 kubectl create deployment test-deploy --image=nginx:1.17.8 --port=80
 kubectl edit deploy test-deploy # 手动添加多个容器
+```
+
+(3)Schedule: 将名为 ek8s-node-1 的 node 设置为不可用，并重新调度该 node 上所有 运行的 pods
+```yaml
+kubectl cordon ek8s-node-1
+kubectl drain ek8s-node-1 --ignore-daemonsets --force
 ```
 
 
@@ -105,90 +119,6 @@ https://rx-m.com/cka-online-training/ckav2-online-training-module-5/
 
 
 
-
-
-
-4、此项目无需更改配置环境。问题权重: 7%
-Task
-首先，为运行在 https://127.0.0.1:2379 上的现有 etcd 实例创建快照并将快照 保存到 /srv/data/etcd-snapshot.db。
-为给定实例创建快照预计能在几秒钟内完成。 如果该操作似乎挂起，则命令可 能有问题。用 + 来取消操作，然后重试。
-然后还原位于/data/backup/etcd-snapshot-previous.db 的现有先前快照。 提供了以下 TLS 证书和密钥，以通过 etcdctl 连接到服务器。
-CA 证书: /opt/KUIN00601/ca.crt
-客户端证书: /opt/KUIN00601/etcd-client.crt
-客户端密钥: /opt/KUIN00601/etcd-client.key 考点:etcd 的备份和还原命令
-ETCDCTL_API=3 etcdctl --endpoints $ENDPOINT snapshot save/restore snapshotdb --cert=/opt/KUIN00601/etcd-client.crt --key=/opt/KUIN00601/etcd- client.key --cacert=/opt/KUIN00601/ca.crt
-
-
-
-
-
-2、将名为 ek8s-node-1 的 node 设置为不可用，并重新调度该 node 上所有 运行的 pods
-考点:cordon 和 drain 命令的使用
-$ kubectl cordon ek8s-node-1
-$ kubectl drain ek8s-node-1 --force
-
-3、现有的 Kubernetes 集群正在运行版本 1.18.8。仅将主节点上的所有 Kubernetes 控制平面和节点组件升级到版本 1.19.0。
-另外，在主节点上升级 kubelet 和 kubectl。
-确保在升级之前 drain 主节点，并在升级后 uncordon 主节点。 请不要升级 工作节点，etcd，container 管理器，CNI 插件， DNS 服务或任何其他插件。
-
-考点:如何离线主机，并升级控制面板和升级节点
-kubectl drain <cp-node-name> --ignore-daemonsets
-sudo kubeadm upgrade apply v1.19.0
-yum install -y kubelet-1.19.0 kubectl-1.19.0 --disableexcludes=kubernetes
-sudo systemctl daemon-reload
-sudo systemctl restart kubelet
-kubectl uncordon <cp-node-name>
---升级节点
-sudo kubeadm upgrade node
-yum install -y kubelet-1.19.0 kubectl-1.19.0 --disableexcludes=kubernetes
-sudo systemctl daemon-reload
-sudo systemctl restart kubelet
-
-
-
-
-7、问题权重: 7%设置配置环境: kubectl config use-context k8s
-Task
-如下创建一个新的 nginx Ingress 资源: 名称: ping
-Namespace: ing-internal
-使用服务端口 5678 在路径 /hello 上公开服务 hello 可以使用以下命令检查服务 hello 的可用性，该命令应返回 hello: curl -kL <INTERNAL_IP>/hello
-考点:Ingress 的创建
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-name: ping
-namespace: ing-internal
-annotations:
-nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-rules:
-- http:
-  paths:
-- path: /hello
-  pathType: Prefix
-  backend:
-  service:
-  name: hello
-  port:
-  number: 5678  
-
-
-
-
-
-
-
-(7)
-
-
-8、设置配置环境:问题权重: 4%
-kubectl config use-context k8s
-Task
-将 deployment 从 presentation 扩展至 6 pods 考点:kubectl scale 命令
-$ kubectl scale --replicas=6 deployment/loadbalancer
-
-
-(8)
 
 
 (9)集群中存在一个 Pod，并且该 Pod 中的容器会将 log 输出到指定文件。 修改 Pod 配置，将 Pod 的日志输出到控制台,其实就是给 Pod 添加一个 sidecar，然后不断读取指定文件，输出到控制台？
@@ -876,6 +806,7 @@ kubectl 命令能用 kubectl get cs 健康检查  看manager-controller  是否r
 ```
 https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/#create-a-persistentvolume
 ```
+
 
 
 
