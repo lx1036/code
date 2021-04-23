@@ -28,7 +28,7 @@ cat /sys/fs/cgroup/cpuset/cpuset.cpu # 查看当前cgroup中可以被task使用�
 ```shell
 # 安装 cgroups v2 cli
 # https://github.com/containerd/cgroups/blob/master/cmd/cgctl/main.go
-go get go get github.com/containerd/cgroups/cmd/cgctl
+go get github.com/containerd/cgroups/cmd/cgctl
 
 ```
 

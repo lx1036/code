@@ -1,0 +1,35 @@
+package cgroupfs
+
+import (
+	"testing"
+)
+
+// 测试 cpuset.Set() 函数
+func TestCpusetSetCpus(t *testing.T) {
+	helper := NewCgroupTestUtil("cpuset", t)
+	defer helper.cleanup()
+
+	const (
+		cpusBefore = "0"
+		cpusAfter  = "1-3"
+	)
+
+	helper.writeFileContents(map[string]string{
+		"cpuset.cpus": cpusBefore,
+	})
+
+	helper.CgroupData.config.Resources.CpusetCpus = cpusAfter
+	cpuset := &CpusetController{}
+	if err := cpuset.Set(helper.CgroupPath, helper.CgroupData.config); err != nil {
+		t.Fatal(err)
+	}
+
+	value, err := GetCgroupParamString(helper.CgroupPath, "cpuset.cpus")
+	if err != nil {
+		t.Fatalf("Failed to parse cpuset.cpus - %s", err)
+	}
+
+	if value != cpusAfter {
+		t.Fatal("Got the wrong value, set cpuset.cpus failed.")
+	}
+}

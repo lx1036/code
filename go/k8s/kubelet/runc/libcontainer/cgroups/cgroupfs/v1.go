@@ -1,4 +1,4 @@
-package cgroups
+package cgroupfs
 
 import (
 	"bufio"
@@ -8,27 +8,18 @@ import (
 	"strings"
 )
 
-// V1 returns all the groups in the default cgroups mountpoint in a single hierarchy
-func V1() ([]Subsystem, error) {
+// Gets the cgroupRoot.
+func getCgroupRoot() (string, error) {
+	cgroupRootLock.Lock()
+	defer cgroupRootLock.Unlock()
+
 	// root="/sys/fs/cgroup", 这里用的测试数据root="fixtures"
 	root, err := v1MountPoint()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	subsystems, err := defaults(root)
-	if err != nil {
-		return nil, err
-	}
-	var enabled []Subsystem
-	for _, subsystem := range pathers(subsystems) {
-		// check and remove the default groups that do not exist
-		if _, err := os.Lstat(subsystem.Path("/")); err == nil {
-			enabled = append(enabled, subsystem)
-		}
-	}
-
-	return enabled, nil
+	return root, nil
 }
 
 const MountInfo = "fixtures/proc/self/mountinfo"
@@ -62,5 +53,5 @@ func v1MountPoint() (string, error) {
 	if err := scanner.Err(); err != nil {
 		return "", err
 	}
-	return "", ErrMountPointNotExist
+	return "", fmt.Errorf("cgroups: cgroup mountpoint does not exist")
 }

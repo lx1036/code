@@ -30,10 +30,12 @@ func (c *cpusetController) Create(path string, resources *specs.LinuxResources) 
 		return err
 	}
 
+	// 从 parent cgroup 中copy个值
 	if err := c.copyIfNeeded(c.Path(path), filepath.Dir(c.Path(path))); err != nil {
 		return err
 	}
 
+	// 然后根据自定义的值，更新下cpuset.cpus cpuset.mems
 	// INFO: 这里的 ioutil.WriteFile 是覆盖写，不是 append 追加写，所以也就是 Update()
 	if resources.CPU != nil {
 		if len(resources.CPU.Cpus) != 0 {
