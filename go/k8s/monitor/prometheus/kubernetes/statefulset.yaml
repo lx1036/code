@@ -1,0 +1,292 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: prometheus
+    chart: prometheus-0.0.1
+    heritage: Tiller
+    io.cattle.field/appId: cluster-monitoring
+    monitoring.coreos.com: "true"
+    release: cluster-monitoring
+  name: prometheus-cluster-monitoring
+  namespace: cattle-prometheus
+  ownerReferences:
+    - apiVersion: monitoring.coreos.com/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Prometheus
+      name: cluster-monitoring
+      uid: b3533e34-c9c1-4aed-9332-d430532c9f9b
+spec:
+  podManagementPolicy: Parallel
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: prometheus
+      chart: prometheus-0.0.1
+      monitoring.coreos.com: "true"
+      prometheus: cluster-monitoring
+      release: cluster-monitoring
+  serviceName: prometheus-operated
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        chart: prometheus-0.0.1
+        monitoring.coreos.com: "true"
+        prometheus: cluster-monitoring
+        release: cluster-monitoring
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: prometheus
+                    prometheus: cluster-monitoring
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      containers:
+        - args:
+            - --web.console.templates=/etc/prometheus/consoles
+            - --web.console.libraries=/etc/prometheus/console_libraries
+            - --config.file=/etc/prometheus/config_out/prometheus.env.yaml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=12h
+            - --web.enable-lifecycle
+            - --storage.tsdb.no-lockfile
+            - --web.route-prefix=/
+            - --web.listen-address=127.0.0.1:9090
+          image: rancher/prom-prometheus:v2.18.2
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - if [ -x "$(command -v curl)" ]; then curl http://localhost:9090/-/healthy;
+                  elif [ -x "$(command -v wget)" ]; then wget -q -O /dev/null http://localhost:9090/-/healthy;
+                  else exit 1; fi
+            failureThreshold: 6
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          name: prometheus
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - if [ -x "$(command -v curl)" ]; then curl http://localhost:9090/-/ready;
+                  elif [ -x "$(command -v wget)" ]; then wget -q -O /dev/null http://localhost:9090/-/ready;
+                  else exit 1; fi
+            failureThreshold: 120
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources:
+            limits:
+              cpu: "1"
+              memory: 10000Mi
+            requests:
+              cpu: 750m
+              memory: 750Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - mountPath: /etc/prometheus/config_out
+              name: config-out
+              readOnly: true
+            - mountPath: /etc/prometheus/certs
+              name: tls-assets
+              readOnly: true
+            - mountPath: /prometheus
+              name: prometheus-cluster-monitoring-db
+            - mountPath: /etc/prometheus/rules/prometheus-cluster-monitoring-rulefiles-0
+              name: prometheus-cluster-monitoring-rulefiles-0
+            - mountPath: /etc/prometheus/secrets/exporter-etcd-cert
+              name: secret-exporter-etcd-cert
+              readOnly: true
+            - mountPath: /etc/prometheus/configmaps/prometheus-cluster-monitoring-nginx
+              name: configmap-prometheus-cluster-monitoring-nginx
+              readOnly: true
+        - args:
+            - --log-format=logfmt
+            - --reload-url=http://localhost:9090/-/reload
+            - --config-file=/etc/prometheus/config/prometheus.yaml.gz
+            - --config-envsubst-file=/etc/prometheus/config_out/prometheus.env.yaml
+          command:
+            - /bin/prometheus-config-reloader
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+          image: rancher/coreos-prometheus-config-reloader:v0.38.1
+          imagePullPolicy: IfNotPresent
+          name: prometheus-config-reloader
+          resources:
+            limits:
+              cpu: 100m
+              memory: 25Mi
+            requests:
+              cpu: 100m
+              memory: 25Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - mountPath: /etc/prometheus/config
+              name: config
+            - mountPath: /etc/prometheus/config_out
+              name: config-out
+        - args:
+            - --webhook-url=http://localhost:9090/-/reload
+            - --volume-dir=/etc/prometheus/rules/prometheus-cluster-monitoring-rulefiles-0
+          image: rancher/jimmidyson-configmap-reload:v0.3.0
+          imagePullPolicy: IfNotPresent
+          name: rules-configmap-reloader
+          resources:
+            limits:
+              cpu: 100m
+              memory: 25Mi
+            requests:
+              cpu: 100m
+              memory: 25Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - mountPath: /etc/prometheus/rules/prometheus-cluster-monitoring-rulefiles-0
+              name: prometheus-cluster-monitoring-rulefiles-0
+        - command:
+            - /bin/sh
+            - -c
+            - cp /nginx/run-sh.tmpl /var/cache/nginx/nginx-start.sh; chmod +x /var/cache/nginx/nginx-start.sh;
+              /var/cache/nginx/nginx-start.sh
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+          image: rancher/library-nginx:1.19.2-alpine
+          imagePullPolicy: IfNotPresent
+          name: prometheus-proxy
+          ports:
+            - containerPort: 8080
+              name: nginx-http
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 100m
+              memory: 100Mi
+            requests:
+              cpu: 50m
+              memory: 50Mi
+          securityContext:
+            runAsGroup: 101
+            runAsUser: 101
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /nginx
+              name: configmap-prometheus-cluster-monitoring-nginx
+            - mountPath: /var/cache/nginx
+              name: nginx-home
+        - args:
+            - --proxy-url=http://127.0.0.1:9090
+            - --listen-address=$(POD_IP):9090
+            - --filter-reader-labels=prometheus
+            - --filter-reader-labels=prometheus_replica
+          command:
+            - prometheus-auth
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+          image: rancher/prometheus-auth:v0.2.0
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 6
+            httpGet:
+              path: /-/healthy
+              port: web
+              scheme: HTTP
+            initialDelaySeconds: 300
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          name: prometheus-agent
+          ports:
+            - containerPort: 9090
+              name: web
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 10
+            httpGet:
+              path: /-/ready
+              port: web
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/os: linux
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 2000
+        runAsNonRoot: true
+        runAsUser: 1000
+      serviceAccount: cluster-monitoring
+      serviceAccountName: cluster-monitoring
+      terminationGracePeriodSeconds: 600
+      tolerations:
+        - effect: NoSchedule
+          key: cattle.io/os
+          operator: Equal
+          value: linux
+      volumes:
+        - name: config
+          secret:
+            defaultMode: 420
+            secretName: prometheus-cluster-monitoring
+        - name: tls-assets
+          secret:
+            defaultMode: 420
+            secretName: prometheus-cluster-monitoring-tls-assets
+        - emptyDir: {}
+          name: config-out
+        - configMap:
+            defaultMode: 420
+            name: prometheus-cluster-monitoring-rulefiles-0
+          name: prometheus-cluster-monitoring-rulefiles-0
+        - name: secret-exporter-etcd-cert
+          secret:
+            defaultMode: 420
+            secretName: exporter-etcd-cert
+        - configMap:
+            defaultMode: 420
+            name: prometheus-cluster-monitoring-nginx
+          name: configmap-prometheus-cluster-monitoring-nginx
+        - emptyDir: {}
+          name: prometheus-cluster-monitoring-db
+        - emptyDir: {}
+          name: nginx-home
+  updateStrategy:
+    type: RollingUpdate
