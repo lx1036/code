@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -33,6 +34,11 @@ var (
 // debug in local: go run . --kubeconfig=`echo $HOME`/.kube/config --node=docker1234
 func main() {
 	flag.Parse()
+
+	if len(*kubeconfig) == 0 || len(*nodeName) == 0 {
+		klog.Errorf("--kubeconfig or --node should be required")
+		return
+	}
 
 	clientConfig, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
@@ -69,7 +75,11 @@ func main() {
 	}
 
 	// TODO: 统计该 node 上所有 pod 的 cpu/memory 资源总和
-	totalQuantityOnNode := resource.NewQuantity(0, resource.BinarySI)
+	totalResource := v1.ResourceList{
+		v1.ResourceCPU:              *resource.NewMilliQuantity(0, resource.DecimalSI),
+		v1.ResourceMemory:           *resource.NewQuantity(0, resource.BinarySI),
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(0, resource.BinarySI),
+	}
 	metricsClient := resourceclient.NewForConfigOrDie(clientConfig)
 	// INFO: list pods metrics on current node
 	for _, pod := range pods {
@@ -83,6 +93,13 @@ func main() {
 		for _, containerMetrics := range podMetrics.Containers {
 			msg += fmt.Sprintf("containerName:%s usage:[cpu %s memory %s] ",
 				containerMetrics.Name, containerMetrics.Usage.Cpu(), containerMetrics.Usage.Memory())
+
+			cpu := totalResource[v1.ResourceCPU]
+			cpu.Add(*containerMetrics.Usage.Cpu())
+			totalResource[v1.ResourceCPU] = cpu
+			memory := totalResource[v1.ResourceMemory]
+			memory.Add(*containerMetrics.Usage.Memory())
+			totalResource[v1.ResourceMemory] = memory
 		}
 
 		klog.Info(msg)
@@ -104,4 +121,9 @@ func main() {
 
 		klog.Info(msg)
 	}
+
+	// INFO: total resource in node
+	totalCpu := totalResource[v1.ResourceCPU]
+	totalMemory := totalResource[v1.ResourceMemory]
+	klog.Infof("total resource cpu: %s, memory: %s in node %s", totalCpu.String(), totalMemory.String(), *nodeName)
 }

@@ -31,7 +31,7 @@ func addNotImplatedReaction(kubeClient *fake.Clientset) {
 	kubeClient.AddReactor("*", "*", notImplemented)
 }
 
-// INFO: kubelet 向 apiserver 中注册 node 对象
+// INFO: kubelet 启动时，会向 apiserver 中注册一个 node 新对象，或者更新已有的 node 对象
 func TestRegisterWithApiServer(test *testing.T) {
 	testKubelet := newTestKubelet(test, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
@@ -88,4 +88,27 @@ func TestRegisterWithApiServer(test *testing.T) {
 	case <-done:
 		return
 	}
+}
+
+func TestUpdateNewNodeStatus(test *testing.T) {
+	fixtures := []struct {
+		desc                string
+		nodeStatusMaxImages int32
+	}{
+		{
+			desc:                "5 image limit",
+			nodeStatusMaxImages: 5,
+		},
+		{
+			desc:                "no image limit",
+			nodeStatusMaxImages: -1,
+		},
+	}
+
+	for _, fixture := range fixtures {
+		test.Run(fixture.desc, func(t *testing.T) {
+
+		})
+	}
+
 }
