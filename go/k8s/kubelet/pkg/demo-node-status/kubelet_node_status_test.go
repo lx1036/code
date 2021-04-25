@@ -11,12 +11,14 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 func notImplemented(action core.Action) (bool, runtime.Object, error) {
@@ -107,6 +109,31 @@ func TestUpdateNewNodeStatus(test *testing.T) {
 
 	for _, fixture := range fixtures {
 		test.Run(fixture.desc, func(t *testing.T) {
+			numTestImages := int(fixture.nodeStatusMaxImages) + 1
+			if fixture.nodeStatusMaxImages == -1 {
+				numTestImages = 5
+			}
+			inputImageList, expectedImageList := generateTestingImageLists(numTestImages, int(fixture.nodeStatusMaxImages))
+
+			testKubelet := newTestKubeletWithImageList(
+				t, inputImageList, false /* controllerAttachDetachEnabled */, true /*initFakeVolumePlugin*/)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			kubelet.nodeStatusMaxImages = fixture.nodeStatusMaxImages
+			kubelet.kubeClient = nil // ensure only the heartbeat client is used
+			kubelet.containerManager = &localCM{
+				ContainerManager: cm.NewStubContainerManager(),
+				allocatableReservation: v1.ResourceList{
+					v1.ResourceCPU:              *resource.NewMilliQuantity(200, resource.DecimalSI),
+					v1.ResourceMemory:           *resource.NewQuantity(100e6, resource.BinarySI),
+					v1.ResourceEphemeralStorage: *resource.NewQuantity(2000, resource.BinarySI),
+				},
+				capacity: v1.ResourceList{
+					v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+					v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+					v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+				},
+			}
 
 		})
 	}
