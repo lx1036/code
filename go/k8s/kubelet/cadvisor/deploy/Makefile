@@ -1,5 +1,0 @@
-
-
-
-install:
-	kubectl apply --kustomize .

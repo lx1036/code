@@ -10,7 +10,7 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cm/topologymanager"
 	"k8s-lx1036/k8s/kubelet/pkg/devicemanager"
 	evictionapi "k8s-lx1036/k8s/kubelet/pkg/eviction/api"
-	"k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups"
+	libcontainercgroups "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups/cgroupfs"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -63,10 +63,10 @@ type systemContainer struct {
 
 	// Function that ensures the state of the container.
 	// m is the cgroup manager for the specified container.
-	ensureStateFunc func(m cgroups.Manager) error
+	ensureStateFunc func(m libcontainercgroups.Manager) error
 
 	// Manager for the cgroups of the external container.
-	manager cgroups.Manager
+	manager libcontainercgroups.Manager
 }
 
 type containerManagerImpl struct {

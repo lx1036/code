@@ -1,99 +1,115 @@
 
+# CKA Curriculum: https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.20.pdf
+CKA 考试内容:
+* Application Lifecycle Management 8%
+* Installation, Configuration & Validation 12%
+* Core Concepts 19%
+* Networking 11%
+* Scheduling 5%
+* Security 12%
+* Cluster Maintenance 11%
+* Logging / Monitoring 5%
+* Storage 7%
+* Troubleshooting 10%
 
-(1) https://blog.csdn.net/shenhonglei1234/article/details/109413090
-Create a new ClusterRole named deployment-clusterrole that only allows the creation of the following resource types:
-Deployment
-StatefulSet
-DaemonSet
-Create a new ServiceAccount named cicd-token in the existing namespace app-team1.
-Limited to namespace app-team1, bind the new ClusterRole deployment-clusterrole to the new ServiceAccount cicd-token.
-
-```yaml
-# 参考文档：
-# https://kubernetes.io/zh/docs/reference/access-authn-authz/rbac/#kubectl-create-clusterrolebinding
-# https://kubernetes.io/zh/docs/reference/access-authn-authz/service-accounts-admin/
----
-# kubectl create namespace app-team1
-# kubectl delete namespace app-team1
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: app-team1
-  
----
-
-# kubectl create clusterrole deployment-clusterrole --verb=create --resource=deployments,statefulsets,daemonsets
-# kubectl delete clusterrole deployment-clusterrole
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: deployment-clusterrole
-rules:
-  - verbs: ["create"]
-    apiGroups: ["apps"]
-    resources: ["deployments", "statefulsets", "daemonset"]
-
----
-# kubectl create serviceaccount cicd-token -n app-team1
-# kubectl delete serviceaccount cicd-token -n app-team1
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: cicd-token
-  namespace: app-team1
-
----
-# kubectl create clusterrolebinding deployment-clusterrolebinding --clusterrole=deployment-clusterrole --serviceaccount=app-team1:cicd-token
-# kubectl delete clusterrolebinding deployment-clusterrolebinding
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: deployment-clusterrolebinding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: deployment-clusterrole
-subjects:
-  - kind: ServiceAccount
-    name: cicd-token
-    namespace: app-team1
-
-```
-
-
-(2) https://blog.csdn.net/shenhonglei1234/article/details/109413090
-Set the node named ek8s-node-1 as unavaliable and reschedule all the pods running on it.
-
-
-# CKA Curriculum: https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.19.pdf
-
+CKAD 考试内容:
+* Core Concepts 13%
+* Configuration 18%
+* Multi-Container Pods 10%
+* Observability 18%
+* Pod Design 20%
+* Services & Networking 13%
+* State Persistence 8%
 
 ## Module 1 - Cluster Architecture, Installation, and Configuration
 https://rx-m.com/cka-online-training/ckav2-online-training-module-1/
-第一部分主要考察内容：
-* RBAC
-* [我的k8s升级原则]控制组件kube-apiserver/kube-controller-manager/kube-scheduler版本保持一致；计算组件kubelet/kube-proxy版本保持一致，且必须比控制组件小一个版本。
 
+(1)RBAC: 创建一个 deployment-clusterrole ClusterRole，只具有创建 "deployments", "statefulsets", "daemonset" 资源的权限，
+并在 Namespace app-team1 创建 cicd-token ServiceAccount，并把 cicd-token ServiceAccount 绑定到 deployment-clusterrole ClusterRole 上。
+https://blog.csdn.net/shenhonglei1234/article/details/109413090
+```shell
+kubectl create namespace app-team1
+kubectl create clusterrole deployment-clusterrole --verb=create --resource=deployments,statefulsets,daemonsets
+kubectl create serviceaccount cicd-token -n app-team1
+kubectl create clusterrolebinding deployment-clusterrolebinding --clusterrole=deployment-clusterrole --serviceaccount=app-team1:cicd-token
+```
 
-
-
-
+(2)升级集群: 将集群中 master 所有组件从 v1.18 升级到 1.19(controller,apiserver,scheduler,kubelet,kubectl)？
+参考：https://kubernetes.io/zh/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/
+[我的k8s升级原则]控制组件kube-apiserver/kube-controller-manager/kube-scheduler版本保持一致；计算组件kubelet/kube-proxy版本保持一致，且必须比控制组件小一个版本。
+```shell
+# `kubeadm upgrade apply v1.19.0` 命令不会升级 kubelet，需要手动升级
+kubectl cordon k8s-master
+kubectl drain k8s-master --ignore-daemonsets --force
+apt-get install kubeadm=1.19.0-00 kubelet=1.19.0-00 kubectl=1.19.0-00
+systemctl daemon-reload && systemctl restart kubelet
+kubeadm upgrade apply v1.19.0
+```
 
 ## Module 2 - Workloads and Scheduling
 https://rx-m.com/cka-online-training/ckav2-online-training-module-2/
+(1)scale: 将一个 Deployment 的副本数量从 1 个副本扩至3 个？
+```shell
+kubectl scale --current-replicas=1 --replicas=3 deployment/nginx
+```
 
+(2)Pod: 创建一个pod，包含多个image，如 image=nginx,name=nginx; image=redis,name=redis ？
+```shell
+kubectl create deployment test-deploy --image=nginx:1.17.8 --port=80
+kubectl edit deploy test-deploy # 手动添加多个容器
+```
+
+(3)Schedule: 将名为 ek8s-node-1 的 node 设置为不可用，并重新调度该 node 上所有 运行的 pods
+```yaml
+kubectl cordon ek8s-node-1
+kubectl drain ek8s-node-1 --ignore-daemonsets --force
+```
 
 
 ## Module 3 - Services and Networking
 https://rx-m.com/cka-online-training/ckav2-online-training-module-3/
+(1)Ingress: 创建 Ingress，将指定的 Service 的 9999 端口在/test 路径暴露出来？
+```shell
+# foo.com 域名证书在 my-cert secret 里
+kubectl create ingress test-ingress --rule="foo.com/bar=svc1:8080,tls=my-cert"
+```
 
-
+(2)NetworkPolicy: 在指定namespace创建一个NetworkPolicy, 允许namespace中的Pod访问同namespace中其他Pod的8080端口？
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+  - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: db
+      ports:
+        - port: 8080
+```
 
 
 ## Module 4 - Storage
 https://rx-m.com/cka-online-training/ckav2-online-training-module-4/
+(1)Etcd: 对 etcd 进行 snapshot save 和 restore，因为 https 会提供 endpoints, cacert, cert 和 key？
+```shell
+# etcdctl 3.4.10 以上好像不需要指定 api 版本了，已经默认了
+ETCDCTL_API=3 etcdctl --endpoints="https://127.0.0.1:2379" --cacert=ca.crt --cert=etcd.crt --key=etcd.key snapshot save /etc/data/etcd-snapshot.db
+ETCDCTL_API=3 etcdctl --endpoints="https://127.0.0.1:12379" --cacert=ca.crt --cert=etcd.crt --key=etcd.key snapshot restore /etc/data/etcd-snapshot.db
+```
 
-
+(2)PVC/PV: 对集群中的 PV 按照大小顺序排序显示，并将结果写道指定文件？
+```shell
+kubectl get pv --sort-by=.spec.capacity.storage --no-headers > pv.txt
+```
 
 
 ## Module 5 - Troubleshooting
@@ -101,203 +117,7 @@ https://rx-m.com/cka-online-training/ckav2-online-training-module-5/
 
 
 
-# CKA 2020-11~12 真题！！！
-(1)创建 clusterrole,并且对该 clusterrole 只绑定对 Deployment， Daemonset,Statefulset 的创建权限；
-在指定 namespace 创建一个 serviceaccount，并且将上一步创建 clusterrole 和该 serviceaccount 绑定？
-```yaml
-#解答
-#创建对应的 ClusterRole,并绑定对应的权限
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-name: deployment-clusterrole
-rules:
-- apiGroups: ["apps"]
-resources: ["daemonsets", "deployments", "statefulsets"]
-verbs: ["create"]
 
-#创建对应的 serviceaccount
-  kubectl -n app-team1 create serviceaccount cicd-token
-
-#将 serviceaccount 与 ClusterRole 进行绑定
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-name: read-secrets-global
-subjects:
-  - kind: ServiceAccount
-name: cicd-token
-namespace: app-team1
-roleRef:
-kind: ClusterRole
-name: deployment-clusterrole
-apiGroup: rbac.authorization.k8s.io
-```
-1、Context k8s
-为部署管道创建一个新的 ClusterRole 并将其绑定到范围为特定的 namespace
-的特定 ServiceAccount。 Task
-创建一个名为 deployment-clusterrole 且仅允许创建以下资源类型的新 ClusterRole:
-Deployment StatefulSet DaemonSet
-在现有的 namespace app-team1 中创建一个名为 cicd-token 的新 ServiceAccount。限于 namespace app-team1，将新的 ClusterRole deployment-clusterrole 绑定到新的 ServiceAccount cicd-token
-考点:RABC 授权模型的理解。
-kubectl create clusterrole deployment-clusterrole --verb=create --
-resource=deployments,statefulsets,daemonsets
-kubectl create serviceaccount cicd-token --namespace=default
-kubectl create rolebinding deployment-clusterrole --clusterrole=deployment- clusterrole --serviceaccount=default:cicd-token --namespace=default
-
-
-
-(2)对指定 etcd 集群进行备份和还原,考试时会给定 endpoints, 根证书，证书签名，私钥？
-```shell
-#解答
-首先，为运行在 https://127.0.0.1:2379 上的现有 etcd 实力创建快照并且将快照保存到
-/etc/data/etcd-snapshot.db
-然后还原与/var/lib/backup/etcd-snapshot-previoys.db 的现有先前快照
-提供了以下 TLS 证书和密钥，已通过 etcdctl 连接到服务器
-ca 证书:/opt/KUIN000601/ca.crt
-客户端证书:/opt/KUIN000601/etcd-client.crt
-客户端密钥:/opt/KUIN000601/etcd-client.key
-#备份:要求备份到指定路径及指定文件名
-$ ETCDCTL_API=3 etcdctl --endpoints="https://127.0.0.1:2379" --
-cacert=/opt/KUIN000601/ca.crt --cert=/opt/KUIN000601/etcd-client.crt --
-key=/opt/KUIN000601/etcd-client.key snapshot save /etc/data/etcd-snapshot.db
-#还原:要求使用指定文件进行还原
-$ ETCDCTL_API=3 etcdctl --endpoints="https://127.0.0.1:2379" --
-cacert=/opt/KUIN000601/ca.crt --cert=/opt/KUIN000601/etcd-client.crt --
-key=/opt/KUIN000601/etcd-client.key snapshot restore /var/lib/backup/etcd-snapshot-previoys.db
-```
-
-4、此项目无需更改配置环境。问题权重: 7%
-Task
-首先，为运行在 https://127.0.0.1:2379 上的现有 etcd 实例创建快照并将快照 保存到 /srv/data/etcd-snapshot.db。
-为给定实例创建快照预计能在几秒钟内完成。 如果该操作似乎挂起，则命令可 能有问题。用 + 来取消操作，然后重试。
-然后还原位于/data/backup/etcd-snapshot-previous.db 的现有先前快照。 提供了以下 TLS 证书和密钥，以通过 etcdctl 连接到服务器。
-CA 证书: /opt/KUIN00601/ca.crt
-客户端证书: /opt/KUIN00601/etcd-client.crt
-客户端密钥: /opt/KUIN00601/etcd-client.key 考点:etcd 的备份和还原命令
-ETCDCTL_API=3 etcdctl --endpoints $ENDPOINT snapshot save/restore snapshotdb --cert=/opt/KUIN00601/etcd-client.crt --key=/opt/KUIN00601/etcd- client.key --cacert=/opt/KUIN00601/ca.crt
-
-
-
-
-(3)升级集群，将集群中 master 所有组件从 v1.18 升级到 1.19(controller,apiserver,scheduler,kubelet,kubectl)？
-```shell
-#解答
-#将节点标记为不可调度状态
-$ kubectl cordon k8s-master
-#驱逐节点上面的 pod
-$ kubectl drain k8s-master--delete-local-data --ignore-daemonsets --force
-#升级组件
-$ apt-get install kubeadm=1.19.0-00 kubelet=1.19.0-00 kubectl=1.19.0-00
-#重启 kubelet 服务
-$ systemctl restart kubelet
-#升级集群其他组件
-$ kubeadm upgrade apply v1.19.0
-```
-
-2、将名为 ek8s-node-1 的 node 设置为不可用，并重新调度该 node 上所有 运行的 pods
-考点:cordon 和 drain 命令的使用
-$ kubectl cordon ek8s-node-1
-$ kubectl drain ek8s-node-1 --force
-
-3、现有的 Kubernetes 集群正在运行版本 1.18.8。仅将主节点上的所有 Kubernetes 控制平面和节点组件升级到版本 1.19.0。
-另外，在主节点上升级 kubelet 和 kubectl。
-确保在升级之前 drain 主节点，并在升级后 uncordon 主节点。 请不要升级 工作节点，etcd，container 管理器，CNI 插件， DNS 服务或任何其他插件。
-
-考点:如何离线主机，并升级控制面板和升级节点
-kubectl drain <cp-node-name> --ignore-daemonsets
-sudo kubeadm upgrade apply v1.19.0
-yum install -y kubelet-1.19.0 kubectl-1.19.0 --disableexcludes=kubernetes
-sudo systemctl daemon-reload
-sudo systemctl restart kubelet
-kubectl uncordon <cp-node-name>
---升级节点
-sudo kubeadm upgrade node
-yum install -y kubelet-1.19.0 kubectl-1.19.0 --disableexcludes=kubernetes
-sudo systemctl daemon-reload
-sudo systemctl restart kubelet
-
-
-(4)创建 Ingress，将指定的 Service 的 9999 端口在/test 路径暴露出来？
-```shell
-#解答
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-name: pong
-namespace: ing-internal
-annotations:
-nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-rules:
-- http:
-paths:
-- path: /hi
-pathType: Prefix
-backend:
-service:
-name: hi
-port:
-number: 5678
-```
-
-7、问题权重: 7%设置配置环境: kubectl config use-context k8s
-Task
-如下创建一个新的 nginx Ingress 资源: 名称: ping
-Namespace: ing-internal
-使用服务端口 5678 在路径 /hello 上公开服务 hello 可以使用以下命令检查服务 hello 的可用性，该命令应返回 hello: curl -kL <INTERNAL_IP>/hello
-考点:Ingress 的创建
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-name: ping
-namespace: ing-internal
-annotations:
-nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-rules:
-- http:
-  paths:
-- path: /hello
-  pathType: Prefix
-  backend:
-  service:
-  name: hello
-  port:
-  number: 5678  
-
-
-
-(5)创建一个两个 container 容器的 Pod:nginx+redis？
-
-11、设置配置环境:问题权重: 4%
-kubectl config use-context k8s
-Task
-创建一个名为 kucc8 的 pod，在 pod 里面分别为以下每个 images 单独运 行一个 app container(可能会有 1-4 个 images):nginx + redis + memcached + consul
-考点:pod 概念 apiVersion: v1 kind: Pod metadata: name: kucc1 spec: containers:
-- image: nginx name: nginx
-- image: redis name: redis
-- image: memchached
-  name: memcached
-- image: consul
-  name: consul
-
-
-
-
-(6)对集群中的 PV 按照大小顺序排序显示，并将结果写道指定文件？
-
-
-
-(7)将一个 Deployment 的副本数量从 1 个副本扩至3 个？
-8、设置配置环境:问题权重: 4%
-kubectl config use-context k8s
-Task
-将 deployment 从 presentation 扩展至 6 pods 考点:kubectl scale 命令
-$ kubectl scale --replicas=6 deployment/loadbalancer
-
-
-(8)在指定 namespace 创建一个 Networkpolicy, 允许 namespace 中的 Pod 访问 同 namespace 中其他 Pod 的8080 端口？
 
 
 
@@ -986,6 +806,7 @@ kubectl 命令能用 kubectl get cs 健康检查  看manager-controller  是否r
 ```
 https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/#create-a-persistentvolume
 ```
+
 
 
 

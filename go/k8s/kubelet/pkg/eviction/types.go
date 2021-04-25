@@ -1,7 +1,10 @@
 package eviction
 
 import (
+	"time"
+
 	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/stats/v1alpha1"
+	evictionapi "k8s-lx1036/k8s/kubelet/pkg/eviction/api"
 
 	v1 "k8s.io/api/core/v1"
 )
@@ -53,3 +56,17 @@ type statsFunc func(pod *v1.Pod) (statsapi.PodStats, bool)
 
 // ActivePodsFunc returns pods bound to the kubelet that are active (i.e. non-terminal state)
 type ActivePodsFunc func() []*v1.Pod
+
+// Config holds information about how eviction is configured.
+type Config struct {
+	// PressureTransitionPeriod is duration the kubelet has to wait before transitioning out of a pressure condition.
+	PressureTransitionPeriod time.Duration
+	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
+	MaxPodGracePeriodSeconds int64
+	// Thresholds define the set of conditions monitored to trigger eviction.
+	Thresholds []evictionapi.Threshold
+	// KernelMemcgNotification if true will integrate with the kernel memcg notification to determine if memory thresholds are crossed.
+	KernelMemcgNotification bool
+	// PodCgroupRoot is the cgroup which contains all pods.
+	PodCgroupRoot string
+}

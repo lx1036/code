@@ -8,6 +8,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -132,7 +133,7 @@ func main() {
 		return
 	}
 
-	/*go wait.Until(func() {
+	go wait.Until(func() {
 		key, quit := podsQueue.Get()
 		if quit {
 			return
@@ -146,6 +147,7 @@ func main() {
 
 		klog.Infof("pod %s/%s deleted", pod.Namespace, pod.Name)
 	}, time.Second, stopCh)
+
 	go wait.Until(func() {
 		key, quit := endpointsQueue.Get()
 		if quit {
@@ -159,7 +161,7 @@ func main() {
 		}
 
 		klog.Infof("endpoints %s/%s updated", endpoints.Namespace, endpoints.Name)
-	}, time.Second, stopCh)*/
+	}, time.Second, stopCh)
 
 	klog.Infof("cache synced...")
 

@@ -23,6 +23,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 )
@@ -116,17 +117,16 @@ type Kubelet struct {
 
 	// StatsProvider provides the node and the container stats.
 	StatsProvider *stats.Provider
+
+	// the list of handlers to call during pod admission.
+	admitHandlers lifecycle.PodAdmitHandlers
 }
 
 func (kubelet *Kubelet) RunOnce() {
 
 }
 
-func NewMainKubelet(
-	kubeCfg *KubeletConfiguration,
-	kubeDeps *Dependencies,
-	nodeName types.NodeName) (*Kubelet, error) {
-
+func NewMainKubelet(kubeCfg *KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName) (*Kubelet, error) {
 	klet := &Kubelet{}
 
 	var nodeLister corelisters.NodeLister
@@ -166,22 +166,22 @@ func NewMainKubelet(
 		UID:       types.UID(nodeName),
 		Namespace: "",
 	}
-	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, crOptions.PodSandboxImage)
+	/*imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, crOptions.PodSandboxImage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
-	klet.imageManager = imageManager
+	klet.imageManager = imageManager*/
 
-	imageFsInfoProvider := cadvisor.NewImageFsInfoProvider("docker", "unix:///var/run/dockershim.sock")
+	/*imageFsInfoProvider := cadvisor.NewImageFsInfoProvider("docker", "unix:///var/run/dockershim.sock")
 	cAdvisorInterface, err := cadvisor.New(imageFsInfoProvider, "/var/lib/kubelet", cgroupRoots, false)
 	if err != nil {
 		return nil, err
-	}
-	klet.StatsProvider = stats.NewCRIStatsProvider(cAdvisorInterface)
+	}*/
+	//klet.StatsProvider = stats.NewCRIStatsProvider(cAdvisorInterface)
 
-	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet.StatsProvider, time.Minute)
+	//klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet.StatsProvider, time.Minute)
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
-	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
+	//klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
 	thresholds, err := eviction.ParseThresholdConfig(kubeCfg.EnforceNodeAllocatable, kubeCfg.EvictionHard, kubeCfg.EvictionSoft, kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)
 	if err != nil {
@@ -197,13 +197,15 @@ func NewMainKubelet(
 		PodCgroupRoot: "/",
 	}
 	// setup eviction manager
+	//etcHostsPathFunc := func(podUID types.UID) string { return getEtcHostsPath(klet.getPodDir(podUID)) }
+	etcHostsPathFunc := func(podUID types.UID) string { return "" }
 	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
 		killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.podManager.GetMirrorPodByPod,
 		klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, etcHostsPathFunc)
 	klet.evictionManager = evictionManager
 	klet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 
-	klet.evictionManager.Start(klet.StatsProvider, klet.GetActivePods, klet.podResourcesAreReclaimed, evictionMonitoringPeriod)
+	//klet.evictionManager.Start(klet.StatsProvider, klet.GetActivePods, klet.podResourcesAreReclaimed, evictionMonitoringPeriod)
 
 	return klet, nil
 }

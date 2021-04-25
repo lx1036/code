@@ -7,9 +7,7 @@ import (
 	"path"
 	"strings"
 
-	libcontainercgroups "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups"
-	cgroupfs "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups/fs"
-	cgroupsystemd "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups/systemd"
+	libcontainercgroups "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups/cgroupfs"
 	libcontainerconfigs "k8s-lx1036/k8s/kubelet/runc/libcontainer/configs"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -87,7 +85,7 @@ func (cgroupName CgroupName) ToSystemd() string {
 		newparts = append(newparts, part)
 	}
 
-	result, err := cgroupsystemd.ExpandSlice(strings.Join(newparts, "-") + systemdSuffix)
+	result, err := ExpandSlice(strings.Join(newparts, "-") + systemdSuffix)
 	if err != nil {
 		// Should never happen...
 		panic(fmt.Errorf("error converting cgroup name [%v] to systemd format: %v", cgroupName, err))
@@ -105,6 +103,40 @@ func ParseSystemdToCgroupName(name string) CgroupName {
 		result = append(result, unescapeSystemdCgroupName(part))
 	}
 	return CgroupName(result)
+}
+
+// systemd represents slice hierarchy using `-`, so we need to follow suit when
+// generating the path of slice. Essentially, test-a-b.slice becomes
+// /test.slice/test-a.slice/test-a-b.slice.
+func ExpandSlice(slice string) (string, error) {
+	suffix := ".slice"
+	// Name has to end with ".slice", but can't be just ".slice".
+	if len(slice) < len(suffix) || !strings.HasSuffix(slice, suffix) {
+		return "", fmt.Errorf("invalid slice name: %s", slice)
+	}
+
+	// Path-separators are not allowed.
+	if strings.Contains(slice, "/") {
+		return "", fmt.Errorf("invalid slice name: %s", slice)
+	}
+
+	var path, prefix string
+	sliceName := strings.TrimSuffix(slice, suffix)
+	// if input was -.slice, we should just return root now
+	if sliceName == "-" {
+		return "/", nil
+	}
+	for _, component := range strings.Split(sliceName, "-") {
+		// test--a.slice isn't permitted, nor is -test.slice.
+		if component == "" {
+			return "", fmt.Errorf("invalid slice name: %s", slice)
+		}
+
+		// Append the component to the path and to the prefix.
+		path += "/" + prefix + component + suffix
+		prefix += component + "-"
+	}
+	return path, nil
 }
 
 func ParseCgroupfsToCgroupName(name string) CgroupName {
@@ -160,7 +192,7 @@ func (l *libcontainerAdapter) newManager(cgroups *libcontainerconfigs.Cgroup,
 	paths map[string]string) (libcontainercgroups.Manager, error) {
 	switch l.cgroupManagerType {
 	case libcontainerCgroupfs:
-		return cgroupfs.NewManager(cgroups, paths, false), nil
+		return libcontainercgroups.NewManager(cgroups, paths, false), nil
 	}
 
 	return nil, fmt.Errorf("invalid cgroup manager configuration")
@@ -258,7 +290,7 @@ func (cgroupManager *cgroupManagerImpl) toResources(resourceConfig *ResourceConf
 		pageSizes.Insert(sizeString)
 	}
 	// for each page size omitted, limit to 0
-	for _, pageSize := range cgroupfs.HugePageSizes {
+	/*for _, pageSize := range libcontainercgroups.HugePageSizes {
 		if pageSizes.Has(pageSize) {
 			continue
 		}
@@ -266,7 +298,7 @@ func (cgroupManager *cgroupManagerImpl) toResources(resourceConfig *ResourceConf
 			Pagesize: pageSize,
 			Limit:    uint64(0),
 		})
-	}
+	}*/
 
 	return resources
 }
