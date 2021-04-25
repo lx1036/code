@@ -30,3 +30,12 @@ server端 DockerService 接口，而 DockerService 包含了 dockerClient 对象
 把函数传给 docker daemon。
 
 
+## CRI
+接口在 k8s 源码 staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2/api.proto 中定义。
+
+```shell
+# 下载 crictl CRI 容器工具，类似于 docker cli
+wget https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-darwin-amd64.tar.gz
+tar zxf crictl-v1.21.0-darwin-amd64.tar.gz
+mv crictl /usr/local/bin/
+```

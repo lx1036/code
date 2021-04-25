@@ -104,8 +104,8 @@ func main() {
 	}
 
 	// 3. 等于 curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/nodes (kubectl proxy，该集群得部署 metrics-server deployment)
-	resourceMetricsClient := resourceclient.NewForConfigOrDie(clientConfig)
-	nodeMetricsList, err := resourceMetricsClient.NodeMetricses().List(context.TODO(), metav1.ListOptions{})
+	metricsClient := resourceclient.NewForConfigOrDie(clientConfig)
+	nodeMetricsList, err := metricsClient.NodeMetricses().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -117,7 +117,7 @@ func main() {
 
 	// 4. curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/pods
 	// metrics-server pod
-	podMetricsList, err := resourceMetricsClient.PodMetricses("kube-system").List(context.TODO(), metav1.ListOptions{
+	podMetricsList, err := metricsClient.PodMetricses("kube-system").List(context.TODO(), metav1.ListOptions{
 		LabelSelector: "k8s-app=metrics-server",
 	})
 	if err != nil {

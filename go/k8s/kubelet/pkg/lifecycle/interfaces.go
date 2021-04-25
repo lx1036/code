@@ -1,6 +1,9 @@
 package lifecycle
 
-import v1 "k8s.io/api/core/v1"
+import (
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+)
 
 // PodAdmitResult provides the result of a pod admission decision.
 type PodAdmitResult struct {
@@ -25,4 +28,8 @@ type PodAdmitAttributes struct {
 type PodAdmitHandler interface {
 	// Admit evaluates if a pod can be admitted.
 	Admit(attrs *PodAdmitAttributes) PodAdmitResult
+}
+
+func (p PodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	panic("implement me")
 }

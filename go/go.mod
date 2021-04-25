@@ -24,7 +24,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
-	github.com/docker/go-units v0.4.0
+	github.com/docker/go-units v0.4.0 // indirect
 	github.com/emicklei/go-restful v2.14.3+incompatible
 	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
 	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
@@ -121,6 +121,7 @@ require (
 	k8s.io/apimachinery v0.20.2
 	k8s.io/apiserver v0.20.0
 	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/cloud-provider v0.19.7
 	k8s.io/code-generator v0.20.5 // indirect
 	k8s.io/component-base v0.20.0
 	k8s.io/component-helpers v0.20.2
