@@ -24,3 +24,21 @@ type InMemoryCache struct {
 	maxAge            time.Duration
 	backend           []storage.StorageDriver
 }
+
+func (c *InMemoryCache) RemoveContainer(containerName string) error {
+	c.lock.Lock()
+	delete(c.containerCacheMap, containerName)
+	c.lock.Unlock()
+
+	return nil
+}
+
+func New(maxAge time.Duration, backend []storage.StorageDriver) *InMemoryCache {
+	ret := &InMemoryCache{
+		containerCacheMap: make(map[string]*containerCache, 32),
+		maxAge:            maxAge,
+		backend:           backend,
+	}
+
+	return ret
+}

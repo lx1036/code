@@ -119,7 +119,7 @@ type MachineInfo struct {
 	MemoryCapacity uint64 `json:"memory_capacity"`
 
 	// Memory capacity and number of DIMMs by memory type
-	MemoryByType map[string]*MemoryInfo `json:"memory_by_type"`
+	//MemoryByType map[string]*MemoryInfo `json:"memory_by_type"`
 
 	//NVMInfo NVMInfo `json:"nvm"`
 

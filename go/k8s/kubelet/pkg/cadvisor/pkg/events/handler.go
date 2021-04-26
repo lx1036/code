@@ -37,3 +37,18 @@ type EventChannel struct {
 	// Channel on which the caller can receive watch events.
 	channel chan *v1.Event
 }
+
+// EventManager is implemented by Events. It provides two ways to monitor
+// events and one way to add events
+type EventManager interface {
+	// WatchEvents() allows a caller to register for receiving events based on the specified request.
+	// On successful registration, an EventChannel object is returned.
+	WatchEvents(request *Request) (*EventChannel, error)
+	// GetEvents() returns all detected events based on the filters specified in request.
+	GetEvents(request *Request) ([]*v1.Event, error)
+	// AddEvent allows the caller to add an event to an EventManager
+	// object
+	AddEvent(event *v1.Event) error
+	// Cancels a previously requested watch event.
+	StopWatch(watchID int)
+}

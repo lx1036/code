@@ -1,6 +1,10 @@
 package sysfs
 
-import "os"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+)
 
 type CacheInfo struct {
 	// size in bytes
@@ -53,4 +57,114 @@ type SysFs interface {
 	// IsCPUOnline determines if CPU status from kernel hotplug machanism standpoint.
 	// See: https://www.kernel.org/doc/html/latest/core-api/cpu_hotplug.html
 	IsCPUOnline(dir string) bool
+}
+
+const (
+	blockDir     = "/sys/block"
+	cacheDir     = "/sys/devices/system/cpu/cpu"
+	netDir       = "/sys/class/net"
+	dmiDir       = "/sys/class/dmi"
+	ppcDevTree   = "/proc/device-tree"
+	s390xDevTree = "/etc" // s390/s390x changes
+
+	coreIDFilePath    = "/topology/core_id"
+	packageIDFilePath = "/topology/physical_package_id"
+	meminfoFile       = "meminfo"
+
+	cpuDirPattern  = "cpu*[0-9]"
+	nodeDirPattern = "node*[0-9]"
+
+	//HugePagesNrFile name of nr_hugepages file in sysfs
+	HugePagesNrFile = "nr_hugepages"
+)
+
+var (
+	nodeDir = "/sys/devices/system/node/"
+)
+
+type realSysFs struct{}
+
+func (fs *realSysFs) GetNodesPaths() ([]string, error) {
+	pathPattern := fmt.Sprintf("%s%s", nodeDir, nodeDirPattern)
+	return filepath.Glob(pathPattern)
+}
+
+func (fs *realSysFs) GetCPUsPaths(cpusPath string) ([]string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetCoreID(coreIDFilePath string) (string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetCPUPhysicalPackageID(cpuPath string) (string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetMemInfo(nodeDir string) (string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetHugePagesInfo(hugePagesDirectory string) ([]os.FileInfo, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetHugePagesNr(hugePagesDirectory string, hugePageName string) (string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetBlockDevices() ([]os.FileInfo, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetBlockDeviceSize(s string) (string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetBlockDeviceScheduler(s string) (string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetBlockDeviceNumbers(s string) (string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetNetworkDevices() ([]os.FileInfo, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetNetworkAddress(s string) (string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetNetworkMtu(s string) (string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetNetworkSpeed(s string) (string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetNetworkStatValue(dev string, stat string) (uint64, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetCaches(id int) ([]os.FileInfo, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetCacheInfo(cpu int, cache string) (CacheInfo, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) GetSystemUUID() (string, error) {
+	panic("implement me")
+}
+
+func (fs *realSysFs) IsCPUOnline(dir string) bool {
+	panic("implement me")
+}
+
+func NewRealSysFs() SysFs {
+	return &realSysFs{}
 }
