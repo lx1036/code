@@ -1,13 +1,19 @@
 package memory
 
 import (
+	"errors"
 	"sync"
 	"time"
 
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/storage"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/utils"
+
+	"k8s.io/klog/v2"
 )
+
+// ErrDataNotFound is the error resulting if failed to find a container in memory cache.
+var ErrDataNotFound = errors.New("unable to find data in memory cache")
 
 // TODO(vmarmol): See about refactoring this class, we have an unnecessary redirection of containerCache and InMemoryCache.
 // containerCache is used to store per-container information
@@ -16,6 +22,34 @@ type containerCache struct {
 	recentStats *utils.TimedStore
 	maxAge      time.Duration
 	lock        sync.RWMutex
+}
+
+func (c *containerCache) AddStats(stats *v1.ContainerStats) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	// Add the stat to storage.
+	c.recentStats.Add(stats.Timestamp, stats)
+	return nil
+}
+
+func (c *containerCache) RecentStats(start, end time.Time, maxStats int) ([]*v1.ContainerStats, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	result := c.recentStats.InTimeRange(start, end, maxStats)
+	converted := make([]*v1.ContainerStats, len(result))
+	for i, el := range result {
+		converted[i] = el.(*v1.ContainerStats)
+	}
+	return converted, nil
+}
+
+func newContainerStore(ref v1.ContainerReference, maxAge time.Duration) *containerCache {
+	return &containerCache{
+		ref:         ref,
+		recentStats: utils.NewTimedStore(maxAge, -1),
+		maxAge:      maxAge,
+	}
 }
 
 type InMemoryCache struct {
@@ -31,6 +65,48 @@ func (c *InMemoryCache) RemoveContainer(containerName string) error {
 	c.lock.Unlock()
 
 	return nil
+}
+
+func (c *InMemoryCache) AddStats(cInfo *v1.ContainerInfo, stats *v1.ContainerStats) error {
+	var cstore *containerCache
+	var ok bool
+
+	func() {
+		c.lock.Lock()
+		defer c.lock.Unlock()
+		if cstore, ok = c.containerCacheMap[cInfo.ContainerReference.Name]; !ok {
+			cstore = newContainerStore(cInfo.ContainerReference, c.maxAge)
+			c.containerCacheMap[cInfo.ContainerReference.Name] = cstore
+		}
+	}()
+
+	for _, backend := range c.backend {
+		// TODO(monnand): To deal with long delay write operations, we
+		// may want to start a pool of goroutines to do write
+		// operations.
+		if err := backend.AddStats(cInfo, stats); err != nil {
+			klog.Error(err)
+		}
+	}
+	return cstore.AddStats(stats)
+}
+
+func (c *InMemoryCache) RecentStats(name string, start, end time.Time, maxStats int) ([]*v1.ContainerStats, error) {
+	var cstore *containerCache
+	var ok bool
+	err := func() error {
+		c.lock.RLock()
+		defer c.lock.RUnlock()
+		if cstore, ok = c.containerCacheMap[name]; !ok {
+			return ErrDataNotFound
+		}
+		return nil
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	return cstore.RecentStats(start, end, maxStats)
 }
 
 func New(maxAge time.Duration, backend []storage.StorageDriver) *InMemoryCache {

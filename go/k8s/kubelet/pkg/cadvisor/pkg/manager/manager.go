@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -235,6 +236,7 @@ func (m *manager) globalHousekeeping(quit chan error) {
 		longHousekeeping = *globalHousekeepingInterval / 2
 	}
 
+	// 60s
 	ticker := time.NewTicker(*globalHousekeepingInterval)
 	for {
 		select {
@@ -470,8 +472,8 @@ func (m *manager) destroyContainerLocked(containerName string) error {
 
 // Watches for new containers started in the system. Runs forever unless there is a setup error.
 func (m *manager) watchForNewContainers(quit chan error) error {
-	for _, watcher := range m.containerWatchers {
-		err := watcher.Start(m.eventsChannel)
+	for _, containerWatcher := range m.containerWatchers {
+		err := containerWatcher.Start(m.eventsChannel)
 		if err != nil {
 			return err
 		}
@@ -537,8 +539,94 @@ func (m *manager) GetContainerInfoV2(containerName string, options v2.RequestOpt
 	panic("implement me")
 }
 
+func (m *manager) getSubcontainers(containerName string) map[string]*containerData {
+	m.containersLock.RLock()
+	defer m.containersLock.RUnlock()
+	containersMap := make(map[string]*containerData, len(m.containers))
+
+	// Get all the unique subcontainers of the specified container
+	matchedName := path.Join(containerName, "/")
+	for i := range m.containers {
+		if m.containers[i] == nil {
+			continue
+		}
+		name := m.containers[i].info.Name
+		if name == containerName || strings.HasPrefix(name, matchedName) {
+			containersMap[m.containers[i].info.Name] = m.containers[i]
+		}
+	}
+	return containersMap
+}
+
+func (m *manager) containerDataSliceToContainerInfoSlice(containers []*containerData,
+	query *v1.ContainerInfoRequest) ([]*v1.ContainerInfo, error) {
+	if len(containers) == 0 {
+		return nil, fmt.Errorf("no containers found")
+	}
+
+	// Get the info for each container.
+	output := make([]*v1.ContainerInfo, 0, len(containers))
+	for i := range containers {
+		cinfo, err := m.containerDataToContainerInfo(containers[i], query)
+		if err != nil {
+			// Skip containers with errors, we try to degrade gracefully.
+			klog.V(4).Infof("convert container data to container info failed with error %s", err.Error())
+			continue
+		}
+		output = append(output, cinfo)
+	}
+
+	return output, nil
+}
+
+func (m *manager) getAdjustedSpec(cinfo *containerInfo) v1.ContainerSpec {
+	spec := cinfo.Spec
+
+	// Set default value to an actual value
+	if spec.HasMemory {
+		// Memory.Limit is 0 means there's no limit
+		if spec.Memory.Limit == 0 {
+			m.machineMu.RLock()
+			spec.Memory.Limit = uint64(m.machineInfo.MemoryCapacity)
+			m.machineMu.RUnlock()
+		}
+	}
+
+	return spec
+}
+
+func (m *manager) containerDataToContainerInfo(cont *containerData, query *v1.ContainerInfoRequest) (*v1.ContainerInfo, error) {
+	// Get the info from the container.
+	cinfo, err := cont.GetInfo(true)
+	if err != nil {
+		return nil, err
+	}
+
+	stats, err := m.memoryCache.RecentStats(cinfo.Name, query.Start, query.End, query.NumStats)
+	if err != nil {
+		return nil, err
+	}
+
+	// Make a copy of the info for the user.
+	ret := &v1.ContainerInfo{
+		ContainerReference: cinfo.ContainerReference,
+		Subcontainers:      cinfo.Subcontainers,
+		Spec:               m.getAdjustedSpec(cinfo),
+		Stats:              stats,
+	}
+
+	return ret, nil
+}
+
 func (m *manager) SubcontainersInfo(containerName string, query *v1.ContainerInfoRequest) ([]*v1.ContainerInfo, error) {
-	panic("implement me")
+	containersMap := m.getSubcontainers(containerName)
+
+	containers := make([]*containerData, 0, len(containersMap))
+	for _, cont := range containersMap {
+		containers = append(containers, cont)
+	}
+
+	return m.containerDataSliceToContainerInfoSlice(containers, query)
 }
 
 func (m *manager) AllDockerContainers(query *v1.ContainerInfoRequest) (map[string]v1.ContainerInfo, error) {

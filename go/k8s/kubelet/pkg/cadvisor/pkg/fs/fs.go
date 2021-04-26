@@ -2,6 +2,7 @@ package fs
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -90,7 +91,7 @@ func processMounts(mounts []mount.MountInfo, excludedMountpointPrefixes []string
 }
 
 func (i *RealFsInfo) GetGlobalFsInfo() ([]Fs, error) {
-	panic("implement me")
+	return i.GetFsInfoForPath(nil)
 }
 
 func (i *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, error) {
@@ -138,7 +139,11 @@ func (i *RealFsInfo) addSystemRootLabel(mounts []mount.MountInfo) {
 }
 
 func NewFsInfo(context Context) (FsInfo, error) {
-	mounts, err := mount.ParseMountInfo("fixtures/proc/self/mountinfo")
+	mountinfoFile, err := filepath.Abs("fixtures/proc/self/mountinfo")
+	if err != nil {
+		panic(err)
+	}
+	mounts, err := mount.ParseMountInfo(mountinfoFile)
 	if err != nil {
 		return nil, err
 	}

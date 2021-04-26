@@ -41,12 +41,12 @@ func getInfoFromFiles(filePaths string) string {
 
 // INFO: 这个函数很重要，直接获取机器的 machine info
 func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*v1.MachineInfo, error) {
-	rootFs := "/"
+	rootFs := "fixtures"
 	if !inHostNamespace {
 		rootFs = "/rootfs"
 	}
 
-	cpuinfo, err := ioutil.ReadFile(filepath.Join(rootFs, "fixtures/proc/cpuinfo"))
+	cpuinfo, err := ioutil.ReadFile(filepath.Join(rootFs, "proc/cpuinfo"))
 	if err != nil {
 		return nil, err
 	}

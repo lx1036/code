@@ -72,12 +72,12 @@ func InitializePlugins(factory v1.MachineInfoFactory, fsInfo fs.FsInfo, included
 
 	var containerWatchers []watcher.ContainerWatcher
 	for name, plugin := range plugins {
-		watcher, err := plugin.Register(factory, fsInfo, includedMetrics)
+		containerWatcher, err := plugin.Register(factory, fsInfo, includedMetrics)
 		if err != nil {
 			klog.V(5).Infof("Registration of the %s container factory failed: %v", name, err)
 		}
-		if watcher != nil {
-			containerWatchers = append(containerWatchers, watcher)
+		if containerWatcher != nil {
+			containerWatchers = append(containerWatchers, containerWatcher)
 		}
 	}
 	return containerWatchers
@@ -89,6 +89,14 @@ func HasFactories() bool {
 	defer factoriesLock.Unlock()
 
 	return len(factories) != 0
+}
+
+// Clear the known factories.
+func ClearContainerHandlerFactories() {
+	factoriesLock.Lock()
+	defer factoriesLock.Unlock()
+
+	factories = map[watcher.ContainerWatchSource][]ContainerHandlerFactory{}
 }
 
 // Create a new ContainerHandler for the specified container.

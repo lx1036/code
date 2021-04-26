@@ -2,10 +2,12 @@ package main
 
 import (
 	"net/http"
+	"testing"
 	"time"
 
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/cache/memory"
 	cadvisormetrics "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
+	_ "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/docker/install"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/manager"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/utils/sysfs"
 
@@ -19,7 +21,7 @@ const maxHousekeepingInterval = 15 * time.Second
 const defaultHousekeepingInterval = 10 * time.Second
 const allowDynamicHousekeeping = true
 
-func main() {
+func TestManagerStart(test *testing.T) {
 	sysFs := sysfs.NewRealSysFs()
 
 	includedMetrics := cadvisormetrics.MetricSet{
@@ -46,7 +48,11 @@ func main() {
 		return
 	}
 
-	m.Start()
+	err = m.Start()
+	if err != nil {
+		klog.Error(err)
+		return
+	}
 
 	machineInfo, err := m.GetMachineInfo()
 	if err != nil {

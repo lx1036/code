@@ -153,5 +153,6 @@ func RootDir() string {
 			dockerRootDir = *dockerRootDirFlag
 		}
 	})
+
 	return dockerRootDir
 }

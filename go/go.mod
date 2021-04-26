@@ -23,6 +23,7 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.2
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
+	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/emicklei/go-restful v2.14.3+incompatible
