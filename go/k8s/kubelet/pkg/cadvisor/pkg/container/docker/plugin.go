@@ -10,9 +10,9 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/libcontainer"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/fs"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/watcher"
 
-	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/watcher"
 	"k8s.io/klog/v2"
 )
 
@@ -26,7 +26,7 @@ func NewPlugin() container.Plugin {
 }
 
 // Register root container before running this function!
-func (p *plugin) Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics container.MetricSet) (watcher.ContainerWatcher, error) {
+func (p *plugin) Register(factory v1.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics container.MetricSet) (watcher.ContainerWatcher, error) {
 	client, err := Client()
 	if err != nil {
 		return nil, fmt.Errorf("unable to communicate with docker daemon: %v", err)
@@ -92,7 +92,7 @@ func (p *plugin) InitializeFSContext(context *fs.Context) error {
 	return nil
 }
 
-func retryDockerStatus() info.DockerStatus {
+func retryDockerStatus() v1.DockerStatus {
 	startupTimeout := dockerClientTimeout
 	maxTimeout := 4 * startupTimeout
 	for {
@@ -107,7 +107,7 @@ func retryDockerStatus() info.DockerStatus {
 			klog.Warningf("Timeout trying to communicate with docker during initialization, will retry")
 		default:
 			klog.V(5).Infof("Docker not connected: %v", err)
-			return info.DockerStatus{}
+			return v1.DockerStatus{}
 		}
 
 		startupTimeout = 2 * startupTimeout

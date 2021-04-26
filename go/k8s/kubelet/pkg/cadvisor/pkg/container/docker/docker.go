@@ -3,11 +3,12 @@ package docker
 import (
 	"context"
 	"fmt"
-	v1 "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/machine"
 	"regexp"
 	"strconv"
 	"time"
+
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/machine"
 
 	dockertypes "github.com/docker/docker/api/types"
 )

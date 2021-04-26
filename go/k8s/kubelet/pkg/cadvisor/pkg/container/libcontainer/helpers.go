@@ -2,12 +2,11 @@ package libcontainer
 
 import (
 	"fmt"
-	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
+	cgroups "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups/cgroupfs"
+	"k8s-lx1036/k8s/kubelet/runc/libcontainer/configs"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
-	configs "github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
 )
 
@@ -96,5 +95,5 @@ func NewCgroupManager(name string, paths map[string]string) (cgroups.Manager, er
 		Name: name,
 	}
 
-	return fs.NewManager(&config, paths, false), nil
+	return cgroups.NewManager(&config, paths, false), nil
 }

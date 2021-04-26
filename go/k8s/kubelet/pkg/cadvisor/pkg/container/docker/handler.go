@@ -3,22 +3,20 @@ package docker
 import (
 	"context"
 	"fmt"
-	dockercontainer "github.com/docker/docker/api/types/container"
 	"io/ioutil"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/cadvisor/container/common"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/common"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/libcontainer"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/fs"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
 
+	dockercontainer "github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
-	"github.com/google/cadvisor/devicemapper"
-	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/zfs"
 )
 
 const (
@@ -32,8 +30,8 @@ const (
 )
 
 type dockerContainerHandler struct {
-	// machineInfoFactory provides info.MachineInfo
-	machineInfoFactory info.MachineInfoFactory
+	// machineInfoFactory provides v1.MachineInfo
+	machineInfoFactory v1.MachineInfoFactory
 
 	// Absolute path to the cgroup hierarchies of this container.
 	// (e.g.: "cpu" -> "/sys/fs/cgroup/cpu/test")
@@ -72,24 +70,24 @@ type dockerContainerHandler struct {
 	zfsParent string
 
 	// Reference to the container
-	reference info.ContainerReference
+	reference v1.ContainerReference
 
 	libcontainerHandler *libcontainer.Handler
 }
 
-func (h *dockerContainerHandler) ContainerReference() (info.ContainerReference, error) {
+func (h *dockerContainerHandler) ContainerReference() (v1.ContainerReference, error) {
 	panic("implement me")
 }
 
-func (h *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
+func (h *dockerContainerHandler) GetSpec() (v1.ContainerSpec, error) {
 	panic("implement me")
 }
 
-func (h *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
+func (h *dockerContainerHandler) GetStats() (*v1.ContainerStats, error) {
 	panic("implement me")
 }
 
-func (h *dockerContainerHandler) ListContainers(listType container.ListType) ([]info.ContainerReference, error) {
+func (h *dockerContainerHandler) ListContainers(listType container.ListType) ([]v1.ContainerReference, error) {
 	panic("implement me")
 }
 
@@ -146,7 +144,7 @@ func getRwLayerID(containerID, storageDir string, sd storageDriver, dockerVersio
 func newDockerContainerHandler(
 	client *docker.Client,
 	name string,
-	machineInfoFactory info.MachineInfoFactory,
+	machineInfoFactory v1.MachineInfoFactory,
 	fsInfo fs.FsInfo,
 	storageDriver storageDriver,
 	storageDir string,
@@ -156,8 +154,6 @@ func newDockerContainerHandler(
 	dockerVersion []int,
 	includedMetrics container.MetricSet,
 	thinPoolName string,
-	thinPoolWatcher *devicemapper.ThinPoolWatcher,
-	zfsWatcher *zfs.ZfsWatcher,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
 	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
@@ -223,7 +219,7 @@ func newDockerContainerHandler(
 	handler.libcontainerHandler = libcontainer.NewHandler(cgroupManager, rootFs, ctnr.State.Pid, includedMetrics)
 
 	// Add the name and bare ID as aliases of the container.
-	handler.reference = info.ContainerReference{
+	handler.reference = v1.ContainerReference{
 		Id:        id,
 		Name:      name,
 		Aliases:   []string{strings.TrimPrefix(ctnr.Name, "/"), id},

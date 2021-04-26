@@ -2,9 +2,8 @@ package libcontainer
 
 import (
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
-
-	info "github.com/google/cadvisor/info/v1"
-	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
+	cgroups "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups/cgroupfs"
 )
 
 type Handler struct {
@@ -12,7 +11,7 @@ type Handler struct {
 	rootFs          string
 	pid             int
 	includedMetrics container.MetricSet
-	pidMetricsCache map[int]*info.CpuSchedstat
+	pidMetricsCache map[int]*v1.CpuSchedstat
 	cycles          uint64
 }
 
@@ -22,6 +21,6 @@ func NewHandler(cgroupManager cgroups.Manager, rootFs string, pid int, includedM
 		rootFs:          rootFs,
 		pid:             pid,
 		includedMetrics: includedMetrics,
-		pidMetricsCache: make(map[int]*info.CpuSchedstat),
+		pidMetricsCache: make(map[int]*v1.CpuSchedstat),
 	}
 }

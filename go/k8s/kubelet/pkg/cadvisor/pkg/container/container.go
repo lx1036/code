@@ -1,6 +1,8 @@
 package container
 
-import info "github.com/google/cadvisor/info/v1"
+import (
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
+)
 
 // ListType describes whether listing should be just for a
 // specific container or performed recursively.
@@ -24,16 +26,16 @@ const (
 // Interface for container operation handlers.
 type ContainerHandler interface {
 	// Returns the ContainerReference
-	ContainerReference() (info.ContainerReference, error)
+	ContainerReference() (v1.ContainerReference, error)
 
 	// Returns container's isolation spec.
-	GetSpec() (info.ContainerSpec, error)
+	GetSpec() (v1.ContainerSpec, error)
 
 	// Returns the current stats values of the container.
-	GetStats() (*info.ContainerStats, error)
+	GetStats() (*v1.ContainerStats, error)
 
 	// Returns the subcontainers of this container.
-	ListContainers(listType ListType) ([]info.ContainerReference, error)
+	ListContainers(listType ListType) ([]v1.ContainerReference, error)
 
 	// Returns the processes inside this container.
 	ListProcesses(listType ListType) ([]int, error)

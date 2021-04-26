@@ -269,6 +269,14 @@ func IsNotFound(err error) bool {
 	return ok
 }
 
+// GetCgroupMounts returns the mounts for the cgroup subsystems.
+// all indicates whether to return just the first instance or all the mounts.
+// This function should not be used from cgroupv2 code, as in this case
+// all the controllers are available under the constant unifiedMountpoint.
+func GetCgroupMounts(all bool) ([]Mount, error) {
+	return getCgroupMountsV1(all)
+}
+
 func getCgroupMountsV1(all bool) ([]Mount, error) {
 	path, err := filepath.Abs("fixtures/proc/self/mountinfo")
 	if err != nil {

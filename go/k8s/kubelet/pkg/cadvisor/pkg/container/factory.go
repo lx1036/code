@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/fs"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/watcher"
 
-	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/watcher"
 	"k8s.io/klog/v2"
 )
 
@@ -18,7 +18,7 @@ type Plugin interface {
 
 	// Register is invoked when starting a manager. It can optionally return a container watcher.
 	// A returned error is logged, but is not fatal.
-	Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics MetricSet) (watcher.ContainerWatcher, error)
+	Register(factory v1.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics MetricSet) (watcher.ContainerWatcher, error)
 }
 
 type ContainerHandlerFactory interface {

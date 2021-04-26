@@ -11,11 +11,9 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/libcontainer"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/fs"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
 
 	docker "github.com/docker/docker/client"
-	"github.com/google/cadvisor/devicemapper"
-	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/zfs"
 )
 
 // The namespace under which Docker aliases are unique.
@@ -39,7 +37,7 @@ const (
 )
 
 type dockerFactory struct {
-	machineInfoFactory info.MachineInfoFactory
+	machineInfoFactory v1.MachineInfoFactory
 
 	storageDriver storageDriver
 	storageDir    string
@@ -58,10 +56,10 @@ type dockerFactory struct {
 
 	includedMetrics container.MetricSet
 
-	thinPoolName    string
-	thinPoolWatcher *devicemapper.ThinPoolWatcher
+	thinPoolName string
+	//thinPoolWatcher *devicemapper.ThinPoolWatcher
 
-	zfsWatcher *zfs.ZfsWatcher
+	//zfsWatcher *zfs.ZfsWatcher
 }
 
 var dockerEnvWhitelist = flag.String("docker_env_metadata_whitelist", "",
@@ -88,8 +86,8 @@ func (f *dockerFactory) NewContainerHandler(name string, inHostNamespace bool) (
 		f.dockerVersion,
 		f.includedMetrics,
 		f.thinPoolName,
-		f.thinPoolWatcher,
-		f.zfsWatcher,
+		//f.thinPoolWatcher,
+		//f.zfsWatcher,
 	)
 
 	return
@@ -97,6 +95,7 @@ func (f *dockerFactory) NewContainerHandler(name string, inHostNamespace bool) (
 
 // Regexp that identifies docker cgroups, containers started with
 // --cgroup-parent have another prefix than 'docker'
+// 包含64位字符
 var dockerCgroupRegexp = regexp.MustCompile(`([a-z0-9]{64})`)
 
 // isContainerName returns true if the cgroup with associated name
@@ -107,7 +106,8 @@ func isContainerName(name string) bool {
 		return false
 	}
 
-	return dockerCgroupRegexp.MatchString(path.Base(name))
+	base := path.Base(name)
+	return dockerCgroupRegexp.MatchString(base)
 }
 
 // Returns the Docker ID from the full container name.
