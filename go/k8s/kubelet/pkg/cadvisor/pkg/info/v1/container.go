@@ -321,3 +321,76 @@ type ContainerStats struct {
 	// Resource Control (resctrl) statistics
 	//Resctrl ResctrlStats `json:"resctrl,omitempty"`
 }
+
+// Event contains information general to events such as the time at which they
+// occurred, their specific type, and the actual event. Event types are
+// differentiated by the EventType field of Event.
+type Event struct {
+	// the absolute container name for which the event occurred
+	ContainerName string `json:"container_name"`
+
+	// the time at which the event occurred
+	Timestamp time.Time `json:"timestamp"`
+
+	// the type of event. EventType is an enumerated type
+	EventType EventType `json:"event_type"`
+
+	// the original event object and all of its extraneous data, ex. an
+	// OomInstance
+	EventData EventData `json:"event_data,omitempty"`
+}
+
+// EventType is an enumerated type which lists the categories under which
+// events may fall. The Event field EventType is populated by this enum.
+type EventType string
+
+const (
+	EventOom               EventType = "oom"
+	EventOomKill           EventType = "oomKill"
+	EventContainerCreation EventType = "containerCreation"
+	EventContainerDeletion EventType = "containerDeletion"
+)
+
+// Extra information about an event. Only one type will be set.
+type EventData struct {
+	// Information about an OOM kill event.
+	OomKill *OomKillEventData `json:"oom,omitempty"`
+}
+
+// Information related to an OOM kill instance
+type OomKillEventData struct {
+	// process id of the killed process
+	Pid int `json:"pid"`
+
+	// The name of the killed process
+	ProcessName string `json:"process_name"`
+}
+
+// ContainerInfoRequest is used when users check a container info from the REST API.
+// It specifies how much data users want to get about a container
+type ContainerInfoRequest struct {
+	// Max number of stats to return. Specify -1 for all stats currently available.
+	// Default: 60
+	NumStats int `json:"num_stats,omitempty"`
+
+	// Start time for which to query information.
+	// If omitted, the beginning of time is assumed.
+	Start time.Time `json:"start,omitempty"`
+
+	// End time for which to query information.
+	// If omitted, current time is assumed.
+	End time.Time `json:"end,omitempty"`
+}
+
+type ContainerInfo struct {
+	ContainerReference
+
+	// The direct subcontainers of the current container.
+	Subcontainers []ContainerReference `json:"subcontainers,omitempty"`
+
+	// The isolation used in the container.
+	Spec ContainerSpec `json:"spec,omitempty"`
+
+	// Historical statistics gathered from the container.
+	Stats []*ContainerStats `json:"stats,omitempty"`
+}

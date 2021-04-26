@@ -137,7 +137,6 @@ func (f *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	}
 
 	return true, true, nil
-
 }
 
 func (f *dockerFactory) String() string {

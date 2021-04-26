@@ -13,3 +13,11 @@ type DockerStatus struct {
 	NumImages     int               `json:"num_images"`
 	NumContainers int               `json:"num_containers"`
 }
+
+type DockerImage struct {
+	ID          string   `json:"id"`
+	RepoTags    []string `json:"repo_tags"` // repository name and tags.
+	Created     int64    `json:"created"`   // unix time since creation.
+	VirtualSize int64    `json:"virtual_size"`
+	Size        int64    `json:"size"`
+}
