@@ -29,6 +29,8 @@ var (
 	nodeName   = flag.String("node", "", "current node")
 )
 
+// INFO: agent -> metrics-server -> kubelet summary api -> cadvisor -> cgroup stats
+
 // 启动 metrics-client 来调用 metrics-server 获取 node/pod metrics 数据
 // HPA 就是这么做的，使用 pod cpu/memory metrics 来计算replicas副本数量
 // debug in local: go run . --kubeconfig=`echo $HOME`/.kube/config --node=docker1234
@@ -126,4 +128,7 @@ func main() {
 	totalCpu := totalResource[v1.ResourceCPU]
 	totalMemory := totalResource[v1.ResourceMemory]
 	klog.Infof("total resource cpu: %s, memory: %s in node %s", totalCpu.String(), totalMemory.String(), *nodeName)
+
+	// TODO: 根据 node cpu topo 和在线业务 pod total_cpu_usage，算出在离线 pod 的两个 CPUSet 对象
+
 }
