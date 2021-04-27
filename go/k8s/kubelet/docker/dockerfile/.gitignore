@@ -1,8 +1,0 @@
-# Created by .ignore support plugin (hsz.mobi)
-logs
-**/.terraform
-*.tfstate
-*.tfstate.*
-plan
-go/*/pkg
-go/*/src

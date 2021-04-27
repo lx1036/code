@@ -1,3 +1,0 @@
-[dockerhosts]
-localhost ansible_connection=ssh ansible_ssh_user=root ansible_ssh_port=4422
-localhost ansible_connection=ssh ansible_ssh_user=root ansible_ssh_port=4423
