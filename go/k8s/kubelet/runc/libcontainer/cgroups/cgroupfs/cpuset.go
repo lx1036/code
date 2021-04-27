@@ -156,10 +156,8 @@ func (cpusetController *CpusetController) Set(path string, cgroup *configs.Cgrou
 		}
 	}
 	return nil
-
 }
 
 func (cpusetController *CpusetController) GetStats(path string, stats *Stats) error {
 	return nil
-
 }

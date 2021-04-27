@@ -7,6 +7,7 @@ import (
 	clientv1 "github.com/google/cadvisor/client"
 	clientv2 "github.com/google/cadvisor/client/v2"
 	info "github.com/google/cadvisor/info/v1"
+
 	"k8s.io/klog/v2"
 )
 
@@ -15,6 +16,7 @@ var (
 )
 
 // INFO: 直接读取 cadvisor pod api 获取 machineInfo 等数据
+// go run . --podip=
 func main() {
 	flag.Parse()
 
@@ -69,6 +71,16 @@ func main() {
 		klog.Infof("static einfo %v: %v", idx, event)
 	}
 
+	// INFO: 获取该容器的 stats, 其实就是调用 manager.GetContainerInfo(containerName string, query *v1.ContainerInfoRequest)
+	containerInfo, err := clientV1.DockerContainer("0e8b25a584ce27c6c88a59d9411cafc6ac82bd90ee67ccaead109ffbccd46cf4", &info.ContainerInfoRequest{})
+	if err != nil {
+		panic(err)
+	}
+	for _, stat := range containerInfo.Stats {
+		klog.Infof("container id %s, cpu usage: %v", containerInfo.Id, stat.Cpu)
+	}
+
+	// watch oom events
 	eventInfo := make(chan *info.Event)
 	go func() {
 		err = clientV1.EventStreamingInfo("?creation_events=true&stream=true&oom_events=true&deletion_events=true", eventInfo)

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"math/rand"
 	"sort"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
 
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 
@@ -120,8 +122,144 @@ func newContainerData(containerName string, memoryCache *memory.InMemoryCache, h
 }
 
 func (cd *containerData) Start() error {
-	//go cd.housekeeping()
+	go cd.housekeeping()
+
 	return nil
+}
+
+// 每一个容器都会启动一个 goroutine 来 collect container data
+func (cd *containerData) housekeeping() {
+	// Start any background goroutines - must be cleaned up in cd.handler.Cleanup().
+	cd.handler.Start()
+	defer cd.handler.Cleanup() // goroutine stop 之后需要 cleanup
+
+	// Long housekeeping is either 100ms or half of the housekeeping interval.
+	longHousekeeping := 100 * time.Millisecond
+	if *HousekeepingInterval/2 < longHousekeeping {
+		longHousekeeping = *HousekeepingInterval / 2
+	}
+
+	// Housekeep every second.
+	klog.V(3).Infof("Start housekeeping for container %q\n", cd.info.Name)
+	houseKeepingTimer := cd.clock.NewTimer(0 * time.Second)
+	defer houseKeepingTimer.Stop()
+
+	for {
+		if !cd.housekeepingTick(houseKeepingTimer.C(), longHousekeeping) {
+			return
+		}
+		// Stop and drain the timer so that it is safe to reset it
+		if !houseKeepingTimer.Stop() {
+			select {
+			case <-houseKeepingTimer.C():
+			default:
+			}
+		}
+
+		houseKeepingTimer.Reset(cd.nextHousekeepingInterval())
+	}
+}
+
+// Determine when the next housekeeping should occur.
+func (cd *containerData) nextHousekeepingInterval() time.Duration {
+	if cd.allowDynamicHousekeeping {
+		var empty time.Time
+		stats, err := cd.memoryCache.RecentStats(cd.info.Name, empty, empty, 2)
+		if err != nil {
+			klog.Warningf("Failed to get RecentStats(%q) while determining the next housekeeping: %v", cd.info.Name, err)
+		} else if len(stats) == 2 {
+			// TODO(vishnuk): Use no processes as a signal.
+			// Raise the interval if usage hasn't changed in the last housekeeping.
+			if stats[0].StatsEq(stats[1]) && (cd.housekeepingInterval < cd.maxHousekeepingInterval) {
+				cd.housekeepingInterval *= 2
+				if cd.housekeepingInterval > cd.maxHousekeepingInterval {
+					cd.housekeepingInterval = cd.maxHousekeepingInterval
+				}
+			} else if cd.housekeepingInterval != *HousekeepingInterval {
+				// Lower interval back to the baseline.
+				cd.housekeepingInterval = *HousekeepingInterval
+			}
+		}
+	}
+
+	return jitter(cd.housekeepingInterval, 1.0)
+}
+
+// jitter returns a time.Duration between duration and duration + maxFactor * duration,
+// to allow clients to avoid converging on periodic behavior.  If maxFactor is 0.0, a
+// suggested default value will be chosen.
+func jitter(duration time.Duration, maxFactor float64) time.Duration {
+	if maxFactor <= 0.0 {
+		maxFactor = 1.0
+	}
+	wait := duration + time.Duration(rand.Float64()*maxFactor*float64(duration))
+	return wait
+}
+
+func (cd *containerData) housekeepingTick(timer <-chan time.Time, longHousekeeping time.Duration) bool {
+	select {
+	case <-cd.stop:
+		// Stop housekeeping when signaled.
+		return false
+	case finishedChan := <-cd.onDemandChan:
+		// notify the calling function once housekeeping has completed
+		defer close(finishedChan)
+	case <-timer:
+	}
+	start := cd.clock.Now()
+	err := cd.updateStats()
+	if err != nil {
+		klog.Warningf("Failed to update stats for container \"%s\": %s", cd.info.Name, err)
+	}
+	// Log if housekeeping took too long.
+	duration := cd.clock.Since(start)
+	if duration >= longHousekeeping {
+		klog.V(3).Infof("[%s] Housekeeping took %s", cd.info.Name, duration)
+	}
+	//cd.notifyOnDemand()
+	cd.statsLastUpdatedTime = cd.clock.Now()
+	return true
+}
+
+// INFO: 从 handler.GetStats() 获取每一个 container stats，并存入 memoryCache 对象中
+func (cd *containerData) updateStats() error {
+	stats, statsErr := cd.handler.GetStats()
+	if statsErr != nil {
+		// Ignore errors if the container is dead.
+		if !cd.handler.Exists() {
+			return nil
+		}
+
+		// Stats may be partially populated, push those before we return an error.
+		statsErr = fmt.Errorf("%v, continuing to push stats", statsErr)
+	}
+	if stats == nil {
+		return statsErr
+	}
+	var customStatsErr error
+
+	ref, err := cd.handler.ContainerReference()
+	if err != nil {
+		// Ignore errors if the container is dead.
+		if !cd.handler.Exists() {
+			return nil
+		}
+		return err
+	}
+
+	cInfo := v1.ContainerInfo{
+		ContainerReference: ref,
+	}
+
+	err = cd.memoryCache.AddStats(&cInfo, stats)
+	if err != nil {
+		return err
+	}
+	if statsErr != nil {
+		return statsErr
+	}
+
+	return customStatsErr
 }
 
 func (cd *containerData) Stop() error {

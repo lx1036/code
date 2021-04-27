@@ -1,6 +1,9 @@
 package v1
 
-import "time"
+import (
+	"reflect"
+	"time"
+)
 
 // Container reference contains enough information to uniquely identify a container
 type ContainerReference struct {
@@ -320,6 +323,24 @@ type ContainerStats struct {
 
 	// Resource Control (resctrl) statistics
 	//Resctrl ResctrlStats `json:"resctrl,omitempty"`
+}
+
+// Checks equality of the stats values.
+func (a *ContainerStats) StatsEq(b *ContainerStats) bool {
+	// TODO(vmarmol): Consider using this through reflection.
+	if !reflect.DeepEqual(a.Cpu, b.Cpu) {
+		return false
+	}
+	if !reflect.DeepEqual(a.Memory, b.Memory) {
+		return false
+	}
+	if !reflect.DeepEqual(a.DiskIo, b.DiskIo) {
+		return false
+	}
+	if !reflect.DeepEqual(a.Filesystem, b.Filesystem) {
+		return false
+	}
+	return true
 }
 
 // Event contains information general to events such as the time at which they

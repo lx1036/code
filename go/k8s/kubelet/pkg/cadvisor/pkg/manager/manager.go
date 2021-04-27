@@ -150,6 +150,7 @@ type manager struct {
 // Start the container manager.
 func (m *manager) Start() error {
 	var err error
+	// INFO: 这里初始化所有 plugins，这里是初始化 docker/plugin.go::Register()
 	m.containerWatchers = container.InitializePlugins(m, m.fsInfo, m.includedMetrics)
 
 	/*err := raw.Register(m, m.fsInfo, m.includedMetrics, m.rawContainerCgroupPathPrefixWhiteList)
@@ -531,8 +532,25 @@ func (m *manager) Stop() error {
 	panic("implement me")
 }
 
+func (m *manager) getContainerData(containerName string) (*containerData, error) {
+	m.containersLock.RLock()
+	defer m.containersLock.RUnlock()
+
+	cont, ok := m.containers[namespacedContainerName{Name: containerName}]
+	if !ok {
+		return nil, fmt.Errorf("unknown container %q", containerName)
+	}
+
+	return cont, nil
+}
+
 func (m *manager) GetContainerInfo(containerName string, query *v1.ContainerInfoRequest) (*v1.ContainerInfo, error) {
-	panic("implement me")
+	cont, err := m.getContainerData(containerName)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.containerDataToContainerInfo(cont, query)
 }
 
 func (m *manager) GetContainerInfoV2(containerName string, options v2.RequestOptions) (map[string]v2.ContainerInfo, error) {

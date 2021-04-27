@@ -8,6 +8,7 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/cache/memory"
 	cadvisormetrics "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
 	_ "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/docker/install"
+	v1 "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/manager"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/utils/sysfs"
 
@@ -25,14 +26,14 @@ func TestManagerStart(test *testing.T) {
 	sysFs := sysfs.NewRealSysFs()
 
 	includedMetrics := cadvisormetrics.MetricSet{
-		cadvisormetrics.CpuUsageMetrics:         struct{}{},
-		cadvisormetrics.MemoryUsageMetrics:      struct{}{},
-		cadvisormetrics.CpuLoadMetrics:          struct{}{},
-		cadvisormetrics.DiskIOMetrics:           struct{}{},
-		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
-		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
-		cadvisormetrics.AppMetrics:              struct{}{},
-		cadvisormetrics.ProcessMetrics:          struct{}{},
+		cadvisormetrics.CpuUsageMetrics: struct{}{},
+		//cadvisormetrics.MemoryUsageMetrics:      struct{}{},
+		//cadvisormetrics.CpuLoadMetrics:          struct{}{},
+		//cadvisormetrics.DiskIOMetrics:           struct{}{},
+		//cadvisormetrics.NetworkUsageMetrics:     struct{}{},
+		//cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
+		//cadvisormetrics.AppMetrics:              struct{}{},
+		//cadvisormetrics.ProcessMetrics:          struct{}{},
 	}
 	duration := maxHousekeepingInterval
 	housekeepingConfig := manager.HouskeepingConfig{
@@ -61,4 +62,13 @@ func TestManagerStart(test *testing.T) {
 	}
 
 	klog.Infof("machineInfo: %v", machineInfo)
+
+	// INFO: 获取该容器的 stats, 其实就是调用 manager.GetContainerInfo(containerName string, query *v1.ContainerInfoRequest)
+	containerInfo, err := m.GetContainerInfo("0e8b25a584ce27c6c88a59d9411cafc6ac82bd90ee67ccaead109ffbccd46cf4", &v1.ContainerInfoRequest{})
+	if err != nil {
+		panic(err)
+	}
+	for _, stat := range containerInfo.Stats {
+		klog.Infof("container id %s, cpu usage: %v", containerInfo.Id, stat.Cpu)
+	}
 }
