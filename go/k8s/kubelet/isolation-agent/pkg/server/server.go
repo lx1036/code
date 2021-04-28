@@ -39,7 +39,6 @@ type Config struct {
 	ConnectionTimeout     time.Duration
 }
 
-// server scrapes metrics and serves then using k8s api.
 type Server struct {
 
 	// The resolution at which metrics-server will retain metrics
@@ -62,15 +61,13 @@ func NewRestConfig(kubeconfig string) (*rest.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else { //Use Incluster Configuration
+	} else {
 		config, err = rest.InClusterConfig()
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	// Use protobufs for communication with apiserver
-	//config.ContentType = "application/vnd.kubernetes.protobuf"
 	return config, nil
 }
 
@@ -148,16 +145,13 @@ func (server *Server) tick(ctx context.Context, startTime time.Time) {
 		return
 	}
 
-	prodCpu := prodMetrics[corev1.ResourceCPU]
-	nonProdCpu := nonProdMetrics[corev1.ResourceCPU]
-	prodMemory := prodMetrics[corev1.ResourceMemory]
-	nonProdMemory := nonProdMetrics[corev1.ResourceMemory]
-	nodeCpuResource := currentNode.Status.Allocatable[corev1.ResourceCPU]
-	nodeMemoryResource := currentNode.Status.Allocatable[corev1.ResourceMemory]
-	prodCpuRatio := float64(prodCpu.Value()) / float64(nodeCpuResource.Value())
-	nonProdCpuRatio := float64(nonProdCpu.Value()) / float64(nodeCpuResource.Value())
-	prodMemoryRatio := float64(prodMemory.Value()) / float64(nodeMemoryResource.Value())
-	nonProdMemoryRatio := float64(nonProdMemory.Value()) / float64(nodeMemoryResource.Value())
+	// INFO: 由于会超卖，所以 Allocatable 不是 node 的资源实际值，可以考虑使用
+	//  machineInfo, err := cadvisorClient.MachineInfo()
+	//  capacity := cadvisor.CapacityFromMachineInfo(machineInfo), 这里 capacity 就是 currentNode.Status.Capacity
+	prodCpuRatio := float64(prodMetrics.Cpu().Value()) / float64(currentNode.Status.Allocatable.Cpu().Value())
+	nonProdCpuRatio := float64(nonProdMetrics.Cpu().Value()) / float64(currentNode.Status.Allocatable.Cpu().Value())
+	prodMemoryRatio := float64(prodMetrics.Memory().Value()) / float64(currentNode.Status.Allocatable.Memory().Value())
+	nonProdMemoryRatio := float64(nonProdMetrics.Memory().Value()) / float64(currentNode.Status.Allocatable.Memory().Value())
 
 	klog.Info(prodCpuRatio, nonProdCpuRatio, prodMemoryRatio, nonProdMemoryRatio)
 
@@ -179,27 +173,27 @@ func (server *Server) tick(ctx context.Context, startTime time.Time) {
 			}
 			if containerStatus.State.Waiting != nil ||
 				(containerStatus.State.Waiting == nil && containerStatus.State.Running == nil && containerStatus.State.Terminated == nil) {
-				klog.Warningf("reconcileState: skipping container; container still in the waiting state (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)
-				//failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
+				klog.Warningf("reconcileState: skipping container; container still in the waiting state (pod: %s, container: %s, error: %v)",
+					pod.Name, container.Name, err)
 				continue
 			}
 			if containerStatus.State.Terminated != nil {
-				klog.Warningf("[cpumanager] reconcileState: ignoring terminated container (pod: %s, container id: %s)", pod.Name, containerID)
+				klog.Warningf("[cpumanager] reconcileState: ignoring terminated container (pod: %s, container id: %s)",
+					pod.Name, containerID)
 				continue
 			}
 
 			cpuSet := policy.GetCPUSetOrDefault(prodCpuRatio)
-
-			klog.V(4).Infof("[cpumanager] reconcileState: updating container (pod: %s, container: %s, container id: %s, cpuset: \"%v\")", pod.Name, container.Name, containerID, cset)
+			klog.Info(fmt.Sprintf("[cpumanager] reconcileState: updating container (pod: %s, container: %s, container id: %s, cpuset: %s)",
+				pod.Name, container.Name, containerID, cpuSet.String()))
 			err = server.updateContainerCPUSet(containerID, cpuSet)
 			if err != nil {
-				klog.Errorf("[cpumanager] reconcileState: failed to update container (pod: %s, container: %s, container id: %s, cpuset: \"%v\", error: %v)", pod.Name, container.Name, containerID, cset, err)
-
+				klog.Error(fmt.Sprintf("[cpumanager] reconcileState: failed to update container (pod: %s, container: %s, container id: %s, cpuset: %s, error: %v)",
+					pod.Name, container.Name, containerID, cpuSet.String(), err))
 				continue
 			}
 		}
 	}
-
 }
 
 func (server *Server) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) error {

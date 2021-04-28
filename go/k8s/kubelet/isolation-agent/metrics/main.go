@@ -102,19 +102,19 @@ func main() {
 			msg += fmt.Sprintf("containerName:%s usage:[cpu %s memory %s] ",
 				containerMetrics.Name, containerMetrics.Usage.Cpu(), containerMetrics.Usage.Memory())
 
-			cpu := totalUsageResource[v1.ResourceCPU]
+			cpu := totalUsageResource.Cpu()
 			cpu.Add(*containerMetrics.Usage.Cpu())
-			totalUsageResource[v1.ResourceCPU] = cpu
-			memory := totalUsageResource[v1.ResourceMemory]
+			totalUsageResource[v1.ResourceCPU] = *cpu
+			memory := totalUsageResource.Memory()
 			memory.Add(*containerMetrics.Usage.Memory())
-			totalUsageResource[v1.ResourceMemory] = memory
+			totalUsageResource[v1.ResourceMemory] = *memory
 		}
 
 		klog.Info(msg)
 	}
 
-	nodeCpuResource := currentNode.Status.Allocatable[v1.ResourceCPU]
-	nodeMemoryResource := currentNode.Status.Allocatable[v1.ResourceMemory]
+	nodeCpuResource := currentNode.Status.Allocatable.Cpu()
+	nodeMemoryResource := currentNode.Status.Allocatable.Memory()
 	klog.Info(fmt.Sprintf("node cpu: %s, memory: %s", nodeCpuResource.String(), nodeMemoryResource.String()))
 
 	// node metrics: cpu/memory 是怎么取值的？
@@ -122,8 +122,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	nodeCpuUsage := nodeMetrics.Usage[v1.ResourceCPU]
-	nodeMemoryUsage := nodeMetrics.Usage[v1.ResourceMemory]
+	nodeCpuUsage := nodeMetrics.Usage.Cpu()
+	nodeMemoryUsage := nodeMetrics.Usage.Memory()
 	klog.Info(fmt.Sprintf("node %s resource cpu: %s, memory: %s", *nodeName, nodeCpuUsage.String(), nodeMemoryUsage.String()))
 	klog.Infof("node_usage cpu ratio: %f, memory ratio: %f",
 		float64(nodeCpuUsage.Value())/float64(nodeCpuResource.Value()),
@@ -131,9 +131,9 @@ func main() {
 	klog.Info(float64(nodeCpuUsage.Value()), float64(nodeCpuResource.Value()), float64(nodeMemoryUsage.Value()), float64(nodeMemoryResource.Value()))
 
 	// INFO: total resource in node
-	totalCpu := totalUsageResource[v1.ResourceCPU]
+	totalCpu := totalUsageResource.Cpu()
 	//klog.Infof("MilliValue: %d", totalCpu.MilliValue())
-	totalMemory := totalUsageResource[v1.ResourceMemory]
+	totalMemory := totalUsageResource.Memory()
 	klog.Infof("all pods total resource cpu: %s, memory: %s in node %s", totalCpu.String(), totalMemory.String(), *nodeName)
 	//klog.Info(cpuRatio, memoryRatio, totalCpu.Value(),nodeCpuResource.Value(), totalMemory.Value(), nodeMemoryResource.Value())
 	klog.Infof("pods_usage cpu ratio: %f, memory ratio: %f",

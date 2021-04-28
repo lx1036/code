@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +16,8 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 )
@@ -81,4 +84,35 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	containerRuntime := "docker"
+	rootDirectory := "/var/lib/kubelet"
+	imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(containerRuntime, remoteRuntimeEndpoint)
+	cadvisorClient, err := cadvisor.New(imageFsInfoProvider, rootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(containerRuntime, remoteRuntimeEndpoint))
+	if err != nil {
+		panic(err)
+	}
+	machineInfo, err := cadvisorClient.MachineInfo()
+	if err != nil {
+		panic(err)
+	}
+	capacity := cadvisor.CapacityFromMachineInfo(machineInfo)
+	klog.Info(fmt.Sprintf("cpu: %s, memory: %s", capacity.Cpu().String(), capacity.Memory().String()))
+	numaNodeInfo, err := topology.GetNUMANodeInfo()
+	if err != nil {
+		panic(err)
+	}
+	cpuTopo, err := topology.Discover(machineInfo, numaNodeInfo)
+	if err != nil {
+		panic(err)
+	}
+	allCPUs := cpuTopo.CPUDetails.CPUs()
+
+	// takeByTopology allocates CPUs associated with low-numbered cores from
+	// allCPUs.
+	//
+	// For example: Given a system with 8 CPUs available and HT enabled,
+	// if numReservedCPUs=2, then reserved={0,4}
+	reserved, _ = takeByTopology(cpuTopo, allCPUs, numReservedCPUs)
+
 }
