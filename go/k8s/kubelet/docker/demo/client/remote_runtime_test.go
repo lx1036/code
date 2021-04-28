@@ -4,7 +4,9 @@ import (
 	"testing"
 	"time"
 
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 )
 
@@ -30,9 +32,9 @@ server端 DockerService 接口，而 DockerService 包含了 dockerClient 对象
 
 */
 
-// INFO: 根据以上信息，这里是没法这样调用的。
+// INFO: dockershim serve 在 socket "unix:///var/run/dockershim.sock", 需要在 k8s node 上运行。已经测试没问题。
 func TestRemoteRuntimeService(test *testing.T) {
-	endpoint := "unix:///var/run/docker.sock" // unix:///var/run/dockershim.sock
+	endpoint := "unix:///var/run/dockershim.sock"
 	connectionTimeout := time.Second * 30
 	runtimeService, err := remote.NewRemoteRuntimeService(endpoint, connectionTimeout)
 	if err != nil {
@@ -45,4 +47,12 @@ func TestRemoteRuntimeService(test *testing.T) {
 	}
 
 	klog.Infof("runtime status: %s", runtimeStatus.String())
+
+	cpus := cpuset.NewCPUSet(2, 14)
+	err = runtimeService.UpdateContainerResources("be27303c38cd3ee17ca4ee18c0772a42f1743b5682c30d617560878304342012", &runtimeapi.LinuxContainerResources{
+		CpusetCpus: cpus.String(),
+	})
+	if err != nil {
+		panic(err)
+	}
 }

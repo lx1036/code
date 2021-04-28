@@ -13,7 +13,7 @@ require (
 	github.com/bep/debounce v1.2.0
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/caddyserver/caddy v1.0.4
-	github.com/codingsince1985/checksum v1.1.0
+	github.com/codingsince1985/checksum v1.1.0 // indirect
 	github.com/container-storage-interface/spec v1.3.0
 	github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 	github.com/containerd/containerd v1.4.4
