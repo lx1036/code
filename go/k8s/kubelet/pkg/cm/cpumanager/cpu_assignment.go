@@ -96,7 +96,7 @@ type cpuAccumulator struct {
 func newCPUAccumulator(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int) *cpuAccumulator {
 	return &cpuAccumulator{
 		topo:          topo,
-		details:       topo.CPUDetails.KeepOnly(availableCPUs), // KeepOnly 求交集
+		details:       topo.CPUDetails.KeepOnly(availableCPUs), // details=topo - availableCPUs, KeepOnly 求交集, availableCPUs 不能超过实际 cpu topo 逻辑核
 		numCPUsNeeded: numCPUs,
 		result:        cpuset.NewCPUSet(),
 	}
@@ -116,16 +116,20 @@ func (a *cpuAccumulator) needs(n int) bool {
 
 // Returns true if the supplied socket is fully available in `topoDetails`.
 func (a *cpuAccumulator) isSocketFree(socketID int) bool {
-	return a.details.CPUsInSockets(socketID).Size() == a.topo.CPUsPerSocket()
+	cpusInSocket := a.details.CPUsInSockets(socketID).Size()
+	cpusPerSocket := a.topo.CPUsPerSocket()
+	return cpusInSocket == cpusPerSocket
 }
 
 // Returns true if the supplied core is fully available in `topoDetails`.
+// free core 表示该 core(物理核)上所有逻辑核都没有被分配出去
 func (a *cpuAccumulator) isCoreFree(coreID int) bool {
 	return a.details.CPUsInCores(coreID).Size() == a.topo.CPUsPerCore()
 }
 
 // Returns free socket IDs as a slice sorted by:
 // - socket ID, ascending.
+// free socket 表示该 socket(numa node)上所有逻辑核(processor)都没有被分配出去
 func (a *cpuAccumulator) freeSockets() []int {
 	return a.details.Sockets().Filter(a.isSocketFree).ToSlice()
 }
@@ -134,6 +138,7 @@ func (a *cpuAccumulator) freeSockets() []int {
 // - the number of whole available cores on the socket, ascending
 // - socket ID, ascending
 // - core ID, ascending
+// free core 表示该 core(物理核)上所有逻辑核都没有被分配出去
 func (a *cpuAccumulator) freeCores() []int {
 	socketIDs := a.details.Sockets().ToSliceNoSort()
 	sort.Slice(socketIDs,
@@ -143,10 +148,11 @@ func (a *cpuAccumulator) freeCores() []int {
 			return iCores.Size() < jCores.Size() || socketIDs[i] < socketIDs[j]
 		})
 
-	var coreIDs []int
+	coreIDs := []int{}
 	for _, s := range socketIDs {
 		coreIDs = append(coreIDs, a.details.CoresInSockets(s).Filter(a.isCoreFree).ToSlice()...)
 	}
+
 	return coreIDs
 }
 
@@ -201,7 +207,7 @@ func (a *cpuAccumulator) freeCPUs() []int {
 	return result
 }
 
-// INFO: ???
+// INFO: 分配
 func (a *cpuAccumulator) take(cpus cpuset.CPUSet) {
 	a.result = a.result.Union(cpus)
 	a.details = a.details.KeepOnly(a.details.CPUs().Difference(a.result))

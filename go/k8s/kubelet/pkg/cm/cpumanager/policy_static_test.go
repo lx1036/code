@@ -14,6 +14,24 @@ import (
 )
 
 var (
+	// single socket
+	topoSingleSocketHT = &topology.CPUTopology{
+		NumCPUs:    8, // 每个core就2个processor，说明开启了超线程, 逻辑核
+		NumSockets: 1, // 机器上1个cpu，或者是 1 个numa node
+		NumCores:   4, // 每个cpu 4个core, 物理核
+		CPUDetails: map[int]topology.CPUInfo{
+			0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			1: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+			2: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			3: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+			4: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			5: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+			6: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			7: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+		},
+	}
+
+	// dual socket
 	topoDualSocketHT = &topology.CPUTopology{
 		NumCPUs:    12, // 每个core就1个processor，说明没有开启超线程
 		NumSockets: 2,  // 机器上2个cpu，或者是 2 个numa node
@@ -31,22 +49,6 @@ var (
 			9:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
 			10: {CoreID: 4, SocketID: 0, NUMANodeID: 0},
 			11: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
-		},
-	}
-
-	topoSingleSocketHT = &topology.CPUTopology{
-		NumCPUs:    8, // 每个core就2个processor，说明开启了超线程
-		NumSockets: 1, // 机器上1个cpu，或者是 1 个numa node
-		NumCores:   4, // 每个cpu 4个core
-		CPUDetails: map[int]topology.CPUInfo{
-			0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
-			1: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
-			2: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
-			3: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
-			4: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
-			5: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
-			6: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
-			7: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
 		},
 	}
 )
