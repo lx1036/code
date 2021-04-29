@@ -8,7 +8,6 @@ import (
 	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/utils"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
@@ -22,14 +21,6 @@ type PodMetrics map[*v1.Pod]v1.ResourceList
 
 // 计算在离线 pod 的资源使用总和
 func (scraper *Scraper) Scrape(baseCtx context.Context, pods []*v1.Pod) (v1.ResourceList, v1.ResourceList, error) {
-	prodTotalUsageResource, nonProdTotalUsageResource := v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewQuantity(0, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(0, resource.BinarySI),
-	}, v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewQuantity(0, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(0, resource.BinarySI),
-	}
-
 	var errs []error
 
 	responseChannel := make(chan PodMetrics, len(pods))
@@ -53,6 +44,8 @@ func (scraper *Scraper) Scrape(baseCtx context.Context, pods []*v1.Pod) (v1.Reso
 		}(pod)
 	}
 
+	prodTotalUsageResource, nonProdTotalUsageResource := make(v1.ResourceList), make(v1.ResourceList)
+
 	for range pods {
 		err := <-errChannel
 		podMetrics := <-responseChannel
@@ -65,19 +58,21 @@ func (scraper *Scraper) Scrape(baseCtx context.Context, pods []*v1.Pod) (v1.Reso
 
 		for pod, metrics := range podMetrics {
 			if utils.IsProdPod(pod) {
-				cpu := prodTotalUsageResource.Cpu()
-				cpu.Add(*metrics.Cpu())
-				prodTotalUsageResource[v1.ResourceCPU] = *cpu
-				memory := prodTotalUsageResource.Memory()
-				memory.Add(*metrics.Memory())
-				prodTotalUsageResource[v1.ResourceMemory] = *memory
+				for name := range metrics {
+					value := prodTotalUsageResource[name]
+					value.Add(metrics[name])
+					if !value.IsZero() {
+						prodTotalUsageResource[name] = value
+					}
+				}
 			} else if utils.IsNonProdPod(pod) {
-				cpu := nonProdTotalUsageResource.Cpu()
-				cpu.Add(*metrics.Cpu())
-				nonProdTotalUsageResource[v1.ResourceCPU] = *cpu
-				memory := nonProdTotalUsageResource.Memory()
-				memory.Add(*metrics.Memory())
-				nonProdTotalUsageResource[v1.ResourceMemory] = *memory
+				for name := range metrics {
+					value := nonProdTotalUsageResource[name]
+					value.Add(metrics[name])
+					if !value.IsZero() {
+						nonProdTotalUsageResource[name] = value
+					}
+				}
 			} else {
 				// TODO
 			}
@@ -94,17 +89,15 @@ func (scraper *Scraper) collectPodMetrics(ctx context.Context, pod *v1.Pod) (v1.
 		return nil, fmt.Errorf("")
 	}
 
-	podUsageResource := v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewQuantity(0, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(0, resource.BinarySI),
-	}
+	podUsageResource := make(v1.ResourceList)
 	for _, containerMetrics := range podMetrics.Containers {
-		cpu := podUsageResource.Cpu()
-		cpu.Add(*containerMetrics.Usage.Cpu())
-		podUsageResource[v1.ResourceCPU] = *cpu
-		memory := podUsageResource.Memory()
-		memory.Add(*containerMetrics.Usage.Memory())
-		podUsageResource[v1.ResourceMemory] = *memory
+		for name := range containerMetrics.Usage {
+			value := podUsageResource[name]
+			value.Add(containerMetrics.Usage[name])
+			if !value.IsZero() {
+				podUsageResource[name] = value
+			}
+		}
 	}
 
 	return podUsageResource, nil

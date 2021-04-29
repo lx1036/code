@@ -7,7 +7,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,6 +32,7 @@ var (
 
 // 启动 metrics-client 来调用 metrics-server 获取 node/pod metrics 数据
 // HPA 就是这么做的，使用 pod cpu/memory metrics 来计算replicas副本数量
+
 // debug in local: go run . --kubeconfig=`echo $HOME`/.kube/config --node=docker1234
 func main() {
 	flag.Parse()
@@ -82,11 +82,7 @@ func main() {
 	}*/
 
 	// TODO: 统计该 node 上所有 pod 的 cpu/memory 资源实际使用总和
-	totalUsageResource := v1.ResourceList{
-		v1.ResourceCPU:              *resource.NewQuantity(0, resource.DecimalSI),
-		v1.ResourceMemory:           *resource.NewQuantity(0, resource.BinarySI),
-		v1.ResourceEphemeralStorage: *resource.NewQuantity(0, resource.BinarySI),
-	}
+	totalUsageResource := make(v1.ResourceList)
 	metricsClient := resourceclient.NewForConfigOrDie(clientConfig)
 
 	// INFO: list pods metrics on current node
@@ -102,12 +98,14 @@ func main() {
 			msg += fmt.Sprintf("containerName:%s usage:[cpu %s memory %s] ",
 				containerMetrics.Name, containerMetrics.Usage.Cpu(), containerMetrics.Usage.Memory())
 
-			cpu := totalUsageResource.Cpu()
-			cpu.Add(*containerMetrics.Usage.Cpu())
-			totalUsageResource[v1.ResourceCPU] = *cpu
-			memory := totalUsageResource.Memory()
-			memory.Add(*containerMetrics.Usage.Memory())
-			totalUsageResource[v1.ResourceMemory] = *memory
+			// INFO: @see pkg/kubelet/cm/node_container_manager_linux.go::GetNodeAllocatableReservation()
+			for name := range containerMetrics.Usage {
+				value := totalUsageResource[name]
+				value.Add(containerMetrics.Usage[name])
+				if !value.IsZero() {
+					totalUsageResource[name] = value
+				}
+			}
 		}
 
 		klog.Info(msg)
