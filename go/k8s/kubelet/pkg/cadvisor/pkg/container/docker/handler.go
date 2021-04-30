@@ -83,8 +83,35 @@ func (h *dockerContainerHandler) GetSpec() (v1.ContainerSpec, error) {
 	panic("implement me")
 }
 
+func (h *dockerContainerHandler) needNet() bool {
+	if h.includedMetrics.Has(container.NetworkUsageMetrics) {
+		return !h.networkMode.IsContainer()
+	}
+	return false
+}
+
+// TODO: Get from libcontainer API instead of cgroup manager when we don't have to support older Dockers.
 func (h *dockerContainerHandler) GetStats() (*v1.ContainerStats, error) {
-	panic("implement me")
+	stats, err := h.libcontainerHandler.GetStats()
+	if err != nil {
+		return stats, err
+	}
+
+	// Clean up stats for containers that don't have their own network - this
+	// includes containers running in Kubernetes pods that use the network of the
+	// infrastructure container. This stops metrics being reported multiple times
+	// for each container in a pod.
+	if !h.needNet() {
+		stats.Network = v1.NetworkStats{}
+	}
+
+	// Get filesystem stats.
+	err = h.getFsStats(stats)
+	if err != nil {
+		return stats, err
+	}
+
+	return stats, nil
 }
 
 func (h *dockerContainerHandler) ListContainers(listType container.ListType) ([]v1.ContainerReference, error) {

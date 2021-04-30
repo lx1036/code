@@ -1,4 +1,4 @@
-package cgroupfs
+package cgroups
 
 import (
 	"bufio"
@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -16,6 +18,10 @@ import (
 	securejoin "github.com/cyphar/filepath-securejoin"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
+)
+
+var (
+	ErrNotValidFormat = errors.New("line is not a valid key value format")
 )
 
 // The absolute path to the root of the cgroup hierarchies.
@@ -386,4 +392,69 @@ func cleanPath(path string) string {
 		path, _ = filepath.Rel(string(os.PathSeparator), filepath.Clean(string(os.PathSeparator)+path))
 	}
 	return filepath.Clean(path)
+}
+
+func PathExists(path string) bool {
+	if _, err := os.Stat(path); err != nil {
+		return false
+	}
+	return true
+}
+
+// GetCgroupParamKeyValue parses a space-separated "name value" kind of cgroup
+// parameter and returns its components. For example, "io_service_bytes 1234"
+// will return as "io_service_bytes", 1234.
+func GetCgroupParamKeyValue(t string) (string, uint64, error) {
+	parts := strings.Fields(t)
+	switch len(parts) {
+	case 2:
+		value, err := ParseUint(parts[1], 10, 64)
+		if err != nil {
+			return "", 0, fmt.Errorf("unable to convert to uint64: %v", err)
+		}
+
+		return parts[0], value, nil
+	default:
+		return "", 0, ErrNotValidFormat
+	}
+}
+
+// ParseUint converts a string to an uint64 integer.
+// Negative values are returned at zero as, due to kernel bugs,
+// some of the memory cgroup stats can be negative.
+func ParseUint(s string, base, bitSize int) (uint64, error) {
+	value, err := strconv.ParseUint(s, base, bitSize)
+	if err != nil {
+		intValue, intErr := strconv.ParseInt(s, base, bitSize)
+		// 1. Handle negative values greater than MinInt64 (and)
+		// 2. Handle negative values lesser than MinInt64
+		if intErr == nil && intValue < 0 {
+			return 0, nil
+		} else if intErr != nil && intErr.(*strconv.NumError).Err == strconv.ErrRange && intValue < 0 {
+			return 0, nil
+		}
+
+		return value, err
+	}
+
+	return value, nil
+}
+
+// Gets a single uint64 value from the specified cgroup file.
+func GetCgroupParamUint(cgroupPath, cgroupFile string) (uint64, error) {
+	fileName := filepath.Join(cgroupPath, cgroupFile)
+	contents, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return 0, err
+	}
+	trimmed := strings.TrimSpace(string(contents))
+	if trimmed == "max" {
+		return math.MaxUint64, nil
+	}
+
+	res, err := ParseUint(trimmed, 10, 64)
+	if err != nil {
+		return res, fmt.Errorf("unable to parse %q as a uint from Cgroup file %q", string(contents), fileName)
+	}
+	return res, nil
 }

@@ -1,4 +1,4 @@
-package cgroupfs
+package cgroups
 
 import (
 	"sync"
@@ -63,7 +63,7 @@ type manager struct {
 	paths    map[string]string
 }
 
-func (m *manager) getSubsystems() []subsystem {
+func (m *manager) getSubsystems() subsystemSet {
 	return subsystemsLegacy
 }
 
@@ -106,7 +106,21 @@ func (m *manager) GetAllPids() ([]int, error) {
 }
 
 func (m *manager) GetStats() (*Stats, error) {
-	panic("implement me")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	stats := NewStats()
+	for name, path := range m.paths {
+		sys, err := m.getSubsystems().Get(name)
+		if err != nil || err == errSubsystemDoesNotExist || !PathExists(path) {
+			continue
+		}
+		if err := sys.GetStats(path, stats); err != nil {
+			return nil, err
+		}
+	}
+
+	return stats, nil
 }
 
 func (m *manager) Freeze(state configs.FreezerState) error {

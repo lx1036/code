@@ -1,4 +1,4 @@
-package cgroupfs
+package cgroups
 
 type NameGroup struct {
 	GroupName string

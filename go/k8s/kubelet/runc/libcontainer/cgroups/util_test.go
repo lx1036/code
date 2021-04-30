@@ -1,4 +1,4 @@
-package cgroupfs
+package cgroups
 
 import (
 	"io/ioutil"

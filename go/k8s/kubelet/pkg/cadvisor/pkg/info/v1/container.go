@@ -585,6 +585,32 @@ type AcceleratorStats struct {
 	DutyCycle uint64 `json:"duty_cycle"`
 }
 
+type UlimitSpec struct {
+	Name      string `json:"name"`
+	SoftLimit int64  `json:"soft_limit"`
+	HardLimit int64  `json:"hard_limit"`
+}
+
+type ProcessStats struct {
+	// Number of processes
+	ProcessCount uint64 `json:"process_count"`
+
+	// Number of open file descriptors
+	FdCount uint64 `json:"fd_count"`
+
+	// Number of sockets
+	SocketCount uint64 `json:"socket_count"`
+
+	// Number of threads currently in container
+	ThreadsCurrent uint64 `json:"threads_current,omitempty"`
+
+	// Maxium number of threads allowed in container
+	ThreadsMax uint64 `json:"threads_max,omitempty"`
+
+	// Ulimits for the top-level container process
+	Ulimits []UlimitSpec `json:"ulimits,omitempty"`
+}
+
 type ContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time   `json:"timestamp"`

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
-	cgroups "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups/cgroupfs"
+	"k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups"
 	"k8s-lx1036/k8s/kubelet/runc/libcontainer/configs"
 
 	"k8s.io/klog/v2"

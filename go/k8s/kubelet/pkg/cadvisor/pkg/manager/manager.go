@@ -20,6 +20,7 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/utils/sysfs"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/watcher"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -554,7 +555,39 @@ func (m *manager) GetContainerInfo(containerName string, query *v1.ContainerInfo
 }
 
 func (m *manager) GetContainerInfoV2(containerName string, options v2.RequestOptions) (map[string]v2.ContainerInfo, error) {
-	panic("implement me")
+	// 先根据 containerName="/" 获取所有 containers
+	containers, err := m.getRequestedContainers(containerName, options)
+	if err != nil {
+		return nil, err
+	}
+
+	var errs []error
+	var nilTime time.Time // Ignored.
+
+	infos := make(map[string]v2.ContainerInfo, len(containers))
+	for name, cData := range containers {
+		result := v2.ContainerInfo{}
+		cinfo, err := cData.GetInfo(false)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("[GetInfo for %s with err: %v]", name, err))
+			infos[name] = result
+			continue
+		}
+		result.Spec = m.getV2Spec(cinfo)
+
+		// container stats 是cadvisor周期定时读取 cgroup，然后存入 memoryCache 中
+		stats, err := m.memoryCache.RecentStats(name, nilTime, nilTime, options.Count)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("[RecentStats for %s with err: %v]", name, err))
+			infos[name] = result
+			continue
+		}
+
+		result.Stats = v2.ContainerStatsFromV1(containerName, &cinfo.Spec, stats)
+		infos[name] = result
+	}
+
+	return infos, utilerrors.NewAggregate(errs)
 }
 
 func (m *manager) getSubcontainers(containerName string) map[string]*containerData {

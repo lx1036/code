@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	libcontainercgroups "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups/cgroupfs"
+	libcontainercgroups "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups"
 	libcontainerconfigs "k8s-lx1036/k8s/kubelet/runc/libcontainer/configs"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"

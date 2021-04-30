@@ -297,6 +297,7 @@ func (cd *containerData) GetInfo(shouldUpdateSubcontainers bool) (*containerInfo
 	cInfo.Name = cd.info.Name
 	cInfo.Aliases = cd.info.Aliases
 	cInfo.Namespace = cd.info.Namespace
+
 	return &cInfo, nil
 }
 

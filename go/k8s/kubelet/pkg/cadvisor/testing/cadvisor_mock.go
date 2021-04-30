@@ -28,7 +28,8 @@ func (c *Mock) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest)
 }
 
 func (c *Mock) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
-	panic("implement me")
+	args := c.Called(name, options)
+	return args.Get(0).(map[string]cadvisorapiv2.ContainerInfo), args.Error(1)
 }
 
 func (c *Mock) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
@@ -48,11 +49,13 @@ func (c *Mock) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 }
 
 func (c *Mock) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
-	panic("implement me")
+	args := c.Called()
+	return args.Get(0).(cadvisorapiv2.FsInfo), args.Error(1)
 }
 
 func (c *Mock) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
-	panic("implement me")
+	args := c.Called()
+	return args.Get(0).(cadvisorapiv2.FsInfo), args.Error(1)
 }
 
 func (c *Mock) WatchEvents(request *events.Request) (*events.EventChannel, error) {

@@ -1,6 +1,8 @@
-package cgroupfs
+package cgroups
 
 import (
+	"errors"
+
 	"k8s-lx1036/k8s/kubelet/runc/libcontainer/configs"
 )
 
@@ -21,14 +23,27 @@ const (
 )
 
 var (
-	subsystemsLegacy = []subsystem{
-		&CpusetController{},
-		//&MemoryGroup{},
-		//&CpuGroup{},
-		//&CpuacctGroup{},
+	subsystemsLegacy = subsystemSet{
+		&CpusetGroup{},
+		&CpuGroup{},
+		&MemoryGroup{},
+		&CpuacctGroup{},
 		//&PidsGroup{},
 	}
 )
+
+var errSubsystemDoesNotExist = errors.New("cgroup: subsystem does not exist")
+
+type subsystemSet []subsystem
+
+func (s subsystemSet) Get(name string) (subsystem, error) {
+	for _, ss := range s {
+		if ss.Name() == name {
+			return ss, nil
+		}
+	}
+	return nil, errSubsystemDoesNotExist
+}
 
 type subsystem interface {
 	// Name returns the name of the subsystem.

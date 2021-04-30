@@ -1,4 +1,4 @@
-package cgroupfs
+package cgroups
 
 type CpuUsage struct {
 	// Total CPU time consumed.
@@ -122,4 +122,10 @@ type Stats struct {
 	BlkioStats  BlkioStats  `json:"blkio_stats,omitempty"`
 	// the map is in the format "size of hugepage: stats of the hugepage"
 	HugetlbStats map[string]HugetlbStats `json:"hugetlb_stats,omitempty"`
+}
+
+func NewStats() *Stats {
+	memoryStats := MemoryStats{Stats: make(map[string]uint64)}
+	hugetlbStats := make(map[string]HugetlbStats)
+	return &Stats{MemoryStats: memoryStats, HugetlbStats: hugetlbStats}
 }

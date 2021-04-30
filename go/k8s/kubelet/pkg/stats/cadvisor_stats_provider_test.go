@@ -152,4 +152,74 @@ func TestCadvisorListPodStats(test *testing.T) {
 	assert.NoError(test, err)
 	assert.Equal(test, 4, len(pods))
 
+	prf0 := statsapi.PodReference{Name: pName0, Namespace: namespace0, UID: "UID" + pName0}
+	prf1 := statsapi.PodReference{Name: pName1, Namespace: namespace0, UID: "UID" + pName1}
+	prf2 := statsapi.PodReference{Name: pName2, Namespace: namespace2, UID: "UID" + pName2}
+	prf3 := statsapi.PodReference{Name: pName3, Namespace: namespace0, UID: "UID" + pName3}
+	indexPods := make(map[statsapi.PodReference]statsapi.PodStats, len(pods))
+	for _, pod := range pods {
+		indexPods[pod.PodRef] = pod
+	}
+	// Validate Pod0 Results
+	ps, found := indexPods[prf0]
+	assert.True(test, found)
+	assert.Len(test, ps.Containers, 2)
+	indexCon := make(map[string]statsapi.ContainerStats, len(ps.Containers))
+	for _, con := range ps.Containers {
+		indexCon[con.Name] = con
+	}
+	con := indexCon[cName00]
+	assert.EqualValues(test, testTime(creationTime, seedPod0Container0).Unix(), con.StartTime.Time.Unix())
+	checkCPUStats(test, "Pod0Container0", seedPod0Container0, con.CPU)
+	checkMemoryStats(test, "Pod0Conainer0", seedPod0Container0, containerInfos["/pod0-c0"], con.Memory)
+	con = indexCon[cName01]
+	assert.EqualValues(test, testTime(creationTime, seedPod0Container1).Unix(), con.StartTime.Time.Unix())
+	checkCPUStats(test, "Pod0Container1", seedPod0Container1, con.CPU)
+	checkMemoryStats(test, "Pod0Container1", seedPod0Container1, containerInfos["/pod0-c1"], con.Memory)
+	assert.EqualValues(test, p0Time.Unix(), ps.StartTime.Time.Unix())
+	checkNetworkStats(test, "Pod0", seedPod0Infra, ps.Network)
+	checkEphemeralStats(test, "Pod0", []int{seedPod0Container0, seedPod0Container1}, []int{seedEphemeralVolume1, seedEphemeralVolume2}, ps.EphemeralStorage)
+	if ps.CPU != nil {
+		checkCPUStats(test, "Pod0", seedPod0Infra, ps.CPU)
+	}
+	if ps.Memory != nil {
+		checkMemoryStats(test, "Pod0", seedPod0Infra, containerInfos["/pod0-i"], ps.Memory)
+	}
+
+	// Validate Pod1 Results
+	ps, found = indexPods[prf1]
+	assert.True(test, found)
+	assert.Len(test, ps.Containers, 1)
+	con = ps.Containers[0]
+	assert.Equal(test, cName10, con.Name)
+	checkCPUStats(test, "Pod1Container0", seedPod1Container, con.CPU)
+	checkMemoryStats(test, "Pod1Container0", seedPod1Container, containerInfos["/pod1-c0"], con.Memory)
+	checkNetworkStats(test, "Pod1", seedPod1Infra, ps.Network)
+
+	// Validate Pod2 Results
+	ps, found = indexPods[prf2]
+	assert.True(test, found)
+	assert.Len(test, ps.Containers, 1)
+	con = ps.Containers[0]
+	assert.Equal(test, cName20, con.Name)
+	checkCPUStats(test, "Pod2Container0", seedPod2Container, con.CPU)
+	checkMemoryStats(test, "Pod2Container0", seedPod2Container, containerInfos["/pod2-c0"], con.Memory)
+	checkNetworkStats(test, "Pod2", seedPod2Infra, ps.Network)
+
+	// Validate Pod3 Results
+	ps, found = indexPods[prf3]
+	assert.True(test, found)
+	assert.Len(test, ps.Containers, 2)
+	indexCon = make(map[string]statsapi.ContainerStats, len(ps.Containers))
+	for _, con := range ps.Containers {
+		indexCon[con.Name] = con
+	}
+	con = indexCon[cName31]
+	assert.Equal(test, cName31, con.Name)
+	checkCPUStats(test, "Pod3Container1", seedPod3Container1, con.CPU)
+	checkMemoryStats(test, "Pod3Container1", seedPod3Container1, containerInfos["/pod3-c1"], con.Memory)
+	con = indexCon[cName30]
+	assert.Equal(test, cName30, con.Name)
+	checkEmptyCPUStats(test, "Pod3Container0", seedPod3Container0, con.CPU)
+	checkEmptyMemoryStats(test, "Pod3Container0", seedPod3Container0, containerInfos["/pod3-c0-init"], con.Memory)
 }
