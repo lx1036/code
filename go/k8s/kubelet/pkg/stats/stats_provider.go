@@ -3,15 +3,16 @@ package stats
 import (
 	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor"
+	kubecontainer "k8s-lx1036/k8s/kubelet/pkg/container"
+	kubepod "k8s-lx1036/k8s/kubelet/pkg/pod"
 	"k8s-lx1036/k8s/kubelet/pkg/server/stats"
+	"k8s-lx1036/k8s/kubelet/pkg/status"
 
 	internalapi "k8s.io/cri-api/pkg/apis"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 // Provider provides the stats of the node and the pod-managed containers.
-type Provider struct {
+type StatsProvider struct {
 	cadvisor     cadvisor.Interface
 	podManager   kubepod.Manager
 	runtimeCache kubecontainer.RuntimeCache
@@ -44,7 +45,7 @@ func NewCRIStatsProvider(
 	imageService internalapi.ImageManagerService,
 	logMetricsService LogMetricsService,
 	osInterface kubecontainer.OSInterface,
-) *Provider {
+) *StatsProvider {
 	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer,
 		runtimeService, imageService, logMetricsService, osInterface))
 }
@@ -56,11 +57,29 @@ func newStatsProvider(
 	podManager kubepod.Manager,
 	runtimeCache kubecontainer.RuntimeCache,
 	containerStatsProvider containerStatsProvider,
-) *Provider {
-	return &Provider{
+) *StatsProvider {
+	return &StatsProvider{
 		cadvisor:               cadvisor,
 		podManager:             podManager,
 		runtimeCache:           runtimeCache,
 		containerStatsProvider: containerStatsProvider,
+	}
+}
+
+// NewCadvisorStatsProvider returns a containerStatsProvider that provides both
+// the node and the container stats from cAdvisor.
+func NewCadvisorStatsProvider(
+	cadvisor cadvisor.Interface,
+	resourceAnalyzer stats.ResourceAnalyzer,
+	podManager kubepod.Manager,
+	runtimeCache kubecontainer.RuntimeCache,
+	imageService kubecontainer.ImageService,
+	statusProvider status.PodStatusProvider,
+) *StatsProvider {
+	return &StatsProvider{
+		cadvisor:               cadvisor,
+		podManager:             podManager,
+		runtimeCache:           runtimeCache,
+		containerStatsProvider: newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider),
 	}
 }

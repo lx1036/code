@@ -98,8 +98,6 @@ spec:
       labels:
         app: node-status-webhook
     spec:
-      imagePullSecrets:
-        - name: docker-registry-addops
       containers:
         - args:
             - --tls-cert-file
