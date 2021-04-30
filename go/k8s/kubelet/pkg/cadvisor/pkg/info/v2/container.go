@@ -6,6 +6,11 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
 )
 
+const (
+	TypeName   = "name"
+	TypeDocker = "docker"
+)
+
 type CpuSpec struct {
 	// Requested cpu shares. Default is 1024.
 	Limit uint64 `json:"limit"`
@@ -35,6 +40,30 @@ type MemorySpec struct {
 	SwapLimit uint64 `json:"swap_limit,omitempty"`
 }
 
+// Instantaneous CPU stats
+type CpuInstStats struct {
+	Usage CpuInstUsage `json:"usage"`
+}
+
+// CPU usage time statistics.
+type CpuInstUsage struct {
+	// Total CPU usage.
+	// Units: nanocores per second
+	Total uint64 `json:"total"`
+
+	// Per CPU/core usage of the container.
+	// Unit: nanocores per second
+	PerCpu []uint64 `json:"per_cpu_usage,omitempty"`
+
+	// Time spent in user space.
+	// Unit: nanocores per second
+	User uint64 `json:"user"`
+
+	// Time spent in kernel space.
+	// Unit: nanocores per second
+	System uint64 `json:"system"`
+}
+
 type RequestOptions struct {
 	// Type of container identifier specified - "name", "dockerid", dockeralias"
 	IdType string `json:"type"`
@@ -45,6 +74,18 @@ type RequestOptions struct {
 	// Update stats if they are older than MaxAge
 	// nil indicates no update, and 0 will always trigger an update.
 	MaxAge *time.Duration `json:"max_age"`
+}
+
+// Filesystem usage statistics.
+type FilesystemStats struct {
+	// Total Number of bytes consumed by container.
+	TotalUsageBytes *uint64 `json:"totalUsageBytes,omitempty"`
+	// Number of bytes consumed by a container through its root filesystem.
+	BaseUsageBytes *uint64 `json:"baseUsageBytes,omitempty"`
+	// Number of inodes used within the container's root filesystem.
+	// This only accounts for inodes that are shared across containers,
+	// and does not include inodes used in mounted directories.
+	InodeUsage *uint64 `json:"containter_inode_usage,omitempty"`
 }
 
 type FsInfo struct {
@@ -141,6 +182,46 @@ type ContainerSpec struct {
 	Image string `json:"image,omitempty"`
 }
 
+type TcpStat struct {
+	// Count of TCP connections in state "Established"
+	Established uint64
+	// Count of TCP connections in state "Syn_Sent"
+	SynSent uint64
+	// Count of TCP connections in state "Syn_Recv"
+	SynRecv uint64
+	// Count of TCP connections in state "Fin_Wait1"
+	FinWait1 uint64
+	// Count of TCP connections in state "Fin_Wait2"
+	FinWait2 uint64
+	// Count of TCP connections in state "Time_Wait
+	TimeWait uint64
+	// Count of TCP connections in state "Close"
+	Close uint64
+	// Count of TCP connections in state "Close_Wait"
+	CloseWait uint64
+	// Count of TCP connections in state "Listen_Ack"
+	LastAck uint64
+	// Count of TCP connections in state "Listen"
+	Listen uint64
+	// Count of TCP connections in state "Closing"
+	Closing uint64
+}
+
+type NetworkStats struct {
+	// Network stats by interface.
+	Interfaces []v1.InterfaceStats `json:"interfaces,omitempty"`
+	// TCP connection stats (Established, Listen...)
+	Tcp TcpStat `json:"tcp"`
+	// TCP6 connection stats (Established, Listen...)
+	Tcp6 TcpStat `json:"tcp6"`
+	// UDP connection stats
+	Udp v1.UdpStat `json:"udp"`
+	// UDP6 connection stats
+	Udp6 v1.UdpStat `json:"udp6"`
+	// TCP advanced stats
+	TcpAdvanced v1.TcpAdvancedStat `json:"tcp_advanced"`
+}
+
 type ContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time `json:"timestamp"`
@@ -148,7 +229,7 @@ type ContainerStats struct {
 	// In nanoseconds (aggregated)
 	Cpu *v1.CpuStats `json:"cpu,omitempty"`
 	// In nanocores per second (instantaneous)
-	//CpuInst *CpuInstStats `json:"cpu_inst,omitempty"`
+	CpuInst *CpuInstStats `json:"cpu_inst,omitempty"`
 	// Disk IO statistics
 	DiskIo *v1.DiskIoStats `json:"diskio,omitempty"`
 	// Memory statistics
@@ -156,17 +237,17 @@ type ContainerStats struct {
 	// Hugepage statistics
 	//Hugetlb *map[string]v1.HugetlbStats `json:"hugetlb,omitempty"`
 	// Network statistics
-	//Network *NetworkStats `json:"network,omitempty"`
+	Network *NetworkStats `json:"network,omitempty"`
 	// Processes statistics
 	//Processes *v1.ProcessStats `json:"processes,omitempty"`
 	// Filesystem statistics
-	//Filesystem *FilesystemStats `json:"filesystem,omitempty"`
+	Filesystem *FilesystemStats `json:"filesystem,omitempty"`
 	// Task load statistics
 	//Load *v1.LoadStats `json:"load_stats,omitempty"`
 	// Metrics for Accelerators. Each Accelerator corresponds to one element in the array.
-	//Accelerators []v1.AcceleratorStats `json:"accelerators,omitempty"`
+	Accelerators []v1.AcceleratorStats `json:"accelerators,omitempty"`
 	// Custom Metrics
-	//CustomMetrics map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
+	CustomMetrics map[string][]v1.MetricVal `json:"custom_metrics,omitempty"`
 	// Perf events counters
 	//PerfStats []v1.PerfStat `json:"perf_stats,omitempty"`
 	// Statistics originating from perf uncore events.

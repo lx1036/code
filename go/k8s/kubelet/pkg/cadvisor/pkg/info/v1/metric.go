@@ -1,5 +1,7 @@
 package v1
 
+import "time"
+
 // Type of metric being exported.
 type MetricType string
 
@@ -32,4 +34,18 @@ type MetricSpec struct {
 
 	// Display Units for the stats.
 	Units string `json:"units"`
+}
+
+// An exported metric.
+type MetricVal struct {
+	// Label associated with a metric
+	Label  string            `json:"label,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Time at which the metric was queried
+	Timestamp time.Time `json:"timestamp"`
+
+	// The value of the metric at this point.
+	IntValue   int64   `json:"int_value,omitempty"`
+	FloatValue float64 `json:"float_value,omitempty"`
 }

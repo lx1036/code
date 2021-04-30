@@ -37,6 +37,11 @@ func (s *fsResourceAnalyzer) Start() {
 	})
 }
 
+// updateCachedPodVolumeStats calculates and caches the PodVolumeStats for every Pod known to the kubelet.
+func (s *fsResourceAnalyzer) updateCachedPodVolumeStats() {
+
+}
+
 // GetPodVolumeStats returns the PodVolumeStats for a given pod.  Results are looked up from a cache that
 // is eagerly populated in the background, and never calculated on the fly.
 func (s *fsResourceAnalyzer) GetPodVolumeStats(uid types.UID) (PodVolumeStats, bool) {

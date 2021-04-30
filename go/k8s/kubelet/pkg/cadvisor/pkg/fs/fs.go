@@ -10,7 +10,11 @@ import (
 )
 
 const (
-	LabelSystemRoot = "root"
+	LabelSystemRoot          = "root"
+	LabelDockerImages        = "docker-images"
+	LabelCrioImages          = "crio-images"
+	DriverStatusPoolName     = "Pool Name"
+	DriverStatusDataLoopFile = "Data loop file"
 )
 
 type partition struct {

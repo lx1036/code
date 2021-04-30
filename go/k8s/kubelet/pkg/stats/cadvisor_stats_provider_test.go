@@ -3,11 +3,13 @@ package stats
 import (
 	"testing"
 
+	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/stats/v1alpha1"
 	cadvisorapiv2 "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v2"
 	cadvisortest "k8s-lx1036/k8s/kubelet/pkg/cadvisor/testing"
 	kubecontainer "k8s-lx1036/k8s/kubelet/pkg/container"
 	containertest "k8s-lx1036/k8s/kubelet/pkg/container/testing"
 	"k8s-lx1036/k8s/kubelet/pkg/leaky"
+	serverstats "k8s-lx1036/k8s/kubelet/pkg/server/stats"
 	statustest "k8s-lx1036/k8s/kubelet/pkg/status/testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +19,44 @@ import (
 )
 
 func TestCadvisorListPodStats(test *testing.T) {
-
+	const (
+		seedRoot              = 0
+		seedRuntime           = 100
+		seedKubelet           = 200
+		seedMisc              = 300
+		seedPod0Infra         = 1000
+		seedPod0Container0    = 2000
+		seedPod0Container1    = 2001
+		seedPod1Infra         = 3000
+		seedPod1Container     = 4000
+		seedPod2Infra         = 5000
+		seedPod2Container     = 6000
+		seedPod3Infra         = 7000
+		seedPod3Container0    = 8000
+		seedPod3Container1    = 8001
+		seedEphemeralVolume1  = 10000
+		seedEphemeralVolume2  = 10001
+		seedPersistentVolume1 = 20000
+		seedPersistentVolume2 = 20001
+	)
+	const (
+		namespace0 = "test0"
+		namespace2 = "test2"
+	)
+	const (
+		pName0 = "pod0"
+		pName1 = "pod1"
+		pName2 = "pod0" // ensure pName2 conflicts with pName0, but is in a different namespace
+		pName3 = "pod3"
+	)
+	const (
+		cName00 = "c0"
+		cName01 = "c1"
+		cName10 = "c0" // ensure cName10 conflicts with cName02, but is in a different pod
+		cName20 = "c1" // ensure cName20 conflicts with cName01, but is in a different pod + namespace
+		cName30 = "c0-init"
+		cName31 = "c1"
+	)
 	containerInfos := map[string]cadvisorapiv2.ContainerInfo{
 		"/":              getTestContainerInfo(seedRoot, "", "", ""),
 		"/docker-daemon": getTestContainerInfo(seedRuntime, "", "", ""),
@@ -87,14 +126,17 @@ func TestCadvisorListPodStats(test *testing.T) {
 	mockRuntime.
 		On("ImageStats").Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil)
 
+	// volume
+	ephemeralVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
+		getPodVolumeStats(seedEphemeralVolume2, "ephemeralVolume2")}
+	persistentVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedPersistentVolume1, "persistentVolume1"),
+		getPodVolumeStats(seedPersistentVolume2, "persistentVolume2")}
+	volumeStats := serverstats.PodVolumeStats{
+		EphemeralVolumes:  ephemeralVolumes,
+		PersistentVolumes: persistentVolumes,
+	}
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
-	const (
-		pName0 = "pod0"
-		pName1 = "pod1"
-		pName2 = "pod0" // ensure pName2 conflicts with pName0, but is in a different namespace
-		pName3 = "pod3"
-	)
 	p0Time := metav1.Now()
 	p1Time := metav1.Now()
 	p2Time := metav1.Now()

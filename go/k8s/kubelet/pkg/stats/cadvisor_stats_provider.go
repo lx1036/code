@@ -65,6 +65,7 @@ func newCadvisorStatsProvider(
 // ListPodStats returns the stats of all the pod-managed containers.
 func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 
+	return nil, nil
 }
 
 func getCadvisorContainerInfo(ca cadvisor.Interface) (map[string]cadvisorapiv2.ContainerInfo, error) {
