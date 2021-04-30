@@ -2,23 +2,23 @@
 apiVersion: cert-manager.io/v1alpha2
 kind: Certificate
 metadata:
-  name: lxcfs-serving-cert
+  name: node-status-serving-cert
   namespace: default
 spec:
   dnsNames:
-    - lxcfs-webhook.default.svc
-    - lxcfs-webhook.default.svc.cluster.local
+    - node-status-webhook.default.svc
+    - node-status-webhook.default.svc.cluster.local
   issuerRef:
     kind: Issuer
-    name: lxcfs-selfsigned-issuer
-  secretName: lxcfs-webhook-server-cert
+    name: node-status-selfsigned-issuer
+  secretName: node-status-webhook-server-cert
 
 ---
 
 apiVersion: cert-manager.io/v1alpha2
 kind: Issuer
 metadata:
-  name: lxcfs-selfsigned-issuer
+  name: node-status-selfsigned-issuer
   namespace: default
 spec:
   selfSigned: {}
@@ -28,11 +28,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: lxcfs-webhook
+  name: node-status-webhook
   namespace: default
 spec:
   selector:
-    app: lxcfs-webhook
+    app: node-status-webhook
   ports:
     - port: 443
       targetPort: 8443
@@ -44,17 +44,17 @@ spec:
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: lxcfs-webhook
+  name: node-status-webhook
   annotations:
-    cert-manager.io/inject-ca-from: default/lxcfs-serving-cert
+    cert-manager.io/inject-ca-from: default/node-status-serving-cert
   labels:
-    app: lxcfs-webhook
+    app: node-status-webhook
 webhooks:
-  - name: mutating.lxcfs-webhook.net
+  - name: mutating.node-status-webhook.net
     clientConfig:
       #      url: "https://3657e7190bfe.ngrok.io" # for debug in local
       service:
-        name: lxcfs-webhook
+        name: node-status-webhook
         namespace: default
         path: "/"
     rules:
@@ -65,7 +65,7 @@ webhooks:
         scope: '*'
     namespaceSelector:
       matchExpressions:
-        - key: lxcfs-webhook
+        - key: node-status-webhook
           operator: NotIn
           values:
             - disable
@@ -79,7 +79,7 @@ webhooks:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: lxcfs-webhook
+  name: node-status-webhook
   namespace: default
 spec:
   progressDeadlineSeconds: 600
@@ -87,7 +87,7 @@ spec:
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app: lxcfs-webhook
+      app: node-status-webhook
   strategy:
     rollingUpdate:
       maxSurge: 25%
@@ -96,7 +96,7 @@ spec:
   template:
     metadata:
       labels:
-        app: lxcfs-webhook
+        app: node-status-webhook
     spec:
       imagePullSecrets:
         - name: docker-registry-addops
@@ -106,9 +106,9 @@ spec:
             - /etc/service-webhook/tls.crt
             - --tls-private-key-file
             - /etc/service-webhook/tls.key
-          image: r.addops.soft.360.cn/rancher/lxcfs-webhook:1.0.1
+          image: lx1036/node-status-webhook:1.0.1
           imagePullPolicy: IfNotPresent
-          name: lxcfs-webhook
+          name: node-status-webhook
           resources:
             limits:
               cpu: 500m
@@ -126,7 +126,7 @@ spec:
         - name: service-certs
           secret:
             defaultMode: 420
-            secretName: lxcfs-webhook-server-cert
+            secretName: node-status-webhook-server-cert
 
 
 
