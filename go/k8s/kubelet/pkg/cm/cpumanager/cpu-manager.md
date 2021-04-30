@@ -30,6 +30,9 @@ exclusive cpus: 独占核，只被 integral guaranteed pod 独占的cpus，数�
 * 然后尽可能按照物理核 core 来分配: 所分配逻辑核尽可能在一个物理核 core 上，按照 ProcessorID 升序排序，尽可能先完整物理核分配，不要拆分去分配
 * 最后尽可能按照逻辑核分配: 如果没有完整物理核，只能按照 ProcessorID 升序排序去分配
 
+### CPU Cache
+CPU L1/L2 Cache 是物理核Core单独用的，L3 Cache 是NUMA Node(Socket)单独用的。
+
 
 ## 参考文献
 **[cpu-manager 设计文档](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cpu-manager.md)**
