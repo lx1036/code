@@ -3,7 +3,6 @@ package machine
 import (
 	"bytes"
 	"io/ioutil"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -39,14 +38,25 @@ func getInfoFromFiles(filePaths string) string {
 	return ""
 }
 
+var (
+	fixturesCPUInfoPath = "fixtures/proc/cpuinfo"
+)
+
+func SetFixturesCPUInfoPath(path string) {
+	fixturesCPUInfoPath = path
+}
+func GetFixturesCPUInfoPath() string {
+	return fixturesCPUInfoPath
+}
+
 // INFO: 这个函数很重要，直接获取机器的 machine info
 func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*v1.MachineInfo, error) {
-	rootFs := "fixtures"
+	/*rootFs := "fixtures"
 	if !inHostNamespace {
 		rootFs = "/rootfs"
-	}
+	}*/
 
-	cpuinfo, err := ioutil.ReadFile(filepath.Join(rootFs, "proc/cpuinfo"))
+	cpuinfo, err := ioutil.ReadFile(GetFixturesCPUInfoPath())
 	if err != nil {
 		return nil, err
 	}

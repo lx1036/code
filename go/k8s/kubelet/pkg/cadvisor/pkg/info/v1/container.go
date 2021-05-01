@@ -82,8 +82,8 @@ type ContainerSpec struct {
 	// HasDiskIo when true, indicates that DiskIo stats will be available.
 	HasDiskIo bool `json:"has_diskio"`
 
-	HasCustomMetrics bool `json:"has_custom_metrics"`
-	//CustomMetrics    []MetricSpec `json:"custom_metrics,omitempty"`
+	HasCustomMetrics bool         `json:"has_custom_metrics"`
+	CustomMetrics    []MetricSpec `json:"custom_metrics,omitempty"`
 
 	// Image name used for this container.
 	Image string `json:"image,omitempty"`

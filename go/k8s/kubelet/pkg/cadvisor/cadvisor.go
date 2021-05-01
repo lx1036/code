@@ -74,6 +74,8 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) 
 
 	return res[0], nil
 }
+
+// RootFsInfo 获取 rootPath 的 filesystem information
 func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cc.GetDirFsInfo(cc.rootPath)
 }
@@ -88,14 +90,14 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 	sysFs := sysfs.NewRealSysFs()
 
 	includedMetrics := cadvisormetrics.MetricSet{
-		cadvisormetrics.CpuUsageMetrics:         struct{}{},
-		cadvisormetrics.MemoryUsageMetrics:      struct{}{},
-		cadvisormetrics.CpuLoadMetrics:          struct{}{},
-		cadvisormetrics.DiskIOMetrics:           struct{}{},
-		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
-		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
-		cadvisormetrics.AppMetrics:              struct{}{},
-		cadvisormetrics.ProcessMetrics:          struct{}{},
+		cadvisormetrics.CpuUsageMetrics:    struct{}{},
+		cadvisormetrics.MemoryUsageMetrics: struct{}{},
+		cadvisormetrics.CpuLoadMetrics:     struct{}{},
+		//cadvisormetrics.DiskIOMetrics:           struct{}{},
+		//cadvisormetrics.NetworkUsageMetrics:     struct{}{},
+		//cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
+		//cadvisormetrics.AppMetrics:              struct{}{},
+		//cadvisormetrics.ProcessMetrics:          struct{}{},
 	}
 	if usingLegacyStats {
 		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}

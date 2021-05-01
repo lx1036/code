@@ -12,6 +12,7 @@ import (
 
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/cache/memory"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/docker"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/events"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/fs"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
@@ -590,6 +591,112 @@ func (m *manager) GetContainerInfoV2(containerName string, options v2.RequestOpt
 	return infos, utilerrors.NewAggregate(errs)
 }
 
+// Get V2 container spec from v1 container info.
+func (m *manager) getV2Spec(cinfo *containerInfo) v2.ContainerSpec {
+	spec := m.getAdjustedSpec(cinfo)
+	return v2.ContainerSpecFromV1(&spec, cinfo.Aliases, cinfo.Namespace)
+}
+
+func (m *manager) getRequestedContainers(containerName string, options v2.RequestOptions) (map[string]*containerData, error) {
+	containersMap := make(map[string]*containerData)
+	switch options.IdType {
+	case v2.TypeName:
+		if !options.Recursive {
+			cont, err := m.getContainer(containerName)
+			if err != nil {
+				return containersMap, err
+			}
+			containersMap[cont.info.Name] = cont
+		} else {
+			containersMap = m.getSubcontainers(containerName)
+			if len(containersMap) == 0 {
+				return containersMap, fmt.Errorf("unknown container: %q", containerName)
+			}
+		}
+	case v2.TypeDocker:
+		if !options.Recursive {
+			containerName = strings.TrimPrefix(containerName, "/")
+			cont, err := m.getDockerContainer(containerName)
+			if err != nil {
+				return containersMap, err
+			}
+			containersMap[cont.info.Name] = cont
+		} else {
+			if containerName != "/" {
+				return containersMap, fmt.Errorf("invalid request for docker container %q with subcontainers", containerName)
+			}
+			containersMap = m.getAllDockerContainers()
+		}
+	default:
+		return containersMap, fmt.Errorf("invalid request type %q", options.IdType)
+	}
+
+	if options.MaxAge != nil {
+		// update stats for all containers in containersMap
+		var waitGroup sync.WaitGroup
+		waitGroup.Add(len(containersMap))
+		for _, cont := range containersMap {
+			go func(cont *containerData) {
+				cont.OnDemandHousekeeping(*options.MaxAge)
+				waitGroup.Done()
+			}(cont)
+		}
+		waitGroup.Wait()
+	}
+
+	return containersMap, nil
+}
+func (m *manager) getDockerContainer(containerName string) (*containerData, error) {
+	m.containersLock.RLock()
+	defer m.containersLock.RUnlock()
+
+	// Check for the container in the Docker container namespace.
+	cont, ok := m.containers[namespacedContainerName{
+		Namespace: docker.DockerNamespace,
+		Name:      containerName,
+	}]
+
+	// Look for container by short prefix name if no exact match found.
+	if !ok {
+		for contName, c := range m.containers {
+			if contName.Namespace == docker.DockerNamespace && strings.HasPrefix(contName.Name, containerName) {
+				if cont == nil {
+					cont = c
+				} else {
+					return nil, fmt.Errorf("unable to find container. Container %q is not unique", containerName)
+				}
+			}
+		}
+
+		if cont == nil {
+			return nil, fmt.Errorf("unable to find Docker container %q", containerName)
+		}
+	}
+
+	return cont, nil
+}
+func (m *manager) getContainer(containerName string) (*containerData, error) {
+	m.containersLock.RLock()
+	defer m.containersLock.RUnlock()
+	cont, ok := m.containers[namespacedContainerName{Name: containerName}]
+	if !ok {
+		return nil, fmt.Errorf("unknown container %q", containerName)
+	}
+	return cont, nil
+}
+func (m *manager) getAllDockerContainers() map[string]*containerData {
+	m.containersLock.RLock()
+	defer m.containersLock.RUnlock()
+	containers := make(map[string]*containerData, len(m.containers))
+
+	// Get containers in the Docker namespace.
+	for name, cont := range m.containers {
+		if name.Namespace == docker.DockerNamespace {
+			containers[cont.info.Name] = cont
+		}
+	}
+	return containers
+}
 func (m *manager) getSubcontainers(containerName string) map[string]*containerData {
 	m.containersLock.RLock()
 	defer m.containersLock.RUnlock()

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor"
 	cadvisorapiv2 "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v2"
 	cadvisortest "k8s-lx1036/k8s/kubelet/pkg/cadvisor/testing"
 	kubecontainer "k8s-lx1036/k8s/kubelet/pkg/container"
@@ -11,6 +12,7 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/leaky"
 	serverstats "k8s-lx1036/k8s/kubelet/pkg/server/stats"
 	statustest "k8s-lx1036/k8s/kubelet/pkg/status/testing"
+	kubelettypes "k8s-lx1036/k8s/kubelet/pkg/types"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -114,6 +116,16 @@ func TestCadvisorListPodStats(test *testing.T) {
 		IdType:    cadvisorapiv2.TypeName,
 		Count:     2,
 		Recursive: true,
+	}
+
+	runtime := kubelettypes.DockerContainerRuntime
+	runtimeEndpoint := "unix:///var/run/docker.sock"
+	imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(runtime, runtimeEndpoint)
+	rootPath := ""
+	cgroupRoots := []string{"/kubepods"}
+	cadvisorClient, err := cadvisor.New(imageFsInfoProvider, rootPath, cgroupRoots, true)
+	if err != nil {
+		panic(err)
 	}
 	mockCadvisor := new(cadvisortest.Mock)
 	mockCadvisor.
