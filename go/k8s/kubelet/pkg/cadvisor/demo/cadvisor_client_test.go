@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"testing"
 
 	clientv1 "github.com/google/cadvisor/client"
 	clientv2 "github.com/google/cadvisor/client/v2"
@@ -17,7 +18,7 @@ var (
 
 // INFO: 直接读取 cadvisor pod api 获取 machineInfo 等数据
 // go run . --podip=
-func main() {
+func TestAdvisorClient(test *testing.T) {
 	flag.Parse()
 
 	cadvisorPodIP := *podIP

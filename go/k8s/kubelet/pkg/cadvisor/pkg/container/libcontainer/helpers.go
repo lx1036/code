@@ -34,6 +34,18 @@ type CgroupSubsystems struct {
 	MountPoints map[string]string
 }
 
+// Get information about all the cgroup subsystems.
+func GetAllCgroupSubsystems() (CgroupSubsystems, error) {
+	// Get all cgroup mounts.
+	allCgroups, err := cgroups.GetCgroupMounts(true)
+	if err != nil {
+		return CgroupSubsystems{}, err
+	}
+
+	emptyDisableCgroups := map[string]struct{}{}
+	return getCgroupSubsystemsHelper(allCgroups, emptyDisableCgroups)
+}
+
 // Get information about the cgroup subsystems those we want
 func GetCgroupSubsystems(includedMetrics container.MetricSet) (CgroupSubsystems, error) {
 	// Get all cgroup mounts.

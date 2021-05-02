@@ -49,7 +49,7 @@ func GetFixturesCPUInfoPath() string {
 	return fixturesCPUInfoPath
 }
 
-// INFO: 这个函数很重要，直接获取机器的 machine info
+// INFO: 这个函数很重要，直接获取机器的 machine info，实际上就是读取linux上一些文件获取cpu/memory相关数据
 func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*v1.MachineInfo, error) {
 	/*rootFs := "fixtures"
 	if !inHostNamespace {

@@ -11,6 +11,7 @@ import (
 	containertest "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/testing"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
 	itest "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1/test"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v2"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/utils/sysfs/fakesysfs"
 
 	"github.com/stretchr/testify/assert"
@@ -164,4 +165,124 @@ func TestSubContainersInfoError(t *testing.T) {
 
 	assert.NotEqual(t, totalBurstable, burstableCount)
 	assert.Equal(t, totalBesteffort, besteffortCount)
+}
+
+// Expect a manager with the specified containers and query. Returns the manager, map of ContainerInfo objects,
+// and map of MockContainerHandler objects.}
+func expectManagerWithContainersV2(containers []string, query *v1.ContainerInfoRequest, t *testing.T) (*manager,
+	map[string]*v1.ContainerInfo, map[string]*containertest.MockContainerHandler) {
+	infosMap := make(map[string]*v1.ContainerInfo, len(containers))
+	handlerMap := make(map[string]*containertest.MockContainerHandler, len(containers))
+
+	for _, containerName := range containers {
+		infosMap[containerName] = itest.GenerateRandomContainerInfo(containerName, 4, query, 1*time.Second)
+	}
+
+	memoryCache := memory.New(time.Duration(query.NumStats)*time.Second, nil)
+	sysfs := &fakesysfs.FakeSysFs{}
+	m := createManagerAndAddContainers(
+		memoryCache,
+		sysfs,
+		containers,
+		func(h *containertest.MockContainerHandler) {
+			cinfo := infosMap[h.Name]
+			ref, err := h.ContainerReference()
+			if err != nil {
+				t.Error(err)
+			}
+
+			cInfo := v1.ContainerInfo{
+				ContainerReference: ref,
+			}
+
+			for _, stat := range cinfo.Stats {
+				err = memoryCache.AddStats(&cInfo, stat)
+				if err != nil {
+					t.Error(err)
+				}
+			}
+			spec := cinfo.Spec
+
+			h.On("GetSpec").Return(
+				spec,
+				nil,
+			).Once()
+			handlerMap[h.Name] = h
+		},
+		t,
+	)
+
+	return m, infosMap, handlerMap
+}
+
+func createManagerAndAddContainers(
+	memoryCache *memory.InMemoryCache,
+	sysfs *fakesysfs.FakeSysFs,
+	containers []string,
+	f func(*containertest.MockContainerHandler),
+	t *testing.T,
+) *manager {
+	container.ClearContainerHandlerFactories()
+	m := &manager{
+		containers:   make(map[namespacedContainerName]*containerData),
+		quitChannels: make([]chan error, 0, 2),
+		memoryCache:  memoryCache,
+	}
+	for _, name := range containers {
+		mockHandler := containertest.NewMockContainerHandler(name)
+		spec := itest.GenerateRandomContainerSpec(4)
+		mockHandler.On("GetSpec").Return(
+			spec,
+			nil,
+		).Once()
+		cont, err := newContainerData(name, memoryCache, mockHandler, false, 60*time.Second,
+			true, clock.NewFakeClock(time.Now()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		m.containers[namespacedContainerName{
+			Name: name,
+		}] = cont
+		// Add Docker containers under their namespace.
+		if strings.HasPrefix(name, "/docker") {
+			m.containers[namespacedContainerName{
+				Namespace: docker.DockerNamespace,
+				Name:      strings.TrimPrefix(name, "/docker/"),
+			}] = cont
+		}
+		f(mockHandler)
+	}
+	return m
+}
+
+func TestGetContainerInfoV2(t *testing.T) {
+	containers := []string{
+		"/",
+		"/c1",
+		"/c2",
+	}
+
+	options := v2.RequestOptions{
+		IdType:    v2.TypeName,
+		Count:     1,
+		Recursive: true,
+	}
+	query := &v1.ContainerInfoRequest{
+		NumStats: 2,
+	}
+
+	m, _, handlerMap := expectManagerWithContainersV2(containers, query, t)
+
+	infos, err := m.GetContainerInfoV2("/", options)
+	if err != nil {
+		t.Fatalf("GetContainerInfoV2 failed: %v", err)
+	}
+
+	for container, handler := range handlerMap {
+		handler.AssertExpectations(t)
+		info, ok := infos[container]
+		assert.True(t, ok, "Missing info for container %q", container)
+		assert.NotEqual(t, v2.ContainerSpec{}, info.Spec, "Empty spec for container %q", container)
+		assert.NotEmpty(t, info.Stats, "Missing stats for container %q", container)
+	}
 }

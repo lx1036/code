@@ -25,6 +25,7 @@ const maxHousekeepingInterval = 15 * time.Second
 const defaultHousekeepingInterval = 10 * time.Second
 const allowDynamicHousekeeping = true
 
+// INFO: cadvisorClient 对象其实就是cadvisor仓库的 manager.Manager 对象
 type cadvisorClient struct {
 	imageFsInfoProvider ImageFsInfoProvider
 	rootPath            string
@@ -35,6 +36,7 @@ func (cc *cadvisorClient) ContainerInfo(name string, req *cadvisorapi.ContainerI
 	return cc.GetContainerInfo(name, req)
 }
 
+// INFO: 这个函数很重要，"/" 可以获取所有容器的 stats 数据
 func (cc *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
 	return cc.GetContainerInfoV2(name, options)
 }

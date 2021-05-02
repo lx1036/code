@@ -171,7 +171,8 @@ func (h *dockerContainerHandler) getFsStats(stats *v1.ContainerStats) error {
 }
 
 func (h *dockerContainerHandler) ListContainers(listType container.ListType) ([]v1.ContainerReference, error) {
-	panic("implement me")
+	// No-op for Docker driver.
+	return []v1.ContainerReference{}, nil
 }
 
 func (h *dockerContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {

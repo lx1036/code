@@ -66,7 +66,6 @@ func GetNodesInfo(sysFs sysfs.SysFs) ([]v1.Node, int, error) {
 		}
 
 		nodes = append(nodes, node)
-
 	}
 
 	return nodes, allLogicalCoresCount, err

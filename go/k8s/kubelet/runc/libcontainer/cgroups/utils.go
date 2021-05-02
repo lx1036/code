@@ -104,7 +104,7 @@ func FindCgroupMountpointAndRoot(cgroupPath, subsystem string) (string, string, 
 		return "", "", fmt.Errorf("mountpoint for %s not found", subsystem)
 	}
 
-	mountinfoFile, err := filepath.Abs("fixtures/proc/self/mountinfo")
+	mountinfoFile, err := filepath.Abs(GetFixturesMountInfoPath())
 	if err != nil {
 		panic(err)
 	}
@@ -283,8 +283,25 @@ func GetCgroupMounts(all bool) ([]Mount, error) {
 	return getCgroupMountsV1(all)
 }
 
+var (
+	fixturesMountInfoPath = "fixtures/proc/self/mountinfo"
+	fixturesCgroupPath    = "fixtures/proc/self/cgroup"
+)
+
+func SetFixturesMountInfoPath(path string) {
+	fixturesMountInfoPath = path
+}
+func GetFixturesMountInfoPath() string {
+	return fixturesMountInfoPath
+}
+func SetFixturesCgroupPath(path string) {
+	fixturesCgroupPath = path
+}
+func GetFixturesCgroupPath() string {
+	return fixturesCgroupPath
+}
 func getCgroupMountsV1(all bool) ([]Mount, error) {
-	path, err := filepath.Abs("fixtures/proc/self/mountinfo")
+	path, err := filepath.Abs(GetFixturesMountInfoPath())
 	if err != nil {
 		panic(err)
 	}
@@ -294,7 +311,7 @@ func getCgroupMountsV1(all bool) ([]Mount, error) {
 	}
 	defer f.Close()
 
-	path, err = filepath.Abs("fixtures/proc/self/cgroup")
+	path, err = filepath.Abs(GetFixturesCgroupPath())
 	if err != nil {
 		panic(err)
 	}

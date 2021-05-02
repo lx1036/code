@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/cache/memory"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/docker"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/raw"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/events"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/fs"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
@@ -29,6 +31,8 @@ import (
 var updateMachineInfoInterval = flag.Duration("update_machine_info_interval", 5*time.Minute, "Interval between machine info updates.")
 var globalHousekeepingInterval = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
 var logCadvisorUsage = flag.Bool("log_cadvisor_usage", false, "Whether to log the usage of the cAdvisor container")
+var eventStorageAgeLimit = flag.String("event_storage_age_limit", "default=24h", "Max length of time for which to store events (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is a duration. Default is applied to all non-specified event types")
+var eventStorageEventLimit = flag.String("event_storage_event_limit", "default=100000", "Max number of events to store (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is an integer. Default is applied to all non-specified event types")
 
 // The Manager interface defines operations for starting a manager and getting
 // container and machine information.
@@ -151,11 +155,10 @@ type manager struct {
 
 // Start the container manager.
 func (m *manager) Start() error {
-	var err error
 	// INFO: 这里初始化所有 plugins，这里是初始化 docker/plugin.go::Register()
 	m.containerWatchers = container.InitializePlugins(m, m.fsInfo, m.includedMetrics)
 
-	/*err := raw.Register(m, m.fsInfo, m.includedMetrics, m.rawContainerCgroupPathPrefixWhiteList)
+	err := raw.Register(m, m.fsInfo, m.includedMetrics, m.rawContainerCgroupPathPrefixWhiteList)
 	if err != nil {
 		klog.Errorf("Registration of the raw container factory failed: %v", err)
 	}
@@ -163,7 +166,7 @@ func (m *manager) Start() error {
 	if err != nil {
 		return err
 	}
-	m.containerWatchers = append(m.containerWatchers, rawWatcher)*/
+	m.containerWatchers = append(m.containerWatchers, rawWatcher)
 
 	// Watch for OOMs.
 	/*err := m.watchForNewOoms()
@@ -555,6 +558,7 @@ func (m *manager) GetContainerInfo(containerName string, query *v1.ContainerInfo
 	return m.containerDataToContainerInfo(cont, query)
 }
 
+// INFO: 这个函数很重要，"/" 可以获取所有容器的 stats 数据
 func (m *manager) GetContainerInfoV2(containerName string, options v2.RequestOptions) (map[string]v2.ContainerInfo, error) {
 	// 先根据 containerName="/" 获取所有 containers
 	containers, err := m.getRequestedContainers(containerName, options)
@@ -576,7 +580,7 @@ func (m *manager) GetContainerInfoV2(containerName string, options v2.RequestOpt
 		}
 		result.Spec = m.getV2Spec(cinfo)
 
-		// container stats 是cadvisor周期定时读取 cgroup，然后存入 memoryCache 中
+		// INFO: container stats 是cadvisor周期定时读取 cgroup，然后存入 memoryCache 中
 		stats, err := m.memoryCache.RecentStats(name, nilTime, nilTime, options.Count)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("[RecentStats for %s with err: %v]", name, err))
@@ -836,7 +840,7 @@ func (m *manager) WatchForEvents(request *events.Request) (*events.EventChannel,
 }
 
 func (m *manager) GetPastEvents(request *events.Request) ([]*v1.Event, error) {
-	panic("implement me")
+	return m.eventHandler.GetEvents(request)
 }
 
 func (m *manager) CloseEventChannel(watchID int) {
@@ -853,6 +857,53 @@ func (m *manager) DockerImages() ([]v1.DockerImage, error) {
 
 func (m *manager) DebugInfo() map[string][]string {
 	panic("implement me")
+}
+
+// Parses the events StoragePolicy from the flags.
+func parseEventsStoragePolicy() events.StoragePolicy {
+	policy := events.DefaultStoragePolicy()
+
+	// Parse max age.
+	parts := strings.Split(*eventStorageAgeLimit, ",")
+	for _, part := range parts {
+		items := strings.Split(part, "=")
+		if len(items) != 2 {
+			klog.Warningf("Unknown event storage policy %q when parsing max age", part)
+			continue
+		}
+		dur, err := time.ParseDuration(items[1])
+		if err != nil {
+			klog.Warningf("Unable to parse event max age duration %q: %v", items[1], err)
+			continue
+		}
+		if items[0] == "default" {
+			policy.DefaultMaxAge = dur
+			continue
+		}
+		policy.PerTypeMaxAge[v1.EventType(items[0])] = dur
+	}
+
+	// Parse max number.
+	parts = strings.Split(*eventStorageEventLimit, ",")
+	for _, part := range parts {
+		items := strings.Split(part, "=")
+		if len(items) != 2 {
+			klog.Warningf("Unknown event storage policy %q when parsing max event limit", part)
+			continue
+		}
+		val, err := strconv.Atoi(items[1])
+		if err != nil {
+			klog.Warningf("Unable to parse integer from %q: %v", items[1], err)
+			continue
+		}
+		if items[0] == "default" {
+			policy.DefaultMaxNumEvents = val
+			continue
+		}
+		policy.PerTypeMaxNumEvents[v1.EventType(items[0])] = val
+	}
+
+	return policy
 }
 
 // New takes a memory storage and returns a new manager.
@@ -903,6 +954,8 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 	}
 	newManager.machineInfo = *machineInfo
 	klog.Infof("Machine: %+v", newManager.machineInfo)
+
+	newManager.eventHandler = events.NewEventManager(parseEventsStoragePolicy())
 
 	return newManager, nil
 }

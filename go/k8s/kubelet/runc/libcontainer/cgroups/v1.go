@@ -22,12 +22,10 @@ func getCgroupRoot() (string, error) {
 	return root, nil
 }
 
-const MountInfo = "fixtures/proc/self/mountinfo"
-
 // v1MountPoint returns the mount point where the cgroup
 // mountpoints are mounted in a single hiearchy
 func v1MountPoint() (string, error) {
-	absFilepath, err := filepath.Abs(MountInfo)
+	absFilepath, err := filepath.Abs(GetFixturesMountInfoPath())
 	if err != nil {
 		return "", err
 	}
