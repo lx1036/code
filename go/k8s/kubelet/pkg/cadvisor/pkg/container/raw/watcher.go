@@ -10,6 +10,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// INFO: 这里可以使用 "github.com/fsnotify/fsnotify"(支持macos) 替换 common.InotifyWatcher, 直接参考 go/k8s/storage/csi/pluginmanager/pluginwatcher/plugin_watcher.go
+
 type rawContainerWatcher struct {
 	// Absolute path to the root of the cgroup hierarchies
 	cgroupPaths map[string]string
