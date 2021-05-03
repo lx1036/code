@@ -141,7 +141,7 @@ func findCgroupMountpointAndRootFromReader(reader io.Reader, cgroupPath, subsyst
 }
 
 func isSubsystemAvailable(subsystem string) bool {
-	cgroupFile, err := filepath.Abs("fixtures/proc/self/cgroup")
+	cgroupFile, err := filepath.Abs(GetFixturesCgroupPath())
 	if err != nil {
 		panic(err)
 	}
@@ -215,7 +215,7 @@ func GetOwnCgroupPath(subsystem string) (string, error) {
 
 // GetOwnCgroup returns the relative path to the cgroup docker is running in.
 func GetOwnCgroup(subsystem string) (string, error) {
-	cgroupFile, err := filepath.Abs("fixtures/proc/self/cgroup")
+	cgroupFile, err := filepath.Abs(GetFixturesCgroupPath())
 	if err != nil {
 		panic(err)
 	}
@@ -284,8 +284,8 @@ func GetCgroupMounts(all bool) ([]Mount, error) {
 }
 
 var (
-	fixturesMountInfoPath = "fixtures/proc/self/mountinfo"
-	fixturesCgroupPath    = "fixtures/proc/self/cgroup"
+	fixturesMountInfoPath = "../../../fixtures/proc/self/mountinfo"
+	fixturesCgroupPath    = "../../../fixtures/proc/self/cgroup"
 )
 
 func SetFixturesMountInfoPath(path string) {

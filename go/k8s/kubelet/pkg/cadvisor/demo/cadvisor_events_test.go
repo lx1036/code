@@ -26,12 +26,12 @@ const defaultHousekeepingInterval = 10 * time.Second
 const allowDynamicHousekeeping = true
 
 func init() {
-	fs.SetFixturesMountInfoPath("../pkg/fixtures/proc/self/mountinfo")
-	fs.SetFixturesDiskstatsPath("../pkg/fixtures/proc/diskstats")
-	machine.SetFixturesCPUInfoPath("../pkg/fixtures/proc/cpuinfo")
-	machine.SetFixturesMemInfoPath("../pkg/fixtures/proc/meminfo")
-	cgroups.SetFixturesMountInfoPath("../pkg/fixtures/proc/self/mountinfo")
-	cgroups.SetFixturesCgroupPath("../pkg/fixtures/proc/self/cgroup")
+	fs.SetFixturesMountInfoPath("../../../pkg/fixtures/proc/self/mountinfo")
+	fs.SetFixturesDiskstatsPath("../../../pkg/fixtures/proc/diskstats")
+	machine.SetFixturesCPUInfoPath("../../../pkg/fixtures/proc/cpuinfo")
+	machine.SetFixturesMemInfoPath("../../../pkg/fixtures/proc/meminfo")
+	cgroups.SetFixturesMountInfoPath("../../../pkg/fixtures/proc/self/mountinfo")
+	cgroups.SetFixturesCgroupPath("../../../pkg/fixtures/proc/self/cgroup")
 }
 
 func TestCadvisorEvents(test *testing.T) {

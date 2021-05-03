@@ -15,9 +15,20 @@ func (cpuGroup *CpuGroup) Name() string {
 	return Cpu
 }
 
+var (
+	fixturesCPUPath = "../../../fixtures/cpu"
+)
+
+func SetFixturesCPUPath(path string) {
+	fixturesCPUPath = path
+}
+func GetFixturesCPUPath() string {
+	return fixturesCPUPath
+}
+
 // GetStats INFO: 主要就是读取 cpu.stat 文件获取 cpu throttling 相关数据
 func (cpuGroup *CpuGroup) GetStats(path string, stats *Stats) error {
-	path, err := filepath.Abs("fixtures/cpu")
+	path, err := filepath.Abs(GetFixturesCPUPath())
 	if err != nil {
 		return err
 	}

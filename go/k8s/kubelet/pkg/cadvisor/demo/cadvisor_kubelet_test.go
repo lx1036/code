@@ -21,10 +21,10 @@ func TestKubeletCadvisorClient(test *testing.T) {
 	rootPath := "/tmp/cadvisor"
 	cgroupRoots := []string{"/kubepods"}
 
-	fs.SetFixturesMountInfoPath("../pkg/fixtures/proc/self/mountinfo")
-	fs.SetFixturesDiskstatsPath("../pkg/fixtures/proc/diskstats")
-	machine.SetFixturesCPUInfoPath("../pkg/fixtures/proc/cpuinfo")
-	machine.SetFixturesMemInfoPath("../pkg/fixtures/proc/meminfo")
+	fs.SetFixturesMountInfoPath("../../../pkg/fixtures/proc/self/mountinfo")
+	fs.SetFixturesDiskstatsPath("../../../pkg/fixtures/proc/diskstats")
+	machine.SetFixturesCPUInfoPath("../../../pkg/fixtures/proc/cpuinfo")
+	machine.SetFixturesMemInfoPath("../../../pkg/fixtures/proc/meminfo")
 	cadvisorClient, err := cadvisor.New(imageFsInfoProvider, rootPath, cgroupRoots, true)
 	if err != nil {
 		panic(err)

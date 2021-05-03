@@ -19,7 +19,7 @@ func TestCpusetSetCpus(t *testing.T) {
 	})
 
 	helper.CgroupData.config.Resources.CpusetCpus = cpusAfter
-	cpuset := &CpusetController{}
+	cpuset := &CpusetGroup{}
 	if err := cpuset.Set(helper.CgroupPath, helper.CgroupData.config); err != nil {
 		t.Fatal(err)
 	}

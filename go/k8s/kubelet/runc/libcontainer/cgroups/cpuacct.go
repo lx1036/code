@@ -84,12 +84,23 @@ func getPercpuUsage(path string) ([]uint64, error) {
 	return percpuUsage, nil
 }
 
+var (
+	fixturesCPUAcctPath = "../../../fixtures/cpuacct"
+)
+
+func SetFixturesCPUAcctPath(path string) {
+	fixturesCPUAcctPath = path
+}
+func GetFixturesCPUAcctPath() string {
+	return fixturesCPUAcctPath
+}
+
 // INFO: 读取 cpuacct.usage_all 文件
 func getPercpuUsageInModes(path string) ([]uint64, []uint64, error) {
 	usageKernelMode := []uint64{}
 	usageUserMode := []uint64{}
 
-	path, err := filepath.Abs("fixtures/cpuacct")
+	path, err := filepath.Abs(GetFixturesCPUAcctPath())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -143,7 +154,7 @@ func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
 	// Expected format:
 	// user <usage in ticks>
 	// system <usage in ticks>
-	path, err := filepath.Abs("fixtures/cpuacct")
+	path, err := filepath.Abs(GetFixturesCPUAcctPath())
 	if err != nil {
 		return userModeUsage, kernelModeUsage, err
 	}

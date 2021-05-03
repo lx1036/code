@@ -39,7 +39,7 @@ func getInfoFromFiles(filePaths string) string {
 }
 
 var (
-	fixturesCPUInfoPath = "fixtures/proc/cpuinfo"
+	fixturesCPUInfoPath = "../../../../fixtures/proc/cpuinfo"
 )
 
 func SetFixturesCPUInfoPath(path string) {

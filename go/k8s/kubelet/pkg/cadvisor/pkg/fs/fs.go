@@ -106,7 +106,7 @@ func (i *RealFsInfo) GetGlobalFsInfo() ([]Fs, error) {
 }
 
 var (
-	fixturesDiskstatsPath = "fixtures/proc/diskstats"
+	fixturesDiskstatsPath = "../../../../fixtures/proc/diskstats"
 )
 
 func SetFixturesDiskstatsPath(path string) {
@@ -289,7 +289,7 @@ func (i *RealFsInfo) addSystemRootLabel(mounts []mount.MountInfo) {
 }
 
 var (
-	fixturesMountInfoPath = "fixtures/proc/self/mountinfo"
+	fixturesMountInfoPath = "../../../../fixtures/proc/self/mountinfo"
 )
 
 func SetFixturesMountInfoPath(path string) {

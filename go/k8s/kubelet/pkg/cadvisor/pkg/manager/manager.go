@@ -153,66 +153,6 @@ type manager struct {
 	rawContainerCgroupPathPrefixWhiteList []string
 }
 
-// Start the container manager.
-func (m *manager) Start() error {
-	// INFO: 这里初始化所有 plugins，这里是初始化 docker/plugin.go::Register()
-	m.containerWatchers = container.InitializePlugins(m, m.fsInfo, m.includedMetrics)
-
-	err := raw.Register(m, m.fsInfo, m.includedMetrics, m.rawContainerCgroupPathPrefixWhiteList)
-	if err != nil {
-		klog.Errorf("Registration of the raw container factory failed: %v", err)
-	}
-	rawWatcher, err := raw.NewRawContainerWatcher()
-	if err != nil {
-		return err
-	}
-	m.containerWatchers = append(m.containerWatchers, rawWatcher)
-
-	// Watch for OOMs.
-	/*err := m.watchForNewOoms()
-	if err != nil {
-		klog.Warningf("Could not configure a source for OOM detection, disabling OOM events: %v", err)
-	}*/
-
-	// If there are no factories, don't start any housekeeping and serve the information we do have.
-	if !container.HasFactories() {
-		return nil
-	}
-
-	// Create root and then recover all containers.
-	err = m.createContainer("/", watcher.Raw)
-	if err != nil {
-		return err
-	}
-	klog.V(2).Infof("Starting recovery of all containers")
-	err = m.detectSubcontainers("/")
-	if err != nil {
-		return err
-	}
-	klog.V(2).Infof("Recovery completed")
-
-	// Watch for new container.
-	quitWatcher := make(chan error)
-	err = m.watchForNewContainers(quitWatcher)
-	if err != nil {
-		return err
-	}
-	m.quitChannels = append(m.quitChannels, quitWatcher)
-
-	// Look for new containers in the main housekeeping thread.
-	// INFO: 定时sync containers, 即 add/destroy containers
-	quitGlobalHousekeeping := make(chan error)
-	m.quitChannels = append(m.quitChannels, quitGlobalHousekeeping)
-	go m.globalHousekeeping(quitGlobalHousekeeping)
-
-	// INFO: 定时获取 machineInfo，默认 5 mins
-	quitUpdateMachineInfo := make(chan error)
-	m.quitChannels = append(m.quitChannels, quitUpdateMachineInfo)
-	go m.updateMachineInfo(quitUpdateMachineInfo)
-
-	return nil
-}
-
 func (m *manager) updateMachineInfo(quit chan error) {
 	ticker := time.NewTicker(*updateMachineInfoInterval)
 	for {
@@ -904,6 +844,66 @@ func parseEventsStoragePolicy() events.StoragePolicy {
 	}
 
 	return policy
+}
+
+// Start the container manager.
+func (m *manager) Start() error {
+	// INFO: 这里初始化所有 plugins，这里是初始化 docker/plugin.go::Register()
+	m.containerWatchers = container.InitializePlugins(m, m.fsInfo, m.includedMetrics)
+
+	err := raw.Register(m, m.fsInfo, m.includedMetrics, m.rawContainerCgroupPathPrefixWhiteList)
+	if err != nil {
+		klog.Errorf("Registration of the raw container factory failed: %v", err)
+	}
+	rawWatcher, err := raw.NewRawContainerWatcher()
+	if err != nil {
+		return err
+	}
+	m.containerWatchers = append(m.containerWatchers, rawWatcher)
+
+	// Watch for OOMs.
+	/*err := m.watchForNewOoms()
+	if err != nil {
+		klog.Warningf("Could not configure a source for OOM detection, disabling OOM events: %v", err)
+	}*/
+
+	// If there are no factories, don't start any housekeeping and serve the information we do have.
+	if !container.HasFactories() {
+		return nil
+	}
+
+	// Create root and then recover all containers.
+	err = m.createContainer("/", watcher.Raw)
+	if err != nil {
+		return err
+	}
+	klog.V(2).Infof("Starting recovery of all containers")
+	err = m.detectSubcontainers("/")
+	if err != nil {
+		return err
+	}
+	klog.V(2).Infof("Recovery completed")
+
+	// Watch for new container.
+	quitWatcher := make(chan error)
+	err = m.watchForNewContainers(quitWatcher)
+	if err != nil {
+		return err
+	}
+	m.quitChannels = append(m.quitChannels, quitWatcher)
+
+	// Look for new containers in the main housekeeping thread.
+	// INFO: 定时sync containers, 即 add/destroy containers
+	quitGlobalHousekeeping := make(chan error)
+	m.quitChannels = append(m.quitChannels, quitGlobalHousekeeping)
+	go m.globalHousekeeping(quitGlobalHousekeeping)
+
+	// INFO: 定时获取 machineInfo，默认 5 mins
+	quitUpdateMachineInfo := make(chan error)
+	m.quitChannels = append(m.quitChannels, quitUpdateMachineInfo)
+	go m.updateMachineInfo(quitUpdateMachineInfo)
+
+	return nil
 }
 
 // New takes a memory storage and returns a new manager.

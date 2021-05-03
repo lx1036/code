@@ -88,7 +88,7 @@ func GetClockSpeed(procInfo []byte) (uint64, error) {
 }
 
 var (
-	fixturesMemInfoPath = "fixtures/proc/meminfo"
+	fixturesMemInfoPath = "../../../../fixtures/proc/meminfo"
 )
 
 func SetFixturesMemInfoPath(path string) {
