@@ -8,6 +8,8 @@
 ## 基本概念
 k8s metrics api types definitions/clients 定义代码：https://github.com/kubernetes/metrics, 目前支持到 v1beta1。
 
+CPU单位：
+cpu的单位有时是n (1m = 1000*1000n )，见代码：k8s.io/apimachinery/pkg/api/resource/suffix.go::L123-L125
 
 ```shell
 kubectl proxy
@@ -20,9 +22,13 @@ curl http://127.0.0.1:8001/apis/external.metrics.k8s.io/v1beta1
 
 # 查看具体 pod/node metrics 数据
 curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/nodes
+# 等同于
+kubectl get nodes.metrics.k8s.io {node_name} -o yaml
 curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/nodes/{node_name}
 curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/pods
 curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/namespaces/default/pods
+# 等同于
+kubectl get pods.metrics.k8s.io -n default
 curl http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/namespaces/default/pods/example-app-64547d7dc-ffv9k
 ```
 

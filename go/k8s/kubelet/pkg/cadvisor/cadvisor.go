@@ -7,13 +7,13 @@ import (
 	"path"
 	"time"
 
-	"github.com/google/cadvisor/cache/memory"
-	cadvisormetrics "github.com/google/cadvisor/container"
-	"github.com/google/cadvisor/events"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	"github.com/google/cadvisor/manager"
-	"github.com/google/cadvisor/utils/sysfs"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/cache/memory"
+	cadvisormetrics "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/events"
+	cadvisorapi "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
+	cadvisorapiv2 "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v2"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/manager"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/utils/sysfs"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
@@ -25,6 +25,7 @@ const maxHousekeepingInterval = 15 * time.Second
 const defaultHousekeepingInterval = 10 * time.Second
 const allowDynamicHousekeeping = true
 
+// INFO: cadvisorClient 对象其实就是cadvisor仓库的 manager.Manager 对象
 type cadvisorClient struct {
 	imageFsInfoProvider ImageFsInfoProvider
 	rootPath            string
@@ -35,6 +36,7 @@ func (cc *cadvisorClient) ContainerInfo(name string, req *cadvisorapi.ContainerI
 	return cc.GetContainerInfo(name, req)
 }
 
+// INFO: 这个函数很重要，"/" 可以获取所有容器的 stats 数据
 func (cc *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
 	return cc.GetContainerInfoV2(name, options)
 }
@@ -74,6 +76,8 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) 
 
 	return res[0], nil
 }
+
+// RootFsInfo 获取 rootPath 的 filesystem information
 func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cc.GetDirFsInfo(cc.rootPath)
 }
@@ -88,14 +92,14 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 	sysFs := sysfs.NewRealSysFs()
 
 	includedMetrics := cadvisormetrics.MetricSet{
-		cadvisormetrics.CpuUsageMetrics:         struct{}{},
-		cadvisormetrics.MemoryUsageMetrics:      struct{}{},
-		cadvisormetrics.CpuLoadMetrics:          struct{}{},
-		cadvisormetrics.DiskIOMetrics:           struct{}{},
-		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
-		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
-		cadvisormetrics.AppMetrics:              struct{}{},
-		cadvisormetrics.ProcessMetrics:          struct{}{},
+		cadvisormetrics.CpuUsageMetrics:    struct{}{},
+		cadvisormetrics.MemoryUsageMetrics: struct{}{},
+		cadvisormetrics.CpuLoadMetrics:     struct{}{},
+		//cadvisormetrics.DiskIOMetrics:           struct{}{},
+		//cadvisormetrics.NetworkUsageMetrics:     struct{}{},
+		//cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
+		//cadvisormetrics.AppMetrics:              struct{}{},
+		//cadvisormetrics.ProcessMetrics:          struct{}{},
 	}
 	if usingLegacyStats {
 		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}

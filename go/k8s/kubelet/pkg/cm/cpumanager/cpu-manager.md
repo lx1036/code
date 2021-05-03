@@ -24,6 +24,14 @@ assignable cpus: shared - reserved，可分配的 cpus
 exclusive cpus: 独占核，只被 integral guaranteed pod 独占的cpus，数据也会持久化到 /var/lib/kubelet/cpu_manager_state
 
 
+## CPU 分配(cpu assignment)
+分配原则(相关原则可以看下 cpu_assignment 单元测试就明白了)：
+* 先尽可能按照 socket 来分配(): 所分配逻辑核尽可能在一个 socket 上，按照 CoreID 升序排序
+* 然后尽可能按照物理核 core 来分配: 所分配逻辑核尽可能在一个物理核 core 上，按照 ProcessorID 升序排序，尽可能先完整物理核分配，不要拆分去分配
+* 最后尽可能按照逻辑核分配: 如果没有完整物理核，只能按照 ProcessorID 升序排序去分配
+
+### CPU Cache
+CPU L1/L2 Cache 是物理核Core单独用的，L3 Cache 是NUMA Node(Socket)单独用的。
 
 
 ## 参考文献

@@ -1,0 +1,103 @@
+
+
+# reload prometheus 进程： curl -X POST localhost:9090/-/reload
+
+global:
+  evaluation_interval: 60s
+  scrape_interval: 60s
+  external_labels:
+    prometheus: cattle-prometheus/cluster-monitoring
+    prometheus_from: test-lx1036
+    prometheus_replica: prometheus-cluster-monitoring-0
+
+
+scrape_configs:
+  - job_name: prometheus-io-scrape
+    kubernetes_sd_configs:
+      - api_server: 'http://127.0.0.1:8001' # kubectl proxy 本地测试
+        role: pod
+        tls_config:
+          ca_file: kube-ca.pem
+          cert_file: kube-node.pem
+          key_file: kube-node-key.pem
+      - api_server: 'http://127.0.0.1:8001'
+        role: pod
+        tls_config:
+          ca_file: kube-ca.pem
+          cert_file: kube-node.pem
+          key_file: kube-node-key.pem
+    # http://${pod_ip}:${__meta_kubernetes_pod_annotation_prometheus_io_port}/${__meta_kubernetes_pod_annotation_prometheus_io_path}
+    scheme: http
+    relabel_configs:
+      - source_labels:
+          - __meta_kubernetes_pod_annotation_prometheus_io_scrape
+        action: keep
+        regex: true
+      - source_labels:
+          - __meta_kubernetes_pod_annotation_prometheus_io_path
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels:
+          - __address__
+          - __meta_kubernetes_pod_annotation_prometheus_io_port
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels:
+          - __meta_kubernetes_pod_node_name
+        action: replace
+        target_label: node
+        regex: (.+)
+        replacement: $1
+      - source_labels:
+          - __meta_kubernetes_namespace
+        action: replace
+        target_label: namespace
+        regex: (.+)
+        replacement: $1
+      - source_labels: [ __meta_kubernetes_namespace ]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels:
+          - __meta_kubernetes_pod_name
+        action: replace
+        target_label: pod
+        regex: (.+)
+        replacement: $1
+      - source_labels: [ __meta_kubernetes_pod_container_name ]
+        action: replace
+        target_label: container_name
+      - source_labels:
+          - __meta_kubernetes_pod_ip
+        action: replace
+        target_label: pod_ip
+        regex: (.+)
+        replacement: $1
+      - source_labels:
+          - __meta_kubernetes_pod_host_ip
+        action: replace
+        target_label: host_ip
+        regex: (.+)
+        replacement: $1
+      - source_labels:
+          - __meta_kubernetes_pod_controller_kind
+        action: replace
+        target_label: created_by_kind
+        regex: (.+)
+        replacement: $1
+      - source_labels:
+          - __meta_kubernetes_pod_controller_name
+        action: replace
+        target_label: created_by_kind
+        regex: (.+)
+        replacement: $1
+      - source_labels: [job]
+        regex: kubernetes-custom-(.+)
+        target_label: region
+        replacement: ${1}
+      - target_label: job
+        replacement: kubernetes-custom

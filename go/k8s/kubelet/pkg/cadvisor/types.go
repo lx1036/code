@@ -1,9 +1,9 @@
 package cadvisor
 
 import (
-	"github.com/google/cadvisor/events"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/events"
+	cadvisorapi "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
+	cadvisorapiv2 "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v2"
 )
 
 // Interface is an abstract interface for testability.  It abstracts the interface to cAdvisor.

@@ -13,7 +13,7 @@ require (
 	github.com/bep/debounce v1.2.0
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/caddyserver/caddy v1.0.4
-	github.com/codingsince1985/checksum v1.1.0
+	github.com/codingsince1985/checksum v1.1.0 // indirect
 	github.com/container-storage-interface/spec v1.3.0
 	github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 	github.com/containerd/containerd v1.4.4
@@ -23,6 +23,7 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.2
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
+	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/emicklei/go-restful v2.14.3+incompatible
@@ -44,6 +45,7 @@ require (
 	github.com/google/btree v1.0.0
 	github.com/google/cadvisor v0.37.5
 	github.com/google/go-querystring v1.0.0
+	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4

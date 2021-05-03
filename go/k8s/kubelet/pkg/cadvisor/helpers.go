@@ -2,7 +2,9 @@ package cadvisor
 
 import (
 	"fmt"
-	cadvisorfs "github.com/google/cadvisor/fs"
+
+	cadvisorfs "k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/fs"
+
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 

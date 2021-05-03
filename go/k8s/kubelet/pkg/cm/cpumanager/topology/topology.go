@@ -51,7 +51,7 @@ func (d CPUDetails) Sockets() cpuset.CPUSet {
 func (d CPUDetails) CPUsInSockets(ids ...int) cpuset.CPUSet {
 	b := cpuset.NewBuilder()
 	for _, id := range ids {
-		for cpu, info := range d {
+		for cpu, info := range d { // cpu: 0, 1, 2, ..., 7
 			if info.SocketID == id {
 				b.Add(cpu)
 			}

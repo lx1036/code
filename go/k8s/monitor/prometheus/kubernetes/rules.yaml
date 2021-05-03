@@ -1,0 +1,104 @@
+
+# https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/
+# check rules: promtool check rules ./rules.yaml
+
+groups:
+  - name: apiserver_metrics.rules
+    rules:
+      - expr: apiserver_request_total
+        record: apiserver_request_count
+
+  - name: workqueue_depth.rules
+    rules:
+      - expr: workqueue_depth{name="APIServiceOpenAPIAggregationControllerQueue1"}
+        record: APIServiceOpenAPIAggregationControllerQueue1_depth
+      - expr: workqueue_depth{name="APIServiceRegistrationController"}
+        record: APIServiceRegistrationController_depth
+      - expr: workqueue_depth{name="AvailableConditionController"}
+        record: AvailableConditionController_depth
+      - expr: workqueue_depth{name="DiscoveryController"}
+        record: DiscoveryController_depth
+      - expr: workqueue_depth{name="admission_quota_controller"}
+        record: admission_quota_controller_depth
+      - expr: workqueue_depth{name="autoregister"}
+        record: autoregister_depth
+      - expr: workqueue_depth{name="crdEstablishing"}
+        record: crdEstablishing_depth
+      - expr: workqueue_depth{name="crd_autoregistration_controller"}
+        record: crd_autoregistration_controller_depth
+      - expr: workqueue_depth{name="crd_finalizer"}
+        record: crd_finalizer_depth
+      - expr: workqueue_depth{name="crd_naming_condition_controller"}
+        record: crd_naming_condition_controller_depth
+      - expr: workqueue_depth{name="crd_openapi_controller"}
+        record: crd_openapi_controller_depth
+      - expr: workqueue_depth{name="kubernetes_api_approval_conformant_condition_controller"}
+        record: kubernetes_api_approval_conformant_condition_controller_depth
+      - expr: workqueue_depth{name="non_structural_schema_condition_controller"}
+        record: non_structural_schema_condition_controller_depth
+      - expr: workqueue_depth{name="ClusterRoleAggregator"}
+        record: ClusterRoleAggregator_depth
+      - expr: workqueue_depth{name="certificate"}
+        record: certificate_depth
+      - expr: workqueue_depth{name="claims"}
+        record: claims_depth
+      - expr: workqueue_depth{name="disruption"}
+        record: disruption_depth
+      - expr: workqueue_depth{name="disruption_recheck_depth"}
+        record: disruption_recheck_depth
+      - expr: workqueue_depth{name="garbage_collector_attempt_to_delete"}
+        record: garbage_collector_attempt_to_delete_depth
+      - expr: workqueue_depth{name="garbage_collector_attempt_to_orphan"}
+        record: garbage_collector_attempt_to_orphan_depth
+      - expr: workqueue_depth{name="garbage_collector_graph_changes"}
+        record: garbage_collector_graph_changes_depth
+      - expr: workqueue_depth{name="horizontalpodautoscaler"}
+        record: horizontalpodautoscaler_depth
+      - expr: workqueue_depth{name="node_lifecycle_controller"}
+        record: node_lifecycle_controller_depth
+      - expr: workqueue_depth{name="noexec_taint_node"}
+        record: noexec_taint_node_depth
+      - expr: workqueue_depth{name="noexec_taint_pod"}
+        record: noexec_taint_pod_depth
+      - expr: workqueue_depth{name="pvcprotection"}
+        record: pvcprotection_depth
+      - expr: workqueue_depth{name="pvcs"}
+        record: pvcs_depth
+      - expr: workqueue_depth{name="pvprotection"}
+        record: pvprotection_depth
+      - expr: workqueue_depth{name="resource_quota_controller_resource_changes"}
+        record: resource_quota_controller_resource_changes_depth
+      - expr: workqueue_depth{name="resourcequota_primary"}
+        record: resourcequota_primary_depth
+      - expr: workqueue_depth{name="resourcequota_priority"}
+        record: resourcequota_priority_depth
+      - expr: workqueue_depth{name="serviceaccount_tokens_secret"}
+        record: serviceaccount_tokens_secret_depth
+      - expr: workqueue_depth{name="serviceaccount_tokens_service"}
+        record: serviceaccount_tokens_service_depth
+      - expr: workqueue_depth{name="volume_expand"}
+        record: volume_expand_depth
+      - expr: workqueue_depth{name="ttlcontroller"}
+        record: ttlcontroller_depth
+      - expr: workqueue_depth{name="volumes"}
+        record: volumes_depth
+      - expr: workqueue_depth{name="deployment"}
+        record: deployment_depth
+      - expr: workqueue_depth{name="replicaset"}
+        record: replicaset_depth
+      - expr: workqueue_depth{name="service"}
+        record: service_depth
+      - expr: workqueue_depth{name="serviceaccount"}
+        record: serviceaccount_depth
+      - expr: workqueue_depth{name="endpoint"}
+        record: endpoint_depth
+      - expr: workqueue_depth{name="daemonset"}
+        record: daemonset_depth
+      - expr: workqueue_depth{name="statefulset"}
+        record: statefulset_depth
+      - expr: workqueue_depth{name="replicationmanager"}
+        record: replicationmanager_depth
+      - expr: workqueue_depth{name="job"}
+        record: job_depth
+      - expr: workqueue_depth{name="namespace"}
+        record: namespace_depth

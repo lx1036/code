@@ -5,7 +5,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hpa-prom-demo
-  namespace: kube-system
+  namespace: default
 spec:
   selector:
     matchLabels:
@@ -15,7 +15,7 @@ spec:
       annotations:
         # 这里使用的是 rancher prometheus.yaml 里设置的 annotation
         prometheus.io/scrape: "true"
-        prometheus.io/scheme: "http"
+#        prometheus.io/scheme: "http"
         prometheus.io/port: "80"
         prometheus.io/path: "/status/format/prometheus"
       labels:

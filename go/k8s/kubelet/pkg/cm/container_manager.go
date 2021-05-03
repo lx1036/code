@@ -10,7 +10,7 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cm/topologymanager"
 	"k8s-lx1036/k8s/kubelet/pkg/devicemanager"
 	evictionapi "k8s-lx1036/k8s/kubelet/pkg/eviction/api"
-	libcontainercgroups "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups/cgroupfs"
+	libcontainercgroups "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"

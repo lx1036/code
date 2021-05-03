@@ -1,19 +1,14 @@
 package stats
 
 import (
-	"fmt"
 	"sync"
 
 	statsapi "k8s-lx1036/k8s/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor"
 	"k8s-lx1036/k8s/kubelet/pkg/server/stats"
 
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	internalapi "k8s.io/cri-api/pkg/apis"
-
-	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -48,7 +43,8 @@ type criStatsProvider struct {
 }
 
 func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi.PodStats, error) {
-	// Gets node root filesystem information, which will be used to populate
+	panic("implement me")
+	/*// Gets node root filesystem information, which will be used to populate
 	// the available and capacity bytes/inodes in container stats.
 	rootFsInfo, err := p.cadvisor.RootFsInfo()
 	if err != nil {
@@ -148,7 +144,7 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 		p.makePodStorageStats(s, &rootFsInfo)
 		result = append(result, *s)
 	}
-	return result, nil
+	return result, nil*/
 }
 
 // ListPodStats returns the stats of all the pod-managed containers.

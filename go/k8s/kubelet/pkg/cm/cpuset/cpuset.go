@@ -22,14 +22,13 @@ func (s CPUSet) Size() int {
 	return len(s.elems)
 }
 
-// ToSlice returns a slice of integers that contains all elements from
-// this set.
 func (s CPUSet) ToSlice() []int {
-	var result []int
+	result := []int{} // 不要 var result []int，这会返回nil
 	for cpu := range s.elems {
 		result = append(result, cpu)
 	}
 	sort.Ints(result)
+
 	return result
 }
 
@@ -98,6 +97,19 @@ func (s CPUSet) Equals(s2 CPUSet) bool {
 // 求交集
 func (s CPUSet) Intersection(s2 CPUSet) CPUSet {
 	return s.Filter(func(cpu int) bool { return s2.Contains(cpu) })
+}
+
+// IsSubsetOf returns true if the supplied set contains all the elements
+// 子集
+func (s CPUSet) IsSubsetOf(s2 CPUSet) bool {
+	result := true
+	for cpu := range s.elems {
+		if !s2.Contains(cpu) {
+			result = false
+			break
+		}
+	}
+	return result
 }
 
 // 求并集
