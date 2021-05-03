@@ -8,6 +8,7 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
 )
 
+// INFO: 随机生成 container stats
 func GenerateRandomContainerSpec(numCores int) v1.ContainerSpec {
 	ret := v1.ContainerSpec{
 		CreationTime: time.Now(),

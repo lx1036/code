@@ -31,12 +31,21 @@ func V1() ([]Subsystem, error) {
 	return enabled, nil
 }
 
-const MountInfo = "fixtures/proc/self/mountinfo"
+var (
+	fixturesMemInfoPath = "fixtures/proc/meminfo"
+)
+
+func SetFixturesMemInfoPath(path string) {
+	fixturesMemInfoPath = path
+}
+func GetFixturesMemInfoPath() string {
+	return fixturesMemInfoPath
+}
 
 // v1MountPoint returns the mount point where the cgroup
 // mountpoints are mounted in a single hiearchy
 func v1MountPoint() (string, error) {
-	absFilepath, err := filepath.Abs(MountInfo)
+	absFilepath, err := filepath.Abs(GetFixturesMemInfoPath())
 	if err != nil {
 		return "", err
 	}

@@ -24,11 +24,11 @@ func main() {
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 
-	tlsConfig, err := getTlsConfig()
+	/*tlsConfig, err := getTlsConfig()
 	if err != nil {
 		klog.Errorf("tls config err: %v", err)
 		return
-	}
+	}*/
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		node.Serve(writer, request, node.MutatePod)
@@ -37,10 +37,11 @@ func main() {
 
 	klog.Infof("start listen port: %s", *port)
 	server := &http.Server{
-		Addr:      fmt.Sprintf(":%s", *port),
-		TLSConfig: tlsConfig,
+		Addr: fmt.Sprintf(":%s", *port),
+		//TLSConfig: tlsConfig,
 	}
-	err = server.ListenAndServeTLS("", "")
+	//err := server.ListenAndServeTLS("", "")
+	err := server.ListenAndServe()
 	if err != nil {
 		klog.Errorf("serve tls err: %v", err)
 	}

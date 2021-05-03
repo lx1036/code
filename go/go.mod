@@ -45,6 +45,7 @@ require (
 	github.com/google/btree v1.0.0
 	github.com/google/cadvisor v0.37.5
 	github.com/google/go-querystring v1.0.0
+	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4

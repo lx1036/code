@@ -297,6 +297,7 @@ func (cd *containerData) GetInfo(shouldUpdateSubcontainers bool) (*containerInfo
 	cInfo.Name = cd.info.Name
 	cInfo.Aliases = cd.info.Aliases
 	cInfo.Namespace = cd.info.Namespace
+
 	return &cInfo, nil
 }
 
@@ -342,4 +343,19 @@ func (cd *containerData) updateSubcontainers() error {
 	cd.info.Subcontainers = subcontainers
 
 	return nil
+}
+
+// OnDemandHousekeeping performs housekeeping on the container and blocks until it has completed.
+// It is designed to be used in conjunction with periodic housekeeping, and will cause the timer for
+// periodic housekeeping to reset.  This should be used sparingly, as calling OnDemandHousekeeping frequently
+// can have serious performance costs.
+func (cd *containerData) OnDemandHousekeeping(maxAge time.Duration) {
+	if cd.clock.Since(cd.statsLastUpdatedTime) > maxAge {
+		housekeepingFinishedChan := make(chan struct{})
+		cd.onDemandChan <- housekeepingFinishedChan
+		select {
+		case <-cd.stop:
+		case <-housekeepingFinishedChan:
+		}
+	}
 }

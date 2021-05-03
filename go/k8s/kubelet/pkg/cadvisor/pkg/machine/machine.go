@@ -87,10 +87,21 @@ func GetClockSpeed(procInfo []byte) (uint64, error) {
 	return uint64(speed * 1000), nil
 }
 
+var (
+	fixturesMemInfoPath = "../../../../fixtures/proc/meminfo"
+)
+
+func SetFixturesMemInfoPath(path string) {
+	fixturesMemInfoPath = path
+}
+func GetFixturesMemInfoPath() string {
+	return fixturesMemInfoPath
+}
+
 // GetMachineMemoryCapacity returns the machine's total memory from /proc/meminfo.
 // Returns the total memory capacity as an uint64 (number of bytes).
 func GetMachineMemoryCapacity() (uint64, error) {
-	out, err := ioutil.ReadFile("/proc/meminfo")
+	out, err := ioutil.ReadFile(GetFixturesMemInfoPath())
 	if err != nil {
 		return 0, err
 	}

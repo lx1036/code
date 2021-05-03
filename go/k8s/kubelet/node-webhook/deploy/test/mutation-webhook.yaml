@@ -1,0 +1,35 @@
+
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: node-status-webhook
+  annotations:
+    cert-manager.io/inject-ca-from: default/node-status-serving-cert
+  labels:
+    app: node-status-webhook
+webhooks:
+  - name: mutating.node-status-webhook.net
+    clientConfig:
+      url: "https://b9eacd119057.ngrok.io" # for debug in local
+#      service:
+#        name: node-status-webhook
+#        namespace: default
+#        path: "/"
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["nodes", "nodes/status"]
+        scope: '*'
+#    namespaceSelector:
+#      matchExpressions:
+#        - key: node-status-webhook
+#          operator: NotIn
+#          values:
+#            - disable
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 30
+    reinvocationPolicy: Never
+

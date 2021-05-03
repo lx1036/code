@@ -83,12 +83,96 @@ func (h *dockerContainerHandler) GetSpec() (v1.ContainerSpec, error) {
 	panic("implement me")
 }
 
+func (h *dockerContainerHandler) needNet() bool {
+	if h.includedMetrics.Has(container.NetworkUsageMetrics) {
+		return !h.networkMode.IsContainer()
+	}
+	return false
+}
+
+// TODO: Get from libcontainer API instead of cgroup manager when we don't have to support older Dockers.
 func (h *dockerContainerHandler) GetStats() (*v1.ContainerStats, error) {
-	panic("implement me")
+	stats, err := h.libcontainerHandler.GetStats()
+	if err != nil {
+		return stats, err
+	}
+
+	// Clean up stats for containers that don't have their own network - this
+	// includes containers running in Kubernetes pods that use the network of the
+	// infrastructure container. This stops metrics being reported multiple times
+	// for each container in a pod.
+	if !h.needNet() {
+		//stats.Network = v1.NetworkStats{}
+	}
+
+	// Get filesystem stats.
+	err = h.getFsStats(stats)
+	if err != nil {
+		return stats, err
+	}
+
+	return stats, nil
+}
+
+func (h *dockerContainerHandler) getFsStats(stats *v1.ContainerStats) error {
+	mi, err := h.machineInfoFactory.GetMachineInfo()
+	if err != nil {
+		return err
+	}
+
+	if h.includedMetrics.Has(container.DiskIOMetrics) {
+		//common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
+	}
+
+	if !h.includedMetrics.Has(container.DiskUsageMetrics) {
+		return nil
+	}
+	var device string
+	switch h.storageDriver {
+	case devicemapperStorageDriver:
+		// Device has to be the pool name to correlate with the device name as
+		// set in the machine info filesystems.
+		device = h.poolName
+	case aufsStorageDriver, overlayStorageDriver, overlay2StorageDriver, vfsStorageDriver:
+		deviceInfo, err := h.fsInfo.GetDirFsDevice(h.rootfsStorageDir)
+		if err != nil {
+			return fmt.Errorf("unable to determine device info for dir: %v: %v", h.rootfsStorageDir, err)
+		}
+		device = deviceInfo.Device
+	case zfsStorageDriver:
+		device = h.zfsParent
+	default:
+		return nil
+	}
+
+	var (
+		limit  uint64
+		fsType string
+	)
+
+	// Docker does not impose any filesystem limits for containers. So use capacity as limit.
+	for _, filesystem := range mi.Filesystems {
+		if filesystem.Device == device {
+			limit = filesystem.Capacity
+			fsType = filesystem.Type
+			break
+		}
+	}
+
+	fsStat := v1.FsStats{Device: device, Type: fsType, Limit: limit}
+	usage := h.fsHandler.Usage()
+	fsStat.BaseUsage = usage.BaseUsageBytes
+	fsStat.Usage = usage.TotalUsageBytes
+	fsStat.Inodes = usage.InodeUsage
+
+	stats.Filesystem = append(stats.Filesystem, fsStat)
+
+	return nil
 }
 
 func (h *dockerContainerHandler) ListContainers(listType container.ListType) ([]v1.ContainerReference, error) {
-	panic("implement me")
+	// No-op for Docker driver.
+	return []v1.ContainerReference{}, nil
 }
 
 func (h *dockerContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {

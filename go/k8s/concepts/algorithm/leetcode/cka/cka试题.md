@@ -1,25 +1,51 @@
 
-# CKA Curriculum: https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.20.pdf
-CKA 考试内容:
-* Application Lifecycle Management 8%
-* Installation, Configuration & Validation 12%
-* Core Concepts 19%
-* Networking 11%
-* Scheduling 5%
-* Security 12%
-* Cluster Maintenance 11%
-* Logging / Monitoring 5%
-* Storage 7%
-* Troubleshooting 10%
+# CKA Curriculum 考试大纲 
+https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.20.pdf
 
-CKAD 考试内容:
-* Core Concepts 13%
-* Configuration 18%
-* Multi-Container Pods 10%
-* Observability 18%
-* Pod Design 20%
-* Services & Networking 13%
-* State Persistence 8%
+CKA 考试内容(总共20道题，2个小时):
+集群架构，安装和配置：25%(5道题)
+* 管理基于角色的访问控制（RBAC） Manage role based access control (RBAC)
+* 使用Kubeadm安装基本集群 Use Kubeadm to install a basic cluster
+* 管理高可用性的Kubernetes集群 Manage a highly-available Kubernetes cluster
+* 设置基础架构以部署Kubernetes集群 Provision underlying infrastructure to deploy a Kubernetes cluster
+* 使用Kubeadm在Kubernetes集群上执行版本升级 Perform a version upgrade on a Kubernetes cluster using Kubeadm
+* 实施etcd备份和还原 Implement etcd backup and restore
+
+工作负载和调度：15%(3道题)
+* 了解部署以及如何执行滚动更新和回滚 Understand deployments and how to perform rolling update and rollbacks
+* 使用ConfigMaps和Secrets配置应用程序 Use ConfigMaps and Secrets to configure applications
+* 了解如何扩展应用程序 Know how to scale applications
+* 了解用于创建健壮的、自修复的应用程序部署的原语 Understand the primitives used to create robust, self-healing, application deployments
+* 了解资源限制如何影响Pod调度 Understand how resource limits can affect Pod scheduling
+* 了解清单管理和通用模板工具 Awareness of manifest management and common templating tools
+
+服务和网络：20%(4道题)
+* 了解集群节点上的主机网络配置 Understand host networking configuration on the cluster nodes
+* 理解Pods之间的连通性 Understand connectivity between Pods
+* 了解ClusterIP、NodePort、LoadBalancer服务类型和端点 Understand ClusterIP, NodePort, LoadBalancer service types and endpoints
+* 了解如何使用入口控制器和入口资源 Know how to use Ingress controllers and Ingress resources
+* 了解如何配置和使用CoreDNS Know how to configure and use CoreDNS
+* 选择适当的容器网络接口插件 Choose an appropriate container network interface plugin
+
+存储：10%(2道题)
+* 了解存储类、持久卷 Understand storage classes, persistent volumes
+* 了解卷模式、访问模式和卷回收策略 Understand volume mode, access modes and reclaim policies for volumes
+* 理解持久容量声明原语 Understand persistent volume claims primitive
+* 了解如何配置具有持久性存储的应用程序 Know how to configure applications with persistent storage
+
+故障排除：30%(6道题)
+* 评估集群和节点日志 Evaluate cluster and node logging
+* 了解如何监视应用程序 Understand how to monitor applications
+* 管理容器标准输出和标准错误日志 Manage container stdout & stderr logs
+* 解决应用程序故障 Troubleshoot application failure
+* 对群集组件故障进行故障排除 Troubleshoot cluster component failure
+* 排除网络故障 Troubleshoot networking
+
+
+```shell
+# 切换 k8s 集群
+kubectl config use-context k8s
+```
 
 ## Module 1 - Cluster Architecture, Installation, and Configuration
 https://rx-m.com/cka-online-training/ckav2-online-training-module-1/
@@ -106,7 +132,7 @@ ETCDCTL_API=3 etcdctl --endpoints="https://127.0.0.1:2379" --cacert=ca.crt --cer
 ETCDCTL_API=3 etcdctl --endpoints="https://127.0.0.1:12379" --cacert=ca.crt --cert=etcd.crt --key=etcd.key snapshot restore /etc/data/etcd-snapshot.db
 ```
 
-(2)PVC/PV: 对集群中的 PV 按照大小顺序排序显示，并将结果写道指定文件？
+(2)PVC/PV: 对集群中的 PV 按照大小顺序排序显示，并将结果写到指定文件？
 ```shell
 kubectl get pv --sort-by=.spec.capacity.storage --no-headers > pv.txt
 ```
@@ -114,50 +140,41 @@ kubectl get pv --sort-by=.spec.capacity.storage --no-headers > pv.txt
 
 ## Module 5 - Troubleshooting
 https://rx-m.com/cka-online-training/ckav2-online-training-module-5/
+(1)列出指定pod的日志中状态为Error的行，并记录在指定的文件上? 同时，集群中存在一个 Pod，并且该 Pod 中的容器会将 log 输出到指定文件。
+修改 Pod 配置，将 Pod 的日志输出到控制台,其实就是给 Pod 添加一个 sidecar，然后不断读取指定文件，输出到控制台？
+```shell
+kubectl logs deployment/nginx -c nginx-1 | grep "Error" > /opt/KUCC000xxx/KUCC000xxx.txt
+```
 
-
-
-
-
-
-
-(9)集群中存在一个 Pod，并且该 Pod 中的容器会将 log 输出到指定文件。 修改 Pod 配置，将 Pod 的日志输出到控制台,其实就是给 Pod 添加一个 sidecar，然后不断读取指定文件，输出到控制台？
 ```yaml
 apiVersion: v1
 kind: Pod
 metadata:
-name: podname
+  name: podname
 spec:
-containers:
-- name: count
-image: busybox
-args:
-- /bin/sh
-- -c
-->
-i=0;
-while true;
-do
-echo "$(date) INFO $i" >> /var/log/legacy-ap.log;
-i=$((i+1));
-sleep 1;
-done
-volumeMounts:
-- name: logs
-mountPath: /var/log
-- name: count-log-1
-image: busybox
-args: [/bin/sh, -c, 'tail -n+1 -f /var/log/legacy-ap.log']
-volumeMounts:
-  - name: varlog
-mountPath: /var/log
-volumes:
+  containers:
+  - name: count
+    image: busybox
+    args: ["/bin/sh", "-c", "i=0;while true;do echo '$(date) INFO $i' >> /var/log/legacy-ap.log;i=$((i+1));sleep 1;done"]
+    volumeMounts:
+    - name: logs
+      mountPath: /var/log
+  - name: count-log-1
+    image: busybox
+    args: [/bin/sh, -c, 'tail -n+1 -f /var/log/legacy-ap.log']
+    volumeMounts:
+    - name: logs
+      mountPath: /var/log
+  volumes:
   - name: logs
-emptyDir: {}
+    emptyDir: {}
 
 # 验证:
 # kubectl logs <pod_name> -c <container_name>
 ```
+
+
+
 
 16、 设置配置环境:问题权重: 7%
 kubectl config use-context k8s

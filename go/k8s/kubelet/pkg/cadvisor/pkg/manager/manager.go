@@ -6,12 +6,15 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/cache/memory"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/docker"
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container/raw"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/events"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/fs"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/info/v1"
@@ -20,6 +23,7 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/utils/sysfs"
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/watcher"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -27,6 +31,8 @@ import (
 var updateMachineInfoInterval = flag.Duration("update_machine_info_interval", 5*time.Minute, "Interval between machine info updates.")
 var globalHousekeepingInterval = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
 var logCadvisorUsage = flag.Bool("log_cadvisor_usage", false, "Whether to log the usage of the cAdvisor container")
+var eventStorageAgeLimit = flag.String("event_storage_age_limit", "default=24h", "Max length of time for which to store events (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is a duration. Default is applied to all non-specified event types")
+var eventStorageEventLimit = flag.String("event_storage_event_limit", "default=100000", "Max number of events to store (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is an integer. Default is applied to all non-specified event types")
 
 // The Manager interface defines operations for starting a manager and getting
 // container and machine information.
@@ -145,67 +151,6 @@ type manager struct {
 	//resctrlManager           stats.Manager
 	// List of raw container cgroup path prefix whitelist.
 	rawContainerCgroupPathPrefixWhiteList []string
-}
-
-// Start the container manager.
-func (m *manager) Start() error {
-	var err error
-	// INFO: 这里初始化所有 plugins，这里是初始化 docker/plugin.go::Register()
-	m.containerWatchers = container.InitializePlugins(m, m.fsInfo, m.includedMetrics)
-
-	/*err := raw.Register(m, m.fsInfo, m.includedMetrics, m.rawContainerCgroupPathPrefixWhiteList)
-	if err != nil {
-		klog.Errorf("Registration of the raw container factory failed: %v", err)
-	}
-	rawWatcher, err := raw.NewRawContainerWatcher()
-	if err != nil {
-		return err
-	}
-	m.containerWatchers = append(m.containerWatchers, rawWatcher)*/
-
-	// Watch for OOMs.
-	/*err := m.watchForNewOoms()
-	if err != nil {
-		klog.Warningf("Could not configure a source for OOM detection, disabling OOM events: %v", err)
-	}*/
-
-	// If there are no factories, don't start any housekeeping and serve the information we do have.
-	if !container.HasFactories() {
-		return nil
-	}
-
-	// Create root and then recover all containers.
-	err = m.createContainer("/", watcher.Raw)
-	if err != nil {
-		return err
-	}
-	klog.V(2).Infof("Starting recovery of all containers")
-	err = m.detectSubcontainers("/")
-	if err != nil {
-		return err
-	}
-	klog.V(2).Infof("Recovery completed")
-
-	// Watch for new container.
-	quitWatcher := make(chan error)
-	err = m.watchForNewContainers(quitWatcher)
-	if err != nil {
-		return err
-	}
-	m.quitChannels = append(m.quitChannels, quitWatcher)
-
-	// Look for new containers in the main housekeeping thread.
-	// INFO: 定时sync containers, 即 add/destroy containers
-	quitGlobalHousekeeping := make(chan error)
-	m.quitChannels = append(m.quitChannels, quitGlobalHousekeeping)
-	go m.globalHousekeeping(quitGlobalHousekeeping)
-
-	// INFO: 定时获取 machineInfo，默认 5 mins
-	quitUpdateMachineInfo := make(chan error)
-	m.quitChannels = append(m.quitChannels, quitUpdateMachineInfo)
-	go m.updateMachineInfo(quitUpdateMachineInfo)
-
-	return nil
 }
 
 func (m *manager) updateMachineInfo(quit chan error) {
@@ -553,10 +498,149 @@ func (m *manager) GetContainerInfo(containerName string, query *v1.ContainerInfo
 	return m.containerDataToContainerInfo(cont, query)
 }
 
+// INFO: 这个函数很重要，"/" 可以获取所有容器的 stats 数据
 func (m *manager) GetContainerInfoV2(containerName string, options v2.RequestOptions) (map[string]v2.ContainerInfo, error) {
-	panic("implement me")
+	// 先根据 containerName="/" 获取所有 containers
+	containers, err := m.getRequestedContainers(containerName, options)
+	if err != nil {
+		return nil, err
+	}
+
+	var errs []error
+	var nilTime time.Time // Ignored.
+
+	infos := make(map[string]v2.ContainerInfo, len(containers))
+	for name, cData := range containers {
+		result := v2.ContainerInfo{}
+		cinfo, err := cData.GetInfo(false)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("[GetInfo for %s with err: %v]", name, err))
+			infos[name] = result
+			continue
+		}
+		result.Spec = m.getV2Spec(cinfo)
+
+		// INFO: container stats 是cadvisor周期定时读取 cgroup，然后存入 memoryCache 中
+		stats, err := m.memoryCache.RecentStats(name, nilTime, nilTime, options.Count)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("[RecentStats for %s with err: %v]", name, err))
+			infos[name] = result
+			continue
+		}
+
+		result.Stats = v2.ContainerStatsFromV1(containerName, &cinfo.Spec, stats)
+		infos[name] = result
+	}
+
+	return infos, utilerrors.NewAggregate(errs)
 }
 
+// Get V2 container spec from v1 container info.
+func (m *manager) getV2Spec(cinfo *containerInfo) v2.ContainerSpec {
+	spec := m.getAdjustedSpec(cinfo)
+	return v2.ContainerSpecFromV1(&spec, cinfo.Aliases, cinfo.Namespace)
+}
+
+func (m *manager) getRequestedContainers(containerName string, options v2.RequestOptions) (map[string]*containerData, error) {
+	containersMap := make(map[string]*containerData)
+	switch options.IdType {
+	case v2.TypeName:
+		if !options.Recursive {
+			cont, err := m.getContainer(containerName)
+			if err != nil {
+				return containersMap, err
+			}
+			containersMap[cont.info.Name] = cont
+		} else {
+			containersMap = m.getSubcontainers(containerName)
+			if len(containersMap) == 0 {
+				return containersMap, fmt.Errorf("unknown container: %q", containerName)
+			}
+		}
+	case v2.TypeDocker:
+		if !options.Recursive {
+			containerName = strings.TrimPrefix(containerName, "/")
+			cont, err := m.getDockerContainer(containerName)
+			if err != nil {
+				return containersMap, err
+			}
+			containersMap[cont.info.Name] = cont
+		} else {
+			if containerName != "/" {
+				return containersMap, fmt.Errorf("invalid request for docker container %q with subcontainers", containerName)
+			}
+			containersMap = m.getAllDockerContainers()
+		}
+	default:
+		return containersMap, fmt.Errorf("invalid request type %q", options.IdType)
+	}
+
+	if options.MaxAge != nil {
+		// update stats for all containers in containersMap
+		var waitGroup sync.WaitGroup
+		waitGroup.Add(len(containersMap))
+		for _, cont := range containersMap {
+			go func(cont *containerData) {
+				cont.OnDemandHousekeeping(*options.MaxAge)
+				waitGroup.Done()
+			}(cont)
+		}
+		waitGroup.Wait()
+	}
+
+	return containersMap, nil
+}
+func (m *manager) getDockerContainer(containerName string) (*containerData, error) {
+	m.containersLock.RLock()
+	defer m.containersLock.RUnlock()
+
+	// Check for the container in the Docker container namespace.
+	cont, ok := m.containers[namespacedContainerName{
+		Namespace: docker.DockerNamespace,
+		Name:      containerName,
+	}]
+
+	// Look for container by short prefix name if no exact match found.
+	if !ok {
+		for contName, c := range m.containers {
+			if contName.Namespace == docker.DockerNamespace && strings.HasPrefix(contName.Name, containerName) {
+				if cont == nil {
+					cont = c
+				} else {
+					return nil, fmt.Errorf("unable to find container. Container %q is not unique", containerName)
+				}
+			}
+		}
+
+		if cont == nil {
+			return nil, fmt.Errorf("unable to find Docker container %q", containerName)
+		}
+	}
+
+	return cont, nil
+}
+func (m *manager) getContainer(containerName string) (*containerData, error) {
+	m.containersLock.RLock()
+	defer m.containersLock.RUnlock()
+	cont, ok := m.containers[namespacedContainerName{Name: containerName}]
+	if !ok {
+		return nil, fmt.Errorf("unknown container %q", containerName)
+	}
+	return cont, nil
+}
+func (m *manager) getAllDockerContainers() map[string]*containerData {
+	m.containersLock.RLock()
+	defer m.containersLock.RUnlock()
+	containers := make(map[string]*containerData, len(m.containers))
+
+	// Get containers in the Docker namespace.
+	for name, cont := range m.containers {
+		if name.Namespace == docker.DockerNamespace {
+			containers[cont.info.Name] = cont
+		}
+	}
+	return containers
+}
 func (m *manager) getSubcontainers(containerName string) map[string]*containerData {
 	m.containersLock.RLock()
 	defer m.containersLock.RUnlock()
@@ -696,7 +780,7 @@ func (m *manager) WatchForEvents(request *events.Request) (*events.EventChannel,
 }
 
 func (m *manager) GetPastEvents(request *events.Request) ([]*v1.Event, error) {
-	panic("implement me")
+	return m.eventHandler.GetEvents(request)
 }
 
 func (m *manager) CloseEventChannel(watchID int) {
@@ -713,6 +797,113 @@ func (m *manager) DockerImages() ([]v1.DockerImage, error) {
 
 func (m *manager) DebugInfo() map[string][]string {
 	panic("implement me")
+}
+
+// Parses the events StoragePolicy from the flags.
+func parseEventsStoragePolicy() events.StoragePolicy {
+	policy := events.DefaultStoragePolicy()
+
+	// Parse max age.
+	parts := strings.Split(*eventStorageAgeLimit, ",")
+	for _, part := range parts {
+		items := strings.Split(part, "=")
+		if len(items) != 2 {
+			klog.Warningf("Unknown event storage policy %q when parsing max age", part)
+			continue
+		}
+		dur, err := time.ParseDuration(items[1])
+		if err != nil {
+			klog.Warningf("Unable to parse event max age duration %q: %v", items[1], err)
+			continue
+		}
+		if items[0] == "default" {
+			policy.DefaultMaxAge = dur
+			continue
+		}
+		policy.PerTypeMaxAge[v1.EventType(items[0])] = dur
+	}
+
+	// Parse max number.
+	parts = strings.Split(*eventStorageEventLimit, ",")
+	for _, part := range parts {
+		items := strings.Split(part, "=")
+		if len(items) != 2 {
+			klog.Warningf("Unknown event storage policy %q when parsing max event limit", part)
+			continue
+		}
+		val, err := strconv.Atoi(items[1])
+		if err != nil {
+			klog.Warningf("Unable to parse integer from %q: %v", items[1], err)
+			continue
+		}
+		if items[0] == "default" {
+			policy.DefaultMaxNumEvents = val
+			continue
+		}
+		policy.PerTypeMaxNumEvents[v1.EventType(items[0])] = val
+	}
+
+	return policy
+}
+
+// Start the container manager.
+func (m *manager) Start() error {
+	// INFO: 这里初始化所有 plugins，这里是初始化 docker/plugin.go::Register()
+	m.containerWatchers = container.InitializePlugins(m, m.fsInfo, m.includedMetrics)
+
+	err := raw.Register(m, m.fsInfo, m.includedMetrics, m.rawContainerCgroupPathPrefixWhiteList)
+	if err != nil {
+		klog.Errorf("Registration of the raw container factory failed: %v", err)
+	}
+	rawWatcher, err := raw.NewRawContainerWatcher()
+	if err != nil {
+		return err
+	}
+	m.containerWatchers = append(m.containerWatchers, rawWatcher)
+
+	// Watch for OOMs.
+	/*err := m.watchForNewOoms()
+	if err != nil {
+		klog.Warningf("Could not configure a source for OOM detection, disabling OOM events: %v", err)
+	}*/
+
+	// If there are no factories, don't start any housekeeping and serve the information we do have.
+	if !container.HasFactories() {
+		return nil
+	}
+
+	// Create root and then recover all containers.
+	err = m.createContainer("/", watcher.Raw)
+	if err != nil {
+		return err
+	}
+	klog.V(2).Infof("Starting recovery of all containers")
+	err = m.detectSubcontainers("/")
+	if err != nil {
+		return err
+	}
+	klog.V(2).Infof("Recovery completed")
+
+	// Watch for new container.
+	quitWatcher := make(chan error)
+	err = m.watchForNewContainers(quitWatcher)
+	if err != nil {
+		return err
+	}
+	m.quitChannels = append(m.quitChannels, quitWatcher)
+
+	// Look for new containers in the main housekeeping thread.
+	// INFO: 定时sync containers, 即 add/destroy containers
+	quitGlobalHousekeeping := make(chan error)
+	m.quitChannels = append(m.quitChannels, quitGlobalHousekeeping)
+	go m.globalHousekeeping(quitGlobalHousekeeping)
+
+	// INFO: 定时获取 machineInfo，默认 5 mins
+	quitUpdateMachineInfo := make(chan error)
+	m.quitChannels = append(m.quitChannels, quitUpdateMachineInfo)
+	go m.updateMachineInfo(quitUpdateMachineInfo)
+
+	return nil
 }
 
 // New takes a memory storage and returns a new manager.
@@ -763,6 +954,8 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 	}
 	newManager.machineInfo = *machineInfo
 	klog.Infof("Machine: %+v", newManager.machineInfo)
+
+	newManager.eventHandler = events.NewEventManager(parseEventsStoragePolicy())
 
 	return newManager, nil
 }

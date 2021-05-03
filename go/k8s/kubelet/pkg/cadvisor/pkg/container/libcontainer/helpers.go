@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/container"
-	cgroups "k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups/cgroupfs"
+	"k8s-lx1036/k8s/kubelet/runc/libcontainer/cgroups"
 	"k8s-lx1036/k8s/kubelet/runc/libcontainer/configs"
 
 	"k8s.io/klog/v2"
@@ -32,6 +32,18 @@ type CgroupSubsystems struct {
 	// Cgroup subsystem to their mount location.
 	// e.g.: "cpu" -> "/sys/fs/cgroup/cpu"
 	MountPoints map[string]string
+}
+
+// Get information about all the cgroup subsystems.
+func GetAllCgroupSubsystems() (CgroupSubsystems, error) {
+	// Get all cgroup mounts.
+	allCgroups, err := cgroups.GetCgroupMounts(true)
+	if err != nil {
+		return CgroupSubsystems{}, err
+	}
+
+	emptyDisableCgroups := map[string]struct{}{}
+	return getCgroupSubsystemsHelper(allCgroups, emptyDisableCgroups)
 }
 
 // Get information about the cgroup subsystems those we want

@@ -7,6 +7,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
+func init() {
+	SetFixturesMemInfoPath("../../../../fixtures/proc/meminfo")
+}
+
 func TestCPUSet(test *testing.T) {
 	// 1. Create a new cgroup
 	// 会创建目录 fixtures/cpuset/test，这里用 ./fixtures 目录代替 /sys/fs/cgroup 目录

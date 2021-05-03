@@ -1,16 +1,27 @@
 package fs
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"path"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
+
+	"k8s-lx1036/k8s/kubelet/pkg/cadvisor/pkg/utils"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 )
 
 const (
-	LabelSystemRoot = "root"
+	LabelSystemRoot          = "root"
+	LabelDockerImages        = "docker-images"
+	LabelCrioImages          = "crio-images"
+	DriverStatusPoolName     = "Pool Name"
+	DriverStatusDataLoopFile = "Data loop file"
 )
 
 type partition struct {
@@ -94,8 +105,147 @@ func (i *RealFsInfo) GetGlobalFsInfo() ([]Fs, error) {
 	return i.GetFsInfoForPath(nil)
 }
 
+var (
+	fixturesDiskstatsPath = "../../../../fixtures/proc/diskstats"
+)
+
+func SetFixturesDiskstatsPath(path string) {
+	fixturesDiskstatsPath = path
+}
+func GetFixturesDiskstatsPath() string {
+	return fixturesDiskstatsPath
+}
+
+var partitionRegex = regexp.MustCompile(`^(?:(?:s|v|xv)d[a-z]+\d*|dm-\d+)$`)
+
+func getDiskStatsMap(diskStatsFile string) (map[string]DiskStats, error) {
+	diskStatsMap := make(map[string]DiskStats)
+	file, err := os.Open(diskStatsFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			klog.Warningf("Not collecting filesystem statistics because file %q was not found", diskStatsFile)
+			return diskStatsMap, nil
+		}
+		return nil, err
+	}
+
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		words := strings.Fields(line)
+		if !partitionRegex.MatchString(words[2]) {
+			continue
+		}
+		// 8      50 sdd2 40 0 280 223 7 0 22 108 0 330 330
+		deviceName := path.Join("/dev", words[2])
+
+		devInfo := make([]uint64, 2)
+		for i := 0; i < len(devInfo); i++ {
+			devInfo[i], err = strconv.ParseUint(words[i], 10, 64)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		wordLength := len(words)
+		offset := 3
+		var stats = make([]uint64, wordLength-offset)
+		if len(stats) < 11 {
+			return nil, fmt.Errorf("could not parse all 11 columns of /proc/diskstats")
+		}
+		for i := offset; i < wordLength; i++ {
+			stats[i-offset], err = strconv.ParseUint(words[i], 10, 64)
+			if err != nil {
+				return nil, err
+			}
+		}
+		diskStats := DiskStats{
+			MajorNum:        devInfo[0],
+			MinorNum:        devInfo[1],
+			ReadsCompleted:  stats[0],
+			ReadsMerged:     stats[1],
+			SectorsRead:     stats[2],
+			ReadTime:        stats[3],
+			WritesCompleted: stats[4],
+			WritesMerged:    stats[5],
+			SectorsWritten:  stats[6],
+			WriteTime:       stats[7],
+			IoInProgress:    stats[8],
+			IoTime:          stats[9],
+			WeightedIoTime:  stats[10],
+		}
+		diskStatsMap[deviceName] = diskStats
+	}
+	return diskStatsMap, nil
+}
+
 func (i *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, error) {
-	panic("implement me")
+	filesystems := make([]Fs, 0)
+	deviceSet := make(map[string]struct{})
+	diskStatsMap, err := getDiskStatsMap(GetFixturesDiskstatsPath())
+	if err != nil {
+		return nil, err
+	}
+	for device, partition := range i.partitions {
+		_, hasMount := mountSet[partition.mountpoint]
+		_, hasDevice := deviceSet[device]
+		if mountSet == nil || (hasMount && !hasDevice) {
+			var (
+				err error
+				fs  Fs
+			)
+			switch partition.fsType {
+			case DeviceMapper.String():
+				//fs.Capacity, fs.Free, fs.Available, err = getDMStats(device, partition.blockSize) // no `dmsetup` command in mac
+				klog.V(5).Infof("got devicemapper fs capacity stats: capacity: %v free: %v available: %v:", fs.Capacity, fs.Free, fs.Available)
+				fs.Type = DeviceMapper
+			/*case ZFS.String():
+			if _, devzfs := os.Stat("/dev/zfs"); os.IsExist(devzfs) {
+				fs.Capacity, fs.Free, fs.Available, err = getZfstats(device)
+				fs.Type = ZFS
+				break
+			}
+			// if /dev/zfs is not present default to VFS
+			fallthrough*/
+			default:
+				var inodes, inodesFree uint64
+				if utils.FileExists(partition.mountpoint) {
+					//fs.Capacity, fs.Free, fs.Available, inodes, inodesFree, err = getVfsStats(partition.mountpoint)
+					fs.Inodes = &inodes
+					fs.InodesFree = &inodesFree
+					fs.Type = VFS
+				} else {
+					klog.V(4).Infof("unable to determine file system type, partition mountpoint does not exist: %v", partition.mountpoint)
+				}
+			}
+			if err != nil {
+				klog.V(4).Infof("Stat fs failed. Error: %v", err)
+			} else {
+				deviceSet[device] = struct{}{}
+				fs.DeviceInfo = DeviceInfo{
+					Device: device,
+					Major:  uint(partition.major),
+					Minor:  uint(partition.minor),
+				}
+
+				if val, ok := diskStatsMap[device]; ok {
+					fs.DiskStats = val
+				} else {
+					for k, v := range diskStatsMap {
+						if v.MajorNum == uint64(partition.major) && v.MinorNum == uint64(partition.minor) {
+							fs.DiskStats = diskStatsMap[k]
+							break
+						}
+					}
+				}
+				filesystems = append(filesystems, fs)
+			}
+		}
+	}
+
+	return filesystems, nil
 }
 
 func (i *RealFsInfo) GetDirUsage(dir string) (UsageInfo, error) {
@@ -138,8 +288,20 @@ func (i *RealFsInfo) addSystemRootLabel(mounts []mount.MountInfo) {
 	}
 }
 
+var (
+	fixturesMountInfoPath = "../../../../fixtures/proc/self/mountinfo"
+)
+
+func SetFixturesMountInfoPath(path string) {
+	fixturesMountInfoPath = path
+}
+
+func GetFixturesMountInfoPath() string {
+	return fixturesMountInfoPath
+}
+
 func NewFsInfo(context Context) (FsInfo, error) {
-	mountinfoFile, err := filepath.Abs("fixtures/proc/self/mountinfo")
+	mountinfoFile, err := filepath.Abs(GetFixturesMountInfoPath())
 	if err != nil {
 		panic(err)
 	}
