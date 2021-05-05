@@ -2,8 +2,6 @@
 **[真题1](https://blog.csdn.net/deerjoe/java/article/details/86300826)**
 
 
-#笨方法，人工数
-kubectl get nodes
 
 #CheatSheet方法，应该还能优化JSONPATH
 JSONPATH='{range .items[*]}{@.metadata.name}:{range @.status.conditions[*]}{@.type}={@.status};{end}{end}' \
