@@ -44,6 +44,7 @@ CKA 考试内容(总共20道题，2个小时):
 
 # CKA 真题
 2020-11 和 2019-07 真题
+模拟题：https://rx-m.com/cka-online-training/
 
 ```shell
 # 切换 k8s 集群
