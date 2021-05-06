@@ -1,8 +1,11 @@
 package etcd3
 
 import (
+	"context"
 	"sync"
 	"time"
+
+	"k8s-lx1036/k8s/apiserver/pkg/storage/etcd3/metrics"
 
 	"go.etcd.io/etcd/clientv3"
 )
@@ -37,6 +40,51 @@ type leaseManager struct {
 	leaseReuseDurationPercent   float64
 	leaseMaxAttachedObjectCount int64
 	leaseAttachedObjectCount    int64
+}
+
+// GetLease returns a lease based on requested ttl: if the cached previous
+// lease can be reused, reuse it; otherwise request a new one from etcd.
+func (l *leaseManager) GetLease(ctx context.Context, ttl int64) (clientv3.LeaseID, error) {
+	now := time.Now()
+	l.leaseMu.Lock()
+	defer l.leaseMu.Unlock()
+	// check if previous lease can be reused
+	reuseDurationSeconds := l.getReuseDurationSecondsLocked(ttl)
+	valid := now.Add(time.Duration(ttl) * time.Second).Before(l.prevLeaseExpirationTime)
+	sufficient := now.Add(time.Duration(ttl+reuseDurationSeconds) * time.Second).After(l.prevLeaseExpirationTime)
+
+	// We count all operations that happened in the same lease, regardless of success or failure.
+	// Currently each GetLease call only attach 1 object
+	l.leaseAttachedObjectCount++
+
+	if valid && sufficient && l.leaseAttachedObjectCount <= l.leaseMaxAttachedObjectCount {
+		return l.prevLeaseID, nil
+	}
+
+	// request a lease with a little extra ttl from etcd
+	ttl += reuseDurationSeconds
+	lcr, err := l.client.Lease.Grant(ctx, ttl)
+	if err != nil {
+		return clientv3.LeaseID(0), err
+	}
+	// cache the new lease id
+	l.prevLeaseID = lcr.ID
+	l.prevLeaseExpirationTime = now.Add(time.Duration(ttl) * time.Second)
+	// refresh count
+	metrics.UpdateLeaseObjectCount(l.leaseAttachedObjectCount)
+	l.leaseAttachedObjectCount = 1
+	return lcr.ID, nil
+}
+
+// getReuseDurationSecondsLocked returns the reusable duration in seconds
+// based on the configuration. Lock has to be acquired before calling this
+// function.
+func (l *leaseManager) getReuseDurationSecondsLocked(ttl int64) int64 {
+	reuseDurationSeconds := int64(l.leaseReuseDurationPercent * float64(ttl))
+	if reuseDurationSeconds > l.leaseReuseDurationSeconds {
+		reuseDurationSeconds = l.leaseReuseDurationSeconds
+	}
+	return reuseDurationSeconds
 }
 
 // newDefaultLeaseManager creates a new lease manager using default setting.

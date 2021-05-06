@@ -59,7 +59,7 @@ func init() {
 }
 
 func TestCreate(test *testing.T) {
-	ctx, store, cluster := testSetup(test)
+	ctx, s, cluster := testSetup(test)
 	defer cluster.Terminate(test)
 	etcdClient := cluster.RandClient()
 
@@ -76,7 +76,7 @@ func TestCreate(test *testing.T) {
 		test.Fatalf("expecting empty result on key: %s", key)
 	}
 
-	err = store.Create(ctx, key, obj, out, 0)
+	err = s.Create(ctx, key, obj, out, 0)
 	if err != nil {
 		test.Fatalf("Set failed: %v", err)
 	}
@@ -100,11 +100,11 @@ func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 	// As 30s is the default timeout for testing in glboal configuration,
 	// we cannot wait longer than that in a single time: change it to 10
 	// for testing purposes. See apimachinery/pkg/util/wait/wait.go
-	store := newStore(cluster.RandClient(), true, codec, "",
+	s := newStore(cluster.RandClient(), true, codec, "",
 		&prefixTransformer{prefix: []byte(defaultTestPrefix)}, LeaseManagerConfig{
 			ReuseDurationSeconds: 1,
 			MaxObjectCount:       defaultLeaseMaxObjectCount,
 		})
 	ctx := context.Background()
-	return ctx, store, cluster
+	return ctx, s, cluster
 }
