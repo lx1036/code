@@ -7,7 +7,8 @@ import (
 	"syscall"
 )
 
-// ./network-namespace.sh
+// go run .
+// run in linux
 func main() {
 	cmd := exec.Command("sh")
 	cmd.SysProcAttr = &syscall.SysProcAttr{
