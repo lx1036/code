@@ -62,6 +62,9 @@ kubectl create namespace app-team1
 kubectl create clusterrole deployment-clusterrole --verb=create --resource=deployments,statefulsets,daemonsets
 kubectl create serviceaccount cicd-token -n app-team1
 kubectl create clusterrolebinding deployment-clusterrolebinding --clusterrole=deployment-clusterrole --serviceaccount=app-team1:cicd-token
+
+# 记得验证下 impersonate 为 networker user 具有这个权限
+kubectl auth can-i get ingress --as networker
 ```
 
 (2)升级集群: 将集群中 master 所有组件从 v1.18 升级到 1.19(controller,apiserver,scheduler,kubelet,kubectl)？
