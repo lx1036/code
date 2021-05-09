@@ -62,6 +62,18 @@ kubectl create namespace app-team1
 kubectl create clusterrole deployment-clusterrole --verb=create --resource=deployments,statefulsets,daemonsets
 kubectl create serviceaccount cicd-token -n app-team1
 kubectl create clusterrolebinding deployment-clusterrolebinding --clusterrole=deployment-clusterrole --serviceaccount=app-team1:cicd-token
+
+# 记得验证下 impersonate 为 networker user 具有这个权限
+kubectl auth can-i get ingress --as networker
+```
+
+2021-04: Create a service account name dev-sa in default namespace, dev-sa can create below components in dev namespace: Deployment, Statefulset, Daemonset
+```shell
+k create sa dev-sa
+k create ns dev
+k create role dev-sa --resource=deployment,statefulset,daemonset --verb=create -o yaml -n dev
+k create rolebinding dev-sa --role=dev-sa --serviceaccount=default:dev-sa -n dev
+k auth can-i create deploy --as=system:serviceaccount:default:dev-sa -n dev
 ```
 
 (2)升级集群: 将集群中 master 所有组件从 v1.18 升级到 1.19(controller,apiserver,scheduler,kubelet,kubectl)？
@@ -104,7 +116,7 @@ kubectl get node | grep -i ready
 kubectl describe nodes <nodeName> | grep -i taints | grep -i noSchedule
 ```
 
-(5)Tolerations: 确保在 kubectl 集群的每个节点上运行一个 Nginx Pod。其中 Nginx Pod 必须使用 Nginx 镜像。不要覆盖当前环境中的任何 taints。 使用 Daemonset 来完成这个任务，Daemonset 的名字使用 ds。
+(5)Tolerations/Taints: 确保在 kubectl 集群的每个节点上运行一个 Nginx Pod。其中 Nginx Pod 必须使用 Nginx 镜像。不要覆盖当前环境中的任何 taints。 使用 Daemonset 来完成这个任务，Daemonset 的名字使用 ds。
 ```yaml
 apiVersion: apps/v1
 	kind: DaemonSet
@@ -130,6 +142,12 @@ apiVersion: apps/v1
 		  containers:
 		  - name: fluentd-elasticsearch
 			image: nginx
+```
+
+2021-04: Count the ready node in this cluster that without have a taint, and output the number to the file /root/cka/readyNode.txt.
+```shell
+k get nodes -o wide | grep -v "NotReady" | wc -l
+k describe nodes | grep "Taints" | grep "NoExecute" | wc -l
 ```
 
 (6)initContainers: 添加一个 initcontainer 到 lum(/etc/data)这个 initcontainer 应该创建一个名为/workdir/calm.txt 的空文件，如果/workdir/calm.txt 没有被检测到，这个 Pod 应该退出
@@ -171,6 +189,50 @@ kubectl rollout history deployment nginx-app
 kubectl rollout undo deployment nginx-app
 
 kubectl create deploy kual00201 --image=redis --labels=app_enb_stage=dev --dry-run -o yaml > /opt/KUAL00201/deploy_spec.yaml
+```
+
+2021-04: Create a pod name log, container name log-pro use image busybox, output the important information at /log/data/output.log. Then another container name log-cus use image busybox, load the output.log at /log/data/output.log and print it. Note, this log file only can be share within the pod.
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: log
+  name: log
+spec:
+  containers:
+  - image: busybox
+    name: log-pro
+    command: ["sh", "-c", "echo 'important information' > /log/data/output.log; sleep 1d"]
+    resources: {}
+    volumeMounts:
+    - name: data
+      mountPath: /log/data/
+  - image: busybox
+    name: log-cus
+    command: ["sh", "-c", "cat /log/data/output.log; sleep 1d"]
+    resources: {}
+    volumeMounts:
+    - name: data
+      mountPath: /log/data/
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+  volumes:
+  - name: data
+    emptyDir: {}
+```
+
+2021-04: Output the pod name that uses most CPU resource to file /root/cka/name.txt
+```shell
+k top pod
+```
+
+2021-04: Scale the deployment scale-deploy in namespace dev to three pod and record it.
+```shell
+k scale --replicas=3 deploy/nginx-test1 --record
+k describe deploy nginx-test1
+# 验证找到如下 Annotations:
+# kubernetes.io/change-cause: kubectl scale deploy/nginx-test1 --replicas=3 --record=true
 ```
 
 ## Module 3 - Services and Networking
@@ -224,6 +286,35 @@ spec:
 	  - port: 9200
 ```
 
+2021-04: Only pods that in the internal namespace can access to the pods in mysql namespace via port 8080/TCP.
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mysql-network-policy
+  namespace: mysql
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          ns-name: internal
+    ports:
+    - protocol: TCP
+      port: 8080
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: internal
+  labels:
+    ns-name: internal
+spec: {}
+```
+
 (3)将集群中一个 Deployment 服务暴露出来(是一个 nginx，使用kubectl expose 命令暴露即可)？
 请重新配置现有的部署 front-end 以及添加名为 http 的端口规范来公开现 有容器 nginx 的端口 80/tcp。
 创建一个名为 front-end-svc 的新服务，以公开容器端口 http。 配置此服务，以 通过在排定的节点上的 NodePort 来公开各个 Pods 考点:将现有的 deploy 暴露成 nodeport 的 service。
@@ -265,6 +356,8 @@ kubectl get pods -l app=foo -o=custom-columns=NAME:.spec.name > kucc.txt
       kubectl exec -it busybox -- nslookup nginx-dns
       kubectl exec -it busybox -- nslookup 10.244.0.122(pod IP)
 ```
+
+2021-04: There is pod name pod-nginx, create a service name service-nginx, use nodePort to expose the pod. Then create a pod use image busybox to nslookup the pod pod-nginx and service service-nginx.
 
 
 ## Module 4 - Storage

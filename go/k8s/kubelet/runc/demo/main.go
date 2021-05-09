@@ -39,7 +39,7 @@ func main() {
 		devices = append(devices, &device.Rule)
 	}
 	config := &configs.Config{
-		Rootfs: "/your/path/to/rootfs",
+		Rootfs: "/home/liuxiang3/runc/nginx/rootfs",
 		Capabilities: &configs.Capabilities{
 			Bounding: []string{
 				"CAP_CHOWN",

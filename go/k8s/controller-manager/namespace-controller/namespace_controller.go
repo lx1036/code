@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"k8s-lx1036/k8s/concepts/components/controller-manager/namespace-controller/pkg/cmd"
+	"k8s-lx1036/k8s/controller-manager/namespace-controller/pkg/cmd"
 )
 
 // 测试NamespaceController:
