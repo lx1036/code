@@ -55,7 +55,7 @@ func TestDockerClient(test *testing.T) {
 
 		klog.Infof("container: %v", container)
 
-		// docker-on-mac 上修改 cpuset.cpus，
+		// docker-on-mac 上修改 cpuset.cpus
 		err = dockerClient.UpdateContainerResources(container.ID, dockercontainer.UpdateConfig{
 			Resources: dockercontainer.Resources{
 				CpusetCpus: "1,17",

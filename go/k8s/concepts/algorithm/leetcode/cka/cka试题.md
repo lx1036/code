@@ -42,6 +42,10 @@ CKA 考试内容(总共20道题，2个小时):
 * 排除网络故障 Troubleshoot networking
 
 
+# CKA 真题
+2020-11 和 2019-07 真题
+模拟题：https://rx-m.com/cka-online-training/
+
 ```shell
 # 切换 k8s 集群
 kubectl config use-context k8s
@@ -58,6 +62,18 @@ kubectl create namespace app-team1
 kubectl create clusterrole deployment-clusterrole --verb=create --resource=deployments,statefulsets,daemonsets
 kubectl create serviceaccount cicd-token -n app-team1
 kubectl create clusterrolebinding deployment-clusterrolebinding --clusterrole=deployment-clusterrole --serviceaccount=app-team1:cicd-token
+
+# 记得验证下 impersonate 为 networker user 具有这个权限
+kubectl auth can-i get ingress --as networker
+```
+
+2021-04: Create a service account name dev-sa in default namespace, dev-sa can create below components in dev namespace: Deployment, Statefulset, Daemonset
+```shell
+k create sa dev-sa
+k create ns dev
+k create role dev-sa --resource=deployment,statefulset,daemonset --verb=create -o yaml -n dev
+k create rolebinding dev-sa --role=dev-sa --serviceaccount=default:dev-sa -n dev
+k auth can-i create deploy --as=system:serviceaccount:default:dev-sa -n dev
 ```
 
 (2)升级集群: 将集群中 master 所有组件从 v1.18 升级到 1.19(controller,apiserver,scheduler,kubelet,kubectl)？
@@ -91,6 +107,133 @@ kubectl cordon ek8s-node-1
 kubectl drain ek8s-node-1 --ignore-daemonsets --force
 ```
 
+(4)查询集群中节点，找出可以调度节点的数量，(其实就是被标记为不可调度和 打了污点的节点之外的节点 数量 )，然后将数量写到指定文件？
+检查有多少 worker nodes 已准备就绪(不包括被打上 Taint:NoSchedule 的节点)， 并将数量写入 /opt/KUSC00402/kusc00402.txt
+```shell
+# 查询集群 Ready 节点数量
+kubectl get node | grep -i ready
+# 判断节点有无不可调度污点
+kubectl describe nodes <nodeName> | grep -i taints | grep -i noSchedule
+```
+
+(5)Tolerations/Taints: 确保在 kubectl 集群的每个节点上运行一个 Nginx Pod。其中 Nginx Pod 必须使用 Nginx 镜像。不要覆盖当前环境中的任何 taints。 使用 Daemonset 来完成这个任务，Daemonset 的名字使用 ds。
+```yaml
+apiVersion: apps/v1
+	kind: DaemonSet
+	metadata:
+	  name: ds
+	  namespace: kube-system
+	  labels:
+		k8s-app: fluentd-logging
+	spec:
+	  tolerations:
+			# this toleration is to have the daemonset runnable on master nodes
+			# remove it if your masters can't run pods
+			- key: node-role.kubernetes.io/master
+			  effect: NoSchedule
+	  selector:
+		matchLabels:
+		  name: fluentd-elasticsearch
+	  template:
+		metadata:
+		  labels:
+			name: fluentd-elasticsearch
+		spec:
+		  containers:
+		  - name: fluentd-elasticsearch
+			image: nginx
+```
+
+2021-04: Count the ready node in this cluster that without have a taint, and output the number to the file /root/cka/readyNode.txt.
+```shell
+k get nodes -o wide | grep -v "NotReady" | wc -l
+k describe nodes | grep "Taints" | grep "NoExecute" | wc -l
+```
+
+(6)initContainers: 添加一个 initcontainer 到 lum(/etc/data)这个 initcontainer 应该创建一个名为/workdir/calm.txt 的空文件，如果/workdir/calm.txt 没有被检测到，这个 Pod 应该退出
+```yaml
+      #题目中yaml文件已经给出，只需要增加initcontainers部分，以及emptyDir: {} 即可
+      #init文档位置：https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+    env: test
+spec:
+  volumes:
+  - name: workdir
+    emptyDir: {} 
+  containers:
+  - name: nginx
+    image: nginx
+    command: [if ..]
+    volumeMounts:
+      - name: work
+        mountPath: /workdir
+  initContainers:
+  - name: init-myservice
+    image: busybox:1.28
+    command: ["sh", "-c", "touch /workdir/calm.txt"] 
+    volumeMounts:
+    - name: work
+      mountPath: /workdir
+```
+
+(7)Deployment: 创建 deployment 名字为 nginx-app 容器采用 1.11.9 版本的 nginx  这个 deployment 包含 3 个副本,接下来通过滚动升级的方式更新镜像版本为 1.12.0，并记录这个更新，最后，回滚这个更新到之前的 1.11.9 版本
+创建 deployment 的 spec 文件: 使用 redis 镜像，7 个副本，label 为 app_enb_stage=dev deployment 名字为 kual00201 保存这个 spec 文件到/opt/KUAL00201/deploy_spec.yaml完成后，清理(删除)在此任务期间生成的任何新的 k8s API 对象
+```shell
+kubectl run deployment nginx-app --image=nginx:1.11.9 --replicas=3
+kubectl set image deployment nginx-app nginx-app=nginx:1.12.0 --record  (nginx-app container名字)
+kubectl rollout history deployment nginx-app
+kubectl rollout undo deployment nginx-app
+
+kubectl create deploy kual00201 --image=redis --labels=app_enb_stage=dev --dry-run -o yaml > /opt/KUAL00201/deploy_spec.yaml
+```
+
+2021-04: Create a pod name log, container name log-pro use image busybox, output the important information at /log/data/output.log. Then another container name log-cus use image busybox, load the output.log at /log/data/output.log and print it. Note, this log file only can be share within the pod.
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: log
+  name: log
+spec:
+  containers:
+  - image: busybox
+    name: log-pro
+    command: ["sh", "-c", "echo 'important information' > /log/data/output.log; sleep 1d"]
+    resources: {}
+    volumeMounts:
+    - name: data
+      mountPath: /log/data/
+  - image: busybox
+    name: log-cus
+    command: ["sh", "-c", "cat /log/data/output.log; sleep 1d"]
+    resources: {}
+    volumeMounts:
+    - name: data
+      mountPath: /log/data/
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+  volumes:
+  - name: data
+    emptyDir: {}
+```
+
+2021-04: Output the pod name that uses most CPU resource to file /root/cka/name.txt
+```shell
+k top pod
+```
+
+2021-04: Scale the deployment scale-deploy in namespace dev to three pod and record it.
+```shell
+k scale --replicas=3 deploy/nginx-test1 --record
+k describe deploy nginx-test1
+# 验证找到如下 Annotations:
+# kubernetes.io/change-cause: kubectl scale deploy/nginx-test1 --replicas=3 --record=true
+```
 
 ## Module 3 - Services and Networking
 https://rx-m.com/cka-online-training/ckav2-online-training-module-3/
@@ -100,7 +243,10 @@ https://rx-m.com/cka-online-training/ckav2-online-training-module-3/
 kubectl create ingress test-ingress --rule="foo.com/bar=svc1:8080,tls=my-cert"
 ```
 
+INFO: NetworkPolicy 需要重新演练几遍
 (2)NetworkPolicy: 在指定namespace创建一个NetworkPolicy, 允许namespace中的Pod访问同namespace中其他Pod的8080端口？
+创建一个名为 allow-port-from-namespace 的新 NetworkPolicy，以允许现有 namespace corp-net 中的 Pods 连接到同一 namespace 中其他 Pods 的端 口 9200。
+确保新的 NetworkPolicy:不允许对没有在监听端口 9200 的 Pods 的访问；不允许不来自 namespacecorp-net 的 Pods 的访问
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -120,629 +266,72 @@ spec:
               app: db
       ports:
         - port: 8080
-```
-
-
-## Module 4 - Storage
-https://rx-m.com/cka-online-training/ckav2-online-training-module-4/
-(1)Etcd: 对 etcd 进行 snapshot save 和 restore，因为 https 会提供 endpoints, cacert, cert 和 key？
-```shell
-# etcdctl 3.4.10 以上好像不需要指定 api 版本了，已经默认了
-ETCDCTL_API=3 etcdctl --endpoints="https://127.0.0.1:2379" --cacert=ca.crt --cert=etcd.crt --key=etcd.key snapshot save /etc/data/etcd-snapshot.db
-ETCDCTL_API=3 etcdctl --endpoints="https://127.0.0.1:12379" --cacert=ca.crt --cert=etcd.crt --key=etcd.key snapshot restore /etc/data/etcd-snapshot.db
-```
-
-(2)PVC/PV: 对集群中的 PV 按照大小顺序排序显示，并将结果写到指定文件？
-```shell
-kubectl get pv --sort-by=.spec.capacity.storage --no-headers > pv.txt
-```
-
-
-## Module 5 - Troubleshooting
-https://rx-m.com/cka-online-training/ckav2-online-training-module-5/
-(1)列出指定pod的日志中状态为Error的行，并记录在指定的文件上? 同时，集群中存在一个 Pod，并且该 Pod 中的容器会将 log 输出到指定文件。
-修改 Pod 配置，将 Pod 的日志输出到控制台,其实就是给 Pod 添加一个 sidecar，然后不断读取指定文件，输出到控制台？
-```shell
-kubectl logs deployment/nginx -c nginx-1 | grep "Error" > /opt/KUCC000xxx/KUCC000xxx.txt
-```
-
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: podname
-spec:
-  containers:
-  - name: count
-    image: busybox
-    args: ["/bin/sh", "-c", "i=0;while true;do echo '$(date) INFO $i' >> /var/log/legacy-ap.log;i=$((i+1));sleep 1;done"]
-    volumeMounts:
-    - name: logs
-      mountPath: /var/log
-  - name: count-log-1
-    image: busybox
-    args: [/bin/sh, -c, 'tail -n+1 -f /var/log/legacy-ap.log']
-    volumeMounts:
-    - name: logs
-      mountPath: /var/log
-  volumes:
-  - name: logs
-    emptyDir: {}
-
-# 验证:
-# kubectl logs <pod_name> -c <container_name>
-```
-
-
-
-
-16、 设置配置环境:问题权重: 7%
-kubectl config use-context k8s
-在不更改其现有容器的情况下，需要将一个现有的 Pod 集成到 Kubernetes 的内置日志记录体系结构中(例如 kubectl logs)。添加 streaming sidecar 容器是实现此要求的一种好方法。
-Task
-将一个 busybox sidecar 容器添加到现有的 Pod legacy-app。新的 sidecar
-容器必须运行以下命令:
-/bin/sh -c tail -n+1 -f /var/log/legacy-app.log
-使用名为 logs 的 volume mount 来让文件 /var/log/legacy-app.log 可用于 sidecar 容器。
-不要更改现有容器。 不要修改日志文件的路径，两个容器都必须通过 /var/log/legacy-app.log 来访问该文件。
-考点:pod 两个容器共享存储卷 apiVersion: v1
-kind: Pod
-metadata:
-name: podname spec: containers:
-- name: count image: busybox args:
-- /bin/sh
-- -c
-  ->
-  i=0;
-  while true; do
-  echo "$(date) INFO $i" >> /var/log/legacy-ap.log; i=$((i+1));
-  sleep 1;
-  done
-  volumeMounts:
-- name: logs
-  mountPath: /var/log
-- name: count-log-1
-  image: busybox
-  args: [/bin/sh, -c, 'tail -n+1 -f /var/log/legacy-ap.log']
-  volumeMounts:
-- name: varlog
-  mountPath: /var/log
-  volumes:
-- name: logs
-  emptyDir: {}
-#验证:
-$ kubectl logs <pod_name> -c <container_name>
-
-
-
-(10)查询集群中指定 Pod 的 log日志，将带有 Error 的行输出到指定文件
-15、设置配置环境:问题权重: 5%
-kubectl config use-context k8s
-Task
-监控 pod bar 的日志并:
-提取与错误 file-not-found 相对应的日志行
-将这些日志行写入 /opt/KUTR00101/bar
-考点:kubectl logs 命令
-kubectl logs foobar | grep unable-access-website > /opt/KUTR00101/foobar
-
-
-
-
-(11)1.创建一个 Deployment，2.更新镜像版本，3.回滚？
-
-
-
-(12)集群有一个节点 notready，找出问题，并解决。 并保证机器重启后不会再出现此问题？
-
-
-
-(13)创建一个 PV，使用hostPath 存储，大小1G，ReadWriteOnce？
-12、设置配置环境:问题权重: 4%
-kubectl config use-context hk8s Task
-创建名为 app-config 的 persistent volume，容量为 1Gi，访问模式为 ReadWriteMany。 volume 类型为 hostPath，位于 /srv/app-config
-考点:hostPath 类型的 pv apiVersion: v1
-kind: PersistentVolume metadata:
-name: app-config labels:
-type: local
-spec:
-capacity:
-storage: 2Gi
-accessModes:
-- ReadWriteMany
-  hostPath:
-  path: "/src/app-config"
-
-
-
-
-(14)使用指定 storageclass 创建一个 pvc，大小为 10M，将这个 nginx 容器的/var/nginx/html目录使用该 pvc 挂在出来，将这个 pvc 的大小从 10M 更新成 70M?
-```yaml
-#解答
-#创建 PVC
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-name: pv-volume
-spec:
-accessModes:
-- ReadWriteOnce
-volumeMode: Filesystem
-resources:
-requests:
-storage: 10Mi
-storageClassName: csi-hostpath-sc
-#创建 pod
-apiVersion: v1
-kind: Pod
-metadata:
-name: web-server
-spec:
-containers:
-- name: nginx
-image: nginx
-volumeMounts:
-- mountPath: "/usr/share/nginx/html"
-name: pv-volume
-volumes:
-- name: pv-volume
-persistentVolumeClaim:
-claimName: myclaim
-#通过 kubectl edit pvc pv-volume 可以进行修改容量
-```
-
-
-
-14、 问题权重: 7%
-名称:web-server
-Image:nginx
-挂载路径:/usr/share/nginx/html
-配置新的 Pod，以对 volume 具有 ReadWriteOnce 权限。
-考点:pod 中对 pv 和 pvc 的使用
-
-
-
-
-
-
-13、设置配置环境:问题权重: 7%
-kubectl config use-context ok8s
-Task
-创建一个新的 PersistentVolumeClaim:
-名称: pv-volume
-Class: csi-hostpath-sc
-容量: 10Mi
-创建一个新的 Pod，此 Pod 将作为 volume 挂载到 PersistentVolumeClaim:
-最后，使用 kubectl edit 或 kubectl patch 将 PersistentVolumeClaim 的容量扩 展为 70Mi，并记录此更改。
-
-考点:pvc 的创建 class 属性的使用，--save-config 记录变更 #创建 PVC
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-name: pv-volume
-spec:
-accessModes:
-- ReadWriteOnce
-  volumeMode: Filesystem resources:
-  requests:
-  storage: 10Mi
-  storageClassName: csi-hostpath-sc #创建 pod
-  apiVersion: v1
-  kind: Pod
-  metadata:
-  name: web-server
-  spec:
-  containers:
-- name: nginx
-  image: nginx
-  volumeMounts:
-- mountPath: "/usr/share/nginx/html" name: pv-volume
-  volumes:
-- name: pv-volume
-  persistentVolumeClaim:
-  claimName: myclaim
-  
-kubectl edit pvc pv-volume --save-config
-
-
-
-(15)将集群中一个 Deployment 服务暴露出来,(是一个 nginx，使用kubectl expose 命令暴露即可)？
-6、设置配置环境:问题权重: 7%
-kubectl config use-context k8s
-Task 请重新配置现有的部署 front-end 以及添加名为 http 的端口规范来公开现 有容器 nginx 的端口 80/tcp。
-创建一个名为 front-end-svc 的新服务，以公开容器端口 http。 配置此服务，以 通过在排定的节点上的 NodePort 来公开各个 Pods 考点:将现有的 deploy 暴露成 nodeport 的 service。
-$ kubectl expose deployment front-end --name=front-end-svc --port=80 -- tarport=80 --type=NodePort
-
-
-
-(16)查询集群中节点，找出可以调度节点的数量，(其实就是被标记为不可调度和 打了污点的节点之外的节点 数量 )，然后将数量写到指定文件？
-```yaml
-#解答
-# 查询集群 Ready 节点数量
-$ kubectl get node | grep -i ready
-# 判断节点有误不可调度污点
-$ kubectl describe nodes <nodeName> | grep -i taints | grep -i noSchedule
-```
-
-
-10、设置配置环境:问题权重: 4%
-kubectl config use-context k8s
-Task
-检查有多少 worker nodes 已准备就绪(不包括被打上 Taint:NoSchedule 的节点)， 并将数量写入 /opt/KUSC00402/kusc00402.txt
-考点:检查节点角色标签，状态属性，污点属性的使用
-$ kubectl describe nodes <nodeName> | grep -i taints | grep -i noSchedule
-
-
-
-
-(17)找集群中带有指定 label 的 Pod 中占用资源最高的，并将它的名字写入指定的文件？
-```yaml
-#解答
-$ kubectl top pod -l name=cpu-user -A
-NAMAESPACE NAME CPU MEM
-delault cpu-user-1 45m 6Mi
-delault cpu-user-2 38m 6Mi
-delault cpu-user-3 35m 7Mi
-delault cpu-user-4 32m 10Mi
-
-# echo 'cpu-user-1' >>/opt/KUTR00401/KUTR00401.txt
-```
-
-17、设置配置环境，问题权重: 5%
-kubectl config use-context k8s
-Task
-通过 pod label name=cpu-loader，找到运行时占用大量 CPU 的 pod， 并将 占用 CPU 最高的 pod 名称写入文件 /opt/KUTR000401/KUTR00401.txt(已 存在)。
-考点:kubectl top --l 命令的使用 kubectl top pod -l name=cpu-user -A
-
-
-
-
-(18)创建一个名为 app-config 的 PV，PV 的容量为 2Gi 访问模式为 ReadWriteMany，volume 的类型为 hostPath，位置为/src/app-config？
-```yaml
-# 解答
-apiVersion: v1
-kind: PersistentVolume 
-metadata:
-  name: app-config 
-  labels:
-    type: local 
-spec:
-  capacity: 
-    storage: 2Gi
-  accessModes:
-    - ReadWriteMany
-  hostPath:
-    path: "/src/app-config"
-```
-
-
-(19)将 deployment 扩容到 6 个 pod？
-```shell
-#解答
-# kubectl scale --replicas=6 deployment/loadbalancer
-```
-
-
-(20)创建 NetworkPolicy？
-```yaml
-apiVersion: networking.k8s.io/v1 
-kind: NetworkPolicy
-metadata:
-  name: all-port-from-namespace
-  namespace: internal 
-spec:
-  podSelector: 
-    matchLabels: {}
-  ingress: 
-    - from:
-      - podSelector: {} 
-      ports:
-        - port: 9000
-```
-
-5、设置配置环境:问题权重: 7% kubectl config use-context hk8s
-Task
-创建一个名为 allow-port-from-namespace 的新 NetworkPolicy，以允许现有 namespace corp-net 中的 Pods 连接到同一 namespace 中其他 Pods 的端 口 9200。
-确保新的 NetworkPolicy:
-不允许对没有在监听端口 9200 的 Pods 的访问
-不允许不来自 namespacecorp-net 的 Pods 的访问
-考点:NetworkPolicy 的创建
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-name: all-port-from-namespace
-namespace: internal
+  name: all-port-from-namespace
+  namespace: internal
 spec:
-podSelector:
-matchLabels: {}
-ingress:
-- from:
-- namespaceSelector: matchLabels: name: namespacecorp-net
-- podSelector: {}
-  ports:
-- port: 9000
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector: 
+       matchLabels: 
+         name: namespacecorp-net
+	- podSelector: {}
+	  ports:
+	  - port: 9200
+```
 
-
-9、设置配置环境:问题权重: 4%
-kubectl config use-context k8s
-Task
-按如下要求调度一个 pod:
-名称:nginx-kusc00401
-Image:nginx
-Node selector:disk=spinnin
-考点:nodeSelect 属性的使用
-apiVersion: v1
-kind: Pod
+2021-04: Only pods that in the internal namespace can access to the pods in mysql namespace via port 8080/TCP.
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
-name: nginx-kusc00401
-labels:
-role: nginx-kusc00401
+  name: mysql-network-policy
+  namespace: mysql
 spec:
-nodeSelector:
-disk: spinnin
-containers:
-- name: nginx
-  image: nginx
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# CKA 20190714考试真题
-
-# 1.监控 foobar Pod 的日志，提取 pod 相应的行'error'写入到/logs 文件中
-
-```
-  kubectl logs foobar | grep error > /logs
-```
-
-# 2.使用 name 排序列出所有的 PV，把输出内容存储到/opt/文件中 使用 kubectl own 对输出进行排序，并且不再进一步操作它
-
-```
-  kubectl get pv --all-namespace --sort-by=.metadata.name > /opt/
-```
-
-# 3.确保在 kubectl 集群的每个节点上运行一个 Nginx Pod。其中 Nginx Pod 必须使用 Nginx 镜像。不要覆盖当前环境中的任何 taints。 使用 Daemonset 来完成这个任务，Daemonset 的名字使用 ds。
-
-	题目对应文档：https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
-	删除tolerations字段，复制到image: gcr.io/fluentd-elasticsearch/fluentd:v2.5.1这里即可，再按题意更改yaml文件。
-	apiVersion: apps/v1
-	kind: DaemonSet
-	metadata:
-	  name: ds
-	  namespace: kube-system
-	  labels:
-		k8s-app: fluentd-logging
-	spec:
-	  selector:
-		matchLabels:
-		  name: fluentd-elasticsearch
-	  template:
-		metadata:
-		  labels:
-			name: fluentd-elasticsearch
-		spec:
-		  containers:
-		  - name: fluentd-elasticsearch
-			image: nginx
-
-# 4.添加一个 initcontainer 到 lum(/etc/data)这个 initcontainer 应该创建一个名为/workdir/calm.txt 的空文件，如果/workdir/calm.txt 没有被检测到，这个 Pod 应该退出
-
-- - ```
-      题目中yaml文件已经给出，只需要增加initcontainers部分，以及emptyDir: {} 即可
-      init文档位置：https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
-      apiVersion: v1
-      kind: Pod
-      metadata:
-        name: nginx
-        labels:
-          env: test
-      spec:
-        volumes:
-      - name: workdir
-        emptyDir: {} 
-          containers:
-      - name: nginx
-        image: nginx
-        command: [if ..]
-        volumeMounts:
-        - name: work
-          mountPath: /workdir
-          initContainers:
-      - name: init-myservice
-        image: busybox:1.28
-        command: 
-        - touch
-        - /workdir/calm.txt
-          volumeMounts:
-        - name: work
-          mountPath: /workdir
-        
-```
-
-
-
-# 5.创建一个名为 kucc 的 Pod,其中内部运行着 nginx+redis+memcached+consul 4 个容器
-
-```
-https://v1-14.docs.kubernetes.io/docs/concepts/workloads/pods/pod-overview/
-	apiVersion: v1
-	kind: Pod
-	metadata:
-	  name: kucc
-	spec:
-	  containers:
-	  - name: nginx
-		image: nginx
-	  - name: redis
-		image: redis
-	  - name: memcached
-		image: memcached
-	  - name: consul
-		image: consul
-```
-
-# 6.创建 Pod，名字为 nginx，镜像为 nginx，添加 label disk=ssd
-
-```
-https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          ns-name: internal
+    ports:
+    - protocol: TCP
+      port: 8080
+---
 apiVersion: v1
-	kind: Pod
-	metadata:
-	  name: nginx
-	  labels:
-		env: test
-	spec:
-	  containers:
-	  - name: nginx
-		image: nginx
-		imagePullPolicy: IfNotPresent
-	  nodeSelector:
-		disk: ssd
+kind: Namespace
+metadata:
+  name: internal
+  labels:
+    ns-name: internal
+spec: {}
 ```
 
-# 7.创建 deployment 名字为 nginx-app 容器采用 1.11.9 版本的 nginx  这个 deployment 包含 3 个副本,接下来通过滚动升级的方式更新镜像版本为 1.12.0，并记录这个更新，最后，回滚这个更新到之前的 1.11.9 版本
-
-	kubectl run deployment nginx-app --image=nginx:1.11.9 --replicas=3
-	kubectl set image deployment nginx-app nginx-app=nginx:1.12.0 --record  (nginx-app container名字)
-	kubectl rollout history deployment nginx-app
-	kubectl rollout undo deployment nginx-app
-
-# 8.创建和配置 service，名字为 front-end-service。可以通过 NodePort/ClusterIp 开访问，并且路由到 front-end 的 Pod 上
-
-```
-kubectl expose pod front-end --name=front-end-service --port=80  --type=NodePort
+(3)将集群中一个 Deployment 服务暴露出来(是一个 nginx，使用kubectl expose 命令暴露即可)？
+请重新配置现有的部署 front-end 以及添加名为 http 的端口规范来公开现 有容器 nginx 的端口 80/tcp。
+创建一个名为 front-end-svc 的新服务，以公开容器端口 http。 配置此服务，以 通过在排定的节点上的 NodePort 来公开各个 Pods 考点:将现有的 deploy 暴露成 nodeport 的 service。
+```shell
+kubectl create deployment front-end --image=nginx --port=80
+kubectl expose deployment front-end --port=80 --target-port=80 --name=front-end-svc --type=NodePort
 ```
 
-# 9.创建一个 Pod，名字为 Jenkins，镜像使用 Jenkins。在新的 namespace website-frontend 上创建
-
-	kubectl create ns website-frontend
-	
-	apiVersion: v1
-	kind: Pod
-	metadata:
-	  name: Jenkins
-	  namespace: website-frontend
-	spec:
-	  containers:
-	  - name: Jenkins
-		image: Jenkins
-		
-	kubectl apply -f ./xxx.yaml 	
-
-# 10.创建 deployment 的 spec 文件: 使用 redis 镜像，7 个副本，label 为 app_enb_stage=dev deployment 名字为 kual00201 保存这个 spec 文件到/opt/KUAL00201/deploy_spec.yaml完成后，清理(删除)在此任务期间生成的任何新的 k8s API 对象
-
-```
-kubectl run kual00201 --image=redis --labels=app_enb_stage=dev --dry-run -oyaml > /opt/KUAL00201/deploy_spec.yaml
-```
-
-# 11.创建一个文件/opt/kucc.txt ，这个文件列出所有的 service 为 foo ,在 namespace 为 production 的 Pod这个文件的格式是每行一个 Pod的名字
-
-```
+(4)Service: 创建一个文件/opt/kucc.txt ，这个文件列出所有的 service 为 foo ,在 namespace 为 production 的 Pod这个文件的格式是每行一个 Pod的名字
+```shell
 kubectl get svc -n production --show-labels | grep foo
-
-kubectl get pods -l app=foo(label标签) -o=custom-columns=NAME:.spec.name > kucc.txt
+kubectl get pods -l app=foo -o=custom-columns=NAME:.spec.name > kucc.txt
 ```
 
-# 12.创建一个secret,名字为super-secret包含用户名bob,创建pod1挂载该secret，路径为/secret，创建pod2，使用环境变量引用该secret，该变量的环境变量名为ABC
-
-	https://kubernetes.io/zh/docs/concepts/configuration/secret/#%E8%AF%A6%E7%BB%86
-	echo -n "bob" | base64
-	
-	apiVersion: v1
-	kind: Secret
-	metadata:
-	  name: super-secret
-	type: Opaque
-	data:
-	  username: Ym9i
-	  
-	apiVersion: v1
-	kind: Pod
-	metadata:
-	  name: pod1
-	spec:
-	containers:
-	- name: mypod
-	  image: redis
-	  volumeMounts:
-	- name: foo
-	  mountPath: "/secret"
-	  readOnly: true
-	volumes: secret
-	- name: foo
-	  secret:
-	    secretName: super-secret
-
-
-	apiVersion: v1
-	kind: Pod
-	metadata:
-	  name: pod-evn-eee
-	spec:
-	containers:
-	- name: mycontainer
-	image: redis
-	env:
-	- name: ABC
-	    valueFrom:
-	      secretKeyRef:
-	        name: super-secret
-	        key: username
-	restartPolicy: Never
-
-# 13.在新的ns中创建pv，指定pv名字和挂载路径，镜像等
-
-	https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/#create-a-persistentvolume
-	kubectl create ns new
-	
-	apiVersion: v1
-	kind: PersistentVolume
-	metadata:
-	  name: pv0003
-	spec:
-	  capacity:
-	    storage: 5Gi
-	volumeMode: Filesystem
-	accessModes:
-	- ReadWriteOnce
-	persistentVolumeReclaimPolicy: Recycle
-	storageClassName: slow
-	hostPath:
-	  path: "/etc/data"
-	
-	kubectlc apply -f ./xxx.yaml --namespace=new
-
-# 14.为给定deploy  website副本扩容到6
-
+(5)创建一个 deployment 名字为:nginx-dns 路由服务名为：nginx-dns 确保服务和 pod 可以通过各自的 DNS 记录访问 容器使用 nginx 镜像，
+使用 nslookup 工具来解析 service 和 pod 的记录并写入相应的/opt/service.dns 和/opt/pod.dns 文件中，确保你使用 busybox:1.28 的镜像用来测试。
 ```
- kubectl scale deployment website --replicas=6
-```
-
-# 15.查看给定集群ready的node个数(不包含NoSchedule)
-
-```
-1.kubectl get nodes 
-2.把所有ready得都执行kubectl describe node $nodename | grep Taint  如果有NoSchedule
-```
-
-# 16.找出指定ns中使用cup最高的pod名写出到指定文件
-
-```
-   kubectc top pod -l xxx --namespace=xxx
-```
-
-# 17.创建一个 deployment 名字为:nginx-dns 路由服务名为：nginx-dns 确保服务和 pod 可以通过各自的 DNS 记录访问 容器使用 nginx 镜像，使用 nslookup 工具来解析 service 和 pod 的记录并写入相应的/opt/service.dns 和/opt/pod.dns 文件中，确保你使用 busybox:1.28 的镜像用来测试。
-
-- ```
     busybox这里找：https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
     1.kubectl run nginx-dns --image=nginx
       kubectl expose deployment nginx-dns --name=nginx-dns --port=80 --type=NodePort
@@ -766,37 +355,169 @@ kubectl get pods -l app=foo(label标签) -o=custom-columns=NAME:.spec.name > kuc
     3.解析
       kubectl exec -it busybox -- nslookup nginx-dns
       kubectl exec -it busybox -- nslookup 10.244.0.122(pod IP)
-    ```
-
-# 18.给定https地址，ca，cert证书，key备份该数据到指定目录
-
-```
-ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:1111 --ca-file=/pki/ca.crt --cert-file=/pki/cert.crt --key-file=/pki/key.crt snapshot save 给的路径
-有些题目下--ca-file会报错，记得看endpoints -h 里的字段怎么要求的
 ```
 
-# 19.在ek8s集群中使name=ek8s-node-1节点不能被调度，并使已被调度的pod重新调度
+2021-04: There is pod name pod-nginx, create a service name service-nginx, use nodePort to expose the pod. Then create a pod use image busybox to nslookup the pod pod-nginx and service service-nginx.
 
-```
-先切换集群到ek8s    
-再执行
-kubectl drain node1 --ignore-daemonsets --delete-local-data  
-```
 
-# 20.给定集群中的一个node未处于ready状态，解决该问题并具有持久性
-
-```
-进入集群
-ssh node  
-
-systemctl status kubelet
-
-systemctl start kubelet   
-systemctl enable kubelet
+## Module 4 - Storage
+https://rx-m.com/cka-online-training/ckav2-online-training-module-4/
+(1)Etcd: 对 etcd 进行 snapshot save 和 restore，因为 https 会提供 endpoints, cacert, cert 和 key？
+```shell
+# etcdctl 3.4.10 以上好像不需要指定 api 版本了，已经默认了
+ETCDCTL_API=3 etcdctl --endpoints="https://127.0.0.1:2379" --cacert=ca.crt --cert=etcd.crt --key=etcd.key snapshot save /etc/data/etcd-snapshot.db
+ETCDCTL_API=3 etcdctl --endpoints="https://127.0.0.1:12379" --cacert=ca.crt --cert=etcd.crt --key=etcd.key snapshot restore /etc/data/etcd-snapshot.db
 ```
 
-# 21.题目很绕，大致是 在k8s的集群中的node1节点配置kubelet的service服务，去拉起一个由kubelet直接管理的pod(说明了是静态pod)，
+(2)PVC/PV: 对集群中的 PV 按照大小顺序排序显示，并将结果写到指定文件？
+```shell
+kubectl get pv --sort-by=.spec.capacity.storage --no-headers > pv.txt
+```
 
+(3)PVC/PV: 创建一个 Name: web-server, Image: nginx, mountPath: /usr/share/nginx/html, 同时 volume 具有 ReadWriteOnce 权限？
+使用指定 storageclass 创建一个 pvc，大小为 10M，将这个 nginx 容器的/var/nginx/html目录使用该 pvc 挂在出来，将这个 pvc 的大小从 10M 更新成 70M?
+```yaml
+#通过 kubectl edit pvc pv-volume 可以进行修改容量
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-server
+spec:
+  containers:
+    - name: nginx-1
+      image: nginx
+      volumeMounts:
+        - name: data
+          mountPath: /usr/share/nginx/html
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: hostpath-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hostpath-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  selector:
+    matchLabels:
+      pv: hostpath
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hostpath-pv
+  labels:
+    pv: hostpath
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /usr/share/nginx/html
+```
+
+(5)Secret: 创建一个secret,名字为super-secret包含用户名bob,创建pod1挂载该secret，路径为/secret，创建pod2，使用环境变量引用该secret，该变量的环境变量名为ABC
+```yaml
+#https://kubernetes.io/zh/docs/concepts/configuration/secret/#%E8%AF%A6%E7%BB%86
+#	echo -n "bob" | base64
+	
+apiVersion: v1
+kind: Secret
+metadata:
+  name: super-secret
+type: Opaque
+data:
+  username: Ym9i
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+spec:
+  containers:
+  - name: mypod
+    image: redis
+    volumeMounts:
+    - name: foo
+      mountPath: "/secret"
+      readOnly: true
+  volumes: secret
+  - name: foo
+    secret:
+      secretName: super-secret
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-evn-eee
+spec:
+  containers:
+  - name: mycontainer
+    image: redis
+    env:
+      - name: ABC
+        valueFrom:
+          secretKeyRef:
+            name: super-secret
+            key: username
+```
+
+## Module 5 - Troubleshooting
+https://rx-m.com/cka-online-training/ckav2-online-training-module-5/
+(1)列出指定pod的日志中状态为Error的行，并记录在指定的文件上? 同时，集群中存在一个 Pod，并且该 Pod 中的容器会将 log 输出到指定文件。
+修改 Pod 配置，将 Pod 的日志输出到控制台,其实就是给 Pod 添加一个 sidecar，然后不断读取指定文件，输出到控制台？
+```shell
+kubectl logs deployment/nginx -c nginx-1 | grep "Error" > /opt/KUCC000xxx/KUCC000xxx.txt
+```
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: podname
+spec:
+  containers:
+  - name: count
+    image: busybox
+    args: ["/bin/sh", "-c", "i=0;while true;do echo '$(date) INFO $i' >> /var/log/legacy-ap.log;i=$((i+1));sleep 1;done"]
+    volumeMounts:
+    - name: logs
+      mountPath: /var/log
+  - name: count-log-1
+    image: busybox
+    args: ["/bin/sh", "-c", "tail -n+1 -f /var/log/legacy-ap.log"]
+    volumeMounts:
+    - name: logs
+      mountPath: /var/log
+  volumes:
+  - name: logs
+    emptyDir: {}
+
+# 验证:
+# kubectl logs <pod_name> -c <container_name>
+```
+
+(2)找集群中带有指定 label 的 Pod 中占用资源最高的，并将它的名字写入指定的文件？
+通过 pod label name=cpu-loader，找到运行时占用大量 CPU 的 pod， 并将占用 CPU 最高的 pod 名称写入文件 /opt/KUTR000401/KUTR00401.txt(已 存在)。
+```shell
+kubectl top pod -l name=cpu-user -A
+#NAMAESPACE NAME CPU MEM
+#delault cpu-user-1 45m 6Mi
+#delault cpu-user-2 38m 6Mi
+#delault cpu-user-3 35m 7Mi
+#delault cpu-user-4 32m 10Mi
+echo 'cpu-user-1' >>/opt/KUTR00401/KUTR00401.txt
+```
+
+(3)static pod: 题目很绕，大致是 在k8s的集群中的node1节点配置kubelet的service服务，去拉起一个由kubelet直接管理的pod(说明了是静态pod)，
 ```
 该文件应该放置在/etc/kubernetes/manifest目录下(给出了pod路径)
 
@@ -808,22 +529,3 @@ systemctl enable kubelet
 	  6.systemctl enable kubelet
       7.检查  kubectl get pods -n kube-system | grep static-pod  实际是static-pod+系统  static-pod-kubelet-service
 ```
-
-# 22.某集群中kubelet.service服务无法正常启动，解决该问题，并具有持久性
-
-```
-kubectl 命令能用 kubectl get cs 健康检查  看manager-controller  是否ready   如果不ready   systemctl start kube-manager-controller.service   
-```
-
-
-23.TLS问题 （一道很长的题目，建议放弃，难度特别大）
-
-# 24.创建指定大小和路径的pv
-
-```
-https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/#create-a-persistentvolume
-```
-
-
-
-
