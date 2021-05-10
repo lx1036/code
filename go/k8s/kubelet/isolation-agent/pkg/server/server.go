@@ -9,7 +9,6 @@ import (
 	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/cgroup"
 	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/scraper"
 	topologycpu "k8s-lx1036/k8s/kubelet/isolation-agent/pkg/topology"
-	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +38,7 @@ type Config struct {
 	Nodename   string
 
 	RemoteRuntimeEndpoint string // "unix:///var/run/dockershim.sock"
+	ContainerRuntime      string // "docker"
 	ConnectionTimeout     time.Duration
 }
 
@@ -52,12 +52,24 @@ type Server struct {
 	informer  informers.SharedInformerFactory
 	podLister v1.PodLister
 
-	scraper               *scraper.Scraper
-	kubeClient            *kubernetes.Clientset
-	cgroupManager         *cgroup.Manager
-	capacity              corev1.ResourceList
-	cpuTopology           *topology.CPUTopology
-	remoteRuntimeEndpoint string
+	scraper       *scraper.Scraper
+	kubeClient    *kubernetes.Clientset
+	cgroupManager *cgroup.Manager
+	capacity      corev1.ResourceList
+	cpuTopology   *topology.CPUTopology
+
+	remoteRuntimeEndpoint string // "unix:///var/run/dockershim.sock"
+	containerRuntime      string // "docker"
+
+	// CgroupRoot is the root cgroup to use for pods.
+	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
+	CgroupRoot string
+	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
+	// And all Burstable and BestEffort pods are brought up under their
+	// specific top level QoS cgroup.
+	CgroupsPerQOS bool
+	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
+	CgroupDriver string
 }
 
 func NewRestConfig(kubeconfig string) (*rest.Config, error) {
@@ -98,6 +110,7 @@ func NewServer(config *Config) (*Server, error) {
 	return &Server{
 		//cpuTopology: cpuTopology,
 		//capacity: capacity,
+		containerRuntime:      config.ContainerRuntime,
 		remoteRuntimeEndpoint: config.RemoteRuntimeEndpoint,
 		nodeName:              config.Nodename,
 		scraper:               scraper.NewScraper(metricsClient),
@@ -111,13 +124,10 @@ func NewServer(config *Config) (*Server, error) {
 }
 
 func (server *Server) getCPUTopology() (*topology.CPUTopology, corev1.ResourceList) {
-	containerRuntime := "docker"
 	rootDirectory := "/var/lib/kubelet"
-	//remoteRuntimeEndpoint := "unix:///var/run/dockershim.sock"
-	cgroupRoots := []string{"/kubepods"}
-	imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(containerRuntime, server.remoteRuntimeEndpoint)
-	cadvisorClient, err := cadvisor.New(imageFsInfoProvider, rootDirectory, cgroupRoots,
-		cadvisor.UsingLegacyCadvisorStats(containerRuntime, server.remoteRuntimeEndpoint))
+	imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(server.containerRuntime, server.remoteRuntimeEndpoint)
+	cadvisorClient, err := cadvisor.New(imageFsInfoProvider, rootDirectory, server.GetCgroupRoots(),
+		cadvisor.UsingLegacyCadvisorStats(server.containerRuntime, server.remoteRuntimeEndpoint))
 	if err != nil {
 		panic(err)
 	}
@@ -167,55 +177,56 @@ func (server *Server) RunUntil(stopCh <-chan struct{}) error {
 	return nil
 }
 
+type ResourceRatio struct {
+	cpuRatio    float64
+	memoryRatio float64
+}
+
+// TODO: 结合在离线pod资源实际使用比率，根据policy计算出离线pod应该独占多少物理核，policy后续在完善先简单写下
+func (server *Server) policy(prodResourceRatio, nonProdResourceRatio *ResourceRatio, max int) int {
+	numReservedCPUs := 2 // 最小值得是2，即至少一个物理核
+	if prodResourceRatio.cpuRatio < 0.2 {
+		numReservedCPUs = numReservedCPUs * 2
+		if numReservedCPUs > max {
+			klog.Warning("")
+			numReservedCPUs = 2
+		}
+	}
+
+	return numReservedCPUs
+}
+
 func (server *Server) tick(ctx context.Context, startTime time.Time) {
-
-	// 每次都重新计算 cpu topology
-	cpuTopo, capacity := server.getCPUTopology()
-
 	pods, err := server.podLister.Pods(metav1.NamespaceAll).List(labels.Everything())
 	if err != nil {
 		klog.Error(fmt.Sprintf("get pods in node %s err: %v", server.nodeName, err))
 		return
 	}
 
+	// 每次都重新计算 cpu topology
+	cpuTopology, capacity := server.getCPUTopology()
+	// 由于可能会超卖，所以不要使用 node .status.allocatable
 	prodMetrics, nonProdMetrics, err := server.scraper.Scrape(ctx, pods)
 	if err != nil {
 		klog.Error(err)
 	}
-
-	/*
-		currentNode, err := server.kubeClient.CoreV1().Nodes().Get(context.TODO(), server.nodeName, metav1.GetOptions{})
-		if err != nil {
-			klog.Error(err)
-			return
-		}
-		// INFO: 由于会超卖，所以 Allocatable 不是 node 的资源实际值，可以考虑使用
-		//  machineInfo, err := cadvisorClient.MachineInfo()
-		//  capacity := cadvisor.CapacityFromMachineInfo(machineInfo), 这里 capacity 就是 currentNode.Status.Capacity
-		prodCpuRatio := float64(prodMetrics.Cpu().Value()) / float64(currentNode.Status.Allocatable.Cpu().Value())
-		nonProdCpuRatio := float64(nonProdMetrics.Cpu().Value()) / float64(currentNode.Status.Allocatable.Cpu().Value())
-		prodMemoryRatio := float64(prodMetrics.Memory().Value()) / float64(currentNode.Status.Allocatable.Memory().Value())
-		nonProdMemoryRatio := float64(nonProdMetrics.Memory().Value()) / float64(currentNode.Status.Allocatable.Memory().Value())
-	*/
 	prodCpuRatio := float64(prodMetrics.Cpu().Value()) / float64(capacity.Cpu().Value())
 	nonProdCpuRatio := float64(nonProdMetrics.Cpu().Value()) / float64(capacity.Cpu().Value())
 	prodMemoryRatio := float64(prodMetrics.Memory().Value()) / float64(capacity.Memory().Value())
 	nonProdMemoryRatio := float64(nonProdMetrics.Memory().Value()) / float64(capacity.Memory().Value())
-
 	klog.Info(prodCpuRatio, nonProdCpuRatio, prodMemoryRatio, nonProdMemoryRatio)
-
-	allCPUs := cpuTopo.CPUDetails.CPUs()
-	// TODO: policy, 先草稿下后面再继续完善 policy
-	numReservedCPUs := 2 // 最小值得是2，即至少一个物理核
-	if prodCpuRatio < 0.2 {
-		numReservedCPUs = numReservedCPUs * 2
-		if numReservedCPUs > allCPUs.Size() {
-			klog.Warning("")
-			numReservedCPUs = 2
-		}
+	prodResourceRatio := &ResourceRatio{
+		cpuRatio:    prodCpuRatio,
+		memoryRatio: prodMemoryRatio,
+	}
+	nonProdResourceRatio := &ResourceRatio{
+		cpuRatio:    nonProdCpuRatio,
+		memoryRatio: nonProdMemoryRatio,
 	}
 
-	reserved, err := topologycpu.TakeCPUByTopology(cpuTopo, allCPUs, numReservedCPUs)
+	allCPUs := cpuTopology.CPUDetails.CPUs()
+	numReservedCPUs := server.policy(prodResourceRatio, nonProdResourceRatio, allCPUs.Size())
+	reserved, err := topologycpu.TakeCPUByTopology(cpuTopology, allCPUs, numReservedCPUs)
 	if err != nil {
 		klog.Error(err)
 		return
@@ -224,12 +235,13 @@ func (server *Server) tick(ctx context.Context, startTime time.Time) {
 	prodCPUSet := allCPUs.Difference(reserved)
 	klog.Info(fmt.Sprintf("take cpuset %s for nonProdPod, cpuset %s for ProdPod", reserved.String(), prodCPUSet.String()))
 
+	// default all cpus
 	cpuSet := allCPUs.Clone()
 	// TODO: get cpuset.CPUSet
-	for _, pod := range pods {
-		if utils.IsProdPod(pod) {
+	for _, pod := range GetActivePods(pods) {
+		if IsProdPod(pod) {
 			cpuSet = prodCPUSet.Clone()
-		} else if utils.IsNonProdPod(pod) {
+		} else if IsNonProdPod(pod) {
 			cpuSet = reserved.Clone()
 		}
 
@@ -258,8 +270,6 @@ func (server *Server) tick(ctx context.Context, startTime time.Time) {
 					pod.Name, containerID)
 				continue
 			}
-
-			//cpuSet := policy.GetCPUSetOrDefault(prodCpuRatio)
 
 			klog.Info(fmt.Sprintf("[cpumanager] reconcileState: updating container (pod: %s, container: %s, container id: %s, cpuset: %s)",
 				pod.Name, container.Name, containerID, cpuSet.String()))
