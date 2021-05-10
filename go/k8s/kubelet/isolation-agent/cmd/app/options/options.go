@@ -4,8 +4,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-
-	kubetypes "k8s-lx1036/k8s/kubelet/pkg/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 type Options struct {

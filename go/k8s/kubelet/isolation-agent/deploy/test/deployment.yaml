@@ -1,0 +1,33 @@
+
+# 压测cpu: stress -c 4
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: colocation
+  labels:
+    app: colocation
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: colocation
+      labels:
+        app: colocation
+    spec:
+      nodeName: docker04
+      containers:
+        - name: colocation
+          image: nginx:1.17.8
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - mountPath: /tmp/bin
+              name: data
+      volumes:
+        - name: data
+          hostPath:
+            path: /bin
+  selector:
+    matchLabels:
+      app: colocation
+

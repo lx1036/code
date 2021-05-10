@@ -93,7 +93,7 @@ func (server *Server) getCPUTopology() (*topology.CPUTopology, corev1.ResourceLi
 		return nil, nil, err
 	}
 	capacity := cadvisor.CapacityFromMachineInfo(machineInfo)
-	klog.Info(fmt.Sprintf("cpu: %s, memory: %s", capacity.Cpu().String(), capacity.Memory().String()))
+	klog.Info(fmt.Sprintf("[node capacity]node %s has resources cpu: %s, memory: %s", server.option.Nodename, capacity.Cpu().String(), capacity.Memory().String()))
 	numaNodeInfo, err := topology.GetNUMANodeInfo()
 	if err != nil {
 		return nil, nil, err
@@ -103,8 +103,8 @@ func (server *Server) getCPUTopology() (*topology.CPUTopology, corev1.ResourceLi
 		return nil, nil, err
 	}
 	allCPUs := cpuTopology.CPUDetails.CPUs()
-	klog.Info(fmt.Sprintf("NumCPUs[processor,逻辑核]: %d, NumCores[core,物理核]: %d, NumSockets[NUMA node]: %d, allCPUs: %s",
-		cpuTopology.NumCPUs, cpuTopology.NumCores, cpuTopology.NumSockets, allCPUs.String()))
+	klog.Info(fmt.Sprintf("[node capacity]node %s has cpu topology: %d processors, %d cores, %d sockets, all CPU ID: %s",
+		server.option.Nodename, cpuTopology.NumCPUs, cpuTopology.NumCores, cpuTopology.NumSockets, allCPUs.String()))
 
 	return cpuTopology, capacity, nil
 }
@@ -134,18 +134,22 @@ func (server *Server) tick(ctx context.Context, startTime time.Time) {
 		klog.Error(fmt.Sprintf("get pods in node %s err: %v", server.option.Nodename, err))
 		return
 	}
+	activePods := GetActivePods(pods)
 
+	klog.Info(fmt.Sprintf("[1]calculate cpu topology..."))
 	// 每次都重新计算 cpu topology
 	cpuTopology, capacity, err := server.getCPUTopology()
 	if err != nil {
 		klog.Error(fmt.Sprintf("get cpu topology err: %v", err))
 		return
 	}
+
+	klog.Info(fmt.Sprintf("[2]calculate pods resource metrics..."))
 	// 由于可能会超卖，所以不要使用 Node.status.allocatable
-	prodMetrics, nonProdMetrics, err := server.scraper.Scrape(ctx, pods)
+	prodMetrics, nonProdMetrics, err := server.scraper.Scrape(ctx, activePods)
 	if err != nil {
 		klog.Error(fmt.Sprintf("get pod resource err: %v", err))
-		return
+		// no return
 	}
 	prodCpuRatio := float64(prodMetrics.Cpu().Value()) / float64(capacity.Cpu().Value())
 	nonProdCpuRatio := float64(nonProdMetrics.Cpu().Value()) / float64(capacity.Cpu().Value())
@@ -161,20 +165,22 @@ func (server *Server) tick(ctx context.Context, startTime time.Time) {
 		memoryRatio: nonProdMemoryRatio,
 	}
 
+	klog.Info(fmt.Sprintf("[3]calculate pods cpuset..."))
 	allCPUs := cpuTopology.CPUDetails.CPUs()
 	numReservedCPUs := server.policy(prodResourceRatio, nonProdResourceRatio, allCPUs.Size())
-	klog.Info(fmt.Sprintf("[policy]need %d cores at time %s", numReservedCPUs, startTime.String()))
+	klog.Info(fmt.Sprintf("[policy]need %d processors at time %s", numReservedCPUs, startTime.String()))
 	reserved, err := topologycpu.TakeCPUByTopology(cpuTopology, allCPUs, numReservedCPUs)
 	if err != nil {
 		klog.Error(err)
 		return
 	}
 	prodCPUSet := allCPUs.Difference(reserved)
-	klog.Info(fmt.Sprintf("take cpuset %s for nonProdPod, cpuset %s for ProdPod", reserved.String(), prodCPUSet.String()))
+	klog.Info(fmt.Sprintf("[policy]take cpuset %s for nonProdPod, cpuset %s for ProdPod", reserved.String(), prodCPUSet.String()))
 
+	klog.Info(fmt.Sprintf("[4]update containers cpuset..."))
 	// default all cpus
 	cpuSet := allCPUs.Clone()
-	for _, pod := range GetActivePods(pods) {
+	for _, pod := range activePods {
 		if utils.IsProdPod(pod) {
 			cpuSet = prodCPUSet.Clone()
 		} else if utils.IsNonProdPod(pod) {
@@ -187,28 +193,30 @@ func (server *Server) tick(ctx context.Context, startTime time.Time) {
 		for _, container := range allContainers {
 			containerID, err := findContainerIDByName(&podStatus, container.Name)
 			if err != nil {
+				klog.Warning(fmt.Sprintf("[container cpuset]ignoring container for container id(pod: %s, container: %s, err: %v)", container.Name, pod.Name, err))
 				continue
 			}
 
 			// filter container by container status
 			containerStatus, err := findContainerStatusByName(&podStatus, container.Name)
 			if err != nil {
+				klog.Warning(fmt.Sprintf("[container cpuset]ignoring container for container status(pod: %s, container: %s, err: %v)", container.Name, pod.Name, err))
 				continue
 			}
 			if containerStatus.State.Waiting != nil ||
 				(containerStatus.State.Waiting == nil && containerStatus.State.Running == nil && containerStatus.State.Terminated == nil) {
-				klog.Warningf("reconcileState: skipping container; container still in the waiting state (pod: %s, container: %s, error: %v)",
-					pod.Name, container.Name, err)
+				klog.Warning(fmt.Sprintf("[container cpuset]ignoring waiting state container (pod: %s, container: %s)",
+					pod.Name, container.Name))
 				continue
 			}
 			if containerStatus.State.Terminated != nil {
-				klog.Warningf("reconcileState: ignoring terminated container (pod: %s, container id: %s)",
-					pod.Name, containerID)
+				klog.Warning(fmt.Sprintf("[container cpuset]ignoring terminated container (pod: %s, container id: %s)",
+					pod.Name, containerID))
 				continue
 			}
 
-			klog.Info(fmt.Sprintf("reconcileState: updating container cpuset(pod: %s, container: %s, container id: %s, cpuset: %s)",
-				pod.Name, container.Name, containerID, cpuSet.String()))
+			klog.Info(fmt.Sprintf("[container cpuset]updating container cpuset(pod name: %s, pod uid: %s, container name: %s, container id: %s, cpuset: %s)",
+				pod.Name, pod.UID, container.Name, containerID, cpuSet.String()))
 
 			// if debug, skip updating container cpuset
 			if server.option.Debug {
@@ -216,15 +224,15 @@ func (server *Server) tick(ctx context.Context, startTime time.Time) {
 			}
 			err = server.updateContainerCPUSet(containerID, cpuSet)
 			if err != nil {
-				klog.Error(fmt.Sprintf("reconcileState: failed to update container (pod: %s, container: %s, container id: %s, cpuset: %s, error: %v)",
-					pod.Name, container.Name, containerID, cpuSet.String(), err))
+				klog.Error(fmt.Sprintf("[container cpuset]failed to update container (pod name: %s, pod uid: %s, container name: %s, container id: %s, cpuset: %s, error: %v)",
+					pod.Name, pod.UID, container.Name, containerID, cpuSet.String(), err))
 				continue
 			}
 		}
 	}
 
 	latency := time.Since(startTime).Seconds()
-	klog.Info(fmt.Sprintf("tick latency %f seconds", latency))
+	klog.Info(fmt.Sprintf("[5]consume %f seconds...", latency))
 }
 
 func (server *Server) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) error {
@@ -247,6 +255,7 @@ func (server *Server) RunUntil(stopCh <-chan struct{}) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	klog.Info(fmt.Sprintf("updating container cpuset..."))
 	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		server.tick(ctx, time.Now())
 	}, server.option.ReconcilePeriod)

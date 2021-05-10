@@ -5,13 +5,12 @@ import (
 	"os"
 	"runtime"
 
-	"k8s-lx1036/k8s/kubelet/isolation-agent/cmd/app"
-
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/logs"
+
+	"sigs.k8s.io/metrics-server/cmd/metrics-server/app"
 )
 
-// go run . --kubeconfig=`echo $HOME`/.kube/config --nodename=docker1234 --debug --root-dir=/data/kubernetes/var/lib/kubelet/ --reconcile-period=10m
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
@@ -20,7 +19,7 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
-	cmd := app.NewIsolationCommand(genericapiserver.SetupSignalHandler())
+	cmd := app.NewMetricsServerCommand(genericapiserver.SetupSignalHandler())
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
 		panic(err)
