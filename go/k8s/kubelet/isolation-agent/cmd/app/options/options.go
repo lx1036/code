@@ -43,7 +43,7 @@ func (o *Options) Flags(cmd *cobra.Command) {
 }
 
 func (o *Options) ServerConfig() (*server.Config, error) {
-
+	return nil, nil
 }
 
 func NewOptions() *Options {

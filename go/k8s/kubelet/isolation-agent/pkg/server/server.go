@@ -61,6 +61,9 @@ type Server struct {
 	remoteRuntimeEndpoint string // "unix:///var/run/dockershim.sock"
 	containerRuntime      string // "docker"
 
+	// rootDirectory is the directory path to place kubelet files (volume
+	// mounts,etc).
+	RootDirectory string
 	// CgroupRoot is the root cgroup to use for pods.
 	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	CgroupRoot string
@@ -124,9 +127,8 @@ func NewServer(config *Config) (*Server, error) {
 }
 
 func (server *Server) getCPUTopology() (*topology.CPUTopology, corev1.ResourceList) {
-	rootDirectory := "/var/lib/kubelet"
 	imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(server.containerRuntime, server.remoteRuntimeEndpoint)
-	cadvisorClient, err := cadvisor.New(imageFsInfoProvider, rootDirectory, server.GetCgroupRoots(),
+	cadvisorClient, err := cadvisor.New(imageFsInfoProvider, server.RootDirectory, server.GetCgroupRoots(),
 		cadvisor.UsingLegacyCadvisorStats(server.containerRuntime, server.remoteRuntimeEndpoint))
 	if err != nil {
 		panic(err)
