@@ -16,9 +16,8 @@ type Manager struct {
 	containerRuntime runtimeService
 }
 
+// @see https://github.com/kubernetes/kubernetes/blob/release-1.19/pkg/kubelet/cm/cpumanager/cpu_manager.go#L456-L466
 func (manager *Manager) UpdateContainerResource(containerID string, cpus cpuset.CPUSet) error {
-	//cpus := cpuset.NewCPUSet(1, 13)
-	//containerID := "0e8b25a584ce27c6c88a59d9411cafc6ac82bd90ee67ccaead109ffbccd46cf4"
 	err := manager.containerRuntime.UpdateContainerResources(containerID,
 		&runtimeapi.LinuxContainerResources{
 			CpusetCpus: cpus.String(),
@@ -30,15 +29,13 @@ func (manager *Manager) UpdateContainerResource(containerID string, cpus cpuset.
 	return nil
 }
 
-func NewManager(remoteRuntimeEndpoint string, connectionTimeout time.Duration) *Manager {
-	//remoteRuntimeEndpoint := "unix:///var/run/dockershim.sock"
-	//remoteRuntimeService, err := remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, time.Minute*2)
+func NewManager(remoteRuntimeEndpoint string, connectionTimeout time.Duration) (*Manager, error) {
 	remoteRuntimeService, err := remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, connectionTimeout)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return &Manager{
 		containerRuntime: remoteRuntimeService,
-	}
+	}, nil
 }

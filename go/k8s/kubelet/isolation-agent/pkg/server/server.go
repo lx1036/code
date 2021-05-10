@@ -3,12 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
+	"k8s-lx1036/k8s/kubelet/isolation-agent/cmd/app/options"
 	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/cgroup"
 	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/scraper"
 	topologycpu "k8s-lx1036/k8s/kubelet/isolation-agent/pkg/topology"
+	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,36 +19,17 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	coreapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
-type Config struct {
-	MetricResolution time.Duration
-	ScrapeTimeout    time.Duration
-
-	Kubeconfig string
-	Nodename   string
-
-	RemoteRuntimeEndpoint string // "unix:///var/run/dockershim.sock"
-	ContainerRuntime      string // "docker"
-	ConnectionTimeout     time.Duration
-}
-
 type Server struct {
-
-	// The resolution at which metrics-server will retain metrics
-	resolution time.Duration
-	nodeName   string
-
 	sync      cache.InformerSynced
 	informer  informers.SharedInformerFactory
 	podLister v1.PodLister
@@ -55,45 +37,13 @@ type Server struct {
 	scraper       *scraper.Scraper
 	kubeClient    *kubernetes.Clientset
 	cgroupManager *cgroup.Manager
-	capacity      corev1.ResourceList
-	cpuTopology   *topology.CPUTopology
 
-	remoteRuntimeEndpoint string // "unix:///var/run/dockershim.sock"
-	containerRuntime      string // "docker"
-
-	// rootDirectory is the directory path to place kubelet files (volume
-	// mounts,etc).
-	RootDirectory string
-	// CgroupRoot is the root cgroup to use for pods.
-	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
-	CgroupRoot string
-	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
-	// And all Burstable and BestEffort pods are brought up under their
-	// specific top level QoS cgroup.
-	CgroupsPerQOS bool
-	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
-	CgroupDriver string
+	option *options.Options
 }
 
-func NewRestConfig(kubeconfig string) (*rest.Config, error) {
-	var config *rest.Config
-	if _, err := os.Stat(kubeconfig); err == nil {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return config, nil
-}
-
-func NewServer(config *Config) (*Server, error) {
-	restConfig, err := NewRestConfig(config.Kubeconfig)
+// TODO: add prometheus metrics
+func NewServer(option *options.Options) (*Server, error) {
+	restConfig, err := NewRestConfig(option.Kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -103,80 +53,60 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	informer := informers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*10, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-		options.FieldSelector = fields.Set{api.PodHostField: config.Nodename}.String()
+		options.FieldSelector = fields.Set{coreapi.PodHostField: option.Nodename}.String()
 	}))
 
 	metricsClient := resourceclient.NewForConfigOrDie(restConfig)
-	//scraper := scraper.NewScraper(metricsClient)
-	cgroupManager := cgroup.NewManager(config.RemoteRuntimeEndpoint, config.ConnectionTimeout)
+	cgroupManager, err := cgroup.NewManager(option.RemoteRuntimeEndpoint, option.RuntimeRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Server{
-		//cpuTopology: cpuTopology,
-		//capacity: capacity,
-		containerRuntime:      config.ContainerRuntime,
-		remoteRuntimeEndpoint: config.RemoteRuntimeEndpoint,
-		nodeName:              config.Nodename,
-		scraper:               scraper.NewScraper(metricsClient),
-		kubeClient:            kubeClient,
-		cgroupManager:         cgroupManager,
-		sync:                  informer.Core().V1().Pods().Informer().HasSynced,
-		informer:              informer,
-		podLister:             informer.Core().V1().Pods().Lister(),
-		resolution:            config.MetricResolution,
+		option:        option,
+		scraper:       scraper.NewScraper(metricsClient),
+		cgroupManager: cgroupManager,
+		sync:          informer.Core().V1().Pods().Informer().HasSynced,
+		informer:      informer,
+		podLister:     informer.Core().V1().Pods().Lister(),
 	}, nil
 }
 
-func (server *Server) getCPUTopology() (*topology.CPUTopology, corev1.ResourceList) {
-	imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(server.containerRuntime, server.remoteRuntimeEndpoint)
-	cadvisorClient, err := cadvisor.New(imageFsInfoProvider, server.RootDirectory, server.GetCgroupRoots(),
-		cadvisor.UsingLegacyCadvisorStats(server.containerRuntime, server.remoteRuntimeEndpoint))
+// INFO: @see https://github.com/kubernetes/kubernetes/blob/release-1.19/cmd/kubelet/app/server.go#L604-L606
+func (server *Server) GetCgroupRoots() []string {
+	var cgroupRoots []string
+	nodeAllocatableRoot := cm.NodeAllocatableRoot(server.option.CgroupRoot, server.option.CgroupsPerQOS, server.option.CgroupDriver)
+	cgroupRoots = append(cgroupRoots, nodeAllocatableRoot) // "/kubepods"
+
+	return cgroupRoots
+}
+
+func (server *Server) getCPUTopology() (*topology.CPUTopology, corev1.ResourceList, error) {
+	imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(server.option.ContainerRuntime, server.option.RemoteRuntimeEndpoint)
+	cadvisorClient, err := cadvisor.New(imageFsInfoProvider, server.option.RootDirectory, server.GetCgroupRoots(),
+		cadvisor.UsingLegacyCadvisorStats(server.option.ContainerRuntime, server.option.RemoteRuntimeEndpoint))
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 	machineInfo, err := cadvisorClient.MachineInfo()
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 	capacity := cadvisor.CapacityFromMachineInfo(machineInfo)
 	klog.Info(fmt.Sprintf("cpu: %s, memory: %s", capacity.Cpu().String(), capacity.Memory().String()))
 	numaNodeInfo, err := topology.GetNUMANodeInfo()
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 	cpuTopology, err := topology.Discover(machineInfo, numaNodeInfo)
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 	allCPUs := cpuTopology.CPUDetails.CPUs()
 	klog.Info(fmt.Sprintf("NumCPUs[processor,逻辑核]: %d, NumCores[core,物理核]: %d, NumSockets[NUMA node]: %d, allCPUs: %s",
 		cpuTopology.NumCPUs, cpuTopology.NumCores, cpuTopology.NumSockets, allCPUs.String()))
 
-	return cpuTopology, capacity
-}
-
-func (server *Server) RunUntil(stopCh <-chan struct{}) error {
-	server.informer.Start(stopCh)
-	shutdown := cache.WaitForCacheSync(stopCh, server.sync)
-	if !shutdown {
-		klog.Errorf("can not sync pods in node %s", server.nodeName)
-		return nil
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go wait.UntilWithContext(ctx, func(ctx context.Context) {
-		server.tick(ctx, time.Now())
-	}, server.resolution)
-
-	<-stopCh
-
-	err := server.RunPreShutdownHooks()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return cpuTopology, capacity, nil
 }
 
 type ResourceRatio struct {
@@ -190,7 +120,7 @@ func (server *Server) policy(prodResourceRatio, nonProdResourceRatio *ResourceRa
 	if prodResourceRatio.cpuRatio < 0.2 {
 		numReservedCPUs = numReservedCPUs * 2
 		if numReservedCPUs > max {
-			klog.Warning("")
+			klog.Warning(fmt.Sprintf("[warning]numReservedCPUs %d is above max %d", numReservedCPUs, max))
 			numReservedCPUs = 2
 		}
 	}
@@ -201,22 +131,27 @@ func (server *Server) policy(prodResourceRatio, nonProdResourceRatio *ResourceRa
 func (server *Server) tick(ctx context.Context, startTime time.Time) {
 	pods, err := server.podLister.Pods(metav1.NamespaceAll).List(labels.Everything())
 	if err != nil {
-		klog.Error(fmt.Sprintf("get pods in node %s err: %v", server.nodeName, err))
+		klog.Error(fmt.Sprintf("get pods in node %s err: %v", server.option.Nodename, err))
 		return
 	}
 
 	// 每次都重新计算 cpu topology
-	cpuTopology, capacity := server.getCPUTopology()
-	// 由于可能会超卖，所以不要使用 node .status.allocatable
+	cpuTopology, capacity, err := server.getCPUTopology()
+	if err != nil {
+		klog.Error(fmt.Sprintf("get cpu topology err: %v", err))
+		return
+	}
+	// 由于可能会超卖，所以不要使用 Node.status.allocatable
 	prodMetrics, nonProdMetrics, err := server.scraper.Scrape(ctx, pods)
 	if err != nil {
-		klog.Error(err)
+		klog.Error(fmt.Sprintf("get pod resource err: %v", err))
+		return
 	}
 	prodCpuRatio := float64(prodMetrics.Cpu().Value()) / float64(capacity.Cpu().Value())
 	nonProdCpuRatio := float64(nonProdMetrics.Cpu().Value()) / float64(capacity.Cpu().Value())
 	prodMemoryRatio := float64(prodMetrics.Memory().Value()) / float64(capacity.Memory().Value())
 	nonProdMemoryRatio := float64(nonProdMetrics.Memory().Value()) / float64(capacity.Memory().Value())
-	klog.Info(prodCpuRatio, nonProdCpuRatio, prodMemoryRatio, nonProdMemoryRatio)
+	klog.Info(fmt.Sprintf("[ratio]prod pod ratio: cpu %f, memory %f; non prod pod ratio: cpu %f, memory %f.", prodCpuRatio, nonProdCpuRatio, prodMemoryRatio, nonProdMemoryRatio))
 	prodResourceRatio := &ResourceRatio{
 		cpuRatio:    prodCpuRatio,
 		memoryRatio: prodMemoryRatio,
@@ -228,22 +163,21 @@ func (server *Server) tick(ctx context.Context, startTime time.Time) {
 
 	allCPUs := cpuTopology.CPUDetails.CPUs()
 	numReservedCPUs := server.policy(prodResourceRatio, nonProdResourceRatio, allCPUs.Size())
+	klog.Info(fmt.Sprintf("[policy]need %d cores at time %s", numReservedCPUs, startTime.String()))
 	reserved, err := topologycpu.TakeCPUByTopology(cpuTopology, allCPUs, numReservedCPUs)
 	if err != nil {
 		klog.Error(err)
 		return
 	}
-
 	prodCPUSet := allCPUs.Difference(reserved)
 	klog.Info(fmt.Sprintf("take cpuset %s for nonProdPod, cpuset %s for ProdPod", reserved.String(), prodCPUSet.String()))
 
 	// default all cpus
 	cpuSet := allCPUs.Clone()
-	// TODO: get cpuset.CPUSet
 	for _, pod := range GetActivePods(pods) {
-		if IsProdPod(pod) {
+		if utils.IsProdPod(pod) {
 			cpuSet = prodCPUSet.Clone()
-		} else if IsNonProdPod(pod) {
+		} else if utils.IsNonProdPod(pod) {
 			cpuSet = reserved.Clone()
 		}
 
@@ -268,21 +202,29 @@ func (server *Server) tick(ctx context.Context, startTime time.Time) {
 				continue
 			}
 			if containerStatus.State.Terminated != nil {
-				klog.Warningf("[cpumanager] reconcileState: ignoring terminated container (pod: %s, container id: %s)",
+				klog.Warningf("reconcileState: ignoring terminated container (pod: %s, container id: %s)",
 					pod.Name, containerID)
 				continue
 			}
 
-			klog.Info(fmt.Sprintf("[cpumanager] reconcileState: updating container (pod: %s, container: %s, container id: %s, cpuset: %s)",
+			klog.Info(fmt.Sprintf("reconcileState: updating container cpuset(pod: %s, container: %s, container id: %s, cpuset: %s)",
 				pod.Name, container.Name, containerID, cpuSet.String()))
+
+			// if debug, skip updating container cpuset
+			if server.option.Debug {
+				continue
+			}
 			err = server.updateContainerCPUSet(containerID, cpuSet)
 			if err != nil {
-				klog.Error(fmt.Sprintf("[cpumanager] reconcileState: failed to update container (pod: %s, container: %s, container id: %s, cpuset: %s, error: %v)",
+				klog.Error(fmt.Sprintf("reconcileState: failed to update container (pod: %s, container: %s, container id: %s, cpuset: %s, error: %v)",
 					pod.Name, container.Name, containerID, cpuSet.String(), err))
 				continue
 			}
 		}
 	}
+
+	latency := time.Since(startTime).Seconds()
+	klog.Info(fmt.Sprintf("tick latency %f seconds", latency))
 }
 
 func (server *Server) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) error {
@@ -290,33 +232,31 @@ func (server *Server) updateContainerCPUSet(containerID string, cpus cpuset.CPUS
 }
 
 func (server *Server) RunPreShutdownHooks() error {
+	// do something
 	return nil
 }
 
-// INFO: @see pkg/kubelet/cm/cpumanager/cpu_manager.go::findContainerIDByName()
-func findContainerIDByName(status *corev1.PodStatus, name string) (string, error) {
-	allStatuses := status.InitContainerStatuses
-	allStatuses = append(allStatuses, status.ContainerStatuses...)
-	for _, container := range allStatuses {
-		if container.Name == name && container.ContainerID != "" {
-			cid := &kubecontainer.ContainerID{}
-			err := cid.ParseString(container.ContainerID)
-			if err != nil {
-				return "", err
-			}
-			return cid.ID, nil
-		}
+func (server *Server) RunUntil(stopCh <-chan struct{}) error {
+	server.informer.Start(stopCh)
+	shutdown := cache.WaitForCacheSync(stopCh, server.sync)
+	if !shutdown {
+		klog.Errorf("can not sync pods in node %s", server.option.Nodename)
+		return nil
 	}
 
-	return "", fmt.Errorf("unable to find ID for container with name %v in pod status (it may not be running)", name)
-}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-func findContainerStatusByName(status *corev1.PodStatus, name string) (*corev1.ContainerStatus, error) {
-	for _, status := range append(status.InitContainerStatuses, status.ContainerStatuses...) {
-		if status.Name == name {
-			return &status, nil
-		}
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
+		server.tick(ctx, time.Now())
+	}, server.option.ReconcilePeriod)
+
+	<-stopCh
+
+	err := server.RunPreShutdownHooks()
+	if err != nil {
+		return err
 	}
 
-	return nil, fmt.Errorf("unable to find status for container with name %v in pod status (it may not be running)", name)
+	return nil
 }

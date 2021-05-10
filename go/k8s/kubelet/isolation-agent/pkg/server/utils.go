@@ -1,8 +1,14 @@
 package server
 
 import (
+	"fmt"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"os"
+
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
-	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // INFO: @see https://github.com/kubernetes/kubernetes/blob/release-1.19/pkg/kubelet/kubelet_pods.go#L96-L101
@@ -59,21 +65,48 @@ func notRunning(statuses []v1.ContainerStatus) bool {
 	return true
 }
 
-// IsProdPod 在线 pod
-func IsProdPod(pod *v1.Pod) bool {
-	qos := v1qos.GetPodQOS(pod)
-	if qos == v1.PodQOSGuaranteed || qos == v1.PodQOSBurstable {
-		return true
+// @see https://github.com/kubernetes/kubernetes/blob/release-1.19/pkg/kubelet/cm/cpumanager/cpu_manager.go#L431-L445
+func findContainerIDByName(status *corev1.PodStatus, name string) (string, error) {
+	allStatuses := status.InitContainerStatuses
+	allStatuses = append(allStatuses, status.ContainerStatuses...)
+	for _, container := range allStatuses {
+		if container.Name == name && container.ContainerID != "" {
+			cid := &kubecontainer.ContainerID{}
+			err := cid.ParseString(container.ContainerID)
+			if err != nil {
+				return "", err
+			}
+			return cid.ID, nil
+		}
 	}
 
-	return false
+	return "", fmt.Errorf("unable to find ID for container with name %v in pod status (it may not be running)", name)
 }
 
-// IsNonProdPod 离线 pod
-func IsNonProdPod(pod *v1.Pod) bool {
-	if v1qos.GetPodQOS(pod) == v1.PodQOSBestEffort {
-		return true
+// @see https://github.com/kubernetes/kubernetes/blob/release-1.19/pkg/kubelet/cm/cpumanager/cpu_manager.go#L447-L454
+func findContainerStatusByName(status *corev1.PodStatus, name string) (*corev1.ContainerStatus, error) {
+	for _, status := range append(status.InitContainerStatuses, status.ContainerStatuses...) {
+		if status.Name == name {
+			return &status, nil
+		}
 	}
 
-	return false
+	return nil, fmt.Errorf("unable to find status for container with name %v in pod status (it may not be running)", name)
+}
+
+func NewRestConfig(kubeconfig string) (*rest.Config, error) {
+	var config *rest.Config
+	if _, err := os.Stat(kubeconfig); err == nil {
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return config, nil
 }

@@ -9,7 +9,6 @@ import (
 
 func NewIsolationCommand(stopCh <-chan struct{}) *cobra.Command {
 	opts := options.NewOptions()
-
 	cmd := &cobra.Command{
 		Use:  "isolation",
 		Long: "isolation agent for container cpu/memory",
@@ -21,16 +20,12 @@ func NewIsolationCommand(stopCh <-chan struct{}) *cobra.Command {
 		},
 	}
 	opts.Flags(cmd)
+
 	return cmd
 }
 
-func runCommand(o *options.Options, stopCh <-chan struct{}) error {
-	config, err := o.ServerConfig()
-	if err != nil {
-		return err
-	}
-
-	s, err := server.NewServer(config)
+func runCommand(option *options.Options, stopCh <-chan struct{}) error {
+	s, err := server.NewServer(option)
 	if err != nil {
 		return err
 	}

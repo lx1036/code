@@ -19,7 +19,7 @@ type Scraper struct {
 
 type PodMetrics map[*v1.Pod]v1.ResourceList
 
-// 计算在离线 pod 的资源使用总和
+// Scrape calculate prodPod/nonProdPod sum of resources
 func (scraper *Scraper) Scrape(baseCtx context.Context, pods []*v1.Pod) (v1.ResourceList, v1.ResourceList, error) {
 	var errs []error
 
@@ -33,10 +33,6 @@ func (scraper *Scraper) Scrape(baseCtx context.Context, pods []*v1.Pod) (v1.Reso
 			defer cancelTimeout()
 
 			metrics, err := scraper.collectPodMetrics(ctx, pod)
-			if err != nil {
-				err = fmt.Errorf("unable to fully scrape metrics from pod %s: %v", pod.Name, err)
-			}
-
 			podMetrics := make(PodMetrics)
 			podMetrics[pod] = metrics
 			responseChannel <- podMetrics
@@ -52,7 +48,7 @@ func (scraper *Scraper) Scrape(baseCtx context.Context, pods []*v1.Pod) (v1.Reso
 		if err != nil {
 			errs = append(errs, err)
 		}
-		if podMetrics == nil {
+		if podMetrics == nil || len(podMetrics) == 0 {
 			continue
 		}
 
@@ -74,7 +70,7 @@ func (scraper *Scraper) Scrape(baseCtx context.Context, pods []*v1.Pod) (v1.Reso
 					}
 				}
 			} else {
-				// TODO
+				// do something
 			}
 		}
 	}
@@ -85,8 +81,7 @@ func (scraper *Scraper) Scrape(baseCtx context.Context, pods []*v1.Pod) (v1.Reso
 func (scraper *Scraper) collectPodMetrics(ctx context.Context, pod *v1.Pod) (v1.ResourceList, error) {
 	podMetrics, err := scraper.metricsClient.PodMetricses(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
-		//klog.Errorf("fail to get pod %s/%s metrics: %v", pod.Namespace, pod.Name, err)
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf(fmt.Sprintf("fail to get pod %s/%s metrics: %v", pod.Namespace, pod.Name, err))
 	}
 
 	podUsageResource := make(v1.ResourceList)

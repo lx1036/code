@@ -11,6 +11,7 @@ import (
 	"k8s.io/component-base/logs"
 )
 
+// go run . --kubeconfig=`echo $HOME`/.kube/config --node=docker1234 --debug
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
