@@ -30,9 +30,8 @@ import (
 )
 
 type Server struct {
-	sync      cache.InformerSynced
-	informer  informers.SharedInformerFactory
-	podLister v1.PodLister
+	podLister   v1.PodLister
+	podInformer cache.SharedIndexInformer
 
 	scraper       *scraper.Scraper
 	kubeClient    *kubernetes.Clientset
@@ -52,10 +51,11 @@ func NewServer(option *options.Options) (*Server, error) {
 		return nil, fmt.Errorf("unable to construct lister client: %v", err)
 	}
 
-	informer := informers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*10, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+	factory := informers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*10, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 		options.FieldSelector = fields.Set{coreapi.PodHostField: option.Nodename}.String()
 	}))
 
+	podInformer := factory.Core().V1().Pods().Informer()
 	metricsClient := resourceclient.NewForConfigOrDie(restConfig)
 	cgroupManager, err := cgroup.NewManager(option.RemoteRuntimeEndpoint, option.RuntimeRequestTimeout)
 	if err != nil {
@@ -66,9 +66,8 @@ func NewServer(option *options.Options) (*Server, error) {
 		option:        option,
 		scraper:       scraper.NewScraper(metricsClient),
 		cgroupManager: cgroupManager,
-		sync:          informer.Core().V1().Pods().Informer().HasSynced,
-		informer:      informer,
-		podLister:     informer.Core().V1().Pods().Lister(),
+		podInformer:   podInformer,
+		podLister:     factory.Core().V1().Pods().Lister(),
 	}, nil
 }
 
@@ -245,8 +244,8 @@ func (server *Server) RunPreShutdownHooks() error {
 }
 
 func (server *Server) RunUntil(stopCh <-chan struct{}) error {
-	server.informer.Start(stopCh)
-	shutdown := cache.WaitForCacheSync(stopCh, server.sync)
+	server.podInformer.Run(stopCh)
+	shutdown := cache.WaitForCacheSync(stopCh, server.podInformer.HasSynced)
 	if !shutdown {
 		klog.Errorf("can not sync pods in node %s", server.option.Nodename)
 		return nil
