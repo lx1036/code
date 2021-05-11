@@ -2084,6 +2084,7 @@ k8s.io/klog/v2 v2.4.0 h1:7+X0fUguPyrKEC4WjH8iGDg3laWgMo5tMnRTIGTTxGQ=
 k8s.io/klog/v2 v2.4.0/go.mod h1:Od+F08eJP+W3HUb4pSrPpgp9DGU4GzlpG/TmITuYh/Y=
 k8s.io/klog/v2 v2.8.0 h1:Q3gmuM9hKEjefWFFYF0Mat+YyFJvsUyYuwyNNJ5C9Ts=
 k8s.io/klog/v2 v2.8.0/go.mod h1:hy9LJ/NvuK+iVyP4Ehqva4HxZG/oXyIS3n3Jmire4Ec=
+k8s.io/kube-aggregator v0.19.7 h1:Eol5vPNFKaDScdVuTh0AofhuSr4cJxP5Vfv8JXW8OAQ=
 k8s.io/kube-aggregator v0.19.7/go.mod h1:kA6tIyq3iJ8HJ/Yz9xY6ifceJNp/l/Eym0H1jRRAjMk=
 k8s.io/kube-aggregator v0.20.4/go.mod h1:0ixQ9De7KXyHteXizS6nVtrnKqGa4kiuxl9rEBsNccw=
 k8s.io/kube-controller-manager v0.19.7/go.mod h1:A5dw0l+rRB/vDLEWscsbZjuHjig8dex+9v+wigKmnRA=

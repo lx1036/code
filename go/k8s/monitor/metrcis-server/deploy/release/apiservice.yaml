@@ -1,6 +1,7 @@
 
 
 # https://kubernetes.io/docs/tasks/extend-kubernetes/configure-aggregation-layer/#register-apiservice-objects
+# http://127.0.0.1:8001/apis/metrics.k8s.io/v1beta1/nodes
 
 apiVersion: apiregistration.k8s.io/v1
 kind: APIService

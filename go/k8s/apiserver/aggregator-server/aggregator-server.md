@@ -1,7 +1,9 @@
 
 # aggregator server
 代码在：staging/src/k8s.io/kube-aggregator
-
+两种部署模式(https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/aggregated-api-servers.md#operational-configurations)：
+(1)test mode/single-user mode: 单独作为一个 deployment 部署
+(2)gateway mode: 嵌入 kube-apiserver 代码中，作为一个代理
 
 
 ## 基本概念
