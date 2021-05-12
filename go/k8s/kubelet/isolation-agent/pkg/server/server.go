@@ -51,11 +51,11 @@ func NewServer(option *options.Options) (*Server, error) {
 		return nil, fmt.Errorf("unable to construct lister client: %v", err)
 	}
 
-	factory := informers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*10, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*10, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 		options.FieldSelector = fields.Set{coreapi.PodHostField: option.Nodename}.String()
 	}))
 
-	podInformer := factory.Core().V1().Pods().Informer()
+	podInformer := informerFactory.Core().V1().Pods().Informer()
 	metricsClient := resourceclient.NewForConfigOrDie(restConfig)
 	cgroupManager, err := cgroup.NewManager(option.RemoteRuntimeEndpoint, option.RuntimeRequestTimeout)
 	if err != nil {
@@ -67,7 +67,7 @@ func NewServer(option *options.Options) (*Server, error) {
 		scraper:       scraper.NewScraper(metricsClient),
 		cgroupManager: cgroupManager,
 		podInformer:   podInformer,
-		podLister:     factory.Core().V1().Pods().Lister(),
+		podLister:     informerFactory.Core().V1().Pods().Lister(),
 	}, nil
 }
 

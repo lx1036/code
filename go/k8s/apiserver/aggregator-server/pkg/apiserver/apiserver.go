@@ -1,12 +1,16 @@
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
+	"k8s-lx1036/k8s/apiserver/aggregator-server/pkg/apis/apiregistration/v1"
+	aggregatorscheme "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/apiserver/scheme"
 	clientset "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/client/clientset/versioned"
 	informers "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/client/informers/externalversions"
 	listers "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/client/listers/apiregistration/v1"
+	apiservicerest "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/registry/apiservice/rest"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -93,6 +97,31 @@ type APIAggregator struct {
 	openAPIConfig *openapicommon.Config
 }
 
+// INFO: 这两个函数很重要，基本解释了 apiserver 扩展原理
+func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
+	panic("implement me")
+}
+
+func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
+	panic("implement me")
+}
+
+// PrepareRun prepares the aggregator to run, by setting up the OpenAPI spec and calling
+// the generic PrepareRun.
+func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
+	// add post start hook before generic PrepareRun in order to be before /healthz installation
+	if s.openAPIConfig != nil {
+		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
+			//go s.openAPIAggregationController.Run(context.StopCh)
+			return nil
+		})
+	}
+
+	prepared := s.GenericAPIServer.PrepareRun()
+
+	return preparedAPIAggregator{APIAggregator: s, runnable: prepared}, nil
+}
+
 // NewWithDelegate returns a new instance of APIAggregator from the given config.
 func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
 	genericServer, err := c.GenericConfig.New("kube-aggregator", delegationTarget)
@@ -123,6 +152,66 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		proxyCurrentCertKeyContent: func() (bytes []byte, bytes2 []byte) { return nil, nil },
 	}
 
+	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
+	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
+		return nil, err
+	}
+
+	// check version
+	enabledVersions := sets.NewString()
+	for v := range apiGroupInfo.VersionedResourcesStorageMap {
+		enabledVersions.Insert(v)
+	}
+	if !enabledVersions.Has(v1.SchemeGroupVersion.Version) {
+		return nil, fmt.Errorf("API group/version %s must be enabled", v1.SchemeGroupVersion.String())
+	}
+
+	apisHandler := &apisHandler{
+		codecs:         aggregatorscheme.Codecs,
+		lister:         s.lister,
+		discoveryGroup: discoveryGroup(enabledVersions),
+	}
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
+
+	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().V1().APIServices(), s)
+
+	availableController, err := statuscontrollers.NewAvailableConditionController(
+		informerFactory.Apiregistration().V1().APIServices(),
+		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
+		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
+		apiregistrationClient.ApiregistrationV1(),
+		c.ExtraConfig.ProxyTransport,
+		(func() ([]byte, []byte))(s.proxyCurrentCertKeyContent),
+		s.serviceResolver,
+		c.GenericConfig.EgressSelector,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	s.GenericAPIServer.AddPostStartHookOrDie("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
+		informerFactory.Start(context.StopCh)
+		c.GenericConfig.SharedInformerFactory.Start(context.StopCh)
+		return nil
+	})
+	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
+		handlerSyncedCh := make(chan struct{})
+		go apiserviceRegistrationController.Run(context.StopCh, handlerSyncedCh)
+		select {
+		case <-context.StopCh:
+		case <-handlerSyncedCh:
+		}
+
+		return nil
+	})
+	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
+		// if we end up blocking for long periods of time, we may need to increase threadiness.
+		go availableController.Run(5, context.StopCh)
+		return nil
+	})
+
+	return s, nil
 }
 
 type runnable interface {
@@ -133,37 +222,6 @@ type runnable interface {
 type preparedAPIAggregator struct {
 	*APIAggregator
 	runnable runnable
-}
-
-// PrepareRun prepares the aggregator to run, by setting up the OpenAPI spec and calling
-// the generic PrepareRun.
-func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
-	// add post start hook before generic PrepareRun in order to be before /healthz installation
-	if s.openAPIConfig != nil {
-		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
-			//go s.openAPIAggregationController.Run(context.StopCh)
-			return nil
-		})
-	}
-
-	prepared := s.GenericAPIServer.PrepareRun()
-
-	// delay OpenAPI setup until the delegate had a chance to setup their OpenAPI handlers
-	/*if s.openAPIConfig != nil {
-		specDownloader := openapiaggregator.NewDownloader()
-		openAPIAggregator, err := openapiaggregator.BuildAndRegisterAggregator(
-			&specDownloader,
-			s.GenericAPIServer.NextDelegate(),
-			s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(),
-			s.openAPIConfig,
-			s.GenericAPIServer.Handler.NonGoRestfulMux)
-		if err != nil {
-			return preparedAPIAggregator{}, err
-		}
-		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
-	}*/
-
-	return preparedAPIAggregator{APIAggregator: s, runnable: prepared}, nil
 }
 
 func (s preparedAPIAggregator) Run(stopCh <-chan struct{}) error {
