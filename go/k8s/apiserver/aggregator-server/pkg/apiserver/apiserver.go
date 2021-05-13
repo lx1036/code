@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/apiserver/aggregator-server/pkg/apis/apiregistration/v1"
+	v1helper "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/apis/apiregistration/v1/helper"
 	aggregatorscheme "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/apiserver/scheme"
 	clientset "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/client/clientset/versioned"
 	informers "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/client/informers/externalversions"
@@ -19,6 +20,9 @@ import (
 	"k8s.io/client-go/pkg/version"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
+
+// legacyAPIServiceName is the fixed name of the only non-groupified API version
+const legacyAPIServiceName = "v1."
 
 // Config represents the configuration needed to create an APIAggregator.
 type Config struct {
@@ -100,11 +104,73 @@ type APIAggregator struct {
 
 // INFO: 这两个函数很重要，基本解释了 apiserver 扩展原理
 func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
-	panic("implement me")
+	// if the proxyHandler already exists, it needs to be updated. The aggregation bits do not
+	// since they are wired against listers because they require multiple resources to respond
+	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
+		proxyHandler.updateAPIService(apiService)
+		return nil
+	}
+
+	proxyPath := "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
+	// v1. is a special case for the legacy API.  It proxies to a wider set of endpoints.
+	if apiService.Name == legacyAPIServiceName {
+		proxyPath = "/api"
+	}
+	// register the proxy handler
+	proxyHandler := &proxyHandler{
+		localDelegate:              s.delegateHandler,
+		proxyCurrentCertKeyContent: s.proxyCurrentCertKeyContent,
+		proxyTransport:             s.proxyTransport,
+		serviceResolver:            s.serviceResolver,
+		egressSelector:             s.egressSelector,
+	}
+	proxyHandler.updateAPIService(apiService)
+	s.proxyHandlers[apiService.Name] = proxyHandler
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
+
+	// if we're dealing with the legacy group, we're done here
+	if apiService.Name == legacyAPIServiceName {
+		return nil
+	}
+
+	// if we've already registered the path with the handler, we don't want to do it again.
+	if s.handledGroups.Has(apiService.Spec.Group) {
+		return nil
+	}
+
+	// INFO: group api e.g. http://127.0.0.1:8001/apis/metrics.k8s.io/
+	// it's time to register the group aggregation endpoint
+	groupPath := "/apis/" + apiService.Spec.Group
+	groupDiscoveryHandler := &apiGroupHandler{
+		codecs:    aggregatorscheme.Codecs,
+		groupName: apiService.Spec.Group,
+		lister:    s.lister,
+		delegate:  s.delegateHandler,
+	}
+	// aggregation is protected
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
+	s.handledGroups.Insert(apiService.Spec.Group)
+
+	return nil
 }
 
 func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
-	panic("implement me")
+	v := v1helper.APIServiceNameToGroupVersion(apiServiceName)
+	proxyPath := "/apis/" + v.Group + "/" + v.Version
+	// v1. is a special case for the legacy API.  It proxies to a wider set of endpoints.
+	if apiServiceName == legacyAPIServiceName {
+		proxyPath = "/api"
+	}
+
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath + "/")
+
+	delete(s.proxyHandlers, apiServiceName)
+
+	// TODO unregister group level discovery when there are no more versions for the group
+	// We don't need this right away because the handler properly delegates when no versions are present
 }
 
 // PrepareRun prepares the aggregator to run, by setting up the OpenAPI spec and calling
@@ -167,13 +233,13 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil, fmt.Errorf("API group/version %s must be enabled", v1.SchemeGroupVersion.String())
 	}
 
-	apisHandler := &apisHandler{
+	handler := &apisHandler{
 		codecs:         aggregatorscheme.Codecs,
 		lister:         s.lister,
 		discoveryGroup: discoveryGroup(enabledVersions),
 	}
-	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
-	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", handler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", handler)
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().V1().APIServices(), s)
 

@@ -22,6 +22,8 @@ k8s 通过 api-aggregator 来支持扩展 kube-apiserver。通过以下options�
 
 
 ## 参考文献
+**[aggregator server 设计文档](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/aggregated-api-servers.md)**
+
 **[通过聚合层扩展 Kubernetes API](https://kubernetes.io/zh/docs/concepts/extend-kubernetes/api-extension/apiserver-aggregation/)**
 
 **[安装一个扩展的 API server](https://kubernetes.io/zh/docs/tasks/extend-kubernetes/setup-extension-api-server/)**
