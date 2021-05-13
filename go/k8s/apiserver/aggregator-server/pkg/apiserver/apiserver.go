@@ -10,6 +10,7 @@ import (
 	clientset "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/client/clientset/versioned"
 	informers "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/client/informers/externalversions"
 	listers "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/client/listers/apiregistration/v1"
+	statuscontrollers "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/controllers/status"
 	apiservicerest "k8s-lx1036/k8s/apiserver/aggregator-server/pkg/registry/apiservice/rest"
 
 	"k8s.io/apimachinery/pkg/util/sets"
