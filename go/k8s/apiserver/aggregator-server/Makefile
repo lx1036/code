@@ -3,7 +3,7 @@
 
 # 这里 "apiregistration:v1" apiregistration 表示目录，v1 也是目录
 groups:
-	bash "./generate-groups.sh" deepcopy,client,lister,informer \
+	bash "../generate-groups.sh" deepcopy,client,lister,informer \
 	k8s-lx1036/k8s/apiserver/aggregator-server/pkg/client k8s-lx1036/k8s/apiserver/aggregator-server/pkg/apis \
 	"apiregistration:v1" \
 	--output-base "." \
