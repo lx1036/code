@@ -1,17 +1,33 @@
 package master
 
 import (
+	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"k8s-lx1036/k8s/apiserver/master/controller/clusterauthenticationtrust"
+	"k8s-lx1036/k8s/apiserver/master/reconcilers"
 	kubeletclient "k8s-lx1036/k8s/kubelet/pkg/client"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
+	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
+	"k8s.io/klog/v2"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/kubernetes/pkg/master/tunneler"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
@@ -51,6 +67,14 @@ import (
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
+)
+
+const (
+	// DefaultEndpointReconcilerInterval is the default amount of time for how often the endpoints for
+	// the kubernetes Service are reconciled.
+	DefaultEndpointReconcilerInterval = 10 * time.Second
+	// DefaultEndpointReconcilerTTL is the default TTL timeout for the storage layer
+	DefaultEndpointReconcilerTTL = 15 * time.Second
 )
 
 // ExtraConfig defines extra configuration for the master
@@ -131,10 +155,110 @@ type ExtraConfig struct {
 	VersionedInformers informers.SharedInformerFactory
 }
 
+// EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
+// used by the master.
+type EndpointReconcilerConfig struct {
+	Reconciler reconcilers.EndpointReconciler
+	Interval   time.Duration
+}
+
 // Config defines configuration for the master
 type Config struct {
 	GenericConfig *genericapiserver.Config
 	ExtraConfig   ExtraConfig
+}
+type completedConfig struct {
+	GenericConfig genericapiserver.CompletedConfig
+	ExtraConfig   *ExtraConfig
+}
+
+// CompletedConfig embeds a private pointer that cannot be instantiated outside of this package
+type CompletedConfig struct {
+	*completedConfig
+}
+
+// Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
+func (c *Config) Complete() CompletedConfig {
+	cfg := completedConfig{
+		c.GenericConfig.Complete(c.ExtraConfig.VersionedInformers),
+		&c.ExtraConfig,
+	}
+
+	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(cfg.ExtraConfig.ServiceIPRange)
+	if err != nil {
+		klog.Fatalf("Error determining service IP ranges: %v", err)
+	}
+	if cfg.ExtraConfig.ServiceIPRange.IP == nil {
+		cfg.ExtraConfig.ServiceIPRange = serviceIPRange
+	}
+	if cfg.ExtraConfig.APIServerServiceIP == nil {
+		cfg.ExtraConfig.APIServerServiceIP = apiServerServiceIP
+	}
+
+	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: cfg.GenericConfig.ExternalAddress}
+	discoveryAddresses.CIDRRules = append(discoveryAddresses.CIDRRules,
+		discovery.CIDRRule{IPRange: cfg.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(cfg.ExtraConfig.APIServerServiceIP.String(), strconv.Itoa(cfg.ExtraConfig.APIServerServicePort))})
+	cfg.GenericConfig.DiscoveryAddresses = discoveryAddresses
+
+	if cfg.ExtraConfig.ServiceNodePortRange.Size == 0 {
+		// TODO: Currently no way to specify an empty range (do we need to allow this?)
+		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
+		// but then that breaks the strict nestedness of ServiceType.
+		// Review post-v1
+		cfg.ExtraConfig.ServiceNodePortRange = kubeoptions.DefaultServiceNodePortRange
+		klog.Infof("Node port range unspecified. Defaulting to %v.", cfg.ExtraConfig.ServiceNodePortRange)
+	}
+
+	if cfg.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
+		cfg.ExtraConfig.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
+	}
+
+	if cfg.ExtraConfig.MasterEndpointReconcileTTL == 0 {
+		cfg.ExtraConfig.MasterEndpointReconcileTTL = DefaultEndpointReconcilerTTL
+	}
+
+	if cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
+		cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler = c.createEndpointReconciler()
+	}
+
+	return CompletedConfig{&cfg}
+}
+
+func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
+	klog.Infof("Using reconciler: %v", c.ExtraConfig.EndpointReconcilerType)
+	switch c.ExtraConfig.EndpointReconcilerType {
+	// there are numerous test dependencies that depend on a default controller
+	case "", reconcilers.MasterCountReconcilerType:
+		//return c.createMasterCountReconciler()
+		return nil
+	case reconcilers.LeaseEndpointReconcilerType:
+		return c.createLeaseReconciler()
+	case reconcilers.NoneEndpointReconcilerType:
+		//return c.createNoneReconciler()
+		return nil
+	default:
+		klog.Fatalf("Reconciler not implemented: %v", c.ExtraConfig.EndpointReconcilerType)
+	}
+	return nil
+}
+
+func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
+	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
+
+	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
+	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
+	if err != nil {
+		klog.Fatalf("Error determining service IP ranges: %v", err)
+	}
+	leaseStorage, _, err := storagefactory.Create(*config)
+	if err != nil {
+		klog.Fatalf("Error creating storage factory: %v", err)
+	}
+	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
+
+	return reconcilers.NewLeaseEndpointReconciler(endpointsAdapter, masterLeases)
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -142,6 +266,94 @@ type Master struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 
 	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
+}
+
+// RESTStorageProvider is a factory type for REST storage.
+type RESTStorageProvider interface {
+	GroupName() string
+	NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource,
+		restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error)
+}
+
+// New returns a new instance of Master from the given config.
+// Certain config fields will be set to a default value if unset.
+// Certain config fields must be specified, including:
+//   KubeletClientConfig
+func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Master, error) {
+	genericServer, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
+	if err != nil {
+		return nil, err
+	}
+
+	m := &Master{
+		GenericAPIServer:          genericServer,
+		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
+	}
+
+	// The order here is preserved in discovery.
+	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
+	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
+	// This priority order is used for local discovery, but it ends up aggregated in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go
+	// with specific priorities.
+	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
+	// handlers that we have.
+	restStorageProviders := []RESTStorageProvider{}
+	if err := m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...); err != nil {
+		return nil, err
+	}
+
+	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+		if err != nil {
+			return err
+		}
+		clusterAuthenticationTrustController := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient)
+
+		// prime values and start listeners
+		if m.ClusterAuthenticationInfo.ClientCA != nil {
+			if notifier, ok := m.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.Notifier); ok {
+				notifier.AddListener(clusterAuthenticationTrustController)
+			}
+			if controller, ok := m.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.ControllerRunner); ok {
+				// runonce to be sure that we have a value.
+				if err := controller.RunOnce(); err != nil {
+					runtime.HandleError(err)
+				}
+				go controller.Run(1, hookContext.StopCh)
+			}
+		}
+		if m.ClusterAuthenticationInfo.RequestHeaderCA != nil {
+			if notifier, ok := m.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.Notifier); ok {
+				notifier.AddListener(clusterAuthenticationTrustController)
+			}
+			if controller, ok := m.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.ControllerRunner); ok {
+				// runonce to be sure that we have a value.
+				if err := controller.RunOnce(); err != nil {
+					runtime.HandleError(err)
+				}
+
+				go controller.Run(1, hookContext.StopCh)
+			}
+		}
+
+		go clusterAuthenticationTrustController.Run(1, hookContext.StopCh)
+		return nil
+	})
+
+	return m, nil
+
+}
+
+// InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
+func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter,
+	restStorageProviders ...RESTStorageProvider) error {
+	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
+
+	if err := m.GenericAPIServer.InstallAPIGroups(apiGroupsInfo...); err != nil {
+		return fmt.Errorf("error in registering group versions: %v", err)
+	}
+
+	return nil
 }
 
 // DefaultAPIResourceConfigSource returns default configuration for an APIResource.

@@ -131,6 +131,7 @@ require (
 	k8s.io/gengo v0.0.0-20210203185629-de9496dff47b // indirect
 	k8s.io/klog/v2 v2.8.0
 	k8s.io/kube-aggregator v0.17.3
+	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubelet v0.0.0
 	k8s.io/kubernetes v1.19.7
@@ -163,4 +164,5 @@ replace (
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.19.7
 	k8s.io/metrics => k8s.io/metrics v0.19.7
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.19.7
+	gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.2.2
 )
