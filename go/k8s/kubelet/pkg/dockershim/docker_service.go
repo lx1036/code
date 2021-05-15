@@ -1,0 +1,276 @@
+package dockershim
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"sync"
+	"time"
+
+	kubeletconfig "k8s-lx1036/k8s/kubelet/pkg/apis/config"
+	kubecontainer "k8s-lx1036/k8s/kubelet/pkg/container"
+	"k8s-lx1036/k8s/kubelet/pkg/dockershim/cm"
+	"k8s-lx1036/k8s/kubelet/pkg/dockershim/libdocker"
+	"k8s-lx1036/k8s/kubelet/pkg/dockershim/network"
+	"k8s-lx1036/k8s/kubelet/pkg/dockershim/network/cni"
+	"k8s-lx1036/k8s/kubelet/pkg/util/cache"
+
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+)
+
+// CRIService includes all methods necessary for a CRI server.
+type CRIService interface {
+	runtimeapi.RuntimeServiceServer
+	runtimeapi.ImageServiceServer
+	Start() error
+}
+
+// NetworkPluginSettings is the subset of kubelet runtime args we pass
+// to the container runtime shim so it can probe for network plugins.
+// In the future we will feed these directly to a standalone container
+// runtime process.
+type NetworkPluginSettings struct {
+	// HairpinMode is best described by comments surrounding the kubelet arg
+	HairpinMode kubeletconfig.HairpinMode
+	// NonMasqueradeCIDR is the range of ips which should *not* be included
+	// in any MASQUERADE rules applied by the plugin
+	NonMasqueradeCIDR string
+	// PluginName is the name of the plugin, runtime shim probes for
+	PluginName string
+	// PluginBinDirString is a list of directiores delimited by commas, in
+	// which the binaries for the plugin with PluginName may be found.
+	PluginBinDirString string
+	// PluginBinDirs is an array of directories in which the binaries for
+	// the plugin with PluginName may be found. The admin is responsible for
+	// provisioning these binaries before-hand.
+	PluginBinDirs []string
+	// PluginConfDir is the directory in which the admin places a CNI conf.
+	// Depending on the plugin, this may be an optional field, eg: kubenet
+	// generates its own plugin conf.
+	PluginConfDir string
+	// PluginCacheDir is the directory in which CNI should store cache files.
+	PluginCacheDir string
+	// MTU is the desired MTU for network devices created by the plugin.
+	MTU int
+}
+
+// DockerService is an interface that embeds the new RuntimeService and
+// ImageService interfaces.
+type DockerService interface {
+	CRIService
+
+	// For serving streaming calls.
+	http.Handler
+}
+
+type dockerService struct {
+	client          libdocker.Interface
+	os              kubecontainer.OSInterface
+	podSandboxImage string
+	//streamingRuntime *streamingRuntime
+	//streamingServer  streaming.Server
+
+	network *network.PluginManager
+	// Map of podSandboxID :: network-is-ready
+	networkReady     map[string]bool
+	networkReadyLock sync.Mutex
+
+	containerManager cm.ContainerManager
+	// cgroup driver used by Docker runtime.
+	cgroupDriver      string
+	checkpointManager checkpointmanager.CheckpointManager
+	// caches the version of the runtime.
+	// To be compatible with multiple docker versions, we need to perform
+	// version checking for some operations. Use this cache to avoid querying
+	// the docker daemon every time we need to do such checks.
+	versionCache *cache.ObjectCache
+
+	// containerCleanupInfos maps container IDs to the `containerCleanupInfo` structs
+	// needed to clean up after containers have been removed.
+	// (see `applyPlatformSpecificDockerConfig` and `performPlatformSpecificContainerCleanup`
+	// methods for more info).
+	containerCleanupInfos map[string]*containerCleanupInfo
+	cleanupInfosLock      sync.RWMutex
+}
+
+func (ds *dockerService) Version(ctx context.Context, request *runtimeapi.VersionRequest) (*runtimeapi.VersionResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) RunPodSandbox(ctx context.Context, request *runtimeapi.RunPodSandboxRequest) (*runtimeapi.RunPodSandboxResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) StopPodSandbox(ctx context.Context, request *runtimeapi.StopPodSandboxRequest) (*runtimeapi.StopPodSandboxResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) RemovePodSandbox(ctx context.Context, request *runtimeapi.RemovePodSandboxRequest) (*runtimeapi.RemovePodSandboxResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) PodSandboxStatus(ctx context.Context, request *runtimeapi.PodSandboxStatusRequest) (*runtimeapi.PodSandboxStatusResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) ListPodSandbox(ctx context.Context, request *runtimeapi.ListPodSandboxRequest) (*runtimeapi.ListPodSandboxResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) CreateContainer(ctx context.Context, request *runtimeapi.CreateContainerRequest) (*runtimeapi.CreateContainerResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) StartContainer(ctx context.Context, request *runtimeapi.StartContainerRequest) (*runtimeapi.StartContainerResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) StopContainer(ctx context.Context, request *runtimeapi.StopContainerRequest) (*runtimeapi.StopContainerResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) RemoveContainer(ctx context.Context, request *runtimeapi.RemoveContainerRequest) (*runtimeapi.RemoveContainerResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) ListContainers(ctx context.Context, request *runtimeapi.ListContainersRequest) (*runtimeapi.ListContainersResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) ContainerStatus(ctx context.Context, request *runtimeapi.ContainerStatusRequest) (*runtimeapi.ContainerStatusResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) UpdateContainerResources(ctx context.Context, request *runtimeapi.UpdateContainerResourcesRequest) (*runtimeapi.UpdateContainerResourcesResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) ReopenContainerLog(ctx context.Context, request *runtimeapi.ReopenContainerLogRequest) (*runtimeapi.ReopenContainerLogResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) ExecSync(ctx context.Context, request *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) Exec(ctx context.Context, request *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) Attach(ctx context.Context, request *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) PortForward(ctx context.Context, request *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) ContainerStats(ctx context.Context, request *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) ListContainerStats(ctx context.Context, request *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) UpdateRuntimeConfig(ctx context.Context, request *runtimeapi.UpdateRuntimeConfigRequest) (*runtimeapi.UpdateRuntimeConfigResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) Status(ctx context.Context, request *runtimeapi.StatusRequest) (*runtimeapi.StatusResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) ListImages(ctx context.Context, request *runtimeapi.ListImagesRequest) (*runtimeapi.ListImagesResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) ImageStatus(ctx context.Context, request *runtimeapi.ImageStatusRequest) (*runtimeapi.ImageStatusResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) PullImage(ctx context.Context, request *runtimeapi.PullImageRequest) (*runtimeapi.PullImageResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) RemoveImage(ctx context.Context, request *runtimeapi.RemoveImageRequest) (*runtimeapi.RemoveImageResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) ImageFsInfo(ctx context.Context, request *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) Start() error {
+	panic("implement me")
+}
+
+func (ds *dockerService) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	panic("implement me")
+}
+
+// NewDockerService creates a new `DockerService` struct.
+// NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
+func NewDockerService(config *ClientConfig, podSandboxImage string, pluginSettings *NetworkPluginSettings,
+	cgroupsName string, kubeCgroupDriver string, dockershimRootDir string) (DockerService, error) {
+	// Create docker client.
+	dockerClient := libdocker.ConnectToDockerOrDie(
+		config.DockerEndpoint,
+		config.RuntimeRequestTimeout,
+		config.ImagePullProgressDeadline,
+	)
+	ds := &dockerService{
+		client:                dockerClient,
+		os:                    kubecontainer.RealOS{},
+		podSandboxImage:       podSandboxImage,
+		containerManager:      cm.NewContainerManager(cgroupsName, dockerClient),
+		checkpointManager:     checkpointManager,
+		networkReady:          make(map[string]bool),
+		containerCleanupInfos: make(map[string]*containerCleanupInfo),
+	}
+
+	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginCacheDir, pluginSettings.PluginBinDirs)
+	netHost := &dockerNetworkHost{
+		&namespaceGetter{ds},
+		&portMappingGetter{ds},
+	}
+	plug, err := network.InitNetworkPlugin(cniPlugins, pluginSettings.PluginName, netHost, pluginSettings.HairpinMode, pluginSettings.NonMasqueradeCIDR, pluginSettings.MTU)
+	if err != nil {
+		return nil, fmt.Errorf("didn't find compatible CNI plugin with given settings %+v: %v", pluginSettings, err)
+	}
+	ds.network = network.NewPluginManager(plug)
+
+	return ds, nil
+}
+
+// ClientConfig is parameters used to initialize docker client
+type ClientConfig struct {
+	DockerEndpoint            string
+	RuntimeRequestTimeout     time.Duration
+	ImagePullProgressDeadline time.Duration
+
+	// Configuration for fake docker client
+	EnableSleep       bool
+	WithTraceDisabled bool
+}
+
+// dockerNetworkHost implements network.Host by wrapping the legacy host passed in by the kubelet
+// and dockerServices which implements the rest of the network host interfaces.
+// The legacy host methods are slated for deletion.
+type dockerNetworkHost struct {
+	*namespaceGetter
+	*portMappingGetter
+}
+
+// namespaceGetter is a wrapper around the dockerService that implements
+// the network.NamespaceGetter interface.
+type namespaceGetter struct {
+	ds *dockerService
+}
+
+// portMappingGetter is a wrapper around the dockerService that implements
+// the network.PortMappingGetter interface.
+type portMappingGetter struct {
+	ds *dockerService
+}
