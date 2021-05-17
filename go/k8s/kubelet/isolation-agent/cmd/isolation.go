@@ -11,6 +11,7 @@ import (
 	"k8s.io/component-base/logs"
 )
 
+// go run . --kubeconfig=`echo $HOME`/.kube/config --nodename=docker1234 --debug --root-dir=/data/kubernetes/var/lib/kubelet/ --reconcile-period=10m
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()

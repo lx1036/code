@@ -5,7 +5,7 @@ import "k8s.io/component-base/metrics"
 var (
 	metricFreshness = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Namespace: "metrics_server",
+			Namespace: "colocation",
 			Subsystem: "api",
 			Name:      "metric_freshness_seconds",
 			Help:      "Freshness of metrics exported",

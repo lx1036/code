@@ -193,8 +193,7 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	return cpuset.NewCPUSet(), fmt.Errorf("failed to allocate cpus")
 }
 
-// 根据 topo 分配 cpu
-
+// TakeCPUByTopology allocate cpu by topology
 func TakeCPUByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
 	return takeByTopology(topo, availableCPUs, numCPUs)
 }
