@@ -21,6 +21,18 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
+const (
+	// Internal docker labels used to identify whether a container is a sandbox
+	// or a regular container.
+	// TODO: This is not backward compatible with older containers. We will
+	// need to add filtering based on names.
+	containerTypeLabelKey       = "io.kubernetes.docker.type"
+	containerTypeLabelSandbox   = "podsandbox"
+	containerTypeLabelContainer = "container"
+	containerLogPathLabelKey    = "io.kubernetes.container.logpath"
+	sandboxIDLabelKey           = "io.kubernetes.sandbox.id"
+)
+
 // CRIService includes all methods necessary for a CRI server.
 type CRIService interface {
 	runtimeapi.RuntimeServiceServer
@@ -109,14 +121,6 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, request *runtimeapi
 }
 
 func (ds *dockerService) RemovePodSandbox(ctx context.Context, request *runtimeapi.RemovePodSandboxRequest) (*runtimeapi.RemovePodSandboxResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) PodSandboxStatus(ctx context.Context, request *runtimeapi.PodSandboxStatusRequest) (*runtimeapi.PodSandboxStatusResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) ListPodSandbox(ctx context.Context, request *runtimeapi.ListPodSandboxRequest) (*runtimeapi.ListPodSandboxResponse, error) {
 	panic("implement me")
 }
 

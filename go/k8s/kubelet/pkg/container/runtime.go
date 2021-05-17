@@ -162,6 +162,11 @@ type ContainerID struct {
 	ID string
 }
 
+// BuildContainerID returns the ContainerID given type and id.
+func BuildContainerID(typ, ID string) ContainerID {
+	return ContainerID{Type: typ, ID: ID}
+}
+
 // Annotation represents an annotation.
 type Annotation struct {
 	Name  string
@@ -274,4 +279,9 @@ type Runtime interface {
 	// This method just proxies a new runtimeConfig with the updated
 	// CIDR value down to the runtime shim.
 	UpdatePodCIDR(podCIDR string) error
+}
+
+// BuildPodFullName builds the pod full name from pod name and namespace.
+func BuildPodFullName(name, namespace string) string {
+	return name + "_" + namespace
 }

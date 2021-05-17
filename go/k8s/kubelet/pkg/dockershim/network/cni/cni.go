@@ -63,8 +63,31 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, podSa
 	panic("implement me")
 }
 
+// INFO: 实际上就是运行 `nsenter --target=${pid} --net -F -- ip -o -4 addr show dev eth0 scope global` 命令获得 pod ip
 func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name string, podSandboxID kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
-	panic("implement me")
+	// netnsPath="/proc/${pid}/ns/net"
+	netnsPath, err := plugin.host.GetNetNS(podSandboxID.ID)
+	if err != nil {
+		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
+	}
+	if netnsPath == "" {
+		return nil, fmt.Errorf("cannot find the network namespace, skipping pod network status for container %q", podSandboxID)
+	}
+
+	// `nsenter --net=/proc/${pid}/ns/net -F -- ip -o -4 addr show dev eth0 scope global`
+	ips, err := network.GetPodIPs(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ips) == 0 {
+		return nil, fmt.Errorf("cannot find pod IPs in the network namespace, skipping pod network status for container %q", podSandboxID)
+	}
+
+	return &network.PodNetworkStatus{
+		IP:  ips[0],
+		IPs: ips,
+	}, nil
 }
 
 func (plugin *cniNetworkPlugin) Status() error {

@@ -42,11 +42,28 @@ type kubeDockerClient struct {
 }
 
 func (d *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
-	panic("implement me")
+	ctx, cancel := d.getTimeoutContext()
+	defer cancel()
+
+	// get /containers/json
+	containers, err := d.client.ContainerList(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return containers, nil
 }
 
-func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
-	panic("implement me")
+func (d *kubeDockerClient) InspectContainer(containerID string) (*dockertypes.ContainerJSON, error) {
+	ctx, cancel := d.getTimeoutContext()
+	defer cancel()
+	// get /containers/${container_id}/json
+	containerJSON, err := d.client.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &containerJSON, nil
 }
 
 func (d *kubeDockerClient) InspectContainerWithSize(id string) (*dockertypes.ContainerJSON, error) {
