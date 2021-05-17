@@ -11,6 +11,7 @@ import (
 	kubeletconfig "k8s-lx1036/k8s/kubelet/pkg/apis/config"
 	"k8s-lx1036/k8s/kubelet/pkg/checkpointmanager"
 	kubecontainer "k8s-lx1036/k8s/kubelet/pkg/container"
+	"k8s-lx1036/k8s/kubelet/pkg/cri/streaming"
 	"k8s-lx1036/k8s/kubelet/pkg/dockershim/cm"
 	"k8s-lx1036/k8s/kubelet/pkg/dockershim/libdocker"
 	"k8s-lx1036/k8s/kubelet/pkg/dockershim/network"
@@ -85,6 +86,8 @@ type dockerService struct {
 	//streamingRuntime *streamingRuntime
 	//streamingServer  streaming.Server
 
+	streamingServer streaming.Server
+
 	network *network.PluginManager
 	// Map of podSandboxID :: network-is-ready
 	networkReady     map[string]bool
@@ -112,74 +115,6 @@ func (ds *dockerService) Version(ctx context.Context, request *runtimeapi.Versio
 	panic("implement me")
 }
 
-func (ds *dockerService) RunPodSandbox(ctx context.Context, request *runtimeapi.RunPodSandboxRequest) (*runtimeapi.RunPodSandboxResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) StopPodSandbox(ctx context.Context, request *runtimeapi.StopPodSandboxRequest) (*runtimeapi.StopPodSandboxResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) RemovePodSandbox(ctx context.Context, request *runtimeapi.RemovePodSandboxRequest) (*runtimeapi.RemovePodSandboxResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) CreateContainer(ctx context.Context, request *runtimeapi.CreateContainerRequest) (*runtimeapi.CreateContainerResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) StartContainer(ctx context.Context, request *runtimeapi.StartContainerRequest) (*runtimeapi.StartContainerResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) StopContainer(ctx context.Context, request *runtimeapi.StopContainerRequest) (*runtimeapi.StopContainerResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) RemoveContainer(ctx context.Context, request *runtimeapi.RemoveContainerRequest) (*runtimeapi.RemoveContainerResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) ListContainers(ctx context.Context, request *runtimeapi.ListContainersRequest) (*runtimeapi.ListContainersResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) ContainerStatus(ctx context.Context, request *runtimeapi.ContainerStatusRequest) (*runtimeapi.ContainerStatusResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) UpdateContainerResources(ctx context.Context, request *runtimeapi.UpdateContainerResourcesRequest) (*runtimeapi.UpdateContainerResourcesResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) ReopenContainerLog(ctx context.Context, request *runtimeapi.ReopenContainerLogRequest) (*runtimeapi.ReopenContainerLogResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) ExecSync(ctx context.Context, request *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) Exec(ctx context.Context, request *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) Attach(ctx context.Context, request *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) PortForward(ctx context.Context, request *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) ContainerStats(ctx context.Context, request *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) ListContainerStats(ctx context.Context, request *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
-	panic("implement me")
-}
-
 func (ds *dockerService) UpdateRuntimeConfig(ctx context.Context, request *runtimeapi.UpdateRuntimeConfigRequest) (*runtimeapi.UpdateRuntimeConfigResponse, error) {
 	panic("implement me")
 }
@@ -188,32 +123,16 @@ func (ds *dockerService) Status(ctx context.Context, request *runtimeapi.StatusR
 	panic("implement me")
 }
 
-func (ds *dockerService) ListImages(ctx context.Context, request *runtimeapi.ListImagesRequest) (*runtimeapi.ListImagesResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) ImageStatus(ctx context.Context, request *runtimeapi.ImageStatusRequest) (*runtimeapi.ImageStatusResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) PullImage(ctx context.Context, request *runtimeapi.PullImageRequest) (*runtimeapi.PullImageResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) RemoveImage(ctx context.Context, request *runtimeapi.RemoveImageRequest) (*runtimeapi.RemoveImageResponse, error) {
-	panic("implement me")
-}
-
-func (ds *dockerService) ImageFsInfo(ctx context.Context, request *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
-	panic("implement me")
-}
-
 func (ds *dockerService) Start() error {
 	return ds.containerManager.Start()
 }
 
 func (ds *dockerService) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	panic("implement me")
+	if ds.streamingServer != nil {
+		ds.streamingServer.ServeHTTP(writer, request)
+	} else {
+		http.NotFound(writer, request)
+	}
 }
 
 // GetNetNS returns the network namespace of the given containerID. The ID

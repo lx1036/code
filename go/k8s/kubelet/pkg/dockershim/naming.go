@@ -20,6 +20,17 @@ const (
 	DockerPullableImageIDPrefix = "docker-pullable://"
 )
 
+func makeContainerName(s *runtimeapi.PodSandboxConfig, c *runtimeapi.ContainerConfig) string {
+	return strings.Join([]string{
+		kubePrefix,                            // 0
+		c.Metadata.Name,                       // 1:
+		s.Metadata.Name,                       // 2: sandbox name
+		s.Metadata.Namespace,                  // 3: sandbox namesapce
+		s.Metadata.Uid,                        // 4  sandbox uid
+		fmt.Sprintf("%d", c.Metadata.Attempt), // 5
+	}, nameDelimiter)
+}
+
 // INFO: name="/k8s_cgroup1-0_cgroup1-75cb7bc8c5-vbzww_default_cf1f7aa0-acb5-48cf-a2e6-50d34d553d96_0"
 func parseSandboxName(name string) (*runtimeapi.PodSandboxMetadata, error) {
 	// Docker adds a "/" prefix to names. so trim it.

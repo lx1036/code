@@ -264,6 +264,18 @@ func (ds *dockerService) ListPodSandbox(ctx context.Context, request *runtimeapi
 	return &runtimeapi.ListPodSandboxResponse{Items: result}, nil
 }
 
+func (ds *dockerService) RunPodSandbox(ctx context.Context, request *runtimeapi.RunPodSandboxRequest) (*runtimeapi.RunPodSandboxResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) StopPodSandbox(ctx context.Context, request *runtimeapi.StopPodSandboxRequest) (*runtimeapi.StopPodSandboxResponse, error) {
+	panic("implement me")
+}
+
+func (ds *dockerService) RemovePodSandbox(ctx context.Context, request *runtimeapi.RemovePodSandboxRequest) (*runtimeapi.RemovePodSandboxResponse, error) {
+	panic("implement me")
+}
+
 // networkNamespaceMode returns the network runtimeapi.NamespaceMode for this container.
 // Supports: POD, NODE
 func networkNamespaceMode(container *dockertypes.ContainerJSON) runtimeapi.NamespaceMode {

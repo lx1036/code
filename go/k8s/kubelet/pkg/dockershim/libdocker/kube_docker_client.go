@@ -71,11 +71,28 @@ func (d *kubeDockerClient) InspectContainerWithSize(id string) (*dockertypes.Con
 }
 
 func (d *kubeDockerClient) CreateContainer(config dockertypes.ContainerCreateConfig) (*dockercontainer.ContainerCreateCreatedBody, error) {
-	panic("implement me")
+	ctx, cancel := d.getTimeoutContext()
+	defer cancel()
+
+	if config.HostConfig != nil && config.HostConfig.ShmSize <= 0 {
+		config.HostConfig.ShmSize = defaultShmSize
+	}
+
+	// post /containers/create
+	createResp, err := d.client.ContainerCreate(ctx, config.Config, config.HostConfig, config.NetworkingConfig, config.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &createResp, err
 }
 
 func (d *kubeDockerClient) StartContainer(id string) error {
-	panic("implement me")
+	ctx, cancel := d.getTimeoutContext()
+	defer cancel()
+
+	// post /containers/${container_id}/start
+	return d.client.ContainerStart(ctx, id, dockertypes.ContainerStartOptions{})
 }
 
 func (d *kubeDockerClient) StopContainer(id string, timeout time.Duration) error {
@@ -115,7 +132,16 @@ func (d *kubeDockerClient) Version() (*dockertypes.Version, error) {
 }
 
 func (d *kubeDockerClient) Info() (*dockertypes.Info, error) {
-	panic("implement me")
+	ctx, cancel := d.getTimeoutContext()
+	defer cancel()
+
+	// get /info
+	resp, err := d.client.Info(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, err
 }
 
 func (d *kubeDockerClient) CreateExec(s string, config dockertypes.ExecConfig) (*dockertypes.IDResponse, error) {
