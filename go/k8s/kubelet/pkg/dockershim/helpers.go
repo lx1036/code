@@ -6,12 +6,15 @@ import (
 
 	"k8s-lx1036/k8s/kubelet/pkg/types"
 
+	dockertypes "github.com/docker/docker/api/types"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 )
 
 const (
 	annotationPrefix     = "annotation."
 	securityOptSeparator = '='
+
+	dockerNetNSFmt = "/proc/%v/ns/net"
 )
 
 var internalLabelKeys = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
@@ -83,4 +86,13 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 		labels[k] = v
 	}
 	return labels, annotations
+}
+
+func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
+	if c.State.Pid == 0 {
+		// Docker reports pid 0 for an exited container.
+		return "", fmt.Errorf("cannot find network namespace for the terminated container %q", c.ID)
+	}
+
+	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid), nil
 }

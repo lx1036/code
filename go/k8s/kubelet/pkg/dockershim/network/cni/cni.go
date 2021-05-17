@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	kubeletconfig "k8s-lx1036/k8s/kubelet/pkg/apis/config"
 	kubecontainer "k8s-lx1036/k8s/kubelet/pkg/container"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
@@ -20,6 +22,9 @@ import (
 const (
 	// CNIPluginName is the name of CNI plugin
 	CNIPluginName = "cni"
+
+	// defaultSyncConfigPeriod is the default period to sync CNI config
+	defaultSyncConfigPeriod = time.Second * 5
 )
 
 type cniNetworkPlugin struct {
@@ -39,8 +44,32 @@ type cniNetworkPlugin struct {
 	podCidr     string
 }
 
+// `nsenter` bin path
+func (plugin *cniNetworkPlugin) platformInit() error {
+	var err error
+	plugin.nsenterPath, err = plugin.execer.LookPath("nsenter")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
-	panic("implement me")
+	err := plugin.platformInit()
+	if err != nil {
+		return err
+	}
+
+	// INFO: 这一步很重要，为了获取 net namespace，其实就是 "/proc/${pid}/ns/net"
+	plugin.host = host
+
+	plugin.syncNetworkConfig()
+
+	// INFO: 这里定期更新 plugin.defaultNetwork
+	// start a goroutine to sync network config from confDir periodically to detect network config updates in every 5 seconds
+	go wait.Forever(plugin.syncNetworkConfig, defaultSyncConfigPeriod)
+
+	return nil
 }
 
 func (plugin *cniNetworkPlugin) Event(name string, details map[string]interface{}) {
@@ -65,7 +94,7 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, podSa
 
 // INFO: 实际上就是运行 `nsenter --target=${pid} --net -F -- ip -o -4 addr show dev eth0 scope global` 命令获得 pod ip
 func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name string, podSandboxID kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
-	// netnsPath="/proc/${pid}/ns/net"
+	// INFO: 获取当前 sandbox container net namespace path netnsPath="/proc/${pid}/ns/net"
 	netnsPath, err := plugin.host.GetNetNS(podSandboxID.ID)
 	if err != nil {
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
@@ -231,6 +260,7 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 			Capabilities:  caps,
 		}, nil
 	}
+
 	return nil, fmt.Errorf("no valid networks found in %s", confDir)
 }
 

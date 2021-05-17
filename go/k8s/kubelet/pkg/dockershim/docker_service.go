@@ -220,7 +220,13 @@ func (ds *dockerService) ServeHTTP(writer http.ResponseWriter, request *http.Req
 // supplied is typically the ID of a pod sandbox. This getter doesn't try
 // to map non-sandbox IDs to their respective sandboxes.
 func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
-	panic("implement me")
+	// `docker inspect ${container_id}` 获取 ".State.Pid"
+	r, err := ds.client.InspectContainer(podSandboxID)
+	if err != nil {
+		return "", err
+	}
+
+	return getNetworkNamespace(r)
 }
 
 // GetPodPortMappings returns the port mappings of the given podSandbox ID.
@@ -258,11 +264,12 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, pluginSettin
 		&namespaceGetter{ds},
 		&portMappingGetter{ds},
 	}
-	plug, err := network.InitNetworkPlugin(cniPlugins, pluginSettings.PluginName, netHost, pluginSettings.HairpinMode, pluginSettings.NonMasqueradeCIDR, pluginSettings.MTU)
+	plugin, err := network.InitNetworkPlugin(cniPlugins, pluginSettings.PluginName, netHost, pluginSettings.HairpinMode, pluginSettings.NonMasqueradeCIDR, pluginSettings.MTU)
 	if err != nil {
 		return nil, fmt.Errorf("didn't find compatible CNI plugin with given settings %+v: %v", pluginSettings, err)
 	}
-	ds.network = network.NewPluginManager(plug)
+	// INFO: dockerService network 模块，很重要，在创建/查询 sandbox container network status 即 pod network 时需要
+	ds.network = network.NewPluginManager(plugin)
 
 	return ds, nil
 }
