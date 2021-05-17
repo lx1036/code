@@ -4,19 +4,21 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
 
 	kubeletconfig "k8s-lx1036/k8s/kubelet/pkg/apis/config"
+	"k8s-lx1036/k8s/kubelet/pkg/checkpointmanager"
 	kubecontainer "k8s-lx1036/k8s/kubelet/pkg/container"
 	"k8s-lx1036/k8s/kubelet/pkg/dockershim/cm"
 	"k8s-lx1036/k8s/kubelet/pkg/dockershim/libdocker"
 	"k8s-lx1036/k8s/kubelet/pkg/dockershim/network"
 	"k8s-lx1036/k8s/kubelet/pkg/dockershim/network/cni"
+	"k8s-lx1036/k8s/kubelet/pkg/dockershim/network/hostport"
 	"k8s-lx1036/k8s/kubelet/pkg/util/cache"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 )
 
 // CRIService includes all methods necessary for a CRI server.
@@ -203,10 +205,22 @@ func (ds *dockerService) ImageFsInfo(ctx context.Context, request *runtimeapi.Im
 }
 
 func (ds *dockerService) Start() error {
-	panic("implement me")
+	return ds.containerManager.Start()
 }
 
 func (ds *dockerService) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	panic("implement me")
+}
+
+// GetNetNS returns the network namespace of the given containerID. The ID
+// supplied is typically the ID of a pod sandbox. This getter doesn't try
+// to map non-sandbox IDs to their respective sandboxes.
+func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
+	panic("implement me")
+}
+
+// GetPodPortMappings returns the port mappings of the given podSandbox ID.
+func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.PortMapping, error) {
 	panic("implement me")
 }
 
@@ -220,6 +234,11 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, pluginSettin
 		config.RuntimeRequestTimeout,
 		config.ImagePullProgressDeadline,
 	)
+
+	checkpointManager, err := checkpointmanager.NewCheckpointManager(filepath.Join(dockershimRootDir, sandboxCheckpointDir))
+	if err != nil {
+		return nil, err
+	}
 	ds := &dockerService{
 		client:                dockerClient,
 		os:                    kubecontainer.RealOS{},
@@ -269,8 +288,16 @@ type namespaceGetter struct {
 	ds *dockerService
 }
 
+func (n *namespaceGetter) GetNetNS(containerID string) (string, error) {
+	return n.ds.GetNetNS(containerID)
+}
+
 // portMappingGetter is a wrapper around the dockerService that implements
 // the network.PortMappingGetter interface.
 type portMappingGetter struct {
 	ds *dockerService
+}
+
+func (p *portMappingGetter) GetPodPortMappings(containerID string) ([]*hostport.PortMapping, error) {
+	return p.ds.GetPodPortMappings(containerID)
 }

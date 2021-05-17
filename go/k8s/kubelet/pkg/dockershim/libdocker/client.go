@@ -25,14 +25,14 @@ type Interface interface {
 	ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.ImageSummary, error)
 	PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error
 	RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error)
-	ImageHistory(id string) ([]dockerimagetypes.HistoryResponseItem, error)
-	Logs(string, dockertypes.ContainerLogsOptions, StreamOptions) error
+	//ImageHistory(id string) ([]dockerimagetypes.HistoryResponseItem, error)
+	//Logs(string, dockertypes.ContainerLogsOptions, StreamOptions) error
 	Version() (*dockertypes.Version, error)
 	Info() (*dockertypes.Info, error)
 	CreateExec(string, dockertypes.ExecConfig) (*dockertypes.IDResponse, error)
-	StartExec(string, dockertypes.ExecStartCheck, StreamOptions) error
+	//StartExec(string, dockertypes.ExecStartCheck, StreamOptions) error
 	InspectExec(id string) (*dockertypes.ContainerExecInspect, error)
-	AttachToContainer(string, dockertypes.ContainerAttachOptions, StreamOptions) error
+	//AttachToContainer(string, dockertypes.ContainerAttachOptions, StreamOptions) error
 	ResizeContainerTTY(id string, height, width uint) error
 	ResizeExecTTY(id string, height, width uint) error
 	GetContainerStats(id string) (*dockertypes.StatsJSON, error)
@@ -49,7 +49,6 @@ func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgre
 	if err != nil {
 		klog.ErrorS(err, "Couldn't connect to docker")
 		os.Exit(1)
-
 	}
 	klog.InfoS("Start docker client with request timeout", "timeout", requestTimeout)
 	return newKubeDockerClient(dockerClient, requestTimeout, imagePullProgressDeadline)
