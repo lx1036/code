@@ -2,7 +2,9 @@ package cni
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -13,9 +15,13 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/dockershim/network"
 
 	"github.com/containernetworking/cni/libcni"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/util/bandwidth"
+	utilslice "k8s.io/kubernetes/pkg/util/slice"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -25,6 +31,14 @@ const (
 
 	// defaultSyncConfigPeriod is the default period to sync CNI config
 	defaultSyncConfigPeriod = time.Second * 5
+
+	// supported capabilities
+	// https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md
+	portMappingsCapability = "portMappings"
+	// { "subnet": "10.1.2.0/24", "rangeStart": "10.1.2.3", "rangeEnd": 10.1.2.99", "gateway": "10.1.2.254" }
+	ipRangesCapability  = "ipRanges"
+	bandwidthCapability = "bandwidth"
+	dnsCapability       = "dns"
 )
 
 type cniNetworkPlugin struct {
@@ -42,6 +56,37 @@ type cniNetworkPlugin struct {
 	binDirs     []string
 	cacheDir    string
 	podCidr     string
+}
+
+/*
+"portMappings": [
+  {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+]
+*/
+// cniPortMapping maps to the standard CNI portmapping Capability
+// see: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md
+// https://www.cni.dev/docs/conventions/
+type cniPortMapping struct {
+	HostPort      int32  `json:"hostPort"`
+	ContainerPort int32  `json:"containerPort"`
+	Protocol      string `json:"protocol"`
+	HostIP        string `json:"hostIP"`
+}
+
+// cniBandwidthEntry maps to the standard CNI bandwidth Capability
+// https://github.com/containernetworking/plugins/blob/master/plugins/meta/bandwidth/README.md
+// https://www.cni.dev/docs/conventions/
+type cniBandwidthEntry struct {
+	// IngressRate is the bandwidth rate in bits per second for traffic through container. 0 for no limit. If IngressRate is set, IngressBurst must also be set
+	IngressRate int `json:"ingressRate,omitempty"`
+	// IngressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If IngressBurst is set, IngressRate must also be set
+	// NOTE: it's not used for now and defaults to 0. If IngressRate is set IngressBurst will be math.MaxInt32 ~ 2Gbit
+	IngressBurst int `json:"ingressBurst,omitempty"`
+	// EgressRate is the bandwidth is the bandwidth rate in bits per second for traffic through container. 0 for no limit. If EgressRate is set, EgressBurst must also be set
+	EgressRate int `json:"egressRate,omitempty"`
+	// EgressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If EgressBurst is set, EgressRate must also be set
+	// NOTE: it's not used for now and defaults to 0. If EgressRate is set EgressBurst will be math.MaxInt32 ~ 2Gbit
+	EgressBurst int `json:"egressBurst,omitempty"`
 }
 
 // `nsenter` bin path
@@ -84,8 +129,177 @@ func (plugin *cniNetworkPlugin) Capabilities() sets.Int {
 	panic("implement me")
 }
 
+func (plugin *cniNetworkPlugin) checkInitialized() error {
+	if plugin.getDefaultNetwork() == nil {
+		return fmt.Errorf("cni config uninitialized")
+	}
+
+	if utilslice.ContainsString(plugin.getDefaultNetwork().Capabilities, ipRangesCapability, nil) && plugin.podCidr == "" {
+		return fmt.Errorf("cni config needs ipRanges but no PodCIDR set")
+	}
+
+	return nil
+}
+
 func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, podSandboxID kubecontainer.ContainerID, annotations, options map[string]string) error {
-	panic("implement me")
+	if err := plugin.checkInitialized(); err != nil {
+		return err
+	}
+
+	// /proc/${pid}/ns/net
+	netnsPath, err := plugin.host.GetNetNS(podSandboxID.ID)
+	if err != nil {
+		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
+	}
+
+	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
+	defer cancelFunc()
+
+	// Windows doesn't have loNetwork. It comes only with Linux
+	if plugin.loNetwork != nil {
+		if _, err = plugin.addToNetwork(cniTimeoutCtx, plugin.loNetwork, name, namespace, podSandboxID, netnsPath, annotations, options); err != nil {
+			return err
+		}
+	}
+
+	_, err = plugin.addToNetwork(cniTimeoutCtx, plugin.getDefaultNetwork(), name, namespace, podSandboxID, netnsPath, annotations, options)
+	return err
+}
+
+// @see https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md
+/*
+[
+	[
+		{ "subnet": "10.1.2.0/24", "rangeStart": "10.1.2.3", "rangeEnd": 10.1.2.99", "gateway": "10.1.2.254" }
+	]
+]
+*/
+// cniIPRange maps to the standard CNI ip range Capability
+type cniIPRange struct {
+	Subnet string `json:"subnet"`
+}
+
+func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations, options map[string]string) (*libcni.RuntimeConf, error) {
+	rt := &libcni.RuntimeConf{
+		ContainerID: podSandboxID.ID,
+		NetNS:       podNetnsPath,
+		IfName:      network.DefaultInterfaceName,
+		CacheDir:    plugin.cacheDir,
+		Args: [][2]string{
+			{"IgnoreUnknown", "1"},
+			{"K8S_POD_NAMESPACE", podNs},
+			{"K8S_POD_NAME", podName},
+			{"K8S_POD_INFRA_CONTAINER_ID", podSandboxID.ID},
+		},
+	}
+
+	// INFO: port mappings
+	// port mappings are a cni capability-based args, rather than parameters
+	// to a specific plugin
+	portMappings, err := plugin.host.GetPodPortMappings(podSandboxID.ID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve port mappings: %v", err)
+	}
+	portMappingsParam := make([]cniPortMapping, 0, len(portMappings))
+	for _, p := range portMappings {
+		if p.HostPort <= 0 {
+			continue
+		}
+		portMappingsParam = append(portMappingsParam, cniPortMapping{
+			HostPort:      p.HostPort,
+			ContainerPort: p.ContainerPort,
+			Protocol:      strings.ToLower(string(p.Protocol)),
+			HostIP:        p.HostIP,
+		})
+	}
+	rt.CapabilityArgs = map[string]interface{}{
+		portMappingsCapability: portMappingsParam,
+	}
+
+	// INFO: bandwidth
+	// { "ingressRate": 2048, "ingressBurst": 1600, "egressRate": 4096, "egressBurst": 1600 }
+	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pod bandwidth from annotations: %v", err)
+	}
+	if ingress != nil || egress != nil {
+		bandwidthParam := cniBandwidthEntry{}
+		if ingress != nil {
+			// https://www.cni.dev/docs/conventions/
+			// Rates are in bits per second, burst values are in bits.
+			bandwidthParam.IngressRate = int(ingress.Value())
+			// Limit IngressBurst to math.MaxInt32, in practice limiting to 2Gbit is the equivalent of setting no limit
+			bandwidthParam.IngressBurst = math.MaxInt32
+		}
+		if egress != nil {
+			bandwidthParam.EgressRate = int(egress.Value())
+			// Limit EgressBurst to math.MaxInt32, in practice limiting to 2Gbit is the equivalent of setting no limit
+			bandwidthParam.EgressBurst = math.MaxInt32
+		}
+		rt.CapabilityArgs[bandwidthCapability] = bandwidthParam
+	}
+
+	// INFO: ipRanges
+	// Set the PodCIDR
+	rt.CapabilityArgs[ipRangesCapability] = [][]cniIPRange{{{Subnet: plugin.podCidr}}}
+
+	// INFO: dns
+	// Set dns capability args.
+	if dnsOptions, ok := options["dns"]; ok {
+		dnsConfig := runtimeapi.DNSConfig{}
+		err := json.Unmarshal([]byte(dnsOptions), &dnsConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal dns config %q: %v", dnsOptions, err)
+		}
+		if dnsParam := buildDNSCapabilities(&dnsConfig); dnsParam != nil {
+			rt.CapabilityArgs[dnsCapability] = *dnsParam
+		}
+	}
+
+	return rt, nil
+}
+
+// cniDNSConfig maps to the windows CNI dns Capability.
+// see: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md
+// https://www.cni.dev/docs/conventions/
+// Note that dns capability is only used for Windows containers.
+type cniDNSConfig struct {
+	// List of DNS servers of the cluster.
+	Servers []string `json:"servers,omitempty"`
+	// List of DNS search domains of the cluster.
+	Searches []string `json:"searches,omitempty"`
+	// List of DNS options.
+	Options []string `json:"options,omitempty"`
+}
+
+// buildDNSCapabilities builds cniDNSConfig from runtimeapi.DNSConfig.
+func buildDNSCapabilities(dnsConfig *runtimeapi.DNSConfig) *cniDNSConfig {
+	return nil
+}
+
+func podDesc(namespace, name string, id kubecontainer.ContainerID) string {
+	return fmt.Sprintf("%s_%s/%s", namespace, name, id.ID)
+}
+
+func (plugin *cniNetworkPlugin) addToNetwork(ctx context.Context, network *cniNetwork, podName string, podNamespace string,
+	podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations, options map[string]string) (cnitypes.Result, error) {
+	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, options)
+	if err != nil {
+		klog.Errorf("Error adding network when building cni runtime conf: %v", err)
+		return nil, err
+	}
+
+	pdesc := podDesc(podNamespace, podName, podSandboxID)
+	netConf, cniNet := network.NetworkConfig, network.CNIConfig
+	klog.V(4).Infof("Adding %s to network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
+	res, err := cniNet.AddNetworkList(ctx, netConf, rt)
+	if err != nil {
+		klog.Errorf("Error adding %s to network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
+		return nil, err
+	}
+	klog.V(4).Infof("Added %s to network %s: %v", pdesc, netConf.Name, res)
+
+	return res, nil
 }
 
 func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, podSandboxID kubecontainer.ContainerID) error {
@@ -137,6 +351,12 @@ func (plugin *cniNetworkPlugin) setDefaultNetwork(n *cniNetwork) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	plugin.defaultNetwork = n
+}
+
+func (plugin *cniNetworkPlugin) getDefaultNetwork() *cniNetwork {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	return plugin.defaultNetwork
 }
 
 type cniNetwork struct {

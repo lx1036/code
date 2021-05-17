@@ -11,6 +11,9 @@ import (
 // TODO: Consider making this value configurable.
 const DefaultInterfaceName = "eth0"
 
+// CNITimeoutSec is set to be slightly less than 240sec/4mins, which is the default remote runtime request timeout.
+const CNITimeoutSec = 220
+
 // INFO: 这个函数很基础很重要的函数
 // getOnePodIP 使用 nsenter 命令进入 pid net namespace 获取 pod ip:
 // nsenter --target=${pid} --net -F -- ip -o -4 addr show dev eth0 scope global

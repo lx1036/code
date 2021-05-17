@@ -204,6 +204,7 @@ type ClientConfig struct {
 	WithTraceDisabled bool
 }
 
+// INFO: 实现接口 go/k8s/kubelet/pkg/dockershim/network/plugins.go::Host
 // dockerNetworkHost implements network.Host by wrapping the legacy host passed in by the kubelet
 // and dockerServices which implements the rest of the network host interfaces.
 // The legacy host methods are slated for deletion.

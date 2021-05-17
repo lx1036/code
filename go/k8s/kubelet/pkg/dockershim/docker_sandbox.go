@@ -2,6 +2,7 @@ package dockershim
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"k8s-lx1036/k8s/kubelet/pkg/checkpointmanager/errors"
@@ -21,6 +22,8 @@ const (
 
 	// Name of the underlying container runtime
 	runtimeName = "docker"
+
+	defaultSandboxImage = "k8s.gcr.io/pause:3.2"
 )
 
 // getIPsFromPlugin interrogates the network plugin for sandbox IPs.
@@ -264,8 +267,76 @@ func (ds *dockerService) ListPodSandbox(ctx context.Context, request *runtimeapi
 	return &runtimeapi.ListPodSandboxResponse{Items: result}, nil
 }
 
+// RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
+// the sandbox is in ready state.
+// For docker, PodSandbox is implemented by a container holding the network
+// namespace for the pod.
+// Note: docker doesn't use LogDirectory (yet).
 func (ds *dockerService) RunPodSandbox(ctx context.Context, request *runtimeapi.RunPodSandboxRequest) (*runtimeapi.RunPodSandboxResponse, error) {
-	panic("implement me")
+	config := request.GetConfig()
+
+	// Step 1: Pull the image for the sandbox.
+	image := defaultSandboxImage
+	podSandboxImage := ds.podSandboxImage
+	if len(podSandboxImage) != 0 {
+		image = podSandboxImage
+	}
+
+	// pull default sandbox image
+
+	// Step 2: Create the sandbox container.
+	if request.GetRuntimeHandler() != "" && request.GetRuntimeHandler() != runtimeName {
+		return nil, fmt.Errorf("RuntimeHandler %q not supported", request.GetRuntimeHandler())
+	}
+
+	createResp, err := ds.client.CreateContainer(*createConfig)
+	if err != nil {
+
+	}
+	if err != nil || createResp == nil {
+		return nil, fmt.Errorf("failed to create a sandbox for pod %q: %v", config.Metadata.Name, err)
+	}
+	resp := &runtimeapi.RunPodSandboxResponse{PodSandboxId: createResp.ID}
+
+	// Step 3: Create Sandbox Checkpoint.
+	if err = ds.checkpointManager.CreateCheckpoint(createResp.ID, constructPodSandboxCheckpoint(config)); err != nil {
+		return nil, err
+	}
+
+	// Step 4: Start the sandbox container.
+
+	// Assume kubelet's garbage collector would remove the sandbox later, if
+	// startContainer failed.
+	err = ds.client.StartContainer(createResp.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start sandbox container for pod %q: %v", config.Metadata.Name, err)
+	}
+
+	// Step 5: Setup networking for the sandbox.
+
+	// All pod networking is setup by a CNI plugin discovered at startup time.
+	// This plugin assigns the pod ip, sets up routes inside the sandbox,
+	// creates interfaces etc. In theory, its jurisdiction ends with pod
+	// sandbox networking, but it might insert iptables rules or open ports
+	// on the host as well, to satisfy parts of the pod spec that aren't
+	// recognized by the CNI standard yet.
+	cID := kubecontainer.BuildContainerID(runtimeName, createResp.ID)
+	// INFO: dns 是在创建 sandbox 时配置的，但是在 go/k8s/kubelet/pkg/dockershim/network/cni/cni.go::buildCNIRuntimeConf() 里却没有配置 dns
+	networkOptions := make(map[string]string)
+	if dnsConfig := config.GetDnsConfig(); dnsConfig != nil {
+		// Build DNS options.
+		dnsOption, err := json.Marshal(dnsConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal dns config for pod %q: %v", config.Metadata.Name, err)
+		}
+		networkOptions["dns"] = string(dnsOption)
+	}
+	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations, networkOptions)
+	if err != nil {
+
+	}
+
+	return resp, nil
 }
 
 func (ds *dockerService) StopPodSandbox(ctx context.Context, request *runtimeapi.StopPodSandboxRequest) (*runtimeapi.StopPodSandboxResponse, error) {

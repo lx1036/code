@@ -171,6 +171,19 @@ func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id ku
 	return netStatus, err
 }
 
+func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer.ContainerID, annotations, options map[string]string) error {
+	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
+	pm.podLock(fullPodName).Lock()
+	defer pm.podUnlock(fullPodName)
+
+	klog.V(3).Infof("Calling network plugin %s to set up pod %q", pm.plugin.Name(), fullPodName)
+	if err := pm.plugin.SetUpPod(podNamespace, podName, id, annotations, options); err != nil {
+		return fmt.Errorf("networkPlugin %s failed to set up pod %q network: %v", pm.plugin.Name(), fullPodName, err)
+	}
+
+	return nil
+}
+
 func NewPluginManager(plugin NetworkPlugin) *PluginManager {
 	return &PluginManager{
 		plugin: plugin,
