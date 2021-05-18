@@ -46,3 +46,10 @@ Examples
 
 
 
+
+# cgroups v1
+
+## cpusets
+官方文档：https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/cpusets.html
+
+

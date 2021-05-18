@@ -26,6 +26,10 @@ func init() {
 	}
 }
 
+// mkdir -p busybox/rootfs && cd busybox
+// docker export $(docker create busybox) | tar -C rootfs -xvf -
+// runc spec
+// debug: go run .
 func main() {
 	factory, err := libcontainer.New("/var/lib/container", libcontainer.Cgroupfs, libcontainer.InitArgs(os.Args[0], "init"))
 	if err != nil {
@@ -34,12 +38,12 @@ func main() {
 	}
 
 	defaultMountFlags := unix.MS_NOEXEC | unix.MS_NOSUID | unix.MS_NODEV
-	var devices []*devices.Rule
+	var allowedDevices []*devices.Rule
 	for _, device := range specconv.AllowedDevices {
-		devices = append(devices, &device.Rule)
+		allowedDevices = append(allowedDevices, &device.Rule)
 	}
 	config := &configs.Config{
-		Rootfs: "/home/liuxiang3/runc/nginx/rootfs",
+		Rootfs: "/home/liuxiang3/cpuset/busybox/rootfs",
 		Capabilities: &configs.Capabilities{
 			Bounding: []string{
 				"CAP_CHOWN",
@@ -136,7 +140,7 @@ func main() {
 			Parent: "system",
 			Resources: &configs.Resources{
 				MemorySwappiness: nil,
-				Devices:          devices,
+				Devices:          allowedDevices,
 			},
 		},
 		MaskPaths: []string{
@@ -148,7 +152,7 @@ func main() {
 		},
 		Devices:  specconv.AllowedDevices,
 		Hostname: "testing",
-		Mounts: []*configs.Mount{
+		Mounts: []*configs.Mount{ // `mount`
 			{
 				Source:      "proc",
 				Destination: "/proc",
@@ -226,9 +230,9 @@ func main() {
 	}
 
 	process := &libcontainer.Process{
-		Args:   []string{"/bin/bash"},
+		Args:   []string{"/bin/sh"},
 		Env:    []string{"PATH=/bin"},
-		User:   "daemon",
+		User:   "daemon", // `whoami`
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
