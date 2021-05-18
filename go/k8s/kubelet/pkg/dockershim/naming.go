@@ -31,6 +31,17 @@ func makeContainerName(s *runtimeapi.PodSandboxConfig, c *runtimeapi.ContainerCo
 	}, nameDelimiter)
 }
 
+func makeSandboxName(s *runtimeapi.PodSandboxConfig) string {
+	return strings.Join([]string{
+		kubePrefix,                            // 0
+		PodInfraContainerName,                 // 1
+		s.Metadata.Name,                       // 2
+		s.Metadata.Namespace,                  // 3
+		s.Metadata.Uid,                        // 4
+		fmt.Sprintf("%d", s.Metadata.Attempt), // 5
+	}, nameDelimiter)
+}
+
 // INFO: name="/k8s_cgroup1-0_cgroup1-75cb7bc8c5-vbzww_default_cf1f7aa0-acb5-48cf-a2e6-50d34d553d96_0"
 func parseSandboxName(name string) (*runtimeapi.PodSandboxMetadata, error) {
 	// Docker adds a "/" prefix to names. so trim it.

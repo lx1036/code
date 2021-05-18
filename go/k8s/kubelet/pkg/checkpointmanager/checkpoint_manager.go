@@ -36,7 +36,14 @@ type impl struct {
 }
 
 func (manager *impl) CreateCheckpoint(checkpointKey string, checkpoint Checkpoint) error {
-	panic("implement me")
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
+	blob, err := checkpoint.MarshalCheckpoint()
+	if err != nil {
+		return err
+	}
+
+	return manager.store.Write(checkpointKey, blob)
 }
 
 func (manager *impl) GetCheckpoint(checkpointKey string, checkpoint Checkpoint) error {

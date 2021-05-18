@@ -303,7 +303,51 @@ func (plugin *cniNetworkPlugin) addToNetwork(ctx context.Context, network *cniNe
 }
 
 func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, podSandboxID kubecontainer.ContainerID) error {
-	panic("implement me")
+	if err := plugin.checkInitialized(); err != nil {
+		return err
+	}
+
+	// Lack of namespace should not be fatal on teardown
+	netnsPath, err := plugin.host.GetNetNS(podSandboxID.ID)
+	if err != nil {
+		klog.Warningf("CNI failed to retrieve network namespace path: %v", err)
+	}
+
+	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
+	defer cancelFunc()
+	// Windows doesn't have loNetwork. It comes only with Linux
+	if plugin.loNetwork != nil {
+		// Loopback network deletion failure should not be fatal on teardown
+		if err := plugin.deleteFromNetwork(cniTimeoutCtx, plugin.loNetwork, name, namespace, podSandboxID, netnsPath, nil); err != nil {
+			klog.Warningf("CNI failed to delete loopback network: %v", err)
+		}
+	}
+
+	return plugin.deleteFromNetwork(cniTimeoutCtx, plugin.getDefaultNetwork(), name, namespace, podSandboxID, netnsPath, nil)
+}
+
+func (plugin *cniNetworkPlugin) deleteFromNetwork(ctx context.Context, network *cniNetwork, podName string,
+	podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) error {
+	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, nil)
+	if err != nil {
+		klog.Errorf("Error deleting network when building cni runtime conf: %v", err)
+		return err
+	}
+
+	pdesc := podDesc(podNamespace, podName, podSandboxID)
+	netConf, cniNet := network.NetworkConfig, network.CNIConfig
+	klog.V(4).Infof("Deleting %s from network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
+	err = cniNet.DelNetworkList(ctx, netConf, rt)
+	// The pod may not get deleted successfully at the first time.
+	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
+	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
+		klog.Errorf("Error deleting %s from network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
+		return err
+	}
+
+	klog.V(4).Infof("Deleted %s from network %s/%s", pdesc, netConf.Plugins[0].Network.Type, netConf.Name)
+
+	return nil
 }
 
 // INFO: 实际上就是运行 `nsenter --target=${pid} --net -F -- ip -o -4 addr show dev eth0 scope global` 命令获得 pod ip

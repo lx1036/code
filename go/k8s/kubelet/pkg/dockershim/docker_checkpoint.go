@@ -1,6 +1,8 @@
 package dockershim
 
 import (
+	"encoding/json"
+
 	"k8s-lx1036/k8s/kubelet/pkg/checkpointmanager"
 	"k8s-lx1036/k8s/kubelet/pkg/checkpointmanager/checksum"
 )
@@ -49,7 +51,8 @@ type PodSandboxCheckpoint struct {
 }
 
 func (checkpoint *PodSandboxCheckpoint) MarshalCheckpoint() ([]byte, error) {
-	panic("implement me")
+	checkpoint.Checksum = checksum.New(*checkpoint.Data)
+	return json.Marshal(*checkpoint)
 }
 
 func (checkpoint *PodSandboxCheckpoint) UnmarshalCheckpoint(blob []byte) error {

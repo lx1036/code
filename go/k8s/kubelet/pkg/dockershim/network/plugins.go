@@ -184,6 +184,19 @@ func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer
 	return nil
 }
 
+func (pm *PluginManager) TearDownPod(podNamespace, podName string, id kubecontainer.ContainerID) error {
+	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
+	pm.podLock(fullPodName).Lock()
+	defer pm.podUnlock(fullPodName)
+
+	klog.V(3).Infof("Calling network plugin %s to tear down pod %q", pm.plugin.Name(), fullPodName)
+	if err := pm.plugin.TearDownPod(podNamespace, podName, id); err != nil {
+		return fmt.Errorf("networkPlugin %s failed to teardown pod %q network: %v", pm.plugin.Name(), fullPodName, err)
+	}
+
+	return nil
+}
+
 func NewPluginManager(plugin NetworkPlugin) *PluginManager {
 	return &PluginManager{
 		plugin: plugin,
