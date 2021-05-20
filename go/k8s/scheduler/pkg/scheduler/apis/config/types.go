@@ -4,6 +4,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 const (
@@ -33,6 +34,19 @@ const (
 // KubeSchedulerConfiguration configures a scheduler
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta
+
+	// ClientConnection specifies the kubeconfig file and client connection
+	// settings for the proxy server to use when communicating with the apiserver.
+	ClientConnection componentbaseconfig.ClientConnectionConfiguration
+
+	// LeaderElection defines the configuration of leader election client.
+	LeaderElection componentbaseconfig.LeaderElectionConfiguration
+
+	// Profiles are scheduling profiles that kube-scheduler supports. Pods can
+	// choose to be scheduled under a particular profile by setting its associated
+	// scheduler name. Pods that don't specify any scheduler name are scheduled
+	// with the "default-scheduler" profile, if present here.
+	Profiles []KubeSchedulerProfile
 }
 
 // KubeSchedulerProfile is a scheduling profile.
@@ -161,6 +175,7 @@ func (p *Plugins) Append(src *Plugins) {
 	p.PostBind = appendPluginSet(p.PostBind, src.PostBind)
 }
 
+// INFO: 这里逻辑可以 disable kube-scheduler 默认的 plugin，比如 disable "NodeResourcesLeastAllocated" plugin, 在 scheduler-config.yaml 对象里配置
 // Apply merges the plugin configuration from custom plugins, handling disabled sets.
 func (p *Plugins) Apply(customPlugins *Plugins) {
 	if customPlugins == nil {

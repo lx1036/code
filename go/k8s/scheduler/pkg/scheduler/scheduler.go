@@ -426,10 +426,8 @@ var defaultSchedulerOptions = schedulerOptions{
 }
 
 // New returns a Scheduler
-func New(client clientset.Interface,
-	informerFactory informers.SharedInformerFactory,
-	podInformer coreinformers.PodInformer,
-	opts ...Option) (*Scheduler, error) {
+func New(client clientset.Interface, informerFactory informers.SharedInformerFactory, podInformer coreinformers.PodInformer,
+	recorderFactory profile.RecorderFactory, stopCh <-chan struct{}, opts ...Option) (*Scheduler, error) {
 	stopEverything := wait.NeverStop
 	options := defaultSchedulerOptions
 	for _, opt := range opts {
