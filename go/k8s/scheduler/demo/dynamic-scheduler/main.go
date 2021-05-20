@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"k8s-lx1036/k8s/scheduler/demo/extend-scheduler/pkg/plugins/priorityclass"
+	"k8s-lx1036/k8s/scheduler/demo/dynamic-scheduler/pkg/plugins/priorityclass"
 
 	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
