@@ -8,6 +8,7 @@ import (
 	"k8s-lx1036/k8s/scheduler/cmd/app/options"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/profile"
 
 	"github.com/spf13/cobra"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -105,6 +106,7 @@ func Setup(ctx context.Context, opts *options.Options,
 		}
 	}
 
+	// INFO: kube-scheduler 提供一种可以外部参数定义的方式，通过修改schedulerOptions进一步自定义scheduler对象，可以借鉴
 	recorderFactory := getRecorderFactory(c)
 	sched, err := scheduler.New(
 		c.Client,
@@ -112,12 +114,11 @@ func Setup(ctx context.Context, opts *options.Options,
 		c.PodInformer,
 		recorderFactory,
 		ctx.Done(),
-		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
-		scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
-		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
+		scheduler.WithProfiles(c.ComponentConfig.Profiles...),
+		scheduler.WithPercentageOfNodesToScore(c.ComponentConfig.PercentageOfNodesToScore),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
-		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
-		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),
+		scheduler.WithPodMaxBackoffSeconds(c.ComponentConfig.PodMaxBackoffSeconds),
+		scheduler.WithPodInitialBackoffSeconds(c.ComponentConfig.PodInitialBackoffSeconds),
 	)
 
 	return c, sched, nil

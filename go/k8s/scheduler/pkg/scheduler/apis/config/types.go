@@ -31,6 +31,13 @@ const (
 	DefaultKubeSchedulerPort = 10259
 )
 
+const (
+	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
+	// that once found feasible, the scheduler stops looking for more nodes.
+	// A value of 0 means adaptive, meaning the scheduler figures out a proper default.
+	DefaultPercentageOfNodesToScore = 0
+)
+
 // KubeSchedulerConfiguration configures a scheduler
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta
@@ -47,6 +54,26 @@ type KubeSchedulerConfiguration struct {
 	// scheduler name. Pods that don't specify any scheduler name are scheduled
 	// with the "default-scheduler" profile, if present here.
 	Profiles []KubeSchedulerProfile
+
+	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
+	// for running a pod, the scheduler stops its search for more feasible nodes in
+	// the cluster. This helps improve scheduler's performance. Scheduler always tries to find
+	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
+	// Example: if the cluster size is 500 nodes and the value of this flag is 30,
+	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
+	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
+	// nodes will be scored.
+	PercentageOfNodesToScore int32
+
+	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
+	// If specified, it must be greater than 0. If this value is null, the default value (1s)
+	// will be used.
+	PodInitialBackoffSeconds int64
+
+	// PodMaxBackoffSeconds is the max backoff for unschedulable pods.
+	// If specified, it must be greater than or equal to podInitialBackoffSeconds. If this value is null,
+	// the default value (10s) will be used.
+	PodMaxBackoffSeconds int64
 }
 
 // KubeSchedulerProfile is a scheduling profile.

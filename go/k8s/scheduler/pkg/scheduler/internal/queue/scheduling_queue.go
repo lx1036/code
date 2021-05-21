@@ -26,6 +26,7 @@ const (
 	// for unschedulable pods. To change the default podInitialBackoffDurationSeconds used by the
 	// scheduler, update the ComponentConfig value in defaults.go
 	DefaultPodInitialBackoffDuration time.Duration = 1 * time.Second
+
 	// DefaultPodMaxBackoffDuration is the default value for the max backoff duration
 	// for unschedulable pods. To change the default podMaxBackoffDurationSeconds used by the
 	// scheduler, update the ComponentConfig value in defaults.go

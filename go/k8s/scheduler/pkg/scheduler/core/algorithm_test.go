@@ -1,4 +1,4 @@
-package algo
+package core
 
 import (
 	"context"

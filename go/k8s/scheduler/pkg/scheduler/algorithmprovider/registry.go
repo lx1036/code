@@ -1,25 +1,25 @@
-package scheduler
+package algorithmprovider
 
 import (
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
-	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/nodename"
 
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodepreferavoidpods"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/defaultpreemption"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/imagelocality"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/nodename"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/nodeports"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/nodepreferavoidpods"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/noderesources"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/nodeunschedulable"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/nodevolumelimits"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/podtopologyspread"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/queuesort"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/tainttoleration"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/volumebinding"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/volumerestrictions"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/volumezone"
 )
 
 // ClusterAutoscalerProvider defines the default autoscaler provider
