@@ -45,6 +45,9 @@ type FrameworkHandle interface {
 	PreemptHandle() PreemptHandle
 }
 
+// LessFunc is the function to sort pod info
+type LessFunc func(podInfo1, podInfo2 *QueuedPodInfo) bool
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {

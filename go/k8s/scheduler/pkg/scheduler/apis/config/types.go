@@ -99,8 +99,6 @@ type KubeSchedulerProfile struct {
 	PluginConfig []PluginConfig
 }
 
-///////////////// plugin ///////////////////////
-
 // PluginConfig specifies arguments that should be passed to a plugin at the time of initialization.
 // A plugin that is invoked at multiple extension points is initialized once. Args can have arbitrary structure.
 // It is up to the plugin to process these Args.
@@ -203,7 +201,6 @@ func (p *Plugins) Append(src *Plugins) {
 }
 
 // INFO: 这里逻辑可以 disable kube-scheduler 默认的 plugin，比如 disable "NodeResourcesLeastAllocated" plugin, 在 scheduler-config.yaml 对象里配置
-// Apply merges the plugin configuration from custom plugins, handling disabled sets.
 func (p *Plugins) Apply(customPlugins *Plugins) {
 	if customPlugins == nil {
 		return

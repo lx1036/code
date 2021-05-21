@@ -1,17 +1,20 @@
 package scheduler
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/core"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
 	internalqueue "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/queue"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/profile"
-	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 
+	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -75,9 +78,6 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 
 // create a scheduler from a set of registered plugins.
 func (c *Configurator) create() (*Scheduler, error) {
-	var extenders []framework.Extender
-	var ignoredExtendedResources []string
-
 	// The nominator will be passed all the way to framework instantiation.
 	nominator := internalqueue.NewPodNominator()
 	profiles, err := profile.NewMap(c.profiles, c.buildFramework, c.recorderFactory,
@@ -100,7 +100,6 @@ func (c *Configurator) create() (*Scheduler, error) {
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
 		c.nodeInfoSnapshot,
-		extenders,
 		c.informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
@@ -115,4 +114,22 @@ func (c *Configurator) create() (*Scheduler, error) {
 		StopEverything:  c.StopEverything,
 		SchedulingQueue: podQueue,
 	}, nil
+}
+
+func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile, opts ...frameworkruntime.Option) (framework.Framework, error) {
+	if c.frameworkCapturer != nil {
+		c.frameworkCapturer(p)
+	}
+	opts = append([]frameworkruntime.Option{
+		frameworkruntime.WithClientSet(c.client),
+		frameworkruntime.WithInformerFactory(c.informerFactory),
+		frameworkruntime.WithSnapshotSharedLister(c.nodeInfoSnapshot),
+		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
+	}, opts...)
+	return frameworkruntime.NewFramework(
+		c.registry,
+		p.Plugins,
+		p.PluginConfig,
+		opts...,
+	)
 }

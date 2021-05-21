@@ -2,7 +2,6 @@ package runtime
 
 import (
 	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -13,11 +12,11 @@ type frameworkOptions struct {
 	clientSet            clientset.Interface
 	eventRecorder        events.EventRecorder
 	informerFactory      informers.SharedInformerFactory
-	snapshotSharedLister v1alpha1.SharedLister
+	snapshotSharedLister framework.SharedLister
 	metricsRecorder      *metricsRecorder
 	profileName          string
-	podNominator         v1alpha1.PodNominator
-	extenders            []v1alpha1.Extender
+	podNominator         framework.PodNominator
+	extenders            []framework.Extender
 	runAllFilters        bool
 }
 
@@ -25,7 +24,7 @@ type frameworkOptions struct {
 type Option func(*frameworkOptions)
 
 // WithPodNominator sets podNominator for the scheduling frameworkImpl.
-func WithPodNominator(nominator v1alpha1.PodNominator) Option {
+func WithPodNominator(nominator framework.PodNominator) Option {
 	return func(o *frameworkOptions) {
 		o.podNominator = nominator
 	}
@@ -35,20 +34,20 @@ func WithPodNominator(nominator v1alpha1.PodNominator) Option {
 // plugins.
 type frameworkImpl struct {
 	registry              Registry
-	snapshotSharedLister  v1alpha1.SharedLister
+	snapshotSharedLister  framework.SharedLister
 	waitingPods           *waitingPodsMap
 	pluginNameToWeightMap map[string]int
-	queueSortPlugins      []v1alpha1.QueueSortPlugin
-	preFilterPlugins      []v1alpha1.PreFilterPlugin
-	filterPlugins         []v1alpha1.FilterPlugin
-	postFilterPlugins     []v1alpha1.PostFilterPlugin
-	preScorePlugins       []v1alpha1.PreScorePlugin
-	scorePlugins          []v1alpha1.ScorePlugin
-	reservePlugins        []v1alpha1.ReservePlugin
-	preBindPlugins        []v1alpha1.PreBindPlugin
-	bindPlugins           []v1alpha1.BindPlugin
-	postBindPlugins       []v1alpha1.PostBindPlugin
-	permitPlugins         []v1alpha1.PermitPlugin
+	queueSortPlugins      []framework.QueueSortPlugin
+	preFilterPlugins      []framework.PreFilterPlugin
+	filterPlugins         []framework.FilterPlugin
+	postFilterPlugins     []framework.PostFilterPlugin
+	preScorePlugins       []framework.PreScorePlugin
+	scorePlugins          []framework.ScorePlugin
+	reservePlugins        []framework.ReservePlugin
+	preBindPlugins        []framework.PreBindPlugin
+	bindPlugins           []framework.BindPlugin
+	postBindPlugins       []framework.PostBindPlugin
+	permitPlugins         []framework.PermitPlugin
 
 	clientSet       clientset.Interface
 	eventRecorder   events.EventRecorder
@@ -57,7 +56,7 @@ type frameworkImpl struct {
 	metricsRecorder *metricsRecorder
 	profileName     string
 
-	preemptHandle v1alpha1.PreemptHandle
+	preemptHandle framework.PreemptHandle
 
 	// Indicates that RunFilterPlugins should accumulate all failed statuses and not return
 	// after the first failure.
