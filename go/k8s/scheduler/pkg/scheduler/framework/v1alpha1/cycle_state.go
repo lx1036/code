@@ -1,6 +1,14 @@
 package v1alpha1
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
+
+const (
+	// NotFound is the not found error message.
+	NotFound = "not found"
+)
 
 // StateData is a generic type for arbitrary data stored in CycleState.
 type StateData interface {
@@ -22,6 +30,17 @@ type CycleState struct {
 	storage map[StateKey]StateData
 	// if recordPluginMetrics is true, PluginExecutionDuration will be recorded for this cycle.
 	recordPluginMetrics bool
+}
+
+func (c *CycleState) Write(key StateKey, val StateData) {
+	c.storage[key] = val
+}
+
+func (c *CycleState) Read(key StateKey) (StateData, error) {
+	if v, ok := c.storage[key]; ok {
+		return v, nil
+	}
+	return nil, errors.New(NotFound)
 }
 
 // NewCycleState initializes a new CycleState and returns its pointer.

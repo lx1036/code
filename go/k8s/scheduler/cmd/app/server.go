@@ -128,6 +128,9 @@ func Setup(ctx context.Context, opts *options.Options,
 func Run(ctx context.Context, cc *config.Config, sched *scheduler.Scheduler) error {
 	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
 
+	// Prepare the event broadcaster
+	cc.EventBroadcaster.StartRecordingToSink(ctx.Done())
+
 	// Start all informers.
 	go cc.PodInformer.Informer().Run(ctx.Done())
 	cc.InformerFactory.Start(ctx.Done())

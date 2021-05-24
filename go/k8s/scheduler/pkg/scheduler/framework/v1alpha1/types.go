@@ -38,6 +38,12 @@ type PodInfo struct {
 	ParseError                 error
 }
 
+// INFO: 抽取 pod affinity 相关信息
+func NewPodInfo(pod *v1.Pod) *PodInfo {
+	// TODO:
+
+}
+
 // NodeInfo is node level aggregated information.
 type NodeInfo struct {
 	// Overall node information.
@@ -82,9 +88,34 @@ type NodeInfo struct {
 	Generation int64
 }
 
-// AddPod adds pod information to this NodeInfo.
+// INFO: 把 pod 加入当前 node，更新下 nodeInfo 相关信息
 func (n *NodeInfo) AddPod(pod *v1.Pod) {
-	// TODO:
+	podInfo := NewPodInfo(pod)
+	res, non0CPU, non0Mem := calculateResource(pod)
+	n.Requested.MilliCPU += res.MilliCPU
+	n.Requested.Memory += res.Memory
+	n.Requested.EphemeralStorage += res.EphemeralStorage
+	if n.Requested.ScalarResources == nil && len(res.ScalarResources) > 0 {
+		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
+	}
+	for rName, rQuant := range res.ScalarResources {
+		n.Requested.ScalarResources[rName] += rQuant
+	}
+	n.NonZeroRequested.MilliCPU += non0CPU
+	n.NonZeroRequested.Memory += non0Mem
+	if podWithAffinity(pod) {
+		n.PodsWithAffinity = append(n.PodsWithAffinity, podInfo)
+	}
+	if podWithRequiredAntiAffinity(pod) {
+		n.PodsWithRequiredAntiAffinity = append(n.PodsWithRequiredAntiAffinity, podInfo)
+	}
+
+	n.Pods = append(n.Pods, podInfo)
+
+	// Consume ports when pods added.
+	n.updateUsedPorts(podInfo.Pod, true)
+
+	n.Generation = nextGeneration()
 }
 
 // RemovePod subtracts pod information from this NodeInfo.
@@ -266,11 +297,71 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 	}
 }
 
+// DefaultBindAllHostIP defines the default ip address used to bind to all host.
+const DefaultBindAllHostIP = "0.0.0.0"
+
 // ProtocolPort represents a protocol port pair, e.g. tcp:80.
 type ProtocolPort struct {
 	Protocol string
 	Port     int32
 }
 
+// NewProtocolPort creates a ProtocolPort instance.
+func NewProtocolPort(protocol string, port int32) *ProtocolPort {
+	pp := &ProtocolPort{
+		Protocol: protocol,
+		Port:     port,
+	}
+
+	if len(pp.Protocol) == 0 {
+		pp.Protocol = string(v1.ProtocolTCP)
+	}
+
+	return pp
+}
+
 // HostPortInfo stores mapping from ip to a set of ProtocolPort
 type HostPortInfo map[string]map[ProtocolPort]struct{}
+
+// CheckConflict checks if the input (ip, protocol, port) conflicts with the existing
+// ones in HostPortInfo.
+func (h HostPortInfo) CheckConflict(ip, protocol string, port int32) bool {
+	if port <= 0 {
+		return false
+	}
+
+	h.sanitize(&ip, &protocol)
+
+	pp := NewProtocolPort(protocol, port)
+
+	// If ip is 0.0.0.0 check all IP's (protocol, port) pair
+	if ip == DefaultBindAllHostIP {
+		for _, m := range h {
+			if _, ok := m[*pp]; ok {
+				return true
+			}
+		}
+		return false
+	}
+
+	// If ip isn't 0.0.0.0, only check IP and 0.0.0.0's (protocol, port) pair
+	for _, key := range []string{DefaultBindAllHostIP, ip} {
+		if m, ok := h[key]; ok {
+			if _, ok2 := m[*pp]; ok2 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// sanitize the parameters
+func (h HostPortInfo) sanitize(ip, protocol *string) {
+	if len(*ip) == 0 {
+		*ip = DefaultBindAllHostIP
+	}
+	if len(*protocol) == 0 {
+		*protocol = string(v1.ProtocolTCP)
+	}
+}

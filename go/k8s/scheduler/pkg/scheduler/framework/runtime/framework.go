@@ -140,7 +140,18 @@ func (f *frameworkImpl) PreemptHandle() framework.PreemptHandle {
 }
 
 func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
-	panic("implement me")
+	if f == nil {
+		// If frameworkImpl is nil, simply keep their order unchanged.
+		// NOTE: this is primarily for tests.
+		return func(_, _ *framework.QueuedPodInfo) bool { return false }
+	}
+
+	if len(f.queueSortPlugins) == 0 {
+		panic("No QueueSort plugin is registered in the frameworkImpl.")
+	}
+
+	// Only one QueueSort plugin can be enabled.
+	return f.queueSortPlugins[0].Less
 }
 
 func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
@@ -268,6 +279,7 @@ var defaultFrameworkOptions = frameworkOptions{
 	metricsRecorder: newMetricsRecorder(1000, time.Second),
 }
 
+// NewFramework INFO: Framework 对象是一个框架对象，管理多个hooks点，在每一个hook点运行多个plugins
 func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, opts ...Option) (framework.Framework, error) {
 	options := defaultFrameworkOptions
 	for _, opt := range opts {

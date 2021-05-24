@@ -32,6 +32,7 @@ type Scheduler struct {
 	// by NodeLister and Algorithm.
 	SchedulerCache internalcache.Cache
 
+	// INFO: 类似 iptables，把各个hooks串起来
 	Algorithm core.ScheduleAlgorithm
 
 	// NextPod should be a function that blocks until the next pod
@@ -279,6 +280,7 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 
 	klog.Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 
+	// INFO: 由 schedule algo 来串起来并实际执行各个plugins
 	scheduleResult, err := scheduler.Algorithm.Schedule(schedulingCycleCtx, prof, state, pod)
 	if err != nil {
 

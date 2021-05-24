@@ -258,5 +258,15 @@ func TestNodeLabelScore(t *testing.T) {
 }
 
 func TestNodeLabelScoreWithoutNode(t *testing.T) {
-
+	t.Run("node does not exist", func(t *testing.T) {
+		fh, _ := runtime.NewFramework(nil, nil, nil, runtime.WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+		p, err := New(&config.NodeLabelArgs{}, fh)
+		if err != nil {
+			t.Fatalf("Failed to create plugin: %+v", err)
+		}
+		_, status := p.(framework.ScorePlugin).Score(context.Background(), nil, nil, "")
+		if status.Code() != framework.Error {
+			t.Errorf("Status mismatch. got: %v, want: %v", status.Code(), framework.Error)
+		}
+	})
 }
