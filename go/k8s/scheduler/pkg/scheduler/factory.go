@@ -126,6 +126,7 @@ func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile, opts 
 		frameworkruntime.WithSnapshotSharedLister(c.nodeInfoSnapshot),
 		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
 	}, opts...)
+
 	return frameworkruntime.NewFramework(
 		c.registry,
 		p.Plugins,

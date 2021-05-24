@@ -38,6 +38,8 @@ const (
 	DefaultPercentageOfNodesToScore = 0
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // KubeSchedulerConfiguration configures a scheduler
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta

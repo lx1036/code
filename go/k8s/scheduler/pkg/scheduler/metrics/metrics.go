@@ -1,6 +1,11 @@
 package metrics
 
-import "k8s.io/component-base/metrics"
+import (
+	"sync"
+
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+)
 
 const (
 	// SchedulerSubsystem - subsystem name used by scheduler
@@ -21,4 +26,35 @@ var (
 // UnschedulablePods returns the pending pods metrics with the label unschedulable
 func UnschedulablePods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "unschedulable"})
+}
+
+var registerMetrics sync.Once
+
+var (
+	scheduleAttempts = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "schedule_attempts_total",
+			Help:           "Number of attempts to schedule pods, by the result. 'unschedulable' means a pod could not be scheduled, while 'error' means an internal scheduler problem.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"result", "profile"})
+
+	metricsList = []metrics.Registerable{
+		scheduleAttempts,
+	}
+)
+
+func RegisterMetrics(extraMetrics ...metrics.Registerable) {
+	for _, metric := range extraMetrics {
+		legacyregistry.MustRegister(metric)
+	}
+}
+
+// Register all metrics.
+func Register() {
+	// Register the metrics.
+	registerMetrics.Do(func() {
+		RegisterMetrics(metricsList...)
+		//volumeschedulingmetrics.RegisterVolumeSchedulingMetrics()
+	})
 }
