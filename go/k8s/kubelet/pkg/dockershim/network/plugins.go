@@ -2,16 +2,67 @@ package network
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 
 	kubeletconfig "k8s-lx1036/k8s/kubelet/pkg/apis/config"
+	kubecontainer "k8s-lx1036/k8s/kubelet/pkg/container"
+	"k8s-lx1036/k8s/kubelet/pkg/dockershim/network/hostport"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 )
+
+// Host is an interface that plugins can use to access the kubelet.
+// TODO(#35457): get rid of this backchannel to the kubelet. The scope of
+// the back channel is restricted to host-ports/testing, and restricted
+// to kubenet. No other network plugin wrapper needs it. Other plugins
+// only require a way to access namespace information and port mapping
+// information , which they can do directly through the embedded interfaces.
+type Host interface {
+	// NamespaceGetter is a getter for sandbox namespace information.
+	NamespaceGetter
+
+	// PortMappingGetter is a getter for sandbox port mapping information.
+	PortMappingGetter
+}
+
+// NamespaceGetter is an interface to retrieve namespace information for a given
+// podSandboxID. Typically implemented by runtime shims that are closely coupled to
+// CNI plugin wrappers like kubenet.
+type NamespaceGetter interface {
+	// GetNetNS returns network namespace information for the given containerID.
+	// Runtimes should *never* return an empty namespace and nil error for
+	// a container; if error is nil then the namespace string must be valid.
+	GetNetNS(containerID string) (string, error)
+}
+
+// PortMappingGetter is an interface to retrieve port mapping information for a given
+// podSandboxID. Typically implemented by runtime shims that are closely coupled to
+// CNI plugin wrappers like kubenet.
+type PortMappingGetter interface {
+	// GetPodPortMappings returns sandbox port mappings information.
+	GetPodPortMappings(containerID string) ([]*hostport.PortMapping, error)
+}
+
+// PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
+// This struct represents version "v1beta1"
+type PodNetworkStatus struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// IP is the primary ipv4/ipv6 address of the pod. Among other things it is the address that -
+	//   - kube expects to be reachable across the cluster
+	//   - service endpoints are constructed with
+	//   - will be reported in the PodStatus.PodIP field (will override the IP reported by docker)
+	IP net.IP `json:"ip" description:"Primary IP address of the pod"`
+	// IPs is the list of IPs assigned to Pod. IPs[0] == IP. The rest of the list is additional IPs
+	IPs []net.IP `json:"ips" description:"list of additional ips (inclusive of IP) assigned to pod"`
+}
 
 // NetworkPlugin is an interface to network plugins for the kubelet
 type NetworkPlugin interface {
@@ -28,7 +79,7 @@ type NetworkPlugin interface {
 	Name() string
 
 	// Returns a set of NET_PLUGIN_CAPABILITY_*
-	Capabilities() utilsets.Int
+	Capabilities() sets.Int
 
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
@@ -45,6 +96,15 @@ type NetworkPlugin interface {
 	Status() error
 }
 
+type podLock struct {
+	// Count of in-flight operations for this pod; when this reaches zero
+	// the lock can be removed from the pod map
+	refcount uint
+
+	// Lock to synchronize operations for this specific pod
+	mu sync.Mutex
+}
+
 // The PluginManager wraps a kubelet network plugin and provides synchronization
 // for a given pod's network operations.  Each pod's setup/teardown/status operations
 // are synchronized against each other, but network operations of other pods can
@@ -56,6 +116,85 @@ type PluginManager struct {
 	// Pod list and lock
 	podsLock sync.Mutex
 	pods     map[string]*podLock
+}
+
+// Lock network operations for a specific pod.  If that pod is not yet in
+// the pod map, it will be added.  The reference count for the pod will
+// be increased.
+func (pm *PluginManager) podLock(fullPodName string) *sync.Mutex {
+	pm.podsLock.Lock()
+	defer pm.podsLock.Unlock()
+
+	lock, ok := pm.pods[fullPodName]
+	if !ok {
+		lock = &podLock{}
+		pm.pods[fullPodName] = lock
+	}
+	lock.refcount++
+	return &lock.mu
+}
+
+// Unlock network operations for a specific pod.  The reference count for the
+// pod will be decreased.  If the reference count reaches zero, the pod will be
+// removed from the pod map.
+func (pm *PluginManager) podUnlock(fullPodName string) {
+	pm.podsLock.Lock()
+	defer pm.podsLock.Unlock()
+
+	lock, ok := pm.pods[fullPodName]
+	if !ok {
+		klog.Warningf("Unbalanced pod lock unref for %s", fullPodName)
+		return
+	} else if lock.refcount == 0 {
+		// This should never ever happen, but handle it anyway
+		delete(pm.pods, fullPodName)
+		klog.Warningf("Pod lock for %s still in map with zero refcount", fullPodName)
+		return
+	}
+	lock.refcount--
+	lock.mu.Unlock()
+	if lock.refcount == 0 {
+		delete(pm.pods, fullPodName)
+	}
+}
+
+func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
+	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
+	pm.podLock(fullPodName).Lock()
+	defer pm.podUnlock(fullPodName)
+
+	netStatus, err := pm.plugin.GetPodNetworkStatus(podNamespace, podName, id)
+	if err != nil {
+		return nil, fmt.Errorf("networkPlugin %s failed on the status hook for pod %q: %v", pm.plugin.Name(), fullPodName, err)
+	}
+
+	return netStatus, err
+}
+
+func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer.ContainerID, annotations, options map[string]string) error {
+	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
+	pm.podLock(fullPodName).Lock()
+	defer pm.podUnlock(fullPodName)
+
+	klog.V(3).Infof("Calling network plugin %s to set up pod %q", pm.plugin.Name(), fullPodName)
+	if err := pm.plugin.SetUpPod(podNamespace, podName, id, annotations, options); err != nil {
+		return fmt.Errorf("networkPlugin %s failed to set up pod %q network: %v", pm.plugin.Name(), fullPodName, err)
+	}
+
+	return nil
+}
+
+func (pm *PluginManager) TearDownPod(podNamespace, podName string, id kubecontainer.ContainerID) error {
+	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
+	pm.podLock(fullPodName).Lock()
+	defer pm.podUnlock(fullPodName)
+
+	klog.V(3).Infof("Calling network plugin %s to tear down pod %q", pm.plugin.Name(), fullPodName)
+	if err := pm.plugin.TearDownPod(podNamespace, podName, id); err != nil {
+		return fmt.Errorf("networkPlugin %s failed to teardown pod %q network: %v", pm.plugin.Name(), fullPodName, err)
+	}
+
+	return nil
 }
 
 func NewPluginManager(plugin NetworkPlugin) *PluginManager {

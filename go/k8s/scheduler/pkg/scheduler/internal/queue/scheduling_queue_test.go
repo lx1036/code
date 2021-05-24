@@ -1,16 +1,17 @@
 package queue
 
 import (
-	"k8s.io/apimachinery/pkg/util/clock"
 	"reflect"
 	"testing"
 	"time"
 
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/queuesort"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 func newDefaultQueueSort() framework.LessFunc {
