@@ -5,16 +5,16 @@ import (
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
-	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 
 	"k8s.io/client-go/tools/events"
 )
 
 // Profile is a scheduling profile.
 type Profile struct {
-	v1alpha1.Framework
-	Recorder events.EventRecorder
-	Name     string
+	framework.Framework // INFO: 每一个 profile 都对应有一个 Framework
+	Recorder            events.EventRecorder
+	Name                string
 }
 
 // RecorderFactory builds an EventRecorder for a given scheduler name.

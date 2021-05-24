@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/core"
 	frameworkplugins "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
 	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
 	internalqueue "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/queue"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/metrics"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/profile"
 
 	v1 "k8s.io/api/core/v1"
@@ -61,8 +63,7 @@ type Scheduler struct {
 	//recorderFactory profile.RecorderFactory
 	informerFactory informers.SharedInformerFactory
 	podInformer     coreinformers.PodInformer
-	// Close this to stop all reflectors
-	StopEverything <-chan struct{}
+
 	schedulerCache internalcache.Cache
 	// Disable pod preemption or not.
 	disablePreemption bool
@@ -74,6 +75,9 @@ type Scheduler struct {
 	nodeInfoSnapshot         *internalcache.Snapshot
 	extenders                []config.Extender
 	frameworkCapturer        FrameworkCapturer
+
+	// SchedulingQueue holds pods to be scheduled
+	SchedulingQueue internalqueue.SchedulingQueue
 }
 
 // FrameworkCapturer is used for registering a notify function in building framework.
@@ -241,8 +245,6 @@ func (scheduler *Scheduler) deleteNodeFromCache(obj interface{}) {
 }
 
 ////////////////////// PriorityQueue ////////////////////////////
-
-////////////////////// Run ////////////////////////////
 
 // Run begins watching and scheduling.
 // It waits for cache to be synced, then starts scheduling and blocked until the context is done.
@@ -462,73 +464,4 @@ func New(client clientset.Interface, informerFactory informers.SharedInformerFac
 	addAllEventHandlers(sched, informerFactory, podInformer)
 
 	return sched, nil
-
-	scheduler := &Scheduler{
-		client: client,
-		//recorderFactory:          recorderFactory,
-		informerFactory:          informerFactory,
-		podInformer:              podInformer,
-		schedulerCache:           schedulerCache,
-		StopEverything:           stopEverything,
-		percentageOfNodesToScore: options.percentageOfNodesToScore,
-		podInitialBackoffSeconds: options.podInitialBackoffSeconds,
-		podMaxBackoffSeconds:     options.podMaxBackoffSeconds,
-		profiles:                 append([]config.KubeSchedulerProfile(nil), options.profiles...),
-		registry:                 registry,
-		nodeInfoSnapshot:         snapshot,
-		extenders:                options.extenders,
-		frameworkCapturer:        options.frameworkCapturer,
-	}
-	scheduler.Algorithm = core.NewGenericScheduler(
-		schedulerCache,
-		snapshot,
-		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-		scheduler.disablePreemption,
-		scheduler.percentageOfNodesToScore,
-	)
-	// Create the config from a named algorithm provider.
-	// 1. merge下 plugin hook
-	klog.Infof("Creating scheduler from algorithm provider '%v'", *options.schedulerAlgorithmSource.Provider)
-	r := NewRegistry()
-	defaultPlugins, exist := r[*options.schedulerAlgorithmSource.Provider]
-	if !exist {
-		return nil, fmt.Errorf("algorithm provider %q is not registered", *options.schedulerAlgorithmSource.Provider)
-	}
-	// defaultPlugins默认的plugin hook 与自定义的merge下
-	// 把config.yaml里的profiles与默认的algorithmprovider/registry，merge下
-	for i := range scheduler.profiles {
-		prof := &scheduler.profiles[i]
-		plugins := &config.Plugins{}
-		plugins.Append(defaultPlugins)
-		plugins.Apply(prof.Plugins)
-		prof.Plugins = plugins
-	}
-	// The nominator will be passed all the way to framework instantiation.
-	nominator := internalqueue.NewPodNominator()
-	profiles, err := profile.NewMap(scheduler.profiles, scheduler.buildFramework, scheduler.recorderFactory,
-		frameworkruntime.WithPodNominator(nominator))
-	if err != nil {
-		return nil, fmt.Errorf("initializing profiles: %v", err)
-	}
-	if len(profiles) == 0 {
-		return nil, fmt.Errorf("at least one profile is required")
-	}
-	// Profiles are required to have equivalent queue sort plugins.
-	lessFn := profiles[scheduler.profiles[0].SchedulerName].Framework.QueueSortFunc()
-	podQueue := internalqueue.NewPriorityQueue(
-		lessFn,
-		internalqueue.WithPodInitialBackoffDuration(time.Duration(scheduler.podInitialBackoffSeconds)*time.Second),
-		internalqueue.WithPodMaxBackoffDuration(time.Duration(scheduler.podMaxBackoffSeconds)*time.Second),
-		internalqueue.WithPodNominator(nominator),
-	)
-
-	scheduler.NextPod = internalqueue.MakeNextPodFunc(podQueue) // 从scheduling queue里pop pod
-	scheduler.Profiles = profiles
-
-	// Additional tweaks to the config produced by the configurator.
-	scheduler.StopEverything = stopEverything
-	scheduler.client = client
-	scheduler.scheduledPodsHasSynced = podInformer.Informer().HasSynced
-
-	return scheduler, nil
 }

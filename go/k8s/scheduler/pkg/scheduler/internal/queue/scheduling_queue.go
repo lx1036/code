@@ -9,16 +9,16 @@ import (
 	"sync"
 	"time"
 
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/heap"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/metrics"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/util"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -88,6 +88,38 @@ const (
 	NodeConditionChange = "NodeConditionChange"
 )
 
+// SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
+// The interface follows a pattern similar to cache.FIFO and cache.Heap and
+// makes it easy to use those data structures as a SchedulingQueue.
+type SchedulingQueue interface {
+	framework.PodNominator
+	Add(pod *v1.Pod) error
+	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
+	// The podSchedulingCycle represents the current scheduling cycle number which can be
+	// returned by calling SchedulingCycle().
+	AddUnschedulableIfNotPresent(pod *framework.QueuedPodInfo, podSchedulingCycle int64) error
+	// SchedulingCycle returns the current number of scheduling cycle which is
+	// cached by scheduling queue. Normally, incrementing this number whenever
+	// a pod is popped (e.g. called Pop()) is enough.
+	SchedulingCycle() int64
+	// Pop removes the head of the queue and returns it. It blocks if the
+	// queue is empty and waits until a new item is added to the queue.
+	Pop() (*framework.QueuedPodInfo, error)
+	Update(oldPod, newPod *v1.Pod) error
+	Delete(pod *v1.Pod) error
+	MoveAllToActiveOrBackoffQueue(event string)
+	AssignedPodAdded(pod *v1.Pod)
+	AssignedPodUpdated(pod *v1.Pod)
+	PendingPods() []*v1.Pod
+	// Close closes the SchedulingQueue so that the goroutine which is
+	// waiting to pop items can exit gracefully.
+	Close()
+	// NumUnschedulablePods returns the number of unschedulable pods exist in the SchedulingQueue.
+	NumUnschedulablePods() int
+	// Run starts the goroutines managing the queue.
+	Run()
+}
+
 // PriorityQueue implements a scheduling queue.
 // The head of PriorityQueue is the highest priority pending pod. This structure
 // has three sub queues. One sub-queue holds pods that are being considered for
@@ -97,7 +129,7 @@ const (
 // unschedulable queues and will be moved to active queue when backoff are completed.
 type PriorityQueue struct {
 	// PodNominator abstracts the operations to maintain nominated Pods.
-	PodNominator *nominatedPodMap
+	PodNominator framework.PodNominator
 
 	stop  chan struct{}
 	clock util.Clock
@@ -130,6 +162,50 @@ type PriorityQueue struct {
 	// closed indicates that the queue is closed.
 	// It is mainly used to let Pop() exit its control loop while waiting for an item.
 	closed bool
+}
+
+func (p *PriorityQueue) AddNominatedPod(pod *v1.Pod, nodeName string) {
+	panic("implement me")
+}
+
+func (p *PriorityQueue) DeleteNominatedPodIfExists(pod *v1.Pod) {
+	panic("implement me")
+}
+
+func (p *PriorityQueue) UpdateNominatedPod(oldPod, newPod *v1.Pod) {
+	panic("implement me")
+}
+
+func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []*v1.Pod {
+	panic("implement me")
+}
+
+func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
+	panic("implement me")
+}
+
+func (p *PriorityQueue) Delete(pod *v1.Pod) error {
+	panic("implement me")
+}
+
+func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
+	panic("implement me")
+}
+
+func (p *PriorityQueue) PendingPods() []*v1.Pod {
+	panic("implement me")
+}
+
+func (p *PriorityQueue) Close() {
+	panic("implement me")
+}
+
+func (p *PriorityQueue) NumUnschedulablePods() int {
+	panic("implement me")
+}
+
+func (p *PriorityQueue) Run() {
+	panic("implement me")
 }
 
 // newQueuedPodInfo builds a QueuedPodInfo object.
@@ -336,8 +412,9 @@ type priorityQueueOptions struct {
 	clock                     util.Clock
 	podInitialBackoffDuration time.Duration
 	podMaxBackoffDuration     time.Duration
-	podNominator              *nominatedPodMap
+	podNominator              framework.PodNominator
 }
+
 type Option func(*priorityQueueOptions)
 
 func WithClock(clock util.Clock) Option {
@@ -346,10 +423,36 @@ func WithClock(clock util.Clock) Option {
 	}
 }
 
+// WithPodInitialBackoffDuration sets pod initial backoff duration for PriorityQueue.
+func WithPodInitialBackoffDuration(duration time.Duration) Option {
+	return func(o *priorityQueueOptions) {
+		o.podInitialBackoffDuration = duration
+	}
+}
+
+// WithPodMaxBackoffDuration sets pod max backoff duration for PriorityQueue.
+func WithPodMaxBackoffDuration(duration time.Duration) Option {
+	return func(o *priorityQueueOptions) {
+		o.podMaxBackoffDuration = duration
+	}
+}
+
+// WithPodNominator sets pod nominator for PriorityQueue.
+func WithPodNominator(pn framework.PodNominator) Option {
+	return func(o *priorityQueueOptions) {
+		o.podNominator = pn
+	}
+}
+
 var defaultPriorityQueueOptions = priorityQueueOptions{
 	clock:                     util.RealClock{},
 	podInitialBackoffDuration: DefaultPodInitialBackoffDuration,
 	podMaxBackoffDuration:     DefaultPodMaxBackoffDuration,
+}
+
+// NewSchedulingQueue initializes a priority queue as a new scheduling queue.
+func NewSchedulingQueue(lessFn framework.LessFunc, opts ...Option) SchedulingQueue {
+	return NewPriorityQueue(lessFn, opts...)
 }
 
 // NewPriorityQueue creates a PriorityQueue object.

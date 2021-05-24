@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"fmt"
 	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 
 	v1 "k8s.io/api/core/v1"
@@ -22,6 +23,31 @@ type Snapshot struct {
 	generation                                   int64
 }
 
+func (s *Snapshot) List() ([]*framework.NodeInfo, error) {
+	panic("implement me")
+}
+
+func (s *Snapshot) HavePodsWithAffinityList() ([]*framework.NodeInfo, error) {
+	panic("implement me")
+}
+
+func (s *Snapshot) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error) {
+	panic("implement me")
+}
+
+func (s *Snapshot) Get(nodeName string) (*framework.NodeInfo, error) {
+	if v, ok := s.nodeInfoMap[nodeName]; ok && v.Node() != nil {
+		return v, nil
+	}
+
+	return nil, fmt.Errorf("nodeinfo not found for node name %q", nodeName)
+}
+
+// NodeInfos returns a NodeInfoLister.
+func (s *Snapshot) NodeInfos() framework.NodeInfoLister {
+	return s
+}
+
 // NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
@@ -29,12 +55,10 @@ func NewEmptySnapshot() *Snapshot {
 	}
 }
 
-// NewSnapshot initializes a Snapshot struct and returns it.
-func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
-	// createNodeInfoMap obtains a list of pods and pivots that list into a map
-	// where the keys are node names and the values are the aggregated information
-	// for that node.
-	//nodeInfoMap := createNodeInfoMap(pods, nodes)
+// createNodeInfoMap obtains a list of pods and pivots that list into a map
+// where the keys are node names and the values are the aggregated information
+// for that node.
+func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.NodeInfo {
 	nodeNameToInfo := make(map[string]*framework.NodeInfo)
 	for _, pod := range pods {
 		nodeName := pod.Spec.NodeName
@@ -43,19 +67,8 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 		}
 		nodeNameToInfo[nodeName].AddPod(pod)
 	}
-	// createImageExistenceMap returns a map recording on which nodes the images exist, keyed by the images' names.
-	imageExistenceMap := make(map[string]sets.String)
-	for _, node := range nodes {
-		for _, image := range node.Status.Images {
-			for _, name := range image.Names {
-				if _, ok := imageExistenceMap[name]; !ok {
-					imageExistenceMap[name] = sets.NewString(node.Name)
-				} else {
-					imageExistenceMap[name].Insert(node.Name)
-				}
-			}
-		}
-	}
+	imageExistenceMap := createImageExistenceMap(nodes)
+
 	for _, node := range nodes {
 		if _, ok := nodeNameToInfo[node.Name]; !ok {
 			nodeNameToInfo[node.Name] = framework.NewNodeInfo()
@@ -64,11 +77,16 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 		nodeInfo.SetNode(node)
 		nodeInfo.ImageStates = getNodeImageStates(node, imageExistenceMap)
 	}
+	return nodeNameToInfo
+}
 
+// NewSnapshot initializes a Snapshot struct and returns it.
+func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
+	nodeInfoMap := createNodeInfoMap(pods, nodes)
 	nodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithAffinityNodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithRequiredAntiAffinityNodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
-	for _, v := range nodeNameToInfo {
+	for _, v := range nodeInfoMap {
 		nodeInfoList = append(nodeInfoList, v)
 		if len(v.PodsWithAffinity) > 0 {
 			havePodsWithAffinityNodeInfoList = append(havePodsWithAffinityNodeInfoList, v)
@@ -101,4 +119,21 @@ func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String)
 	}
 
 	return imageStates
+}
+
+// createImageExistenceMap returns a map recording on which nodes the images exist, keyed by the images' names.
+func createImageExistenceMap(nodes []*v1.Node) map[string]sets.String {
+	imageExistenceMap := make(map[string]sets.String)
+	for _, node := range nodes {
+		for _, image := range node.Status.Images {
+			for _, name := range image.Names {
+				if _, ok := imageExistenceMap[name]; !ok {
+					imageExistenceMap[name] = sets.NewString(node.Name)
+				} else {
+					imageExistenceMap[name].Insert(node.Name)
+				}
+			}
+		}
+	}
+	return imageExistenceMap
 }
