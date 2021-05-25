@@ -1,11 +1,15 @@
 package v1alpha1
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	schedutil "k8s-lx1036/k8s/scheduler/pkg/scheduler/util"
+
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -26,6 +30,52 @@ type WeightedAffinityTerm struct {
 	Weight int32
 }
 
+func newAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm) (*AffinityTerm, error) {
+	namespaces := schedutil.GetNamespacesFromPodAffinityTerm(pod, term)
+	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+	if err != nil {
+		return nil, err
+	}
+	return &AffinityTerm{Namespaces: namespaces, Selector: selector, TopologyKey: term.TopologyKey}, nil
+}
+
+// getAffinityTerms receives a Pod and affinity terms and returns the namespaces and
+// selectors of the terms.
+func getAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]AffinityTerm, error) {
+	if v1Terms == nil {
+		return nil, nil
+	}
+
+	var terms []AffinityTerm
+	for _, term := range v1Terms {
+		t, err := newAffinityTerm(pod, &term)
+		if err != nil {
+			// We get here if the label selector failed to process
+			return nil, err
+		}
+		terms = append(terms, *t)
+	}
+	return terms, nil
+}
+
+// getWeightedAffinityTerms returns the list of processed affinity terms.
+func getWeightedAffinityTerms(pod *v1.Pod, v1Terms []v1.WeightedPodAffinityTerm) ([]WeightedAffinityTerm, error) {
+	if v1Terms == nil {
+		return nil, nil
+	}
+
+	var terms []WeightedAffinityTerm
+	for _, term := range v1Terms {
+		t, err := newAffinityTerm(pod, &term.PodAffinityTerm)
+		if err != nil {
+			// We get here if the label selector failed to process
+			return nil, err
+		}
+		terms = append(terms, WeightedAffinityTerm{AffinityTerm: *t, Weight: term.Weight})
+	}
+	return terms, nil
+}
+
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
 // accelerate processing. This information is typically immutable (e.g., pre-processed
 // inter-pod affinity selectors).
@@ -40,8 +90,44 @@ type PodInfo struct {
 
 // INFO: 抽取 pod affinity 相关信息
 func NewPodInfo(pod *v1.Pod) *PodInfo {
-	// TODO:
+	var preferredAffinityTerms []v1.WeightedPodAffinityTerm
+	var preferredAntiAffinityTerms []v1.WeightedPodAffinityTerm
+	if affinity := pod.Spec.Affinity; affinity != nil {
+		if a := affinity.PodAffinity; a != nil {
+			preferredAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+		if a := affinity.PodAntiAffinity; a != nil {
+			preferredAntiAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+	}
 
+	// Attempt to parse the affinity terms
+	var parseErr error
+	requiredAffinityTerms, err := getAffinityTerms(pod, schedutil.GetPodAffinityTerms(pod.Spec.Affinity))
+	if err != nil {
+		parseErr = fmt.Errorf("requiredAffinityTerms: %w", err)
+	}
+	requiredAntiAffinityTerms, err := getAffinityTerms(pod, schedutil.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	if err != nil {
+		parseErr = fmt.Errorf("requiredAntiAffinityTerms: %w", err)
+	}
+	weightedAffinityTerms, err := getWeightedAffinityTerms(pod, preferredAffinityTerms)
+	if err != nil {
+		parseErr = fmt.Errorf("preferredAffinityTerms: %w", err)
+	}
+	weightedAntiAffinityTerms, err := getWeightedAffinityTerms(pod, preferredAntiAffinityTerms)
+	if err != nil {
+		parseErr = fmt.Errorf("preferredAntiAffinityTerms: %w", err)
+	}
+
+	return &PodInfo{
+		Pod:                        pod,
+		RequiredAffinityTerms:      requiredAffinityTerms,
+		RequiredAntiAffinityTerms:  requiredAntiAffinityTerms,
+		PreferredAffinityTerms:     weightedAffinityTerms,
+		PreferredAntiAffinityTerms: weightedAntiAffinityTerms,
+		ParseError:                 parseErr,
+	}
 }
 
 // NodeInfo is node level aggregated information.
@@ -118,6 +204,69 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	n.Generation = nextGeneration()
 }
 
+func podWithAffinity(p *v1.Pod) bool {
+	affinity := p.Spec.Affinity
+	return affinity != nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil)
+}
+func podWithRequiredAntiAffinity(p *v1.Pod) bool {
+	affinity := p.Spec.Affinity
+	return affinity != nil && affinity.PodAntiAffinity != nil &&
+		len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
+}
+
+// resourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
+func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
+	resPtr := &res
+	for _, c := range pod.Spec.Containers {
+		resPtr.Add(c.Resources.Requests)
+		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&c.Resources.Requests)
+		non0CPU += non0CPUReq
+		non0Mem += non0MemReq
+		// No non-zero resources for GPUs or opaque resources.
+	}
+
+	for _, ic := range pod.Spec.InitContainers {
+		resPtr.SetMaxResource(ic.Resources.Requests)
+		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&ic.Resources.Requests)
+		if non0CPU < non0CPUReq {
+			non0CPU = non0CPUReq
+		}
+
+		if non0Mem < non0MemReq {
+			non0Mem = non0MemReq
+		}
+	}
+
+	// If Overhead is being utilized, add to the total requests for the pod
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		resPtr.Add(pod.Spec.Overhead)
+		if _, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
+			non0CPU += pod.Spec.Overhead.Cpu().MilliValue()
+		}
+
+		if _, found := pod.Spec.Overhead[v1.ResourceMemory]; found {
+			non0Mem += pod.Spec.Overhead.Memory().Value()
+		}
+	}
+
+	return
+}
+
+// updateUsedPorts updates the UsedPorts of NodeInfo.
+func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
+	for j := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[j]
+		for k := range container.Ports {
+			podPort := &container.Ports[k]
+			if add {
+				n.UsedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
+			} else {
+				n.UsedPorts.Remove(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
+			}
+		}
+	}
+}
+
 // RemovePod subtracts pod information from this NodeInfo.
 func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	// TODO:
@@ -170,6 +319,39 @@ type Resource struct {
 	AllowedPodNumber int
 	// ScalarResources
 	ScalarResources map[v1.ResourceName]int64
+}
+
+// SetMaxResource compares with ResourceList and takes max value for each Resource.
+func (r *Resource) SetMaxResource(rl v1.ResourceList) {
+	if r == nil {
+		return
+	}
+
+	for rName, rQuantity := range rl {
+		switch rName {
+		case v1.ResourceMemory:
+			if mem := rQuantity.Value(); mem > r.Memory {
+				r.Memory = mem
+			}
+		case v1.ResourceCPU:
+			if cpu := rQuantity.MilliValue(); cpu > r.MilliCPU {
+				r.MilliCPU = cpu
+			}
+		case v1.ResourceEphemeralStorage:
+			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
+					r.EphemeralStorage = ephemeralStorage
+				}
+			}
+		default:
+			if v1helper.IsScalarResourceName(rName) {
+				value := rQuantity.Value()
+				if value > r.ScalarResources[rName] {
+					r.SetScalar(rName, value)
+				}
+			}
+		}
+	}
 }
 
 func (r *Resource) Add(rl v1.ResourceList) {
@@ -363,5 +545,41 @@ func (h HostPortInfo) sanitize(ip, protocol *string) {
 	}
 	if len(*protocol) == 0 {
 		*protocol = string(v1.ProtocolTCP)
+	}
+}
+
+// Add adds (ip, protocol, port) to HostPortInfo
+func (h HostPortInfo) Add(ip, protocol string, port int32) {
+	if port <= 0 {
+		return
+	}
+
+	h.sanitize(&ip, &protocol)
+
+	pp := NewProtocolPort(protocol, port)
+	if _, ok := h[ip]; !ok {
+		h[ip] = map[ProtocolPort]struct{}{
+			*pp: {},
+		}
+		return
+	}
+
+	h[ip][*pp] = struct{}{}
+}
+
+// Remove removes (ip, protocol, port) from HostPortInfo
+func (h HostPortInfo) Remove(ip, protocol string, port int32) {
+	if port <= 0 {
+		return
+	}
+
+	h.sanitize(&ip, &protocol)
+
+	pp := NewProtocolPort(protocol, port)
+	if m, ok := h[ip]; ok {
+		delete(m, *pp)
+		if len(h[ip]) == 0 {
+			delete(h, ip)
+		}
 	}
 }
