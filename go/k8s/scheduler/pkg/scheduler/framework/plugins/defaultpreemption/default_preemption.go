@@ -8,6 +8,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
+	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // INFO: 抢占preemption plugin
@@ -54,10 +56,15 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 // other pods with the same priority. The nominated pod prevents other pods from
 // using the nominated resources and the nominated pod could take a long time
 // before it is retried after many other pending pods.
+// INFO: @see https://kubernetes.io/zh/docs/concepts/configuration/pod-priority-preemption/
 func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
 	m framework.NodeToStatusMap) (string, error) {
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
+	if !PodEligibleToPreemptOthers(pod, nodeLister, m[pod.Status.NominatedNodeName]) {
+		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
+		return "", nil
+	}
 
 	// 2) Find all preemption candidates.
 
@@ -77,4 +84,42 @@ func New(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, erro
 	}
 
 	return &pl, nil
+}
+
+// PodEligibleToPreemptOthers determines whether this pod should be considered
+// for preempting other pods or not. If this pod has already preempted other
+// pods and those are in their graceful termination period, it shouldn't be
+// considered for preemption.
+// We look at the node that is nominated for this pod and as long as there are
+// terminating pods on the node, we don't consider this for preempting more pods.
+// INFO: @see https://kubernetes.io/zh/docs/concepts/configuration/pod-priority-preemption/#non-preempting-priority-class
+func PodEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister, nominatedNodeStatus *framework.Status) bool {
+	// INFO: 非抢占式的 pod 不需要抢占，返回 false
+	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
+		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, v1.PreemptNever)
+		return false
+	}
+
+	nominatedNodeName := pod.Status.NominatedNodeName
+	if len(nominatedNodeName) > 0 {
+		// If the pod's nominated node is considered as UnschedulableAndUnresolvable by the filters,
+		// then the pod should be considered for preempting again.
+		// INFO: nominatedNodeName 是不可调度的，可以抢占？
+		if nominatedNodeStatus.Code() == framework.UnschedulableAndUnresolvable {
+			return true
+		}
+
+		// nominatedNodeName 有 terminating pod 了，则不需要抢占
+		if nodeInfo, _ := nodeInfos.Get(nominatedNodeName); nodeInfo != nil {
+			podPriority := podutil.GetPodPriority(pod)
+			for _, p := range nodeInfo.Pods {
+				if p.Pod.DeletionTimestamp != nil && podutil.GetPodPriority(p.Pod) < podPriority {
+					// There is a terminating pod on the nominated node.
+					return false
+				}
+			}
+		}
+	}
+
+	return true
 }
