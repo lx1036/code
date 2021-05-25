@@ -43,6 +43,22 @@ func (c *CycleState) Read(key StateKey) (StateData, error) {
 	return nil, errors.New(NotFound)
 }
 
+// ShouldRecordPluginMetrics returns whether PluginExecutionDuration metrics should be recorded.
+func (c *CycleState) ShouldRecordPluginMetrics() bool {
+	if c == nil {
+		return false
+	}
+	return c.recordPluginMetrics
+}
+
+// SetRecordPluginMetrics sets recordPluginMetrics to the given value.
+func (c *CycleState) SetRecordPluginMetrics(flag bool) {
+	if c == nil {
+		return
+	}
+	c.recordPluginMetrics = flag
+}
+
 // NewCycleState initializes a new CycleState and returns its pointer.
 func NewCycleState() *CycleState {
 	return &CycleState{

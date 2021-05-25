@@ -1,7 +1,15 @@
 package util
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/kubernetes"
 )
 
 // GetPodFullName returns a name that uniquely identifies a pod.
@@ -37,4 +45,24 @@ func GetPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm)
 		//}
 	}
 	return terms
+}
+
+// PatchPod calculates the delta bytes change from <old> to <new>,
+// and then submit a request to API server to patch the pod changes.
+func PatchPod(cs kubernetes.Interface, old *v1.Pod, new *v1.Pod) error {
+	oldData, err := json.Marshal(old)
+	if err != nil {
+		return err
+	}
+
+	newData, err := json.Marshal(new)
+	if err != nil {
+		return err
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Pod{})
+	if err != nil {
+		return fmt.Errorf("failed to create merge patch for pod %q/%q: %v", old.Namespace, old.Name, err)
+	}
+	_, err = cs.CoreV1().Pods(old.Namespace).Patch(context.TODO(), old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	return err
 }
