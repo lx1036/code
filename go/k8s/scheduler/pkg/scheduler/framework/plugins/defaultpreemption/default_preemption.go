@@ -59,6 +59,7 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 // INFO: @see https://kubernetes.io/zh/docs/concepts/configuration/pod-priority-preemption/
 func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
 	m framework.NodeToStatusMap) (string, error) {
+	nodeLister := pl.fh.SnapshotSharedLister().NodeInfos()
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
 	if !PodEligibleToPreemptOthers(pod, nodeLister, m[pod.Status.NominatedNodeName]) {

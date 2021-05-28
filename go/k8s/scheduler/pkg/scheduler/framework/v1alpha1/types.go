@@ -9,6 +9,7 @@ import (
 	schedutil "k8s-lx1036/k8s/scheduler/pkg/scheduler/util"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -319,6 +320,23 @@ type Resource struct {
 	AllowedPodNumber int
 	// ScalarResources
 	ScalarResources map[v1.ResourceName]int64
+}
+
+func (r *Resource) ResourceList() v1.ResourceList {
+	result := v1.ResourceList{
+		v1.ResourceCPU:              *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
+		v1.ResourceMemory:           *resource.NewQuantity(r.Memory, resource.BinarySI),
+		v1.ResourcePods:             *resource.NewQuantity(int64(r.AllowedPodNumber), resource.BinarySI),
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(r.EphemeralStorage, resource.BinarySI),
+	}
+	for rName, rQuant := range r.ScalarResources {
+		if v1helper.IsHugePageResourceName(rName) {
+			result[rName] = *resource.NewQuantity(rQuant, resource.BinarySI)
+		} else {
+			result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
+		}
+	}
+	return result
 }
 
 // SetMaxResource compares with ResourceList and takes max value for each Resource.

@@ -252,7 +252,7 @@ func (f *frameworkImpl) HasFilterPlugins() bool {
 }
 
 func (f *frameworkImpl) HasPostFilterPlugins() bool {
-	panic("implement me")
+	return len(f.postFilterPlugins) > 0
 }
 
 func (f *frameworkImpl) HasScorePlugins() bool {
