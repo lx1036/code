@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -600,4 +601,14 @@ func (h HostPortInfo) Remove(ip, protocol string, port int32) {
 			delete(h, ip)
 		}
 	}
+}
+
+// GetPodKey returns the string key of a pod.
+func GetPodKey(pod *v1.Pod) (string, error) {
+	uid := string(pod.UID)
+	if len(uid) == 0 {
+		return "", errors.New("Cannot get cache key for pod with empty UID")
+	}
+
+	return uid, nil
 }
