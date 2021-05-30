@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
-
+	
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/scheduling/config"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/scheduling/v1alpha1"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned"
 	schedinformer "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/informers/externalversions"
@@ -52,7 +53,7 @@ func (c *CapacityScheduling) PreFilter(ctx context.Context, cycleState *framewor
 }
 
 func New(obj runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args, ok := obj.(*v1alpha1.CapacitySchedulingArgs)
+	args, ok := obj.(*config.CapacitySchedulingArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type CapacitySchedulingArgs, got %T", obj)
 	}
