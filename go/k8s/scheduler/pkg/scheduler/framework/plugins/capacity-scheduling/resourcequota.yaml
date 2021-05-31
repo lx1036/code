@@ -1,0 +1,16 @@
+
+
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: mem-cpu-demo
+  namespace: liuxiang
+spec:
+  hard:
+    requests.cpu: "4" # sum(pod request)
+    requests.memory: 10Gi
+    limits.cpu: "8" # sum(pod limit)
+    limits.memory: 20Gi
+
+---

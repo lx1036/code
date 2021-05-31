@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
@@ -14,6 +15,7 @@ import (
 	internalqueue "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/queue"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/metrics"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/profile"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/util"
 
 	v1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -23,6 +25,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
+)
+
+const (
+	pluginMetricsSamplePercent = 10
 )
 
 // Scheduler watches for new unscheduled pods. It attempts to find
@@ -32,6 +40,7 @@ type Scheduler struct {
 	// by NodeLister and Algorithm.
 	SchedulerCache internalcache.Cache
 
+	// INFO: 类似 iptables，把各个hooks串起来
 	Algorithm core.ScheduleAlgorithm
 
 	// NextPod should be a function that blocks until the next pod
@@ -279,8 +288,44 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 
 	klog.Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 
+	// INFO: 由 schedule algo 来串起来并实际执行各个plugins
+	//start := time.Now()
+	state := framework.NewCycleState()
+	// INFO: 这里逻辑只有10%概率记录 plugin metrics
+	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
+	schedulingCycleCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	scheduleResult, err := scheduler.Algorithm.Schedule(schedulingCycleCtx, prof, state, pod)
 	if err != nil {
+		nominatedNode := ""
+		// INFO: 如果pod调度失败，则调用 PostFilter plugin 进行抢占
+		if fitError, ok := err.(*core.FitError); ok {
+			if !prof.HasPostFilterPlugins() {
+				klog.V(3).Infof("No PostFilter plugins are registered, so no preemption will be performed.")
+			} else {
+				// INFO: PostFilter plugin 其实就是 defaultpreemption.Name plugin，运行 preemption plugin
+				result, status := prof.RunPostFilterPlugins(ctx, state, pod, fitError.FilteredNodesStatuses)
+				if status.Code() == framework.Error {
+					klog.Errorf("Status after running PostFilter plugins for pod %v/%v: %v", pod.Namespace, pod.Name, status)
+				} else {
+					klog.V(5).Infof("Status after running PostFilter plugins for pod %v/%v: %v", pod.Namespace, pod.Name, status)
+				}
+				if status.IsSuccess() && result != nil {
+					// INFO: 如果抢占成功，则去更新 pod.Status.NominatedNodeName，但是这次调度周期不会立刻更新 pod.Spec.nodeName，
+					// 等待下次调度周期去调度。同时，下次调度周期时 pod.Spec.nodeName 未必就是 pod.Status.NominatedNodeName 这个 node
+					// 可以去看 k8s.io/api/core/v1/types.go::NominatedNodeName 字段定义描述
+					nominatedNode = result.NominatedNodeName
+				}
+			}
+			// metrics
+		} else if err == core.ErrNoNodesAvailable {
+
+		} else {
+			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))
+		}
+
+		// INFO: 更新 pod.Status.NominatedNodeName，以及更新 pod.Status.Conditions 便于展示信息
+		scheduler.recordSchedulingFailure(prof, podInfo, err, v1.PodReasonUnschedulable, nominatedNode)
 
 		return
 	}
@@ -313,6 +358,60 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 		}
 	}()
 
+}
+
+// recordSchedulingFailure records an event for the pod that indicates the
+// pod has failed to schedule. Also, update the pod condition and nominated node name if set.
+func (sched *Scheduler) recordSchedulingFailure(prof *profile.Profile, podInfo *framework.QueuedPodInfo,
+	err error, reason string, nominatedNode string) {
+	sched.Error(podInfo, err)
+
+	// Update the scheduling queue with the nominated pod information. Without
+	// this, there would be a race condition between the next scheduling cycle
+	// and the time the scheduler receives a Pod Update for the nominated pod.
+	// Here we check for nil only for tests.
+	if sched.SchedulingQueue != nil {
+		sched.SchedulingQueue.AddNominatedPod(podInfo.Pod, nominatedNode)
+	}
+
+	pod := podInfo.Pod
+	msg := truncateMessage(err.Error())
+	prof.Recorder.Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+	if err := updatePod(sched.client, pod, &v1.PodCondition{
+		Type:    v1.PodScheduled,
+		Status:  v1.ConditionFalse,
+		Reason:  reason,
+		Message: err.Error(),
+	}, nominatedNode); err != nil {
+		klog.Errorf("Error updating pod %s/%s: %v", pod.Namespace, pod.Name, err)
+	}
+}
+
+// truncateMessage truncates a message if it hits the NoteLengthLimit.
+func truncateMessage(message string) string {
+	max := validation.NoteLengthLimit
+	if len(message) <= max {
+		return message
+	}
+	suffix := " ..."
+	return message[:max-len(suffix)] + suffix
+}
+
+func updatePod(client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatedNode string) error {
+	klog.V(3).Infof("Updating pod condition for %s/%s to (%s==%s, Reason=%s)",
+		pod.Namespace, pod.Name, condition.Type, condition.Status, condition.Reason)
+	podCopy := pod.DeepCopy()
+	// NominatedNodeName is updated only if we are trying to set it, and the value is
+	// different from the existing one.
+	if !podutil.UpdatePodCondition(&podCopy.Status, condition) &&
+		(len(nominatedNode) == 0 || pod.Status.NominatedNodeName == nominatedNode) {
+		return nil
+	}
+	if nominatedNode != "" {
+		podCopy.Status.NominatedNodeName = nominatedNode
+	}
+
+	return util.PatchPod(client, pod, podCopy)
 }
 
 ////////////////////// Run ////////////////////////////

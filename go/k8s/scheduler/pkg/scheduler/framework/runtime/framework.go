@@ -9,6 +9,7 @@ import (
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config/scheme"
 	schedulerapiv1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config/v1"
 	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/metrics"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,6 +17,10 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
+)
+
+const (
+	postFilter = "PostFilter"
 )
 
 type frameworkOptions struct {
@@ -140,7 +145,18 @@ func (f *frameworkImpl) PreemptHandle() framework.PreemptHandle {
 }
 
 func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
-	panic("implement me")
+	if f == nil {
+		// If frameworkImpl is nil, simply keep their order unchanged.
+		// NOTE: this is primarily for tests.
+		return func(_, _ *framework.QueuedPodInfo) bool { return false }
+	}
+
+	if len(f.queueSortPlugins) == 0 {
+		panic("No QueueSort plugin is registered in the frameworkImpl.")
+	}
+
+	// Only one QueueSort plugin can be enabled.
+	return f.queueSortPlugins[0].Less
 }
 
 func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
@@ -151,8 +167,40 @@ func (f *frameworkImpl) RunFilterPlugins(ctx context.Context, state *framework.C
 	panic("implement me")
 }
 
-func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
-	panic("implement me")
+// INFO: pod在当前调度周期 filter extension point 失败时，执行抢占preemption逻辑，但是在下一个调度周期再去执行调度
+func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
+	filteredNodeStatusMap framework.NodeToStatusMap) (_ *framework.PostFilterResult, status *framework.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(postFilter, status.Code().String(),
+			f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+
+	statuses := make(framework.PluginToStatus)
+	for _, pl := range f.postFilterPlugins {
+		r, s := f.runPostFilterPlugin(ctx, pl, state, pod, filteredNodeStatusMap)
+		if s.IsSuccess() {
+			return r, s
+		} else if !s.IsUnschedulable() {
+			// Any status other than Success or Unschedulable is Error.
+			return nil, framework.NewStatus(framework.Error, s.Message())
+		}
+
+		statuses[pl.Name()] = s
+	}
+
+	return nil, statuses.Merge()
+}
+
+func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.PostFilterPlugin, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+	if !state.ShouldRecordPluginMetrics() { // INFO: 有90%概率不需要record plugin metrics
+		return pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
+	}
+
+	startTime := time.Now()
+	r, s := pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
+	f.metricsRecorder.observePluginDurationAsync(postFilter, pl.Name(), s, metrics.SinceInSeconds(startTime))
+	return r, s
 }
 
 func (f *frameworkImpl) RunPreFilterExtensionAddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
@@ -204,7 +252,7 @@ func (f *frameworkImpl) HasFilterPlugins() bool {
 }
 
 func (f *frameworkImpl) HasPostFilterPlugins() bool {
-	panic("implement me")
+	return len(f.postFilterPlugins) > 0
 }
 
 func (f *frameworkImpl) HasScorePlugins() bool {
@@ -268,6 +316,7 @@ var defaultFrameworkOptions = frameworkOptions{
 	metricsRecorder: newMetricsRecorder(1000, time.Second),
 }
 
+// NewFramework INFO: Framework 对象是一个框架对象，管理多个hooks点，在每一个hook点运行多个plugins
 func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, opts ...Option) (framework.Framework, error) {
 	options := defaultFrameworkOptions
 	for _, opt := range opts {

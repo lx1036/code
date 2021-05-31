@@ -458,6 +458,10 @@ func (s *Status) IsSuccess() bool {
 	return s.Code() == Success
 }
 
+func (s *Status) Reasons() []string {
+	return s.reasons
+}
+
 // NewStatus makes a Status out of the given arguments and returns its pointer.
 func NewStatus(code Code, reasons ...string) *Status {
 	return &Status{

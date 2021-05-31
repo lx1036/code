@@ -65,6 +65,8 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 	}
 
 	// 把config.yaml里的profiles与默认的algorithmprovider/registry，merge下
+	// 合并config.yaml profiles定义的plugins，和kube-scheduler在各个hooks定义的default plugins
+	// INFO: 这里逻辑可以 disable kube-scheduler 默认的 plugin，比如 disable "NodeResourcesLeastAllocated" plugin, 在 scheduler-config.yaml 对象里配置
 	for i := range c.profiles {
 		prof := &c.profiles[i]
 		plugins := &schedulerapi.Plugins{}

@@ -1,0 +1,40 @@
+
+
+
+# Preemption
+
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000000
+globalDefault: false
+description: "This priority class should be used for XYZ service pods only."
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-scheduler-preemption
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: test-scheduler-preemption
+  template:
+    metadata:
+      labels:
+        app: test-scheduler-preemption
+    spec:
+      priorityClassName: high-priority
+      containers:
+        - image: nginx:1.17.8
+          imagePullPolicy: IfNotPresent
+          name: nginx
+          resources:
+            requests:
+              cpu: 4000m
+              memory: 10Gi
+          ports:
+            - containerPort: 80

@@ -1,0 +1,29 @@
+
+---
+
+apiVersion: scheduling.sigs.k8s.io/v1alpha1
+kind: ElasticQuota
+metadata:
+  name: quota1
+  namespace: quota1
+spec:
+  max:
+    cpu: 6
+  min:
+    cpu: 4
+
+---
+
+apiVersion: scheduling.sigs.k8s.io/v1alpha1
+kind: ElasticQuota
+metadata:
+  name: quota2
+  namespace: quota2
+spec:
+  max:
+    cpu: 6
+  min:
+    cpu: 4
+
+---
+

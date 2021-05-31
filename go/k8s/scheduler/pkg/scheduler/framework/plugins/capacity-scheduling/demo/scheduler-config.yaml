@@ -1,0 +1,36 @@
+
+# https://kubernetes.io/zh/docs/reference/scheduling/config/
+# k8s.io/kube-scheduler/config/v1beta1/types.go
+
+apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: /Users/liuxiang/.kube/config
+leaderElection:
+  leaderElect: false
+  resourceName: priority-class-fit-scheduler
+  resourceNamespace: kube-system
+profiles:
+  - schedulerName: default-scheduler
+    plugins:
+      preFilter:
+        enabled:
+          - name: "CapacityScheduling"
+#        disabled:
+#          - name: "*"
+#      filter:
+#        disabled:
+#          - name: '*'
+#      preScore:
+#        disabled:
+#          - name: '*'
+#      score:
+#        disabled:
+#          - name: '*'
+#      reserve:
+#        disabled:
+#          - name: '*'
+    pluginConfig:
+      - name: "CapacityScheduling"
+        args:
+          kubeConfigPath: /Users/liuxiang/.kube/config

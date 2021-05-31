@@ -7,6 +7,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
+// INFO: pod priority 优先级高在前
+
 // PrioritySort is a plugin that implements Priority based sorting.
 type PrioritySort struct{}
 

@@ -6,7 +6,7 @@ kind: Deployment
 metadata:
   name: test-scheduler
 spec:
-  replicas: 1
+  replicas: 10
   selector:
     matchLabels:
       app: test-scheduler
@@ -15,10 +15,14 @@ spec:
       labels:
         app: test-scheduler
     spec:
-      schedulerName: priority-class-fit-scheduler
+#      schedulerName: priority-class-fit-scheduler
       containers:
         - image: nginx:1.17.8
           imagePullPolicy: IfNotPresent
           name: nginx
+          resources:
+            requests:
+              cpu: 4000m
+              memory: 10Gi
           ports:
             - containerPort: 80

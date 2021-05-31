@@ -2,9 +2,12 @@ package core
 
 import (
 	"context"
+	"fmt"
+	"sort"
+	"strings"
 	"time"
 
-	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/profile"
 
@@ -13,14 +16,50 @@ import (
 	utiltrace "k8s.io/utils/trace"
 )
 
+// ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
+var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
+
+const (
+	// NoNodeAvailableMsg is used to format message when no nodes available.
+	NoNodeAvailableMsg = "0/%v nodes are available"
+)
+
+// FitError describes a fit error of a pod.
+type FitError struct {
+	Pod                   *v1.Pod
+	NumAllNodes           int
+	FilteredNodesStatuses framework.NodeToStatusMap
+}
+
+// Error returns detailed information of why the pod failed to fit on each node
+func (f *FitError) Error() string {
+	reasons := make(map[string]int)
+	for _, status := range f.FilteredNodesStatuses {
+		for _, reason := range status.Reasons() {
+			reasons[reason]++
+		}
+	}
+
+	sortReasonsHistogram := func() []string {
+		var reasonStrings []string
+		for k, v := range reasons {
+			reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
+		}
+		sort.Strings(reasonStrings)
+		return reasonStrings
+	}
+	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
+	return reasonMsg
+}
+
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
 // onto machines.
 // INFO: Rename this type.
 type ScheduleAlgorithm interface {
-	Schedule(context.Context, *profile.Profile, *v1alpha1.CycleState, *v1.Pod) (scheduleResult ScheduleResult, err error)
+	Schedule(context.Context, *profile.Profile, *framework.CycleState, *v1.Pod) (scheduleResult ScheduleResult, err error)
 	// Extenders returns a slice of extender config. This is exposed for
 	// testing.
-	Extenders() []v1alpha1.Extender
+	Extenders() []framework.Extender
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -36,7 +75,7 @@ type ScheduleResult struct {
 
 type genericScheduler struct {
 	cache internalcache.Cache
-	//extenders                []v1alpha1.Extender
+	//extenders                []framework.Extender
 	nodeInfoSnapshot         *internalcache.Snapshot
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	disablePreemption        bool
@@ -57,7 +96,7 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, prof *profil
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
-func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, state *v1alpha1.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
+func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 
@@ -86,7 +125,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 	}, err
 }
 
-func (g *genericScheduler) Extenders() []v1alpha1.Extender {
+func (g *genericScheduler) Extenders() []framework.Extender {
 	return g.extenders
 }
 
@@ -116,7 +155,7 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, prof *p
 func NewGenericScheduler(
 	cache internalcache.Cache,
 	nodeInfoSnapshot *internalcache.Snapshot,
-	//extenders []v1alpha1.Extender,
+	//extenders []framework.Extender,
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	disablePreemption bool,
 	percentageOfNodesToScore int32) ScheduleAlgorithm {
