@@ -16,20 +16,20 @@ profiles:
       preFilter:
         enabled:
           - name: "CapacityScheduling"
-        disabled:
-          - name: "*"
-      filter:
-        disabled:
-          - name: '*'
-      preScore:
-        disabled:
-          - name: '*'
-      score:
-        disabled:
-          - name: '*'
-      reserve:
-        disabled:
-          - name: '*'
+#        disabled:
+#          - name: "*"
+#      filter:
+#        disabled:
+#          - name: '*'
+#      preScore:
+#        disabled:
+#          - name: '*'
+#      score:
+#        disabled:
+#          - name: '*'
+#      reserve:
+#        disabled:
+#          - name: '*'
     pluginConfig:
       - name: "CapacityScheduling"
         args:

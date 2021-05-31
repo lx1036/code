@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	
+
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/scheduling/config"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/scheduling/v1alpha1"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned"
@@ -50,89 +50,6 @@ func (c *CapacityScheduling) PreFilterExtensions() framework.PreFilterExtensions
 
 func (c *CapacityScheduling) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
 	return nil
-}
-
-func New(obj runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args, ok := obj.(*config.CapacitySchedulingArgs)
-	if !ok {
-		return nil, fmt.Errorf("want args to be of type CapacitySchedulingArgs, got %T", obj)
-	}
-	kubeConfigPath := args.KubeConfigPath
-
-	c := &CapacityScheduling{
-		frameworkHandle:   handle,
-		elasticQuotaInfos: NewElasticQuotaInfos(),
-		//pdbLister:         getPDBLister(handle.SharedInformerFactory()),
-	}
-
-	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
-	if err != nil {
-		return nil, err
-	}
-	elasticQuotaClient, err := versioned.NewForConfig(restConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	schedSharedInformerFactory := schedinformer.NewSharedInformerFactory(elasticQuotaClient, 0)
-	c.elasticQuotaLister = schedSharedInformerFactory.Scheduling().V1alpha1().ElasticQuotas().Lister()
-	elasticQuotaInformer := schedSharedInformerFactory.Scheduling().V1alpha1().ElasticQuotas().Informer()
-	elasticQuotaInformer.AddEventHandler(
-		cache.FilteringResourceEventHandler{
-			FilterFunc: func(obj interface{}) bool {
-				switch t := obj.(type) {
-				case *v1alpha1.ElasticQuota:
-					return true
-				case cache.DeletedFinalStateUnknown:
-					if _, ok := t.Obj.(*v1alpha1.ElasticQuota); ok {
-						return true
-					}
-					utilruntime.HandleError(fmt.Errorf("cannot convert to *v1alpha1.ElasticQuota: %v", obj))
-					return false
-				default:
-					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T", obj))
-					return false
-				}
-			},
-			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    c.addElasticQuota,
-				UpdateFunc: c.updateElasticQuota,
-				DeleteFunc: c.deleteElasticQuota,
-			},
-		})
-
-	schedSharedInformerFactory.Start(nil)
-	if !cache.WaitForCacheSync(nil, elasticQuotaInformer.HasSynced) {
-		return nil, fmt.Errorf("timed out waiting for caches to sync %v", Name)
-	}
-
-	podInformer := handle.SharedInformerFactory().Core().V1().Pods().Informer()
-	podInformer.AddEventHandler(
-		cache.FilteringResourceEventHandler{
-			FilterFunc: func(obj interface{}) bool {
-				switch t := obj.(type) {
-				case *v1.Pod:
-					return assignedPod(t)
-				case cache.DeletedFinalStateUnknown:
-					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return assignedPod(pod)
-					}
-					return false
-				default:
-					return false
-				}
-			},
-			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    c.addPod,
-				UpdateFunc: c.updatePod,
-				DeleteFunc: c.deletePod,
-			},
-		},
-	)
-
-	klog.Infof("CapacityScheduling start")
-
-	return c, nil
 }
 
 func (c *CapacityScheduling) addElasticQuota(obj interface{}) {
@@ -246,6 +163,89 @@ func (c *CapacityScheduling) deletePod(obj interface{}) {
 			klog.Errorf("ElasticQuota deletePodIfPresent for pod %v/%v error %v", pod.Namespace, pod.Name, err)
 		}
 	}
+}
+
+func New(obj runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
+	args, ok := obj.(*config.CapacitySchedulingArgs)
+	if !ok {
+		return nil, fmt.Errorf("want args to be of type CapacitySchedulingArgs, got %T", obj)
+	}
+	kubeConfigPath := args.KubeConfigPath
+
+	c := &CapacityScheduling{
+		frameworkHandle:   handle,
+		elasticQuotaInfos: NewElasticQuotaInfos(),
+		//pdbLister:         getPDBLister(handle.SharedInformerFactory()),
+	}
+
+	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
+	if err != nil {
+		return nil, err
+	}
+	elasticQuotaClient, err := versioned.NewForConfig(restConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	schedSharedInformerFactory := schedinformer.NewSharedInformerFactory(elasticQuotaClient, 0)
+	c.elasticQuotaLister = schedSharedInformerFactory.Scheduling().V1alpha1().ElasticQuotas().Lister()
+	elasticQuotaInformer := schedSharedInformerFactory.Scheduling().V1alpha1().ElasticQuotas().Informer()
+	elasticQuotaInformer.AddEventHandler(
+		cache.FilteringResourceEventHandler{
+			FilterFunc: func(obj interface{}) bool {
+				switch t := obj.(type) {
+				case *v1alpha1.ElasticQuota:
+					return true
+				case cache.DeletedFinalStateUnknown:
+					if _, ok := t.Obj.(*v1alpha1.ElasticQuota); ok {
+						return true
+					}
+					utilruntime.HandleError(fmt.Errorf("cannot convert to *v1alpha1.ElasticQuota: %v", obj))
+					return false
+				default:
+					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T", obj))
+					return false
+				}
+			},
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc:    c.addElasticQuota,
+				UpdateFunc: c.updateElasticQuota,
+				DeleteFunc: c.deleteElasticQuota,
+			},
+		})
+
+	schedSharedInformerFactory.Start(nil)
+	if !cache.WaitForCacheSync(nil, elasticQuotaInformer.HasSynced) {
+		return nil, fmt.Errorf("timed out waiting for caches to sync %v", Name)
+	}
+
+	podInformer := handle.SharedInformerFactory().Core().V1().Pods().Informer()
+	podInformer.AddEventHandler(
+		cache.FilteringResourceEventHandler{
+			FilterFunc: func(obj interface{}) bool {
+				switch t := obj.(type) {
+				case *v1.Pod:
+					return assignedPod(t)
+				case cache.DeletedFinalStateUnknown:
+					if pod, ok := t.Obj.(*v1.Pod); ok {
+						return assignedPod(pod)
+					}
+					return false
+				default:
+					return false
+				}
+			},
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc:    c.addPod,
+				UpdateFunc: c.updatePod,
+				DeleteFunc: c.deletePod,
+			},
+		},
+	)
+
+	klog.Infof("CapacityScheduling start")
+
+	return c, nil
 }
 
 // assignedPod selects pods that are assigned (scheduled and running).

@@ -12,13 +12,11 @@ const GroupName = "kubescheduler.config.k8s.io"
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta1"}
 
-
 var (
 	localSchemeBuilder = &schedschemev1beta1.SchemeBuilder
 	// AddToScheme is a global function that registers this API group & version to a scheme
 	AddToScheme = localSchemeBuilder.AddToScheme
 )
-
 
 // addKnownTypes registers known types to the given scheme
 func addKnownTypes(scheme *runtime.Scheme) error {
@@ -27,7 +25,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	)
 	return nil
 }
-
 
 func init() {
 	// We only register manually written functions here. The registration of the
