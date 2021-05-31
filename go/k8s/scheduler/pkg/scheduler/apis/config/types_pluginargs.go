@@ -2,6 +2,14 @@ package config
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// ResourceSpec represents single resource.
+type ResourceSpec struct {
+	// Name of the resource.
+	Name string
+	// Weight of the resource.
+	Weight int64
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // NodeLabelArgs holds arguments used to configure the NodeLabel plugin.
@@ -32,4 +40,16 @@ type NodeResourcesFitArgs struct {
 	// with "example.com", such as "example.com/aaa" and "example.com/bbb".
 	// A resource group name can't contain '/'.
 	IgnoredResourceGroups []string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourcesLeastAllocatedArgs holds arguments used to configure NodeResourcesLeastAllocated plugin.
+type NodeResourcesLeastAllocatedArgs struct {
+	metav1.TypeMeta
+
+	// Resources to be considered when scoring.
+	// The default resource set includes "cpu" and "memory" with an equal weight.
+	// Allowed weights go from 1 to 100.
+	Resources []ResourceSpec
 }

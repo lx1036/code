@@ -152,10 +152,9 @@ type NodeInfo struct {
 	// Total requested resources of all pods on this node. This includes assumed
 	// pods, which scheduler has sent for binding, but may not be scheduled yet.
 	Requested *Resource
-	// Total requested resources of all pods on this node with a minimum value
-	// applied to each container's CPU and memory requests. This does not reflect
-	// the actual resource requests for this node, but is used to avoid scheduling
-	// many zero-request pods onto one node.
+
+	// INFO: 这个字段会被 NodeResourcesLeastAllocated plugin 使用，和 Requested 字段意思类似，但是如果 pod request 没有设置值，也需要根据一个默认值去
+	// 统计，所以 (allocatable - NonZeroRequested[cpu]) / allocatable 就表示 sum(request) 占该 node allocatable 资源比率，哪个 node 比率最小分数最高
 	NonZeroRequested *Resource
 	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
 	// as int64, to avoid conversions and accessing map.
@@ -189,8 +188,12 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	for rName, rQuant := range res.ScalarResources {
 		n.Requested.ScalarResources[rName] += rQuant
 	}
+
+	// INFO: 这个字段会被 NodeResourcesLeastAllocated plugin 使用，和 Requested 字段意思类似，但是如果 pod request 没有设置值，也需要根据一个默认值去
+	// 统计，所以 (allocatable - NonZeroRequested[cpu]) / allocatable 就表示 sum(request) 占该 node allocatable 资源比率，哪个 node 比率最小分数最高
 	n.NonZeroRequested.MilliCPU += non0CPU
 	n.NonZeroRequested.Memory += non0Mem
+
 	if podWithAffinity(pod) {
 		n.PodsWithAffinity = append(n.PodsWithAffinity, podInfo)
 	}

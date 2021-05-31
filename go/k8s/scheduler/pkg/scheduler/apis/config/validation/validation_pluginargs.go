@@ -31,3 +31,19 @@ func validateNoConflict(presentLabels []string, absentLabels []string) error {
 	}
 	return nil
 }
+
+func ValidateNodeResourcesLeastAllocatedArgs(args *config.NodeResourcesLeastAllocatedArgs) error {
+	return validateResources(args.Resources)
+}
+
+func validateResources(resources []config.ResourceSpec) error {
+	for _, resource := range resources {
+		if resource.Weight <= 0 {
+			return fmt.Errorf("resource Weight of %v should be a positive value, got %v", resource.Name, resource.Weight)
+		}
+		if resource.Weight > 100 {
+			return fmt.Errorf("resource Weight of %v should be less than 100, got %v", resource.Name, resource.Weight)
+		}
+	}
+	return nil
+}

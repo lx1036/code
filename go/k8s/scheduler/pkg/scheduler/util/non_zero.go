@@ -7,14 +7,9 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-// For each of these resources, a pod that doesn't request the resource explicitly
-// will be treated as having requested the amount indicated below, for the purpose
-// of computing priority only. This ensures that when scheduling zero-request pods, such
-// pods will not all be scheduled to the machine with the smallest in-use request,
-// and that when scheduling regular pods, such pods will not see zero-request pods as
-// consuming no resources whatsoever. We chose these values to be similar to the
-// resources that we give to cluster addon pods (#10653). But they are pretty arbitrary.
-// As described in #11713, we use request instead of limit to deal with resource requirements.
+// INFO: 这个字段会被 NodeResourcesLeastAllocated plugin 使用，和 Requested 字段意思类似，但是如果 pod request 没有设置值，也需要根据一个默认值去
+// 统计，所以 (allocatable - NonZeroRequested[cpu]) / allocatable 就表示 sum(request) 占该 node allocatable 资源比率，哪个 node 比率最小分数最高
+
 const (
 	// DefaultMilliCPURequest defines default milli cpu request number.
 	DefaultMilliCPURequest int64 = 100 // 0.1 core
