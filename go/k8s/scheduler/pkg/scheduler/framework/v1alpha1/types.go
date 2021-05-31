@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -9,6 +10,7 @@ import (
 	schedutil "k8s-lx1036/k8s/scheduler/pkg/scheduler/util"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -321,6 +323,23 @@ type Resource struct {
 	ScalarResources map[v1.ResourceName]int64
 }
 
+func (r *Resource) ResourceList() v1.ResourceList {
+	result := v1.ResourceList{
+		v1.ResourceCPU:              *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
+		v1.ResourceMemory:           *resource.NewQuantity(r.Memory, resource.BinarySI),
+		v1.ResourcePods:             *resource.NewQuantity(int64(r.AllowedPodNumber), resource.BinarySI),
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(r.EphemeralStorage, resource.BinarySI),
+	}
+	for rName, rQuant := range r.ScalarResources {
+		if v1helper.IsHugePageResourceName(rName) {
+			result[rName] = *resource.NewQuantity(rQuant, resource.BinarySI)
+		} else {
+			result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
+		}
+	}
+	return result
+}
+
 // SetMaxResource compares with ResourceList and takes max value for each Resource.
 func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 	if r == nil {
@@ -582,4 +601,14 @@ func (h HostPortInfo) Remove(ip, protocol string, port int32) {
 			delete(h, ip)
 		}
 	}
+}
+
+// GetPodKey returns the string key of a pod.
+func GetPodKey(pod *v1.Pod) (string, error) {
+	uid := string(pod.UID)
+	if len(uid) == 0 {
+		return "", errors.New("Cannot get cache key for pod with empty UID")
+	}
+
+	return uid, nil
 }

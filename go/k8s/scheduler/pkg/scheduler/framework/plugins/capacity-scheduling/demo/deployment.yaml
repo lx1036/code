@@ -1,0 +1,71 @@
+
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quota1
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: quota1
+  labels:
+    app: nginx
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.17.8
+          resources:
+            limits:
+              cpu: "2"
+            requests:
+              cpu: "2"
+
+---
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quota2
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: quota2
+  labels:
+    app: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          resources:
+            limits:
+              cpu: "2"
+            requests:
+              cpu: "2"
