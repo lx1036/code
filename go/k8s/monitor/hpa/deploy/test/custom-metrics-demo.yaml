@@ -5,8 +5,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hpa-prom-demo
-  namespace: kube-system
+#  namespace: kube-system
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: nginx-server
