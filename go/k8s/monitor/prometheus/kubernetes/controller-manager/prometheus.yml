@@ -1,0 +1,342 @@
+
+
+# prometheus --config.file="prometheus.yml"
+
+# @see https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config
+
+global:
+  evaluation_interval: 60s
+  scrape_interval: 60s
+  external_labels:
+    prometheus: cattle-prometheus/cluster-monitoring
+    prometheus_from: test-local
+    prometheus_replica: prometheus-cluster-monitoring-0
+
+scrape_configs:
+  - job_name: kube-controller-manager
+    honor_labels: false
+    kubernetes_sd_configs:
+#      - api_server: 'http://127.0.0.1:8001'
+#        role: pod
+      - role: endpoints
+        api_server: 'http://127.0.0.1:8001'
+        namespaces:
+          names:
+            - cattle-prometheus
+    scheme: http
+#    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config
+    relabel_configs: # relabel_configs allow advanced modifications to any target and its labels before scraping
+      - action: keep
+        source_labels:
+          - __meta_kubernetes_service_label_k8s_app
+        regex: kube-controller-manager
+      - action: keep
+        source_labels:
+          - __meta_kubernetes_endpoint_port_name
+        regex: metrics
+      - source_labels:
+          - __meta_kubernetes_endpoint_address_target_kind
+          - __meta_kubernetes_endpoint_address_target_name
+        separator: ;
+        regex: Node;(.*)
+        replacement: ${1}
+        target_label: node
+      - source_labels:
+          - __meta_kubernetes_endpoint_address_target_kind
+          - __meta_kubernetes_endpoint_address_target_name
+        separator: ;
+        regex: Pod;(.*)
+        replacement: ${1}
+        target_label: pod
+      - source_labels:
+          - __meta_kubernetes_namespace
+        target_label: namespace
+      - source_labels:
+          - __meta_kubernetes_service_name
+        target_label: service
+      - source_labels:
+          - __meta_kubernetes_pod_name
+        target_label: pod
+      - source_labels:
+          - __meta_kubernetes_service_name
+        target_label: job
+        replacement: ${1}
+      - target_label: endpoint
+        replacement: metrics
+      - source_labels:
+          - __meta_kubernetes_pod_host_ip
+        target_label: host_ip
+        regex: (.+)
+        replacement: $1
+        action: replace
+      - source_labels:
+          - __meta_kubernetes_pod_node_name
+        target_label: node
+        regex: (.+)
+        replacement: $1
+        action: replace
+
+  - job_name: kube-scheduler
+    honor_labels: false
+    kubernetes_sd_configs: # 非常重要：https://prometheus.io/docs/prometheus/latest/configuration/configuration/#kubernetes_sd_config
+      - role: endpoints
+        api_server: 'http://127.0.0.1:8001'
+        namespaces:
+          names:
+            - cattle-prometheus
+    scheme: http
+#    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - source_labels:
+          - __meta_kubernetes_service_label_component # service labels "component: kube-scheduler"
+        regex: kube-scheduler
+        action: keep # Action to perform based on regex matching
+#        kubectl get ep -n cattle-prometheus expose-kube-scheduler-metrics -o yaml
+#        ports:
+#          - name: http-metrics
+#            port: 10251
+#            protocol: TCP
+      - source_labels:
+          - __meta_kubernetes_endpoint_port_name # __meta_kubernetes_endpoint_port_name: Name of the endpoint port
+        regex: http-metrics
+        action: keep
+      - source_labels:
+          - __meta_kubernetes_endpoint_address_target_kind # __meta_kubernetes_endpoint_address_target_kind: Kind of the endpoint address target
+          - __meta_kubernetes_endpoint_address_target_name # __meta_kubernetes_endpoint_address_target_name: Name of the endpoint address target
+        separator: ;
+        regex: Node;(.*)
+        replacement: ${1}
+        target_label: node
+      - source_labels:
+          - __meta_kubernetes_endpoint_address_target_kind
+          - __meta_kubernetes_endpoint_address_target_name
+        separator: ;
+        regex: Pod;(.*)
+        replacement: ${1}
+        target_label: pod
+      - source_labels:
+          - __meta_kubernetes_namespace
+        target_label: namespace
+      - source_labels:
+          - __meta_kubernetes_service_name
+        target_label: service
+      - source_labels:
+          - __meta_kubernetes_pod_name
+        target_label: pod
+      - source_labels:
+          - __meta_kubernetes_service_name
+        target_label: job
+        replacement: ${1}
+      - target_label: endpoint
+        replacement: http-metrics
+      - source_labels:
+          - __meta_kubernetes_pod_host_ip
+        target_label: host_ip
+        regex: (.+)
+        replacement: $1
+        action: replace
+      - source_labels:
+          - __meta_kubernetes_pod_node_name
+        target_label: node
+        regex: (.+)
+        replacement: $1
+        action: replace
+
+  - job_name: kube-state-metrics
+    honor_labels: true
+    kubernetes_sd_configs:
+      - role: endpoints
+        api_server: 'http://127.0.0.1:8001'
+        namespaces:
+          names:
+            - cattle-prometheus
+    relabel_configs:
+      - action: keep
+        source_labels:
+          - __meta_kubernetes_service_label_app
+        regex: exporter-kube-state
+      - action: keep
+        source_labels:
+          - __meta_kubernetes_endpoint_port_name
+        regex: http
+      - source_labels:
+          - __meta_kubernetes_endpoint_address_target_kind
+          - __meta_kubernetes_endpoint_address_target_name
+        separator: ;
+        regex: Node;(.*)
+        replacement: ${1}
+        target_label: node
+      - source_labels:
+          - __meta_kubernetes_endpoint_address_target_kind
+          - __meta_kubernetes_endpoint_address_target_name
+        separator: ;
+        regex: Pod;(.*)
+        replacement: ${1}
+        target_label: pod
+      - source_labels:
+          - __meta_kubernetes_namespace
+        target_label: namespace
+      - source_labels:
+          - __meta_kubernetes_service_name
+        target_label: service
+      - source_labels:
+          - __meta_kubernetes_pod_name
+        target_label: pod
+      - source_labels:
+          - __meta_kubernetes_service_name
+        target_label: job
+        replacement: ${1}
+      - target_label: endpoint
+        replacement: http # 8080 端口
+      - source_labels:
+          - __meta_kubernetes_pod_host_ip
+        target_label: host_ip
+        regex: (.+)
+        replacement: $1
+        action: replace
+      - source_labels:
+          - __meta_kubernetes_pod_node_name
+        target_label: node
+        regex: (.+)
+        replacement: $1
+        action: replace
+
+  - job_name: kube-state-metrics-self
+    honor_labels: false
+    kubernetes_sd_configs:
+      - role: endpoints
+        api_server: 'http://127.0.0.1:8001'
+        namespaces:
+          names:
+            - cattle-prometheus
+    relabel_configs:
+      - action: keep
+        source_labels:
+          - __meta_kubernetes_service_label_app
+        regex: exporter-kube-state
+      - action: keep
+        source_labels:
+          - __meta_kubernetes_endpoint_port_name
+        regex: http-metrics
+      - source_labels:
+          - __meta_kubernetes_endpoint_address_target_kind
+          - __meta_kubernetes_endpoint_address_target_name
+        separator: ;
+        regex: Node;(.*)
+        replacement: ${1}
+        target_label: node
+      - source_labels:
+          - __meta_kubernetes_endpoint_address_target_kind
+          - __meta_kubernetes_endpoint_address_target_name
+        separator: ;
+        regex: Pod;(.*)
+        replacement: ${1}
+        target_label: pod
+      - source_labels:
+          - __meta_kubernetes_namespace
+        target_label: namespace
+      - source_labels:
+          - __meta_kubernetes_service_name
+        target_label: service
+      - source_labels:
+          - __meta_kubernetes_pod_name
+        target_label: pod
+      - source_labels:
+          - __meta_kubernetes_service_name
+        target_label: job
+        replacement: ${1}
+      - target_label: endpoint
+        replacement: http-metrics # 8081 端口，kube-state-metrics 自己的监控
+      - source_labels:
+          - __meta_kubernetes_pod_host_ip
+        target_label: host_ip
+        regex: (.+)
+        replacement: $1
+        action: replace
+      - source_labels:
+          - __meta_kubernetes_pod_node_name
+        target_label: node
+        regex: (.+)
+        replacement: $1
+        action: replace
+
+  - job_name: kubelets-cluster
+    honor_labels: true
+    kubernetes_sd_configs:
+      - role: endpoints
+        api_server: 'http://127.0.0.1:8001'
+        namespaces:
+          names:
+            - cattle-prometheus
+    metrics_path: /metrics/cadvisor
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+      ca_file: ca.crt
+    bearer_token_file: token
+    relabel_configs:
+      - action: keep
+        source_labels:
+          - __meta_kubernetes_service_label_k8s_app
+        regex: kubelet
+      - action: keep
+        source_labels:
+          - __meta_kubernetes_endpoint_port_name
+        regex: https-metrics # 10250 端口
+      - source_labels:
+          - __meta_kubernetes_endpoint_address_target_kind
+          - __meta_kubernetes_endpoint_address_target_name
+        separator: ;
+        regex: Node;(.*)
+        replacement: ${1}
+        target_label: node
+      - source_labels:
+          - __meta_kubernetes_endpoint_address_target_kind
+          - __meta_kubernetes_endpoint_address_target_name
+        separator: ;
+        regex: Pod;(.*)
+        replacement: ${1}
+        target_label: pod
+      - source_labels:
+          - __meta_kubernetes_namespace
+        target_label: namespace
+      - source_labels:
+          - __meta_kubernetes_service_name
+        target_label: service
+      - source_labels:
+          - __meta_kubernetes_pod_name
+        target_label: pod
+      - source_labels:
+          - __meta_kubernetes_service_name
+        target_label: job
+        replacement: ${1}
+      - target_label: endpoint
+        replacement: https-metrics
+      - source_labels:
+          - __meta_kubernetes_pod_host_ip
+        target_label: host_ip
+        regex: (.+)
+        replacement: $1
+        action: replace
+      - source_labels:
+          - __meta_kubernetes_pod_node_name
+        target_label: node
+        regex: (.+)
+        replacement: $1
+        action: replace
+    metric_relabel_configs:
+      - regex: (^id$|^image$|^name$|^cpu$)
+        action: labeldrop
+      - source_labels:
+          - container
+        target_label: container_name
+        regex: (.+)
+        replacement: $1
+        action: replace
+      - source_labels:
+          - pod
+        target_label: pod_name
+        regex: (.+)
+        replacement: $1
+        action: replace

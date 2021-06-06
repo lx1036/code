@@ -18,4 +18,4 @@
 
 **[VPA设计文档](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/autoscaling/vertical-pod-autoscaler.md)**
 
-
+**[自动生成 clientset](// @see https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/generating-clientset.md)**

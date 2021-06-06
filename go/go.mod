@@ -124,7 +124,7 @@ require (
 	k8s.io/apiserver v0.20.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cloud-provider v0.19.7
-	k8s.io/code-generator v0.21.0 // indirect
+	k8s.io/code-generator v0.21.1 // indirect
 	k8s.io/component-base v0.20.0
 	k8s.io/component-helpers v0.20.2
 	k8s.io/cri-api v0.0.0
@@ -143,6 +143,7 @@ require (
 )
 
 replace (
+	gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.2.2
 	k8s.io/api => k8s.io/api v0.19.7
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.7
 	k8s.io/apimachinery => k8s.io/apimachinery v0.19.7
@@ -164,5 +165,4 @@ replace (
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.19.7
 	k8s.io/metrics => k8s.io/metrics v0.19.7
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.19.7
-	gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.2.2
 )
