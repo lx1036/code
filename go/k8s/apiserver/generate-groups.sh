@@ -53,6 +53,13 @@ for GVs in ${GROUPS_WITH_VERSIONS}; do
   done
 done
 
+# go get k8s.io/code-generator/cmd/deepcopy-gen
+# go get k8s.io/code-generator/cmd/defaulter-gen
+# go get k8s.io/code-generator/cmd/conversion-gen
+# go get k8s.io/code-generator/cmd/client-gen
+# go get k8s.io/code-generator/cmd/lister-gen
+# go get k8s.io/code-generator/cmd/informer-gen
+
 if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
   echo "Generating deepcopy funcs"
   "${gobin}/deepcopy-gen" --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" -O zz_generated.deepcopy --bounding-dirs "${APIS_PKG}" "$@"
