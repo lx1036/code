@@ -1,6 +1,7 @@
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
@@ -19,9 +20,53 @@ type VerticalPodAutoscaler struct {
 	Status VerticalPodAutoscalerStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+/*
+spec:
+  resourcePolicy:
+    containerPolicies:
+    - containerName: '*'
+      controlledResources:
+      - cpu
+      - memory
+      maxAllowed:
+        cpu: 1
+        memory: 500Mi
+      minAllowed:
+        cpu: 100m
+        memory: 50Mi
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hamster
+  updatePolicy:
+    updateMode: Auto
+*/
+
 type VerticalPodAutoscalerSpec struct {
 	TargetRef *autoscaling.CrossVersionObjectReference `json:"targetRef" protobuf:"bytes,1,name=targetRef"`
 }
+
+/*
+  conditions:
+  - lastTransitionTime: "2021-06-05T08:22:55Z"
+    status: "True"
+    type: RecommendationProvided
+  recommendation:
+    containerRecommendations:
+    - containerName: hamster
+      lowerBound:
+        cpu: 586m
+        memory: 262144k
+      target:
+        cpu: 587m
+        memory: 262144k
+      uncappedTarget:
+        cpu: 587m
+        memory: 262144k
+      upperBound:
+        cpu: 967m
+        memory: 262144k
+*/
 
 type VerticalPodAutoscalerStatus struct {
 }
@@ -59,4 +104,78 @@ var (
 	// ConfigUnsupported indicates that this VPA configuration is unsupported
 	// and recommendations will not be provided for it.
 	ConfigUnsupported VerticalPodAutoscalerConditionType = "ConfigUnsupported"
+)
+
+// RecommendedPodResources is the recommendation of resources computed by
+// autoscaler. It contains a recommendation for each container in the pod
+// (except for those with `ContainerScalingMode` set to 'Off').
+type RecommendedPodResources struct {
+	// Resources recommended by the autoscaler for each container.
+	// +optional
+	ContainerRecommendations []RecommendedContainerResources `json:"containerRecommendations,omitempty" protobuf:"bytes,1,rep,name=containerRecommendations"`
+}
+
+// RecommendedContainerResources is the recommendation of resources computed by
+// autoscaler for a specific container. Respects the container resource policy
+// if present in the spec. In particular the recommendation is not produced for
+// containers with `ContainerScalingMode` set to 'Off'.
+type RecommendedContainerResources struct {
+	// Name of the container.
+	ContainerName string `json:"containerName,omitempty" protobuf:"bytes,1,opt,name=containerName"`
+	// Recommended amount of resources. Observes ContainerResourcePolicy.
+	Target v1.ResourceList `json:"target" protobuf:"bytes,2,rep,name=target,casttype=ResourceList,castkey=ResourceName"`
+	// Minimum recommended amount of resources. Observes ContainerResourcePolicy.
+	// This amount is not guaranteed to be sufficient for the application to operate in a stable way, however
+	// running with less resources is likely to have significant impact on performance/availability.
+	// +optional
+	LowerBound v1.ResourceList `json:"lowerBound,omitempty" protobuf:"bytes,3,rep,name=lowerBound,casttype=ResourceList,castkey=ResourceName"`
+	// Maximum recommended amount of resources. Observes ContainerResourcePolicy.
+	// Any resources allocated beyond this value are likely wasted. This value may be larger than the maximum
+	// amount of application is actually capable of consuming.
+	// +optional
+	UpperBound v1.ResourceList `json:"upperBound,omitempty" protobuf:"bytes,4,rep,name=upperBound,casttype=ResourceList,castkey=ResourceName"`
+	// The most recent recommended resources target computed by the autoscaler
+	// for the controlled pods, based only on actual resource usage, not taking
+	// into account the ContainerResourcePolicy.
+	// May differ from the Recommendation if the actual resource usage causes
+	// the target to violate the ContainerResourcePolicy (lower than MinAllowed
+	// or higher that MaxAllowed).
+	// Used only as status indication, will not affect actual resource assignment.
+	// +optional
+	UncappedTarget v1.ResourceList `json:"uncappedTarget,omitempty" protobuf:"bytes,5,opt,name=uncappedTarget"`
+}
+
+// UpdateMode controls when autoscaler applies changes to the pod resoures.
+// +kubebuilder:validation:Enum=Off;Initial;Recreate;Auto
+type UpdateMode string
+
+const (
+	// UpdateModeOff means that autoscaler never changes Pod resources.
+	// The recommender still sets the recommended resources in the
+	// VerticalPodAutoscaler object. This can be used for a "dry run".
+	UpdateModeOff UpdateMode = "Off"
+	// UpdateModeInitial means that autoscaler only assigns resources on pod
+	// creation and does not change them during the lifetime of the pod.
+	UpdateModeInitial UpdateMode = "Initial"
+	// UpdateModeRecreate means that autoscaler assigns resources on pod
+	// creation and additionally can update them during the lifetime of the
+	// pod by deleting and recreating the pod.
+	UpdateModeRecreate UpdateMode = "Recreate"
+	// UpdateModeAuto means that autoscaler assigns resources on pod creation
+	// and additionally can update them during the lifetime of the pod,
+	// using any available update method. Currently this is equivalent to
+	// Recreate, which is the only available update method.
+	UpdateModeAuto UpdateMode = "Auto"
+)
+
+// ContainerScalingMode controls whether autoscaler is enabled for a specific
+// container.
+// +kubebuilder:validation:Enum=Auto;Off
+type ContainerScalingMode string
+
+const (
+	// ContainerScalingModeAuto means autoscaling is enabled for a container.
+	ContainerScalingModeAuto ContainerScalingMode = "Auto"
+	// ContainerScalingModeOff means autoscaling is disabled for a container.
+	ContainerScalingModeOff ContainerScalingMode = "Off"
 )

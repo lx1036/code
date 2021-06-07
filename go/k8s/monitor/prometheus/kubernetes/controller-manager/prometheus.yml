@@ -261,7 +261,7 @@ scrape_configs:
         replacement: $1
         action: replace
 
-  - job_name: kubelets-cluster
+  - job_name: kubelet-cadvisor
     honor_labels: true
     kubernetes_sd_configs:
       - role: endpoints
@@ -339,4 +339,49 @@ scrape_configs:
         target_label: pod_name
         regex: (.+)
         replacement: $1
+        action: replace
+
+  - job_name: nodes
+    honor_labels: true
+    honor_timestamps: true
+    scrape_interval: 15s
+    scrape_timeout: 15s
+    metrics_path: /metrics
+    scheme: http
+    kubernetes_sd_configs:
+      - api_server: 'http://127.0.0.1:8001'
+        role: node
+    relabel_configs:
+      - separator: ;
+        regex: __meta_kubernetes_node_label_(.+)
+        replacement: $1
+        action: labelmap
+      - source_labels: [__address__]
+        separator: ;
+        regex: (.*):10250
+        target_label: __address__
+        replacement: ${1}:9100
+        action: replace
+
+  - job_name: kubelet
+    honor_timestamps: true
+    scrape_interval: 30s
+    scrape_timeout: 30s
+    metrics_path: /metrics
+    scheme: http
+    kubernetes_sd_configs:
+      - api_server: 'http://127.0.0.1:8001'
+        role: node
+    relabel_configs:
+      - source_labels: [__address__]
+        separator: ;
+        regex: (.*):10250
+        target_label: __address__
+        replacement: ${1}:10255
+        action: replace
+      - source_labels: [__meta_kubernetes_node_name]
+        separator: ;
+        regex: (.*)
+        target_label: cluster
+        replacement: zzzc2
         action: replace

@@ -1,9 +1,11 @@
 package types
 
 import (
+	"fmt"
 	"time"
 
 	v1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/apis/autoscaling.k9s.io/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ClusterState holds all runtime information about the cluster required for the
@@ -38,4 +40,23 @@ func NewClusterState() *ClusterState {
 		aggregateStateMap: make(aggregateContainerStatesMap),
 		labelSetMap:       make(labelSetMap),
 	}
+}
+
+// AddSample adds a new usage sample to the proper container in the ClusterState
+// object. Requires the container as well as the parent pod to be added to the
+// ClusterState first. Otherwise an error is returned.
+func (cluster *ClusterState) AddSample(sample *ContainerUsageSampleWithKey) error {
+	pod, podExists := cluster.Pods[sample.Container.PodID]
+	if !podExists {
+		return fmt.Errorf("KeyError: %s", sample.Container.PodID)
+	}
+	containerState, containerExists := pod.Containers[sample.Container.ContainerName]
+	if !containerExists {
+		return fmt.Errorf("KeyError: %s", sample.Container.ContainerName)
+	}
+
+	if !containerState.AddSample(&sample.ContainerUsageSample) {
+		return fmt.Errorf("sample discarded (invalid or out of order)")
+	}
+	return nil
 }

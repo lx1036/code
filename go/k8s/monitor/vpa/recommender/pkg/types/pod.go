@@ -1,6 +1,9 @@
 package types
 
-import "time"
+import (
+	corev1 "k8s.io/api/core/v1"
+	"time"
+)
 
 // PodID contains information needed to identify a Pod within a cluster.
 type PodID struct {
@@ -56,4 +59,20 @@ type ContainerUsageSample struct {
 type ContainerUsageSampleWithKey struct {
 	ContainerUsageSample
 	Container ContainerID
+}
+
+// String representation of the labels.LabelSet. This is the value returned by
+// labelSet.String(). As opposed to the LabelSet object, it can be used as a map key.
+type labelSetKey string
+
+// PodState holds runtime information about a single Pod.
+type PodState struct {
+	// Unique id of the Pod.
+	ID PodID
+	// Set of labels attached to the Pod.
+	labelSetKey labelSetKey
+	// Containers that belong to the Pod, keyed by the container name.
+	Containers map[string]*ContainerState
+	// PodPhase describing current life cycle phase of the Pod.
+	Phase corev1.PodPhase
 }
