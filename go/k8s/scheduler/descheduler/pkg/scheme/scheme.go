@@ -2,7 +2,7 @@ package scheme
 
 import (
 	"k8s-lx1036/k8s/scheduler/descheduler/pkg/api"
-	"k8s-lx1036/k8s/scheduler/descheduler/pkg/api/v1alpha1"
+	apiv1alpha1 "k8s-lx1036/k8s/scheduler/descheduler/pkg/api/v1alpha1"
 	"k8s-lx1036/k8s/scheduler/descheduler/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s-lx1036/k8s/scheduler/descheduler/pkg/apis/componentconfig/v1alpha1"
 
@@ -20,7 +20,7 @@ var (
 
 func init() {
 	utilruntime.Must(api.AddToScheme(Scheme))
-	utilruntime.Must(v1alpha1.AddToScheme(Scheme))
+	utilruntime.Must(apiv1alpha1.AddToScheme(Scheme))
 
 	utilruntime.Must(componentconfig.AddToScheme(Scheme))
 	utilruntime.Must(componentconfigv1alpha1.AddToScheme(Scheme))
