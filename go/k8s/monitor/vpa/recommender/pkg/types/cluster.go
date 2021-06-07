@@ -3,9 +3,7 @@ package types
 import (
 	"time"
 
-
 	v1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/apis/autoscaling.k9s.io/v1"
-	
 )
 
 // ClusterState holds all runtime information about the cluster required for the
@@ -24,19 +22,13 @@ type ClusterState struct {
 	EmptyVPAs map[VpaID]time.Time
 	// Observed VPAs. Used to check if there are updates needed.
 	ObservedVpas []*v1.VerticalPodAutoscaler
-	
+
 	// All container aggregations where the usage samples are stored.
 	aggregateStateMap aggregateContainerStatesMap
 	// Map with all label sets used by the aggregations. It serves as a cache
 	// that allows to quickly access labels.Set corresponding to a labelSetKey.
 	labelSetMap labelSetMap
 }
-
-
-
-
-
-
 
 func NewClusterState() *ClusterState {
 	return &ClusterState{
