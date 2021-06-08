@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	apisv1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/apis/autoscaling.k9s.io/v1"
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned"
+	vpaInformers "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/informers/externalversions"
 	listersv1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/listers/autoscaling.k9s.io/v1"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/target"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/types"
@@ -41,13 +43,16 @@ func NewClusterStateFeeder(config *rest.Config, clusterState *types.ClusterState
 
 	factory := informers.NewSharedInformerFactoryWithOptions(kubeClient, defaultResyncPeriod, informers.WithNamespace(namespace))
 
+	vpaClient := versioned.NewForConfigOrDie(config)
+	vpaFactory := vpaInformers.NewSharedInformerFactoryWithOptions(vpaClient, defaultResyncPeriod)
+
 	c := &ClusterStateFeeder{
 		coreClient:    kubeClient.CoreV1(),
 		specClient:    nil,
 		metricsClient: NewMetricsClient(resourceclient.NewForConfigOrDie(config), namespace),
 		//oomChan:             nil,
 		//vpaCheckpointClient: nil,
-		vpaLister:         nil,
+		vpaLister:         vpaFactory.Autoscaling().V1().VerticalPodAutoscalers().Lister(),
 		clusterState:      nil,
 		selectorFetcher:   nil,
 		memorySaveMode:    false,
