@@ -530,10 +530,12 @@ func (controller *Controller) syncSparkApplication(key string) error {
 	// won't be sent to the API server as we only update the /status subresource.
 	v1.SetSparkApplicationDefaults(appCopy)
 
+	// INFO: 可以参考 **[Running Spark on Kubernetes](https://spark.apache.org/docs/latest/running-on-kubernetes.html)** 看看 `spark-submit` 提交spark作业流程
+
 	// Take action based on application state.
 	switch appCopy.Status.AppState.State {
 	case v1.NewState:
-		// INFO: (1) `spark-submit --conf ...` 提交作业，--conf 参数是由 SparkApplication 对象的字段值拼接起来的
+		// INFO: (1) `spark-submit --conf ...` 提交作业，--conf 参数是由 SparkApplication 对象的字段值拼接起来的；同时还会创建 podgroup
 		// v1.NewState -> v1.SubmittedState/v1.FailedSubmissionState
 		controller.recordSparkApplicationEvent(appCopy)
 		if err := controller.validateSparkApplication(appCopy); err != nil {
@@ -553,6 +555,7 @@ func (controller *Controller) syncSparkApplication(key string) error {
 	case v1.PendingRerunState:
 
 	case v1.SubmittedState, v1.RunningState, v1.UnknownState:
+		// INFO: podgroup 已经创建，进入提交成功状态
 
 	case v1.CompletedState, v1.FailedState:
 

@@ -78,6 +78,9 @@ func buildSubmissionCommandArgs(app *v1.SparkApplication, driverPodName string, 
 		args = append(args, "--conf",
 			fmt.Sprintf("%s=%s", config.SparkPythonVersion, *app.Spec.PythonVersion))
 	}
+
+	// INFO: @see https://spark.apache.org/docs/latest/running-on-kubernetes.html#using-ram-for-local-storage
+	// 所以 spark-operator 这么设计：https://github.com/GoogleCloudPlatform/spark-on-k8s-operator/blob/master/docs/user-guide.md#using-volume-for-scratch-space
 	if app.Spec.MemoryOverheadFactor != nil {
 		args = append(args, "--conf",
 			fmt.Sprintf("%s=%s", config.SparkMemoryOverheadFactor, *app.Spec.MemoryOverheadFactor))
@@ -136,6 +139,8 @@ func buildSubmissionCommandArgs(app *v1.SparkApplication, driverPodName string, 
 		}
 	}
 
+	// INFO: local:// 表示jar文件在image里，否则 file:// 还得从s3上下载
+	// INFO: @see https://spark.apache.org/docs/latest/running-on-kubernetes.html#dependency-management
 	if app.Spec.MainApplicationFile != nil {
 		// Add the main application file if it is present.
 		args = append(args, *app.Spec.MainApplicationFile)
@@ -159,6 +164,7 @@ func getMasterURL() (string, error) {
 		return "", fmt.Errorf("environment variable %s is not found", kubernetesServicePortEnvVar)
 	}
 
+	// INFO: 其实就是 kubernetes.default.svc service 的 ip:port, 得是 k8s://<api_server_host>:<k8s-apiserver-port>
 	return fmt.Sprintf("k8s://https://%s:%s", kubernetesServiceHost, kubernetesServicePort), nil
 }
 
@@ -168,10 +174,12 @@ func addLocalDirConfOptions(app *v1.SparkApplication) ([]string, error) {
 
 	sparkLocalVolumes := map[string]corev1.Volume{}
 	var mutateVolumes []corev1.Volume
-	// Filter local dir volumes
+	// INFO: 不是愚蠢的设计，是 `spark-submit` 就有这个机制：https://spark.apache.org/docs/latest/running-on-kubernetes.html#local-storage
 	for _, volume := range app.Spec.Volumes {
 		if strings.HasPrefix(volume.Name, config.SparkLocalDirVolumePrefix) {
-			sparkLocalVolumes[volume.Name] = volume // 带有 "spark-local-dir-" 前缀的 volume，为 spark-local volume
+			// 带有 "spark-local-dir-" 前缀的 volume，为 spark local storage
+			// 如果没有 local storage，则在shuffles和其他操作阶段，使用 emptyDir 来 spill data，这样并不会持久化数据
+			sparkLocalVolumes[volume.Name] = volume
 		} else {
 			mutateVolumes = append(mutateVolumes, volume)
 		}
@@ -197,6 +205,7 @@ func addLocalDirConfOptions(app *v1.SparkApplication) ([]string, error) {
 }
 
 // INFO: 看看 driver/executor volume mount 里哪些是 spark-local volume，哪些是自己的 volume。愚蠢的设计！！！
+// INFO: 不是愚蠢的设计，是 `spark-submit` 就有这个机制：https://spark.apache.org/docs/latest/running-on-kubernetes.html#local-storage
 func filterMutateMountVolumes(volumeMounts []corev1.VolumeMount, prefix string,
 	sparkLocalVolumes map[string]corev1.Volume) ([]corev1.VolumeMount, []string) {
 
@@ -216,6 +225,7 @@ func filterMutateMountVolumes(volumeMounts []corev1.VolumeMount, prefix string,
 	return mutateMountVolumes, localDirConfOptions
 }
 
+// INFO: @see https://spark.apache.org/docs/latest/running-on-kubernetes.html#using-kubernetes-volumes
 func buildLocalVolumeOptions(prefix string, volume corev1.Volume, volumeMount corev1.VolumeMount) []string {
 	VolumeMountPathTemplate := prefix + "%s.%s.mount.path=%s"
 	VolumeMountOptionTemplate := prefix + "%s.%s.options.%s=%s"
@@ -223,15 +233,27 @@ func buildLocalVolumeOptions(prefix string, volume corev1.Volume, volumeMount co
 	var options []string
 	switch {
 	case volume.HostPath != nil:
+		// spark.kubernetes.driver.volumes.hostPath.[volumeName].mount.path=<mount path>
+		// spark.kubernetes.executor.volumes.hostPath.[volumeName].mount.path=<mount path>
 		options = append(options, fmt.Sprintf(VolumeMountPathTemplate, string(policy.HostPath), volume.Name, volumeMount.MountPath))
+		// spark.kubernetes.driver.volumes.hostPath.[volumeName].options.path=<host path>
+		// spark.kubernetes.executor.volumes.hostPath.[volumeName].options.path=<host path>
 		options = append(options, fmt.Sprintf(VolumeMountOptionTemplate, string(policy.HostPath), volume.Name, "path", volume.HostPath.Path))
 		if volume.HostPath.Type != nil {
+			// spark.kubernetes.driver.volumes.hostPath.[volumeName].options.type=<host path type>
+			// spark.kubernetes.executor.volumes.hostPath.[volumeName].options.type=<host path type>
 			options = append(options, fmt.Sprintf(VolumeMountOptionTemplate, string(policy.HostPath), volume.Name, "type", *volume.HostPath.Type))
 		}
 	case volume.EmptyDir != nil:
+		// spark.kubernetes.driver.volumes.emptyDir.[volumeName].mount.path=<mount path>
+		// spark.kubernetes.executor.volumes.emptyDir.[volumeName].mount.path=<mount path>
 		options = append(options, fmt.Sprintf(VolumeMountPathTemplate, string(policy.EmptyDir), volume.Name, volumeMount.MountPath))
 	case volume.PersistentVolumeClaim != nil:
+		// spark.kubernetes.driver.volumes.persistentVolumeClaim.[volumeName].mount.path=<mount path>
+		// spark.kubernetes.executor.volumes.persistentVolumeClaim.[volumeName].mount.path=<mount path>
 		options = append(options, fmt.Sprintf(VolumeMountPathTemplate, string(policy.PersistentVolumeClaim), volume.Name, volumeMount.MountPath))
+		// spark.kubernetes.driver.volumes.persistentVolumeClaim.[volumeName].options.claimName=<pvc name>
+		// spark.kubernetes.executor.volumes.persistentVolumeClaim.[volumeName].options.claimName=<pvc name>
 		options = append(options, fmt.Sprintf(VolumeMountOptionTemplate, string(policy.PersistentVolumeClaim), volume.Name, "claimName", volume.PersistentVolumeClaim.ClaimName))
 	}
 

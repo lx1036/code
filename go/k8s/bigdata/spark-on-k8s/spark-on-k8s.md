@@ -28,3 +28,19 @@ Apache Spark作为通用分布式计算平台，K8s作为资源管理器平台�
 **[spark-operator](https://github.com/GoogleCloudPlatform/spark-on-k8s-operator)**
 
 **[Spark on Kubernetes 的现状与挑战](https://developer.aliyun.com/article/712297)**
+
+
+# spark-submit 工作过程
+**[Running Spark on Kubernetes](https://spark.apache.org/docs/latest/running-on-kubernetes.html#how-it-works)**
+
+* `spark-submit --conf ...` 会根据传入的 conf 指定的 driver 相关参数，创建一个 driver pod，它通过 fabric8 包来和 apiserver 通信
+* driver pod 会根据 executor 参数，创建多个 executor pods
+* executor pods 完成后会被销毁，但是 driver pod 是 completed state(不会使用任何资源)，但是不会销毁，只能被垃圾回收或者手动清理
+
+这里有两种 pod: driver 和 executor，访问 driver pod UI 方式：http://{pod_ip}:4040
+或者：
+```shell
+kubectl port-forward <driver-pod-name> 4040:4040
+curl http://localhost:4040
+```
+
