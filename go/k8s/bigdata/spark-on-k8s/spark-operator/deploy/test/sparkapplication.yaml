@@ -1,0 +1,79 @@
+
+# 该 yaml 更具有生产性
+
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: liuxiang1
+  namespace: demons
+spec:
+  arguments:
+  - alluxio://demovw-master-0.demons:20000/base/sparkjava/part-03999-000.gz
+  - alluxio://demovw-master-0.demons:20000/base/jyhtest
+  - file:///opt/spark/work-dir/driverjar//base/sparkjava/cleanquery.list
+  - (com.cn|net.cn|gov.cn|org.nz|org.cn|me.uk|edu|int|com|net|org|gov|cc|biz|info|cn|co|mil|top|pw|tv|la|tw|hk|me|us|de|so|fr|club)$
+  - "10"
+  batchScheduler: volcano
+  batchSchedulerOptions:
+    queue: "sparkqueue"
+  driver:
+    cores: 2
+    envVars: {}
+    labels:
+      version: 2.4.5
+    memory: 512m
+    serviceAccount: spark
+    volumeMounts:
+    - mountPath: /opt/spark/work-dir/driverjar/
+      name: spark-local-dir-sparkjob-main
+    - mountPath: /opt/spark/work-dir/driveroutput
+      name: spark-local-dir-spark-main-host
+    - mountPath: /opt/dtmp
+      name: spark-local-dir-spark-work-em
+  executor:
+    cores: 1
+    envVars: {}
+    instances: 5
+    labels:
+      version: 2.4.5
+    memory: 1024m
+    volumeMounts:
+    - mountPath: /opt/spark/work-dir/executorjar/
+      name: spark-local-dir-sparkjob-main
+    - mountPath: /opt/spark/work-dir/executoroutput
+      name: spark-local-dir-spark-main-host
+    - mountPath: /opt/etmp
+      name: spark-local-dir-spark-work-em
+  hadoopConf:
+    fs.alluxio.impl: alluxio.hadoop.FileSystem
+  image: hadoop/spark-pi:3.0 # 该镜像编造的
+  imagePullPolicy: IfNotPresent
+  mainApplicationFile: local:///opt/spark/work-dir/driverjar/base/sparkjava/SpiderURLTitleParser.jar
+  mainClass: cn.hadoop.SpiderURLTitleParser
+  mode: cluster
+  nodeSelector:
+    yunzhou: demovw
+  pythonVersion: "2"
+  restartPolicy:
+    onFailureRetries: 3
+    onFailureRetryInterval: 10
+    onSubmissionFailureRetries: 5
+    onSubmissionFailureRetryInterval: 20
+    type: OnFailure
+  sparkConf:
+    spark.driver.extraClassPath: local:///opt/spark/work-dir/driverjar/base/alluxio-2.4.1-client.jar
+    spark.executor.extraClassPath: local:///opt/spark/work-dir/driverjar/base/alluxio-2.4.1-client.jar
+    spark.kryoserializer.buffer: 64m
+    spark.kryoserializer.buffer.max: 256m
+    spark.sql.parquet.compression.codec: gzip
+  sparkVersion: 2.4.5
+  type: Java
+  volumes:
+  - name: spark-local-dir-sparkjob-main
+    persistentVolumeClaim:
+      claimName: demovw
+  - hostPath:
+      path: /tmp/data
+    name: spark-local-dir-spark-main-host
+  - emptyDir: {}
+    name: spark-local-dir-spark-work-em
