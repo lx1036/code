@@ -82,7 +82,7 @@ func NewController(option *options.Options) (*Controller, error) {
 	sparkAppInformerFactory := sparkApplicationInformer.NewSharedInformerFactoryWithOptions(sparkAppClient, time.Second*30, sparkAppFactoryOpts...)
 	sparkAppInformer := sparkAppInformerFactory.Sparkoperator().V1().SparkApplications().Informer()
 
-	// INFO: 只会 watch driver pod
+	// INFO: 只会 watch driver/executors pod
 	var podFactoryOpts []informers.SharedInformerOption
 	if option.Namespace != corev1.NamespaceAll {
 		podFactoryOpts = append(podFactoryOpts, informers.WithNamespace(option.Namespace))
