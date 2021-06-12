@@ -25,6 +25,18 @@ type SparkApplication struct {
 	Status            SparkApplicationStatus `json:"status,omitempty"`
 }
 
+// DriverState tells the current state of a spark driver.
+type DriverState string
+
+// Different states a spark driver may have.
+const (
+	DriverPendingState   DriverState = "PENDING"
+	DriverRunningState   DriverState = "RUNNING"
+	DriverCompletedState DriverState = "COMPLETED"
+	DriverFailedState    DriverState = "FAILED"
+	DriverUnknownState   DriverState = "UNKNOWN"
+)
+
 // SparkApplicationType describes the type of a Spark application.
 type SparkApplicationType string
 

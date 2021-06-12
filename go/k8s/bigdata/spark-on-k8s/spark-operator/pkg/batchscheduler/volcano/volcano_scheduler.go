@@ -82,7 +82,7 @@ func (scheduler *VolcanoBatchScheduler) syncPodGroupInClusterMode(app *v1.SparkA
 	//We need both mark Driver and Executor when submitting
 	//NOTE: In cluster mode, the initial size of PodGroup is set to 1 in order to schedule driver pod first.
 	if _, ok := app.Spec.Driver.Annotations[v1beta1.KubeGroupNameAnnotationKey]; !ok {
-		//Both driver and executor resource will be considered.
+		// INFO: 统计driver和executor(cores*instances)资源使用总和
 		totalResource := sumResourceList([]corev1.ResourceList{
 			getExecutorRequestResource(app),
 			getDriverRequestResource(app),
@@ -232,6 +232,7 @@ func getExecutorRequestResource(app *v1.SparkApplication) corev1.ResourceList {
 	for i := int32(0); i < *app.Spec.Executor.Instances; i++ {
 		resourceList = append(resourceList, minResource)
 	}
+
 	return sumResourceList(resourceList)
 }
 

@@ -356,7 +356,9 @@ func NewResizeController(
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: kubeClient.CoreV1().Events(v1.NamespaceAll)})
+	eventBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{
+		Interface: kubeClient.CoreV1().Events(v1.NamespaceAll),
+	})
 	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme,
 		v1.EventSource{Component: fmt.Sprintf("external-resizer %s", name)})
 

@@ -3,6 +3,7 @@ package sparkapplication
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/cmd/app/options"
@@ -16,17 +17,18 @@ import (
 	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/utils"
 
 	"github.com/google/uuid"
-	apiv1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -44,10 +46,11 @@ var (
 
 // Controller manages instances of SparkApplication.
 type Controller struct {
-	crdClient  versioned.Interface
-	kubeClient kubernetes.Interface
+	sparkAppClient versioned.Interface
+	kubeClient     kubernetes.Interface
 
 	podInformer cache.SharedIndexInformer
+	podLister   listersv1.PodLister
 
 	sparkAppInformer       cache.SharedIndexInformer
 	sparkApplicationLister sparkApplicationLister.SparkApplicationLister
@@ -72,7 +75,7 @@ func NewController(option *options.Options) (*Controller, error) {
 	}
 
 	var sparkAppFactoryOpts []sparkApplicationInformer.SharedInformerOption
-	if option.Namespace != apiv1.NamespaceAll {
+	if option.Namespace != corev1.NamespaceAll {
 		sparkAppFactoryOpts = append(sparkAppFactoryOpts, sparkApplicationInformer.WithNamespace(option.Namespace))
 	}
 	sparkAppClient := versioned.NewForConfigOrDie(restConfig)
@@ -81,7 +84,7 @@ func NewController(option *options.Options) (*Controller, error) {
 
 	// INFO: 只会 watch driver pod
 	var podFactoryOpts []informers.SharedInformerOption
-	if option.Namespace != apiv1.NamespaceAll {
+	if option.Namespace != corev1.NamespaceAll {
 		podFactoryOpts = append(podFactoryOpts, informers.WithNamespace(option.Namespace))
 	}
 	tweakListOptionsFunc := func(options *metav1.ListOptions) {
@@ -97,6 +100,10 @@ func NewController(option *options.Options) (*Controller, error) {
 
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), Name)
 
+	// INFO: 这里由于eventBroadcaster.NewRecorder使用的是根scheme.Scheme，所以必须要把sparkoperator.k9s.io/v1注册到这个Scheme里，
+	//  否则会在这里报错：https://github.com/kubernetes/kubernetes/blob/v1.19.7/staging/src/k8s.io/client-go/tools/reference/ref.go#L66-L68
+	//  说没有注册报错 NewNotRegisteredErrForType(s.schemeName, t)
+	_ = v1.AddToScheme(scheme.Scheme)
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{
 		Interface: kubeClient.CoreV1().Events(option.Namespace),
@@ -105,9 +112,10 @@ func NewController(option *options.Options) (*Controller, error) {
 		Component: "spark-operator",
 	})
 	controller := &Controller{
-		crdClient:              nil,
-		kubeClient:             nil,
+		sparkAppClient:         sparkAppClient,
+		kubeClient:             kubeClient,
 		podInformer:            podInformer,
+		podLister:              podInformerFactory.Core().V1().Pods().Lister(),
 		sparkAppInformer:       sparkAppInformer,
 		queue:                  queue,
 		recorder:               eventRecorder,
@@ -210,12 +218,12 @@ func (controller *Controller) onUpdate(oldObj, newObj interface{}) {
 			status.AppState.State = v1.InvalidatingState
 		})
 		if err != nil {
-			controller.recorder.Eventf(newApp, apiv1.EventTypeWarning, "SparkApplicationSpecUpdateFailed", "failed to process spec update for SparkApplication %s: %v", newApp.Name, err)
+			controller.recorder.Eventf(newApp, corev1.EventTypeWarning, "SparkApplicationSpecUpdateFailed", "failed to process spec update for SparkApplication %s: %v", newApp.Name, err)
 			return
 		}
 
 		// INFO: 生成出一个新 event 对象，而且是 SparkApplication 对象的 event，在 kubectl describe SparkApplication 时可以看到相关事件，非常便于 debug
-		controller.recorder.Eventf(newApp, apiv1.EventTypeNormal, "SparkApplicationSpecUpdateProcessed", "Successfully processed spec update for SparkApplication %s", newApp.Name)
+		controller.recorder.Eventf(newApp, corev1.EventTypeNormal, "SparkApplicationSpecUpdateProcessed", "Successfully processed spec update for SparkApplication %s", newApp.Name)
 	}
 
 	klog.V(2).Infof("SparkApplication %s/%s was updated, enqueuing it", newApp.Namespace, newApp.Name)
@@ -239,7 +247,7 @@ func (controller *Controller) onDelete(obj interface{}) {
 
 	if sparkApplication != nil {
 		controller.handleSparkApplicationDeletion(sparkApplication) // 删除了 SparkApplication
-		controller.recorder.Eventf(sparkApplication, apiv1.EventTypeNormal, "SparkApplicationDeleted", "SparkApplication %s was deleted", sparkApplication.Name)
+		controller.recorder.Eventf(sparkApplication, corev1.EventTypeNormal, "SparkApplicationDeleted", "SparkApplication %s was deleted", sparkApplication.Name)
 		klog.V(2).Infof("SparkApplication %s/%s was deleted", sparkApplication.Namespace, sparkApplication.Name)
 	}
 }
@@ -279,7 +287,7 @@ func (controller *Controller) updateApplicationStatusWithRetries(original *v1.Sp
 			return true, nil
 		}
 		// 开始更新 SparkApplication status 子对象
-		toUpdate, err = controller.crdClient.SparkoperatorV1().SparkApplications(original.Namespace).UpdateStatus(context.TODO(), toUpdate, metav1.UpdateOptions{})
+		toUpdate, err = controller.sparkAppClient.SparkoperatorV1().SparkApplications(original.Namespace).UpdateStatus(context.TODO(), toUpdate, metav1.UpdateOptions{})
 		if err == nil {
 			return true, nil
 		}
@@ -288,7 +296,7 @@ func (controller *Controller) updateApplicationStatusWithRetries(original *v1.Sp
 		}
 
 		// INFO: 更新时发生 conflict 错误，这是因为不是 latest resource version，所以需要重新 fetch 下
-		toUpdate, err = controller.crdClient.SparkoperatorV1().SparkApplications(original.Namespace).Get(context.TODO(), original.Name, metav1.GetOptions{})
+		toUpdate, err = controller.sparkAppClient.SparkoperatorV1().SparkApplications(original.Namespace).Get(context.TODO(), original.Name, metav1.GetOptions{})
 		if err != nil {
 
 			return false, err
@@ -331,13 +339,16 @@ func (controller *Controller) getSparkApplication(namespace string, name string)
 func (controller *Controller) recordSparkApplicationEvent(app *v1.SparkApplication) {
 	switch app.Status.AppState.State {
 	case v1.NewState:
-		controller.recorder.Eventf(app, apiv1.EventTypeNormal, "SparkApplicationAdded", "SparkApplication %s was added, enqueuing it for submission", app.Name)
+		controller.recorder.Eventf(app, corev1.EventTypeNormal, "SparkApplicationAdded", "SparkApplication %s was added, enqueuing it for submission", app.Name)
 
 	case v1.FailedSubmissionState:
-		controller.recorder.Eventf(app, apiv1.EventTypeWarning, "SparkApplicationSubmissionFailed", "failed to submit SparkApplication %s: %s", app.Name, app.Status.AppState.ErrorMessage)
+		controller.recorder.Eventf(app, corev1.EventTypeWarning, "SparkApplicationSubmissionFailed", "failed to submit SparkApplication %s: %s", app.Name, app.Status.AppState.ErrorMessage)
 
 	case v1.SubmittedState:
-		controller.recorder.Eventf(app, apiv1.EventTypeNormal, "SparkApplicationSubmitted", "SparkApplication %s was submitted successfully", app.Name)
+		controller.recorder.Eventf(app, corev1.EventTypeNormal, "SparkApplicationSubmitted", "SparkApplication %s was submitted successfully", app.Name)
+
+	case v1.CompletedState:
+		controller.recorder.Eventf(app, corev1.EventTypeNormal, "SparkApplicationCompleted", "SparkApplication %s completed", app.Name)
 	}
 
 }
@@ -374,7 +385,9 @@ func (controller *Controller) shouldDoBatchScheduling(app *v1.SparkApplication) 
 
 // INFO: 使用 `spark-submit` 来提交 SparkApplication 中定义的
 func (controller *Controller) submitSparkApplication(app *v1.SparkApplication) *v1.SparkApplication {
-	// INFO: DoBatchSchedulingOnSubmission 做了两个逻辑：1. 创建或更新 podgroup 对象；2. 更新 SparkApplication driver/executor annotation 值
+	// INFO: DoBatchSchedulingOnSubmission 做了两个逻辑：
+	//  1. 创建或更新 podgroup 对象；
+	//  2. 更新 SparkApplication driver/executor annotation 值
 	if scheduler, needScheduling := controller.shouldDoBatchScheduling(app); needScheduling {
 		err := scheduler.DoBatchSchedulingOnSubmission(app)
 		if err != nil {
@@ -397,6 +410,25 @@ func (controller *Controller) submitSparkApplication(app *v1.SparkApplication) *
 		}
 		return app
 	}
+
+	/*
+		--class org.apache.spark.examples.SparkPi --master k8s://https://192.168.0.1:443 --deploy-mode cluster
+		--conf spark.kubernetes.namespace=default --conf spark.app.name=spark-liuxiang-demo1 --conf spark.kubernetes.driver.pod.name=spark-liuxiang-demo1-driver
+		--conf spark.kubernetes.container.image=gcr.io/spark-operator/spark:v3.1.1 --conf spark.kubernetes.container.image.pullPolicy=Always
+		--conf spark.kubernetes.submission.waitAppCompletion=false --conf spark.kubernetes.driver.label.sparkoperator.k8s.io/app-name=spark-liuxiang-demo1
+		--conf spark.kubernetes.driver.label.sparkoperator.k8s.io/launched-by-spark-operator=true
+		--conf spark.kubernetes.driver.label.sparkoperator.k8s.io/submission-id=498c75ff-d356-46b0-8e01-a19adc6d2497
+		--conf spark.driver.cores=1 --conf spark.kubernetes.driver.limit.cores=1200m --conf spark.driver.memory=512m
+		--conf spark.kubernetes.authenticate.driver.serviceAccountName=spark --conf spark.kubernetes.driver.label.version=3.1.1
+		--conf spark.kubernetes.driver.annotation.scheduling.k8s.io/group-name=spark-spark-liuxiang-demo1-pg
+		--conf spark.kubernetes.executor.label.sparkoperator.k8s.io/app-name=spark-liuxiang-demo1
+		--conf spark.kubernetes.executor.label.sparkoperator.k8s.io/launched-by-spark-operator=true
+		--conf spark.kubernetes.executor.label.sparkoperator.k8s.io/submission-id=498c75ff-d356-46b0-8e01-a19adc6d2497
+		--conf spark.executor.instances=1 --conf spark.executor.cores=1 --conf spark.executor.memory=512m
+		--conf spark.kubernetes.executor.label.version=3.1.1 --conf spark.kubernetes.executor.annotation.scheduling.k8s.io/group-name=spark-spark-liuxiang-demo1-pg
+		local:///opt/spark/examples/jars/spark-examples_2.12-3.1.1.jar
+	*/
+	klog.Info(fmt.Sprintf("submission command args: %s", strings.Join(submissionCmdArgs, " ")))
 
 	// Try submitting the application by running spark-submit.
 	submitted, err := runSparkSubmit(newSubmission(submissionCmdArgs, app))
@@ -470,6 +502,209 @@ func (controller *Controller) updateStatusAndExportMetrics(oldApp, newApp *v1.Sp
 	return nil
 }
 
+func (controller *Controller) getAndUpdateAppState(app *v1.SparkApplication) error {
+	if err := controller.getAndUpdateDriverState(app); err != nil {
+		return err
+	}
+	if err := controller.getAndUpdateExecutorState(app); err != nil {
+		return err
+	}
+	return nil
+}
+
+// getAndUpdateDriverState finds the driver pod of the application
+// and updates the driver state based on the current phase of the pod.
+func (controller *Controller) getAndUpdateDriverState(app *v1.SparkApplication) error {
+	// Either the driver pod doesn't exist yet or its name has not been updated.
+	if app.Status.DriverInfo.PodName == "" {
+		return fmt.Errorf("empty driver pod name with application state %s", app.Status.AppState.State)
+	}
+
+	driverPod, err := controller.getDriverPod(app)
+	if err != nil {
+		return err
+	}
+
+	if driverPod == nil {
+		app.Status.AppState.ErrorMessage = "driver pod not found"
+		app.Status.AppState.State = v1.FailingState
+		app.Status.TerminationTime = metav1.Now()
+		return nil
+	}
+
+	app.Status.SparkApplicationID = getSparkApplicationID(driverPod)
+	driverState := podPhaseToDriverState(driverPod.Status)
+
+	// driver pod 完成还有一种可能是 v1.DriverFailedState，记录下 error message
+	if hasDriverTerminated(driverState) {
+		if app.Status.TerminationTime.IsZero() {
+			app.Status.TerminationTime = metav1.Now()
+		}
+		if driverState == v1.DriverFailedState {
+			state := getDriverContainerTerminatedState(driverPod.Status)
+			if state != nil {
+				if state.ExitCode != 0 {
+					app.Status.AppState.ErrorMessage = fmt.Sprintf("driver container failed with ExitCode: %d, Reason: %s", state.ExitCode, state.Reason)
+				}
+			} else {
+				app.Status.AppState.ErrorMessage = "driver container status missing"
+			}
+		}
+	}
+
+	// driver pod state 记录在 spark app state 中
+	newState := driverStateToApplicationState(driverState)
+	// Only record a driver event if the application state (derived from the driver pod phase) has changed.
+	if newState != app.Status.AppState.State {
+		controller.recordDriverEvent(app, driverState, driverPod.Name)
+		app.Status.AppState.State = newState
+	}
+
+	return nil
+}
+
+func (controller *Controller) recordDriverEvent(app *v1.SparkApplication, phase v1.DriverState, name string) {
+	switch phase {
+	case v1.DriverCompletedState:
+		controller.recorder.Eventf(app, corev1.EventTypeNormal, "SparkDriverCompleted", "Driver %s completed", name)
+	case v1.DriverPendingState:
+		controller.recorder.Eventf(app, corev1.EventTypeNormal, "SparkDriverPending", "Driver %s is pending", name)
+	case v1.DriverRunningState:
+		controller.recorder.Eventf(app, corev1.EventTypeNormal, "SparkDriverRunning", "Driver %s is running", name)
+	case v1.DriverFailedState:
+		controller.recorder.Eventf(app, corev1.EventTypeWarning, "SparkDriverFailed", "Driver %s failed", name)
+	case v1.DriverUnknownState:
+		controller.recorder.Eventf(app, corev1.EventTypeWarning, "SparkDriverUnknownState", "Driver %s in unknown state", name)
+	}
+}
+
+// INFO: 代码逻辑复用，先从本地cache里查找，然后从apiserver查找. 为何要这么做，而不是从缓存查找就够了么？
+func (controller *Controller) getDriverPod(app *v1.SparkApplication) (*corev1.Pod, error) {
+	pod, err := controller.podLister.Pods(app.Namespace).Get(app.Status.DriverInfo.PodName)
+	if err == nil {
+		return pod, nil
+	}
+	if !errors.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to get driver pod %s: %v", app.Status.DriverInfo.PodName, err)
+	}
+
+	// The driver pod was not found in the informer cache, try getting it directly from the API server.
+	pod, err = controller.kubeClient.CoreV1().Pods(app.Namespace).Get(context.TODO(), app.Status.DriverInfo.PodName, metav1.GetOptions{})
+	if err == nil {
+		return pod, nil
+	}
+	if !errors.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to get driver pod %s: %v", app.Status.DriverInfo.PodName, err)
+	}
+	// Driver pod was not found on the API server either.
+	return nil, nil
+}
+
+// INFO: 根据executors状态去更新 sparkApplication.Status.ExecutorState
+func (controller *Controller) getAndUpdateExecutorState(app *v1.SparkApplication) error {
+	pods, err := controller.getExecutorPods(app)
+	if err != nil {
+		return err
+	}
+
+	executorStateMap := make(map[string]v1.ExecutorState)
+	var executorApplicationID string
+	for _, pod := range pods {
+		if IsExecutorPod(pod) {
+			newState := podPhaseToExecutorState(pod.Status.Phase)
+			oldState, exists := app.Status.ExecutorState[pod.Name]
+			// Only record an executor event if the executor state is new or it has changed.
+			if !exists || newState != oldState {
+				controller.recordExecutorEvent(app, newState, pod.Name)
+			}
+			executorStateMap[pod.Name] = newState
+
+			if executorApplicationID == "" {
+				executorApplicationID = getSparkApplicationID(pod)
+			}
+		}
+	}
+
+	// ApplicationID label can be different on driver/executors. Prefer executor ApplicationID if set.
+	// Refer https://issues.apache.org/jira/projects/SPARK/issues/SPARK-25922 for details.
+	if executorApplicationID != "" {
+		app.Status.SparkApplicationID = executorApplicationID
+	}
+
+	if app.Status.ExecutorState == nil {
+		app.Status.ExecutorState = make(map[string]v1.ExecutorState)
+	}
+	for name, execStatus := range executorStateMap {
+		app.Status.ExecutorState[name] = execStatus
+	}
+
+	// INFO: 处理 missing/deleted executors，特别是已经删除的executor，需要从app.Status.ExecutorState置于v1.ExecutorUnknownState
+	for name, oldStatus := range app.Status.ExecutorState {
+		_, exists := executorStateMap[name]
+		if !isExecutorTerminated(oldStatus) && !exists {
+			if !isDriverRunning(app) {
+				// If ApplicationState is COMPLETED, in other words, the driver pod has been completed
+				// successfully. The executor pods terminate and are cleaned up, so we could not found
+				// the executor pod, under this circumstances, we assume the executor pod are completed.
+				if app.Status.AppState.State == v1.CompletedState {
+					app.Status.ExecutorState[name] = v1.ExecutorCompletedState
+				} else {
+					klog.Infof("Executor pod %s not found, assuming it was deleted.", name)
+					app.Status.ExecutorState[name] = v1.ExecutorFailedState
+				}
+			} else {
+				app.Status.ExecutorState[name] = v1.ExecutorUnknownState
+			}
+		}
+	}
+
+	return nil
+}
+
+// INFO: 奇怪，查询 executor pod 时没有从apiserver中查找，只是从本地cache中查找
+func (controller *Controller) getExecutorPods(app *v1.SparkApplication) ([]*corev1.Pod, error) {
+	matchLabels := getResourceLabels(app)
+	matchLabels[config.SparkRoleLabel] = config.SparkExecutorRole
+	// Fetch all the executor pods for the current run of the application.
+	selector := labels.SelectorFromSet(labels.Set(matchLabels))
+	pods, err := controller.podLister.Pods(app.Namespace).List(selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pods for SparkApplication %s/%s: %v", app.Namespace, app.Name, err)
+	}
+
+	return pods, nil
+}
+
+func (controller *Controller) recordExecutorEvent(app *v1.SparkApplication, state v1.ExecutorState, name string) {
+	switch state {
+	case v1.ExecutorCompletedState:
+		controller.recorder.Eventf(app, corev1.EventTypeNormal, "SparkExecutorCompleted", "Executor %s completed", name)
+	case v1.ExecutorPendingState:
+		controller.recorder.Eventf(app, corev1.EventTypeNormal, "SparkExecutorPending", "Executor %s is pending", name)
+	case v1.ExecutorRunningState:
+		controller.recorder.Eventf(app, corev1.EventTypeNormal, "SparkExecutorRunning", "Executor %s is running", name)
+	case v1.ExecutorFailedState:
+		controller.recorder.Eventf(app, corev1.EventTypeWarning, "SparkExecutorFailed", "Executor %s failed", name)
+	case v1.ExecutorUnknownState:
+		controller.recorder.Eventf(app, corev1.EventTypeWarning, "SparkExecutorUnknownState", "Executor %s in unknown state", name)
+	}
+}
+
+func (controller *Controller) hasApplicationExpired(app *v1.SparkApplication) bool {
+	// The application has no TTL defined and will never expire.
+	if app.Spec.TimeToLiveSeconds == nil {
+		return false
+	}
+
+	ttl := time.Duration(*app.Spec.TimeToLiveSeconds) * time.Second
+	now := time.Now()
+	if !app.Status.TerminationTime.IsZero() && now.Sub(app.Status.TerminationTime.Time) > ttl {
+		return true
+	}
+
+	return false
+}
+
 // State Machine for SparkApplication:
 //+--------------------------------------------------------------------------------------------------------------------+
 //|        +---------------------------------------------------------------------------------------------+             |
@@ -520,6 +755,7 @@ func (controller *Controller) syncSparkApplication(key string) error {
 		return nil
 	}
 
+	// INFO: 通过 DeletionTimestamp 判断是否已经删除。可以复用!!!
 	if !app.DeletionTimestamp.IsZero() {
 		controller.handleSparkApplicationDeletion(app) // 删除了 SparkApplication
 		return nil
@@ -535,8 +771,9 @@ func (controller *Controller) syncSparkApplication(key string) error {
 	// Take action based on application state.
 	switch appCopy.Status.AppState.State {
 	case v1.NewState:
-		// INFO: (1) `spark-submit --conf ...` 提交作业，--conf 参数是由 SparkApplication 对象的字段值拼接起来的；同时还会创建 podgroup
-		// v1.NewState -> v1.SubmittedState/v1.FailedSubmissionState
+		klog.Info(fmt.Sprintf("[state machine]SparkApplication State NewState"))
+		// INFO: (1)`spark-submit --conf ...` 提交作业，--conf 参数是由 SparkApplication 对象的字段值拼接起来的；同时还会创建 podgroup
+		//  v1.NewState -> v1.SubmittedState/v1.FailedSubmissionState
 		controller.recordSparkApplicationEvent(appCopy)
 		if err := controller.validateSparkApplication(appCopy); err != nil {
 			appCopy.Status.AppState.State = v1.FailedState
@@ -545,7 +782,18 @@ func (controller *Controller) syncSparkApplication(key string) error {
 			appCopy = controller.submitSparkApplication(appCopy)
 		}
 	case v1.SucceedingState:
-
+		// INFO: 很重要，这里可以有重试机会，在SparkApplication yaml 里配置 RestartPolicy
+		if !shouldRetry(appCopy) { // INFO: 这里判断需不需要重试，然后进入 v1.SucceedingState -> v1.CompletedState
+			appCopy.Status.AppState.State = v1.CompletedState
+			controller.recordSparkApplicationEvent(appCopy)
+		} else { // INFO: 需要重试，就 v1.SucceedingState -> v1.PendingRerunState
+			if err := controller.deleteSparkResources(appCopy); err != nil {
+				klog.Errorf("failed to delete resources associated with SparkApplication %s/%s: %v",
+					appCopy.Namespace, appCopy.Name, err)
+				return err
+			}
+			appCopy.Status.AppState.State = v1.PendingRerunState
+		}
 	case v1.FailingState:
 
 	case v1.FailedSubmissionState:
@@ -555,10 +803,30 @@ func (controller *Controller) syncSparkApplication(key string) error {
 	case v1.PendingRerunState:
 
 	case v1.SubmittedState, v1.RunningState, v1.UnknownState:
-		// INFO: podgroup 已经创建，进入提交成功状态
-
+		// INFO: (2)podgroup 已经创建，进入提交成功状态: v1.NewState -> v1.SubmittedState/v1.FailedSubmissionState
+		//  driver会起多个executors，这样 v1.SubmittedState -> v1.RunningState
+		//  sparkApplication 会在 v1.RunningState 一段时间，等所有executors运行成功并退出，driver pod就在succeeded(pod completed)状态，这时
+		//  推动 sparkApplication到 v1.RunningState -> v1.SucceedingState，可见函数 driverStateToApplicationState()
+		klog.Info(fmt.Sprintf("[state machine]SparkApplication State %s", v1.SubmittedState))
+		if err := controller.getAndUpdateAppState(appCopy); err != nil {
+			return err
+		}
 	case v1.CompletedState, v1.FailedState:
-
+		// INFO: v1.SucceedingState -> v1.CompletedState，根据executors更新 sparkApplication.Status.ExecutorState
+		//  https://github.com/GoogleCloudPlatform/spark-on-k8s-operator/blob/master/docs/user-guide.md#setting-ttl-for-a-sparkapplication
+		if controller.hasApplicationExpired(app) { // 如果sparkApplication过期，需要删除sparkApplication
+			klog.Infof("Garbage collecting expired SparkApplication %s/%s", app.Namespace, app.Name)
+			err := controller.sparkAppClient.SparkoperatorV1().SparkApplications(app.Namespace).Delete(context.TODO(), app.Name, metav1.DeleteOptions{
+				GracePeriodSeconds: int64ptr(0), // 直接硬删除
+			})
+			if err != nil && !errors.IsNotFound(err) {
+				return err
+			}
+			return nil
+		}
+		if err := controller.getAndUpdateExecutorState(appCopy); err != nil {
+			return err
+		}
 	}
 
 	// INFO: 更新 SparkApplication status

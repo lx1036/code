@@ -1,16 +1,19 @@
 package sparkapplication
 
 import (
+	"flag"
 	"fmt"
-	v1 "k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/apis/sparkoperator.k9s.io/v1"
-	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/config"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	v1 "k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/apis/sparkoperator.k9s.io/v1"
+	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/config"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 const (
@@ -22,6 +25,12 @@ const (
 const (
 	podAlreadyExistsErrorCode = "code=409"
 )
+
+var debug bool
+
+func init() {
+	flag.BoolVar(&debug, "debug", false, "for debug in local")
+}
 
 // submission includes information of a Spark application to be submitted.
 type submission struct {
@@ -157,11 +166,13 @@ func buildSubmissionCommandArgs(app *v1.SparkApplication, driverPodName string, 
 func getMasterURL() (string, error) {
 	kubernetesServiceHost := os.Getenv(kubernetesServiceHostEnvVar)
 	if kubernetesServiceHost == "" {
-		return "", fmt.Errorf("environment variable %s is not found", kubernetesServiceHostEnvVar)
+		kubernetesServiceHost = "192.168.0.1"
+		//return "", fmt.Errorf("environment variable %s is not found", kubernetesServiceHostEnvVar)
 	}
 	kubernetesServicePort := os.Getenv(kubernetesServicePortEnvVar)
 	if kubernetesServicePort == "" {
-		return "", fmt.Errorf("environment variable %s is not found", kubernetesServicePortEnvVar)
+		kubernetesServicePort = "443"
+		//return "", fmt.Errorf("environment variable %s is not found", kubernetesServicePortEnvVar)
 	}
 
 	// INFO: 其实就是 kubernetes.default.svc service 的 ip:port, 得是 k8s://<api_server_host>:<k8s-apiserver-port>
@@ -434,6 +445,11 @@ INFO: ` /opt/spark/bin/spark-submit --class xxx --master xxx --deploy-mode clust
 `
 */
 func runSparkSubmit(submission *submission) (bool, error) {
+	if debug {
+		klog.V(2).Info(fmt.Sprintf("[runSparkSubmit]for debug in local"))
+		return true, nil
+	}
+
 	// INFO: 在 spark-operator pod 里 path: /opt/spark/bin/spark-submit
 	sparkHome, present := os.LookupEnv(sparkHomeEnvVar)
 	if !present {
