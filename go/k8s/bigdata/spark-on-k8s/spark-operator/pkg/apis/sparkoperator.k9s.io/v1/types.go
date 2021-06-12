@@ -5,6 +5,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+/*
+INFO:
+	(1)+kubebuilder:subresource:status: enables the "/status" subresource on a CRD
+
+*/
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:defaulter-gen=true
@@ -139,6 +145,8 @@ type SparkPodSpec struct {
 // DriverSpec is specification of the driver.
 type DriverSpec struct {
 	SparkPodSpec `json:",inline"`
+
+	// INFO: crd yaml 会多生成一个 `pattern: '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'`
 	// PodName is the name of the driver pod that the user creates. This is used for the
 	// in-cluster client mode in which the user creates a client pod where the driver of
 	// the user application runs. It's an error to set this field if Mode is not
@@ -173,6 +181,7 @@ type DriverSpec struct {
 // ExecutorSpec is specification of the executor.
 type ExecutorSpec struct {
 	SparkPodSpec `json:",inline"`
+	// INFO: 会多一个 `minimum: 1`
 	// Instances is the number of executor instances.
 	// +optional
 	// +kubebuilder:validation:Minimum=1

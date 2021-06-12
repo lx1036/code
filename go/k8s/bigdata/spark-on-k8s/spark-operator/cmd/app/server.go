@@ -3,9 +3,9 @@ package app
 import (
 	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/cmd/app/options"
 	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/controller/sparkapplication"
-	"k8s.io/klog/v2"
 
 	"github.com/spf13/cobra"
+	"k8s.io/klog/v2"
 )
 
 func NewSparkOperatorCommand(stopCh <-chan struct{}) *cobra.Command {
@@ -31,6 +31,7 @@ func runCommand(option *options.Options, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+	klog.Info("starting run server...")
 	err = sparkApplicationController.Start(option.ControllerThreads, stopCh)
 	if err != nil {
 		return err

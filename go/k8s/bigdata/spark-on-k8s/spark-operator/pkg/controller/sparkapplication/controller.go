@@ -3,37 +3,35 @@ package sparkapplication
 import (
 	"context"
 	"fmt"
-	"k8s.io/client-go/util/retry"
+	"time"
 
-	"github.com/golang/glog"
-	"github.com/google/uuid"
 	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/cmd/app/options"
+	v1 "k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/apis/sparkoperator.k9s.io/v1"
 	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/batchscheduler"
 	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/batchscheduler/schedulerinterface"
-
-	v1 "k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/apis/sparkoperator.k9s.io/v1"
 	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/client/clientset/versioned"
 	sparkApplicationInformer "k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/client/informers/externalversions"
 	sparkApplicationLister "k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/client/listers/sparkoperator.k9s.io/v1"
 	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/config"
 	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/utils"
+
+	"github.com/google/uuid"
 	apiv1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/scheme"
-	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
-	"time"
-
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -81,6 +79,7 @@ func NewController(option *options.Options) (*Controller, error) {
 	sparkAppInformerFactory := sparkApplicationInformer.NewSharedInformerFactoryWithOptions(sparkAppClient, time.Second*30, sparkAppFactoryOpts...)
 	sparkAppInformer := sparkAppInformerFactory.Sparkoperator().V1().SparkApplications().Informer()
 
+	// INFO: 只会 watch driver pod
 	var podFactoryOpts []informers.SharedInformerOption
 	if option.Namespace != apiv1.NamespaceAll {
 		podFactoryOpts = append(podFactoryOpts, informers.WithNamespace(option.Namespace))
@@ -171,8 +170,8 @@ func (controller *Controller) processNextItem() bool {
 	}
 	defer controller.queue.Done(key)
 
-	glog.V(2).Infof("Starting processing key: %q", key)
-	defer glog.V(2).Infof("Ending processing key: %q", key)
+	klog.V(2).Infof("Starting processing key: %q", key)
+	defer klog.V(2).Infof("Ending processing key: %q", key)
 	err := controller.syncSparkApplication(key.(string))
 	if err == nil {
 		// Successfully processed the key or the key was not found so tell the queue to stop tracking
@@ -241,6 +240,7 @@ func (controller *Controller) onDelete(obj interface{}) {
 	if sparkApplication != nil {
 		controller.handleSparkApplicationDeletion(sparkApplication) // 删除了 SparkApplication
 		controller.recorder.Eventf(sparkApplication, apiv1.EventTypeNormal, "SparkApplicationDeleted", "SparkApplication %s was deleted", sparkApplication.Name)
+		klog.V(2).Infof("SparkApplication %s/%s was deleted", sparkApplication.Namespace, sparkApplication.Name)
 	}
 }
 
@@ -309,7 +309,7 @@ func (controller *Controller) updateApplicationStatusWithRetries(original *v1.Sp
 func (controller *Controller) enqueue(obj interface{}) {
 	key, err := keyFunc(obj)
 	if err != nil {
-		glog.Errorf("failed to get key for %v: %v", obj, err)
+		klog.Errorf("failed to get key for %v: %v", obj, err)
 		return
 	}
 

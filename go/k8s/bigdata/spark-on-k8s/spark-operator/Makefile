@@ -10,3 +10,10 @@ groups:
 	"sparkoperator.k9s.io:v1" \
 	--output-base "." \
 	--go-header-file "../../../apiserver/hack/boilerplate/boilerplate.go.txt" --v=3
+
+
+# 自动化生成 crd
+# controller-gen -hhh
+controller-gen:
+	controller-gen crd:trivialVersions=true,maxDescLen=0,crdVersions=v1 paths="./pkg/apis/sparkoperator.k9s.io/v1" output:crd:artifacts:config=./deploy/release
+
