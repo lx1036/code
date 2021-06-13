@@ -12,8 +12,8 @@ func NewSparkOperatorCommand(stopCh <-chan struct{}) *cobra.Command {
 	opts := options.NewOptions()
 
 	cmd := &cobra.Command{
-		Short: "Launch metrics-server",
-		Long:  "Launch metrics-server",
+		Short: "Launch spark-operator",
+		Long:  "Launch spark-operator",
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := runCommand(opts, stopCh); err != nil {
 				return err

@@ -1,7 +1,8 @@
-package types
+package clusterstate
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/labels"
 	"time"
 
 	v1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/apis/autoscaling.k9s.io/v1"
@@ -59,4 +60,8 @@ func (cluster *ClusterState) AddSample(sample *ContainerUsageSampleWithKey) erro
 		return fmt.Errorf("sample discarded (invalid or out of order)")
 	}
 	return nil
+}
+
+func (cluster *ClusterState) AddOrUpdateVpa(vpa v1.VerticalPodAutoscaler, selector labels.Selector) {
+
 }

@@ -1,4 +1,4 @@
-package types
+package clusterstate
 
 import (
 	"k8s.io/apimachinery/pkg/labels"

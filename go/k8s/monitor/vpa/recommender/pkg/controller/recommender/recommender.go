@@ -1,12 +1,15 @@
 package recommender
 
 import (
+	"fmt"
+
+	"k8s-lx1036/k8s/monitor/vpa/recommender/cmd/app/options"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned"
 	v1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned/typed/autoscaling.k9s.io/v1"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/input"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/types"
-	"k8s.io/client-go/rest"
-	"time"
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/utils"
+	"k8s.io/client-go/kubernetes"
 
 	"k8s.io/klog/v2"
 )
@@ -21,7 +24,12 @@ type Recommender struct {
 	podResourceRecommender PodResourceRecommender
 }
 
-func (r *Recommender) RunOnce() {
+func (r *Recommender) RunUntil(stopCh <-chan struct{}) error {
+
+	err := r.clusterStateFeeder.Start(stopCh)
+	if err != nil {
+		return err
+	}
 
 	r.clusterStateFeeder.LoadVPAs()
 
@@ -60,14 +68,27 @@ func (r *Recommender) UpdateVPAs() {
 	}
 }
 
-func NewRecommender(config *rest.Config, checkpointsGCInterval time.Duration, useCheckpoints bool, namespace string) *Recommender {
-
-	return &Recommender{
-		clusterState:       nil,
-		clusterStateFeeder: input.ClusterStateFeeder{},
-		vpaClient:          versioned.NewForConfigOrDie(config).AutoscalingV1(),
+func NewRecommender(option *options.Options) (*Recommender, error) {
+	restConfig, err := utils.NewRestConfig(option.Kubeconfig)
+	if err != nil {
+		return nil, err
 	}
 
+	kubeClient, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to construct lister client: %v", err)
+	}
+
+	vpaClient := versioned.NewForConfigOrDie(restConfig)
+	clusterStateFeeder := input.NewClusterStateFeeder(restConfig)
+
+	recommender := &Recommender{
+		clusterState:       nil,
+		clusterStateFeeder: input.ClusterStateFeeder{},
+		vpaClient:          vpaClient.AutoscalingV1(),
+	}
+
+	return recommender, nil
 }
 
 // getCappedRecommendation creates a recommendation based on recommended pod
