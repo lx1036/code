@@ -11,11 +11,15 @@ INFO:
 
 */
 
+// 额外的打印列: https://kubernetes.io/zh/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#additional-printer-columns
+// https://cloudnative.to/kubebuilder/reference/markers/crd.html
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:defaulter-gen=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Namespaced,shortName=sparkapp,singular=sparkapplication
+// +kubebuilder:printcolumn:name="Type",type="string",JSONPath=".spec.type"
 
 // SparkApplication represents a Spark application running on and using Kubernetes as a cluster manager.
 type SparkApplication struct {

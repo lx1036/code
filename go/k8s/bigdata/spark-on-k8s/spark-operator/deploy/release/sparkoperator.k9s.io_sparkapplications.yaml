@@ -18,7 +18,11 @@ spec:
     singular: sparkapplication
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.type
+      name: Type
+      type: string
+    name: v1
     schema:
       openAPIV3Schema:
         properties:

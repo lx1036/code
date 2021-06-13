@@ -7,9 +7,22 @@ import (
 )
 
 // @see https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/generating-clientset.md
+// 额外的打印列: https://kubernetes.io/zh/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#additional-printer-columns
+// https://cloudnative.to/kubebuilder/reference/markers/crd.html
+
+/*
+kubectl get vpa
+NAME          MODE   CPU    MEM       PROVIDED   AGE
+hamster-vpa   Auto   587m   262144k   True       8d
+*/
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:name="Mode",type="string",JSONPath=".spec.updatePolicy.updateMode"
+// +kubebuilder:printcolumn:name="CPU",type="string",JSONPath=".status.recommendation.containerRecommendations[0].target.cpu"
+// +kubebuilder:printcolumn:name="Mem",type="string",JSONPath=".status.recommendation.containerRecommendations[0].target.memory"
+// +kubebuilder:printcolumn:name="Provided",type="string",JSONPath=".status.conditions[?(@.type=='RecommendationProvided')].status"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 type VerticalPodAutoscaler struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -17,6 +30,7 @@ type VerticalPodAutoscaler struct {
 
 	Spec VerticalPodAutoscalerSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
+	// +optional
 	Status VerticalPodAutoscalerStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -44,6 +58,19 @@ spec:
 
 type VerticalPodAutoscalerSpec struct {
 	TargetRef *autoscaling.CrossVersionObjectReference `json:"targetRef" protobuf:"bytes,1,name=targetRef"`
+
+	// +optional
+	UpdatePolicy *PodUpdatePolicy `json:"updatePolicy,omitempty" protobuf:"bytes,2,opt,name=updatePolicy"`
+
+	// +optional
+	ResourcePolicy *PodResourcePolicy `json:"resourcePolicy,omitempty" protobuf:"bytes,3,opt,name=resourcePolicy"`
+}
+
+type PodUpdatePolicy struct {
+	// Controls when autoscaler applies changes to the pod resources.
+	// The default is 'Auto'.
+	// +optional
+	UpdateMode *UpdateMode `json:"updateMode,omitempty" protobuf:"bytes,1,opt,name=updateMode"`
 }
 
 /*
