@@ -140,6 +140,7 @@ require (
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/controller-runtime v0.6.2
 	sigs.k8s.io/metrics-server v0.4.4
+	volcano.sh/apis v0.0.0-20210603070204-70005b2d502a
 )
 
 replace (

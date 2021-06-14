@@ -20,7 +20,6 @@ package versioned
 
 import (
 	"fmt"
-
 	autoscalingv1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned/typed/autoscaling.k9s.io/v1"
 
 	discovery "k8s.io/client-go/discovery"
