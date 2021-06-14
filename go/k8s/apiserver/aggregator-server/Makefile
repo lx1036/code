@@ -7,7 +7,7 @@ groups:
 	k8s-lx1036/k8s/apiserver/aggregator-server/pkg/client k8s-lx1036/k8s/apiserver/aggregator-server/pkg/apis \
 	"apiregistration:v1" \
 	--output-base "." \
-	--go-header-file "../hack/boilerplate/boilerplate.go.txt"
+	--go-header-file "../hack/boilerplate/boilerplate.go.txt" --v=3
 
 
 deepcopy-gen:

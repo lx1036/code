@@ -216,6 +216,7 @@ func (c *Controller) syncConfigMap() error {
 		return err
 	}
 
+	// INFO: 如果 configMap 没有变化
 	if equality.Semantic.DeepEqual(authConfigMap, originalAuthConfigMap) {
 		klog.V(5).Info("no changes to configmap")
 		return nil

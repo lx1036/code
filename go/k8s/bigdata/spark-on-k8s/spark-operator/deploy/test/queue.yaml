@@ -1,0 +1,27 @@
+
+
+
+
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: default
+spec:
+  weight: 1
+  reclaimable: false
+  capability:
+    cpu: 20
+    memory: 40Gi
+
+---
+
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: liuxiang4
+spec:
+  weight: 1
+  reclaimable: false
+  capability:
+    cpu: 10
+    memory: 40Gi

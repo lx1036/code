@@ -616,6 +616,7 @@ func (c *AvailableConditionController) updateAPIServiceStatus(originalAPIService
 	// update this metric on every sync operation to reflect the actual state
 	c.setUnavailableGauge(newAPIService)
 
+	// INFO: 如果 status 没有变化
 	if equality.Semantic.DeepEqual(originalAPIService.Status, newAPIService.Status) {
 		return newAPIService, nil
 	}
