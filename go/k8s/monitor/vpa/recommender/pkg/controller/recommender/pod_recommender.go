@@ -1,7 +1,7 @@
 package recommender
 
 import (
-	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/types"
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate/types"
 )
 
 type PodResourceRecommender struct {

@@ -1,4 +1,4 @@
-package clusterstate
+package types
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -61,10 +61,6 @@ type ContainerUsageSampleWithKey struct {
 	Container ContainerID
 }
 
-// String representation of the labels.LabelSet. This is the value returned by
-// labelSet.String(). As opposed to the LabelSet object, it can be used as a map key.
-type labelSetKey string
-
 // PodState holds runtime information about a single Pod.
 type PodState struct {
 	// Unique id of the Pod.
@@ -75,4 +71,11 @@ type PodState struct {
 	Containers map[string]*ContainerState
 	// PodPhase describing current life cycle phase of the Pod.
 	Phase corev1.PodPhase
+}
+
+func newPod(id PodID) *PodState {
+	return &PodState{
+		ID:         id,
+		Containers: make(map[string]*ContainerState),
+	}
 }

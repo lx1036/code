@@ -21,7 +21,7 @@ type ContainerState struct {
 	// Start of the latest memory usage sample that was aggregated.
 	lastMemorySampleStart time.Time
 	// Aggregation to add usage samples to.
-	//aggregator ContainerStateAggregator
+	aggregator ContainerStateAggregator
 }
 
 // AddSample adds a usage sample to the given ContainerState. Requires samples
@@ -40,4 +40,12 @@ func (container *ContainerState) AddSample(sample *ContainerUsageSample) bool {
 	default:
 		return false
 	}
+}
+
+func (container *ContainerState) addCPUSample(sample *ContainerUsageSample) bool {
+	panic("implement me")
+}
+
+func (container *ContainerState) addMemorySample(sample *ContainerUsageSample, isOOM bool) bool {
+	panic("implement me")
 }

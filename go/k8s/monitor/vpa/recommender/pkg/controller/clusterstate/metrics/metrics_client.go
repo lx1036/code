@@ -1,12 +1,14 @@
-package clusterstate
+package metrics
 
 import (
 	"context"
-	"k8s.io/client-go/rest"
 	"time"
+
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate/types"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
@@ -20,13 +22,13 @@ type MetricsClient struct {
 // ContainerMetricsSnapshot contains information about usage of certain container within defined time window.
 type ContainerMetricsSnapshot struct {
 	// ID identifies a specific container those metrics are coming from.
-	ID ContainerID
+	ID types.ContainerID
 	// End time of the measurement interval.
 	SnapshotTime time.Time
 	// Duration of the measurement interval, which is [SnapshotTime - SnapshotWindow, SnapshotTime].
 	SnapshotWindow time.Duration
 	// Actual usage of the resources over the measurement interval.
-	Usage Resources
+	Usage types.Resources
 }
 
 func NewMetricsClient(config *rest.Config, namespace string) *MetricsClient {
@@ -38,6 +40,7 @@ func NewMetricsClient(config *rest.Config, namespace string) *MetricsClient {
 	}
 }
 
+// INFO: 获取每一个容器的 cpu/memory 的 stats，可以复用!!!
 func (c *MetricsClient) GetContainersMetrics() ([]*ContainerMetricsSnapshot, error) {
 	var metricsSnapshots []*ContainerMetricsSnapshot
 
@@ -67,9 +70,9 @@ func newContainerMetricsSnapshot(containerMetrics v1beta1.ContainerMetrics, podM
 	usage := calculateUsage(containerMetrics.Usage)
 
 	return &ContainerMetricsSnapshot{
-		ID: ContainerID{
+		ID: types.ContainerID{
 			ContainerName: containerMetrics.Name,
-			PodID: PodID{
+			PodID: types.PodID{
 				Namespace: podMetrics.Namespace,
 				PodName:   podMetrics.Name,
 			},
@@ -80,14 +83,14 @@ func newContainerMetricsSnapshot(containerMetrics v1beta1.ContainerMetrics, podM
 	}
 }
 
-func calculateUsage(containerUsage corev1.ResourceList) Resources {
+func calculateUsage(containerUsage corev1.ResourceList) types.Resources {
 	cpuQuantity := containerUsage[corev1.ResourceCPU]
 	cpuMillicores := cpuQuantity.MilliValue() // cpu: e.g. 1234m
 	memoryQuantity := containerUsage[corev1.ResourceMemory]
 	memoryBytes := memoryQuantity.Value()
 
-	return Resources{
-		ResourceCPU:    ResourceAmount(cpuMillicores),
-		ResourceMemory: ResourceAmount(memoryBytes),
+	return types.Resources{
+		types.ResourceCPU:    types.ResourceAmount(cpuMillicores),
+		types.ResourceMemory: types.ResourceAmount(memoryBytes),
 	}
 }

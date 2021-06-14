@@ -3,13 +3,13 @@ package recommender
 import (
 	"fmt"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate"
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"time"
 
 	"k8s-lx1036/k8s/monitor/vpa/recommender/cmd/app/options"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned"
 	v1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned/typed/autoscaling.k9s.io/v1"
-	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/types"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/utils"
 	"k8s.io/client-go/kubernetes"
 

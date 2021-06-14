@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate/types"
+
 	promapi "github.com/prometheus/client_golang/api"
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	prommodel "github.com/prometheus/common/model"
-
 	"k8s.io/klog/v2"
 )
 
@@ -36,19 +37,19 @@ type PodHistory struct {
 	LastSeen   time.Time
 	// A map for container name to a list of its usage samples, in chronological
 	// order.
-	Samples map[string][]ContainerUsageSample
+	Samples map[string][]types.ContainerUsageSample
 }
 
 func newEmptyHistory() *PodHistory {
 	return &PodHistory{
 		LastLabels: map[string]string{},
-		Samples:    map[string][]ContainerUsageSample{},
+		Samples:    map[string][]types.ContainerUsageSample{},
 	}
 }
 
 // HistoryProvider gives history of all pods in a cluster.
 type HistoryProvider interface {
-	GetClusterHistory() (map[PodID]*PodHistory, error)
+	GetClusterHistory() (map[types.PodID]*PodHistory, error)
 }
 
 type prometheusHistoryProvider struct {
@@ -59,8 +60,8 @@ type prometheusHistoryProvider struct {
 	historyResolution prommodel.Duration
 }
 
-func (provider *prometheusHistoryProvider) GetClusterHistory() (map[PodID]*PodHistory, error) {
-	clusterHistory := make(map[PodID]*PodHistory)
+func (provider *prometheusHistoryProvider) GetClusterHistory() (map[types.PodID]*PodHistory, error) {
+	clusterHistory := make(map[types.PodID]*PodHistory)
 
 	var podSelector string
 	// `job="kubernetes-cadvisor", `
@@ -80,7 +81,7 @@ func (provider *prometheusHistoryProvider) GetClusterHistory() (map[PodID]*PodHi
 	// INFO: historicalCpuQuery=`rate(container_cpu_usage_seconds_total{job="cadvisor", pod=~".+", name!="POD", name!="", namespace="cattle-system"}[1h])`
 	historicalCpuQuery := fmt.Sprintf("rate(container_cpu_usage_seconds_total{%s}[%s])", podSelector, provider.config.HistoryResolution)
 	klog.V(2).Infof("Historical CPU usage query used: %s", historicalCpuQuery)
-	err := provider.readResourceHistory(clusterHistory, historicalCpuQuery, ResourceCPU)
+	err := provider.readResourceHistory(clusterHistory, historicalCpuQuery, types.ResourceCPU)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get usage history: %v", err)
 	}
@@ -90,7 +91,7 @@ func (provider *prometheusHistoryProvider) GetClusterHistory() (map[PodID]*PodHi
 	// INFO: historicalMemoryQuery=`container_memory_working_set_bytes{job="cadvisor", pod=~".+", name!="POD", name!="", namespace="cattle-system"}`
 	historicalMemoryQuery := fmt.Sprintf("container_memory_working_set_bytes{%s}", podSelector)
 	klog.V(4).Infof("Historical memory usage query used: %s", historicalMemoryQuery)
-	err = provider.readResourceHistory(clusterHistory, historicalMemoryQuery, ResourceMemory)
+	err = provider.readResourceHistory(clusterHistory, historicalMemoryQuery, types.ResourceMemory)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get usage history: %v", err)
 	}
@@ -109,7 +110,7 @@ func (provider *prometheusHistoryProvider) GetClusterHistory() (map[PodID]*PodHi
 	return clusterHistory, nil
 }
 
-func (provider *prometheusHistoryProvider) readResourceHistory(clusterHistory map[PodID]*PodHistory, query string, resource ResourceName) error {
+func (provider *prometheusHistoryProvider) readResourceHistory(clusterHistory map[types.PodID]*PodHistory, query string, resource types.ResourceName) error {
 	end := time.Now()
 	start := end.Add(-time.Duration(provider.historyDuration))
 
@@ -151,7 +152,7 @@ func (provider *prometheusHistoryProvider) readResourceHistory(clusterHistory ma
 	return nil
 }
 
-func (provider *prometheusHistoryProvider) getContainerIDFromLabels(metric prommodel.Metric) (*ContainerID, error) {
+func (provider *prometheusHistoryProvider) getContainerIDFromLabels(metric prommodel.Metric) (*types.ContainerID, error) {
 	labels := promMetricToLabelMap(metric)
 	namespace, ok := labels[provider.config.ContainerNamespaceLabel]
 	if !ok {
@@ -165,8 +166,8 @@ func (provider *prometheusHistoryProvider) getContainerIDFromLabels(metric promm
 	if !ok {
 		return nil, fmt.Errorf("no %s label on container data", provider.config.ContainerNameLabel)
 	}
-	return &ContainerID{
-		PodID: PodID{
+	return &types.ContainerID{
+		PodID: types.PodID{
 			Namespace: namespace,
 			PodName:   podName,
 		},
@@ -174,7 +175,7 @@ func (provider *prometheusHistoryProvider) getContainerIDFromLabels(metric promm
 	}, nil
 }
 
-func (provider *prometheusHistoryProvider) readLastLabels(clusterHistory map[PodID]*PodHistory, query string) error {
+func (provider *prometheusHistoryProvider) readLastLabels(clusterHistory map[types.PodID]*PodHistory, query string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), provider.queryTimeout)
 	defer cancel()
 
@@ -212,7 +213,7 @@ func (provider *prometheusHistoryProvider) readLastLabels(clusterHistory map[Pod
 	return nil
 }
 
-func (provider *prometheusHistoryProvider) getPodIDFromLabels(metric prommodel.Metric) (*PodID, error) {
+func (provider *prometheusHistoryProvider) getPodIDFromLabels(metric prommodel.Metric) (*types.PodID, error) {
 	labels := promMetricToLabelMap(metric)
 	namespace, ok := labels[provider.config.PodNamespaceLabel]
 	if !ok {
@@ -222,7 +223,7 @@ func (provider *prometheusHistoryProvider) getPodIDFromLabels(metric prommodel.M
 	if !ok {
 		return nil, fmt.Errorf("no %s label", provider.config.PodNameLabel)
 	}
-	return &PodID{Namespace: namespace, PodName: podName}, nil
+	return &types.PodID{Namespace: namespace, PodName: podName}, nil
 }
 
 func (provider *prometheusHistoryProvider) getPodLabelsMap(metric prommodel.Metric) map[string]string {

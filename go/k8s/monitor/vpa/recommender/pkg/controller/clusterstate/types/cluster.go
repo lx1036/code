@@ -1,4 +1,4 @@
-package clusterstate
+package types
 
 import (
 	"fmt"
@@ -8,6 +8,24 @@ import (
 	v1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/apis/autoscaling.k9s.io/v1"
 	corev1 "k8s.io/api/core/v1"
 )
+
+// AggregateStateKey determines the set of containers for which the usage samples
+// are kept aggregated in the model.
+type AggregateStateKey interface {
+	Namespace() string
+	ContainerName() string
+	Labels() labels.Labels
+}
+
+// AggregateContainerStatesMap is a map from AggregateStateKey to AggregateContainerState.
+type aggregateContainerStatesMap map[AggregateStateKey]*AggregateContainerState
+
+// String representation of the labels.LabelSet. This is the value returned by
+// labelSet.String(). As opposed to the LabelSet object, it can be used as a map key.
+type labelSetKey string
+
+// Map of label sets keyed by their string representation.
+type labelSetMap map[labelSetKey]labels.Set
 
 // ClusterState holds all runtime information about the cluster required for the
 // VPA operations, i.e. configuration of resources (pods, containers,
@@ -65,6 +83,15 @@ func (cluster *ClusterState) AddSample(sample *ContainerUsageSampleWithKey) erro
 // INFO: 把 vpa 对象缓存到 clusterstate 对象中；如果已经存在但pod selector变化，则更新
 func (cluster *ClusterState) AddOrUpdateVpa(verticalPodAutoscaler *v1.VerticalPodAutoscaler, selector labels.Selector) error {
 	vpaID := VpaID{Namespace: verticalPodAutoscaler.Namespace, VpaName: verticalPodAutoscaler.Name}
+	annotationsMap := verticalPodAutoscaler.Annotations
+	conditionsMap := make(vpaConditionsMap)
+	for _, condition := range verticalPodAutoscaler.Status.Conditions {
+		conditionsMap[condition.Type] = condition
+	}
+	var currentRecommendation *v1.RecommendedPodResources
+	if conditionsMap[v1.RecommendationProvided].Status == corev1.ConditionTrue {
+		currentRecommendation = verticalPodAutoscaler.Status.Recommendation
+	}
 
 	vpa, vpaExists := cluster.Vpas[vpaID]
 	if vpaExists && (vpa.PodSelector.String() != selector.String()) { // 已经存在但pod selector变化
@@ -93,8 +120,8 @@ func (cluster *ClusterState) AddOrUpdatePod(podID PodID, newLabels labels.Set, p
 		cluster.Pods[podID] = pod
 	}
 
-	newlabelSetKey := cluster.getLabelSetKey(newLabels)
-	if podExists && pod.labelSetKey != newlabelSetKey {
+	newLabelSetKey := cluster.getLabelSetKey(newLabels)
+	if podExists && pod.labelSetKey != newLabelSetKey {
 		// This Pod is already counted in the old VPA, remove the link.
 		cluster.removePodFromItsVpa(pod)
 	}
@@ -112,4 +139,31 @@ func (cluster *ClusterState) AddOrUpdatePod(podID PodID, newLabels labels.Set, p
 	}
 
 	pod.Phase = phase
+}
+
+// getLabelSetKey puts the given labelSet in the global labelSet map and returns a
+// corresponding labelSetKey.
+func (cluster *ClusterState) getLabelSetKey(labelSet labels.Set) labelSetKey {
+	l := labelSetKey(labelSet.String())
+	cluster.labelSetMap[l] = labelSet
+
+	return l
+}
+
+// removePodFromItsVpa decreases the count of Pods associated with a VPA object.
+func (cluster *ClusterState) removePodFromItsVpa(pod *PodState) {
+
+}
+
+// findOrCreateAggregateContainerState returns (possibly newly created) AggregateContainerState
+// that should be used to aggregate usage samples from container with a given ID.
+// The pod with the corresponding PodID must already be present in the ClusterState.
+func (cluster *ClusterState) findOrCreateAggregateContainerState(containerID ContainerID) *AggregateContainerState {
+	panic("implement me")
+}
+
+// addPodToItsVpa increases the count of Pods associated with a VPA object.
+// Does a scan similar to findOrCreateAggregateContainerState so could be optimized if needed.
+func (cluster *ClusterState) addPodToItsVpa(pod *PodState) {
+
 }

@@ -2,23 +2,25 @@ package clusterstate
 
 import (
 	"fmt"
-	"k8s.io/client-go/tools/cache"
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate/prometheus"
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate/types"
 	"time"
 
 	apisv1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/apis/autoscaling.k9s.io/v1"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned"
 	vpaInformers "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/informers/externalversions"
 	listersv1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/listers/autoscaling.k9s.io/v1"
-	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/target"
-	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/types"
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate/metrics"
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/input/target"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	typedCorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
 const (
@@ -32,22 +34,22 @@ type condition struct {
 }
 
 type ClusterStateFeeder struct {
-	coreClient    corev1.CoreV1Interface
+	coreClient    typedCorev1.CoreV1Interface
 	specClient    SpecClient
-	metricsClient *MetricsClient
+	metricsClient *metrics.MetricsClient
 
 	//oomChan             <-chan oom.OomInfo
 	//vpaCheckpointClient vpa_api.VerticalPodAutoscalerCheckpointsGetter
 	vpaLister   listersv1.VerticalPodAutoscalerLister
 	vpaInformer cache.SharedIndexInformer
 
-	clusterState      *ClusterState
+	clusterState      *types.ClusterState
 	selectorFetcher   target.VpaTargetSelectorFetcher
 	memorySaveMode    bool
 	controllerFetcher controllerfetcher.ControllerFetcher
 }
 
-func NewClusterStateFeeder(config *rest.Config, clusterState *ClusterState, memorySave bool, namespace string) *ClusterStateFeeder {
+func NewClusterStateFeeder(config *rest.Config, clusterState *types.ClusterState, memorySave bool, namespace string) *ClusterStateFeeder {
 	kubeClient := kubernetes.NewForConfigOrDie(config)
 
 	factory := informers.NewSharedInformerFactoryWithOptions(kubeClient, defaultResyncPeriod, informers.WithNamespace(namespace))
@@ -58,7 +60,7 @@ func NewClusterStateFeeder(config *rest.Config, clusterState *ClusterState, memo
 	c := &ClusterStateFeeder{
 		coreClient:    kubeClient.CoreV1(),
 		specClient:    nil,
-		metricsClient: NewMetricsClient(config, namespace),
+		metricsClient: metrics.NewMetricsClient(config, namespace),
 		//oomChan:             nil,
 		//vpaCheckpointClient: nil,
 		vpaLister:         vpaFactory.Autoscaling().V1().VerticalPodAutoscalers().Lister(),
@@ -93,9 +95,9 @@ func (clusterStateFeeder *ClusterStateFeeder) LoadVPAs() {
 	klog.V(2).Infof("Fetched %d VPAs.", len(vpas))
 
 	// Add or update existing VPAs in the model.
-	vpaKeys := make(map[VpaID]bool)
+	vpaKeys := make(map[types.VpaID]bool)
 	for _, vpa := range vpas {
-		vpaID := VpaID{
+		vpaID := types.VpaID{
 			Namespace: vpa.Namespace,
 			VpaName:   vpa.Name,
 		}
@@ -164,7 +166,7 @@ func (clusterStateFeeder *ClusterStateFeeder) LoadPods() {
 	if err != nil {
 		klog.Errorf("Cannot get SimplePodSpecs. Reason: %+v", err)
 	}
-	pods := make(map[PodID]*BasicPodSpec)
+	pods := make(map[types.PodID]*BasicPodSpec)
 	for _, spec := range podSpecs {
 		pods[spec.ID] = spec
 	}
@@ -182,13 +184,13 @@ func (clusterStateFeeder *ClusterStateFeeder) LoadPods() {
 	}
 }
 
-func newContainerUsageSamplesWithKey(metrics *ContainerMetricsSnapshot) []*ContainerUsageSampleWithKey {
+func newContainerUsageSamplesWithKey(metrics *metrics.ContainerMetricsSnapshot) []*types.ContainerUsageSampleWithKey {
 	var samples []*ContainerUsageSampleWithKey
 
 	for metricName, resourceAmount := range metrics.Usage {
-		sample := &ContainerUsageSampleWithKey{
+		sample := &types.ContainerUsageSampleWithKey{
 			Container: metrics.ID,
-			ContainerUsageSample: ContainerUsageSample{
+			ContainerUsageSample: types.ContainerUsageSample{
 				MeasureStart: metrics.SnapshotTime,
 				Resource:     metricName,
 				Usage:        resourceAmount,
@@ -219,4 +221,37 @@ func (clusterStateFeeder *ClusterStateFeeder) LoadRealTimeMetrics() {
 
 	klog.V(3).Infof("ClusterSpec fed with #%v ContainerUsageSamples for #%v containers. Dropped #%v samples.",
 		sampleCount, len(containerMetricsSnapshots), droppedSampleCount)
+}
+
+// INFO: 从 prometheus 中读取出cluster history数据，然后缓存到clusterstate中
+func (clusterStateFeeder *ClusterStateFeeder) LoadFromPrometheusProvider(config prometheus.PrometheusHistoryProviderConfig) error {
+	provider, err := prometheus.NewPrometheusHistoryProvider(config)
+	if err != nil {
+		return err
+	}
+
+	clusterHistory, err := provider.GetClusterHistory()
+	if err != nil {
+		return err
+	}
+
+	for podID, podHistory := range clusterHistory {
+		clusterStateFeeder.clusterState.AddOrUpdatePod(podID, podHistory.LastLabels, corev1.PodUnknown)
+		for containerName, containerUsageSamples := range podHistory.Samples {
+			containerID := types.ContainerID{
+				PodID:         podID,
+				ContainerName: containerName,
+			}
+
+			for _, containerUsageSample := range containerUsageSamples {
+				err = clusterStateFeeder.clusterState.AddSample(&types.ContainerUsageSampleWithKey{
+					ContainerUsageSample: containerUsageSample,
+					Container:            containerID,
+				})
+				if err != nil {
+					klog.Warning(err)
+				}
+			}
+		}
+	}
 }
