@@ -3,6 +3,7 @@ package clusterstate
 import (
 	"fmt"
 	"k8s.io/client-go/tools/cache"
+	"time"
 
 	apisv1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/apis/autoscaling.k9s.io/v1"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned"
@@ -20,6 +21,10 @@ import (
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
+const (
+	defaultResyncPeriod = 10 * time.Minute
+)
+
 type condition struct {
 	conditionType apisv1.VerticalPodAutoscalerConditionType
 	delete        bool
@@ -28,7 +33,7 @@ type condition struct {
 
 type ClusterStateFeeder struct {
 	coreClient    corev1.CoreV1Interface
-	specClient    types.SpecClient
+	specClient    SpecClient
 	metricsClient *MetricsClient
 
 	//oomChan             <-chan oom.OomInfo
@@ -53,7 +58,7 @@ func NewClusterStateFeeder(config *rest.Config, clusterState *ClusterState, memo
 	c := &ClusterStateFeeder{
 		coreClient:    kubeClient.CoreV1(),
 		specClient:    nil,
-		metricsClient: NewMetricsClient(resourceclient.NewForConfigOrDie(config), namespace),
+		metricsClient: NewMetricsClient(config, namespace),
 		//oomChan:             nil,
 		//vpaCheckpointClient: nil,
 		vpaLister:         vpaFactory.Autoscaling().V1().VerticalPodAutoscalers().Lister(),
@@ -77,7 +82,7 @@ func (clusterStateFeeder *ClusterStateFeeder) Start(stopCh <-chan struct{}) erro
 	return nil
 }
 
-// Fetch VPA objects and load them into the cluster state.
+// INFO: load vpa 对象到 clusterstate 缓存
 func (clusterStateFeeder *ClusterStateFeeder) LoadVPAs() {
 	vpas, err := clusterStateFeeder.vpaLister.List(labels.Everything())
 	if err != nil {
@@ -104,6 +109,7 @@ func (clusterStateFeeder *ClusterStateFeeder) LoadVPAs() {
 
 			for _, condition := range conditions {
 				if condition.delete {
+					// INFO: 每一个属性值都是指针或者map类型
 					delete(clusterStateFeeder.clusterState.Vpas[vpaID].Conditions, condition.conditionType)
 				} else {
 					clusterStateFeeder.clusterState.Vpas[vpaID].Conditions.Set(condition.conditionType, true, "", condition.message)
@@ -120,7 +126,7 @@ func (clusterStateFeeder *ClusterStateFeeder) LoadVPAs() {
 		}
 	}
 
-	clusterStateFeeder.clusterState.ObservedVpas = vpaCRDs
+	clusterStateFeeder.clusterState.ObservedVpas = vpas
 }
 
 // INFO:
@@ -152,12 +158,13 @@ func (clusterStateFeeder *ClusterStateFeeder) getSelector(vpa *apisv1.VerticalPo
 }
 
 // Load pod into the cluster state.
+// INFO:
 func (clusterStateFeeder *ClusterStateFeeder) LoadPods() {
 	podSpecs, err := clusterStateFeeder.specClient.GetPodSpecs()
 	if err != nil {
 		klog.Errorf("Cannot get SimplePodSpecs. Reason: %+v", err)
 	}
-	pods := make(map[types.PodID]*types.BasicPodSpec)
+	pods := make(map[PodID]*BasicPodSpec)
 	for _, spec := range podSpecs {
 		pods[spec.ID] = spec
 	}
@@ -175,13 +182,13 @@ func (clusterStateFeeder *ClusterStateFeeder) LoadPods() {
 	}
 }
 
-func newContainerUsageSamplesWithKey(metrics *ContainerMetricsSnapshot) []*types.ContainerUsageSampleWithKey {
-	var samples []*types.ContainerUsageSampleWithKey
+func newContainerUsageSamplesWithKey(metrics *ContainerMetricsSnapshot) []*ContainerUsageSampleWithKey {
+	var samples []*ContainerUsageSampleWithKey
 
 	for metricName, resourceAmount := range metrics.Usage {
-		sample := &types.ContainerUsageSampleWithKey{
+		sample := &ContainerUsageSampleWithKey{
 			Container: metrics.ID,
-			ContainerUsageSample: types.ContainerUsageSample{
+			ContainerUsageSample: ContainerUsageSample{
 				MeasureStart: metrics.SnapshotTime,
 				Resource:     metricName,
 				Usage:        resourceAmount,

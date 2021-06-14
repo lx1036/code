@@ -62,6 +62,54 @@ func (cluster *ClusterState) AddSample(sample *ContainerUsageSampleWithKey) erro
 	return nil
 }
 
-func (cluster *ClusterState) AddOrUpdateVpa(vpa v1.VerticalPodAutoscaler, selector labels.Selector) {
+// INFO: 把 vpa 对象缓存到 clusterstate 对象中；如果已经存在但pod selector变化，则更新
+func (cluster *ClusterState) AddOrUpdateVpa(verticalPodAutoscaler *v1.VerticalPodAutoscaler, selector labels.Selector) error {
+	vpaID := VpaID{Namespace: verticalPodAutoscaler.Namespace, VpaName: verticalPodAutoscaler.Name}
 
+	vpa, vpaExists := cluster.Vpas[vpaID]
+	if vpaExists && (vpa.PodSelector.String() != selector.String()) { // 已经存在但pod selector变化
+
+	}
+	if !vpaExists { // 不存在则缓存到 clusterstate 对象中
+		vpa = NewVpa(vpaID, selector, verticalPodAutoscaler.CreationTimestamp.Time)
+		cluster.Vpas[vpaID] = vpa
+	}
+
+	// 更新缓存的 vpa 对象
+	vpa.TargetRef = verticalPodAutoscaler.Spec.TargetRef
+	vpa.Annotations = annotationsMap
+	vpa.Conditions = conditionsMap
+	vpa.Recommendation = currentRecommendation
+	vpa.SetUpdateMode(verticalPodAutoscaler.Spec.UpdatePolicy)
+	vpa.SetResourcePolicy(verticalPodAutoscaler.Spec.ResourcePolicy)
+	return nil
+}
+
+// INFO: 更新或添加缓存对象 cluster.Pods
+func (cluster *ClusterState) AddOrUpdatePod(podID PodID, newLabels labels.Set, phase corev1.PodPhase) {
+	pod, podExists := cluster.Pods[podID]
+	if !podExists {
+		pod = newPod(podID)
+		cluster.Pods[podID] = pod
+	}
+
+	newlabelSetKey := cluster.getLabelSetKey(newLabels)
+	if podExists && pod.labelSetKey != newlabelSetKey {
+		// This Pod is already counted in the old VPA, remove the link.
+		cluster.removePodFromItsVpa(pod)
+	}
+
+	if !podExists || pod.labelSetKey != newLabelSetKey {
+		pod.labelSetKey = newLabelSetKey
+
+		// Set the links between the containers and aggregations based on the current pod labels.
+		for containerName, container := range pod.Containers {
+			containerID := ContainerID{PodID: podID, ContainerName: containerName}
+			container.aggregator = cluster.findOrCreateAggregateContainerState(containerID)
+		}
+
+		cluster.addPodToItsVpa(pod)
+	}
+
+	pod.Phase = phase
 }

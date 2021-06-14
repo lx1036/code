@@ -15,6 +15,8 @@ type VpaID struct {
 	VpaName   string
 }
 
+type vpaConditionsMap map[apisv1.VerticalPodAutoscalerConditionType]apisv1.VerticalPodAutoscalerCondition
+
 // Vpa (Vertical Pod Autoscaler) object is responsible for vertical scaling of
 // Pods matching a given label selector.
 type Vpa struct {

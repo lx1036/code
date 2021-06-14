@@ -1,4 +1,4 @@
-package types
+package clusterstate
 
 import (
 	"k8s.io/api/core/v1"
@@ -67,6 +67,7 @@ func newBasicPodSpec(pod *v1.Pod) *BasicPodSpec {
 		Containers: containerSpecs,
 		Phase:      pod.Status.Phase,
 	}
+
 	return basicPodSpec
 }
 

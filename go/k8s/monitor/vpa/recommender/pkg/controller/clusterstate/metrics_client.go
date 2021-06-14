@@ -1,10 +1,9 @@
-package input
+package clusterstate
 
 import (
 	"context"
+	"k8s.io/client-go/rest"
 	"time"
-
-	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/types"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,18 +20,20 @@ type MetricsClient struct {
 // ContainerMetricsSnapshot contains information about usage of certain container within defined time window.
 type ContainerMetricsSnapshot struct {
 	// ID identifies a specific container those metrics are coming from.
-	ID types.ContainerID
+	ID ContainerID
 	// End time of the measurement interval.
 	SnapshotTime time.Time
 	// Duration of the measurement interval, which is [SnapshotTime - SnapshotWindow, SnapshotTime].
 	SnapshotWindow time.Duration
 	// Actual usage of the resources over the measurement interval.
-	Usage types.Resources
+	Usage Resources
 }
 
-func NewMetricsClient(metricsGetter resourceclient.PodMetricsesGetter, namespace string) *MetricsClient {
+func NewMetricsClient(config *rest.Config, namespace string) *MetricsClient {
+	metricsClient := resourceclient.NewForConfigOrDie(config)
+
 	return &MetricsClient{
-		metricsGetter: metricsGetter,
+		metricsGetter: metricsClient,
 		namespace:     namespace,
 	}
 }
@@ -40,8 +41,7 @@ func NewMetricsClient(metricsGetter resourceclient.PodMetricsesGetter, namespace
 func (c *MetricsClient) GetContainersMetrics() ([]*ContainerMetricsSnapshot, error) {
 	var metricsSnapshots []*ContainerMetricsSnapshot
 
-	podMetricsInterface := c.metricsGetter.PodMetricses(c.namespace)
-	podMetricsList, err := podMetricsInterface.List(context.TODO(), metav1.ListOptions{})
+	podMetricsList, err := c.metricsGetter.PodMetricses(c.namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -67,9 +67,9 @@ func newContainerMetricsSnapshot(containerMetrics v1beta1.ContainerMetrics, podM
 	usage := calculateUsage(containerMetrics.Usage)
 
 	return &ContainerMetricsSnapshot{
-		ID: types.ContainerID{
+		ID: ContainerID{
 			ContainerName: containerMetrics.Name,
-			PodID: types.PodID{
+			PodID: PodID{
 				Namespace: podMetrics.Namespace,
 				PodName:   podMetrics.Name,
 			},
@@ -80,14 +80,14 @@ func newContainerMetricsSnapshot(containerMetrics v1beta1.ContainerMetrics, podM
 	}
 }
 
-func calculateUsage(containerUsage corev1.ResourceList) types.Resources {
+func calculateUsage(containerUsage corev1.ResourceList) Resources {
 	cpuQuantity := containerUsage[corev1.ResourceCPU]
 	cpuMillicores := cpuQuantity.MilliValue() // cpu: e.g. 1234m
 	memoryQuantity := containerUsage[corev1.ResourceMemory]
 	memoryBytes := memoryQuantity.Value()
 
-	return types.Resources{
-		types.ResourceCPU:    types.ResourceAmount(cpuMillicores),
-		types.ResourceMemory: types.ResourceAmount(memoryBytes),
+	return Resources{
+		ResourceCPU:    ResourceAmount(cpuMillicores),
+		ResourceMemory: ResourceAmount(memoryBytes),
 	}
 }
