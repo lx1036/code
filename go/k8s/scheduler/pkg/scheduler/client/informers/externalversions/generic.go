@@ -20,6 +20,7 @@ package externalversions
 
 import (
 	"fmt"
+	v1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/podgroup/v1"
 	v1alpha1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/scheduling/v1alpha1"
 
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -55,6 +56,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=scheduling.sigs.k8s.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("elasticquotas"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1alpha1().ElasticQuotas().Informer()}, nil
+
+		// Group=scheduling.sigs.k9s.io, Version=v1
+	case v1.SchemeGroupVersion.WithResource("podgroups"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1().PodGroups().Informer()}, nil
 
 	}
 
