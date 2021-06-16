@@ -25,17 +25,17 @@ import (
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeSchedulingV1 struct {
+type FakePodGroupV1 struct {
 	*testing.Fake
 }
 
-func (c *FakeSchedulingV1) PodGroups(namespace string) v1.PodGroupInterface {
+func (c *FakePodGroupV1) PodGroups(namespace string) v1.PodGroupInterface {
 	return &FakePodGroups{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeSchedulingV1) RESTClient() rest.Interface {
+func (c *FakePodGroupV1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

@@ -20,7 +20,7 @@ package versioned
 
 import (
 	"fmt"
-	schedulingv1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned/typed/podgroup/v1"
+	podgroupv1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned/typed/podgroup/v1"
 	schedulingv1alpha1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned/typed/scheduling/v1alpha1"
 
 	discovery "k8s.io/client-go/discovery"
@@ -30,7 +30,7 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	SchedulingV1() schedulingv1.SchedulingV1Interface
+	PodGroupV1() podgroupv1.PodGroupV1Interface
 	SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface
 }
 
@@ -38,13 +38,13 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	schedulingV1       *schedulingv1.SchedulingV1Client
+	podGroupV1         *podgroupv1.PodGroupV1Client
 	schedulingV1alpha1 *schedulingv1alpha1.SchedulingV1alpha1Client
 }
 
-// SchedulingV1 retrieves the SchedulingV1Client
-func (c *Clientset) SchedulingV1() schedulingv1.SchedulingV1Interface {
-	return c.schedulingV1
+// PodGroupV1 retrieves the PodGroupV1Client
+func (c *Clientset) PodGroupV1() podgroupv1.PodGroupV1Interface {
+	return c.podGroupV1
 }
 
 // SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client
@@ -73,7 +73,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.schedulingV1, err = schedulingv1.NewForConfig(&configShallowCopy)
+	cs.podGroupV1, err = podgroupv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.schedulingV1 = schedulingv1.NewForConfigOrDie(c)
+	cs.podGroupV1 = podgroupv1.NewForConfigOrDie(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
@@ -103,7 +103,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.schedulingV1 = schedulingv1.New(c)
+	cs.podGroupV1 = podgroupv1.New(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)

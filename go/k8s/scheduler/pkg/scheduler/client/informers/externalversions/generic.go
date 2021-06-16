@@ -59,7 +59,7 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 
 		// Group=scheduling.sigs.k9s.io, Version=v1
 	case v1.SchemeGroupVersion.WithResource("podgroups"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1().PodGroups().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.PodGroup().V1().PodGroups().Informer()}, nil
 
 	}
 

@@ -173,11 +173,11 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
-	Scheduling() podgroup.Interface
+	PodGroup() podgroup.Interface
 	Scheduling() scheduling.Interface
 }
 
-func (f *sharedInformerFactory) Scheduling() podgroup.Interface {
+func (f *sharedInformerFactory) PodGroup() podgroup.Interface {
 	return podgroup.New(f, f.namespace, f.tweakListOptions)
 }
 

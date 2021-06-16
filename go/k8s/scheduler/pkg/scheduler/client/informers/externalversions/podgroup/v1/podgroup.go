@@ -62,13 +62,13 @@ func NewFilteredPodGroupInformer(client versioned.Interface, namespace string, r
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SchedulingV1().PodGroups(namespace).List(context.TODO(), options)
+				return client.PodGroupV1().PodGroups(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SchedulingV1().PodGroups(namespace).Watch(context.TODO(), options)
+				return client.PodGroupV1().PodGroups(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&podgroupv1.PodGroup{},

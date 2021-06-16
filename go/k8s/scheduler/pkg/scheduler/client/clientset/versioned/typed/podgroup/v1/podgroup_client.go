@@ -25,22 +25,22 @@ import (
 	rest "k8s.io/client-go/rest"
 )
 
-type SchedulingV1Interface interface {
+type PodGroupV1Interface interface {
 	RESTClient() rest.Interface
 	PodGroupsGetter
 }
 
-// SchedulingV1Client is used to interact with features provided by the scheduling.sigs.k9s.io group.
-type SchedulingV1Client struct {
+// PodGroupV1Client is used to interact with features provided by the scheduling.sigs.k9s.io group.
+type PodGroupV1Client struct {
 	restClient rest.Interface
 }
 
-func (c *SchedulingV1Client) PodGroups(namespace string) PodGroupInterface {
+func (c *PodGroupV1Client) PodGroups(namespace string) PodGroupInterface {
 	return newPodGroups(c, namespace)
 }
 
-// NewForConfig creates a new SchedulingV1Client for the given config.
-func NewForConfig(c *rest.Config) (*SchedulingV1Client, error) {
+// NewForConfig creates a new PodGroupV1Client for the given config.
+func NewForConfig(c *rest.Config) (*PodGroupV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -49,12 +49,12 @@ func NewForConfig(c *rest.Config) (*SchedulingV1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SchedulingV1Client{client}, nil
+	return &PodGroupV1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new SchedulingV1Client for the given config and
+// NewForConfigOrDie creates a new PodGroupV1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *SchedulingV1Client {
+func NewForConfigOrDie(c *rest.Config) *PodGroupV1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -62,9 +62,9 @@ func NewForConfigOrDie(c *rest.Config) *SchedulingV1Client {
 	return client
 }
 
-// New creates a new SchedulingV1Client for the given RESTClient.
-func New(c rest.Interface) *SchedulingV1Client {
-	return &SchedulingV1Client{c}
+// New creates a new PodGroupV1Client for the given RESTClient.
+func New(c rest.Interface) *PodGroupV1Client {
+	return &PodGroupV1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
@@ -82,7 +82,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *SchedulingV1Client) RESTClient() rest.Interface {
+func (c *PodGroupV1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

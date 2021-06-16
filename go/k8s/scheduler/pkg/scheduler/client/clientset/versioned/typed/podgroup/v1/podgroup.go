@@ -57,7 +57,7 @@ type podGroups struct {
 }
 
 // newPodGroups returns a PodGroups
-func newPodGroups(c *SchedulingV1Client, namespace string) *podGroups {
+func newPodGroups(c *PodGroupV1Client, namespace string) *podGroups {
 	return &podGroups{
 		client: c.RESTClient(),
 		ns:     namespace,

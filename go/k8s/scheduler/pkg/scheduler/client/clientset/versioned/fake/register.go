@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	schedulingv1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/podgroup/v1"
+	podgroupv1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/podgroup/v1"
 	schedulingv1alpha1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/scheduling/v1alpha1"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +33,7 @@ var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
 var localSchemeBuilder = runtime.SchemeBuilder{
-	schedulingv1.AddToScheme,
+	podgroupv1.AddToScheme,
 	schedulingv1alpha1.AddToScheme,
 }
 

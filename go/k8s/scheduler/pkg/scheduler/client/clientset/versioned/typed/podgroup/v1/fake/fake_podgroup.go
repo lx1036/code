@@ -32,7 +32,7 @@ import (
 
 // FakePodGroups implements PodGroupInterface
 type FakePodGroups struct {
-	Fake *FakeSchedulingV1
+	Fake *FakePodGroupV1
 	ns   string
 }
 
