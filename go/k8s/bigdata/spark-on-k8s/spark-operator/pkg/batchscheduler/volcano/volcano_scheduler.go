@@ -145,6 +145,7 @@ func (scheduler *VolcanoBatchScheduler) syncPodGroup(app *v1.SparkApplication, s
 		}
 		_, err = scheduler.volcanoClient.SchedulingV1beta1().PodGroups(app.Namespace).Create(context.TODO(), &podGroup, metav1.CreateOptions{})
 	} else {
+		// https://volcano.sh/en/docs/podgroup/#minmember
 		if pg.Spec.MinMember != size {
 			pg.Spec.MinMember = size
 			_, err = scheduler.volcanoClient.SchedulingV1beta1().PodGroups(app.Namespace).Update(context.TODO(), pg, metav1.UpdateOptions{})

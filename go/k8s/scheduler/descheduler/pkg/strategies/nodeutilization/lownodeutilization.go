@@ -35,6 +35,14 @@ type NodeUsage struct {
 	highResourceThreshold map[v1.ResourceName]*resource.Quantity
 }
 
+// INFO: LowNodeUtilization 插件主要还是根据 pod request 来区分资源利用率 high/low nodes
+//  但是，我们需要一个插件，可以根据资源实际使用率 pod usage 来区分
+
+// INFO: roadmap这块有一个计划 https://github.com/kubernetes-sigs/descheduler#roadmap ，集成 metrics provider 来获得
+//  pod 的资源真实负载情况 usage: Integration with metrics providers for obtaining real load metrics
+
+// INFO: scheduler plugins 这块已经实现了根据 node resource usage 来调度：https://github.com/kubernetes-sigs/scheduler-plugins/blob/master/kep/61-Trimaran-real-load-aware-scheduling/README.md
+
 // LowNodeUtilization evicts pods from overutilized nodes to underutilized nodes.
 // Note that CPU/Memory requests are used to calculate nodes' utilization and not the actual resource usage.
 // 驱逐高负载Node的pods到低负载Node，这里只考虑pod的 cpu/memory request值，而不是根据pod真实使用率

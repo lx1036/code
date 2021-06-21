@@ -124,11 +124,11 @@ require (
 	k8s.io/apiserver v0.20.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cloud-provider v0.19.7
-	k8s.io/code-generator v0.19.7 // indirect
+	k8s.io/code-generator v0.19.7
 	k8s.io/component-base v0.20.0
 	k8s.io/component-helpers v0.20.2
 	k8s.io/cri-api v0.0.0
-	k8s.io/gengo v0.0.0-20210203185629-de9496dff47b // indirect
+	k8s.io/gengo v0.0.0-20210203185629-de9496dff47b
 	k8s.io/klog/v2 v2.8.0
 	k8s.io/kube-aggregator v0.17.3
 	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd

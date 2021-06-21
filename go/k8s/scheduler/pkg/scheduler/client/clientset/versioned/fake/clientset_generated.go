@@ -20,6 +20,8 @@ package fake
 
 import (
 	clientset "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned"
+	podgroupv1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned/typed/podgroup/v1"
+	fakepodgroupv1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned/typed/podgroup/v1/fake"
 	schedulingv1alpha1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned/typed/scheduling/v1alpha1"
 	fakeschedulingv1alpha1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned/typed/scheduling/v1alpha1/fake"
 
@@ -76,6 +78,11 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 }
 
 var _ clientset.Interface = &Clientset{}
+
+// PodGroupV1 retrieves the PodGroupV1Client
+func (c *Clientset) PodGroupV1() podgroupv1.PodGroupV1Interface {
+	return &fakepodgroupv1.FakePodGroupV1{Fake: &c.Fake}
+}
 
 // SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client
 func (c *Clientset) SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface {

@@ -19,6 +19,7 @@ limitations under the License.
 package scheme
 
 import (
+	podgroupv1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/podgroup/v1"
 	schedulingv1alpha1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/scheduling/v1alpha1"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,7 @@ var Scheme = runtime.NewScheme()
 var Codecs = serializer.NewCodecFactory(Scheme)
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
+	podgroupv1.AddToScheme,
 	schedulingv1alpha1.AddToScheme,
 }
 

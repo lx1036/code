@@ -108,6 +108,12 @@ type PodResourcePolicy struct {
 	ContainerPolicies []ContainerResourcePolicy `json:"containerPolicies,omitempty" patchStrategy:"merge" patchMergeKey:"containerName" protobuf:"bytes,1,rep,name=containerPolicies"`
 }
 
+const (
+	// DefaultContainerResourcePolicy can be passed as
+	// ContainerResourcePolicy.ContainerName to specify the default policy.
+	DefaultContainerResourcePolicy = "*"
+)
+
 // ContainerResourcePolicy controls how autoscaler computes the recommended
 // resources for a specific container.
 type ContainerResourcePolicy struct {

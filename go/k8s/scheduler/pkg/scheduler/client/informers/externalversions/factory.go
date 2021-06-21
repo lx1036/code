@@ -21,6 +21,7 @@ package externalversions
 import (
 	versioned "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned"
 	internalinterfaces "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/informers/externalversions/internalinterfaces"
+	podgroup "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/informers/externalversions/podgroup"
 	scheduling "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/informers/externalversions/scheduling"
 	reflect "reflect"
 	sync "sync"
@@ -172,7 +173,12 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
+	PodGroup() podgroup.Interface
 	Scheduling() scheduling.Interface
+}
+
+func (f *sharedInformerFactory) PodGroup() podgroup.Interface {
+	return podgroup.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Scheduling() scheduling.Interface {

@@ -2,12 +2,14 @@ package recommender
 
 import (
 	"fmt"
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate"
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"time"
 
 	"k8s-lx1036/k8s/monitor/vpa/recommender/cmd/app/options"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned"
 	v1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned/typed/autoscaling.k9s.io/v1"
-	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/input"
-	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/types"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/utils"
 	"k8s.io/client-go/kubernetes"
 
@@ -15,9 +17,9 @@ import (
 )
 
 type Recommender struct {
-	clusterState *types.ClusterState
+	clusterState *clusterstate.ClusterState
 
-	clusterStateFeeder input.ClusterStateFeeder
+	clusterStateFeeder clusterstate.ClusterStateFeeder
 
 	vpaClient v1.AutoscalingV1Interface
 
@@ -25,26 +27,28 @@ type Recommender struct {
 }
 
 func (r *Recommender) RunUntil(stopCh <-chan struct{}) error {
-
 	err := r.clusterStateFeeder.Start(stopCh)
 	if err != nil {
 		return err
 	}
 
-	r.clusterStateFeeder.LoadVPAs()
+	go wait.Until(func() {
+		r.clusterStateFeeder.LoadVPAs()
 
-	r.clusterStateFeeder.LoadPods()
+		r.clusterStateFeeder.LoadPods()
 
-	r.clusterStateFeeder.LoadRealTimeMetrics()
+		r.clusterStateFeeder.LoadRealTimeMetrics()
 
-	r.UpdateVPAs()
+		r.UpdateVPAs()
+	}, time.Second*60, stopCh)
 
+	return nil
 }
 
 // Updates VPA CRD objects' statuses.
 func (r *Recommender) UpdateVPAs() {
 	for _, observedVpa := range r.clusterState.ObservedVpas {
-		key := types.VpaID{
+		key := clusterstate.VpaID{
 			Namespace: observedVpa.Namespace,
 			VpaName:   observedVpa.Name,
 		}
@@ -53,13 +57,13 @@ func (r *Recommender) UpdateVPAs() {
 			continue
 		}
 
-		resources := r.podResourceRecommender.GetRecommendedPodResources(types.GetContainerNameToAggregateStateMap(vpa))
+		resources := r.podResourceRecommender.GetRecommendedPodResources(clusterstate.GetContainerNameToAggregateStateMap(vpa))
 		vpa.UpdateRecommendation(getCappedRecommendation(vpa.ID, resources, observedVpa.Spec.ResourcePolicy))
 
 		hasMatchingPods := vpa.PodCount > 0
 		vpa.UpdateConditions(hasMatchingPods)
 
-		_, err := types.UpdateVpaStatusIfNeeded(
+		_, err := clusterstate.UpdateVpaStatusIfNeeded(
 			r.vpaClient.VerticalPodAutoscalers(vpa.ID.Namespace), vpa.ID.VpaName, vpa.AsStatus(), &observedVpa.Status)
 		if err != nil {
 			klog.Errorf(
@@ -80,11 +84,11 @@ func NewRecommender(option *options.Options) (*Recommender, error) {
 	}
 
 	vpaClient := versioned.NewForConfigOrDie(restConfig)
-	clusterStateFeeder := input.NewClusterStateFeeder(restConfig)
+	clusterStateFeeder := clusterstate.NewClusterStateFeeder(restConfig)
 
 	recommender := &Recommender{
 		clusterState:       nil,
-		clusterStateFeeder: input.ClusterStateFeeder{},
+		clusterStateFeeder: clusterstate.ClusterStateFeeder{},
 		vpaClient:          vpaClient.AutoscalingV1(),
 	}
 
