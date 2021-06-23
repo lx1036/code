@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -36,12 +36,13 @@ type imageState struct {
 	nodes sets.String
 }
 
+// INFO: 缓存了pod和node信息，同时缓存了调度结果，见属性 podStates
 type schedulerCache struct {
 	stop   <-chan struct{}
 	ttl    time.Duration
 	period time.Duration
 
-	// This mutex guards all fields within this cache struct.
+	// schedulerCache会被多个goroutine读写，所以需要读写锁
 	mu sync.RWMutex
 	// a set of assumed pod keys.
 	// The key could further be used to get an entry in podStates.
@@ -62,7 +63,11 @@ func (cache *schedulerCache) PodCount() (int, error) {
 }
 
 func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
-	panic("implement me")
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return err
+	}
+
 }
 
 func (cache *schedulerCache) FinishBinding(pod *v1.Pod) error {
@@ -111,20 +116,6 @@ func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 
 func (cache *schedulerCache) Dump() *Dump {
 	panic("implement me")
-}
-
-func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedulerCache {
-	return &schedulerCache{
-		ttl:    ttl,
-		period: period,
-		stop:   stop,
-
-		nodes:       make(map[string]*nodeInfoListItem),
-		nodeTree:    newNodeTree(nil),
-		assumedPods: make(map[string]bool),
-		podStates:   make(map[string]*podState),
-		imageStates: make(map[string]*imageState),
-	}
 }
 
 func (cache *schedulerCache) run() {
@@ -251,6 +242,20 @@ func (cache *schedulerCache) moveNodeInfoToHead(name string) {
 var (
 	cleanAssumedPeriod = 1 * time.Second
 )
+
+func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedulerCache {
+	return &schedulerCache{
+		ttl:    ttl,
+		period: period,
+		stop:   stop,
+
+		nodes:       make(map[string]*nodeInfoListItem),
+		nodeTree:    newNodeTree(nil),
+		assumedPods: make(map[string]bool),
+		podStates:   make(map[string]*podState),
+		imageStates: make(map[string]*imageState),
+	}
+}
 
 func New(ttl time.Duration, stop <-chan struct{}) Cache {
 	cache := newSchedulerCache(ttl, cleanAssumedPeriod, stop)
