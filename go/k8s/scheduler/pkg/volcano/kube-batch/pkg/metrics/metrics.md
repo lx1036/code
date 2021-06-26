@@ -20,7 +20,7 @@ kube_pod_volcano_container_resource_requests: (gauge)
 缺少的metrics:
   plugins:
     plugin_scheduling_latency_microseconds: grafana dashboard 缺少每一个 plugin 的耗时
-
+    action_scheduling_latency_microseconds: grafana dashboard 缺少每一个 action 的耗时
 
 ```
 

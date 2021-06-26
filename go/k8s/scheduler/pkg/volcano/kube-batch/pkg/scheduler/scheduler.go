@@ -1,9 +1,11 @@
 package scheduler
 
 import (
+	"sync"
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/volcano/kube-batch/pkg/metrics"
+	"k8s-lx1036/k8s/scheduler/pkg/volcano/kube-batch/pkg/scheduler/cache"
 	"k8s-lx1036/k8s/scheduler/pkg/volcano/kube-batch/pkg/scheduler/conf"
 	"k8s-lx1036/k8s/scheduler/pkg/volcano/kube-batch/pkg/scheduler/framework"
 
@@ -15,12 +17,16 @@ import (
 // Scheduler watches for new unscheduled pods for kubebatch. It attempts to find
 // nodes that they fit on and writes bindings back to the api server.
 type Scheduler struct {
-	cache          schedcache.Cache
+	cache          cache.Cache
 	config         *rest.Config
 	actions        []framework.Action
 	plugins        []conf.Tier
 	schedulerConf  string
 	schedulePeriod time.Duration
+
+	mutex sync.Mutex
+
+	configurations []conf.Configuration
 }
 
 // NewScheduler returns a scheduler
@@ -29,7 +35,7 @@ func NewScheduler(config *rest.Config, schedulerName string, conf string, period
 	scheduler := &Scheduler{
 		config:         config,
 		schedulerConf:  conf,
-		cache:          schedcache.New(config, schedulerName, defaultQueue),
+		cache:          cache.New(config, schedulerName, defaultQueue),
 		schedulePeriod: period,
 	}
 
@@ -64,14 +70,22 @@ func (pc *Scheduler) Run(stopCh <-chan struct{}) {
 
 func (pc *Scheduler) runOnce() {
 	klog.V(4).Infof("Start scheduling ...")
-	scheduleStartTime := time.Now()
 	defer klog.V(4).Infof("End scheduling ...")
+
+	scheduleStartTime := time.Now()
 	defer metrics.UpdateE2eDuration(metrics.Duration(scheduleStartTime))
 
-	ssn := framework.OpenSession(pc.cache, pc.plugins)
+	// TODO: 为何要这么做，不直接赋值呢？
+	pc.mutex.Lock()
+	actions := pc.actions
+	plugins := pc.plugins
+	configurations := pc.configurations
+	pc.mutex.Unlock()
+
+	ssn := framework.OpenSession(pc.cache, plugins, configurations)
 	defer framework.CloseSession(ssn)
 
-	for _, action := range pc.actions {
+	for _, action := range actions {
 		actionStartTime := time.Now()
 		action.Execute(ssn)
 		metrics.UpdateActionDuration(action.Name(), metrics.Duration(actionStartTime))

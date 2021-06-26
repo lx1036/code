@@ -53,3 +53,11 @@ type PluginOption struct {
 	// Arguments defines the different arguments that can be given to different plugins
 	Arguments map[string]string `yaml:"arguments"`
 }
+
+// Configuration is configuration of action
+type Configuration struct {
+	// Name is name of action
+	Name string `yaml:"name"`
+	// Arguments defines the different arguments that can be given to specified action
+	Arguments map[string]string `yaml:"arguments"`
+}
