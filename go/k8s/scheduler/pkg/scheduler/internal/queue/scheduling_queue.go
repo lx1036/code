@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/heap"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/metrics"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/util"

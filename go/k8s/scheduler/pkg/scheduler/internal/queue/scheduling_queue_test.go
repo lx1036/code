@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins/queuesort"
-	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
