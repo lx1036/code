@@ -139,6 +139,7 @@ type PodGroupStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:singular=queue
+// +kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.state"
 
 // Queue is a queue of PodGroup.
 type Queue struct {
@@ -178,8 +179,25 @@ type QueueSpec struct {
 	Capability v1.ResourceList `json:"capability,omitempty" protobuf:"bytes,2,opt,name=capability"`
 }
 
+// QueueState is state type of queue.
+type QueueState string
+
+const (
+	// QueueStateOpen indicate `Open` state of queue
+	QueueStateOpen QueueState = "Open"
+	// QueueStateClosed indicate `Closed` state of queue
+	QueueStateClosed QueueState = "Closed"
+	// QueueStateClosing indicate `Closing` state of queue
+	QueueStateClosing QueueState = "Closing"
+	// QueueStateUnknown indicate `Unknown` state of queue
+	QueueStateUnknown QueueState = "Unknown"
+)
+
 // QueueStatus represents the status of Queue.
 type QueueStatus struct {
+	// State is state of queue
+	State QueueState `json:"state,omitempty" protobuf:"bytes,1,opt,name=state"`
+
 	// The number of 'Unknonw' PodGroup in this queue.
 	Unknown int32 `json:"unknown,omitempty" protobuf:"bytes,1,opt,name=unknown"`
 	// The number of 'Pending' PodGroup in this queue.
