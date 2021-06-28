@@ -5,7 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/types"
+	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate/types"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

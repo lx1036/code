@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
-	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"

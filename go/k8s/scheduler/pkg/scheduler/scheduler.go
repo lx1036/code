@@ -8,9 +8,9 @@ import (
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/core"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 	frameworkplugins "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
-	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
 	internalqueue "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/queue"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/metrics"

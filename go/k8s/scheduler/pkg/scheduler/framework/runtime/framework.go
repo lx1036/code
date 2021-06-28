@@ -8,7 +8,7 @@ import (
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config/scheme"
 	schedulerapiv1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config/v1"
-	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/metrics"
 
 	v1 "k8s.io/api/core/v1"

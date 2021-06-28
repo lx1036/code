@@ -10,7 +10,7 @@ import (
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/client/clientset/versioned"
 	schedinformer "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/informers/externalversions"
 	externalv1alpha1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/client/listers/scheduling/v1alpha1"
-	//framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	//framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 
 	"k8s.io/api/core/v1"
