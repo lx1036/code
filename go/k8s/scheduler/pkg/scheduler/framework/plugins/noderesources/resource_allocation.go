@@ -1,7 +1,7 @@
 package noderesources
 
 import (
-	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 	schedutil "k8s-lx1036/k8s/scheduler/pkg/scheduler/util"
 
 	v1 "k8s.io/api/core/v1"

@@ -1,10 +1,12 @@
 package cache
 
 import (
-	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 
 	v1 "k8s.io/api/core/v1"
 )
+
+// INFO: schedulerCache 设计原理 https://github.com/jindezgm/k8s-src-analysis/blob/master/kube-scheduler/Cache.md
 
 // Cache collects pods' information and provides node-level aggregated information.
 // It's intended for generic scheduler to do efficient lookup.
@@ -95,5 +97,5 @@ type Cache interface {
 // Dump is a dump of the cache state.
 type Dump struct {
 	AssumedPods map[string]bool
-	Nodes       map[string]*v1alpha1.NodeInfo
+	Nodes       map[string]*framework.NodeInfo
 }

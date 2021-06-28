@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/config"
-	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 
 	v1 "k8s.io/api/core/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"

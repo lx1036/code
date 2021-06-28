@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 
 	"k8s.io/apimachinery/pkg/runtime"
 )

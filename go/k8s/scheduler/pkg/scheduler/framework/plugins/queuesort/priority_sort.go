@@ -1,7 +1,7 @@
 package queuesort
 
 import (
-	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"k8s.io/kubernetes/pkg/api/v1/pod"

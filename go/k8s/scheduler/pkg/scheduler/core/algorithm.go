@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/v1alpha1"
+	framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/scheduler/internal/cache"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/profile"
 

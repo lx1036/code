@@ -1,4 +1,4 @@
-package v1alpha1
+package framework
 
 import (
 	"errors"
@@ -610,7 +610,7 @@ func (h HostPortInfo) Remove(ip, protocol string, port int32) {
 func GetPodKey(pod *v1.Pod) (string, error) {
 	uid := string(pod.UID)
 	if len(uid) == 0 {
-		return "", errors.New("Cannot get cache key for pod with empty UID")
+		return "", errors.New("can't get cache key for pod with empty UID")
 	}
 
 	return uid, nil

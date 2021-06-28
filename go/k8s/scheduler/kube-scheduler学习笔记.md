@@ -11,6 +11,30 @@
 
 
 
+## kube-scheduler 插件 hooks
+// @see https://github.com/kubernetes-sigs/scheduler-plugins/blob/release-1.19/pkg/noderesources/README.md
+
+QueueSort: ["PrioritySort"]
+
+PreFilter: ["NodeResourcesFit", "NodePorts", "PodTopologySpread", "InterPodAffinity", "VolumeBinding"]
+
+Filter: ["NodeUnschedulable", "NodeResourcesFit", "NodeName", "NodePorts", "NodeAffinity", "VolumeRestrictions",
+"TaintToleration", "EBSLimits", "NodeVolumeLimits", "VolumeBinding", "PodTopologySpread", "InterPodAffinity"]
+
+PostFilter: ["DefaultPreemption"]
+
+PreScore: ["InterPodAffinity", "PodTopologySpread", "TaintToleration"]
+
+Score: ["NodeResourcesBalancedAllocation", "ImageLocality", "InterPodAffinity", "NodeResourcesLeastAllocated",
+"NodeAffinity", "NodePreferAvoidPods", "PodTopologySpread", "TaintToleration"]
+
+Reserve: ["VolumeBinding"]
+
+PreBind: ["VolumeBinding"]
+
+Bind: ["DefaultBinder"]
+
+
 ## 参考文献
 **[Scheduling enhancements 文档](https://github.com/kubernetes/enhancements/blob/master/keps/sig-scheduling/OWNERS)**
 
