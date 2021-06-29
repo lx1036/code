@@ -53,6 +53,7 @@ require (
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jinzhu/gorm v1.9.11
 	github.com/julienschmidt/httprouter v1.3.0
+	github.com/jwhited/corebgp v0.2.0
 	github.com/kavu/go_reuseport v1.5.0 // indirect
 	github.com/klauspost/cpuid v1.2.0
 	github.com/kubernetes-csi/csi-lib-utils v0.9.0
