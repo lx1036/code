@@ -48,6 +48,9 @@ spec:
       ports:
         - containerPort: 80
           name: "http-server"
+#      volumeDevices: # 在pod内使用 block device
+#        - devicePath:
+#          name:
       volumeMounts:
         - mountPath: "/usr/share/nginx/html"
           name: task-pv-storage
