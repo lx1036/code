@@ -43,7 +43,7 @@ var (
 	supportedVersions = []string{"1.0.0"}
 )
 
-// registrationServer is a sample plugin to work with plugin watcher
+// 实现
 type registrationServer struct {
 	driverName string
 	endpoint   string
@@ -80,6 +80,7 @@ func newRegistrationServer(driverName string, endpoint string, versions []string
 	}
 }
 
+// INFO: 最后记得删除 /data/kubernetes/var/lib/kubelet/plugins_registry/csi.sunnyfs.share.com-reg.sock socket 文件。该方式可以复用！
 func removeRegSocket(csiDriverName string) {
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGTERM)

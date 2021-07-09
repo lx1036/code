@@ -25,14 +25,36 @@ Volume就是一个目录。
 # Persistent Volumes
 
 
-# **[详解 Kubernetes Volume 的实现原理](https://draveness.me/kubernetes-volume)**
+**[详解 Kubernetes Volume 的实现原理](https://draveness.me/kubernetes-volume)**
 
 
 
 
 
+# CSI Service RPC 
+如何部署 CSI: 主要就是部署一个 daemonset 和一个 deployment。daemonset 主要用来注册 csi plugin。
+deployment controller: csi driver(CSI Controller Service) + sidecar container(external-provisioner, external-attacher, external-snapshotter, and external-resizer)
 
 
+
+官方建议部署文档：
+https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/container-storage-interface.md#recommended-mechanism-for-deploying-csi-drivers-on-kubernetes
+https://kubernetes-csi.github.io/docs/deploying.html
+
+
+## Identity Service RPC
+Identity Service RPC: 主要用来 csi 的 info, capability 等信息，纯属基本信息这种。
+* info: csi name 和 csi version
+* capability: csi.PluginCapability_Service_CONTROLLER_SERVICE, csi.PluginCapability_VolumeExpansion_ONLINE(支持volume扩容)
+
+
+
+
+```
+GetPluginInfo(): node-driver-registrar 会rpc调用 Identity Service 的 GetPluginInfo() 获取 csi 的 info name 信息
+GetPluginCapabilities(): 
+
+```
 
 
 
