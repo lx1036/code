@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"flag"
 	"io"
+	"log"
 	"os"
 	"strings"
 
@@ -10,6 +12,8 @@ import (
 	"github.com/jacobsa/fuse/fuseops"
 	"github.com/jacobsa/fuse/fuseutil"
 	"github.com/jacobsa/timeutil"
+
+	"k8s.io/klog/v2"
 )
 
 // Create a file system with a fixed structure that looks like this:
@@ -244,4 +248,59 @@ func (fs *helloFS) ReadFile(
 	}
 
 	return err
+}
+
+var (
+	fMountPoint = flag.String("mountpoint", "", "Path to mount point.")
+	fReadyFile  = flag.Uint64("ready_file", 0, "FD to signal when ready.")
+	fReadOnly   = flag.Bool("read_only", false, "Mount in read-only mode.")
+	fDebug      = flag.Bool("debug", true, "Enable debug logging.")
+)
+
+/*
+INFO:
+	[root@stark12 liuxiang3]# ll /mnt/hellofs2
+	total 1
+	dr-xr-xr-x 1 root root  0 Jul 10 20:26 dir
+	-r--r--r-- 1 root root 13 Jul 10 20:26 hello
+	[root@stark12 liuxiang3]# ll /mnt/hellofs2/dir
+	total 1
+	-r--r--r-- 1 root root 13 Jul 10 20:26 world
+	[root@stark12 liuxiang3]# cat /mnt/hellofs2/hello
+	Hello, world!
+	[root@stark12 liuxiang3]# cat /mnt/hellofs2/dir/world
+	Hello, world!
+*/
+
+// go run . --mountpoint=/mnt/hellofs2
+func main() {
+	flag.Parse()
+
+	// filesystem server
+	server, err := NewHelloFS(timeutil.RealClock())
+	if err != nil {
+		klog.Fatalf("makeFS: %v", err)
+	}
+
+	// Mount the file system.
+	if *fMountPoint == "" {
+		klog.Fatalf("You must set --mountpoint.")
+	}
+
+	cfg := &fuse.MountConfig{
+		ReadOnly: *fReadOnly,
+	}
+	if *fDebug {
+		cfg.DebugLogger = log.New(os.Stderr, "fuse: ", 0)
+	}
+
+	mfs, err := fuse.Mount(*fMountPoint, server, cfg)
+	if err != nil {
+		log.Fatalf("Mount: %v", err)
+	}
+
+	// Wait for it to be unmounted.
+	if err = mfs.Join(context.Background()); err != nil {
+		log.Fatalf("Join: %v", err)
+	}
 }

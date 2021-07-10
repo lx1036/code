@@ -43,7 +43,7 @@ var (
 	supportedVersions = []string{"1.0.0"}
 )
 
-// 实现
+// 实现kubelet插件注册接口 https://github.com/kubernetes/kubernetes/blob/v1.19.7/staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1/api.pb.go#L206-L211
 type registrationServer struct {
 	driverName string
 	endpoint   string
