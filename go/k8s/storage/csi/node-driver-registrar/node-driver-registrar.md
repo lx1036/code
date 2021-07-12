@@ -2,14 +2,12 @@
 
 
 ## Node Driver Registrar
+使用 kubelet plugin 注册机制来注册 csi driver 信息。
+
+
 代码和文档：
 https://github.com/kubernetes-csi/node-driver-registrar
 https://kubernetes-csi.github.io/docs/node-driver-registrar.html
 
-作为sidecar container部署，供kubelet调用时用来注册CSI driver，与kubelet交互方式可以参考： **[Device plugin registration](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/#device-plugin-registration)**
 
-
-
-
-## CSI Plugin 注册机制以及带来的结果？
-
+node-driver-registrar主要解决一个问题：把你的 csi driver 以 csi plugin registration 方式注册到 kubelet 中，然后kubelet会rpc调用你的csi driver，去更新node对象(annotation)，和创建/更新csinode对象。
