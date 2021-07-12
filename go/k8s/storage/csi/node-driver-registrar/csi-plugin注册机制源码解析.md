@@ -40,10 +40,10 @@ spec:
           name: node-driver-registrar
           resources:
             limits:
-              cpu: "2"
+              cpu: 2000m
               memory: 4000Mi
             requests:
-              cpu: "1"
+              cpu: 1000m
               memory: 4000Mi
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
@@ -51,20 +51,20 @@ spec:
             - mountPath: /registration
               name: registration-dir
             - mountPath: /csi
-              name: socket-dir
+              name: socket-dir # 这个是 csi socket 地址
         - args:
             - --v=5
             - --endpoint=unix:///csi/sunnyfs-csi-share/sunnyfs-csi-share.sock
-            - --nodeid=$(NODE_ID)
+            - --nodeid=$(KUBE_NODE_NAME)
             - --drivername=csi.sunnyfs.share.com
             - --version=v1.0.0
           env:
-            - name: NODE_ID
+            - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-          image: sunnyfs-csi-driver:v1.0.4
+          image: lx1036/sunnyfs-csi-driver:v1.0.4
           imagePullPolicy: IfNotPresent
           lifecycle:
             preStop:

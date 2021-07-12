@@ -16,7 +16,11 @@ spec:
     singular: queue
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .status.state
+      name: State
+      type: string
+    name: v1
     schema:
       openAPIV3Schema:
         properties:
@@ -44,6 +48,8 @@ spec:
               running:
                 format: int32
                 type: integer
+              state:
+                type: string
               unknown:
                 format: int32
                 type: integer

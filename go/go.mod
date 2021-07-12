@@ -3,6 +3,7 @@ module k8s-lx1036
 go 1.16
 
 require (
+	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05
 	bou.ke/monkey v1.0.2
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/Azure/go-autorest/autorest v0.11.15 // indirect
@@ -50,9 +51,12 @@ require (
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/jacobsa/fuse v0.0.0-20201216155545-e0296dec955f
+	github.com/jacobsa/oglematchers v0.0.0-20150720000706-141901ea67cd // indirect
+	github.com/jacobsa/timeutil v0.0.0-20170205232429-577e5acbbcf6
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/jinzhu/gorm v1.9.11
 	github.com/julienschmidt/httprouter v1.3.0
+	github.com/jwhited/corebgp v0.2.0
 	github.com/kavu/go_reuseport v1.5.0 // indirect
 	github.com/klauspost/cpuid v1.2.0
 	github.com/kubernetes-csi/csi-lib-utils v0.9.0
@@ -67,7 +71,7 @@ require (
 	github.com/moby/ipvs v1.0.1
 	github.com/moby/sys/mountinfo v0.4.1 // indirect
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
-	github.com/olivere/elastic/v7 v7.0.9
+	github.com/olivere/elastic/v7 v7.0.9 // indirect
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/runc v1.0.0-rc93
@@ -113,7 +117,7 @@ require (
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-	gopkg.in/sohlich/elogrus.v7 v7.0.0
+	gopkg.in/sohlich/elogrus.v7 v7.0.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.3.1
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776

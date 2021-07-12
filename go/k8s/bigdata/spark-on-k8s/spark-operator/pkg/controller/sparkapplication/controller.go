@@ -100,6 +100,9 @@ func NewController(option *options.Options) (*Controller, error) {
 
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), Name)
 
+	// INFO: 或者如果注册到 k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/client/clientset/versioned/scheme::Scheme，就不需要在这里
+	//  注册 _ = v1.AddToScheme(scheme.Scheme)，这个逻辑可以参考 volcano queue controller 里的 eventBroadcaster 对象实例化
+
 	// INFO: 这里由于eventBroadcaster.NewRecorder使用的是根scheme.Scheme，所以必须要把sparkoperator.k9s.io/v1注册到这个Scheme里，
 	//  否则会在这里报错：https://github.com/kubernetes/kubernetes/blob/v1.19.7/staging/src/k8s.io/client-go/tools/reference/ref.go#L66-L68
 	//  说没有注册报错 NewNotRegisteredErrForType(s.schemeName, t)
