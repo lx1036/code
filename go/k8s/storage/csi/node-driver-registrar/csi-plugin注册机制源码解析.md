@@ -13,22 +13,22 @@ kind: DaemonSet
 metadata:
   annotations:
     deprecated.daemonset.template.generation: "7"
-  name: sunnyfs-csi-share-node
+  name: sunnyfs-csi-node
   namespace: sunnyfs
 spec:
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app: sunnyfs-csi-share-node
+      app: sunnyfs-csi-node
   template:
     metadata:
       labels:
-        app: sunnyfs-csi-share-node
+        app: sunnyfs-csi-node
     spec:
       containers:
-        - args:
-            - --csi-address=/csi/sunnyfs-csi-share.sock
-            - --kubelet-registration-path=/csi/sunnyfs-csi-share.sock
+        - args: # --kubelet-registration-path 不能写成 /csi/sunnyfs-csi.sock，这个endpoint是给kubelet来rpc调用
+            - --csi-address=/csi/sunnyfs-csi.sock
+            - --kubelet-registration-path=/var/lib/kubelet/plugins/csi.sunnyfs.com/sunnyfs-csi.sock
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -54,9 +54,9 @@ spec:
               name: socket-dir # 这个是 csi socket 地址
         - args:
             - --v=5
-            - --endpoint=unix:///csi/sunnyfs-csi-share/sunnyfs-csi-share.sock
+            - --endpoint=unix:///csi/sunnyfs-csi/sunnyfs-csi.sock
             - --nodeid=$(KUBE_NODE_NAME)
-            - --drivername=csi.sunnyfs.share.com
+            - --drivername=csi.sunnyfs.com
             - --version=v1.0.0
           env:
             - name: KUBE_NODE_NAME
@@ -72,7 +72,7 @@ spec:
                 command:
                   - /bin/sh
                   - -c
-                  - rm -rf /csi/sunnyfs-csi-share.sock /registration/csi.sunnyfs.share.com-reg.sock
+                  - rm -rf /csi/sunnyfs-csi.sock /registration/csi.sunnyfs.com-reg.sock
           name: sunnyfs-csi-driver
           resources:
             limits:
@@ -103,7 +103,7 @@ spec:
         - operator: Exists
       volumes:
         - hostPath:
-            path: /var/lib/kubelet/plugins/csi.sunnyfs.share.com
+            path: /var/lib/kubelet/plugins/csi.sunnyfs.com
             type: DirectoryOrCreate
           name: socket-dir
         - hostPath:

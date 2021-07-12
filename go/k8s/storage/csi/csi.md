@@ -89,7 +89,12 @@ GetPluginCapabilities():
 ```
 
 
+## Node Service RPC
+https://github.com/container-storage-interface/spec/blob/master/spec.md#node-service-rpc
+```
+NodeStageVolume:
 
+```
 
 
 
