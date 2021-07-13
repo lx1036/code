@@ -194,6 +194,7 @@ func (fs *helloFS) OpenDir(
 func (fs *helloFS) ReadDir(
 	ctx context.Context,
 	op *fuseops.ReadDirOp) error {
+	klog.Info(*op)
 	// Find the info for this inode.
 	info, ok := gInodeInfo[op.Inode]
 	if !ok {
@@ -293,14 +294,14 @@ func main() {
 	if *fDebug {
 		cfg.DebugLogger = log.New(os.Stderr, "fuse: ", 0)
 	}
-
-	mfs, err := fuse.Mount(*fMountPoint, server, cfg)
+	
+	mountedFileSystem, err := fuse.Mount(*fMountPoint, server, cfg)
 	if err != nil {
 		log.Fatalf("Mount: %v", err)
 	}
 
 	// Wait for it to be unmounted.
-	if err = mfs.Join(context.Background()); err != nil {
+	if err = mountedFileSystem.Join(context.Background()); err != nil {
 		log.Fatalf("Join: %v", err)
 	}
 }

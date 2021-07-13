@@ -50,7 +50,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/jacobsa/fuse v0.0.0-20201216155545-e0296dec955f
+	github.com/jacobsa/fuse v0.0.0-20210606185441-fac69e018fad
 	github.com/jacobsa/oglematchers v0.0.0-20150720000706-141901ea67cd // indirect
 	github.com/jacobsa/timeutil v0.0.0-20170205232429-577e5acbbcf6
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
