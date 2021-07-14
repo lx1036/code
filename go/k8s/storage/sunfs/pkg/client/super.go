@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/storage/sunfs/pkg/backend"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/client/meta"
+	"k8s-lx1036/k8s/storage/sunfs/pkg/sdk/meta"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/util/config"
 
+	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseops"
 
 	"k8s.io/klog/v2"
@@ -77,119 +78,131 @@ type Super struct {
 	replicators *Ticket
 }
 
-func (s Super) StatFS(ctx context.Context, op *fuseops.StatFSOp) error {
+// INFO: `stat` 命令执行结果
+func (s *Super) StatFS(ctx context.Context, op *fuseops.StatFSOp) error {
+	total, used := s.mw.Statfs()
+	op.BlockSize = uint32(DefaultBlksize)
+	op.Blocks = total / uint64(DefaultBlksize)
+	op.BlocksFree = (total - used) / uint64(DefaultBlksize)
+	op.BlocksAvailable = op.BlocksFree
+	op.IoSize = 1 << 20
+	op.Inodes = 1 << 50
+	op.InodesFree = op.Inodes
+
+	klog.V(5).Infof("TRACE StatFS: op(%+v)", *op)
+	return nil
+}
+
+func (s *Super) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
 	panic("implement me")
 }
 
-func (s Super) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
+func (s *Super) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAttributesOp) error {
 	panic("implement me")
 }
 
-func (s Super) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAttributesOp) error {
+func (s *Super) SetInodeAttributes(ctx context.Context, op *fuseops.SetInodeAttributesOp) error {
 	panic("implement me")
 }
 
-func (s Super) SetInodeAttributes(ctx context.Context, op *fuseops.SetInodeAttributesOp) error {
+func (s *Super) ForgetInode(ctx context.Context, op *fuseops.ForgetInodeOp) error {
 	panic("implement me")
 }
 
-func (s Super) ForgetInode(ctx context.Context, op *fuseops.ForgetInodeOp) error {
+func (s *Super) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
 	panic("implement me")
 }
 
-func (s Super) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
+func (s *Super) MkNode(ctx context.Context, op *fuseops.MkNodeOp) error {
 	panic("implement me")
 }
 
-func (s Super) MkNode(ctx context.Context, op *fuseops.MkNodeOp) error {
+func (s *Super) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) error {
 	panic("implement me")
 }
 
-func (s Super) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) error {
+func (s *Super) CreateLink(ctx context.Context, op *fuseops.CreateLinkOp) error {
 	panic("implement me")
 }
 
-func (s Super) CreateLink(ctx context.Context, op *fuseops.CreateLinkOp) error {
+func (s *Super) CreateSymlink(ctx context.Context, op *fuseops.CreateSymlinkOp) error {
 	panic("implement me")
 }
 
-func (s Super) CreateSymlink(ctx context.Context, op *fuseops.CreateSymlinkOp) error {
+func (s *Super) Rename(ctx context.Context, op *fuseops.RenameOp) error {
 	panic("implement me")
 }
 
-func (s Super) Rename(ctx context.Context, op *fuseops.RenameOp) error {
+func (s *Super) RmDir(ctx context.Context, op *fuseops.RmDirOp) error {
 	panic("implement me")
 }
 
-func (s Super) RmDir(ctx context.Context, op *fuseops.RmDirOp) error {
+func (s *Super) Unlink(ctx context.Context, op *fuseops.UnlinkOp) error {
 	panic("implement me")
 }
 
-func (s Super) Unlink(ctx context.Context, op *fuseops.UnlinkOp) error {
+func (s *Super) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) error {
 	panic("implement me")
 }
 
-func (s Super) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) error {
+func (s *Super) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
 	panic("implement me")
 }
 
-func (s Super) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
+func (s *Super) ReleaseDirHandle(ctx context.Context, op *fuseops.ReleaseDirHandleOp) error {
 	panic("implement me")
 }
 
-func (s Super) ReleaseDirHandle(ctx context.Context, op *fuseops.ReleaseDirHandleOp) error {
+func (s *Super) OpenFile(ctx context.Context, op *fuseops.OpenFileOp) error {
 	panic("implement me")
 }
 
-func (s Super) OpenFile(ctx context.Context, op *fuseops.OpenFileOp) error {
+func (s *Super) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
 	panic("implement me")
 }
 
-func (s Super) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
+func (s *Super) WriteFile(ctx context.Context, op *fuseops.WriteFileOp) error {
 	panic("implement me")
 }
 
-func (s Super) WriteFile(ctx context.Context, op *fuseops.WriteFileOp) error {
+func (s *Super) SyncFile(ctx context.Context, op *fuseops.SyncFileOp) error {
 	panic("implement me")
 }
 
-func (s Super) SyncFile(ctx context.Context, op *fuseops.SyncFileOp) error {
+func (s *Super) FlushFile(ctx context.Context, op *fuseops.FlushFileOp) error {
 	panic("implement me")
 }
 
-func (s Super) FlushFile(ctx context.Context, op *fuseops.FlushFileOp) error {
+func (s *Super) ReleaseFileHandle(ctx context.Context, op *fuseops.ReleaseFileHandleOp) error {
 	panic("implement me")
 }
 
-func (s Super) ReleaseFileHandle(ctx context.Context, op *fuseops.ReleaseFileHandleOp) error {
+func (s *Super) ReadSymlink(ctx context.Context, op *fuseops.ReadSymlinkOp) error {
 	panic("implement me")
 }
 
-func (s Super) ReadSymlink(ctx context.Context, op *fuseops.ReadSymlinkOp) error {
+func (s *Super) RemoveXattr(ctx context.Context, op *fuseops.RemoveXattrOp) error {
 	panic("implement me")
 }
 
-func (s Super) RemoveXattr(ctx context.Context, op *fuseops.RemoveXattrOp) error {
+// Get an extended attribute.
+func (s *Super) GetXattr(ctx context.Context, op *fuseops.GetXattrOp) error {
+	return fuse.ENOSYS
+}
+
+func (s *Super) ListXattr(ctx context.Context, op *fuseops.ListXattrOp) error {
 	panic("implement me")
 }
 
-func (s Super) GetXattr(ctx context.Context, op *fuseops.GetXattrOp) error {
+func (s *Super) SetXattr(ctx context.Context, op *fuseops.SetXattrOp) error {
 	panic("implement me")
 }
 
-func (s Super) ListXattr(ctx context.Context, op *fuseops.ListXattrOp) error {
+func (s *Super) Fallocate(ctx context.Context, op *fuseops.FallocateOp) error {
 	panic("implement me")
 }
 
-func (s Super) SetXattr(ctx context.Context, op *fuseops.SetXattrOp) error {
-	panic("implement me")
-}
-
-func (s Super) Fallocate(ctx context.Context, op *fuseops.FallocateOp) error {
-	panic("implement me")
-}
-
-func (s Super) Destroy() {
+func (s *Super) Destroy() {
 	s.mw.UnMountClient()
 }
 

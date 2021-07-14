@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s-lx1036/k8s/storage/sunfs/pkg/util"
@@ -48,6 +49,13 @@ type MetaWrapper struct {
 	usedSize  uint64
 
 	clientId uint64
+}
+
+func (mw *MetaWrapper) Statfs() (total, used uint64) {
+	mw.updateVolStatInfo()
+	total = atomic.LoadUint64(&mw.totalSize)
+	used = atomic.LoadUint64(&mw.usedSize)
+	return
 }
 
 func NewMetaWrapper(volname, owner, masterHosts string) (*MetaWrapper, error) {
