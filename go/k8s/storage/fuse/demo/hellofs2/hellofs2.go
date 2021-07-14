@@ -194,12 +194,13 @@ func (fs *helloFS) OpenDir(
 func (fs *helloFS) ReadDir(
 	ctx context.Context,
 	op *fuseops.ReadDirOp) error {
-	klog.Info(*op)
 	// Find the info for this inode.
 	info, ok := gInodeInfo[op.Inode]
 	if !ok {
 		return fuse.ENOENT
 	}
+	
+	klog.Info(op.Inode, op.Offset, info)
 
 	if !info.dir {
 		return fuse.EIO
