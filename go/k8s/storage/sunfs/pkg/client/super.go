@@ -93,10 +93,6 @@ func (s *Super) StatFS(ctx context.Context, op *fuseops.StatFSOp) error {
 	return nil
 }
 
-func (s *Super) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
-	panic("implement me")
-}
-
 func (s *Super) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAttributesOp) error {
 	panic("implement me")
 }
