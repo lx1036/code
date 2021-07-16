@@ -132,14 +132,12 @@ func (cp *ConnectPool) autoRelease() {
 }
 
 func (cp *ConnectPool) GetConnect(targetAddr string) (c *net.TCPConn, err error) {
-	cp.RLock()
-	defer cp.RUnlock()
+	cp.Lock()
+	defer cp.Unlock()
 	pool, ok := cp.pools[targetAddr]
 	if !ok {
-		cp.Lock()
 		pool = NewPool(cp.mincap, cp.maxcap, cp.timeout, targetAddr)
 		cp.pools[targetAddr] = pool
-		cp.Unlock()
 	}
 
 	return pool.GetConnectFromPool()

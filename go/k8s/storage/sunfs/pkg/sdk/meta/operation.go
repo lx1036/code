@@ -2,6 +2,7 @@ package meta
 
 import (
 	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
+	"syscall"
 
 	"k8s.io/klog/v2"
 )
@@ -46,4 +47,51 @@ func (mw *MetaWrapper) readdir(mp *MetaPartition, parentID uint64) (status int,
 
 	klog.Infof("readdir: packet(%v) mp(%v) req(%v)", packet, mp, *req)
 	return statusOK, resp.Children, nil
+}
+
+// Proto ResultCode to status
+func parseStatus(result uint8) (status int) {
+	switch result {
+	case proto.OpOk:
+		status = statusOK
+	case proto.OpExistErr:
+		status = statusExist
+	case proto.OpNotExistErr:
+		status = statusNoent
+	case proto.OpInodeFullErr:
+		status = statusFull
+	case proto.OpAgain:
+		status = statusAgain
+	case proto.OpArgMismatchErr:
+		status = statusInval
+	case proto.OpNotPerm:
+		status = statusNotPerm
+	default:
+		status = statusError
+	}
+	return
+}
+
+func statusToErrno(status int) error {
+	switch status {
+	case statusOK:
+		// return error anyway
+		return syscall.EAGAIN
+	case statusExist:
+		return syscall.EEXIST
+	case statusNoent:
+		return syscall.ENOENT
+	case statusFull:
+		return syscall.ENOMEM
+	case statusAgain:
+		return syscall.EAGAIN
+	case statusInval:
+		return syscall.EINVAL
+	case statusNotPerm:
+		return syscall.EPERM
+	case statusError:
+		return syscall.EPERM
+	default:
+	}
+	return syscall.EIO
 }

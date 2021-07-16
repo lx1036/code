@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -189,6 +190,40 @@ func (p *Packet) ReadFromConn(c net.Conn, timeoutSec int) (err error) {
 // UnmarshalData unmarshals the packet data.
 func (p *Packet) UnmarshalData(v interface{}) error {
 	return json.Unmarshal(p.Data, v)
+}
+
+// GetResultMsg returns the result message.
+func (p *Packet) GetResultMsg() (m string) {
+	if p == nil {
+		return ""
+	}
+	switch p.ResultCode {
+	case OpDiskErr:
+		m = "DiskErr"
+	case OpErr:
+		m = "Err"
+	case OpAgain:
+		m = "Again"
+	case OpOk:
+		m = "Ok"
+	case OpExistErr:
+		m = "ExistErr"
+	case OpInodeFullErr:
+		m = "InodeFullErr"
+	case OpArgMismatchErr:
+		m = "ArgUnmatchErr"
+	case OpNotExistErr:
+		m = "NotExistErr"
+	case OpTryOtherAddr:
+		m = "TryOtherAddr"
+	case OpNotPerm:
+		m = "NotPerm"
+	case OpNotEmtpy:
+		m = "DirNotEmpty"
+	default:
+		return fmt.Sprintf("Unknown ResultCode(%v)", p.ResultCode)
+	}
+	return
 }
 
 // NewPacket returns a new packet.

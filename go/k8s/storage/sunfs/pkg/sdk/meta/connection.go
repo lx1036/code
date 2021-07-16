@@ -1,8 +1,11 @@
 package meta
 
 import (
-	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
+	"errors"
+	"fmt"
 	"net"
+
+	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
 )
 
 type MetaConn struct {
@@ -19,6 +22,11 @@ func (mw *MetaWrapper) sendToMetaPartition(mp *MetaPartition, req *proto.Packet)
 		metaConnection *MetaConn
 	)
 
+	// INFO: meta cluster 的地址
+	addr = mp.LeaderAddr
+	if addr == "" {
+		return nil, errors.New(fmt.Sprintf("sendToMetaPartition failed: leader addr empty, req(%v) mp(%v)", req, mp))
+	}
 	metaConnection, err = mw.getConn(mp.PartitionID, addr)
 	if err != nil {
 		return nil, err

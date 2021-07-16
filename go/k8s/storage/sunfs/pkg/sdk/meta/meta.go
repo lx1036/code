@@ -1,13 +1,15 @@
 package meta
 
 import (
+	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/util"
 
 	"github.com/google/btree"
@@ -71,6 +73,20 @@ func (mw *MetaWrapper) Statfs() (total, used uint64) {
 	return
 }
 
+func (mw *MetaWrapper) refresh() {
+	wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
+		err := mw.updateMetaPartitions()
+		if err != nil {
+			klog.Warningf("[refresh]%v", err)
+		}
+		err = mw.updateVolStatInfo()
+		if err != nil {
+			klog.Warningf("[refresh]%v", err)
+		}
+		//mw.updateClientInfo()
+	}, RefreshMetaPartitionsInterval)
+}
+
 func NewMetaWrapper(volname, owner, masterHosts string) (*MetaWrapper, error) {
 	mw := new(MetaWrapper)
 	mw.volname = volname
@@ -84,47 +100,22 @@ func NewMetaWrapper(volname, owner, masterHosts string) (*MetaWrapper, error) {
 	mw.partitions = make(map[uint64]*MetaPartition)
 	mw.ranges = btree.New(32)
 	mw.rwPartitions = make([]*MetaPartition, 0)
-	mw.updateClusterInfo()
-	mw.updateVolStatInfo()
-	mw.updateVolSimpleInfo()
+	err := mw.updateClusterInfo()
+	if err != nil {
+		return nil, err
+	}
+	err = mw.updateVolStatInfo()
+	if err != nil {
+		return nil, err
+	}
+	err = mw.updateVolSimpleInfo()
 
-	limit := MaxMountRetryLimit
-retry:
 	if err := mw.updateMetaPartitions(); err != nil {
-		if limit <= 0 {
-			return nil, fmt.Errorf("init meta wrapper failed err: %v", err)
-		} else {
-			limit--
-			time.Sleep(MountRetryInterval)
-			goto retry
-		}
-
+		return nil, fmt.Errorf("init meta wrapper failed err: %v", err)
 	}
 
-	go mw.refresh()
+	// TODO: refresh
+	//go mw.refresh()
 
 	return mw, nil
-}
-
-// Proto ResultCode to status
-func parseStatus(result uint8) (status int) {
-	switch result {
-	case proto.OpOk:
-		status = statusOK
-	case proto.OpExistErr:
-		status = statusExist
-	case proto.OpNotExistErr:
-		status = statusNoent
-	case proto.OpInodeFullErr:
-		status = statusFull
-	case proto.OpAgain:
-		status = statusAgain
-	case proto.OpArgMismatchErr:
-		status = statusInval
-	case proto.OpNotPerm:
-		status = statusNotPerm
-	default:
-		status = statusError
-	}
-	return
 }
