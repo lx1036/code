@@ -1,4 +1,4 @@
-package client
+package fs
 
 const (
 	DefaultPageSize        = 1 << 17 // 128KB

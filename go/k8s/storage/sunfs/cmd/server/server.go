@@ -69,7 +69,7 @@ func main() {
 	)
 	switch role {
 	case RoleMeta:
-		srv = metadata.NewServer()
+		srv = meta.NewServer()
 	case RoleMaster:
 		srv = master.NewServer()
 	default:

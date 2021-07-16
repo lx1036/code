@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/util"
 
 	"github.com/google/btree"
@@ -20,6 +21,18 @@ const (
 const (
 	MaxMountRetryLimit = 5
 	MountRetryInterval = time.Second * 5
+)
+
+const (
+	statusUnknown int = iota
+	statusOK
+	statusExist
+	statusNoent
+	statusFull
+	statusAgain
+	statusError
+	statusInval
+	statusNotPerm
 )
 
 type MetaWrapper struct {
@@ -91,4 +104,27 @@ retry:
 	go mw.refresh()
 
 	return mw, nil
+}
+
+// Proto ResultCode to status
+func parseStatus(result uint8) (status int) {
+	switch result {
+	case proto.OpOk:
+		status = statusOK
+	case proto.OpExistErr:
+		status = statusExist
+	case proto.OpNotExistErr:
+		status = statusNoent
+	case proto.OpInodeFullErr:
+		status = statusFull
+	case proto.OpAgain:
+		status = statusAgain
+	case proto.OpArgMismatchErr:
+		status = statusInval
+	case proto.OpNotPerm:
+		status = statusNotPerm
+	default:
+		status = statusError
+	}
+	return
 }

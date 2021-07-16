@@ -1,4 +1,4 @@
-package metadata
+package meta
 
 import "net/http"
 

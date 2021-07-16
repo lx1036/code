@@ -1,8 +1,9 @@
 package raftstore
 
 import (
-	"github.com/tiglabs/raft/proto"
 	"testing"
+
+	"github.com/tiglabs/raft/proto"
 
 	"k8s.io/klog/v2"
 )
