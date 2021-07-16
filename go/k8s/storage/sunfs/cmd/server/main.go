@@ -6,10 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/server"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/server/master"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/server/metadata"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/util/config"
+	"k8s-lx1036/k8s/storage/sunfs/cmd/server/master"
+	"k8s-lx1036/k8s/storage/sunfs/cmd/server/meta"
 
 	"k8s.io/klog/v2"
 )

@@ -1,12 +1,17 @@
 package meta
 
 import (
+	"encoding/json"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
+	"k8s-lx1036/k8s/storage/sunfs/pkg/config"
+	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/raftstore"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/util/config"
+	"k8s-lx1036/k8s/storage/sunfs/pkg/util"
 
 	"k8s.io/klog/v2"
 )
@@ -17,6 +22,10 @@ const (
 	StateRunning
 	StateShutdown
 	StateStopped
+)
+
+var (
+	masterHelper util.MasterHelper
 )
 
 // The MetaNode manages the dentry and inode information of the meta partitions on a meta node.
@@ -61,34 +70,64 @@ func (m *MetaNode) Start(cfg *config.Config) (err error) {
 	return
 }
 
-func (m *MetaNode) onStart(cfg *config.Config) (err error) {
+func (m *MetaNode) onStart(cfg *config.Config) error {
+	var err error
 	if err = m.parseConfig(cfg); err != nil {
-		return
+		return err
 	}
 	if err = m.register(); err != nil {
-		return
+		return err
 	}
 	if err = m.startRaftServer(); err != nil {
-		return
+		return err
 	}
 	if err = m.registerAPIHandler(); err != nil {
-		return
+		return err
 	}
 	if err = m.startMetaManager(); err != nil {
-		return
+		return err
 	}
 
 	// check local partition compare with master ,if lack,then not start
 	if err = m.checkLocalPartitionMatchWithMaster(); err != nil {
 		klog.Error(err)
-		return
+		return err
 	}
 
 	if err = m.startServer(); err != nil {
-		return
+		return err
 	}
 
-	return
+	return nil
+}
+
+// 向 master 注册 meta
+func (m *MetaNode) register() (err error) {
+	clusterInfo, err = getClusterInfo()
+	if err != nil {
+		klog.Errorf("[register] %s", err.Error())
+		return err
+	}
+
+	if m.localAddr == "" {
+		m.localAddr = clusterInfo.Ip
+	}
+	m.clusterId = clusterInfo.Cluster
+	reqParam["addr"] = m.localAddr + ":" + m.listen
+
+	respBody, err = masterHelper.Request("POST", proto.AddMetaNode, reqParam, nil)
+	if err != nil {
+
+	}
+	nodeIDStr := strings.TrimSpace(string(respBody))
+	if nodeIDStr == "" {
+
+	}
+	m.nodeId, err = strconv.ParseUint(nodeIDStr, 10, 64)
+	if err != nil {
+
+	}
+
 }
 
 func (m *MetaNode) startMetaManager() (err error) {
@@ -121,6 +160,18 @@ func (m *MetaNode) Sync() {
 	if atomic.LoadUint32(&m.state) == StateRunning {
 		m.wg.Wait()
 	}
+}
+
+func getClusterInfo() (*proto.ClusterInfo, error) {
+	respBody, err := masterHelper.Request("GET", proto.AdminGetIP, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	cInfo := &proto.ClusterInfo{}
+	if err = json.Unmarshal(respBody, cInfo); err != nil {
+		return nil, err
+	}
+	return cInfo, nil
 }
 
 // NewServer creates a new meta node instance.
