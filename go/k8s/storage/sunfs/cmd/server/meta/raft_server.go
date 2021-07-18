@@ -1,6 +1,7 @@
 package meta
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -30,8 +31,9 @@ func (m *MetaNode) startRaftServer() (err error) {
 	}
 	m.raftStore, err = raftstore.NewRaftStore(raftConf)
 	if err != nil {
-		err = errors.NewErrorf("new raftStore: %s", err.Error())
+		err = errors.New(fmt.Sprintf("new raftStore: %s", err.Error()))
 	}
+
 	return
 }
 

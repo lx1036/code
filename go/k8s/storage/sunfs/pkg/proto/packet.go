@@ -226,6 +226,78 @@ func (p *Packet) GetResultMsg() (m string) {
 	return
 }
 
+// GetOpMsg returns the operation type.
+func (p *Packet) GetOpMsg() (m string) {
+	switch p.Opcode {
+	case OpMetaCreateInode:
+		m = "OpMetaCreateInode"
+	case OpMetaUnlinkInode:
+		m = "OpMetaUnlinkInode"
+	case OpMetaCreateDentry:
+		m = "OpMetaCreateDentry"
+	case OpMetaDeleteDentry:
+		m = "OpMetaDeleteDentry"
+	case OpMetaOpen:
+		m = "OpMetaOpen"
+	case OpMetaReleaseOpen:
+		m = "OpMetaReleaseOpen"
+	case OpMetaLookup:
+		m = "OpMetaLookup"
+	case OpMetaReadDir:
+		m = "OpMetaReadDir"
+	case OpMetaInodeGet:
+		m = "OpMetaInodeGet"
+	case OpMetaBatchInodeGet:
+		m = "OpMetaBatchInodeGet"
+	case OpMetaUpdateDentry:
+		m = "OpMetaUpdateDentry"
+	case OpMetaTruncate:
+		m = "OpMetaTruncate"
+	case OpMetaLinkInode:
+		m = "OpMetaLinkInode"
+	case OpMetaEvictInode:
+		m = "OpMetaEvictInode"
+	case OpMetaSetattr:
+		m = "OpMetaSetattr"
+	case OpCreateMetaPartition:
+		m = "OpCreateMetaPartition"
+	case OpMetaNodeHeartbeat:
+		m = "OpMetaNodeHeartbeat"
+	case OpDeleteMetaPartition:
+		m = "OpDeleteMetaPartition"
+	case OpUpdateMetaPartition:
+		m = "OpUpdateMetaPartition"
+	case OpLoadMetaPartition:
+		m = "OpLoadMetaPartition"
+	case OpDecommissionMetaPartition:
+		m = "OpDecommissionMetaPartition"
+	case OpAddMetaPartitionRaftMember:
+		m = "OpAddMetaPartitionRaftMember"
+	case OpRemoveMetaPartitionRaftMember:
+		m = "OpRemoveMetaPartitionRaftMember"
+	case OpMetaPartitionTryToLeader:
+		m = "OpMetaPartitionTryToLeader"
+	case OpMetaLookupName:
+		m = "OpMetaLookupName"
+	}
+	return
+}
+
+// GetUniqueLogId returns the unique log ID.
+func (p *Packet) GetUniqueLogId() (m string) {
+	defer func() {
+		m = m + fmt.Sprintf("_ResultMesg(%v)", p.GetResultMsg())
+	}()
+	m = fmt.Sprintf("Req(%v)_Partition(%v)_Size(%v)_Opcode(%v)_CRC(%v)",
+		p.ReqID, p.PartitionID, p.Size, p.GetOpMsg(), p.CRC)
+
+	return
+}
+
+func (p *Packet) GetReqID() int64 {
+	return p.ReqID
+}
+
 // NewPacket returns a new packet.
 func NewPacket() *Packet {
 	p := new(Packet)

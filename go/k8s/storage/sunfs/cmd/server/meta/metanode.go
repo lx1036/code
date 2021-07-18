@@ -2,6 +2,9 @@ package meta
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -25,7 +28,8 @@ const (
 )
 
 var (
-	masterHelper util.MasterHelper
+	masterHelper   util.MasterHelper
+	configTotalMem uint64
 )
 
 // The MetaNode manages the dentry and inode information of the meta partitions on a meta node.
@@ -101,9 +105,45 @@ func (m *MetaNode) onStart(cfg *config.Config) error {
 	return nil
 }
 
-// 向 master 注册 meta
+type MetaNodeInfo struct {
+	Addr                      string
+	PersistenceMetaPartitions []uint64
+}
+
+func (m *MetaNode) checkLocalPartitionMatchWithMaster() (err error) {
+	params := make(map[string]string)
+	params["addr"] = m.localAddr + ":" + m.listen
+	data, err := masterHelper.Request(http.MethodGet, proto.GetMetaNode, params, nil)
+	if err != nil {
+		return fmt.Errorf("checkLocalPartitionMatchWithMaster error %v", err)
+	}
+
+	minfo := new(MetaNodeInfo)
+	if err = json.Unmarshal(data, minfo); err != nil {
+		return fmt.Errorf("checkLocalPartitionMatchWithMaster jsonUnmarsh failed %v", err)
+	}
+
+	if len(minfo.PersistenceMetaPartitions) == 0 {
+		return
+	}
+	lackPartitions := make([]uint64, 0)
+	for _, partitionID := range minfo.PersistenceMetaPartitions {
+		_, err := m.metadataManager.GetPartition(partitionID)
+		if err != nil {
+			lackPartitions = append(lackPartitions, partitionID)
+		}
+	}
+	if len(lackPartitions) == 0 {
+		return
+	}
+
+	return fmt.Errorf("LackPartitions %v on metanode %v,metanode cannot start", lackPartitions, m.localAddr+":"+m.listen)
+}
+
+// INFO: 向 master 注册 meta, POST /metaNode/add
 func (m *MetaNode) register() (err error) {
-	clusterInfo, err = getClusterInfo()
+	reqParam := make(map[string]string)
+	clusterInfo, err := getClusterInfo()
 	if err != nil {
 		klog.Errorf("[register] %s", err.Error())
 		return err
@@ -115,19 +155,20 @@ func (m *MetaNode) register() (err error) {
 	m.clusterId = clusterInfo.Cluster
 	reqParam["addr"] = m.localAddr + ":" + m.listen
 
-	respBody, err = masterHelper.Request("POST", proto.AddMetaNode, reqParam, nil)
+	respBody, err := masterHelper.Request("POST", proto.AddMetaNode, reqParam, nil)
 	if err != nil {
 
 	}
 	nodeIDStr := strings.TrimSpace(string(respBody))
 	if nodeIDStr == "" {
-
+		return fmt.Errorf("[register] master respond empty body")
 	}
 	m.nodeId, err = strconv.ParseUint(nodeIDStr, 10, 64)
 	if err != nil {
-
+		return err
 	}
 
+	return nil
 }
 
 func (m *MetaNode) startMetaManager() (err error) {
@@ -151,8 +192,8 @@ func (m *MetaNode) startMetaManager() (err error) {
 
 func (m *MetaNode) Shutdown() {
 	// shutdown node and release the resource
-	m.stopServer()
-	m.stopMetaManager()
+	//m.stopServer()
+	//m.stopMetaManager()
 	m.stopRaftServer()
 }
 
@@ -172,6 +213,47 @@ func getClusterInfo() (*proto.ClusterInfo, error) {
 		return nil, err
 	}
 	return cInfo, nil
+}
+
+func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
+	if cfg == nil {
+		err = errors.New("invalid configuration")
+		return
+	}
+	m.localAddr = cfg.GetString(cfgLocalIP)
+	m.listen = cfg.GetString(cfgListen)
+	m.metadataDir = cfg.GetString(cfgMetadataDir)
+	m.raftDir = cfg.GetString(cfgRaftDir)
+	m.raftHeartbeatPort = cfg.GetString(cfgRaftHeartbeatPort)
+	m.raftReplicatePort = cfg.GetString(cfgRaftReplicaPort)
+	configTotalMem, _ = strconv.ParseUint(cfg.GetString(cfgTotalMem), 10, 64)
+	if configTotalMem == 0 {
+		return fmt.Errorf("bad totalMem config,Recommended to be configured as 80 percent of physical machine memory")
+	}
+	if m.metadataDir == "" {
+		return fmt.Errorf("bad metadataDir config")
+	}
+	if m.listen == "" {
+		return fmt.Errorf("bad listen config")
+	}
+	if m.raftDir == "" {
+		return fmt.Errorf("bad raftDir config")
+	}
+	if m.raftHeartbeatPort == "" {
+		return fmt.Errorf("bad raftHeartbeatPort config")
+	}
+	if m.raftReplicatePort == "" {
+		return fmt.Errorf("bad cfgRaftReplicaPort config")
+	}
+
+	// INFO: 向 master 中注册 meta，没有 tcp 请求
+	addrs := cfg.GetArray(cfgMasterAddrs)
+	masterHelper = util.NewMasterHelper()
+	for _, addr := range addrs {
+		masterHelper.AddNode(addr.(string))
+	}
+	//err = m.validConfig()
+	return
 }
 
 // NewServer creates a new meta node instance.

@@ -4,14 +4,13 @@ import (
 	"io"
 	"net"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/util/proto"
+	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
 
 	"k8s.io/klog/v2"
 )
 
-// StartTcpService binds and listens to the specified port.
+// INFO: tcp 监听在 9021 port，没有走 http 协议
 func (m *MetaNode) startServer() (err error) {
-	// initialize and start the server.
 	m.httpStopC = make(chan uint8)
 	ln, err := net.Listen("tcp", ":"+m.listen)
 	if err != nil {
@@ -36,7 +35,7 @@ func (m *MetaNode) startServer() (err error) {
 	return
 }
 
-// Read data from the specified tcp connection until the connection is closed by the remote or the tcp service is down.
+// INFO: 从 tcp connection 读数据
 func (m *MetaNode) serveConn(conn net.Conn, stopC chan uint8) {
 	defer conn.Close()
 	c := conn.(*net.TCPConn)
