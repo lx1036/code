@@ -71,7 +71,6 @@ func (server *Server) handlerWithInterceptor() http.Handler {
 			}
 
 			server.reverseProxy.ServeHTTP(w, r)
-
 		})
 }
 
@@ -135,36 +134,6 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, fmt.Sprintf("unsupported url %s", r.URL.String()), http.StatusBadRequest)
 	}
-}
-
-func (server *Server) getVolSimpleInfo(w http.ResponseWriter, r *http.Request) {
-	var (
-		err     error
-		name    string
-		vol     *Volume
-		volView *proto.SimpleVolView
-	)
-	if name, err = parseAndExtractName(r); err != nil {
-		sendErrReply(w, r, &proto.HTTPReply{Code: proto.ErrCodeParamError, Msg: err.Error()})
-		return
-	}
-	if vol, err = server.cluster.getVolume(name); err != nil {
-		sendErrReply(w, r, newErrHTTPReply(proto.ErrVolNotExists))
-		return
-	}
-	volView = &proto.SimpleVolView{
-		ID:            vol.ID,
-		Name:          vol.Name,
-		Owner:         vol.Owner,
-		MpReplicaNum:  vol.mpReplicaNum,
-		Status:        vol.Status,
-		Capacity:      vol.Capacity,
-		MpCnt:         len(vol.MetaPartitions),
-		S3Endpoint:    vol.s3Endpoint,
-		BucketDeleted: vol.bucketdeleted,
-	}
-
-	sendOkReply(w, r, newSuccessHTTPReply(volView))
 }
 
 func (server *Server) newReverseProxy() *httputil.ReverseProxy {

@@ -9,12 +9,11 @@ import (
 	"path"
 	"time"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/proto"
-
 	"github.com/gorilla/mux"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/tiglabs/raft"
+	"github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/raft/storage/wal"
 	"k8s.io/klog/v2"
 )
@@ -285,7 +284,7 @@ func (server *Server) startRaft() {
 	// start raft server
 	serverConfig := raft.DefaultConfig()
 	serverConfig.NodeID = server.nodeID
-	serverConfig.Resolver = newClusterResolver(server.cfg)
+	serverConfig.Resolver = newCluster(server.cfg)
 	serverConfig.TickInterval = time.Millisecond * 500
 	serverConfig.ReplicateAddr = fmt.Sprintf(":%d", server.node.ReplicatePort)
 	serverConfig.HeartbeatAddr = fmt.Sprintf(":%d", server.node.HeartbeatPort)

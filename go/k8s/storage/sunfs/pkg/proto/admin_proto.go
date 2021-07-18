@@ -54,6 +54,18 @@ type ClusterInfo struct {
 	Ip      string
 }
 
+type ClientInfo struct {
+	Id         uint64
+	Ip         string
+	Hostname   string
+	Version    string
+	MemoryUsed string
+	MountVol   string
+	MountPoint string
+	System     string
+	Expiration string
+}
+
 // SimpleVolView defines the simple view of a volume
 type SimpleVolView struct {
 	ID            uint64
@@ -65,4 +77,11 @@ type SimpleVolView struct {
 	MpCnt         int
 	S3Endpoint    string
 	BucketDeleted bool
+}
+
+// HTTPReply uniform response structure
+type HTTPReply struct {
+	Code int32       `json:"code"`
+	Msg  string      `json:"msg"`
+	Data interface{} `json:"data"`
 }

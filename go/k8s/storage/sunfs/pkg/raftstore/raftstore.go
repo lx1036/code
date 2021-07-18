@@ -33,7 +33,7 @@ type raftStore struct {
 }
 
 // CreatePartition creates a new partition in the raft store.
-func (s *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err error) {
+func (r *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err error) {
 	// Init WaL Storage for this partition.
 	// Variables:
 	// wc: WaL Configuration.
@@ -42,7 +42,7 @@ func (s *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err erro
 
 	var walPath string
 	if cfg.WalPath == "" {
-		walPath = path.Join(s.raftPath, strconv.FormatUint(cfg.ID, 10))
+		walPath = path.Join(r.raftPath, strconv.FormatUint(cfg.ID, 10))
 	} else {
 		walPath = path.Join(cfg.WalPath, "wal_"+strconv.FormatUint(cfg.ID, 10))
 	}
@@ -55,7 +55,7 @@ func (s *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err erro
 	peers := make([]proto.Peer, 0)
 	for _, peerAddress := range cfg.Peers {
 		peers = append(peers, peerAddress.Peer)
-		s.AddNodeWithPort(
+		r.AddNodeWithPort(
 			peerAddress.ID,
 			peerAddress.Address,
 			peerAddress.HeartbeatPort,
@@ -71,10 +71,10 @@ func (s *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err erro
 		StateMachine: cfg.SM,
 		Applied:      cfg.Applied,
 	}
-	if err = s.raftServer.CreateRaft(rc); err != nil {
+	if err = r.raftServer.CreateRaft(rc); err != nil {
 		return
 	}
-	p = newPartition(cfg, s.raftServer, walPath)
+	p = newPartition(cfg, r.raftServer, walPath)
 
 	return
 

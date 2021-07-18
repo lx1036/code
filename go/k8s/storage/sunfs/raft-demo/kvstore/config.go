@@ -124,13 +124,14 @@ func (c *Config) String() string {
 // LoadConfig load config from file
 func LoadConfig(filePath string, nodeID uint64) *Config {
 	c := new(Config)
-	if _, err := toml.Decode(defaultConfigStr, c); err != nil {
-		panic(fmt.Sprintf("fail to decode default config, err: %v", err))
-	}
 	if len(filePath) != 0 {
 		_, err := toml.DecodeFile(filePath, c)
 		if err != nil {
 			panic(fmt.Sprintf("fail to decode config file(%v): %v", filePath, err))
+		}
+	} else {
+		if _, err := toml.Decode(defaultConfigStr, c); err != nil {
+			panic(fmt.Sprintf("fail to decode default config, err: %v", err))
 		}
 	}
 

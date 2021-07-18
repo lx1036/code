@@ -1,3 +1,5 @@
+// INFO: master 是一个 raft state machine
+
 package master
 
 import (
@@ -7,9 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"k8s-lx1036/k8s/storage/sunfs/pkg/config"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/raftstore"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/util"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/util/config"
 
 	"k8s.io/klog/v2"
 )
@@ -29,65 +31,6 @@ const (
 	defaultNodeSetCapacity                  = 18
 	retrySendSyncTaskInternal               = 3 * time.Second
 )
-
-// Server represents the server in a cluster
-type Server struct {
-	id           uint64
-	clusterName  string
-	ip           string
-	port         string
-	walDir       string
-	storeDir     string
-	Version      string
-	retainLogs   uint64
-	tickInterval int
-	electionTick int
-	leaderInfo   *LeaderInfo
-	config       *clusterConfig
-	cluster      *Cluster
-	rocksDBStore *raftstore.RocksDBStore
-	raftStore    raftstore.RaftStore
-	fsm          *raftstore.FilesystemStateMachine
-	partition    raftstore.Partition
-	wg           sync.WaitGroup
-	reverseProxy *httputil.ReverseProxy
-	metaReady    bool
-}
-
-func (server *Server) createRaftServer() error {
-	var err error
-	raftCfg := &raftstore.Config{
-		NodeID:            server.id,
-		RaftPath:          server.walDir,
-		NumOfLogsToRetain: server.retainLogs,
-		HeartbeatPort:     int(server.config.heartbeatPort),
-		ReplicaPort:       int(server.config.replicaPort),
-		TickInterval:      server.tickInterval,
-		ElectionTick:      server.electionTick,
-	}
-	if server.raftStore, err = raftstore.NewRaftStore(raftCfg); err != nil {
-		return fmt.Errorf("NewRaftStore failed! id[%v] walPath[%v] err: %v", server.id, server.walDir, err)
-	}
-
-	klog.Infof("peers[%v],tickInterval[%v],electionTick[%v]\n", server.config.peers, server.tickInterval, server.electionTick)
-	server.fsm = raftstore.NewFilesystemStateMachine(server.rocksDBStore, server.retainLogs, server.raftStore.RaftServer())
-	//server.fsm.registerLeaderChangeHandler(server.handleLeaderChange)
-	//server.fsm.registerPeerChangeHandler(server.handlePeerChange)
-	// register the handlers for the interfaces defined in the Raft library
-	//server.fsm.registerApplySnapshotHandler(server.handleApplySnapshot)
-	server.fsm.Restore()
-	partitionCfg := &raftstore.PartitionConfig{
-		ID:      GroupID,
-		Peers:   server.config.peers,
-		Applied: server.fsm.GetApply(),
-		SM:      server.fsm,
-	}
-	if server.partition, err = server.raftStore.CreatePartition(partitionCfg); err != nil {
-		return fmt.Errorf("CreatePartition failed err %v", err)
-	}
-
-	return nil
-}
 
 // configuration keys
 const (
@@ -130,6 +73,65 @@ const (
 	clientMemoryUsedKey   = "clientMemoryUsed"
 )
 
+// Server represents the server in a cluster
+type Server struct {
+	id           uint64
+	clusterName  string
+	ip           string
+	port         string
+	walDir       string
+	storeDir     string
+	Version      string
+	retainLogs   uint64
+	tickInterval int
+	electionTick int
+	leaderInfo   *LeaderInfo
+	config       *clusterConfig
+	cluster      *Cluster
+	store        *raftstore.Store
+	raftStore    raftstore.RaftStore
+	fsm          *MetadataFsm
+	partition    raftstore.Partition
+	wg           sync.WaitGroup
+	reverseProxy *httputil.ReverseProxy
+	metaReady    bool
+}
+
+func (server *Server) createRaftServer() error {
+	var err error
+	raftCfg := &raftstore.Config{
+		NodeID:            server.id,
+		RaftPath:          server.walDir,
+		NumOfLogsToRetain: server.retainLogs,
+		HeartbeatPort:     int(server.config.heartbeatPort),
+		ReplicaPort:       int(server.config.replicaPort),
+		TickInterval:      server.tickInterval,
+		ElectionTick:      server.electionTick,
+	}
+	if server.raftStore, err = raftstore.NewRaftStore(raftCfg); err != nil {
+		return fmt.Errorf("NewRaftStore failed! id[%v] walPath[%v] err: %v", server.id, server.walDir, err)
+	}
+
+	klog.Infof("peers[%v],tickInterval[%v],electionTick[%v]\n", server.config.peers, server.tickInterval, server.electionTick)
+	server.fsm = newMetadataFsm(server.store, server.retainLogs, server.raftStore.RaftServer())
+	server.fsm.registerLeaderChangeHandler(server.handleLeaderChange)
+	server.fsm.registerPeerChangeHandler(server.handlePeerChange)
+	server.fsm.registerApplySnapshotHandler(server.handleApplySnapshot)
+	server.fsm.restore()
+
+	partitionCfg := &raftstore.PartitionConfig{
+		ID:      GroupID,
+		Peers:   server.config.peers,
+		Applied: server.fsm.GetApply(),
+		SM:      server.fsm,
+	}
+	if server.partition, err = server.raftStore.CreatePartition(partitionCfg); err != nil {
+		return fmt.Errorf("CreatePartition failed err %v", err)
+	}
+
+	return nil
+}
+
 func (server *Server) checkConfig(cfg *config.Config) (err error) {
 	server.clusterName = cfg.GetString(ClusterName)
 	server.ip = cfg.GetString(IP)
@@ -165,9 +167,9 @@ func (server *Server) checkConfig(cfg *config.Config) (err error) {
 	if err = server.config.parsePeers(peerAddrs); err != nil {
 		return
 	}
-	nodeSetCapacity := cfg.GetString(nodeSetCapacity)
-	if nodeSetCapacity != "" {
-		if server.config.nodeSetCapacity, err = strconv.Atoi(nodeSetCapacity); err != nil {
+	capacity := cfg.GetString(nodeSetCapacity)
+	if capacity != "" {
+		if server.config.nodeSetCapacity, err = strconv.Atoi(capacity); err != nil {
 			return fmt.Errorf("bad configuration file,err:%v", err.Error())
 		}
 	}
@@ -194,7 +196,6 @@ func (server *Server) checkConfig(cfg *config.Config) (err error) {
 	if server.retainLogs <= 0 {
 		server.retainLogs = DefaultRetainLogs
 	}
-	fmt.Println("retainLogs=", server.retainLogs)
 
 	server.tickInterval = int(cfg.GetFloat(cfgTickInterval))
 	server.electionTick = int(cfg.GetFloat(cfgElectionTick))
@@ -221,10 +222,9 @@ func (server *Server) Start(cfg *config.Config) error {
 	}
 
 	var err error
-	server.rocksDBStore, err = raftstore.NewRocksDBStore(server.storeDir, LRUCacheSize, WriteBufferSize)
+	server.store, err = raftstore.NewMemoryStore()
 	if err != nil {
-		klog.Errorf("NewRocksDBStore error: %v", err)
-		return err
+		return fmt.Errorf("NewRocksDBStore error: %v", err)
 	}
 
 	if err = server.createRaftServer(); err != nil {
@@ -237,6 +237,8 @@ func (server *Server) Start(cfg *config.Config) error {
 	server.cluster.partition = server.partition
 	server.cluster.idAlloc.partition = server.partition
 	server.cluster.scheduleTask()
+
+	// INFO: server http service
 	server.startHTTPService()
 
 	server.wg.Add(1)

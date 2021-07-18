@@ -3,16 +3,16 @@ package main
 import (
 	"fmt"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft"
+	"github.com/tiglabs/raft"
 )
 
 // ClusterResolver implement raft Resolver
-type ClusterResolver struct {
+type nodeResolver struct {
 	cfg *Config
 }
 
 // NodeAddress get node address
-func (r *ClusterResolver) NodeAddress(nodeID uint64, stype raft.SocketType) (addr string, err error) {
+func (r *nodeResolver) NodeAddress(nodeID uint64, stype raft.SocketType) (addr string, err error) {
 	node := r.cfg.FindClusterNode(nodeID)
 	if node == nil {
 		return "", fmt.Errorf("could not find node(%v) in cluster config:\n: %v", nodeID, r.cfg.String())
@@ -26,8 +26,8 @@ func (r *ClusterResolver) NodeAddress(nodeID uint64, stype raft.SocketType) (add
 	return "", fmt.Errorf("unknown socket type: %v", stype)
 }
 
-func newClusterResolver(cfg *Config) *ClusterResolver {
-	return &ClusterResolver{
+func newCluster(cfg *Config) *nodeResolver {
+	return &nodeResolver{
 		cfg: cfg,
 	}
 }

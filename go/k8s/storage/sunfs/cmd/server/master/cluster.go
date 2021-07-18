@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/raftstore"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/util/proto"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -38,29 +38,6 @@ const (
 	defaultMaxMetaPartitionCountOnEachNode             = 10000
 	defaultReplicaNum                                  = 3
 	defaultRegion                                      = "us-east-2"
-)
-
-const (
-	opSyncAddMetaNode          uint32 = 0x01
-	opSyncAddVol               uint32 = 0x02
-	opSyncAddMetaPartition     uint32 = 0x03
-	opSyncUpdateMetaPartition  uint32 = 0x04
-	opSyncDeleteMetaNode       uint32 = 0x05
-	opSyncAllocMetaPartitionID uint32 = 0x06
-	opSyncAllocCommonID        uint32 = 0x07
-	opSyncPutCluster           uint32 = 0x08
-	opSyncUpdateVol            uint32 = 0x09
-	opSyncDeleteVol            uint32 = 0x0A
-	opSyncDeleteMetaPartition  uint32 = 0x0B
-	opSyncAddNodeSet           uint32 = 0x0C
-	opSyncUpdateNodeSet        uint32 = 0x0D
-	opSyncBatchPut             uint32 = 0x0E
-	opSyncAddBucket            uint32 = 0x0F
-	opSyncUpdateBucket         uint32 = 0x10
-	opSyncDeleteBucket         uint32 = 0x11
-	opSyncAddVolMountClient    uint32 = 0x12
-	opSyncUpdateVolMountClient uint32 = 0x13
-	opSyncDeleteVolMountClient uint32 = 0x14
 )
 
 const (
@@ -117,7 +94,7 @@ type Cluster struct {
 	createVolMutex      sync.RWMutex // create volume mutex
 
 	DisableAutoAllocate bool
-	fsm                 *raftstore.FilesystemStateMachine
+	fsm                 *MetadataFsm
 	partition           raftstore.Partition
 }
 
@@ -213,6 +190,50 @@ func (cluster *Cluster) scheduleToCheckMetaPartitions() {
 	}, time.Second*defaultIntervalToCheckMetaPartition)
 }
 
+func (cluster *Cluster) scheduleToUpdateStatInfo() {
+	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
+		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
+			cluster.updateStatInfo()
+		}
+	}, time.Second*defaultIntervalToCheckHeartbeat)
+}
+
+func (cluster *Cluster) scheduleToCheckVolStatus() {
+	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
+		//check vols after switching leader two minutes
+		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
+			cluster.checkDeleteBucket()
+			for _, vol := range cluster.vols {
+				vol.checkStatus(cluster)
+			}
+		}
+	}, time.Second*defaultIntervalToCheckMetaPartition)
+}
+
+func (cluster *Cluster) checkDeleteBucket() {
+	for _, bucket := range cluster.buckets {
+		deleted, err := cluster.deleteListObjects(bucket.AccessKey, bucket.SecretKey, bucket.Endpoint,
+			bucket.Region, bucket.BucketName)
+		if err != nil {
+			klog.Errorf("action [checkDeleteBucket] deleteListObjects in bucket[%v] error: %v",
+				bucket.BucketName, err)
+			continue
+		}
+
+		if deleted {
+
+		}
+	}
+}
+
+func (cluster *Cluster) scheduleToCheckVolMountClients() {
+	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
+		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
+			cluster.checkVolMountClients()
+		}
+	}, time.Second*defaultIntervalToCheckVolMountClient)
+}
+
 // Return all the volumes except the ones that have been marked to be deleted.
 func (cluster *Cluster) allVols() map[string]*Volume {
 	vols := make(map[string]*Volume, 0)
@@ -243,10 +264,10 @@ func (cluster *Cluster) checkMetaPartitions() {
 func (cluster *Cluster) scheduleTask() {
 	cluster.scheduleToCheckHeartbeat()
 	cluster.scheduleToCheckMetaPartitions()
-	//cluster.scheduleToUpdateStatInfo()
-	//cluster.scheduleToCheckVolStatus()
-	//cluster.scheduleToLoadMetaPartitions()
-	//cluster.scheduleToCheckVolMountClients()
+	cluster.scheduleToUpdateStatInfo()
+	cluster.scheduleToCheckVolStatus()
+	cluster.scheduleToLoadMetaPartitions()
+	cluster.scheduleToCheckVolMountClients()
 }
 
 func (cluster *Cluster) getVolume(volName string) (*Volume, error) {
