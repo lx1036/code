@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/tiglabs/raft"
 	"github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/raft/storage/wal"
@@ -65,19 +63,9 @@ type Server struct {
 
 	hs         *http.Server
 	raftServer *raft.RaftServer
-	db         *leveldb.DB // we use leveldb to store key-value data
+	db         *Store
 
 	leader uint64
-}
-
-func (server *Server) initLeveldb() {
-	dbPath := path.Join(server.cfg.ServerCfg.DataPath, "db")
-	db, err := leveldb.OpenFile(dbPath, &opt.Options{})
-	if err != nil {
-		klog.Fatalf("init leveldb failed: %v, path: %v", err, dbPath)
-	}
-	server.db = db
-	klog.Infof("init leveldb sucessfully. path: %v", dbPath)
 }
 
 func (server *Server) startHTTPServer() {
@@ -102,7 +90,6 @@ func (server *Server) startHTTPServer() {
 // Get get a key
 func (server *Server) Get(w http.ResponseWriter, r *http.Request) {
 	key := mux.Vars(r)["key"]
-
 	if err := r.ParseForm(); err != nil {
 		klog.Errorf("call ParseForm failed: %v", err)
 		return
@@ -118,8 +105,9 @@ func (server *Server) Get(w http.ResponseWriter, r *http.Request) {
 		server.getByReadIndex(w, key)
 		return
 	default:
-		value, err := server.db.Get([]byte(key), nil)
-		if err == leveldb.ErrNotFound {
+		value, err := server.db.Get([]byte(key))
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("[Get]get key %s with err %v", key, err))
 			w.WriteHeader(http.StatusNotFound)
 		} else {
 			w.Write(value)
@@ -149,13 +137,13 @@ func (server *Server) getByReadIndex(w http.ResponseWriter, key string) {
 			klog.Errorf("process get %s failed: unexpected resp type: %T", key, resp)
 			return
 		}
-		value, err := server.db.Get([]byte(key), nil)
-		if err == leveldb.ErrNotFound {
+		value, err := server.db.Get([]byte(key))
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("[getByReadIndex]get %s with err %v", key, err))
 			w.WriteHeader(http.StatusNotFound)
 		} else {
 			w.Write(value)
 		}
-
 	case err := <-errCh:
 		klog.Errorf("process get %s failed: %v", key, err)
 		if err == raft.ErrNotLeader {
@@ -219,7 +207,7 @@ func (server *Server) process(w http.ResponseWriter, op CmdType, key, value []by
 		}
 	case err := <-errCh:
 		klog.Errorf("process %v failed: %v", cmd.String(), err)
-		if err == leveldb.ErrNotFound {
+		if err != nil {
 			klog.Infof("process %v not found", cmd.String())
 			w.WriteHeader(http.StatusNotFound)
 		} else if err == raft.ErrNotLeader {
@@ -244,11 +232,11 @@ func (server *Server) Apply(command []byte, index uint64) (interface{}, error) {
 	}
 	switch cmd.OP {
 	case CmdQuorumGet:
-		return server.db.Get(cmd.Key, nil)
+		return server.db.Get(cmd.Key)
 	case CmdPut:
-		return nil, server.db.Put(cmd.Key, cmd.Value, nil)
+		return nil, server.db.Put(cmd.Key, cmd.Value)
 	case CmdDelete:
-		return nil, server.db.Delete(cmd.Key, nil)
+		return nil, server.db.Delete(cmd.Key)
 	default:
 		return nil, fmt.Errorf("invalid cmd type: %v", cmd.OP)
 	}
@@ -323,13 +311,19 @@ func (server *Server) startRaft() {
 	klog.Info("raft created.")
 }
 
+func (server *Server) initBoltDB() {
+	server.db = newStore(path.Join(server.cfg.ServerCfg.DataPath, "my.db"))
+}
+
 // Run run server
 func (server *Server) Run() {
 	// init store
-	server.initLeveldb()
+	server.initBoltDB()
+	defer server.db.Close()
+
 	// start raft
 	server.startRaft()
-	// start http server
+	// start http server, block
 	server.startHTTPServer()
 }
 
@@ -341,7 +335,7 @@ func NewServer(nodeID uint64, cfg *Config) *Server {
 	}
 	node := cfg.FindClusterNode(nodeID)
 	if node == nil {
-		klog.Fatalf("could not find self node(%v) in cluster config: \n(%v)", nodeID, cfg.String())
+		klog.Fatalf("could not find self node(%v) in cluster config: (%v)", nodeID, cfg.String())
 	}
 	server.node = node
 	return server

@@ -88,7 +88,7 @@ type Server struct {
 	leaderInfo   *LeaderInfo
 	config       *clusterConfig
 	cluster      *Cluster
-	store        *raftstore.Store
+	store        raftstore.Store
 	raftStore    raftstore.RaftStore
 	fsm          *MetadataFsm
 	partition    raftstore.Partition
