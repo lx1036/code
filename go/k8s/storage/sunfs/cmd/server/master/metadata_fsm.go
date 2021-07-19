@@ -223,7 +223,7 @@ func (metadataFsm *MetadataFsm) restoreApplied() {
 }
 
 // INFO: https://github.com/tiglabs/raft/blob/master/test/memory_statemachine.go
-// finite state machine
+// meta finite state machine
 func newMetadataFsm(store raftstore.Store, retainsLog uint64, rs *raft.RaftServer) *MetadataFsm {
 	return &MetadataFsm{
 		store:      store,
