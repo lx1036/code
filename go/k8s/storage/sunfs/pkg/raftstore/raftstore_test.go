@@ -1,8 +1,9 @@
 package raftstore
 
 import (
-	"github.com/tiglabs/raft/proto"
 	"testing"
+
+	"github.com/tiglabs/raft/proto"
 
 	"k8s.io/klog/v2"
 )
@@ -10,7 +11,7 @@ import (
 func TestRaftStoreCreatePartition(test *testing.T) {
 	config := &Config{
 		NodeID:            1,
-		RaftPath:          "",
+		RaftPath:          "raft",
 		IPAddr:            "",
 		HeartbeatPort:     0,
 		ReplicaPort:       0,
@@ -24,7 +25,7 @@ func TestRaftStoreCreatePartition(test *testing.T) {
 		klog.Fatal(err)
 	}
 
-	partition, err := raftstore.CreatePartition(&PartitionConfig{
+	p, err := raftstore.CreatePartition(&PartitionConfig{
 		ID:      1,
 		Applied: 0,
 		Leader:  3,
@@ -36,5 +37,9 @@ func TestRaftStoreCreatePartition(test *testing.T) {
 		},
 		SM: nil,
 	})
+	if err != nil {
+		klog.Fatal(err)
+	}
 
+	klog.Info(p.IsRaftLeader())
 }

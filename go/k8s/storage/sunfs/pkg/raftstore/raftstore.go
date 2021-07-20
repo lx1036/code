@@ -14,6 +14,8 @@ import (
 	raftlog "github.com/tiglabs/raft/util/log"
 )
 
+// INFO: 参考 https://github.com/tiglabs/raft/blob/master/test/testserver.go
+
 // RaftStore defines the interface for the raft store.
 type RaftStore interface {
 	CreatePartition(cfg *PartitionConfig) (Partition, error)
@@ -33,7 +35,7 @@ type raftStore struct {
 }
 
 // CreatePartition creates a new partition in the raft store.
-func (s *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err error) {
+func (r *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err error) {
 	// Init WaL Storage for this partition.
 	// Variables:
 	// wc: WaL Configuration.
@@ -42,7 +44,7 @@ func (s *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err erro
 
 	var walPath string
 	if cfg.WalPath == "" {
-		walPath = path.Join(s.raftPath, strconv.FormatUint(cfg.ID, 10))
+		walPath = path.Join(r.raftPath, strconv.FormatUint(cfg.ID, 10))
 	} else {
 		walPath = path.Join(cfg.WalPath, "wal_"+strconv.FormatUint(cfg.ID, 10))
 	}
@@ -55,7 +57,7 @@ func (s *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err erro
 	peers := make([]proto.Peer, 0)
 	for _, peerAddress := range cfg.Peers {
 		peers = append(peers, peerAddress.Peer)
-		s.AddNodeWithPort(
+		r.AddNodeWithPort(
 			peerAddress.ID,
 			peerAddress.Address,
 			peerAddress.HeartbeatPort,
@@ -71,10 +73,10 @@ func (s *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err erro
 		StateMachine: cfg.SM,
 		Applied:      cfg.Applied,
 	}
-	if err = s.raftServer.CreateRaft(rc); err != nil {
+	if err = r.raftServer.CreateRaft(rc); err != nil {
 		return
 	}
-	p = newPartition(cfg, s.raftServer, walPath)
+	p = newPartition(cfg, r.raftServer, walPath)
 
 	return
 
@@ -128,9 +130,9 @@ func newRaftLogger(dir string) {
 func NewRaftStore(cfg *Config) (mr RaftStore, err error) {
 	resolver := NewNodeResolver()
 	newRaftLogger(cfg.RaftPath)
-	rc := raft.DefaultConfig()
-	rc.NodeID = cfg.NodeID
-	rc.LeaseCheck = true
+	raftConfig := raft.DefaultConfig()
+	raftConfig.NodeID = cfg.NodeID
+	raftConfig.LeaseCheck = true
 	if cfg.HeartbeatPort <= 0 {
 		cfg.HeartbeatPort = DefaultHeartbeatPort
 	}
@@ -146,13 +148,13 @@ func NewRaftStore(cfg *Config) (mr RaftStore, err error) {
 	if cfg.TickInterval < DefaultTickInterval {
 		cfg.TickInterval = DefaultTickInterval
 	}
-	rc.HeartbeatAddr = fmt.Sprintf("%s:%d", cfg.IPAddr, cfg.HeartbeatPort)
-	rc.ReplicateAddr = fmt.Sprintf("%s:%d", cfg.IPAddr, cfg.ReplicaPort)
-	rc.Resolver = resolver
-	rc.RetainLogs = cfg.NumOfLogsToRetain
-	rc.TickInterval = time.Duration(cfg.TickInterval) * time.Millisecond
-	rc.ElectionTick = cfg.ElectionTick
-	rs, err := raft.NewRaftServer(rc)
+	raftConfig.HeartbeatAddr = fmt.Sprintf("%s:%d", cfg.IPAddr, cfg.HeartbeatPort)
+	raftConfig.ReplicateAddr = fmt.Sprintf("%s:%d", cfg.IPAddr, cfg.ReplicaPort)
+	raftConfig.Resolver = resolver
+	raftConfig.RetainLogs = cfg.NumOfLogsToRetain
+	raftConfig.TickInterval = time.Duration(cfg.TickInterval) * time.Millisecond
+	raftConfig.ElectionTick = cfg.ElectionTick
+	raftServer, err := raft.NewRaftServer(raftConfig)
 	if err != nil {
 		return
 	}
@@ -160,8 +162,8 @@ func NewRaftStore(cfg *Config) (mr RaftStore, err error) {
 	mr = &raftStore{
 		nodeID:     cfg.NodeID,
 		resolver:   resolver,
-		raftConfig: rc,
-		raftServer: rs,
+		raftConfig: raftConfig,
+		raftServer: raftServer,
 		raftPath:   cfg.RaftPath,
 	}
 	return
