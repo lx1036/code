@@ -44,6 +44,10 @@ const (
 	worldInode
 )
 
+const (
+	DefaultBlksize = 1 << 20 // 1M
+)
+
 type inodeInfo struct {
 	attributes fuseops.InodeAttributes
 
@@ -135,9 +139,19 @@ func (fs *helloFS) patchAttributes(
 	attr.Crtime = now
 }
 
+// INFO: `stat /mnt/hellofs2`
 func (fs *helloFS) StatFS(
 	ctx context.Context,
 	op *fuseops.StatFSOp) error {
+	total, used := uint64(1073741824), uint64(6)
+	op.BlockSize = uint32(DefaultBlksize)
+	op.Blocks = total / uint64(DefaultBlksize)
+	op.BlocksFree = (total - used) / uint64(DefaultBlksize)
+	op.BlocksAvailable = op.BlocksFree
+	op.IoSize = 1 << 20
+	op.Inodes = 1 << 50
+	op.InodesFree = op.Inodes
+
 	return nil
 }
 
@@ -199,6 +213,8 @@ func (fs *helloFS) ReadDir(
 	if !ok {
 		return fuse.ENOENT
 	}
+
+	klog.Info(op.Inode, op.Offset, info)
 
 	if !info.dir {
 		return fuse.EIO
@@ -294,13 +310,13 @@ func main() {
 		cfg.DebugLogger = log.New(os.Stderr, "fuse: ", 0)
 	}
 
-	mfs, err := fuse.Mount(*fMountPoint, server, cfg)
+	mountedFileSystem, err := fuse.Mount(*fMountPoint, server, cfg)
 	if err != nil {
 		log.Fatalf("Mount: %v", err)
 	}
 
 	// Wait for it to be unmounted.
-	if err = mfs.Join(context.Background()); err != nil {
+	if err = mountedFileSystem.Join(context.Background()); err != nil {
 		log.Fatalf("Join: %v", err)
 	}
 }
