@@ -1,16 +1,16 @@
-package log_replication
+package raft
 
 import (
 	"fmt"
 	"math/rand"
 	"strings"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/proto"
 
 	"k8s.io/klog/v2"
 )
 
-// TODO raftFsm 是一个 state machine 么？
+// finite state machine
 type raftFsm struct {
 	id               uint64
 	term             uint64
@@ -38,7 +38,7 @@ type raftFsm struct {
 }
 
 func NewRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
-	raftlog, err := NewRaftLog(raftConfig.Storage)
+	raftlog, err := newRaftLog(raftConfig.Storage)
 	if err != nil {
 		return nil, err
 	}

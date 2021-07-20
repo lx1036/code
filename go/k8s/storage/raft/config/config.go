@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/proto"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/storage"
+	"k8s-lx1036/k8s/storage/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/storage"
 )
 
 // Config contains the parameters to start a raft server.

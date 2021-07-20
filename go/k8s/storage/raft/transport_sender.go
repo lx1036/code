@@ -3,7 +3,7 @@ package raft
 import (
 	"sync"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/proto"
 )
 
 type transportSender struct {

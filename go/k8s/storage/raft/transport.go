@@ -1,7 +1,7 @@
 package raft
 
 import (
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/proto"
 )
 
 // Transport raft server transport

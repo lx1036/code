@@ -1,11 +1,11 @@
-package log_replication
+package raftlog
 
 import (
 	"reflect"
 	"testing"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/proto"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/storage"
+	"k8s-lx1036/k8s/storage/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/storage"
 )
 
 func TestMaybeLastIndex(test *testing.T) {
@@ -84,7 +84,7 @@ func TestAppend(test *testing.T) {
 		s := storage.DefaultMemoryStorage()
 		s.StoreEntries(previousEntries)
 
-		log, err := NewRaftLog(s)
+		log, err := newRaftLog(s)
 		if err != nil {
 			test.Fatalf("#%d: unexpected error %v", i, err)
 		}

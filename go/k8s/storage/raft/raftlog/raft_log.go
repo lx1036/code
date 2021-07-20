@@ -1,16 +1,19 @@
-package log_replication
+package raftlog
 
 import (
 	"errors"
 	"fmt"
 	"math"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/proto"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/storage"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/util"
+	"k8s-lx1036/k8s/storage/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/storage"
+	"k8s-lx1036/k8s/storage/raft/util"
 
 	"k8s.io/klog/v2"
 )
+
+// INFO: raft log
+//  Raft协议详解-Log Replication: https://zhuanlan.zhihu.com/p/29730357
 
 const noLimit = math.MaxUint64
 
@@ -26,7 +29,7 @@ type RaftLog struct {
 	committed, applied uint64
 }
 
-// 获取 raftlog 的 last index
+// INFO: 获取 raftlog 的 last index
 func (log *RaftLog) LastIndex() uint64 {
 	if i, ok := log.unstable.maybeLastIndex(); ok {
 		return i
@@ -139,7 +142,7 @@ func (log *RaftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error)
 	return limitSize(ents, maxSize), nil
 }
 
-func NewRaftLog(storage storage.Storage) (*RaftLog, error) {
+func newRaftLog(storage storage.Storage) (*RaftLog, error) {
 	log := &RaftLog{
 		storage: storage,
 	}
@@ -153,10 +156,10 @@ func NewRaftLog(storage storage.Storage) (*RaftLog, error) {
 		return nil, err
 	}
 
-	log.unstable.offset = lastIndex + 1 // ???
+	log.unstable.offset = lastIndex + 1
 	log.unstable.entries = make([]*proto.Entry, 0, 256)
-	log.committed = firstIndex - 1 // ???
-	log.applied = firstIndex - 1   // ???
+	log.committed = firstIndex - 1
+	log.applied = firstIndex - 1
 
 	return log, nil
 }

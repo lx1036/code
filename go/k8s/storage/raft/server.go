@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/proto"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/util"
+	"k8s-lx1036/k8s/storage/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/util"
 
 	"k8s.io/klog/v2"
 )

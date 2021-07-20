@@ -1,4 +1,4 @@
-package log_replication
+package raft
 
 type (
 	FsmState     byte
