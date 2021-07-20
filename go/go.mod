@@ -58,15 +58,17 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/jwhited/corebgp v0.2.0
 	github.com/kavu/go_reuseport v1.5.0 // indirect
-	github.com/klauspost/cpuid v1.2.0
+	github.com/klauspost/cpuid v1.2.1
 	github.com/kubernetes-csi/csi-lib-utils v0.9.0
 	github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0
 	github.com/kubernetes-sigs/custom-metrics-apiserver v0.0.0-20210311094424-0ca2b1909cdc
 	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
+	github.com/lni/dragonboat/v3 v3.3.1
+	github.com/lni/goutils v1.3.0
 	github.com/mattbaird/jsonpatch v0.0.0-20200820163806-098863c1fc24
 	github.com/mholt/certmagic v0.8.3
-	github.com/miekg/dns v1.1.22
+	github.com/miekg/dns v1.1.26
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/moby/ipvs v1.0.1
 	github.com/moby/sys/mountinfo v0.4.1 // indirect
@@ -94,7 +96,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.6.1
-	github.com/syndtr/goleveldb v0.0.0-20181127023241-353a9fca669c
+	github.com/syndtr/goleveldb v0.0.0-20181127023241-353a9fca669c // indirect
 	github.com/tecbot/gorocksdb v0.0.0-20191217155057-f0fad39f321c
 	github.com/tidwall/evio v1.0.2
 	github.com/tiglabs/raft v0.0.0-20200304095606-b25a44ad8b33
@@ -112,7 +114,7 @@ require (
 	golang.org/x/sys v0.0.0-20210324051608-47abb6519492
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
 	golang.org/x/tools v0.1.0 // indirect
-	google.golang.org/grpc v1.29.0
+	google.golang.org/grpc v1.29.1
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
@@ -133,6 +135,7 @@ require (
 	k8s.io/component-helpers v0.20.2
 	k8s.io/cri-api v0.0.0
 	k8s.io/gengo v0.0.0-20210203185629-de9496dff47b
+	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.8.0
 	k8s.io/kube-aggregator v0.17.3
 	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
