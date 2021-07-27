@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"k8s-lx1036/k8s/storage/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/raftlog"
 
 	"k8s.io/klog/v2"
 )
@@ -26,7 +27,7 @@ type raftFsm struct {
 	state       FsmState
 	sm          StateMachine
 	config      *Config
-	raftLog     *RaftLog
+	raftLog     *raftlog.RaftLog
 	rand        *rand.Rand
 	votes       map[uint64]bool
 	acks        map[uint64]bool
