@@ -3,6 +3,8 @@
 package boltdb
 
 import (
+	"errors"
+
 	"github.com/hashicorp/raft"
 	bolt "go.etcd.io/bbolt"
 )
@@ -17,6 +19,9 @@ var (
 	// Bucket names we perform transactions in
 	dbLogs = []byte("logs")
 	dbConf = []byte("conf")
+
+	// INFO: @see https://github.com/hashicorp/raft/blob/v1.3.1/api.go#L480-L484
+	ErrKeyNotFound = errors.New("not found")
 )
 
 // BoltStore provides access to Bbolt for Raft to store and retrieve log entries.
@@ -171,6 +176,51 @@ func (b *BoltStore) DeleteRange(min, max uint64) error {
 	}
 
 	return tx.Commit()
+}
+
+// Set is used to set a key/value set outside of the raft log
+func (b *BoltStore) Set(key []byte, val []byte) error {
+	tx, err := b.conn.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	bucket := tx.Bucket(dbConf)
+	if err := bucket.Put(key, val); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (b *BoltStore) Get(key []byte) ([]byte, error) {
+	tx, err := b.conn.Begin(false)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	bucket := tx.Bucket(dbConf)
+	val := bucket.Get(key)
+
+	if val == nil {
+		return nil, ErrKeyNotFound
+	}
+	// INFO: 为啥这么写，不直接返回 val
+	return append([]byte(nil), val...), nil
+}
+
+func (b *BoltStore) SetUint64(key []byte, val uint64) error {
+	return b.Set(key, uint64ToBytes(val))
+}
+
+func (b *BoltStore) GetUint64(key []byte) (uint64, error) {
+	val, err := b.Get(key)
+	if err != nil {
+		return 0, err
+	}
+	return bytesToUint64(val), nil
 }
 
 func New(options Options) (*BoltStore, error) {
