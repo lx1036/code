@@ -1,10 +1,11 @@
 package master
 
 import (
-	"k8s-lx1036/k8s/storage/sunfs/pkg/util/proto"
 	"math/rand"
 	"sync"
 	"time"
+
+	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
 )
 
 // MetaNode defines the structure of a meta node

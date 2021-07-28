@@ -86,8 +86,11 @@ func (h *HttpServer) Get(w http.ResponseWriter, r *http.Request) {
 // go run . --http_addr=127.0.0.1:8001 --raft_addr=127.0.0.1:8000 --raft_id=2 --raft_cluster=1/127.0.0.1:7000,2/127.0.0.1:8000,3/127.0.0.1:9000
 // go run . --http_addr=127.0.0.1:9001 --raft_addr=127.0.0.1:9000 --raft_id=3 --raft_cluster=1/127.0.0.1:7000,2/127.0.0.1:8000,3/127.0.0.1:9000
 
-// curl http://127.0.0.1:7001/set?key=hello&value=world
-// curl http://127.0.0.1:7001/get?key=hello
+// curl "http://127.0.0.1:7001/set?key=hello&value=world" # http://127.0.0.1:7001 是 leader
+// curl "http://127.0.0.1:7001/get?key=hello"
+// curl "http://127.0.0.1:8001/get?key=hello"
+// curl "http://127.0.0.1:8001/set?key=hello&value=world"
+// 断掉之后重新拉起，记得清空数据 `rm -rf ./raft/raft_3`
 func main() {
 	flag.Parse()
 
@@ -95,7 +98,34 @@ func main() {
 	os.MkdirAll(raftDir, 0700)
 
 	// INFO: (1)初始化 raft 对象
-	rf, fsm, err := NewRaft(raftAddr, raftId, raftDir)
+	config := raft.DefaultConfig()
+	config.LocalID = raft.ServerID(raftId)
+	// config.HeartbeatTimeout = 1000 * time.Millisecond
+	// config.ElectionTimeout = 1000 * time.Millisecond
+	// config.CommitTimeout = 1000 * time.Millisecond
+	addr, err := net.ResolveTCPAddr("tcp", raftAddr)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	transport, err := raft.NewTCPTransport(raftAddr, addr, 2, 5*time.Second, os.Stderr)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	snapshots, err := raft.NewFileSnapshotStore(raftDir, 2, os.Stderr)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	logStore, err := boltdb.NewBoltStore(filepath.Join(raftDir, "raft-log.db"))
+	if err != nil {
+		klog.Fatal(err)
+	}
+	stableStore, err := boltdb.NewBoltStore(filepath.Join(raftDir, "raft-stable.db"))
+	if err != nil {
+		klog.Fatal(err)
+	}
+	fsm := new(Fsm)
+	fsm.Data = map[string]string{}
+	rf, err := raft.NewRaft(config, fsm, logStore, stableStore, snapshots, transport)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -147,42 +177,4 @@ func main() {
 	if err != nil {
 		klog.Error(err)
 	}
-}
-
-func NewRaft(raftAddr, raftId, raftDir string) (*raft.Raft, *Fsm, error) {
-	config := raft.DefaultConfig()
-	config.LocalID = raft.ServerID(raftId)
-	// config.HeartbeatTimeout = 1000 * time.Millisecond
-	// config.ElectionTimeout = 1000 * time.Millisecond
-	// config.CommitTimeout = 1000 * time.Millisecond
-	addr, err := net.ResolveTCPAddr("tcp", raftAddr)
-	if err != nil {
-		return nil, nil, err
-	}
-	transport, err := raft.NewTCPTransport(raftAddr, addr, 2, 5*time.Second, os.Stderr)
-	if err != nil {
-		return nil, nil, err
-	}
-	snapshots, err := raft.NewFileSnapshotStore(raftDir, 2, os.Stderr)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	logStore, err := boltdb.NewBoltStore(filepath.Join(raftDir, "raft-log.db"))
-	if err != nil {
-		return nil, nil, err
-	}
-	stableStore, err := boltdb.NewBoltStore(filepath.Join(raftDir, "raft-stable.db"))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	fsm := new(Fsm)
-	fsm.Data = map[string]string{}
-	rf, err := raft.NewRaft(config, fsm, logStore, stableStore, snapshots, transport)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return rf, fsm, nil
 }

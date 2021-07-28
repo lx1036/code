@@ -10,8 +10,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/client"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/util/config"
+	"k8s-lx1036/k8s/storage/sunfs/pkg/config"
 
 	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseutil"
