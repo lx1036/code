@@ -108,3 +108,8 @@ csi_plugin 主要实现csi定义的方法，如 NodeGetInfo/NodeStageVolume/Node
 
 ### mount propagation
 设计文档： https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/propagation.md
+
+
+## Troubleshoot
+(1)csi 没法平滑升级
+juicefs csi 的解决方案：https://mp.weixin.qq.com/s/hPupPQmCPKZpGIA4SCPBzQ
