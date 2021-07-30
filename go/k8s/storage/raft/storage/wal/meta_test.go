@@ -13,9 +13,9 @@ func TestFileRead(test *testing.T) {
 	if err != nil {
 		return
 	}
-	
+
 	meta := make([]byte, 30)
-	n ,err := file.Read(meta)
+	n, err := file.Read(meta)
 	if err != nil && err != io.EOF {
 		klog.Error(err)
 	}

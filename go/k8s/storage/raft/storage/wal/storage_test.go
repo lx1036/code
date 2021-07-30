@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"testing"
-	
+
 	"github.com/tiglabs/raft/proto"
 	"github.com/tiglabs/raft/storage/wal"
 	"k8s.io/klog/v2"
 )
 
 // INFO: https://github.com/tiglabs/raft/blob/master/storage/wal/bench/main.go
-
 
 func TestStorage(test *testing.T) {
 	dir, err := ioutil.TempDir(".", "db_bench_")
@@ -103,7 +102,5 @@ func TestStorage(test *testing.T) {
 }
 
 func TestRaftStorage(test *testing.T) {
-
-
 
 }
