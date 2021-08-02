@@ -1,8 +1,4 @@
-
-
-
 // INFO: https://github.com/wereliang/raft
-
 
 package wal
 
@@ -14,18 +10,17 @@ import (
 
 type Raft struct {
 	state *RaftState
-	
+
 	processors map[Role]Processor
-	processor Processor
-	
-	wg   sync.WaitGroup
-	
-	
+	processor  Processor
+
+	wg  sync.WaitGroup
+	mux sync.Mutex
+
 	notifyC chan *raftEvent // processor -> raft
-	applyC chan *raftEvent // processor -> raft -> application state
-	
+	applyC  chan *raftEvent // processor -> raft -> application state
+
 	stateMachine StateMachine
-	
 }
 
 func (raft *Raft) Start() error {
@@ -33,17 +28,22 @@ func (raft *Raft) Start() error {
 	return nil
 }
 
-func (raft *Raft) raftLoop()  {
-	
+func (raft *Raft) raftLoop() {
 	raft.become(Follower)
 	raft.wg.Add(3)
 	defer raft.wg.Done()
-	go func() { defer raft.wg.Done(); raft.notifyLoop() }()
-	go func() { defer raft.wg.Done(); raft.applyLoop() }()
+	go func() {
+		defer raft.wg.Done()
+		raft.notifyLoop()
+	}()
+	go func() {
+		defer raft.wg.Done()
+		raft.applyLoop()
+	}()
 }
 
-func (raft *Raft) notifyLoop()  {
-	for  {
+func (raft *Raft) notifyLoop() {
+	for {
 		select {
 		case event := <-raft.notifyC:
 			switch event.name {
@@ -55,14 +55,11 @@ func (raft *Raft) notifyLoop()  {
 	}
 }
 
-func (raft *Raft) become(role Role)  {
-	
-	
-	
+func (raft *Raft) become(role Role) {
 }
 
-func (raft *Raft) applyLoop()  {
-	for  {
+func (raft *Raft) applyLoop() {
+	for {
 		select {
 		case event := <-raft.applyC:
 			klog.Infof(fmt.Sprintf("[applyLoop]event %+v", event))
@@ -71,13 +68,28 @@ func (raft *Raft) applyLoop()  {
 	}
 }
 
-func (raft *Raft) apply()  {
-	
+func (raft *Raft) apply() {
+
 }
 
 func NewRaft() (*Raft, error) {
 
+	state, err := NewRaftState("raft/state.json")
+	if err != nil {
+		return nil, err
+	}
 
+	raft := &Raft{
+		state:        state,
+		processors:   nil,
+		processor:    nil,
+		notifyC:      nil,
+		applyC:       nil,
+		stateMachine: nil,
+	}
 
+	commandProcessor := CommandProcessor{}
+	raft.processors[Follower] = NewProcessor(Follower)
 
+	return raft, err
 }

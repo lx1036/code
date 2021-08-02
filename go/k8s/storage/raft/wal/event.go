@@ -1,6 +1,5 @@
 package wal
 
-
 type eventName int8
 
 // Event appointment
@@ -21,6 +20,6 @@ const (
 
 type raftEvent struct {
 	name eventName
-	data  interface{}
-	resc  chan interface{}
+	data interface{}
+	resc chan interface{}
 }

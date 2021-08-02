@@ -21,23 +21,19 @@ func (logEntry *logEntryStorage) open() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// 没有log历史文件，则需要创建一个index=0的文件
 	if len(logFilenames) == 0 {
 		logEntry.createNew(1)
 	}
-	
-	
 
 	return nil
 }
 
-func (logEntry *logEntryStorage) createNew(index uint64)  {
-	
-	
+func (logEntry *logEntryStorage) createNew(index uint64) {
+
 	f, err := createLogEntryFile()
-	
-	
+
 }
 
 func openLogStorage(dir string, storage *Storage) (*logEntryStorage, error) {
@@ -52,4 +48,3 @@ func openLogStorage(dir string, storage *Storage) (*logEntryStorage, error) {
 
 	return logEntry, nil
 }
-

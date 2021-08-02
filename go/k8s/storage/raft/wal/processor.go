@@ -1,7 +1,5 @@
 package wal
 
-
-
 type Processor interface {
 	// HandleEvent external event and application event
 	HandleEvent(evt *raftEvent) (interface{}, error)
@@ -10,4 +8,9 @@ type Processor interface {
 	Stop() bool
 }
 
+type CommandProcessor struct {
+}
 
+func (processor *CommandProcessor) Init() error {
+
+}
