@@ -10,7 +10,6 @@ import (
 
 	"k8s-lx1036/k8s/storage/sunfs/pkg/backend"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/sdk/meta"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/util/config"
 
 	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseops"

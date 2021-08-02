@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/proto"
 )
 
 // Storage is an interface that may be implemented by the application to retrieve log entries from storage.

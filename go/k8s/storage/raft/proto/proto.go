@@ -38,7 +38,7 @@ const (
 	PeerArbiter PeerType = 1
 )
 
-// Entry is the repl log entry.
+// Entry is the replication log entry.
 type Entry struct {
 	Type  EntryType
 	Term  uint64

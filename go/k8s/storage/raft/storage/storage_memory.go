@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/proto"
 
 	"github.com/tiglabs/raft"
 	"github.com/tiglabs/raft/util"
@@ -238,7 +238,6 @@ func (ms *MemoryStorage) resize(capacity, needSize uint64) {
 }
 
 func NewMemoryStorage(fsm fsm, id, capacity uint64) *MemoryStorage {
-	klog.Infof("Memory Storage capacity is: %v.", capacity)
 	return &MemoryStorage{
 		fsm:      fsm,
 		id:       id,

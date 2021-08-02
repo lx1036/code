@@ -4,7 +4,6 @@ import (
 	"github.com/google/btree"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/raftstore"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/util"
-	utilproto "k8s-lx1036/k8s/storage/sunfs/pkg/util/proto"
 	"os"
 
 	"github.com/tiglabs/raft/proto"

@@ -1,9 +1,9 @@
-package log_replication
+package raft
 
 import (
 	"time"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/proto"
 )
 
 // replication represents a follower’s progress of replicate in the view of the leader.

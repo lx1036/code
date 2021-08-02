@@ -6,3 +6,9 @@ chmod +x ~/.air
 mv ~/.air /usr/local/bin/air
 air -c ./air.conf
 ```
+
+
+(1)查看哪个进程占用了指定端口
+```shell
+lsof -Pni4 | grep :9000
+```
