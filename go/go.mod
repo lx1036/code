@@ -101,6 +101,7 @@ require (
 	github.com/syndtr/goleveldb v0.0.0-20181127023241-353a9fca669c // indirect
 	github.com/tecbot/gorocksdb v0.0.0-20191217155057-f0fad39f321c
 	github.com/tidwall/evio v1.0.2
+	github.com/tidwall/wal v0.1.4
 	github.com/tiglabs/raft v0.0.0-20200304095606-b25a44ad8b33
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
 	github.com/urfave/cli v1.22.2
