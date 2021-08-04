@@ -55,7 +55,7 @@ func (state *RaftState) LoadState(filePath string) error {
 func NewRaftState(filePath string) (*RaftState, error) {
 	state := &RaftState{
 		Role:     Follower,
-		FilePath: "",
+		FilePath: filePath,
 	}
 	if err := state.LoadState(filePath); err != nil {
 		return nil, err

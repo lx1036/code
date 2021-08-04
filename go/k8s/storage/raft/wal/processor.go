@@ -8,9 +8,37 @@ type Processor interface {
 	Stop() bool
 }
 
-type CommandProcessor struct {
+type FollowerProcessor struct {
 }
 
-func (processor *CommandProcessor) Init() error {
+func (processor *FollowerProcessor) HandleEvent(evt *raftEvent) (interface{}, error) {
+	panic("implement me")
+}
+
+func (processor *FollowerProcessor) Init() error {
+	panic("implement me")
+}
+
+func (processor *FollowerProcessor) Loop() {
+	panic("implement me")
+}
+
+func (processor *FollowerProcessor) Stop() bool {
+	panic("implement me")
+}
+
+type CandidateProcessor struct {
+	FollowerProcessor
+
+	ConnectionManager *PeerConnectionManager
+}
+
+type LeaderProcessor struct {
+	CandidateProcessor
+
+	syncC chan interface{}
+}
+
+func NewProcessor(role Role, processor Processor) Processor {
 
 }

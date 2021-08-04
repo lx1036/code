@@ -1,5 +1,7 @@
 // INFO: https://github.com/wereliang/raft
 
+// INFO: raft博士作者论文中文版：https://github.com/maemual/raft-zh_cn/blob/master/raft-zh_cn.md
+
 package wal
 
 import (
@@ -9,7 +11,8 @@ import (
 )
 
 type Raft struct {
-	state *RaftState
+	config *Config
+	state  *RaftState
 
 	processors map[Role]Processor
 	processor  Processor
@@ -19,6 +22,8 @@ type Raft struct {
 
 	notifyC chan *raftEvent // processor -> raft
 	applyC  chan *raftEvent // processor -> raft -> application state
+
+	transport Transport
 
 	stateMachine StateMachine
 }
@@ -72,7 +77,8 @@ func (raft *Raft) apply() {
 
 }
 
-func NewRaft() (*Raft, error) {
+// raft = config + transport + stateMachine
+func NewRaft(config *Config, transport Transport, stateMachine StateMachine) (*Raft, error) {
 
 	state, err := NewRaftState("raft/state.json")
 	if err != nil {
@@ -80,16 +86,22 @@ func NewRaft() (*Raft, error) {
 	}
 
 	raft := &Raft{
-		state:        state,
-		processors:   nil,
-		processor:    nil,
-		notifyC:      nil,
-		applyC:       nil,
+		config:     config,
+		state:      state,
+		processors: nil,
+		processor:  nil,
+		notifyC:    nil,
+		applyC:     nil,
+
+		transport: transport,
+
 		stateMachine: nil,
 	}
 
-	commandProcessor := CommandProcessor{}
-	raft.processors[Follower] = NewProcessor(Follower)
+	commonProcessor := &FollowerProcessor{}
+	raft.processors[Follower] = NewProcessor(Follower, commonProcessor)
+	raft.processors[Candidate] = NewProcessor(Candidate, commonProcessor)
+	raft.processors[Leader] = NewProcessor(Leader, commonProcessor)
 
 	return raft, err
 }
