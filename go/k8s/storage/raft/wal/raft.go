@@ -2,6 +2,10 @@
 
 // INFO: raft博士作者论文中文版：https://github.com/maemual/raft-zh_cn/blob/master/raft-zh_cn.md
 
+// INFO:
+//  分布式一致性算法 Raft: https://zhuanlan.zhihu.com/p/383555591
+//  一文搞懂Raft算法: https://www.cnblogs.com/xybaby/p/10124083.html
+
 package wal
 
 import (
@@ -26,6 +30,8 @@ type Raft struct {
 	transport Transport
 
 	stateMachine StateMachine
+
+	raftLog RaftLog
 }
 
 func (raft *Raft) Start() error {
@@ -85,20 +91,30 @@ func NewRaft(config *Config, transport Transport, stateMachine StateMachine) (*R
 		return nil, err
 	}
 
+	raftLog, err := NewStorage("raft")
+	if err != nil {
+		return nil, err
+	}
 	raft := &Raft{
 		config:     config,
 		state:      state,
 		processors: nil,
 		processor:  nil,
-		notifyC:    nil,
+		notifyC:    make(chan *raftEvent, 256),
 		applyC:     nil,
 
 		transport: transport,
 
 		stateMachine: nil,
+
+		raftLog: raftLog,
 	}
 
-	commonProcessor := &FollowerProcessor{}
+	commonProcessor := &FollowerProcessor{
+		raftLog: raft.raftLog,
+		state:   raft.state,
+		notifyC: raft.notifyC,
+	}
 	raft.processors[Follower] = NewProcessor(Follower, commonProcessor)
 	raft.processors[Candidate] = NewProcessor(Candidate, commonProcessor)
 	raft.processors[Leader] = NewProcessor(Leader, commonProcessor)

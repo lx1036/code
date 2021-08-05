@@ -1,3 +1,5 @@
+// INFO: raft state 持久化
+
 package wal
 
 import (
@@ -23,6 +25,8 @@ type RaftState struct {
 
 	// 这几个字段会被持久化
 	PersistentState
+
+	CommitIndex int64 `json:"commitIndex"`
 }
 
 type PersistentState struct {
@@ -50,6 +54,21 @@ func (state *RaftState) LoadState(filePath string) error {
 	}
 
 	return nil
+}
+
+// SaveState 持久化到 raft/state.json
+func (state *RaftState) SaveState() error {
+	persistentState := &PersistentState{
+		CurrentTerm: state.CurrentTerm,
+		VotedFor:    state.VotedFor,
+	}
+	data, err := json.Marshal(persistentState)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(state.FilePath, data, 0644)
+
+	return err
 }
 
 func NewRaftState(filePath string) (*RaftState, error) {
