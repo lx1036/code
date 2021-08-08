@@ -1,19 +1,14 @@
-
-
-
 // INFO: https://github.com/tidwall/wal/blob/master/README.md
-
 
 package wal
 
 import (
 	"encoding/json"
 	"testing"
-	
+
 	"github.com/tidwall/wal"
 	"k8s.io/klog/v2"
 )
-
 
 // rm -rf ./log
 func TestWalWriteRead(test *testing.T) {
@@ -21,7 +16,7 @@ func TestWalWriteRead(test *testing.T) {
 	log, err := wal.Open("log", &wal.Options{
 		//NoSync:           false,
 		//SegmentSize:      0,
-		LogFormat:        wal.JSON, // 这里为了方便debug
+		LogFormat: wal.JSON, // 这里为了方便debug
 		//SegmentCacheSize: 0,
 		//NoCopy:           false,
 	})
@@ -29,9 +24,9 @@ func TestWalWriteRead(test *testing.T) {
 		klog.Fatal(err)
 	}
 	defer log.Close()
-	
+
 	type Person struct {
-		Age int `json:"age"`
+		Age  int    `json:"age"`
 		Name string `json:"name"`
 	}
 	person1 := Person{
@@ -49,14 +44,13 @@ func TestWalWriteRead(test *testing.T) {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	
+
 	data, err := log.Read(1)
 	if err != nil {
 		klog.Fatal(err)
 	}
 	klog.Info(string(data))
-	
-	
+
 	// INFO: batch write
 	// write three entries as a batch
 	batch := new(wal.Batch)
@@ -72,7 +66,7 @@ func TestWalWriteRead(test *testing.T) {
 		klog.Fatal(err)
 	}
 	klog.Info(string(data))
-	
+
 	// 把index=2之前的log，和index=3之后的log都给truncate掉
 	// 其实就是保留index=2~3的log
 	err = log.TruncateFront(2)
@@ -84,6 +78,3 @@ func TestWalWriteRead(test *testing.T) {
 		klog.Info(string(data))
 	}
 }
-
-
-

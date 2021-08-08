@@ -10,11 +10,7 @@ import (
 
 type logEntryFile struct {
 	file *os.File
-	
 }
-
-
-
 
 func createLogEntryFile(dir string, name logFilename) (*logEntryFile, error) {
 	filename := path.Join(dir, name.String()) // log entry 文件 dir/seq-index.log
@@ -22,19 +18,16 @@ func createLogEntryFile(dir string, name logFilename) (*logEntryFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	l := &logEntryFile{
 		file: file,
 	}
 	if err = l.OpenWrite(); err != nil {
 		return nil, err
 	}
-	
+
 	return l, nil
 }
-
-
-
 
 // 日志文件名字组成格式：seq-index.log
 type logFilename struct {
@@ -72,7 +65,7 @@ func listLogEntryFiles(dir string) ([]logFilename, error) {
 		return nil, err
 	}
 	defer file.Close()
-	
+
 	names, err := file.Readdirnames(0)
 	if err != nil {
 		return nil, err
@@ -85,8 +78,8 @@ func listLogEntryFiles(dir string) ([]logFilename, error) {
 			logFilenames = append(logFilenames, filename)
 		}
 	}
-	
+
 	sort.Sort(logFilenameSlice(logFilenames))
-	
+
 	return logFilenames, nil
 }
