@@ -62,6 +62,20 @@ filebeat 解决的几个重要问题：
 * 日志断点续传：这个问题很重要，filebeat 收割日志到某一行之后，filebeat 重启之后可以借助 registry state offset 继续从断点开始继续
 发到 output 模块中
 
+## filebeat 和 log-controller 的几个问题
+好文章：
+**[监控日志系列-Filebeat原理](https://kingjcy.github.io/post/monitor/log/collect/filebeat/filebeat-principle)**
+**[Elastic-Filebeat 实现原理剖析](https://www.cyhone.com/articles/analysis-of-filebeat/)**
+
+(1)pod 重新调度后，container logs 文件是否还存在，什么时候会被删除，还是一直不删除。这对 filebeat 正在消费日志文件，是否有影响？
+(2)filebeat 有 input reload 功能，log-controller 应该如何去更新 input.yml 文件，会不会对 input reload 功能有影响？
+(3)在实际生产环境使用中，仅采集容器的标准输出日志还是远远不够，我们往往还需要采集容器挂载出来的自定义日志目录，
+还需要控制每个服务的日志采集方式以及更多的定制化功能。业务日志有时候不仅仅想要标准输出，还想挂载出来到自定义日志目录，这块filebeat autodiscovery 如何解决？
+(4)filebeat运行一段时间后，内存使用过多，会hang住？这里multiline功能会使得内存占用过多。
+(5)filebeat ack 机制是什么？有什么用？
+(6)filebeat 利用 pipeline 来管理日志的生产和消费，如何做的？
+
+
 ## 参考文献
 **[Elastic-Filebeat 实现原理剖析](https://www.cyhone.com/articles/analysis-of-filebeat/)**
 **[监控日志系列-Filebeat原理](https://kingjcy.github.io/post/monitor/log/collect/filebeat/filebeat-principle/)**
