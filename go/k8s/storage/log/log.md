@@ -68,7 +68,12 @@ filebeat 解决的几个重要问题：
 **[Elastic-Filebeat 实现原理剖析](https://www.cyhone.com/articles/analysis-of-filebeat/)**
 
 (1)pod 重新调度后，container logs 文件是否还存在，什么时候会被删除，还是一直不删除。这对 filebeat 正在消费日志文件，是否有影响？
-(2)filebeat 有 input reload 功能，log-controller 应该如何去更新 input.yml 文件，会不会对 input reload 功能有影响？
+pod 重新调度后，container logs文件会被删除，这会导致filebeat正在消费这个日志文件，不能继续消费了，导致"日志丢失"问题
+解决方案：是可以通过filebeat句柄保持机制解决。
+**[Filebeat keeps open file handlers of deleted files for a long time](https://www.elastic.co/guide/en/beats/filebeat/current/faq-deleted-files-are-not-freed.html)**
+**[Too many open file handlers](https://www.elastic.co/guide/en/beats/filebeat/current/open-file-handlers.html)**
+
+(2)filebeat 有 input reload 功能，好像是定时检查机制，log-controller 应该如何定时去更新 input.yml 文件，会不会对 input reload 功能有影响？
 (3)在实际生产环境使用中，仅采集容器的标准输出日志还是远远不够，我们往往还需要采集容器挂载出来的自定义日志目录，
 还需要控制每个服务的日志采集方式以及更多的定制化功能。业务日志有时候不仅仅想要标准输出，还想挂载出来到自定义日志目录，这块filebeat autodiscovery 如何解决？
 (4)filebeat运行一段时间后，内存使用过多，会hang住？这里multiline功能会使得内存占用过多。
