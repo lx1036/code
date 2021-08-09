@@ -70,6 +70,7 @@ filebeat 解决的几个重要问题：
 (1)pod 重新调度后，container logs 文件是否还存在，什么时候会被删除，还是一直不删除。这对 filebeat 正在消费日志文件，是否有影响？
 pod 重新调度后，container logs文件会被删除，这会导致filebeat正在消费这个日志文件，不能继续消费了，导致"日志丢失"问题
 解决方案：是可以通过filebeat句柄保持机制解决。
+句柄保持是linux操作系统支持的，和filebeat无关。删除一个log文件，只要这个log文件还被其他进程读写，这个文件内容还在磁盘上：https://zhuanlan.zhihu.com/p/25650525
 **[Filebeat keeps open file handlers of deleted files for a long time](https://www.elastic.co/guide/en/beats/filebeat/current/faq-deleted-files-are-not-freed.html)**
 **[Too many open file handlers](https://www.elastic.co/guide/en/beats/filebeat/current/open-file-handlers.html)**
 
