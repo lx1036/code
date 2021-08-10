@@ -34,7 +34,7 @@ type Partition interface {
 	// Status returns the current raft status.
 	Status() (status *raft.Status)
 
-	// LeaderTerm returns the current term of leader in the raft group. TODO what is term?
+	// LeaderTerm returns the current term of leader in the raft group.
 	LeaderTerm() (leaderID, term uint64)
 
 	// IsRaftLeader returns true if this node is the leader of the raft group it belongs to.

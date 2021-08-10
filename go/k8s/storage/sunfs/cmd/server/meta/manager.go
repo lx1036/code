@@ -4,34 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
+	"k8s-lx1036/k8s/storage/sunfs/pkg/raftstore"
+	"k8s-lx1036/k8s/storage/sunfs/pkg/util"
 	"net"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
-
-	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/raftstore"
-	"k8s-lx1036/k8s/storage/sunfs/pkg/util"
 
 	"k8s.io/klog/v2"
 )
 
 const partitionPrefix = "partition_"
-
-var localPartionCount int = 0
-
-// MetadataManager manages all the meta partitions.
-type MetadataManager interface {
-	Start() error
-	Stop()
-	//CreatePartition(id string, start, end uint64, peers []proto.Peer) error
-	HandleMetadataOperation(conn net.Conn, p *proto.Packet, remoteAddr string) error
-	GetPartition(id uint64) (MetaPartition, error)
-	LoadStat() string
-}
 
 // MetadataManagerConfig defines the configures in the metadata manager.
 type MetadataManagerConfig struct {
@@ -41,121 +27,107 @@ type MetadataManagerConfig struct {
 }
 
 type metadataManager struct {
-	nodeId     uint64
-	rootDir    string
-	raftStore  raftstore.RaftStore
-	connPool   *util.ConnectPool
-	state      uint32
-	mu         sync.RWMutex
-	partitions map[uint64]MetaPartition // Key: metaRangeId, Val: metaPartition
+	nodeId              uint64
+	rootDir             string
+	raftStore           raftstore.RaftStore
+	connPool            *util.ConnectPool
+	state               uint32
+	mu                  sync.RWMutex
+	partitions          map[uint64]MetaPartition // Key: metaRangeId, Val: metaPartition
+	localPartitionCount int
 }
 
-func (m *metadataManager) Start() (err error) {
-	if atomic.CompareAndSwapUint32(&m.state, StateStandby, StateStart) {
-		defer func() {
-			var newState uint32
-			if err != nil {
-				newState = StateStandby
-			} else {
-				newState = StateRunning
-			}
-			atomic.StoreUint32(&m.state, newState)
-		}()
-		err = m.onStart()
-	}
-
-	return
-}
-
-// onStart creates the connection pool and loads the partitions.
-func (m *metadataManager) onStart() (err error) {
-	m.connPool = util.NewConnectPool()
-	err = m.loadPartitions()
-	return
-}
-
-func (m *metadataManager) loadPartitions() (err error) {
+// INFO: 从 metadataDir 目录中加载本地已有的 partitions
+func (m *metadataManager) Start() error {
 	// Check metadataDir directory
 	fileInfo, err := os.Stat(m.rootDir)
 	if err != nil {
-		os.MkdirAll(m.rootDir, 0755)
-		err = nil
-		return
-	}
-	if !fileInfo.IsDir() {
-		err = fmt.Errorf("metadataDir must be directory")
-		return
-	}
-	// scan the data directory
-	fileInfoList, err := ioutil.ReadDir(m.rootDir)
-	if err != nil {
-		return
-	}
-	var wg sync.WaitGroup
-	for _, fileInfo := range fileInfoList {
-		if fileInfo.IsDir() && strings.HasPrefix(fileInfo.Name(), partitionPrefix) {
-			localPartionCount++
-			wg.Add(1)
-			go func(fileName string) {
-				var errload error
-				defer func() {
-					if r := recover(); r != nil {
-						klog.Errorf("loadPartitions partition: %s, "+
-							"error: %s, failed: %v", fileName, errload, r)
-						panic(r)
-					}
-					if errload != nil {
-						klog.Errorf("loadPartitions partition: %s, "+
-							"error: %s", fileName, errload)
-						panic(errload)
-					}
-				}()
-				defer wg.Done()
-				if len(fileName) < 10 {
-					klog.Warningf("ignore unknown partition dir: %s", fileName)
-					return
-				}
-				var id uint64
-				partitionId := fileName[len(partitionPrefix):]
-				id, errload = strconv.ParseUint(partitionId, 10, 64)
-				if errload != nil {
-					klog.Warningf("ignore path: %s,not partition", partitionId)
-					return
-				}
-				partitionConfig := &MetaPartitionConfig{
-					NodeId:    m.nodeId,
-					RaftStore: m.raftStore,
-					RootDir:   path.Join(m.rootDir, fileName),
-					ConnPool:  m.connPool,
-				}
-				partitionConfig.AfterStop = func() {
-					m.detachPartition(id)
-				}
-				// check snapshot dir or backup
-				snapshotDir := path.Join(partitionConfig.RootDir, snapshotDir)
-				if _, errload = os.Stat(snapshotDir); errload != nil {
-					backupDir := path.Join(partitionConfig.RootDir, snapshotBackup)
-					if _, errload = os.Stat(backupDir); errload == nil {
-						if errload = os.Rename(backupDir, snapshotDir); errload != nil {
-							errload = fmt.Errorf("fail recover backup snapshot %s with err %v", snapshotDir, errload)
-							return
-						}
-					}
-					errload = nil
-				}
-
-				errload = m.attachPartition(id, NewMetaPartition(partitionConfig, m))
-				if errload != nil {
-					klog.Errorf("load partition id=%d failed: %s.",
-						id, errload.Error())
-				}
-			}(fileInfo.Name())
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(m.rootDir, 0755)
+		}
+		if err != nil {
+			return err
 		}
 	}
+	if !fileInfo.IsDir() {
+		return fmt.Errorf("metadataDir must be directory")
+	}
+
+	// scan the data directory
+	dirEntryList, err := ioutil.ReadDir(m.rootDir)
+	if err != nil {
+		return err
+	}
+	var wg sync.WaitGroup
+	for _, dirEntry := range dirEntryList {
+		// 必须是 partition_xxx 目录
+		if !dirEntry.IsDir() || !strings.HasPrefix(dirEntry.Name(), partitionPrefix) {
+			continue
+		}
+
+		m.localPartitionCount++
+		wg.Add(1)
+		go func(fileName string) {
+			var errload error
+			defer func() {
+				if r := recover(); r != nil {
+					klog.Errorf("loadPartitions partition: %s, "+
+						"error: %s, failed: %v", fileName, errload, r)
+					panic(r)
+				}
+				if errload != nil {
+					klog.Errorf("loadPartitions partition: %s, "+
+						"error: %s", fileName, errload)
+					panic(errload)
+				}
+			}()
+			defer wg.Done()
+
+			if len(fileName) < 10 {
+				klog.Warningf("ignore unknown partition dir: %s", fileName)
+				return
+			}
+			partitionId := fileName[len(partitionPrefix):]
+			id, err := strconv.ParseUint(partitionId, 10, 64)
+			if err != nil {
+				klog.Warningf("ignore path: %s,not partition", partitionId)
+				return
+			}
+			partitionConfig := &MetaPartitionConfig{
+				NodeId:    m.nodeId,
+				RaftStore: m.raftStore,
+				RootDir:   path.Join(m.rootDir, fileName),
+				ConnPool:  m.connPool,
+				AfterStop: func() {
+					m.detachPartition(id)
+				},
+			}
+			// check snapshot dir or backup
+			snapshotDir := path.Join(partitionConfig.RootDir, snapshotDir) // data/metanode/partition/partition_1/snapshot/
+			// 如果没有/snapshot目录，就从 /.snapshot_backup 目录rename到 /snapshot，如果 /.snapshot_backup 存在的话
+			if _, errload = os.Stat(snapshotDir); errload != nil {
+				backupDir := path.Join(partitionConfig.RootDir, snapshotBackup)
+				if _, errload = os.Stat(backupDir); errload == nil {
+					if errload = os.Rename(backupDir, snapshotDir); errload != nil {
+						errload = fmt.Errorf("fail recover backup snapshot %s with err %v", snapshotDir, errload)
+						return
+					}
+				}
+				errload = nil
+			}
+
+			errload = m.attachPartition(id, NewMetaPartition(partitionConfig, m))
+			if errload != nil {
+				klog.Errorf("load partition id=%d failed: %s.", id, errload.Error())
+			}
+		}(dirEntry.Name())
+	}
 	wg.Wait()
-	return
+
+	return nil
 }
 
+// INFO: 启动每一个 partition，并缓存已经启动的 partition
 func (m *metadataManager) attachPartition(id uint64, partition MetaPartition) error {
 	if err := partition.Start(); err != nil {
 		klog.Errorf("finish load metaPartition %v error %v", id, err)
@@ -180,8 +152,13 @@ func (m *metadataManager) detachPartition(id uint64) error {
 	return fmt.Errorf("unknown partition: %d", id)
 }
 
+// INFO: stop 每一个 partition
 func (m *metadataManager) Stop() {
-	panic("implement me")
+	if m.partitions != nil {
+		for _, partition := range m.partitions {
+			partition.Stop()
+		}
+	}
 }
 
 func (m *metadataManager) HandleMetadataOperation(conn net.Conn, p *proto.Packet, remoteAddr string) error {
@@ -260,15 +237,16 @@ func (m *metadataManager) GetPartition(id uint64) (MetaPartition, error) {
 }
 
 func (m *metadataManager) LoadStat() string {
-	panic("implement me")
+	return fmt.Sprintf("state total/loaded : %d/%d", m.localPartitionCount, len(m.partitions))
 }
 
 // NewMetadataManager returns a new metadata manager.
-func NewMetadataManager(conf MetadataManagerConfig) MetadataManager {
+func NewMetadataManager(conf MetadataManagerConfig) *metadataManager {
 	return &metadataManager{
 		nodeId:     conf.NodeID,
 		rootDir:    conf.RootDir,
 		raftStore:  conf.RaftStore,
 		partitions: make(map[uint64]MetaPartition),
+		connPool:   util.NewConnectPool(),
 	}
 }

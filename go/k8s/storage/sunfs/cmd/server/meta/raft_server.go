@@ -20,7 +20,6 @@ func (m *MetaNode) startRaftServer() (err error) {
 
 	heartbeatPort, _ := strconv.Atoi(m.raftHeartbeatPort)
 	replicaPort, _ := strconv.Atoi(m.raftReplicatePort)
-
 	raftConf := &raftstore.Config{
 		NodeID:            m.nodeId,
 		RaftPath:          m.raftDir,

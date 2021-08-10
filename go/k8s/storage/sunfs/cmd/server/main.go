@@ -6,7 +6,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"k8s-lx1036/k8s/storage/sunfs/cmd/server/master"
 	"k8s-lx1036/k8s/storage/sunfs/cmd/server/meta"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/config"
 
@@ -14,9 +13,7 @@ import (
 )
 
 var (
-	configFile       = flag.String("c", "", "config file path")
-	configVersion    = flag.Bool("v", false, "show version")
-	configForeground = flag.Bool("f", false, "run foreground")
+	configFile = flag.String("c", "", "config file path")
 )
 
 const (
@@ -40,19 +37,14 @@ const (
 type Server interface {
 	Start(cfg *config.Config) error
 	Shutdown()
-	// Sync will block invoker goroutine until this MetaNode shutdown.
-	Sync()
+
+	// Wait will block invoker goroutine until this MetaNode shutdown.
+	Wait()
 }
 
 func main() {
-	klog.InitFlags(nil)
-	flag.Set("logtostderr", "true")
 	flag.Parse()
 
-	/*
-	 * LoadConfigFile should be checked before start daemon, since it will
-	 * call os.Exit() w/o notifying the parent process.
-	 */
 	cfg, err := config.LoadConfigFile(*configFile)
 	if err != nil {
 		klog.Error(err)
@@ -67,7 +59,7 @@ func main() {
 	case RoleMeta:
 		server = meta.NewServer()
 	case RoleMaster:
-		server = master.NewServer()
+		//server = master.NewServer()
 	default:
 		klog.Errorf("Fatal: role mismatch: %v", role)
 		os.Exit(1)
@@ -81,7 +73,7 @@ func main() {
 	}
 
 	// Block main goroutine until server shutdown.
-	server.Sync()
+	server.Wait()
 	os.Exit(0)
 }
 

@@ -249,7 +249,7 @@ func (server *Server) Shutdown() {
 	server.wg.Done()
 }
 
-func (server *Server) Sync() {
+func (server *Server) Wait() {
 	server.wg.Wait()
 }
 
