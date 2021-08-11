@@ -160,10 +160,10 @@ func (i *Inode) MarshalValue() []byte {
 
 // NewInode returns a new Inode instance with specified Inode ID, name and type.
 // The AccessTime and ModifyTime will be set to the current time.
-func NewInode(ino uint64, t uint32) *Inode {
+func NewInode(inode uint64, t uint32) *Inode {
 	ts := time.Now().Unix()
 	i := &Inode{
-		Inode:      ino,
+		Inode:      inode,
 		Type:       t,
 		Generation: 1,
 		CreateTime: ts,

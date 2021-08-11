@@ -3,6 +3,8 @@ package meta
 import (
 	"encoding/json"
 	"sync"
+
+	"github.com/google/btree"
 )
 
 // Dentry wraps necessary properties of the `dentry` information in file system.
@@ -31,6 +33,11 @@ type Dentry struct {
 	Name     string `json:"name"`      // Name of the current dentry.
 	Inode    uint64 `json:"inode"`     // FileID value of the current inode.
 	Type     uint32 `json:"type"`
+}
+
+func (dentry *Dentry) Less(than btree.Item) bool {
+	d, ok := than.(*Dentry)
+	return ok && ((dentry.ParentId < d.ParentId) || (dentry.ParentId == d.ParentId) && (dentry.Name < d.Name))
 }
 
 // MarshalToJSON is the wrapper of json.Marshal.

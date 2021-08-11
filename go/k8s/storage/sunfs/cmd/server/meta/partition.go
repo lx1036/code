@@ -3,6 +3,7 @@ package meta
 import (
 	"os"
 	"path"
+	"strings"
 
 	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/raftstore"
@@ -71,7 +72,7 @@ type MetaPartitionConfig struct {
 	VolName     string              `json:"vol_name"`
 	Start       uint64              `json:"start"` // Minimal Inode ID of this range. (Required during initialization)
 	End         uint64              `json:"end"`   // Maximal Inode ID of this range. (Required during initialization)
-	Peers       []raftproto.Peer    `json:"peers"` // Peers information of the raftStore
+	Peers       []proto.Peer        `json:"peers"` // Peers information of the raftStore
 	Cursor      uint64              `json:"-"`     // Cursor ID of the inode that have been assigned
 	NodeId      uint64              `json:"-"`
 	RootDir     string              `json:"-"`
@@ -104,6 +105,7 @@ type metaPartition struct {
 	dentryTree *btree.BTree // dir entry fs.DirEntry
 	inodeTree  *btree.BTree // index node
 
+	// raftPartition 需要多个参数一起构造
 	raftPartition raftstore.Partition
 	stopC         chan bool
 	storeChan     chan *storeMsg
@@ -168,21 +170,50 @@ func (partition *metaPartition) CanRemoveRaftMember(peer raftproto.Peer) error {
 	panic("implement me")
 }
 
-// INFO: 从本地加载 metadata/inode/dentry/applyID
+// INFO: 从本地snapshot加载 metadata/inode/dentry/applyID
 func (partition *metaPartition) load() error {
 	if err := partition.loadMetadata(); err != nil {
 		return err
 	}
-
-	loadSnapshotDir := path.Join(partition.config.RootDir, SnapshotDir) // data/metanode/partition/partition_1/snapshot/
 	if err := partition.loadInode(); err != nil {
 		return err
 	}
-	if err := partition.loadDentry(loadSnapshotDir); err != nil {
+	if err := partition.loadDentry(); err != nil {
 		return err
 	}
+	return partition.loadApplyID()
+}
 
-	return partition.loadApplyID(loadSnapshotDir)
+func (partition *metaPartition) startRaft() error {
+	var (
+		err           error
+		heartbeatPort int
+		replicaPort   int
+		peers         []raftstore.PeerAddress
+	)
+	if heartbeatPort, replicaPort, err = partition.getRaftPort(); err != nil {
+		return err
+	}
+	for _, peer := range partition.config.Peers {
+		addr := strings.Split(peer.Addr, ":")[0]
+		rp := raftstore.PeerAddress{
+			Peer: raftproto.Peer{
+				ID: peer.ID,
+			},
+			Address:       addr,
+			HeartbeatPort: heartbeatPort,
+			ReplicaPort:   replicaPort,
+		}
+		peers = append(peers, rp)
+	}
+	partition.raftPartition, err = partition.config.RaftStore.CreatePartition(&raftstore.PartitionConfig{
+		ID:      partition.config.PartitionId,
+		Applied: partition.applyID,
+		Peers:   peers,
+		SM:      partition,
+	})
+
+	return err
 }
 
 // INFO: 启动各个 partition

@@ -3,11 +3,14 @@ package meta
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"hash/crc32"
 	"io/ioutil"
 	"k8s.io/klog/v2"
 	"os"
 	"path"
+	"strings"
+	"sync/atomic"
 
 	"github.com/google/btree"
 )
@@ -18,8 +21,8 @@ const (
 	snapshotBackup  = ".snapshot_backup"
 	InodeFile       = "inode"
 	DentryFile      = "dentry"
-	applyIDFile     = "apply"
-	SnapshotSign    = ".sign"
+	ApplyIDFile     = "apply"
+	SnapshotSign    = "sign"
 	MetadataFile    = "meta"
 	metadataFileTmp = ".meta"
 )
@@ -113,6 +116,7 @@ func (partition *metaPartition) loadDentry() error {
 
 }
 
+// INFO: 迭代BTree，序列化每一个 btree.Item，然后持久化到一个文件内
 func (partition *metaPartition) storeDentry(msg *storeMsg) (uint32, error) {
 	filename := path.Join(partition.config.RootDir, SnapshotDir, DentryFile)
 	dentryFile, err := os.OpenFile(filename, os.O_RDWR|os.O_TRUNC|os.O_APPEND|os.O_CREATE, 0755)
@@ -156,4 +160,37 @@ func (partition *metaPartition) storeDentry(msg *storeMsg) (uint32, error) {
 
 	// 内容的hash值
 	return sign.Sum32(), nil
+}
+
+func (partition *metaPartition) storeApplyID(msg *storeMsg) error {
+	filename := path.Join(partition.config.RootDir, SnapshotDir, ApplyIDFile)
+	// INFO: 注意这里使用的是 atomic.LoadUint64()，非常重要，学习下 atomic ！！！
+	return ioutil.WriteFile(filename, []byte(fmt.Sprintf("%d|%d", msg.applyIndex, atomic.LoadUint64(&partition.config.Cursor))), 0775)
+}
+
+func (partition *metaPartition) loadApplyID() error {
+	filename := path.Join(partition.config.RootDir, SnapshotDir, ApplyIDFile)
+	content, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	if len(content) == 0 {
+		return fmt.Errorf("[loadApplyID]applyID is empty")
+	}
+
+	var cursor uint64
+	if strings.Contains(string(content), "|") {
+		_, err = fmt.Sscanf(string(content), "%d|%d", &partition.applyID, &cursor)
+	} else {
+		_, err = fmt.Sscanf(string(content), "%d", &partition.applyID)
+	}
+	if err != nil {
+		return err
+	}
+
+	if cursor > atomic.LoadUint64(&partition.config.Cursor) {
+		atomic.StoreUint64(&partition.config.Cursor, cursor)
+	}
+
+	return nil
 }
