@@ -3,9 +3,9 @@ package pluginmanager
 import (
 	"time"
 
-	"k8s-lx1036/k8s/storage/csi/pluginmanager/cache"
-	"k8s-lx1036/k8s/storage/csi/pluginmanager/pluginwatcher"
-	"k8s-lx1036/k8s/storage/csi/pluginmanager/reconciler"
+	"k8s-lx1036/k8s/kubelet/pkg/pluginmanager/cache"
+	"k8s-lx1036/k8s/kubelet/pkg/pluginmanager/pluginwatcher"
+	"k8s-lx1036/k8s/kubelet/pkg/pluginmanager/reconciler"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"

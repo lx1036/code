@@ -6,8 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"k8s-lx1036/k8s/storage/csi/pluginmanager"
-	example_plugin "k8s-lx1036/k8s/storage/csi/pluginmanager/demo/example-plugin"
+	"k8s-lx1036/k8s/kubelet/pkg/pluginmanager"
+	example_plugin "k8s-lx1036/k8s/kubelet/pkg/pluginmanager/demo/example-plugin"
 
 	"k8s.io/klog/v2"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s-lx1036/k8s/storage/csi/pluginmanager/cache"
+	"k8s-lx1036/k8s/kubelet/pkg/pluginmanager/cache"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"

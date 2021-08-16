@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s-lx1036/k8s/storage/csi/pluginmanager/cache"
+	"k8s-lx1036/k8s/kubelet/pkg/pluginmanager/cache"
 
 	"github.com/fsnotify/fsnotify"
 
