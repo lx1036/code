@@ -6,6 +6,6 @@ import (
 	"github.com/jacobsa/fuse/fuseops"
 )
 
-func (s *Super) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
-
+func (super *Super) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
+	return nil
 }

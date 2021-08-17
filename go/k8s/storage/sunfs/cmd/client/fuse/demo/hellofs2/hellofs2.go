@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -312,11 +313,12 @@ func main() {
 
 	mountedFileSystem, err := fuse.Mount(*fMountPoint, server, cfg)
 	if err != nil {
-		log.Fatalf("Mount: %v", err)
+		klog.Fatalf("Mount: %v", err)
 	}
 
+	klog.Infof(fmt.Sprintf("fuse mount point %s successfully", *fMountPoint))
 	// Wait for it to be unmounted.
 	if err = mountedFileSystem.Join(context.Background()); err != nil {
-		log.Fatalf("Join: %v", err)
+		klog.Fatalf("Join: %v", err)
 	}
 }

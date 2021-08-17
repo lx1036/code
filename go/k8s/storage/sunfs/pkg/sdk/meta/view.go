@@ -2,6 +2,7 @@ package meta
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync/atomic"
 
@@ -17,6 +18,17 @@ type VolStatInfo struct {
 }
 
 // POST http://{master_ip}:9500/client/volStat?name={pv-name}
+/*
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "Name": "pvc-liuxiang",
+        "TotalSize": 1073741824,
+        "UsedSize": 6
+    }
+}
+ */
 func (mw *MetaWrapper) updateVolStatInfo() error {
 	params := make(map[string]string)
 	params["name"] = mw.volname
@@ -33,12 +45,22 @@ func (mw *MetaWrapper) updateVolStatInfo() error {
 	}
 	atomic.StoreUint64(&mw.totalSize, info.TotalSize)
 	atomic.StoreUint64(&mw.usedSize, info.UsedSize)
-
-	klog.Infof("VolStatInfo: info(%v)", *info)
+	
+	klog.Infof(fmt.Sprintf("VolStatInfo: %+v", *info))
 	return nil
 }
 
 // POST http://{master_ip}:9500/admin/getIp
+/*
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "Cluster": "test-sunfs",
+        "Ip": "101.20.30.40"
+    }
+}
+ */
 func (mw *MetaWrapper) updateClusterInfo() error {
 	body, err := mw.master.Request(http.MethodPost, proto.AdminGetIP, nil, nil)
 	if err != nil {
@@ -55,9 +77,29 @@ func (mw *MetaWrapper) updateClusterInfo() error {
 	klog.V(5).Infof("ClusterInfo: %v", *info)
 	mw.cluster = info.Cluster
 	mw.localIP = info.Ip
+	
+	klog.Infof(fmt.Sprintf("ClusterInfo: %+v", *info))
 	return nil
 }
 
+// POST http://{master_ip}:9500/admin/getVol
+/*
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "ID": 5,
+        "Name": "pvc-liuxiang",
+        "Owner": "sunfs",
+        "MpReplicaNum": 3,
+        "Status": 0,
+        "Capacity": 1,
+        "MpCnt": 3,
+        "S3Endpoint": "http://test.s3.cn",
+        "BucketDeleted": false
+    }
+}
+ */
 func (mw *MetaWrapper) updateVolSimpleInfo() error {
 	params := make(map[string]string)
 	params["name"] = mw.volname
@@ -74,7 +116,7 @@ func (mw *MetaWrapper) updateVolSimpleInfo() error {
 	}
 
 	mw.S3Endpoint = info.S3Endpoint
-	klog.V(5).Infof("VolSimpleInfo: %+v", *info)
+	klog.Infof(fmt.Sprintf("SimpleVolView: %+v", *info))
 	return nil
 }
 
@@ -83,24 +125,23 @@ func (mw *MetaWrapper) updateMetaPartitions() error {
 	if err != nil {
 		return err
 	}
-
-	rwPartitions := make([]*MetaPartition, 0)
-	for _, mp := range view.MetaPartitions {
-		mw.replaceOrInsertPartition(mp)
-		klog.Infof("updateMetaPartition: mp(%v)", mp)
-		if mp.Status == proto.ReadWrite {
-			rwPartitions = append(rwPartitions, mp)
+	
+	metaPartitions := make([]*MetaPartition, 0)
+	for _, metaPartition := range view.MetaPartitions {
+		mw.replaceOrInsertPartition(metaPartition)
+		if metaPartition.Status == proto.ReadWrite {
+			metaPartitions = append(metaPartitions, metaPartition)
 		}
 	}
 
-	if len(rwPartitions) == 0 {
-		klog.Infof("updateMetaPartition: no rw partitions")
+	if len(metaPartitions) == 0 {
+		klog.Infof("updateMetaPartition: no read-write meta partitions")
 		return nil
 	}
 
 	mw.Lock()
 	defer mw.Unlock()
-	mw.rwPartitions = rwPartitions
+	mw.rwPartitions = metaPartitions
 	return nil
 }
 
@@ -109,6 +150,55 @@ type VolumeView struct {
 	MetaPartitions []*MetaPartition `json:"MetaPartitions"`
 }
 
+// POST http://{master_ip}:9500/client/vol
+/*
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "Name": "pvc-liuxiang",
+        "Status": 0,
+        "MetaPartitions": [
+            {
+                "PartitionID": 3,
+                "Start": 33554433,
+                "End": 9223372036854775807,
+                "Members": [
+                    "101.206.77.175:9021",
+                    "101.206.77.176:9021",
+                    "101.206.77.177:9021"
+                ],
+                "LeaderAddr": "101.206.77.176:9021",
+                "Status": 2
+            },
+            {
+                "PartitionID": 1,
+                "Start": 0,
+                "End": 16777216,
+                "Members": [
+                    "101.206.77.175:9021",
+                    "101.206.77.176:9021",
+                    "101.206.77.177:9021"
+                ],
+                "LeaderAddr": "101.206.77.175:9021",
+                "Status": 2
+            },
+            {
+                "PartitionID": 2,
+                "Start": 16777217,
+                "End": 33554432,
+                "Members": [
+                    "101.206.77.175:9021",
+                    "101.206.77.176:9021",
+                    "101.206.77.177:9021"
+                ],
+                "LeaderAddr": "101.206.77.177:9021",
+                "Status": 2
+            }
+        ]
+    }
+}
+ */
 func (mw *MetaWrapper) fetchVolumeView() (*VolumeView, error) {
 	params := make(map[string]string)
 	params["name"] = mw.volname
@@ -123,6 +213,7 @@ func (mw *MetaWrapper) fetchVolumeView() (*VolumeView, error) {
 		klog.Errorf("fetchVolumeView unmarshal: err(%v) body(%v)", err, string(body))
 		return nil, err
 	}
-
+	
+	klog.Infof(fmt.Sprintf("VolumeView: %+v", *view))
 	return view, nil
 }

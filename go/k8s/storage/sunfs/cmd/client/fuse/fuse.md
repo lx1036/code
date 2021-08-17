@@ -1,6 +1,6 @@
 
 
-## FUSE(Filesystem in UserNamespace)
+## FUSE(Filesystem in Userspace)
 
 
 

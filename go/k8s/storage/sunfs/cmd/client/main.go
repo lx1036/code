@@ -2,15 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strconv"
 	"syscall"
 
-	"k8s-lx1036/k8s/storage/sunfs/pkg/config"
+	"k8s-lx1036/k8s/storage/sunfs/cmd/client/fs"
 
 	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseutil"
@@ -52,33 +52,31 @@ const (
 )
 
 var (
-	configFile       = flag.String("c", "", "config file path")
-	configVersion    = flag.Bool("v", false, "show version")
-	configForeground = flag.Bool("f", false, "run foreground")
+	configFile = flag.String("c", "", "config file path")
 )
 
+// INFO: https://chubaofs.readthedocs.io/zh_CN/latest/design/client.html
+// go run . -c ./fuse_360.json
 func main() {
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 
-	/*
-	 * LoadConfigFile should be checked before start daemon, since it will
-	 * call os.Exit() w/o notifying the parent process.
-	 */
-	cfg, err := config.LoadConfigFile(*configFile)
+	// mount config
+	if len(*configFile) == 0 {
+		klog.Fatalf(fmt.Sprintf("config file should not be empty"))
+	}
+	content, err := ioutil.ReadFile(*configFile)
 	if err != nil {
-		klog.Error(err)
-		os.Exit(1)
+		klog.Fatalf(fmt.Sprintf("read file err %v", err))
+	}
+	var mountOption fs.MountOption
+	err = json.Unmarshal(content, &mountOption)
+	if err != nil {
+		klog.Fatalf(fmt.Sprintf("json unmarshal config file err %v", err))
 	}
 
-	opt, err := parseMountOption(cfg)
-	if err != nil {
-		klog.Errorf("parseMountOption err: %v", err)
-		os.Exit(1)
-	}
-
-	super, err := client.NewSuper(opt)
+	super, err := fs.NewSuper(&mountOption)
 	if err != nil {
 		klog.Error(err)
 		os.Exit(1)
@@ -88,14 +86,14 @@ func main() {
 
 	// mount filesystem
 	server := fuseutil.NewFileSystemServer(super)
-	mntcfg := &fuse.MountConfig{
-		FSName:                  "sunfs-" + opt.Volname,
-		Subtype:                 "sunfs",
-		ReadOnly:                opt.Rdonly,
+	mountConfig := &fuse.MountConfig{
+		FSName:                  "sunfs-" + mountOption.Volname,
+		Subtype:                 "sunfs", // `cat /proc/mounts | grep sunfs` -> xxx fuse.sunfs xxx
+		ReadOnly:                mountOption.ReadOnly,
 		DisableWritebackCaching: true,
 	}
 
-	mfs, err := fuse.Mount(opt.MountPoint, server, mntcfg)
+	mfs, err := fuse.Mount(mountOption.MountPoint, server, mountConfig)
 	if err != nil {
 		super.Destroy()
 		klog.Error(err)
@@ -108,7 +106,7 @@ func main() {
 	}
 }
 
-func registerInterceptedSignal(super *client.Super) {
+func registerInterceptedSignal(super *fs.Super) {
 	sigC := make(chan os.Signal, 1)
 	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -117,64 +115,4 @@ func registerInterceptedSignal(super *client.Super) {
 		klog.Infof("Killed due to a received signal (%v)\n", sig)
 		os.Exit(1)
 	}()
-}
-
-func parseMountOption(cfg *config.Config) (*client.MountOption, error) {
-	var err error
-	opt := new(client.MountOption)
-	opt.Config = cfg
-
-	rawmnt := cfg.GetString(MountPoint)
-	opt.MountPoint, err = filepath.Abs(rawmnt)
-	if err != nil {
-		return nil, fmt.Errorf("invalide mount point (%s) ", rawmnt)
-	}
-
-	opt.Volname = cfg.GetString(VolName)
-	opt.Owner = cfg.GetString(Owner)
-	opt.Master = cfg.GetString(MasterAddr)
-	opt.Logpath = cfg.GetString(LogDir)
-	opt.Loglvl = cfg.GetString(LogLevel)
-	opt.Profport = cfg.GetString(ProfPort)
-	opt.IcacheTimeout = parseConfigString(cfg, IcacheTimeout)
-	opt.LookupValid = parseConfigString(cfg, LookupValid)
-	opt.AttrValid = parseConfigString(cfg, AttrValid)
-	opt.ReadRate = parseConfigString(cfg, ReadRate)
-	opt.WriteRate = parseConfigString(cfg, WriteRate)
-	opt.EnSyncWrite = parseConfigString(cfg, EnSyncWrite)
-	opt.Rdonly = cfg.GetBool(Rdonly)
-	opt.WriteCache = cfg.GetBool(WriteCache)
-	opt.KeepCache = cfg.GetBool(KeepCache)
-	opt.FullPathName = cfg.GetBoolWithDefault(FullPathName, true)
-	opt.S3ObjectNameVerify = cfg.GetBoolWithDefault(S3ObjectNameVerify, true)
-	opt.BufSize = cfg.GetInt64WithDefault(BufSize, WriteBufPoolSize)
-	opt.MaxMultiParts = cfg.GetInt(MaxMultiParts)
-	opt.MaxCacheInode = cfg.GetInt(MaxCacheInode)
-	if opt.MaxMultiParts <= 0 {
-		opt.MaxMultiParts = 60
-	}
-	opt.ReadDirBurst = cfg.GetInt(ReadDirBurst)
-	opt.ReadDirLimit = cfg.GetInt(ReadDirLimit)
-
-	if opt.MountPoint == "" || opt.Volname == "" || opt.Owner == "" || opt.Master == "" {
-		return nil, fmt.Errorf("invalid config file: lack of mandatory fields, mountPoint(%s), volName(%s), owner(%s), masterAddr(%s)",
-			opt.MountPoint, opt.Volname, opt.Owner, opt.Master)
-	}
-
-	opt.S3Cfg, err = config.ParseS3Config(cfg)
-
-	return opt, nil
-}
-
-func parseConfigString(cfg *config.Config, keyword string) int64 {
-	var ret int64 = -1
-	rawstr := cfg.GetString(keyword)
-	if rawstr != "" {
-		val, err := strconv.Atoi(rawstr)
-		if err == nil {
-			ret = int64(val)
-			fmt.Println(fmt.Sprintf("keyword[%v] value[%v]", keyword, ret))
-		}
-	}
-	return ret
 }

@@ -66,11 +66,11 @@ type MetaWrapper struct {
 	clientId uint64
 }
 
-func (mw *MetaWrapper) Statfs() (total, used uint64) {
-	mw.updateVolStatInfo()
-	total = atomic.LoadUint64(&mw.totalSize)
-	used = atomic.LoadUint64(&mw.usedSize)
-	return
+// INFO: `stat ${mountOption.MountPoint}` 命令执行结果
+func (mw *MetaWrapper) Statfs() (uint64, uint64) {
+	_ = mw.updateVolStatInfo()
+	// 如果更新 volume stats 失败，则使用上一次的数据
+	return atomic.LoadUint64(&mw.totalSize), atomic.LoadUint64(&mw.usedSize)
 }
 
 func (mw *MetaWrapper) refresh() {
@@ -109,7 +109,9 @@ func NewMetaWrapper(volname, owner, masterHosts string) (*MetaWrapper, error) {
 		return nil, err
 	}
 	err = mw.updateVolSimpleInfo()
-
+	if err != nil {
+		return nil, err
+	}
 	if err := mw.updateMetaPartitions(); err != nil {
 		return nil, fmt.Errorf("init meta wrapper failed err: %v", err)
 	}
