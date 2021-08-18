@@ -28,7 +28,8 @@ type VolStatInfo struct {
         "UsedSize": 6
     }
 }
- */
+*/
+// 获取 volume stats 数据
 func (mw *MetaWrapper) updateVolStatInfo() error {
 	params := make(map[string]string)
 	params["name"] = mw.volname
@@ -45,7 +46,7 @@ func (mw *MetaWrapper) updateVolStatInfo() error {
 	}
 	atomic.StoreUint64(&mw.totalSize, info.TotalSize)
 	atomic.StoreUint64(&mw.usedSize, info.UsedSize)
-	
+
 	klog.Infof(fmt.Sprintf("VolStatInfo: %+v", *info))
 	return nil
 }
@@ -60,7 +61,7 @@ func (mw *MetaWrapper) updateVolStatInfo() error {
         "Ip": "101.20.30.40"
     }
 }
- */
+*/
 func (mw *MetaWrapper) updateClusterInfo() error {
 	body, err := mw.master.Request(http.MethodPost, proto.AdminGetIP, nil, nil)
 	if err != nil {
@@ -77,7 +78,7 @@ func (mw *MetaWrapper) updateClusterInfo() error {
 	klog.V(5).Infof("ClusterInfo: %v", *info)
 	mw.cluster = info.Cluster
 	mw.localIP = info.Ip
-	
+
 	klog.Infof(fmt.Sprintf("ClusterInfo: %+v", *info))
 	return nil
 }
@@ -99,7 +100,8 @@ func (mw *MetaWrapper) updateClusterInfo() error {
         "BucketDeleted": false
     }
 }
- */
+*/
+// 获取 volume 基本数据
 func (mw *MetaWrapper) updateVolSimpleInfo() error {
 	params := make(map[string]string)
 	params["name"] = mw.volname
@@ -125,7 +127,7 @@ func (mw *MetaWrapper) updateMetaPartitions() error {
 	if err != nil {
 		return err
 	}
-	
+
 	metaPartitions := make([]*MetaPartition, 0)
 	for _, metaPartition := range view.MetaPartitions {
 		mw.replaceOrInsertPartition(metaPartition)
@@ -198,7 +200,7 @@ type VolumeView struct {
         ]
     }
 }
- */
+*/
 func (mw *MetaWrapper) fetchVolumeView() (*VolumeView, error) {
 	params := make(map[string]string)
 	params["name"] = mw.volname
@@ -213,7 +215,7 @@ func (mw *MetaWrapper) fetchVolumeView() (*VolumeView, error) {
 		klog.Errorf("fetchVolumeView unmarshal: err(%v) body(%v)", err, string(body))
 		return nil, err
 	}
-	
+
 	klog.Infof(fmt.Sprintf("VolumeView: %+v", *view))
 	return view, nil
 }

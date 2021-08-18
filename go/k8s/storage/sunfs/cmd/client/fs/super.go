@@ -8,45 +8,45 @@ import (
 	"k8s-lx1036/k8s/storage/sunfs/pkg/sdk/meta"
 	"net/http"
 	"sync"
-	
+
 	"github.com/jacobsa/fuse"
 	"github.com/jacobsa/fuse/fuseops"
-	
+
 	"k8s.io/klog/v2"
 )
 
 type MountOption struct {
 	MountPoint string `json:"mountPoint"`
-	
+
 	//volname is also s3 bucket
-	Volname            string `json:"volName"`
-	Owner              string `json:"owner"`
+	Volname   string `json:"volName"`
+	Owner     string `json:"owner"`
 	AccessKey string `json:"accessKey"`
 	SecretKey string `json:"secretKey"`
-	
-	MasterAddr         string `json:"masterAddr"`
-	
-	ReadRate           int64
-	WriteRate          int64
-	EnSyncWrite        int64
-	BufSize            int64 `json:"bufSize"`
-	
-	ReadOnly           bool `json:"readOnly"`
-	
-	FullPathName       bool `json:"fullPathName"`
+
+	MasterAddr string `json:"masterAddr"`
+
+	ReadRate    int64
+	WriteRate   int64
+	EnSyncWrite int64
+	BufSize     int64 `json:"bufSize"`
+
+	ReadOnly bool `json:"readOnly"`
+
+	FullPathName bool `json:"fullPathName"`
 }
 
 type Super struct {
-	cluster            string
-	endpoint           string
-	localIP            string
-	volname            string
-	owner              string
+	cluster  string
+	endpoint string
+	localIP  string
+	volname  string
+	owner    string
 	//ic                 *InodeCache
-	hc                 *HandleCache
+	hc *HandleCache
 	//readDirc           *ReadDirCache
-	readDirLimiter     *rate.Limiter
-	metaClient                 *meta.MetaWrapper
+	readDirLimiter *rate.Limiter
+	metaClient     *meta.MetaWrapper
 	//orphan             *OrphanInodeList
 	enSyncWrite        bool
 	keepCache          bool
@@ -93,47 +93,11 @@ func (super *Super) ForgetInode(ctx context.Context, op *fuseops.ForgetInodeOp) 
 	panic("implement me")
 }
 
-func (super *Super) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
-	panic("implement me")
-}
-
-func (super *Super) MkNode(ctx context.Context, op *fuseops.MkNodeOp) error {
-	panic("implement me")
-}
-
 func (super *Super) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) error {
 	panic("implement me")
 }
 
-func (super *Super) CreateLink(ctx context.Context, op *fuseops.CreateLinkOp) error {
-	panic("implement me")
-}
-
-func (super *Super) CreateSymlink(ctx context.Context, op *fuseops.CreateSymlinkOp) error {
-	panic("implement me")
-}
-
 func (super *Super) Rename(ctx context.Context, op *fuseops.RenameOp) error {
-	panic("implement me")
-}
-
-func (super *Super) RmDir(ctx context.Context, op *fuseops.RmDirOp) error {
-	panic("implement me")
-}
-
-func (super *Super) Unlink(ctx context.Context, op *fuseops.UnlinkOp) error {
-	panic("implement me")
-}
-
-func (super *Super) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) error {
-	panic("implement me")
-}
-
-func (super *Super) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
-	panic("implement me")
-}
-
-func (super *Super) ReleaseDirHandle(ctx context.Context, op *fuseops.ReleaseDirHandleOp) error {
 	panic("implement me")
 }
 
@@ -190,6 +154,8 @@ func (super *Super) Destroy() {
 	//super.mw.UnMountClient()
 }
 
+// INFO: 不同操作对应其OP: https://github.com/jacobsa/fuse/blob/master/fuseutil/file_system.go#L135-L222
+
 func NewSuper(opt *MountOption) (*Super, error) {
 	var err error
 	super := new(Super)
@@ -197,6 +163,10 @@ func NewSuper(opt *MountOption) (*Super, error) {
 	if err != nil {
 		return nil, fmt.Errorf("NewMetaWrapper failed with err %v", err)
 	}
+
+	super.endpoint = super.metaClient.S3Endpoint
+	super.cluster = super.metaClient.Cluster()
+	super.localIP = super.metaClient.LocalIP()
 
 	return super, nil
 }

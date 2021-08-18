@@ -87,6 +87,14 @@ func (mw *MetaWrapper) refresh() {
 	}, RefreshMetaPartitionsInterval)
 }
 
+func (mw *MetaWrapper) Cluster() string {
+	return mw.cluster
+}
+
+func (mw *MetaWrapper) LocalIP() string {
+	return mw.localIP
+}
+
 func NewMetaWrapper(volname, owner, masterHosts string) (*MetaWrapper, error) {
 	mw := new(MetaWrapper)
 	mw.volname = volname
