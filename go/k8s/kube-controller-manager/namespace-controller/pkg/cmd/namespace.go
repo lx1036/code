@@ -4,8 +4,8 @@ import (
 	"os"
 	"time"
 
-	"k8s-lx1036/k8s/controller-manager/namespace-controller/pkg/controller"
-	"k8s-lx1036/k8s/controller-manager/namespace-controller/pkg/signals"
+	"k8s-lx1036/k8s/kube-controller-manager/namespace-controller/pkg/controller"
+	"k8s-lx1036/k8s/kube-controller-manager/namespace-controller/pkg/signals"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

@@ -289,6 +289,8 @@ INFO:
 	Hello, world!
 */
 
+// INFO: 改下 github.com/jacobsa/fuse mount_darwin.go 文件支持 mac
+
 // go run . --mountpoint=/mnt/hellofs2
 func main() {
 	flag.Parse()

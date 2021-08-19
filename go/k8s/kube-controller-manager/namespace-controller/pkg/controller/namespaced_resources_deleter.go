@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s-lx1036/k8s/controller-manager/namespace-controller/pkg/debug"
+	"k8s-lx1036/k8s/kube-controller-manager/namespace-controller/pkg/debug"
 
 	log "github.com/sirupsen/logrus"
 
