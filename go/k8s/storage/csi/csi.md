@@ -5,29 +5,6 @@
 
 
 
-## Troubleshoot
-(1)为何一些volume drivers，如NFS，或者一些FS，不需要 attach operation，CSIDriver里 `attachRequired: false`？
-```yaml
-# csidriver 需要部署时创建，重点是 podInfoOnMount 参数，见：
-# CSIDriver: https://kubernetes-csi.github.io/docs/csi-driver-object.html
-# Skip Attach: https://kubernetes-csi.github.io/docs/skip-attach.html
-# Pod Info on Mount: https://kubernetes-csi.github.io/docs/pod-info.html
-apiVersion: storage.k8s.io/v1
-kind: CSIDriver
-metadata:
-  name: csi.lxfs.com
-spec:
-  podInfoOnMount: true
-  attachRequired: false # controller-server没有实现ControllerPublishVolume()，不需要volume attach operation
-  volumeLifecycleModes:
-    - Persistent
-```
-
-
-TODO: 
-基于 3.0.5 打出一个 3.0.6 镜像，修改了 tini/profPort/retry call polefs api 问题？
-重点调查下 VolumeAttachment 资源对象是怎么被创建的完整过程？？
-为何 CSIDriver spec.attachRequired=false 就可以控制 k8s 跳过 attach/detach 操作步骤？
 
 
 
@@ -113,3 +90,29 @@ csi_plugin 主要实现csi定义的方法，如 NodeGetInfo/NodeStageVolume/Node
 ## Troubleshoot
 (1)csi 没法平滑升级
 juicefs csi 的解决方案：https://mp.weixin.qq.com/s/hPupPQmCPKZpGIA4SCPBzQ
+让 csi-driver pod 去处理 corrupted mount point PR，早期 kubelet 这里逻辑是如果是 corrupted，则直接返回，没有给机会处理: 
+https://github.com/kubernetes/kubernetes/pull/88569
+chubaofs-csi 使用 VolumeAttachment 解决：https://github.com/chubaofs/chubaofs-csi/pull/54
+
+(2)为何一些volume drivers，如NFS，或者一些FS，不需要 attach operation，CSIDriver里 `attachRequired: false`？
+```yaml
+# csidriver 需要部署时创建，重点是 podInfoOnMount 参数，见：
+# CSIDriver: https://kubernetes-csi.github.io/docs/csi-driver-object.html
+# Skip Attach: https://kubernetes-csi.github.io/docs/skip-attach.html
+# Pod Info on Mount: https://kubernetes-csi.github.io/docs/pod-info.html
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: csi.lxfs.com
+spec:
+  podInfoOnMount: true
+  attachRequired: false # controller-server没有实现ControllerPublishVolume()，不需要volume attach operation
+  volumeLifecycleModes:
+    - Persistent
+```
+
+
+TODO:
+基于 3.0.5 打出一个 3.0.6 镜像，修改了 tini/profPort/retry call polefs api 问题？
+重点调查下 VolumeAttachment 资源对象是怎么被创建的完整过程？？
+为何 CSIDriver spec.attachRequired=false 就可以控制 k8s 跳过 attach/detach 操作步骤？
