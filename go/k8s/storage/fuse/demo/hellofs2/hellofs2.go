@@ -8,11 +8,11 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
-	"github.com/jacobsa/fuse"
-	"github.com/jacobsa/fuse/fuseops"
-	"github.com/jacobsa/fuse/fuseutil"
-	"github.com/jacobsa/timeutil"
+	"k8s-lx1036/k8s/storage/fuse"
+	"k8s-lx1036/k8s/storage/fuse/fuseops"
+	"k8s-lx1036/k8s/storage/fuse/fuseutil"
 
 	"k8s.io/klog/v2"
 )
@@ -24,18 +24,14 @@ import (
 //         world
 //
 // Each file contains the string "Hello, world!".
-func NewHelloFS(clock timeutil.Clock) (fuse.Server, error) {
-	fs := &helloFS{
-		Clock: clock,
-	}
+func NewHelloFS() (fuse.Server, error) {
+	fs := &helloFS{}
 
 	return fuseutil.NewFileSystemServer(fs), nil
 }
 
 type helloFS struct {
 	fuseutil.NotImplementedFileSystem
-
-	Clock timeutil.Clock
 }
 
 const (
@@ -132,9 +128,8 @@ func findChildInode(
 	return 0, fuse.ENOENT
 }
 
-func (fs *helloFS) patchAttributes(
-	attr *fuseops.InodeAttributes) {
-	now := fs.Clock.Now()
+func (fs *helloFS) patchAttributes(attr *fuseops.InodeAttributes) {
+	now := time.Now()
 	attr.Atime = now
 	attr.Mtime = now
 	attr.Crtime = now
@@ -215,7 +210,7 @@ func (fs *helloFS) ReadDir(
 		return fuse.ENOENT
 	}
 
-	klog.Info(op.Inode, op.Offset, info)
+	klog.Infof(fmt.Sprintf("ReadDirOp Inode: %+v, InodeInfo: %+v", op.Inode, info))
 
 	if !info.dir {
 		return fuse.EIO
@@ -271,7 +266,7 @@ var (
 	fMountPoint = flag.String("mountpoint", "", "Path to mount point.")
 	fReadyFile  = flag.Uint64("ready_file", 0, "FD to signal when ready.")
 	fReadOnly   = flag.Bool("read_only", false, "Mount in read-only mode.")
-	fDebug      = flag.Bool("debug", true, "Enable debug logging.")
+	fDebug      = flag.Bool("debug", false, "Enable debug logging.")
 )
 
 /*
@@ -289,14 +284,14 @@ INFO:
 	Hello, world!
 */
 
-// INFO: 改下 github.com/jacobsa/fuse mount_darwin.go 文件支持 mac
+// INFO: 改下 k8s-lx1036/k8s/storage/fuse mount_darwin.go 文件支持 mac
 
 // go run . --mountpoint=/mnt/hellofs2
 func main() {
 	flag.Parse()
 
 	// filesystem server
-	server, err := NewHelloFS(timeutil.RealClock())
+	server, err := NewHelloFS()
 	if err != nil {
 		klog.Fatalf("makeFS: %v", err)
 	}
@@ -308,6 +303,8 @@ func main() {
 
 	cfg := &fuse.MountConfig{
 		ReadOnly: *fReadOnly,
+		FSName:   "hellofs",
+		Subtype:  "hellofs_subtype",
 	}
 	if *fDebug {
 		cfg.DebugLogger = log.New(os.Stderr, "fuse: ", 0)
