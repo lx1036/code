@@ -201,6 +201,7 @@ type VolumeView struct {
     }
 }
 */
+// 获取该 volume 的 meta partition
 func (mw *MetaWrapper) fetchVolumeView() (*VolumeView, error) {
 	params := make(map[string]string)
 	params["name"] = mw.volname

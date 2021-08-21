@@ -5,7 +5,7 @@ import (
 
 	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
 
-	"github.com/jacobsa/fuse/fuseops"
+	"k8s-lx1036/k8s/storage/fuse/fuseops"
 )
 
 type HandleCache struct {

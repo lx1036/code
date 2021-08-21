@@ -3,13 +3,17 @@ package fs
 import (
 	"context"
 
-	"github.com/jacobsa/fuse/fuseops"
+	"k8s-lx1036/k8s/storage/fuse/fuseops"
 )
 
 // MkDir Create a directory inode as a child of an existing directory inode.
 // The kernel sends this in response to a mkdir(2) call.
 func (super *Super) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
-	panic("implement me")
+
+	parentInodeID := op.Parent
+
+	super.metaClient.Create_ll(uint64(parentInodeID), op.Name, uint32(op.Mode.Perm()), op.Uid, op.Gid, nil)
+
 }
 
 func (super *Super) MkNode(ctx context.Context, op *fuseops.MkNodeOp) error {

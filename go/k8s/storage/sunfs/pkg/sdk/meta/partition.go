@@ -56,3 +56,19 @@ func (mw *MetaWrapper) addPartition(mp *MetaPartition) {
 	mw.partitions[mp.PartitionID] = mp
 	mw.ranges.ReplaceOrInsert(mp)
 }
+
+// INFO: 如果 rwPartitions 为空，则直接用 partitions
+func (mw *MetaWrapper) getRWPartitions() []*MetaPartition {
+	mw.Lock()
+	defer mw.Unlock()
+
+	rwPartitions := mw.rwPartitions
+	if len(rwPartitions) == 0 {
+		rwPartitions = make([]*MetaPartition, 0)
+		for _, mp := range mw.partitions {
+			rwPartitions = append(rwPartitions, mp)
+		}
+	}
+
+	return rwPartitions
+}

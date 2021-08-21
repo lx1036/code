@@ -32,6 +32,11 @@ type CreateInodeRequest struct {
 	PInode      uint64 `json:"pino"`
 }
 
+// CreateInodeResponse defines the response to the request of creating an inode.
+type CreateInodeResponse struct {
+	Info *InodeInfo `json:"info"`
+}
+
 // UnlinkInodeRequest defines the request to unlink an inode.
 type UnlinkInodeRequest struct {
 	VolName     string `json:"vol"`
@@ -65,6 +70,10 @@ type EvictInodeRequest struct {
 	VolName     string `json:"vol"`
 	PartitionID uint64 `json:"pid"`
 	Inode       uint64 `json:"ino"`
+}
+
+type InodeInfo struct {
+	Inode uint64 `json:"ino"`
 }
 
 // INFO: Dentry

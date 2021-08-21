@@ -9,9 +9,9 @@ import (
 	"k8s-lx1036/k8s/storage/sunfs/pkg/backend"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/sdk/meta"
 
-	"github.com/jacobsa/fuse"
-	"github.com/jacobsa/fuse/fuseops"
 	"golang.org/x/time/rate"
+	"k8s-lx1036/k8s/storage/fuse"
+	"k8s-lx1036/k8s/storage/fuse/fuseops"
 	"k8s.io/klog/v2"
 )
 
@@ -154,7 +154,7 @@ func (super *Super) Destroy() {
 	//super.mw.UnMountClient()
 }
 
-// INFO: 不同操作对应其OP: https://github.com/jacobsa/fuse/blob/master/fuseutil/file_system.go#L135-L222
+// INFO: 不同操作对应其OP: https://k8s-lx1036/k8s/storage/fuse/blob/master/fuseutil/file_system.go#L135-L222
 
 func NewSuper(opt *MountOption) (*Super, error) {
 	var err error

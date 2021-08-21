@@ -14,6 +14,7 @@ type MetaConn struct {
 	addr string //MetaNode addr
 }
 
+// TODO: 调研下 tcp 调用 meta raft cluster 的 api???
 func (mw *MetaWrapper) sendToMetaPartition(mp *MetaPartition, req *proto.Packet) (*proto.Packet, error) {
 	var (
 		resp           *proto.Packet

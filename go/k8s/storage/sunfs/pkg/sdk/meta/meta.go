@@ -58,7 +58,8 @@ type MetaWrapper struct {
 	ranges *btree.BTree
 
 	rwPartitions []*MetaPartition
-	epoch        uint64
+	// TODO: epoch 字段意义???
+	epoch uint64
 
 	totalSize uint64
 	usedSize  uint64

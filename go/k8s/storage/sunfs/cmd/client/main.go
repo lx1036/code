@@ -12,8 +12,8 @@ import (
 
 	"k8s-lx1036/k8s/storage/sunfs/cmd/client/fs"
 
-	"github.com/jacobsa/fuse"
-	"github.com/jacobsa/fuse/fuseutil"
+	"k8s-lx1036/k8s/storage/fuse"
+	"k8s-lx1036/k8s/storage/fuse/fuseutil"
 
 	"k8s.io/klog/v2"
 )
