@@ -201,7 +201,8 @@ type VolumeView struct {
     }
 }
 */
-// 获取该 volume 的 meta partition
+// INFO: 获取该 volume 的 meta partition，这里有个设计点，partition 是根据 inodeID 范围划分的，
+//  比如 range=1000, 则0-999 inodeID 是 partitionID 1；1000-1999 inodeID 是 partitionID 2
 func (mw *MetaWrapper) fetchVolumeView() (*VolumeView, error) {
 	params := make(map[string]string)
 	params["name"] = mw.volname

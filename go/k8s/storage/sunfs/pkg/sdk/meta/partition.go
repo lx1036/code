@@ -16,15 +16,17 @@ func (mw *MetaPartition) Less(than btree.Item) bool {
 	return mw.Start < that.Start
 }
 
-func (mw *MetaWrapper) getPartitionByInode(inode uint64) *MetaPartition {
+// INFO: 根据 inodeID 获取 meta partition，这里有个设计点，partition 是根据 inodeID 范围划分的，
+//  比如 range=1000, 则0-999 inodeID 是 partitionID 1；1000-1999 inodeID 是 partitionID 2
+func (mw *MetaWrapper) getPartitionByInodeID(inodeID uint64) *MetaPartition {
 	var metaPartition *MetaPartition
 	mw.RLock()
 	defer mw.RUnlock()
 
-	pivot := &MetaPartition{Start: inode}
+	pivot := &MetaPartition{Start: inodeID}
 	mw.ranges.DescendLessOrEqual(pivot, func(item btree.Item) bool {
 		metaPartition = item.(*MetaPartition)
-		if inode > metaPartition.End || inode < metaPartition.Start {
+		if inodeID > metaPartition.End || inodeID < metaPartition.Start {
 			metaPartition = nil
 		}
 		// Iterate one item is enough

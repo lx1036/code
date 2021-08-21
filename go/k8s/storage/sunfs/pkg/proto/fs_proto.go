@@ -1,5 +1,7 @@
 package proto
 
+import "os"
+
 // INFO: Meta Partition
 
 // UpdateMetaPartitionRequest defines the request to update a meta partition.
@@ -21,6 +23,10 @@ type UpdateMetaPartitionResponse struct {
 
 // INFO: Inode
 
+const (
+	RootInode = uint64(1)
+)
+
 // CreateInodeRequest defines the request to create an inode.
 type CreateInodeRequest struct {
 	VolName     string `json:"vol"`
@@ -37,15 +43,20 @@ type CreateInodeResponse struct {
 	Info *InodeInfo `json:"info"`
 }
 
-// UnlinkInodeRequest defines the request to unlink an inode.
-type UnlinkInodeRequest struct {
+// InodeGetRequest defines the request to get the inode.
+type InodeGetRequest struct {
 	VolName     string `json:"vol"`
 	PartitionID uint64 `json:"pid"`
 	Inode       uint64 `json:"ino"`
 }
 
-// InodeGetRequest defines the request to get the inode.
-type InodeGetRequest struct {
+// InodeGetResponse defines the response to the InodeGetRequest.
+type InodeGetResponse struct {
+	Info *InodeInfo `json:"info"`
+}
+
+// UnlinkInodeRequest defines the request to unlink an inode.
+type UnlinkInodeRequest struct {
 	VolName     string `json:"vol"`
 	PartitionID uint64 `json:"pid"`
 	Inode       uint64 `json:"ino"`
@@ -73,7 +84,27 @@ type EvictInodeRequest struct {
 }
 
 type InodeInfo struct {
-	Inode uint64 `json:"ino"`
+	Inode      uint64 `json:"ino"`
+	Mode       uint32 `json:"mode"`
+	Nlink      uint32 `json:"nlink"`
+	Size       uint64 `json:"sz"`
+	Uid        uint32 `json:"uid"`
+	Gid        uint32 `json:"gid"`
+	Generation uint64 `json:"gen"`
+	ModifyTime int64  `json:"mt"`
+	CreateTime int64  `json:"ct"`
+	AccessTime int64  `json:"at"`
+	Target     []byte `json:"tgt"`
+	PInode     uint64 `json:"pino"`
+}
+
+// OsMode returns os.FileMode.
+func OsFileMode(mode uint32) os.FileMode {
+	return os.FileMode(mode)
+}
+
+func IsDir(mode uint32) bool {
+	return OsFileMode(mode).IsDir()
 }
 
 // INFO: Dentry

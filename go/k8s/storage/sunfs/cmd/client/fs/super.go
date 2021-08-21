@@ -42,6 +42,9 @@ type Super struct {
 	localIP  string
 	volname  string
 	owner    string
+
+	inodeCache *InodeCache
+
 	//ic                 *InodeCache
 	hc *HandleCache
 	//readDirc           *ReadDirCache
