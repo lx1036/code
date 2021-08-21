@@ -46,7 +46,7 @@ func (inode *Inode) setExpiration(t time.Duration) {
 
 func (inode *Inode) expired() bool {
 	// root inode never expire
-	if inode.inodeID != proto.RootInode && time.Now().UnixNano() > inode.expiration {
+	if inode.inodeID != fuseops.RootInodeID && time.Now().UnixNano() > inode.expiration {
 		return true
 	}
 

@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-func currentUid() uint32 {
+func CurrentUid() uint32 {
 	user, err := user.Current()
 	if err != nil {
 		panic(err)
@@ -19,7 +19,7 @@ func currentUid() uint32 {
 	return uint32(uid)
 }
 
-func currentGid() uint32 {
+func CurrentGid() uint32 {
 	user, err := user.Current()
 	if err != nil {
 		panic(err)
