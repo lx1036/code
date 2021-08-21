@@ -80,7 +80,7 @@ func (super *Super) StatFS(ctx context.Context, op *fuseops.StatFSOp) error {
 	op.Inodes = 1 << 50
 	op.InodesFree = op.Inodes
 
-	klog.Infof("TRACE StatFS: op(%+v)", *op)
+	klog.Infof(fmt.Sprintf("[StatFS]op: %+v", *op))
 	return nil
 }
 

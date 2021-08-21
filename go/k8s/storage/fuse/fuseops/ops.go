@@ -9,6 +9,11 @@ import (
 // File system
 ////////////////////////////////////////////////////////////////////////
 
+type UserGroup struct {
+	Uid uint32
+	Gid uint32
+}
+
 // OpContext contains extra context that may be needed by some file systems.
 // See https://libfuse.github.io/doxygen/structfuse__context.html as a reference.
 type OpContext struct {
@@ -235,6 +240,8 @@ type MkDirOp struct {
 	// ForgetInodeOp for more information.
 	Entry     ChildInodeEntry
 	OpContext OpContext
+
+	UserGroup
 }
 
 // Create a file inode as a child of an existing directory inode. The kernel

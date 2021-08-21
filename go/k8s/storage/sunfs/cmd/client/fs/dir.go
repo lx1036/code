@@ -12,7 +12,6 @@ import (
 // MkDir Create a directory inode as a child of an existing directory inode.
 // The kernel sends this in response to a mkdir(2) call.
 func (super *Super) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
-
 	parentInodeID := op.Parent
 
 	inodeInfo, err := super.metaClient.Create_ll(uint64(parentInodeID), op.Name, uint32(op.Mode.Perm()), op.Uid, op.Gid, nil)

@@ -6,11 +6,20 @@ import (
 	"sync"
 	"time"
 
+	"k8s-lx1036/k8s/storage/fuse/fuseops"
 	"k8s-lx1036/k8s/storage/sunfs/pkg/proto"
 )
 
+var (
+	// The following two are used in the FUSE cache
+	// every time the lookup will be performed on the fly, and the result will not be cached
+	LookupValidDuration = 5 * time.Second
+	// the expiration duration of the attributes in the FUSE cache
+	AttrValidDuration = 30 * time.Second
+)
+
 type Inode struct {
-	inode       uint64
+	inodeID     uint64
 	parentInode uint64
 	size        uint64
 	nlink       uint32
@@ -37,7 +46,7 @@ func (inode *Inode) setExpiration(t time.Duration) {
 
 func (inode *Inode) expired() bool {
 	// root inode never expire
-	if inode.inode != proto.RootInode && time.Now().UnixNano() > inode.expiration {
+	if inode.inodeID != proto.RootInode && time.Now().UnixNano() > inode.expiration {
 		return true
 	}
 
@@ -46,7 +55,7 @@ func (inode *Inode) expired() bool {
 
 func NewInode(inodeInfo *proto.InodeInfo) *Inode {
 	inode := &Inode{
-		inode:        inodeInfo.Inode,
+		inodeID:      inodeInfo.Inode,
 		parentInode:  inodeInfo.PInode,
 		size:         inodeInfo.Size,
 		nlink:        inodeInfo.Nlink,
@@ -86,10 +95,10 @@ func (inodeCache *InodeCache) Put(inode *Inode) {
 	inodeCache.Lock()
 	defer inodeCache.Unlock()
 
-	old, ok := inodeCache.cache[inode.inode]
+	old, ok := inodeCache.cache[inode.inodeID]
 	if ok {
 		inodeCache.lruList.Remove(old)
-		delete(inodeCache.cache, inode.inode)
+		delete(inodeCache.cache, inode.inodeID)
 	}
 
 	if inodeCache.lruList.Len() >= inodeCache.maxElements {
@@ -98,7 +107,7 @@ func (inodeCache *InodeCache) Put(inode *Inode) {
 
 	inode.setExpiration(inodeCache.expiration)
 	element := inodeCache.lruList.PushFront(inode)
-	inodeCache.cache[inode.inode] = element
+	inodeCache.cache[inode.inodeID] = element
 }
 
 // INFO: 从 map 中取，这是 LRU 性能好的重要一个原因
@@ -117,4 +126,23 @@ func (inodeCache *InodeCache) Get(inodeID uint64) *Inode {
 	}
 
 	return inode
+}
+
+func fillChildEntry(entry *fuseops.ChildInodeEntry, inode *Inode) {
+	entry.Child = fuseops.InodeID(inode.inodeID)
+	entry.AttributesExpiration = time.Now().Add(AttrValidDuration)
+	entry.EntryExpiration = time.Now().Add(LookupValidDuration)
+
+	fillAttr(&entry.Attributes, inode)
+}
+
+func fillAttr(attr *fuseops.InodeAttributes, inode *Inode) {
+	attr.Nlink = inode.nlink
+	attr.Mode = inode.mode
+	attr.Size = inode.size
+	attr.Atime = time.Unix(inode.accessTime, 0)
+	attr.Ctime = time.Unix(inode.createTime, 0)
+	attr.Mtime = time.Unix(inode.modifyTime, 0)
+	attr.Uid = inode.uid
+	attr.Gid = inode.gid
 }

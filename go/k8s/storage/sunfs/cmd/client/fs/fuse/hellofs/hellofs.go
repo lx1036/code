@@ -4,11 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
-	"strings"
-	"time"
 
 	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
@@ -17,7 +14,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// Create a file system with a fixed structure that looks like this:
+// NewHelloFS INFO: Create a file system with a fixed structure that looks like this:
 //
 //     hello
 //     dir/
@@ -54,6 +51,11 @@ type inodeInfo struct {
 	// For directories, children.
 	children []fuseutil.Dirent
 }
+
+// INFO:
+//  hello("Hello, world!")
+//  dir/
+//    world("Hello, world!")
 
 // We have a fixed directory structure.
 var gInodeInfo = map[fuseops.InodeID]inodeInfo{
@@ -116,9 +118,7 @@ var gInodeInfo = map[fuseops.InodeID]inodeInfo{
 	},
 }
 
-func findChildInode(
-	name string,
-	children []fuseutil.Dirent) (fuseops.InodeID, error) {
+func findChildInode(name string, children []fuseutil.Dirent) (fuseops.InodeID, error) {
 	for _, e := range children {
 		if e.Name == name {
 			return e.Inode, nil
@@ -128,17 +128,8 @@ func findChildInode(
 	return 0, fuse.ENOENT
 }
 
-func (fs *helloFS) patchAttributes(attr *fuseops.InodeAttributes) {
-	now := time.Now()
-	attr.Atime = now
-	attr.Mtime = now
-	attr.Crtime = now
-}
-
 // INFO: `stat /mnt/hellofs2`
-func (fs *helloFS) StatFS(
-	ctx context.Context,
-	op *fuseops.StatFSOp) error {
+func (fs *helloFS) StatFS(ctx context.Context, op *fuseops.StatFSOp) error {
 	total, used := uint64(1073741824), uint64(6)
 	op.BlockSize = uint32(DefaultBlksize)
 	op.Blocks = total / uint64(DefaultBlksize)
@@ -148,123 +139,13 @@ func (fs *helloFS) StatFS(
 	op.Inodes = 1 << 50
 	op.InodesFree = op.Inodes
 
-	return nil
-}
-
-func (fs *helloFS) LookUpInode(
-	ctx context.Context,
-	op *fuseops.LookUpInodeOp) error {
-	// Find the info for the parent.
-	parentInfo, ok := gInodeInfo[op.Parent]
-	if !ok {
-		return fuse.ENOENT
-	}
-
-	// Find the child within the parent.
-	childInode, err := findChildInode(op.Name, parentInfo.children)
-	if err != nil {
-		return err
-	}
-
-	// Copy over information.
-	op.Entry.Child = childInode
-	op.Entry.Attributes = gInodeInfo[childInode].attributes
-
-	// Patch attributes.
-	fs.patchAttributes(&op.Entry.Attributes)
+	klog.Infof(fmt.Sprintf("[StatFS]op %+v", *op))
 
 	return nil
-}
-
-func (fs *helloFS) GetInodeAttributes(
-	ctx context.Context,
-	op *fuseops.GetInodeAttributesOp) error {
-	// Find the info for this inode.
-	info, ok := gInodeInfo[op.Inode]
-	if !ok {
-		return fuse.ENOENT
-	}
-
-	// Copy over its attributes.
-	op.Attributes = info.attributes
-
-	// Patch attributes.
-	fs.patchAttributes(&op.Attributes)
-
-	return nil
-}
-
-func (fs *helloFS) OpenDir(
-	ctx context.Context,
-	op *fuseops.OpenDirOp) error {
-	// Allow opening any directory.
-	return nil
-}
-
-func (fs *helloFS) ReadDir(
-	ctx context.Context,
-	op *fuseops.ReadDirOp) error {
-	// Find the info for this inode.
-	info, ok := gInodeInfo[op.Inode]
-	if !ok {
-		return fuse.ENOENT
-	}
-
-	klog.Infof(fmt.Sprintf("ReadDirOp Inode: %+v, InodeInfo: %+v", op.Inode, info))
-
-	if !info.dir {
-		return fuse.EIO
-	}
-
-	entries := info.children
-
-	// Grab the range of interest.
-	if op.Offset > fuseops.DirOffset(len(entries)) {
-		return fuse.EIO
-	}
-
-	entries = entries[op.Offset:]
-
-	// Resume at the specified offset into the array.
-	for _, e := range entries {
-		n := fuseutil.WriteDirent(op.Dst[op.BytesRead:], e)
-		if n == 0 {
-			break
-		}
-
-		op.BytesRead += n
-	}
-
-	return nil
-}
-
-func (fs *helloFS) OpenFile(
-	ctx context.Context,
-	op *fuseops.OpenFileOp) error {
-	// Allow opening any file.
-	return nil
-}
-
-func (fs *helloFS) ReadFile(
-	ctx context.Context,
-	op *fuseops.ReadFileOp) error {
-	// Let io.ReaderAt deal with the semantics.
-	reader := strings.NewReader("Hello, world!")
-
-	var err error
-	op.BytesRead, err = reader.ReadAt(op.Dst, op.Offset)
-
-	// Special case: FUSE doesn't expect us to return io.EOF.
-	if err == io.EOF {
-		return nil
-	}
-
-	return err
 }
 
 var (
 	fMountPoint = flag.String("mountpoint", "", "Path to mount point.")
-	fReadyFile  = flag.Uint64("ready_file", 0, "FD to signal when ready.")
 	fReadOnly   = flag.Bool("read_only", false, "Mount in read-only mode.")
 	fDebug      = flag.Bool("debug", false, "Enable debug logging.")
 )
@@ -284,9 +165,10 @@ INFO:
 	Hello, world!
 */
 
-// INFO: 改下 k8s-lx1036/k8s/storage/fuse mount_darwin.go 文件支持 mac
+// TODO: 目前还不支持 mkdir
 
-// go run . --mountpoint=/mnt/hellofs2
+// mkdir -p /tmp/fuse/hellofs
+// go run . --mountpoint=/tmp/fuse/hellofs
 func main() {
 	flag.Parse()
 
