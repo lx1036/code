@@ -85,15 +85,18 @@ type S3Backend struct {
 }
 
 // INFO: 从 file 文件读取数据写到 data
+//  aws s3api get-object --key=2 --bucket pvc-f73f7c99-0b5c-40ee-b57c-acdebcebed34 --endpoint-url ${endpoint-url} --range bytes=1-100 2.txt
+//  => "asdfadfasdfasdfasdf"
 func (s3Backend *S3Backend) Read(file string, offset int64, data []byte) (int, error) {
-	//rNeed := len(data)
-	//end := offset + int64(rNeed) - 1
-	//bytes := fmt.Sprintf("bytes=%v-%v", offset, end)
+	rNeed := len(data)
+	end := offset + int64(rNeed) - 1
+	bytes := fmt.Sprintf("bytes=%v-%v", offset, end)
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(s3Backend.bucket),
 		Key:    aws.String(file),
 	}
-	//input.Range = &bytes
+	input.Range = &bytes
+	klog.Infof(fmt.Sprintf("[Read]send input %s to s3", input.String()))
 	reader, err := s3Backend.getObject(input)
 	if err != nil {
 		return 0, err
@@ -126,10 +129,12 @@ func (s3Backend *S3Backend) AuthBucket() error {
 		Bucket: aws.String(s3Backend.bucket),
 	}
 
-	_, err := s3Backend.HeadBucket(input)
+	bucketOutput, err := s3Backend.HeadBucket(input)
 	if err != nil {
 		return err
 	}
+
+	klog.Infof(fmt.Sprintf("[AuthBucket]bucketOutput %s", bucketOutput.String()))
 
 	return nil
 }
@@ -196,9 +201,7 @@ func mapAwsError(err error) error {
 			if err != nil {
 				return err
 			} else {
-				klog.Errorf("http=%v %v s3=%v request=%v\n",
-					reqErr.StatusCode(), reqErr.Message(),
-					awsErr.Code(), reqErr.RequestID())
+				klog.Errorf("http=%v %v s3=%v request=%v\n", reqErr.StatusCode(), reqErr.Message(), awsErr.Code(), reqErr.RequestID())
 				return reqErr
 			}
 		} else {

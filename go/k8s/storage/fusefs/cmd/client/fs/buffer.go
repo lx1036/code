@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"container/list"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -12,12 +13,14 @@ import (
 type Buffer struct {
 	sync.RWMutex
 
-	key string // filename
-
+	key     string // filename
 	inodeID uint64
 	ref     int32
 
 	backend backend.Backend
+
+	stopC   chan struct{}
+	LRUList *list.List
 
 	lastError error
 }
@@ -31,10 +34,25 @@ func (buffer *Buffer) IncRef() int32 {
 }
 
 // INFO: 读取 S3 文件，读取到 data 中
-func (buffer *Buffer) ReadFile(offset int64, data []byte, max int64, direct bool) (nRead int,
-	err error) {
+func (buffer *Buffer) ReadFile(offset int64, data []byte, max int64, direct bool) (int, error) {
+	var err error
+	var nRead int
 
-	nNeed := len(data)
+	defer func() {
+		if err == io.EOF {
+			err = nil
+		}
+	}()
+
+	// read data from backend if direct flag is set
+	if direct {
+		nRead, err = buffer.readDirect(offset, data)
+		if err != nil && err != io.EOF {
+			return 0, err
+		}
+	}
+
+	/*nNeed := len(data)
 	aOffset := buffer.alignOffset(offset)
 	for nNeed > 0 {
 		blk := buffer.getBlock(aOffset)
@@ -52,9 +70,9 @@ func (buffer *Buffer) ReadFile(offset int64, data []byte, max int64, direct bool
 			}
 		}
 
-	}
+	}*/
 
-	return
+	return nRead, nil
 }
 
 func (buffer *Buffer) readDirect(offset int64, data []byte) (int, error) {
@@ -66,6 +84,30 @@ func (buffer *Buffer) readDirect(offset int64, data []byte) (int, error) {
 	return rsize, nil
 }
 
-func NewBuffer() *Buffer {
+func NewBuffer(inodeID uint64, backend backend.Backend) *Buffer {
+	buffer := &Buffer{
+		inodeID: inodeID,
+		//blockSize:     fs.blockSize,
+		//flushInterval: fs.bufFlushInterval,
+		//blocks:        make(map[int64]*list.Element, 0),
+		LRUList: list.New(),
+		//dirtyBlocks:   make(map[int64]*list.Element, 0),
+		//dirtyList:     list.New(),
+		//fs:            fs,
+		//gbuf:          gbuf,
+		backend: backend,
+		//mergeBlock:    fs.mergeBlock,
+		//flushC:        make(chan struct{}, 1),
+		stopC: make(chan struct{}, 1),
+	}
 
+	//buffer.bgFlushWait = DefaultFlushWait
+	//atomic.StoreInt64(&buffer.nextReadOffset, 0)
+	//atomic.StoreInt64(&buffer.seqReadAmount, 0)
+	//atomic.StoreInt64(&buffer.nextReadAheadOffset, 0)
+	//atomic.StoreInt64(&buffer.dirtyAmount, 0)
+	//atomic.StoreInt32(&buffer.bgStarted, 0)
+	//atomic.StoreInt32(&buffer.flushing, 0)
+
+	return buffer
 }
