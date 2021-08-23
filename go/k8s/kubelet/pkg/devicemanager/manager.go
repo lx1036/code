@@ -11,7 +11,6 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/cm/topologymanager"
 	"k8s-lx1036/k8s/kubelet/pkg/devicemanager/checkpoint"
 	"k8s-lx1036/k8s/kubelet/pkg/lifecycle"
-	"k8s-lx1036/k8s/storage/csi/pluginmanager/cache"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"google.golang.org/grpc"
