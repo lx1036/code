@@ -1,0 +1,13 @@
+{
+  "mountPoint": "/home/liuxiang3/sunfs/data",
+  "volName": "pvc-liuxiang",
+  "owner": "sunfs",
+  "masterAddr": "101.206.77.175:9500,101.206.77.176:9500,101.206.77.177:9500",
+  "logDir": "/etc/sunfs/client/log",
+  "logLevel": "debug",
+  "AccessKey": "123",
+  "SecretKey": "456",
+  "profPort": "35903",
+  "fullPathName": false,
+  "bufSize": 1073741824
+}

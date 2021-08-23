@@ -1,0 +1,18 @@
+{
+  "role": "metanode",
+  "listen": "9021",
+  "metadataDir": "data/metanode/partition",
+  "raftDir": "data/metanode/raft",
+  "raftHeartbeatPort": "9093",
+  "raftReplicaPort": "9094",
+  "totalMem":  "42949672960",
+  "masterAddrs": [
+    "101.206.77.175:9500",
+    "101.206.77.176:9500",
+    "101.206.77.177:9500"
+  ],
+  "prof": "9092",
+  "logLevel": "debug",
+  "logDir": "data/metanode/log",
+  "exporterPort": 9511
+}

@@ -3,7 +3,6 @@ package devicemanager
 import (
 	"k8s-lx1036/k8s/kubelet/pkg/cm/topologymanager"
 	"k8s-lx1036/k8s/kubelet/pkg/lifecycle"
-	"k8s-lx1036/k8s/storage/csi/pluginmanager/cache"
 
 	v1 "k8s.io/api/core/v1"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"

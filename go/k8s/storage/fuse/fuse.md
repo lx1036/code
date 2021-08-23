@@ -1,6 +1,6 @@
 
 
-## FUSE(Filesystem in UserNamespace)
+## FUSE(Filesystem in Userspace)
 
 
 
@@ -24,3 +24,4 @@ https://github.com/jacobsa/fuse
 
 https://github.com/bazil/fuse
 
+**[基于Fuse的用户态文件系统性能优化几点建议](https://zhuanlan.zhihu.com/p/68085075)**
