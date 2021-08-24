@@ -54,7 +54,7 @@ func (fs *MemoryFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) er
 	op.Entry.AttributesExpiration = time.Now().Add(365 * 24 * time.Hour)
 	op.Entry.EntryExpiration = op.Entry.AttributesExpiration
 
-	klog.Infof(fmt.Sprintf("[CreateFile]create filename %s, parent %d", op.Name, op.Parent))
+	klog.Infof(fmt.Sprintf("[CreateFile]create filename %s, parent inodeID %d", op.Name, op.Parent))
 	return nil
 }
 
@@ -66,6 +66,8 @@ func (fs *MemoryFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error 
 
 	fs.Lock()
 	defer fs.Unlock()
+
+	klog.Infof(fmt.Sprintf("[ReadFile]dst length %d", len(op.Dst)))
 
 	var err error
 	currentInode := fs.getInodeOrDie(op.Inode)

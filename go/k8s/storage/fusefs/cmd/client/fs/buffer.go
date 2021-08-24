@@ -15,9 +15,10 @@ type Buffer struct {
 
 	key     string // filename
 	inodeID uint64
-	ref     int32
+	ref     int32 // 这个字段有何设计目的???
 
 	backend backend.Backend
+	fs      *FuseFS
 
 	stopC   chan struct{}
 	LRUList *list.List
@@ -25,6 +26,7 @@ type Buffer struct {
 	lastError error
 }
 
+// SetFilename INFO: @see FuseFS::newFileHandle() 里设置的 key，其实就是文件的 inodeID
 func (buffer *Buffer) SetFilename(filename string) {
 	buffer.key = filename
 }
@@ -84,7 +86,8 @@ func (buffer *Buffer) readDirect(offset int64, data []byte) (int, error) {
 	return rsize, nil
 }
 
-func NewBuffer(inodeID uint64, backend backend.Backend) *Buffer {
+// NewBuffer INFO: 该 Buffer 对象其实就是对 S3 数据的缓存
+func NewBuffer(inodeID uint64, backend backend.Backend, fs *FuseFS) *Buffer {
 	buffer := &Buffer{
 		inodeID: inodeID,
 		//blockSize:     fs.blockSize,
@@ -93,7 +96,7 @@ func NewBuffer(inodeID uint64, backend backend.Backend) *Buffer {
 		LRUList: list.New(),
 		//dirtyBlocks:   make(map[int64]*list.Element, 0),
 		//dirtyList:     list.New(),
-		//fs:            fs,
+		fs: fs,
 		//gbuf:          gbuf,
 		backend: backend,
 		//mergeBlock:    fs.mergeBlock,

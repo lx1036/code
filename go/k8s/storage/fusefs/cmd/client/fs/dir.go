@@ -16,6 +16,7 @@ func (fs *FuseFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
 
 	inodeInfo, err := fs.metaClient.Create_ll(uint64(parentInodeID), op.Name, uint32(op.Mode.Perm()), op.Uid, op.Gid, nil)
 	if err != nil {
+		klog.Errorf(fmt.Sprintf("[MkDir]create inode/dentry for %d/%s err %v", uint64(parentInodeID), op.Name, err))
 		return err
 	}
 
@@ -26,7 +27,7 @@ func (fs *FuseFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
 		parent.dentryCache.Put(op.Name, inodeInfo.Inode)
 	}
 
-	fillChildEntry(&op.Entry, child)
+	op.Entry = GetChildInodeEntry(child)
 
 	klog.Infof(fmt.Sprintf("[MkDir]mkdir op name %s", op.Name))
 

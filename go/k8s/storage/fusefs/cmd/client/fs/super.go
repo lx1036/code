@@ -61,7 +61,7 @@ type FuseFS struct {
 	maxMultiParts      int
 	HTTPServer         *http.Server
 
-	s3 *backend.S3Backend
+	s3Backend *backend.S3Backend
 
 	// INFO: FUSE file
 	fileHandles  map[fuseops.HandleID]*FileHandle
@@ -146,6 +146,19 @@ func NewFuseFS(opt *MountOption) (*FuseFS, error) {
 	fs.endpoint = fs.metaClient.S3Endpoint
 	fs.cluster = fs.metaClient.Cluster()
 	fs.localIP = fs.metaClient.LocalIP()
+
+	s3Config := &backend.S3Config{
+		Endpoint:         fs.metaClient.S3Endpoint, // S3Endpoint 是调用 meta cluster api 获取的，实际上数据存在 master cluster 中
+		AccessKey:        opt.AccessKey,
+		SecretKey:        opt.SecretKey,
+		DisableSSL:       true,
+		S3ForcePathStyle: true, // 必须为 true，这样 url 才是 http://S3Endpoint/bucket
+	}
+	fs.s3Backend, err = backend.NewS3Backend(opt.Volname, s3Config)
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[NewFuseFS]new s3 client err %v", err))
+		return nil, err
+	}
 
 	return fs, nil
 }
