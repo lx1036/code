@@ -8,9 +8,10 @@ import (
 	"os"
 	"path/filepath"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
@@ -66,17 +67,21 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	patch, err := jsonpatch.CreateMergePatch(originalJSON, modifiedJSON)
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(originalJSON, modifiedJSON, corev1.Node{})
 	if err != nil {
 		panic(err)
 	}
-
-	patchNode, err := clientSet.CoreV1().Nodes().Patch(context.TODO(), *nodeName, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+	patchNode, err := clientSet.CoreV1().Nodes().Patch(context.TODO(), *nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		panic(err)
 	}
 	for key, value := range patchNode.Labels {
-		klog.Infof(fmt.Sprintf("%s=%s", key, value))
+		if key == "test" {
+			klog.Infof(fmt.Sprintf("key %s is new added, %s=%s", key, key, value))
+		} else {
+			klog.Infof(fmt.Sprintf("%s=%s", key, value))
+		}
 	}
 
 	klog.Info("===delete custom lables===")
@@ -102,11 +107,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	patch, err = jsonpatch.CreateMergePatch(originalJSON, modifiedJSON)
+
+	patchBytes, err = strategicpatch.CreateTwoWayMergePatch(originalJSON, modifiedJSON, corev1.Node{})
 	if err != nil {
 		panic(err)
 	}
-	patchNode, err = clientSet.CoreV1().Nodes().Patch(context.TODO(), *nodeName, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+	patchNode, err = clientSet.CoreV1().Nodes().Patch(context.TODO(), *nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		panic(err)
 	}
