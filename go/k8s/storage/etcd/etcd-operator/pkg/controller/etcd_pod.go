@@ -11,8 +11,18 @@ import (
 )
 
 const (
+	// EtcdClientPort is the client port on client service and etcd nodes.
+	EtcdClientPort = 2379
+
 	etcdVolumeMountDir = "/var/etcd"
 	dataDir            = etcdVolumeMountDir + "/data"
+
+	peerTLSDir            = "/etc/etcdtls/member/peer-tls"
+	peerTLSVolume         = "member-peer-tls"
+	serverTLSDir          = "/etc/etcdtls/member/server-tls"
+	serverTLSVolume       = "member-server-tls"
+	operatorEtcdTLSDir    = "/etc/etcdtls/operator/etcd-tls"
+	operatorEtcdTLSVolume = "etcd-client-tls"
 )
 
 /*
@@ -54,7 +64,8 @@ func newEtcdPod(member *Member, initialCluster []string, clusterName, state, tok
 		--initial-advertise-peer-urls=%s --advertise-client-urls=%s
 		--listen-peer-urls=%s --listen-client-urls=%s
 		--initial-cluster=%s --initial-cluster-state=%s`,
-		member.Name, dataDir, member.PeerURL(), member.ClientURL(), member.ListenPeerURL(), member.ListenClientURL(), strings.Join(initialCluster, ","), state)
+		member.Name, dataDir, member.PeerURL(), member.ClientURL(), member.ListenPeerURL(), member.ListenClientURL(),
+		strings.Join(initialCluster, ","), state)
 	if member.SecurePeer {
 		commands += fmt.Sprintf(" --peer-client-cert-auth=true --peer-trusted-ca-file=%[1]s/peer-ca.crt --peer-cert-file=%[1]s/peer.crt --peer-key-file=%[1]s/peer.key", peerTLSDir)
 	}
@@ -94,23 +105,48 @@ func newEtcdPod(member *Member, initialCluster []string, clusterName, state, tok
 			MountPath: peerTLSDir,
 			Name:      peerTLSVolume,
 		})
-		volumes = append(volumes, corev1.Volume{Name: peerTLSVolume, VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{SecretName: cs.TLS.Static.Member.PeerSecret},
-		}})
+		volumes = append(volumes, corev1.Volume{
+			Name: peerTLSVolume,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: etcdClusterSpec.TLS.Static.Member.PeerSecret,
+				},
+			},
+		})
 	}
 	if member.SecureClient {
-		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-			MountPath: serverTLSDir,
-			Name:      serverTLSVolume,
-		}, corev1.VolumeMount{
-			MountPath: operatorEtcdTLSDir,
-			Name:      operatorEtcdTLSVolume,
-		})
-		volumes = append(volumes, corev1.Volume{Name: serverTLSVolume, VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{SecretName: etcdClusterSpec.TLS.Static.Member.ServerSecret},
-		}}, corev1.Volume{Name: operatorEtcdTLSVolume, VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{SecretName: etcdClusterSpec.TLS.Static.OperatorSecret},
-		}})
+		container.VolumeMounts = append(container.VolumeMounts,
+			corev1.VolumeMount{
+				MountPath: serverTLSDir,
+				Name:      serverTLSVolume,
+			},
+			corev1.VolumeMount{
+				MountPath: operatorEtcdTLSDir,
+				Name:      operatorEtcdTLSVolume,
+			},
+		)
+		volumes = append(volumes,
+			corev1.Volume{
+				Name: serverTLSVolume,
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: etcdClusterSpec.TLS.Static.Member.ServerSecret,
+					},
+				},
+			},
+			corev1.Volume{
+				Name: operatorEtcdTLSVolume,
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: etcdClusterSpec.TLS.Static.OperatorSecret,
+					},
+				},
+			},
+		)
+	}
+	var securityContext *corev1.PodSecurityContext
+	if etcdClusterSpec.Pod != nil {
+		securityContext = etcdClusterSpec.Pod.SecurityContext
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -130,7 +166,7 @@ func newEtcdPod(member *Member, initialCluster []string, clusterName, state, tok
 			Hostname:                     member.Name,
 			Subdomain:                    clusterName,
 			AutomountServiceAccountToken: func(b bool) *bool { return &b }(false),
-			SecurityContext:              podSecurityContext(etcdClusterSpec.Pod),
+			SecurityContext:              securityContext,
 		},
 	}
 	SetEtcdVersion(pod, etcdClusterSpec.Version)
@@ -138,10 +174,12 @@ func newEtcdPod(member *Member, initialCluster []string, clusterName, state, tok
 	return pod
 }
 
-func NewEtcdPod() *corev1.Pod {
-	pod := newEtcdPod(m, initialCluster, clusterName, state, token, cs)
-	applyPodPolicy(clusterName, pod, cs.Pod)
+func NewEtcdPod(member *Member, initialCluster []string, clusterName, state, token string, etcdClusterSpec v1.EtcdClusterSpec,
+	owner metav1.OwnerReference) *corev1.Pod {
+	pod := newEtcdPod(member, initialCluster, clusterName, state, token, etcdClusterSpec)
+	//applyPodPolicy(clusterName, pod, etcdClusterSpec.Pod)
 	addOwnerRefToObject(pod.GetObjectMeta(), owner)
+
 	return pod
 }
 
@@ -151,10 +189,21 @@ func ImageName(repo, version string) string {
 
 const (
 	etcdVolumeName = "etcd-data"
+
+	etcdVersionAnnotationKey = "etcd.version"
 )
 
 func etcdVolumeMounts() []corev1.VolumeMount {
 	return []corev1.VolumeMount{
 		{Name: etcdVolumeName, MountPath: etcdVolumeMountDir},
 	}
+}
+
+func SetEtcdVersion(pod *corev1.Pod, version string) {
+	pod.Annotations[etcdVersionAnnotationKey] = version
+}
+
+// 这会直接修改 pod ownerReferences 字段
+func addOwnerRefToObject(obj metav1.Object, owner metav1.OwnerReference) {
+	obj.SetOwnerReferences(append(obj.GetOwnerReferences(), owner))
 }

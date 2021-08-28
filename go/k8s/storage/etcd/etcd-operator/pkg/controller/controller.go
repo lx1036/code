@@ -2,24 +2,24 @@ package controller
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/storage/etcd/etcd-operator/cmd/operator/app/options"
-	v1 "k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/apis/etcd.k9s.io/v1"
-	corev1 "k8s.io/api/core/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes"
-	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/cache"
 	"time"
 
+	"k8s-lx1036/k8s/storage/etcd/etcd-operator/cmd/operator/app/options"
+	v1 "k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/apis/etcd.k9s.io/v1"
 	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/client/clientset/versioned"
-	etcdClusterInformer "k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/client/informers/externalversions"
+	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/client/informers/externalversions"
 	etcdClusterLister "k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/client/listers/etcd.k9s.io/v1"
 	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/utils"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -58,13 +58,13 @@ func NewController(option *options.Options) (*EtcdClusterController, error) {
 		return nil, fmt.Errorf("unable to construct lister client: %v", err)
 	}
 
-	var etcdClusterFactoryOpts []etcdClusterInformer.SharedInformerOption
+	var etcdClusterFactoryOpts []externalversions.SharedInformerOption
 	if option.Namespace != corev1.NamespaceAll {
-		etcdClusterFactoryOpts = append(etcdClusterFactoryOpts, etcdClusterInformer.WithNamespace(option.Namespace))
+		etcdClusterFactoryOpts = append(etcdClusterFactoryOpts, externalversions.WithNamespace(option.Namespace))
 	}
 
 	etcdClusterClient := versioned.NewForConfigOrDie(restConfig)
-	etcdClusterInformerFactory := etcdClusterInformer.NewSharedInformerFactoryWithOptions(etcdClusterClient, time.Second*30, etcdClusterFactoryOpts...)
+	etcdClusterInformerFactory := externalversions.NewSharedInformerFactoryWithOptions(etcdClusterClient, time.Second*30, etcdClusterFactoryOpts...)
 	etcdClusterInformer := etcdClusterInformerFactory.Etcd().V1().EtcdClusters().Informer()
 
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), Name)
@@ -245,6 +245,11 @@ func (controller *EtcdClusterController) syncEtcdCluster(key string) error {
 			return fmt.Errorf("[syncEtcdCluster]unsafe state. cluster (%s) was created before but we received event (%s)", key, event.Type)
 		}
 
+		cluster := NewCluster(&ClusterConfig{
+			kubeClient: controller.kubeClient,
+		}, etcdCluster)
+		controller.clusters[key] = cluster
+
 	case watch.Modified:
 
 	case watch.Deleted:
@@ -252,4 +257,9 @@ func (controller *EtcdClusterController) syncEtcdCluster(key string) error {
 	}
 
 	return nil
+}
+
+func (controller *EtcdClusterController) Stop() {
+	klog.Info("Stopping the EtcdClusterController")
+	controller.queue.ShutDown()
 }

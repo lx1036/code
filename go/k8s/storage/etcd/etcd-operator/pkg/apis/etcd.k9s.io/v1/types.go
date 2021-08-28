@@ -5,6 +5,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	EtcdClusterResourceKind = "EtcdCluster"
+)
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
@@ -16,6 +20,17 @@ type EtcdCluster struct {
 	metav1.ObjectMeta `json:"metadata"`
 	Spec              EtcdClusterSpec   `json:"spec"`
 	Status            EtcdClusterStatus `json:"status,omitempty"`
+}
+
+func (etcdCluster *EtcdCluster) AsOwner() metav1.OwnerReference {
+	trueVar := true
+	return metav1.OwnerReference{
+		APIVersion: SchemeGroupVersion.String(),
+		Kind:       EtcdClusterResourceKind,
+		Name:       etcdCluster.Name,
+		UID:        etcdCluster.UID,
+		Controller: &trueVar,
+	}
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
