@@ -21,7 +21,7 @@ spec:
   - additionalPrinterColumns:
     - jsonPath: .spec.size
       name: Size
-      type: int
+      type: integer
     name: v1
     schema:
       openAPIV3Schema:

@@ -13,7 +13,7 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Namespaced,shortName=etcd,singular=etcdcluster
-// +kubebuilder:printcolumn:name="Size",type="int",JSONPath=".spec.size"
+// +kubebuilder:printcolumn:name="Size",type="integer",JSONPath=".spec.size"
 
 type EtcdCluster struct {
 	metav1.TypeMeta   `json:",inline"`
