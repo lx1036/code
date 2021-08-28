@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	"k8s-lx1036/k8s/storage/oglematchers"
+	"github.com/jacobsa/oglematchers"
 )
 
 // Match os.FileInfo values that specify an mtime equal to the given time.

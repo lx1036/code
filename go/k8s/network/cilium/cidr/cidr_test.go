@@ -24,7 +24,7 @@ func TestSubNetting(t *testing.T) {
 		fmt.Println(c.CIDR())
 	}*/
 
-	c3, _ := ParseCIDR("100.217.152.0/21")                   // 我要划分成 /26 pod cidr
+	c3, _ := ParseCIDR("100.217.152.0/21")                  // 我要划分成 /26 pod cidr
 	cs3, _ := c3.SubNetting(SUBNETTING_METHOD_HOST_NUM, 64) // 这里64是 2^(32-26)
 	fmt.Println(c3.CIDR(), "按主机数量划分:")
 	for _, c := range cs3 {

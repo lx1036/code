@@ -175,7 +175,6 @@ func (controller *Controller) runWorker() {
 
 func (controller *Controller) processNextItem() bool {
 	key, quit := controller.queue.Get()
-
 	if quit {
 		return false
 	}

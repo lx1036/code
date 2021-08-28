@@ -54,9 +54,10 @@ require (
 	github.com/hashicorp/go-msgpack v0.5.5
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/raft v1.3.1
-	github.com/jacobsa/fuse v0.0.0-20210606185441-fac69e018fad
-	github.com/jacobsa/oglematchers v0.0.0-20150720000706-141901ea67cd // indirect
-	github.com/jacobsa/timeutil v0.0.0-20170205232429-577e5acbbcf6
+	github.com/jacobsa/fuse v0.0.0-20210606185441-fac69e018fad // indirect
+	github.com/jacobsa/oglematchers v0.0.0-20150720000706-141901ea67cd
+	github.com/jacobsa/syncutil v0.0.0-20180201203307-228ac8e5a6c3
+	github.com/jacobsa/timeutil v0.0.0-20170205232429-577e5acbbcf6 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible // indirect
 	github.com/jinzhu/gorm v1.9.11
 	github.com/julienschmidt/httprouter v1.3.0
@@ -66,6 +67,7 @@ require (
 	github.com/kubernetes-csi/csi-lib-utils v0.9.0
 	github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0
 	github.com/kubernetes-sigs/custom-metrics-apiserver v0.0.0-20210311094424-0ca2b1909cdc
+	github.com/kylelemons/godebug v1.1.0
 	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.0.1
 	github.com/lni/dragonboat/v3 v3.3.1

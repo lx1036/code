@@ -60,6 +60,9 @@ done
 # go get k8s.io/code-generator/cmd/lister-gen
 # go get k8s.io/code-generator/cmd/informer-gen
 
+echo "GOBIN: ${gobin}; ${APIS_PKG}; ${GROUPS_WITH_VERSIONS}; $@;"
+echo "${FQ_APIS[@]};"
+
 if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
   echo "Generating deepcopy funcs"
   "${gobin}/deepcopy-gen" --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" -O zz_generated.deepcopy --bounding-dirs "${APIS_PKG}" "$@"
