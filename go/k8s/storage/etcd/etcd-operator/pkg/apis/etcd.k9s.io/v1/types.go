@@ -125,6 +125,22 @@ type TLSPolicy struct {
 	Static *StaticTLS `json:"static,omitempty"`
 }
 
+func (tlsPolicy *TLSPolicy) IsSecurePeer() bool {
+	if tlsPolicy == nil || tlsPolicy.Static == nil || tlsPolicy.Static.Member == nil {
+		return false
+	}
+
+	return len(tlsPolicy.Static.Member.PeerSecret) != 0
+}
+
+func (tlsPolicy *TLSPolicy) IsSecureClient() bool {
+	if tlsPolicy == nil || tlsPolicy.Static == nil {
+		return false
+	}
+
+	return len(tlsPolicy.Static.OperatorSecret) != 0
+}
+
 type StaticTLS struct {
 	// Member contains secrets containing TLS certs used by each etcd member pod.
 	Member *MemberSecret `json:"member,omitempty"`

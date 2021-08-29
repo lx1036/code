@@ -144,10 +144,6 @@ func newEtcdPod(member *Member, initialCluster []string, clusterName, state, tok
 			},
 		)
 	}
-	var securityContext *corev1.PodSecurityContext
-	if etcdClusterSpec.Pod != nil {
-		securityContext = etcdClusterSpec.Pod.SecurityContext
-	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        member.Name,
@@ -166,8 +162,10 @@ func newEtcdPod(member *Member, initialCluster []string, clusterName, state, tok
 			Hostname:                     member.Name,
 			Subdomain:                    clusterName,
 			AutomountServiceAccountToken: func(b bool) *bool { return &b }(false),
-			SecurityContext:              securityContext,
 		},
+	}
+	if etcdClusterSpec.Pod != nil {
+		pod.Spec.SecurityContext = etcdClusterSpec.Pod.SecurityContext
 	}
 	SetEtcdVersion(pod, etcdClusterSpec.Version)
 
