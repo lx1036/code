@@ -5,9 +5,11 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	v1 "k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/apis/etcd.k9s.io/v1"
+	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/client/clientset/versioned"
 
 	"github.com/google/uuid"
 	"go.etcd.io/etcd/clientv3"
@@ -31,11 +33,13 @@ const (
 var ErrLostQuorum = errors.New("lost quorum")
 
 type ClusterConfig struct {
-	kubeClient kubernetes.Interface
+	kubeClient        kubernetes.Interface
+	etcdClusterClient *versioned.Clientset
 }
 
 type Cluster struct {
-	etcdCluster *v1.EtcdCluster
+	etcdCluster       *v1.EtcdCluster
+	etcdClusterClient *versioned.Clientset
 
 	kubeClient kubernetes.Interface
 
@@ -47,11 +51,35 @@ type Cluster struct {
 	tlsConfig *tls.Config
 
 	eventClient corev1.Event
+
+	// 缓存 EtcdClusterStatus，有种状态机感觉，显示处于不同状态
+	status v1.EtcdClusterStatus
+}
+
+func NewCluster(clusterConfig *ClusterConfig, etcdCluster *v1.EtcdCluster) *Cluster {
+	cluster := &Cluster{
+		etcdCluster:       etcdCluster,
+		etcdClusterClient: clusterConfig.etcdClusterClient,
+		kubeClient:        clusterConfig.kubeClient,
+		status:            *(etcdCluster.Status.DeepCopy()),
+	}
+
+	// INFO: 这里有个重要逻辑，setup() 先启动一个 etcd seed pod，然后 run() 里去根据 EtcdCluster .spec.size 去 reconcile，
+	//  一个一个去创建 etcd pod。但是，setup() 的 etcd pod 是 "new"，run() reconcile 的 etcd pod 是 "existing"!!!
+	go func() {
+		if err := cluster.setup(); err != nil {
+			klog.Errorf(fmt.Sprintf("[NewCluster]cluster failed to setup err %v", err))
+		}
+
+		cluster.run()
+	}()
+
+	return cluster
 }
 
 func (cluster *Cluster) setup() error {
 	var shouldCreateCluster bool
-	switch cluster.etcdCluster.Status.Phase {
+	switch cluster.status.Phase {
 	case v1.ClusterPhaseNone:
 		shouldCreateCluster = true
 	case v1.ClusterPhaseCreating:
@@ -71,17 +99,45 @@ func (cluster *Cluster) setup() error {
 }
 
 func (cluster *Cluster) create() error {
+	cluster.status.SetPhase(v1.ClusterPhaseCreating)
+	err := cluster.UpdateEtcdClusterStatus()
+	if err != nil {
+		return err
+	}
 
 	return cluster.prepareSeedMember()
 }
 
+// UpdateEtcdClusterStatus INFO: 这里更新 etcdCluster status phase字段值，先 api-server 获取最新的再去 update，防止 conflict error
+func (cluster *Cluster) UpdateEtcdClusterStatus() error {
+	if reflect.DeepEqual(cluster.etcdCluster.Status, cluster.status) {
+		return nil
+	}
+
+	newCluster, err := cluster.etcdClusterClient.EtcdV1().EtcdClusters(cluster.etcdCluster.Namespace).Get(context.TODO(),
+		cluster.etcdCluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	newCluster.Status = cluster.status
+	newCluster, err = cluster.etcdClusterClient.EtcdV1().EtcdClusters(cluster.etcdCluster.Namespace).Update(context.TODO(),
+		newCluster, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+
+	cluster.etcdCluster = newCluster
+	return nil
+}
+
+// INFO: 首先创建一个 seed etcd pod，然后再 reconcile size 依次创建 etcd pod
 func (cluster *Cluster) prepareSeedMember() error {
 
 	return cluster.startSeedMember()
 }
 
 func (cluster *Cluster) startSeedMember() error {
-
 	member := &Member{
 		Name:      cluster.etcdCluster.Name,
 		Namespace: cluster.etcdCluster.Namespace,
@@ -360,21 +416,4 @@ func (cluster *Cluster) removePod(name string) error {
 	}
 
 	return nil
-}
-
-func NewCluster(clusterConfig *ClusterConfig, etcdCluster *v1.EtcdCluster) *Cluster {
-	cluster := &Cluster{
-		etcdCluster: etcdCluster,
-		kubeClient:  clusterConfig.kubeClient,
-	}
-
-	go func() {
-		if err := cluster.setup(); err != nil {
-			klog.Errorf(fmt.Sprintf("[NewCluster]cluster failed to setup err %v", err))
-		}
-
-		cluster.run()
-	}()
-
-	return cluster
 }

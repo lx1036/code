@@ -1,0 +1,34 @@
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etcd-backup-operator
+  namespace: etcd-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: etcd-backup-operator
+  template:
+    metadata:
+      labels:
+        name: etcd-backup-operator
+        app: etcd-backup-operator
+    spec:
+      containers:
+        - name: etcd-backup-operator
+          image: quay.io/coreos/etcd-operator:dev
+          command:
+            - etcd-backup-operator
+          env:
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+

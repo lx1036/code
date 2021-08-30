@@ -231,3 +231,7 @@ type EtcdClusterStatus struct {
 	// If the cluster is not upgrading, TargetVersion is empty.
 	TargetVersion string `json:"targetVersion"`
 }
+
+func (etcdClusterStatus *EtcdClusterStatus) SetPhase(phase ClusterPhase) {
+	etcdClusterStatus.Phase = phase
+}

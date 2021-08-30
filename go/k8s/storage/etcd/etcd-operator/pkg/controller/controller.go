@@ -43,6 +43,7 @@ type EtcdClusterController struct {
 	recorder record.EventRecorder
 
 	etcdClusterLister etcdClusterLister.EtcdClusterLister
+	etcdClusterClient *versioned.Clientset
 
 	clusters map[string]*Cluster
 }
@@ -89,6 +90,7 @@ func NewController(option *options.Options) (*EtcdClusterController, error) {
 		kubeClient:          kubeClient,
 		queue:               queue,
 		recorder:            eventRecorder,
+		etcdClusterClient:   etcdClusterClient,
 		etcdClusterLister:   etcdClusterInformerFactory.Etcd().V1().EtcdClusters().Lister(),
 	}
 
@@ -246,7 +248,8 @@ func (controller *EtcdClusterController) syncEtcdCluster(key string) error {
 		}
 
 		cluster := NewCluster(&ClusterConfig{
-			kubeClient: controller.kubeClient,
+			kubeClient:        controller.kubeClient,
+			etcdClusterClient: controller.etcdClusterClient,
 		}, etcdCluster)
 		controller.clusters[key] = cluster
 
