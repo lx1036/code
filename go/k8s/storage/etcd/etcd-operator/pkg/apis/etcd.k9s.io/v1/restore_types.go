@@ -11,7 +11,6 @@ type EtcdRestoreList struct {
 	Items           []EtcdRestore `json:"items"`
 }
 
-
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
@@ -32,10 +31,10 @@ type EtcdRestore struct {
 type RestoreSpec struct {
 	// BackupStorageType is the type of the backup storage which is used as RestoreSource.
 	BackupStorageType BackupStorageType `json:"backupStorageType"`
-	
+
 	// RestoreSource tells the where to get the backup and restore from.
 	RestoreSource `json:",inline"`
-	
+
 	// EtcdCluster references an EtcdCluster resource whose metadata and spec
 	// will be used to create the new restored EtcdCluster CR.
 	// This reference EtcdCluster CR and all its resources will be deleted before the
@@ -63,7 +62,7 @@ type S3RestoreSource struct {
 	// The format of the path must be: "<s3-bucket-name>/<path-to-backup-file>"
 	// e.g: "mybucket/etcd.backup"
 	Path string `json:"path"`
-	
+
 	// The name of the secret object that stores the AWS credential and config files.
 	// The file name of the credential MUST be 'credentials'.
 	// The file name of the config MUST be 'config'.
@@ -71,11 +70,11 @@ type S3RestoreSource struct {
 	//
 	// AWSSecret overwrites the default etcd operator wide AWS credential and config.
 	AWSSecret string `json:"awsSecret"`
-	
+
 	// Endpoint if blank points to aws. If specified, can point to s3 compatible object
 	// stores.
 	Endpoint string `json:"endpoint"`
-	
+
 	// ForcePathStyle forces to use path style over the default subdomain style.
 	// This is useful when you have an s3 compatible endpoint that doesn't support
 	// subdomain buckets.

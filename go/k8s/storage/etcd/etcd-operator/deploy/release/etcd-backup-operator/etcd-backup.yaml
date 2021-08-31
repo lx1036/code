@@ -28,6 +28,6 @@ metadata:
   name: my-etcd-backup
   namespace: etcd-operator
 data:
-  accessKeyID: "accessKeyID_base64"
-  accessKeySecret: "accessKeySecret_base64"
+  accessKey: "accessKey_base64"
+  secretKey: "secretKey_base64"
 type: Opaque

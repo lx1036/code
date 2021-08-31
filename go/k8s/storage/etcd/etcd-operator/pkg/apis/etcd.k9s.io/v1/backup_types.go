@@ -2,6 +2,15 @@ package v1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+type BackupStorageType string
+
+const (
+	// AWS S3 related consts
+	BackupStorageTypeS3          BackupStorageType = "S3"
+	AWSSecretCredentialsFileName                   = "credentials"
+	AWSSecretConfigFileName                        = "config"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // EtcdBackupList is a list of EtcdBackup.
@@ -10,7 +19,6 @@ type EtcdBackupList struct {
 	metav1.ListMeta `json:"metadata"`
 	Items           []EtcdBackup `json:"items"`
 }
-
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -25,14 +33,6 @@ type EtcdBackup struct {
 	Spec              BackupSpec   `json:"spec"`
 	Status            BackupStatus `json:"status,omitempty"`
 }
-
-
-
-type BackupStorageType string
-const (
-	// AWS S3 related consts
-	BackupStorageTypeS3          BackupStorageType = "S3"
-)
 
 // BackupSpec contains a backup specification for an etcd cluster.
 type BackupSpec struct {
@@ -82,7 +82,7 @@ type S3BackupSource struct {
 	// The format of the path must be: "<s3-bucket-name>/<path-to-backup-file>"
 	// e.g: "mybucket/etcd.backup"
 	Path string `json:"path"`
-	
+
 	// The name of the secret object that stores the AWS credential and config files.
 	// The file name of the credential MUST be 'credentials'.
 	// The file name of the config MUST be 'config'.
@@ -90,17 +90,16 @@ type S3BackupSource struct {
 	//
 	// AWSSecret overwrites the default etcd operator wide AWS credential and config.
 	AWSSecret string `json:"awsSecret"`
-	
+
 	// Endpoint if blank points to aws. If specified, can point to s3 compatible object
 	// stores.
 	Endpoint string `json:"endpoint,omitempty"`
-	
+
 	// ForcePathStyle forces to use path style over the default subdomain style.
 	// This is useful when you have an s3 compatible endpoint that doesn't support
 	// subdomain buckets.
 	ForcePathStyle bool `json:"forcePathStyle"`
 }
-
 
 // BackupStatus represents the status of the EtcdBackup Custom Resource.
 type BackupStatus struct {
@@ -115,4 +114,3 @@ type BackupStatus struct {
 	// LastSuccessDate indicate the time to get snapshot last time
 	LastSuccessDate metav1.Time `json:"lastSuccessDate,omitempty"`
 }
-

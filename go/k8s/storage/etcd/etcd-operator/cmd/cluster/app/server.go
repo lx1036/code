@@ -1,7 +1,7 @@
 package app
 
 import (
-	"k8s-lx1036/k8s/storage/etcd/etcd-operator/cmd/operator/app/options"
+	"k8s-lx1036/k8s/storage/etcd/etcd-operator/cmd/cluster/app/options"
 	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/controller"
 
 	"github.com/spf13/cobra"
