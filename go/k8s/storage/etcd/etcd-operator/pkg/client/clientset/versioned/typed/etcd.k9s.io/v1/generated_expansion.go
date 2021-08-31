@@ -18,4 +18,8 @@ limitations under the License.
 
 package v1
 
+type EtcdBackupExpansion interface{}
+
 type EtcdClusterExpansion interface{}
+
+type EtcdRestoreExpansion interface{}

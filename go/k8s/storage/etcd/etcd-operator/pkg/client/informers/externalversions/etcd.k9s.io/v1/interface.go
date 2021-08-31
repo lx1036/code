@@ -24,8 +24,12 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// EtcdBackups returns a EtcdBackupInformer.
+	EtcdBackups() EtcdBackupInformer
 	// EtcdClusters returns a EtcdClusterInformer.
 	EtcdClusters() EtcdClusterInformer
+	// EtcdRestores returns a EtcdRestoreInformer.
+	EtcdRestores() EtcdRestoreInformer
 }
 
 type version struct {
@@ -39,7 +43,17 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
+// EtcdBackups returns a EtcdBackupInformer.
+func (v *version) EtcdBackups() EtcdBackupInformer {
+	return &etcdBackupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // EtcdClusters returns a EtcdClusterInformer.
 func (v *version) EtcdClusters() EtcdClusterInformer {
 	return &etcdClusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// EtcdRestores returns a EtcdRestoreInformer.
+func (v *version) EtcdRestores() EtcdRestoreInformer {
+	return &etcdRestoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

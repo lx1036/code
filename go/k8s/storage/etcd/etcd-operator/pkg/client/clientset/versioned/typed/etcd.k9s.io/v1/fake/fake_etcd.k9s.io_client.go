@@ -29,8 +29,16 @@ type FakeEtcdV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeEtcdV1) EtcdBackups(namespace string) v1.EtcdBackupInterface {
+	return &FakeEtcdBackups{c, namespace}
+}
+
 func (c *FakeEtcdV1) EtcdClusters(namespace string) v1.EtcdClusterInterface {
 	return &FakeEtcdClusters{c, namespace}
+}
+
+func (c *FakeEtcdV1) EtcdRestores(namespace string) v1.EtcdRestoreInterface {
+	return &FakeEtcdRestores{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

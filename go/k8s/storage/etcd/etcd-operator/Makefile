@@ -22,5 +22,6 @@ groups:
 
 # 自动化生成 crd
 # controller-gen -hhh
+# go get sigs.k8s.io/controller-tools/cmd/controller-gen
 controller-gen:
 	controller-gen crd:trivialVersions=true,maxDescLen=0,crdVersions=v1 paths="./pkg/apis/etcd.k9s.io/v1" output:crd:artifacts:config=./deploy/release

@@ -27,7 +27,9 @@ import (
 
 type EtcdV1Interface interface {
 	RESTClient() rest.Interface
+	EtcdBackupsGetter
 	EtcdClustersGetter
+	EtcdRestoresGetter
 }
 
 // EtcdV1Client is used to interact with features provided by the etcd.k9s.io group.
@@ -35,8 +37,16 @@ type EtcdV1Client struct {
 	restClient rest.Interface
 }
 
+func (c *EtcdV1Client) EtcdBackups(namespace string) EtcdBackupInterface {
+	return newEtcdBackups(c, namespace)
+}
+
 func (c *EtcdV1Client) EtcdClusters(namespace string) EtcdClusterInterface {
 	return newEtcdClusters(c, namespace)
+}
+
+func (c *EtcdV1Client) EtcdRestores(namespace string) EtcdRestoreInterface {
+	return newEtcdRestores(c, namespace)
 }
 
 // NewForConfig creates a new EtcdV1Client for the given config.
