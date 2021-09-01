@@ -1,4 +1,6 @@
 
+## Design
+RaftServer(CreateRaft) -> Raft
 
 
 ## Leader Election

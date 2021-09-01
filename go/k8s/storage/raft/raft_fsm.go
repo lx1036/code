@@ -39,7 +39,7 @@ type raftFsm struct {
 }
 
 func NewRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
-	raftlog, err := newRaftLog(raftConfig.Storage)
+	raftLog, err := raftlog.NewRaftLog(raftConfig.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func NewRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
 		sm:       raftConfig.StateMachine,
 		config:   config,
 		leader:   NoLeader,
-		raftLog:  raftlog,
+		raftLog:  raftLog,
 		replicas: make(map[uint64]*Replica),
 		readOnly: newReadOnly(raftConfig.ID, config.ReadOnlyOption),
 	}
@@ -73,22 +73,22 @@ func NewRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
 		}
 	}
 
-	klog.Info("newRaft[%v] [commit: %d, applied: %d, lastindex: %d]", r.id, raftlog.committed, raftConfig.Applied, raftlog.lastIndex())
+	klog.Info("newRaft[%v] [commit: %d, applied: %d, lastindex: %d]", r.id, raftLog.Committed, raftConfig.Applied, raftLog.LastIndex())
 
 	if raftConfig.Applied > 0 {
-		lasti := raftlog.LastIndex()
+		lasti := raftLog.LastIndex()
 		if lasti == 0 {
 			// If there is application data but no raft log, then restore to initial state.
-			raftlog.committed = 0
+			raftLog.Committed = 0
 			raftConfig.Applied = 0
 		} else if lasti < raftConfig.Applied {
 			// If lastIndex<appliedIndex, then the log as the standard.
-			raftlog.committed = lasti
+			raftLog.Committed = lasti
 			raftConfig.Applied = lasti
-		} else if raftlog.committed < raftConfig.Applied {
-			raftlog.committed = raftConfig.Applied
+		} else if raftLog.Committed < raftConfig.Applied {
+			raftLog.Committed = raftConfig.Applied
 		}
-		raftlog.appliedTo(raftConfig.Applied)
+		raftLog.AppliedTo(raftConfig.Applied)
 	}
 
 	// recover committed
@@ -117,7 +117,7 @@ func NewRaftFsm(config *Config, raftConfig *RaftConfig) (*raftFsm, error) {
 		peerStrs = append(peerStrs, fmt.Sprintf("%v", p.String()))
 	}
 	klog.Infof("newRaft[%v] [peers: [%s], term: %d, commit: %d, applied: %d, lastindex: %d, lastterm: %d]",
-		r.id, strings.Join(peerStrs, ","), r.term, r.raftLog.committed, r.raftLog.applied, r.raftLog.lastIndex(), r.raftLog.lastTerm())
+		r.id, strings.Join(peerStrs, ","), r.term, r.raftLog.Committed, r.raftLog.Applied, r.raftLog.LastIndex(), r.raftLog.LastTerm())
 
 	go r.doRandomSeed()
 

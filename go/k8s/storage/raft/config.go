@@ -1,6 +1,37 @@
 package raft
 
-import "time"
+import (
+	"errors"
+	"strings"
+	"time"
+
+	"k8s-lx1036/k8s/storage/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/storage"
+)
+
+const (
+	_ = iota
+	// KB killobytes
+	KB = 1 << (10 * iota)
+	// MB megabytes
+	MB = KB << 10
+)
+
+const (
+	defaultTickInterval    = time.Millisecond * 2000
+	defaultHeartbeatTick   = 1
+	defaultElectionTick    = 5
+	defaultInflightMsgs    = 128
+	defaultSizeReqBuffer   = 2048
+	defaultSizeAppBuffer   = 2048
+	defaultRetainLogs      = 20000
+	defaultSizeSendBuffer  = 10240
+	defaultReplConcurrency = 5
+	defaultSnapConcurrency = 10
+	defaultSizePerMsg      = MB
+	defaultHeartbeatAddr   = ":3016"
+	defaultReplicateAddr   = ":2015"
+)
 
 // TransportConfig raft server transport config
 type TransportConfig struct {
@@ -75,5 +106,99 @@ type Config struct {
 	// in that case.
 	// LeaseCheck MUST be enabled if ReadOnlyOption is ReadOnlyLeaseBased.
 	ReadOnlyOption ReadOnlyOption
-	transport      Transport
+
+	// INFO: TCP transport
+	transport Transport
+}
+
+// validate returns an error if any required elements of the Config are missing or invalid.
+func (c *Config) validate() error {
+	if c.NodeID == 0 {
+		return errors.New("NodeID is required")
+	}
+	if c.TransportConfig.Resolver == nil {
+		return errors.New("Resolver is required")
+	}
+	if c.MaxSizePerMsg > 4*MB {
+		return errors.New("MaxSizePerMsg it too high")
+	}
+	if c.MaxInflightMsgs > 1024 {
+		return errors.New("MaxInflightMsgs is too high")
+	}
+	if c.MaxSnapConcurrency > 256 {
+		return errors.New("MaxSnapConcurrency is too high")
+	}
+	if c.MaxReplConcurrency > 256 {
+		return errors.New("MaxReplConcurrency is too high")
+	}
+	if c.ReadOnlyOption == ReadOnlyLeaseBased && !c.LeaseCheck {
+		return errors.New("LeaseCheck MUST be enabled when use ReadOnlyLeaseBased")
+	}
+
+	if strings.TrimSpace(c.TransportConfig.HeartbeatAddr) == "" {
+		c.TransportConfig.HeartbeatAddr = defaultHeartbeatAddr
+	}
+	if strings.TrimSpace(c.TransportConfig.ReplicateAddr) == "" {
+		c.TransportConfig.ReplicateAddr = defaultReplicateAddr
+	}
+	if c.TickInterval < 5*time.Millisecond {
+		c.TickInterval = defaultTickInterval
+	}
+	if c.HeartbeatTick <= 0 {
+		c.HeartbeatTick = defaultHeartbeatTick
+	}
+	if c.ElectionTick <= 0 {
+		c.ElectionTick = defaultElectionTick
+	}
+	if c.MaxSizePerMsg <= 0 {
+		c.MaxSizePerMsg = defaultSizePerMsg
+	}
+	if c.MaxInflightMsgs <= 0 {
+		c.MaxInflightMsgs = defaultInflightMsgs
+	}
+	if c.ReqBufferSize <= 0 {
+		c.ReqBufferSize = defaultSizeReqBuffer
+	}
+	if c.AppBufferSize <= 0 {
+		c.AppBufferSize = defaultSizeAppBuffer
+	}
+	if c.MaxSnapConcurrency <= 0 {
+		c.MaxSnapConcurrency = defaultSnapConcurrency
+	}
+	if c.MaxReplConcurrency <= 0 {
+		c.MaxReplConcurrency = defaultReplConcurrency
+	}
+	if c.SendBufferSize <= 0 {
+		c.SendBufferSize = defaultSizeSendBuffer
+	}
+	return nil
+}
+
+// RaftConfig contains the parameters to create a raft.
+type RaftConfig struct {
+	ID           uint64
+	Term         uint64
+	Leader       uint64
+	Applied      uint64
+	Peers        []proto.Peer
+	Storage      storage.Storage
+	StateMachine StateMachine
+}
+
+// validate returns an error if any required elements of the ReplConfig are missing or invalid.
+func (c *RaftConfig) validate() error {
+	if c.ID == 0 {
+		return errors.New("ID is required")
+	}
+	if len(c.Peers) == 0 {
+		return errors.New("Peers is required")
+	}
+	if c.Storage == nil {
+		return errors.New("Storage is required")
+	}
+	if c.StateMachine == nil {
+		return errors.New("StateMachine is required")
+	}
+
+	return nil
 }

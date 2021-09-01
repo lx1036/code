@@ -24,17 +24,17 @@ var (
 // raftLog is responsible for the operation of the log.
 // raftLog 主要用来持久化 operation log
 type RaftLog struct {
-	unstable           unstable
-	storage            storage.Storage
-	committed, applied uint64
+	Unstable           unstable
+	Storage            storage.Storage
+	Committed, Applied uint64
 }
 
 // INFO: 获取 raftlog 的 last index
 func (log *RaftLog) LastIndex() uint64 {
-	if i, ok := log.unstable.maybeLastIndex(); ok {
+	if i, ok := log.Unstable.maybeLastIndex(); ok {
 		return i
 	}
-	i, err := log.storage.LastIndex()
+	i, err := log.Storage.LastIndex()
 	if err != nil {
 		errMsg := fmt.Sprintf("[raftLog->lastIndex]get lastIndex from storage err:[%v]", err)
 		klog.Errorf(errMsg)
@@ -48,14 +48,14 @@ func (log *RaftLog) append(ents ...*proto.Entry) uint64 {
 		return log.LastIndex()
 	}
 
-	if after := ents[0].Index - 1; after < log.committed {
-		errMsg := fmt.Sprintf("[raftLog->append]after(%d) is out of range [committed(%d)]", after, log.committed)
+	if after := ents[0].Index - 1; after < log.Committed {
+		errMsg := fmt.Sprintf("[raftLog->append]after(%d) is out of range [committed(%d)]", after, log.Committed)
 		klog.Error(errMsg)
 		panic(fmt.Errorf(errMsg))
 	}
 
 	// unstable 存储还未提交到 Storage 的 entry
-	log.unstable.truncateAndAppend(ents)
+	log.Unstable.truncateAndAppend(ents)
 
 	return log.LastIndex()
 }
@@ -69,7 +69,7 @@ func (log *RaftLog) entries(i uint64, maxsize uint64) ([]*proto.Entry, error) {
 }
 
 func (log *RaftLog) firstIndex() uint64 {
-	index, err := log.storage.FirstIndex()
+	index, err := log.Storage.FirstIndex()
 	if err != nil {
 		errMsg := fmt.Sprintf("[raftLog->firstIndex]get firstindex from storage err:[%v].", err)
 		klog.Error(errMsg)
@@ -109,9 +109,9 @@ func (log *RaftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error)
 	}
 
 	var ents []*proto.Entry
-	if lo < log.unstable.offset {
-		storedhi := util.Min(hi, log.unstable.offset)
-		storedEnts, cmp, err := log.storage.Entries(lo, storedhi, maxSize)
+	if lo < log.Unstable.offset {
+		storedhi := util.Min(hi, log.Unstable.offset)
+		storedEnts, cmp, err := log.Storage.Entries(lo, storedhi, maxSize)
 		if cmp {
 			return nil, ErrCompacted
 		} else if err != nil {
@@ -125,8 +125,8 @@ func (log *RaftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error)
 		}
 		ents = storedEnts
 	}
-	if hi > log.unstable.offset {
-		unstable := log.unstable.slice(util.Max(lo, log.unstable.offset), hi)
+	if hi > log.Unstable.offset {
+		unstable := log.Unstable.slice(util.Max(lo, log.Unstable.offset), hi)
 		if len(ents) > 0 {
 			ents = append([]*proto.Entry{}, ents...)
 			ents = append(ents, unstable...)
@@ -142,9 +142,9 @@ func (log *RaftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error)
 	return limitSize(ents, maxSize), nil
 }
 
-func newRaftLog(storage storage.Storage) (*RaftLog, error) {
+func NewRaftLog(storage storage.Storage) (*RaftLog, error) {
 	log := &RaftLog{
-		storage: storage,
+		Storage: storage,
 	}
 
 	firstIndex, err := storage.FirstIndex()
@@ -156,10 +156,10 @@ func newRaftLog(storage storage.Storage) (*RaftLog, error) {
 		return nil, err
 	}
 
-	log.unstable.offset = lastIndex + 1
-	log.unstable.entries = make([]*proto.Entry, 0, 256)
-	log.committed = firstIndex - 1
-	log.applied = firstIndex - 1
+	log.Unstable.offset = lastIndex + 1
+	log.Unstable.entries = make([]*proto.Entry, 0, 256)
+	log.Committed = firstIndex - 1
+	log.Applied = firstIndex - 1
 
 	return log, nil
 }
