@@ -190,6 +190,6 @@ func NewRaftServer(config *Config) (*RaftServer, error) {
 		rs.config.transport = transport
 	}
 
-	util.RunWorkerUtilStop(rs.run, rs.stopc)
+	go rs.run()
 	return rs, nil
 }
