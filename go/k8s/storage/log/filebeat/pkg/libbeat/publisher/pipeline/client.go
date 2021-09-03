@@ -1,8 +1,13 @@
 package pipeline
 
-import "sync"
+import (
+	"github.com/elastic/beats/libbeat/beat"
+	"github.com/elastic/beats/libbeat/publisher"
+	"github.com/elastic/beats/libbeat/publisher/queue"
+	"sync"
+)
 
-type client struct {
+type Client struct {
 	pipeline   *Pipeline
 	processors beat.Processor
 	producer   queue.Producer
@@ -21,4 +26,17 @@ type client struct {
 	done      chan struct{} // the done channel will be closed if the closeReg gets closed, or Close is run.
 
 	eventer beat.ClientEventer
+}
+
+func (c *Client) Publish(e beat.Event) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.publish(e)
+}
+
+func (c *Client) publish(e beat.Event) {
+
+	published := c.producer.Publish(pubEvent)
+
 }

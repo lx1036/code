@@ -1,7 +1,10 @@
 package pipeline
 
 import (
+	"github.com/elastic/beats/libbeat/outputs"
+	"github.com/elastic/beats/libbeat/publisher/processing"
 	"k8s-lx1036/k8s/storage/log/filebeat/pkg/libbeat/outputs/console"
+	"k8s-lx1036/k8s/storage/log/filebeat/pkg/libbeat/publisher/queue"
 	"k8s-lx1036/k8s/storage/log/filebeat/pkg/libbeat/publisher/queue/memoryqueue"
 	"sync"
 	"time"
@@ -57,7 +60,7 @@ func NewPipeline(
 
 	pipeline.queue = queue
 	pipeline.output = newOutputController(beat, pipeline.queue)
-	pipeline.output.Set(out)
+	pipeline.output.Set(output)
 
 	return pipeline, nil
 }

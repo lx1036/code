@@ -1,6 +1,9 @@
 package memoryqueue
 
-import "sync"
+import (
+	"github.com/elastic/beats/libbeat/publisher/queue"
+	"sync"
+)
 
 type Broker struct {
 	done chan struct{}
@@ -42,7 +45,7 @@ func NewMemoryQueue() *Broker {
 		ackListener: settings.ACKListener,
 	}
 
-	eventLoop = newBufferingEventLoop(broker, sz, minEvents, flushTimeout)
+	eventLoop := newBufferingEventLoop(broker, sz, minEvents, flushTimeout)
 	broker.bufSize = sz
 	ack := newACKLoop(broker, eventLoop.processACK)
 
@@ -59,4 +62,12 @@ func NewMemoryQueue() *Broker {
 	}()
 
 	return broker
+}
+
+func (broker *Broker) Producer(cfg queue.ProducerConfig) queue.Producer {
+	return newProducer(broker, cfg.ACK, cfg.OnDrop, cfg.DropOnCancel)
+}
+
+func (broker *Broker) Consumer() queue.Consumer {
+	return newConsumer(broker)
 }
