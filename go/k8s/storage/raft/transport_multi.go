@@ -1,5 +1,10 @@
 package raft
 
+import (
+	"k8s-lx1036/k8s/storage/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/util"
+)
+
 type MultiTransport struct {
 	heartbeat *heartbeatTransport
 	replicate *replicateTransport
@@ -23,4 +28,12 @@ func NewMultiTransport(raft *RaftServer, config *TransportConfig) (Transport, er
 	mt.replicate.start()
 
 	return mt, nil
+}
+
+func receiveMessage(r *util.BufferReader) (msg *proto.Message, err error) {
+	msg = proto.NewMessage()
+	if err = msg.Decode(r); err != nil {
+		proto.ReturnMessage(msg)
+	}
+	return
 }

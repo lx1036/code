@@ -306,6 +306,8 @@ type CreateFileOp struct {
 	// later call to ReleaseFileHandle.
 	Handle    HandleID
 	OpContext OpContext
+
+	UserGroup
 }
 
 // Create a symlink inode. If the name already exists, the file system should

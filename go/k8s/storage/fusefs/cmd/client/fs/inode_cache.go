@@ -128,21 +128,21 @@ func (inodeCache *InodeCache) Get(inodeID uint64) *Inode {
 	return inode
 }
 
-func fillChildEntry(entry *fuseops.ChildInodeEntry, inode *Inode) {
-	entry.Child = fuseops.InodeID(inode.inodeID)
-	entry.AttributesExpiration = time.Now().Add(AttrValidDuration)
-	entry.EntryExpiration = time.Now().Add(LookupValidDuration)
-
-	fillAttr(&entry.Attributes, inode)
-}
-
-func fillAttr(attr *fuseops.InodeAttributes, inode *Inode) {
-	attr.Nlink = inode.nlink
-	attr.Mode = inode.mode
-	attr.Size = inode.size
-	attr.Atime = time.Unix(inode.accessTime, 0)
-	attr.Ctime = time.Unix(inode.createTime, 0)
-	attr.Mtime = time.Unix(inode.modifyTime, 0)
-	attr.Uid = inode.uid
-	attr.Gid = inode.gid
+func GetChildInodeEntry(child *Inode) fuseops.ChildInodeEntry {
+	return fuseops.ChildInodeEntry{
+		Child: fuseops.InodeID(child.inodeID),
+		Attributes: fuseops.InodeAttributes{
+			Size:   child.size,
+			Nlink:  child.nlink,
+			Mode:   child.mode,
+			Atime:  time.Unix(child.accessTime, 0),
+			Mtime:  time.Unix(child.modifyTime, 0),
+			Ctime:  time.Unix(child.createTime, 0),
+			Crtime: time.Time{},
+			Uid:    child.uid,
+			Gid:    child.gid,
+		},
+		AttributesExpiration: time.Now().Add(AttrValidDuration),
+		EntryExpiration:      time.Now().Add(LookupValidDuration),
+	}
 }

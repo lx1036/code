@@ -1,0 +1,13 @@
+apiVersion: "etcd.k9s.io/v1"
+kind: "EtcdCluster"
+metadata:
+  name: "example-etcd-cluster"
+  namespace: etcd-operator
+  ## Adding this annotation make this cluster managed by clusterwide operators
+  ## namespaced operators ignore it
+  # annotations:
+  #   etcd.database.coreos.com/scope: clusterwide
+spec:
+  size: 3
+  version: "3.2.13"
+  repository: "quay.io/coreos/etcd"

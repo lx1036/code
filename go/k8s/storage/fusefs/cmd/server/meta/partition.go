@@ -171,7 +171,7 @@ func (partition *metaPartition) CanRemoveRaftMember(peer raftproto.Peer) error {
 }
 
 // INFO: 从本地snapshot加载 metadata/inode/dentry/applyID
-func (partition *metaPartition) load() error {
+func (partition *metaPartition) loadFromSnapshot() error {
 	if err := partition.loadMetadata(); err != nil {
 		return err
 	}
@@ -184,6 +184,7 @@ func (partition *metaPartition) load() error {
 	return partition.loadApplyID()
 }
 
+// INFO: 创建 raft partition，实际上每一个 partition 都有其自己的 wal path
 func (partition *metaPartition) startRaft() error {
 	var (
 		err           error
@@ -218,7 +219,7 @@ func (partition *metaPartition) startRaft() error {
 
 // INFO: 启动各个 partition
 func (partition *metaPartition) Start() error {
-	if err := partition.load(); err != nil {
+	if err := partition.loadFromSnapshot(); err != nil {
 		return err
 	}
 

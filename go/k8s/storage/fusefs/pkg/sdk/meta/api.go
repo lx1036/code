@@ -24,7 +24,7 @@ func (mw *MetaWrapper) ReadDir_ll(parentID uint64) ([]proto.Dentry, error) {
 	return children, nil
 }
 
-// INFO: 在meta cluster 的 partition 中，创建 inode/dentry 对象
+// Create_ll INFO: 在meta cluster 的 partition 中，创建 inode/dentry 对象，其实这个函数重要一个逻辑是：分配一个 inodeID
 func (mw *MetaWrapper) Create_ll(parentInodeID uint64, name string, mode, uid, gid uint32,
 	target []byte) (*proto.InodeInfo, error) {
 	parentMetaPartition := mw.getPartitionByInodeID(parentInodeID)

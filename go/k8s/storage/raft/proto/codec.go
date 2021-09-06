@@ -13,6 +13,8 @@ const (
 	message_header  uint64 = 68
 )
 
+type HeartbeatContext []uint64
+
 func EncodeHBConext(ctx HeartbeatContext) (buf []byte) {
 	sort.Slice(ctx, func(i, j int) bool {
 		return ctx[i] < ctx[j]
@@ -26,4 +28,18 @@ func EncodeHBConext(ctx HeartbeatContext) (buf []byte) {
 		prev = id
 	}
 	return
+}
+
+// INFO: 获取每一个字节的 uint64 值
+func DecodeHBContext(buf []byte) HeartbeatContext {
+	var ctx HeartbeatContext
+	prev := uint64(0)
+	for len(buf) > 0 {
+		id, n := binary.Uvarint(buf)
+		ctx = append(ctx, id+prev)
+		prev = id + prev
+		buf = buf[n:]
+	}
+
+	return ctx
 }

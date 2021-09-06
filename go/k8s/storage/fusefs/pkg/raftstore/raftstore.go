@@ -35,7 +35,7 @@ type raftStore struct {
 }
 
 // CreatePartition creates a new partition in the raft store.
-func (r *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err error) {
+func (store *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err error) {
 	// Init WaL Storage for this partition.
 	// Variables:
 	// wc: WaL Configuration.
@@ -44,7 +44,7 @@ func (r *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err erro
 
 	var walPath string
 	if cfg.WalPath == "" {
-		walPath = path.Join(r.raftPath, strconv.FormatUint(cfg.ID, 10))
+		walPath = path.Join(store.raftPath, strconv.FormatUint(cfg.ID, 10))
 	} else {
 		walPath = path.Join(cfg.WalPath, "wal_"+strconv.FormatUint(cfg.ID, 10))
 	}
@@ -57,7 +57,7 @@ func (r *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err erro
 	peers := make([]proto.Peer, 0)
 	for _, peerAddress := range cfg.Peers {
 		peers = append(peers, peerAddress.Peer)
-		r.AddNodeWithPort(
+		store.AddNodeWithPort(
 			peerAddress.ID,
 			peerAddress.Address,
 			peerAddress.HeartbeatPort,
@@ -73,37 +73,40 @@ func (r *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err erro
 		StateMachine: cfg.SM,
 		Applied:      cfg.Applied,
 	}
-	if err = r.raftServer.CreateRaft(rc); err != nil {
+	if err = store.raftServer.CreateRaft(rc); err != nil {
 		return
 	}
-	p = newPartition(cfg, r.raftServer, walPath)
+	p = newPartition(cfg, store.raftServer, walPath)
 
 	return
 
 }
 
-func (r raftStore) Stop() {
+func (store *raftStore) Stop() {
 	panic("implement me")
 }
 
-func (r raftStore) RaftConfig() *raft.Config {
-	return r.raftConfig
+func (store *raftStore) RaftConfig() *raft.Config {
+	return store.raftConfig
 }
 
-func (r raftStore) RaftStatus(raftID uint64) (raftStatus *raft.Status) {
-	return r.raftServer.Status(raftID)
+func (store *raftStore) RaftStatus(raftID uint64) (raftStatus *raft.Status) {
+	return store.raftServer.Status(raftID)
 }
 
-func (r raftStore) AddNodeWithPort(nodeID uint64, addr string, heartbeat int, replicate int) {
+// AddNodeWithPort add a new node with the given port.
+func (store *raftStore) AddNodeWithPort(nodeID uint64, addr string, heartbeat int, replicate int) {
+	if store.resolver != nil {
+		store.resolver.AddNodeWithPort(nodeID, addr, heartbeat, replicate)
+	}
+}
+
+func (store *raftStore) DeleteNode(nodeID uint64) {
 	panic("implement me")
 }
 
-func (r raftStore) DeleteNode(nodeID uint64) {
-	panic("implement me")
-}
-
-func (r raftStore) RaftServer() *raft.RaftServer {
-	return r.raftServer
+func (store *raftStore) RaftServer() *raft.RaftServer {
+	return store.raftServer
 }
 
 func newRaftLogger(dir string) {
@@ -127,7 +130,7 @@ func newRaftLogger(dir string) {
 }
 
 // NewRaftStore returns a new raft store instance.
-func NewRaftStore(cfg *Config) (mr RaftStore, err error) {
+func NewRaftStore(cfg *Config) (RaftStore, error) {
 	resolver := NewNodeResolver()
 	newRaftLogger(cfg.RaftPath)
 	raftConfig := raft.DefaultConfig()
@@ -156,15 +159,16 @@ func NewRaftStore(cfg *Config) (mr RaftStore, err error) {
 	raftConfig.ElectionTick = cfg.ElectionTick
 	raftServer, err := raft.NewRaftServer(raftConfig)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	mr = &raftStore{
+	store := &raftStore{
 		nodeID:     cfg.NodeID,
 		resolver:   resolver,
 		raftConfig: raftConfig,
 		raftServer: raftServer,
 		raftPath:   cfg.RaftPath,
 	}
-	return
+
+	return store, nil
 }

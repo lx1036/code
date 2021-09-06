@@ -84,6 +84,62 @@ type S3Backend struct {
 	cap Capabilities
 }
 
+func (s3Backend *S3Backend) Write(file string, offset int64, data []byte) (wsize int, err error) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) WriteStream(file string, offset int64, length int64, reader io.ReadSeeker) (wsize int, err error) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) ReadStream(file string, offset int64, length int64, writer io.Writer) (rsize int, err error) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) WriteStreamWithCallBack(file string, offset int64, length int64, reader io.ReadSeeker, cb IOCallback) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) ReadStreamWithCallBack(file string, offset int64, length int64, writer io.Writer, cb IOCallback) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) WriteV(file string, vec *IOVector, reader io.ReadSeeker) (wsize int, err error) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) ReadV(file string, vec *IOVector, writer io.Writer) (rsize int, err error) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) Truncate(file string, offset int64) (err error) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) Fallocate(file string, op int, off int64, len int64) (err error) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) Flush(file string) (err error) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) Rename(src string, dst string, dir bool) (err error) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) Delete(file string) (err error) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) Deletes(files []string) (err error) {
+	panic("implement me")
+}
+
+func (s3Backend *S3Backend) SupportCallBack() bool {
+	panic("implement me")
+}
+
 // INFO: 从 file 文件读取数据写到 data
 //  aws s3api get-object --key=2 --bucket pvc-f73f7c99-0b5c-40ee-b57c-acdebcebed34 --endpoint-url ${endpoint-url} --range bytes=1-100 2.txt
 //  => "asdfadfasdfasdfasdf"

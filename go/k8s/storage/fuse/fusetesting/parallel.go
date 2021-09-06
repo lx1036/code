@@ -10,8 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	. "k8s-lx1036/k8s/storage/ogletest"
-	"k8s-lx1036/k8s/storage/syncutil"
+	"github.com/jacobsa/syncutil"
 )
 
 // Run an ogletest test that checks expectations for parallel calls to open(2)

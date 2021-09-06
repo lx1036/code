@@ -186,7 +186,7 @@ cfssl gencert \
 
 最后会生成根证书、etcd启动时需要的服务端证书和etcdctl交互时需要的客户端证书：
 
-![](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/c8936843313245b489e38f3672b2df7e~tplv-k3u1fbpfcp-watermark.webp)
+![etcd ssl](https://p1-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/c8936843313245b489e38f3672b2df7e~tplv-k3u1fbpfcp-watermark.webp)
 
 
 

@@ -103,7 +103,7 @@ func (m *metadataManager) Start() error {
 				},
 			}
 			// check snapshot dir or backup
-			snapshotDir := path.Join(partitionConfig.RootDir, snapshotDir) // data/metanode/partition/partition_1/snapshot/
+			snapshotDir := path.Join(partitionConfig.RootDir, SnapshotDir) // data/metanode/partition/partition_1/snapshot/
 			// 如果没有/snapshot目录，就从 /.snapshot_backup 目录rename到 /snapshot，如果 /.snapshot_backup 存在的话
 			if _, errload = os.Stat(snapshotDir); errload != nil {
 				backupDir := path.Join(partitionConfig.RootDir, snapshotBackup)

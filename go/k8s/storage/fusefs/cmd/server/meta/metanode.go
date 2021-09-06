@@ -294,7 +294,7 @@ func (m *MetaNode) Start(cfg *config.Config) error {
 		return err
 	}*/
 
-	//
+	// INFO: 启动 raft，等待 meta manager 来提交 raft log
 	if err = m.startRaftServer(); err != nil {
 		return err
 	}
@@ -303,6 +303,7 @@ func (m *MetaNode) Start(cfg *config.Config) error {
 	/*if err = m.registerAPIHandler(); err != nil {
 		return err
 	}*/
+	// INFO: 用来处理来自 client 的请求，并把数据写到 raft log 里
 	if err = m.startMetaManager(); err != nil {
 		return err
 	}
@@ -313,7 +314,7 @@ func (m *MetaNode) Start(cfg *config.Config) error {
 		return err
 	}*/
 
-	// INFO: goroutine 启动 TCP server，监听在 9021 port
+	// INFO: goroutine 启动 TCP server，监听在 9021 port，被 client 调用!!!
 	if err = m.startTCPServer(); err != nil {
 		return err
 	}

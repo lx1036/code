@@ -1,0 +1,33 @@
+
+
+
+apiVersion: "etcd.database.coreos.com/v1beta2"
+kind: "EtcdBackup"
+metadata:
+  name: example-etcd-cluster-backup
+  namespace: etcd-operator
+spec:
+  etcdEndpoints: ["http://example.s3.cn"]
+  storageType: S3
+  backupPolicy:
+    # 0 > enable periodic backup
+    backupIntervalInSecond: 600
+    maxBackups: 4
+  s3:
+    # The format of "path" must be: "<s3-bucket-name>/<path-to-backup-file>"
+    # e.g: "mybucket/etcd.backup"
+    path: pvc-100d58b9-f33e-4c19-abee-a3b3c7c40b5e/etcd.backup
+    awsSecret: my-etcd-backup
+
+---
+
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-etcd-backup
+  namespace: etcd-operator
+data:
+  accessKey: "accessKey_base64"
+  secretKey: "secretKey_base64"
+type: Opaque

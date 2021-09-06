@@ -18,7 +18,7 @@ var (
 	}
 )
 
-func GetMessage() *Message {
+func NewMessage() *Message {
 	msg := msgPool.Get().(*Message)
 	msg.Reject = false
 	msg.RejectIndex = 0
@@ -36,4 +36,10 @@ func GetMessage() *Message {
 	msg.Context = nil
 	msg.Entries = msg.Entries[0:0]
 	return msg
+}
+
+func ReturnMessage(msg *Message) {
+	if msg != nil {
+		msgPool.Put(msg)
+	}
 }

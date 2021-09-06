@@ -18,7 +18,7 @@ func (m *metadataManager) opCreateInode(conn net.Conn, p *proto.Packet, remoteAd
 		m.respondToClient(conn, p)
 		return err
 	}
-	mp, err := m.getPartition(req.PartitionID)
+	partition, err := m.getPartition(req.PartitionID)
 	if err != nil {
 		//p.PacketErrorWithBody(proto.OpNotExistErr, []byte(err.Error()))
 		m.respondToClient(conn, p)
@@ -28,7 +28,7 @@ func (m *metadataManager) opCreateInode(conn net.Conn, p *proto.Packet, remoteAd
 	/*if !m.serveProxy(conn, mp, p) {
 		return err
 	}*/
-	err = mp.CreateInode(req, p)
+	err = partition.CreateInode(req, p)
 	// reply the operation result to the client through TCP
 	m.respondToClient(conn, p)
 	klog.Infof("%s [opCreateInode] req: %d - %v, resp: %v, body: %s", remoteAddr, p.GetReqID(), req, p.GetResultMsg(), p.Data)

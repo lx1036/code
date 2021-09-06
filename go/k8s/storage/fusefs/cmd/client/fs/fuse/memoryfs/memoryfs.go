@@ -75,8 +75,9 @@ var (
 	debug      = flag.Bool("debug", false, "Enable debug logging.")
 )
 
-// mkdir -p /tmp/fuse/memoryfs
-// go run . --mountpoint=/tmp/fuse/memoryfs
+// INFO: 可以直接在 mac 上运行
+//  mkdir -p /tmp/fuse/memoryfs
+//  go run . --mountpoint=/tmp/fuse/memoryfs
 func main() {
 	flag.Parse()
 
