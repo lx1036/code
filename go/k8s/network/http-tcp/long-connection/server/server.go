@@ -14,11 +14,17 @@ func main() {
 	defer listener.Close()
 
 	var ConnectionMap = map[string]*net.TCPConn{}
-
+	stopC := make(chan struct{})
 	for {
 		connection, err := listener.AcceptTCP()
 		if err != nil {
 			continue
+		}
+		
+		select {
+		case <-stopC:
+			return
+		default:
 		}
 
 		ConnectionMap[connection.RemoteAddr().String()] = connection
