@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s-lx1036/k8s/storage/etcd/etcd-operator/cmd/operator/app/options"
+	"k8s-lx1036/k8s/storage/etcd/etcd-operator/cmd/cluster/app/options"
 	v1 "k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/apis/etcd.k9s.io/v1"
 	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/client/clientset/versioned"
 	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/client/informers/externalversions"

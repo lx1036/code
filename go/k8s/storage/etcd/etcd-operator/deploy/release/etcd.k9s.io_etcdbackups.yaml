@@ -1,0 +1,102 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.2
+  creationTimestamp: null
+  name: etcdbackups.etcd.k9s.io
+spec:
+  group: etcd.k9s.io
+  names:
+    kind: EtcdBackup
+    listKind: EtcdBackupList
+    plural: etcdbackups
+    singular: etcdbackup
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.storageType
+      name: StorageType
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              backupPolicy:
+                properties:
+                  backupIntervalInSecond:
+                    format: int64
+                    type: integer
+                  maxBackups:
+                    type: integer
+                  timeoutInSecond:
+                    format: int64
+                    type: integer
+                type: object
+              clientTLSSecret:
+                type: string
+              etcdEndpoints:
+                items:
+                  type: string
+                type: array
+              s3:
+                properties:
+                  awsSecret:
+                    type: string
+                  endpoint:
+                    type: string
+                  forcePathStyle:
+                    type: boolean
+                  path:
+                    type: string
+                required:
+                - awsSecret
+                - forcePathStyle
+                - path
+                type: object
+              storageType:
+                type: string
+            required:
+            - storageType
+            type: object
+          status:
+            properties:
+              Reason:
+                type: string
+              etcdRevision:
+                format: int64
+                type: integer
+              etcdVersion:
+                type: string
+              lastSuccessDate:
+                format: date-time
+                type: string
+              succeeded:
+                type: boolean
+            required:
+            - succeeded
+            type: object
+        required:
+        - metadata
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

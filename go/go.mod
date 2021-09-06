@@ -19,7 +19,8 @@ require (
 	github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 	github.com/containerd/containerd v1.4.4
 	github.com/containernetworking/cni v0.8.0
-	github.com/coreos/go-systemd/v22 v22.1.0
+	github.com/coreos/etcd v3.3.13+incompatible // indirect
+	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/cyphar/filepath-securejoin v0.2.2
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -39,10 +40,10 @@ require (
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gogo/googleapis v1.4.0 // indirect
-	github.com/gogo/protobuf v1.3.1
+	github.com/gogo/protobuf v1.3.2
 	github.com/gohouse/gorose/v2 v2.1.3
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
-	github.com/golang/protobuf v1.4.3
+	github.com/golang/protobuf v1.5.2
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/btree v1.0.0
 	github.com/google/cadvisor v0.37.5
@@ -50,6 +51,7 @@ require (
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.7.3
+	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hanwen/go-fuse/v2 v2.1.1-0.20210611132105-24a1dfe6b4f8
 	github.com/hashicorp/go-msgpack v0.5.5
 	github.com/hashicorp/golang-lru v0.5.4
@@ -75,13 +77,13 @@ require (
 	github.com/mattbaird/jsonpatch v0.0.0-20200820163806-098863c1fc24
 	github.com/mholt/certmagic v0.8.3
 	github.com/miekg/dns v1.1.26
-	github.com/mitchellh/mapstructure v1.1.2
+	github.com/mitchellh/mapstructure v1.4.1
 	github.com/moby/ipvs v1.0.1
 	github.com/moby/sys/mountinfo v0.4.1 // indirect
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/olivere/elastic/v7 v7.0.9 // indirect
-	github.com/onsi/ginkgo v1.14.1
-	github.com/onsi/gomega v1.10.1
+	github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/gomega v1.14.0
 	github.com/opencontainers/runc v1.0.0-rc93
 	github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 	github.com/operator-framework/operator-sdk v0.17.1
@@ -97,11 +99,11 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/sirupsen/logrus v1.7.0
-	github.com/spf13/cast v1.3.0
-	github.com/spf13/cobra v1.1.1
+	github.com/spf13/cast v1.3.1
+	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.7.0
-	github.com/stretchr/testify v1.6.1
+	github.com/spf13/viper v1.8.1
+	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v0.0.0-20181127023241-353a9fca669c // indirect
 	github.com/tecbot/gorocksdb v0.0.0-20191217155057-f0fad39f321c
 	github.com/tidwall/evio v1.0.2
@@ -113,31 +115,30 @@ require (
 	github.com/vishvananda/netns v0.0.0-20200520041808-52d707b772fe
 	go.etcd.io/bbolt v1.3.5
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
-	go.uber.org/zap v1.14.1
+	go.uber.org/zap v1.17.0
 	golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
 	golang.org/x/mod v0.4.2 // indirect
-	golang.org/x/net v0.0.0-20201224014010-6772e930b67b
-	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
-	golang.org/x/sys v0.0.0-20210324051608-47abb6519492
+	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sys v0.0.0-20210510120138-977fb7262007
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
-	golang.org/x/tools v0.1.0 // indirect
-	google.golang.org/grpc v1.29.1
-	google.golang.org/protobuf v1.25.0
+	google.golang.org/grpc v1.38.0
+	google.golang.org/protobuf v1.26.0
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/sohlich/elogrus.v7 v7.0.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.3.1
 	gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	gotest.tools v2.2.0+incompatible
-	k8s.io/api v0.20.2
-	k8s.io/apiextensions-apiserver v0.19.7
-	k8s.io/apimachinery v0.20.2
+	k8s.io/api v0.21.3
+	k8s.io/apiextensions-apiserver v0.21.3
+	k8s.io/apimachinery v0.21.3
 	k8s.io/apiserver v0.20.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cloud-provider v0.19.7
-	k8s.io/code-generator v0.19.7
+	k8s.io/code-generator v0.22.1
 	k8s.io/component-base v0.20.0
 	k8s.io/component-helpers v0.20.2
 	k8s.io/cri-api v0.0.0
@@ -153,6 +154,7 @@ require (
 	k8s.io/sample-controller v0.19.7
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/controller-runtime v0.6.2
+	sigs.k8s.io/controller-tools v0.6.2 // indirect
 	sigs.k8s.io/metrics-server v0.4.4
 	volcano.sh/apis v0.0.0-20210603070204-70005b2d502a
 )

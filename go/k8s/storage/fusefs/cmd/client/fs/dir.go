@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
 
 	"k8s.io/klog/v2"
@@ -54,7 +55,8 @@ func (fs *FuseFS) InodeGet(inodeID uint64) (*Inode, error) {
 }
 
 func (fs *FuseFS) MkNode(ctx context.Context, op *fuseops.MkNodeOp) error {
-	panic("implement me")
+	klog.Warningf("MkNode is not support!")
+	return fuse.ENOSYS
 }
 
 func (fs *FuseFS) RmDir(ctx context.Context, op *fuseops.RmDirOp) error {

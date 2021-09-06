@@ -59,6 +59,7 @@ done
 # go get k8s.io/code-generator/cmd/client-gen
 # go get k8s.io/code-generator/cmd/lister-gen
 # go get k8s.io/code-generator/cmd/informer-gen
+# go get sigs.k8s.io/controller-tools/cmd/controller-gen
 
 echo "GOBIN: ${gobin}; ${APIS_PKG}; ${GROUPS_WITH_VERSIONS}; $@;"
 echo "${FQ_APIS[@]};"
