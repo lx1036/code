@@ -1,4 +1,4 @@
-package wal
+package raft
 
 type LogItem struct {
 	Term  int64  `json:"term"`

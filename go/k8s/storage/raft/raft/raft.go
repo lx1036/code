@@ -6,7 +6,7 @@
 //  分布式一致性算法 Raft: https://zhuanlan.zhihu.com/p/383555591
 //  一文搞懂Raft算法: https://www.cnblogs.com/xybaby/p/10124083.html
 
-package wal
+package raft
 
 import (
 	"fmt"

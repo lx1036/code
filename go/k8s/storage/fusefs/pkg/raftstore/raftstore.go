@@ -79,7 +79,6 @@ func (store *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err 
 	p = newPartition(cfg, store.raftServer, walPath)
 
 	return
-
 }
 
 func (store *raftStore) Stop() {
