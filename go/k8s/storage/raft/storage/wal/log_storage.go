@@ -2,7 +2,7 @@ package wal
 
 import (
 	"fmt"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"os"
 	"sort"
 	"strings"

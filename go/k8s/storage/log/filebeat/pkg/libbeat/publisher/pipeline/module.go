@@ -1,8 +1,6 @@
 package pipeline
 
 import (
-	"github.com/elastic/beats/libbeat/outputs"
-	"github.com/elastic/beats/libbeat/publisher/processing"
 	"k8s-lx1036/k8s/storage/log/filebeat/pkg/libbeat/outputs/console"
 	"k8s-lx1036/k8s/storage/log/filebeat/pkg/libbeat/publisher/queue"
 	"k8s-lx1036/k8s/storage/log/filebeat/pkg/libbeat/publisher/queue/memoryqueue"
@@ -11,11 +9,11 @@ import (
 )
 
 type Pipeline struct {
-	beatInfo beat.Info
+	beatInfo Info
 
 	monitors Monitors
 
-	queue  queue.Queue
+	queue  Queue
 	output *outputController
 
 	eventer pipelineEventer
@@ -32,15 +30,15 @@ type Pipeline struct {
 	guardStartSigPropagation sync.Once
 	sigNewClient             chan *client
 
-	processors processing.Supporter
+	processors Supporter
 }
 
 // NewPipeline INFO: pipeline = queue + output
 func NewPipeline(
-	beatInfo beat.Info,
+	beatInfo Info,
 	config Config,
-	processors processing.Supporter,
-	makeOutput func(outputs.Observer) (string, outputs.Group, error),
+	processors Supporter,
+	makeOutput func(Observer) (string, Group, error),
 ) (*Pipeline, error) {
 	settings := Settings{
 		WaitClose:     0,
@@ -49,7 +47,7 @@ func NewPipeline(
 	}
 
 	output, err := console.NewConsoleOutput()
-	queue := memoryqueue.NewMemoryQueue()
+	queue := memoryNewMemoryQueue()
 
 	pipeline := &Pipeline{
 		beatInfo:         beat,

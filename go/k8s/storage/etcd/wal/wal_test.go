@@ -2,7 +2,6 @@ package wal
 
 import (
 	"bytes"
-	"go.etcd.io/etcd/pkg/pbutil"
 	"go.uber.org/zap"
 	"io"
 	"io/ioutil"

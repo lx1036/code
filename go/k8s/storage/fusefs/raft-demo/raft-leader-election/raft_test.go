@@ -1,7 +1,7 @@
 package main
 
 import (
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"math/rand"
 	"sync"
 	"testing"

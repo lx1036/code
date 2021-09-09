@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"go.etcd.io/etcd/raft/raftpb"
 	"strings"
 
 	"k8s.io/klog/v2"

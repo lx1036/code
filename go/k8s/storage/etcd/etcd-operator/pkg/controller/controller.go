@@ -92,6 +92,7 @@ func NewController(option *options.Options) (*EtcdClusterController, error) {
 		recorder:            eventRecorder,
 		etcdClusterClient:   etcdClusterClient,
 		etcdClusterLister:   etcdClusterInformerFactory.Etcd().V1().EtcdClusters().Lister(),
+		clusters:            make(map[string]*Cluster),
 	}
 
 	etcdClusterInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -117,6 +118,12 @@ func (controller *EtcdClusterController) onEtcdClusterUpdate(oldObj, newObj inte
 	// enqueuing unchanged applications, unless it has expired or is subject to retry.
 	if oldEtcdCluster.ResourceVersion == newEtcdCluster.ResourceVersion {
 		//if oldApp.ResourceVersion == newApp.ResourceVersion && !controller.hasApplicationExpired(newApp) && !shouldRetry(newApp) {
+		return
+	}
+
+	// INFO: status 被更新了也会触发 update 事件，我们只关注 Spec 的更新
+	//  Spec struct 的字段都是标量(如int,string,指针)等等，是可以直接使用操作符 == ，如果有字段类型如 map，则不可以 ==
+	if oldEtcdCluster.Spec == newEtcdCluster.Spec {
 		return
 	}
 
@@ -155,7 +162,7 @@ func (controller *EtcdClusterController) Start(workers int, stopCh <-chan struct
 		return nil
 	}
 
-	klog.Info("Starting the workers of the SparkApplication controller")
+	klog.Info("Starting the workers of the EtcdClusterController")
 	for i := 0; i < workers; i++ {
 		// runWorker will loop until "something bad" happens. Until will then rekick
 		// the worker after one second.
@@ -226,7 +233,7 @@ func (controller *EtcdClusterController) syncEtcdCluster(key string) error {
 
 	// INFO: 通过 DeletionTimestamp 判断是否已经删除。Update 事件时可能会出现。可以复用!!!
 	if !etcdCluster.DeletionTimestamp.IsZero() {
-		controller.handleEtcdClusterDeletion(etcdCluster) // 删除了 SparkApplication
+		controller.handleEtcdClusterDeletion(etcdCluster) // 删除了 EtcdCluster
 		return nil
 	}
 
@@ -238,6 +245,7 @@ func (controller *EtcdClusterController) syncEtcdCluster(key string) error {
 	// If for an ADD event the cluster spec is invalid then it is not added to the local cache
 	// so modifying that cluster will result in another ADD event
 	if _, ok := controller.clusters[key]; ok {
+		klog.Infof(fmt.Sprintf("[syncEtcdCluster]cluster %s is already existed in clusters, update event type Modified", key))
 		event.Type = watch.Modified
 	}
 

@@ -11,7 +11,6 @@ import (
 	examplev1 "k8s-lx1036/k8s/apiserver/pkg/apis/example/v1"
 	"k8s-lx1036/k8s/apiserver/pkg/storage/value"
 
-	"go.etcd.io/etcd/integration"
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

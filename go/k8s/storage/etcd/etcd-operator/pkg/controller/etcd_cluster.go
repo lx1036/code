@@ -12,8 +12,8 @@ import (
 	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/client/clientset/versioned"
 
 	"github.com/google/uuid"
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
+	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +52,8 @@ type Cluster struct {
 
 	eventClient corev1.Event
 
-	// 缓存 EtcdClusterStatus，有种状态机感觉，显示处于不同状态
+	// INFO: 缓存 EtcdClusterStatus，有种状态机感觉，显示处于不同状态
+	//  cluster.status 会和 EtcdCluster.status 保持一致
 	status v1.EtcdClusterStatus
 }
 
@@ -67,8 +68,15 @@ func NewCluster(clusterConfig *ClusterConfig, etcdCluster *v1.EtcdCluster) *Clus
 	// INFO: 这里有个重要逻辑，setup() 先启动一个 etcd seed pod，然后 run() 里去根据 EtcdCluster .spec.size 去 reconcile，
 	//  一个一个去创建 etcd pod。但是，setup() 的 etcd pod 是 "new"，run() reconcile 的 etcd pod 是 "existing"!!!
 	go func() {
-		if err := cluster.setup(); err != nil {
+		if err := cluster.createSeedMember(); err != nil {
 			klog.Errorf(fmt.Sprintf("[NewCluster]cluster failed to setup err %v", err))
+			if cluster.status.Phase != v1.ClusterPhaseFailed {
+				cluster.status.SetPhase(v1.ClusterPhaseFailed)
+				cluster.status.SetReason(err.Error())
+				if err := cluster.UpdateEtcdClusterStatus(); err != nil {
+					klog.Errorf(fmt.Sprintf("[NewCluster]cluster failed to update etcd cluster status err %v", err))
+				}
+			}
 		}
 
 		cluster.run()
@@ -77,7 +85,8 @@ func NewCluster(clusterConfig *ClusterConfig, etcdCluster *v1.EtcdCluster) *Clus
 	return cluster
 }
 
-func (cluster *Cluster) setup() error {
+// INFO: 创建一个 seed etcd pod
+func (cluster *Cluster) createSeedMember() error {
 	var shouldCreateCluster bool
 	switch cluster.status.Phase {
 	case v1.ClusterPhaseNone:
@@ -133,13 +142,12 @@ func (cluster *Cluster) UpdateEtcdClusterStatus() error {
 
 // INFO: 首先创建一个 seed etcd pod，然后再 reconcile size 依次创建 etcd pod
 func (cluster *Cluster) prepareSeedMember() error {
-
 	return cluster.startSeedMember()
 }
 
 func (cluster *Cluster) startSeedMember() error {
 	member := &Member{
-		Name:      cluster.etcdCluster.Name,
+		Name:      UniqueMemberName(cluster.etcdCluster.Name),
 		Namespace: cluster.etcdCluster.Namespace,
 		//SecurePeer:   cluster.isSecurePeer(),
 		//SecureClient: cluster.isSecureClient(),
@@ -149,21 +157,43 @@ func (cluster *Cluster) startSeedMember() error {
 		return fmt.Errorf("failed to create seed member (%s): %v", member.Name, err)
 	}
 
+	// INFO: cluster.members 先缓存一个 "new" state member
 	cluster.members = memberSet
 
 	return nil
 }
 
+func (cluster *Cluster) isPodPVEnabled() bool {
+	if podPolicy := cluster.etcdCluster.Spec.Pod; podPolicy != nil {
+		return podPolicy.PersistentVolumeClaimSpec != nil
+	}
+
+	return false
+}
+
+// INFO: 创建一个 etcd pod
 func (cluster *Cluster) createPod(members MemberSet, member *Member, state string) error {
 	pod := NewEtcdPod(member, members.PeerURLPairs(), cluster.etcdCluster.Name, state, uuid.New().String(),
 		cluster.etcdCluster.Spec, cluster.etcdCluster.AsOwner())
 
+	if cluster.isPodPVEnabled() {
+		pvc := NewEtcdPodPVC(member, *cluster.etcdCluster.Spec.Pod.PersistentVolumeClaimSpec, cluster.etcdCluster.Name, cluster.etcdCluster.Namespace, cluster.etcdCluster.AsOwner())
+		_, err := cluster.kubeClient.CoreV1().PersistentVolumeClaims(cluster.etcdCluster.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf(fmt.Sprintf("[createPod]failed to create PVC for member (%s): %v", member.Name, err))
+		}
+		AddEtcdVolumeToPod(pod, pvc)
+	} else {
+		AddEtcdVolumeToPod(pod, nil)
+	}
+
 	_, err := cluster.kubeClient.CoreV1().Pods(cluster.etcdCluster.Namespace).Create(context.TODO(), pod,
 		metav1.CreateOptions{})
-	return err
 
+	return err
 }
 
+// INFO: 不断去reconcile，后续 etcd pod 以 existing 方式加入 cluster 中
 func (cluster *Cluster) run() {
 	var rerr error
 	for {
@@ -178,6 +208,7 @@ func (cluster *Cluster) run() {
 				klog.Errorf(fmt.Sprintf("[run]fail to poll pods: %v", err))
 				continue
 			}
+			// 如果有 pending pod，说明第一个 etcd pod 还没起来
 			if len(pending) > 0 {
 				// Pod startup might take long, e.g. pulling image. It would deterministically become running or succeeded/failed later.
 				klog.Infof("[run]skip reconciliation: running (%v), pending (%v)", GetPodNames(running), GetPodNames(pending))
@@ -191,7 +222,7 @@ func (cluster *Cluster) run() {
 
 			rerr = cluster.reconcile(running)
 			if rerr != nil {
-				klog.Errorf(fmt.Sprintf("[run]failed to reconcile err %v", err))
+				klog.Errorf(fmt.Sprintf("[run]failed to reconcile err %v", rerr))
 				break
 			}
 
@@ -237,11 +268,10 @@ func (cluster *Cluster) pollPods() (running, pending []*corev1.Pod, err error) {
 // - it tries to reconcile the cluster to desired size.
 // - if the cluster needs for upgrade, it tries to upgrade old member one by one.
 func (cluster *Cluster) reconcile(pods []*corev1.Pod) error {
-
 	clusterSpec := cluster.etcdCluster.Spec
-	running := podsToMemberSet(pods, cluster.isSecureClient())
-	if !running.IsEqual(cluster.members) || cluster.members.Size() != clusterSpec.Size {
-		return cluster.reconcileMembers(running)
+	runningMemberSet := podsToMemberSet(pods, cluster.isSecureClient())
+	if !runningMemberSet.IsEqual(cluster.members) || cluster.members.Size() != clusterSpec.Size {
+		return cluster.reconcileMembers(runningMemberSet)
 	}
 
 	return nil
@@ -256,6 +286,8 @@ func (cluster *Cluster) reconcile(pods []*corev1.Pod) error {
 // 3. If L = members, the current state matches the membership state. END.
 // 4. If len(L) < len(members)/2 + 1, return quorum lost error.
 // 5. Add one missing member. END.
+// INFO:
+//  (1) 先与runnig diff，删除 unknown etcd member
 func (cluster *Cluster) reconcileMembers(running MemberSet) error {
 	unknownMembers := running.Diff(cluster.members)
 	if unknownMembers.Size() > 0 {
@@ -267,18 +299,18 @@ func (cluster *Cluster) reconcileMembers(running MemberSet) error {
 		}
 	}
 
-	// INFO: L consist of remaining pods of running etcd pods
-	L := running.Diff(unknownMembers)
-	if L.Size() == cluster.members.Size() {
+	// INFO: 减去 unknown member，开始依次加入 "existing" member
+	remaining := running.Diff(unknownMembers)
+	if remaining.Size() == cluster.members.Size() {
 		return cluster.resize()
 	}
-	if L.Size() < cluster.members.Size()/2+1 {
+	if remaining.Size() < cluster.members.Size()/2+1 {
 		return ErrLostQuorum
 	}
 
 	klog.Infof("removing one dead member")
 	// remove dead members that doesn't have any running pods before doing resizing.
-	return cluster.removeDeadMember(cluster.members.Diff(L).PickOne())
+	return cluster.removeDeadMember(cluster.members.Diff(remaining).PickOne())
 }
 
 // INFO: add new member/remove member
@@ -315,7 +347,6 @@ func (cluster *Cluster) newMember() *Member {
 
 // INFO: 使用 etcdctl cli 来 add member，这样可以先更新下 etcd 数据；然后创建 etcd pod
 func (cluster *Cluster) addOneMember() error {
-
 	cfg := clientv3.Config{
 		Endpoints:   cluster.members.ClientURLs(),
 		DialTimeout: EtcdDefaultDialTimeout,
