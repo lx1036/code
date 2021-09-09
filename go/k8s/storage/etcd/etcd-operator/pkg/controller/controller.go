@@ -45,6 +45,7 @@ type EtcdClusterController struct {
 	etcdClusterLister etcdClusterLister.EtcdClusterLister
 	etcdClusterClient *versioned.Clientset
 
+	// INFO: 一个 Cluster 表示一个 Etcd Cluster, clusters 表示所有用户的 etcd cluster
 	clusters map[string]*Cluster
 }
 

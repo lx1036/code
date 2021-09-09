@@ -61,10 +61,7 @@ INFO:
       --key-file=$(PWD)/tls/etcd-key.pem \
 */
 func newEtcdPod(member *Member, initialCluster []string, clusterName, state, token string, etcdClusterSpec v1.EtcdClusterSpec) *corev1.Pod {
-	commands := fmt.Sprintf(`/usr/local/bin/etcd --name=%s --data-dir=%s
-		--initial-advertise-peer-urls=%s --advertise-client-urls=%s
-		--listen-peer-urls=%s --listen-client-urls=%s
-		--initial-cluster=%s --initial-cluster-state=%s`,
+	commands := fmt.Sprintf("/usr/local/bin/etcd --name=%s --data-dir=%s --initial-advertise-peer-urls=%s --advertise-client-urls=%s --listen-peer-urls=%s --listen-client-urls=%s --initial-cluster=%s --initial-cluster-state=%s",
 		member.Name, dataDir, member.PeerURL(), member.ClientURL(), member.ListenPeerURL(), member.ListenClientURL(),
 		strings.Join(initialCluster, ","), state)
 	if member.SecurePeer {

@@ -225,7 +225,6 @@ func (cluster *Cluster) run() {
 				klog.Errorf(fmt.Sprintf("[run]failed to reconcile err %v", rerr))
 				break
 			}
-
 		}
 	}
 }
@@ -270,6 +269,7 @@ func (cluster *Cluster) pollPods() (running, pending []*corev1.Pod, err error) {
 func (cluster *Cluster) reconcile(pods []*corev1.Pod) error {
 	clusterSpec := cluster.etcdCluster.Spec
 	runningMemberSet := podsToMemberSet(pods, cluster.isSecureClient())
+	// INFO: (1) ; (2)resize
 	if !runningMemberSet.IsEqual(cluster.members) || cluster.members.Size() != clusterSpec.Size {
 		return cluster.reconcileMembers(runningMemberSet)
 	}
@@ -287,7 +287,8 @@ func (cluster *Cluster) reconcile(pods []*corev1.Pod) error {
 // 4. If len(L) < len(members)/2 + 1, return quorum lost error.
 // 5. Add one missing member. END.
 // INFO:
-//  (1) 先与runnig diff，删除 unknown etcd member
+//  (1) 先与 running diff，删除 unknown etcd member
+//  (2) 再去 resize 到期望节点数量
 func (cluster *Cluster) reconcileMembers(running MemberSet) error {
 	unknownMembers := running.Diff(cluster.members)
 	if unknownMembers.Size() > 0 {
@@ -336,7 +337,7 @@ func (cluster *Cluster) isSecureClient() bool {
 
 func (cluster *Cluster) newMember() *Member {
 	member := &Member{
-		Name:         cluster.etcdCluster.Name,
+		Name:         UniqueMemberName(cluster.etcdCluster.Name),
 		Namespace:    cluster.etcdCluster.Namespace,
 		SecurePeer:   cluster.isSecurePeer(),
 		SecureClient: cluster.isSecureClient(),
@@ -345,7 +346,9 @@ func (cluster *Cluster) newMember() *Member {
 	return member
 }
 
-// INFO: 使用 etcdctl cli 来 add member，这样可以先更新下 etcd 数据；然后创建 etcd pod
+// INFO: 这里先后顺序很重要，先往etcd里写数据，再去起一个etcd实例
+//  (1)使用 etcdctl cli 来 add member，这样可以先更新下 etcd 数据；
+//  (2)然后创建 etcd pod
 func (cluster *Cluster) addOneMember() error {
 	cfg := clientv3.Config{
 		Endpoints:   cluster.members.ClientURLs(),
@@ -397,7 +400,6 @@ func (cluster *Cluster) removeOneMember() error {
 
 // INFO: 先使用 etcdClient 从 etcd 中删除 member 数据，再去删除 etcd pod
 func (cluster *Cluster) removeMember(member *Member) error {
-
 	cfg := clientv3.Config{
 		Endpoints:   cluster.members.ClientURLs(),
 		DialTimeout: EtcdDefaultDialTimeout,
