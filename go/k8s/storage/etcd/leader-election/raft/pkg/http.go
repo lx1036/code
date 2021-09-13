@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"go.etcd.io/etcd/raft/raftpb"
 	"k8s.io/klog/v2"
 )
 

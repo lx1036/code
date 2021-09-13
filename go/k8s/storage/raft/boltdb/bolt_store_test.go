@@ -2,7 +2,7 @@ package boltdb
 
 import (
 	"io/ioutil"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"os"
 	"reflect"
 	"testing"

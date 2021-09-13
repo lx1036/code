@@ -14,6 +14,8 @@ const (
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Namespaced,shortName=etcd,singular=etcdcluster
 // +kubebuilder:printcolumn:name="Size",type="integer",JSONPath=".spec.size"
+// +kubebuilder:printcolumn:name="Repository",type="string",JSONPath=".spec.repository"
+// +kubebuilder:printcolumn:name="Version",type="string",JSONPath=".spec.version"
 
 type EtcdCluster struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -234,4 +236,8 @@ type EtcdClusterStatus struct {
 
 func (etcdClusterStatus *EtcdClusterStatus) SetPhase(phase ClusterPhase) {
 	etcdClusterStatus.Phase = phase
+}
+
+func (etcdClusterStatus *EtcdClusterStatus) SetReason(reason string) {
+	etcdClusterStatus.Reason = reason
 }

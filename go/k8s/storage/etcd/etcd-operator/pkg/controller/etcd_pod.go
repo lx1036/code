@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
 	"strings"
 
 	v1 "k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/apis/etcd.k9s.io/v1"
@@ -60,10 +61,7 @@ INFO:
       --key-file=$(PWD)/tls/etcd-key.pem \
 */
 func newEtcdPod(member *Member, initialCluster []string, clusterName, state, token string, etcdClusterSpec v1.EtcdClusterSpec) *corev1.Pod {
-	commands := fmt.Sprintf(`/usr/local/bin/etcd --name=%s --data-dir=%s
-		--initial-advertise-peer-urls=%s --advertise-client-urls=%s
-		--listen-peer-urls=%s --listen-client-urls=%s
-		--initial-cluster=%s --initial-cluster-state=%s`,
+	commands := fmt.Sprintf("/usr/local/bin/etcd --name=%s --data-dir=%s --initial-advertise-peer-urls=%s --advertise-client-urls=%s --listen-peer-urls=%s --listen-client-urls=%s --initial-cluster=%s --initial-cluster-state=%s",
 		member.Name, dataDir, member.PeerURL(), member.ClientURL(), member.ListenPeerURL(), member.ListenClientURL(),
 		strings.Join(initialCluster, ","), state)
 	if member.SecurePeer {
@@ -76,6 +74,7 @@ func newEtcdPod(member *Member, initialCluster []string, clusterName, state, tok
 		commands = fmt.Sprintf("%s --initial-cluster-token=%s", commands, token)
 	}
 
+	klog.Infof(fmt.Sprintf("[newEtcdPod]etcd pod cmd: %s", commands))
 	container := corev1.Container{
 		Command: strings.Split(commands, " "),
 		Name:    "etcd",
@@ -181,6 +180,41 @@ func NewEtcdPod(member *Member, initialCluster []string, clusterName, state, tok
 	return pod
 }
 
+func NewEtcdPodPVC(member *Member, pvcSpec corev1.PersistentVolumeClaimSpec, clusterName, namespace string, owner metav1.OwnerReference) *corev1.PersistentVolumeClaim {
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      PVCNameFromMember(member.Name),
+			Namespace: namespace,
+			Labels:    LabelsForCluster(clusterName),
+		},
+		Spec: pvcSpec,
+	}
+
+	addOwnerRefToObject(pvc.GetObjectMeta(), owner)
+	return pvc
+}
+
+// INFO: etcd data 是否需要持久化，emptyDir 或者 PVC
+func AddEtcdVolumeToPod(pod *corev1.Pod, pvc *corev1.PersistentVolumeClaim) {
+	volume := corev1.Volume{Name: etcdVolumeName}
+	if pvc != nil {
+		volume.VolumeSource = corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: pvc.Name,
+			},
+		}
+	} else {
+		volume.VolumeSource = corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}
+	}
+
+	pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+}
+
+// PVCNameFromMember the way we get PVC name from the member name
+func PVCNameFromMember(memberName string) string {
+	return memberName
+}
+
 func ImageName(repo, version string) string {
 	return fmt.Sprintf("%s:v%v", repo, version)
 }
@@ -201,7 +235,7 @@ func SetEtcdVersion(pod *corev1.Pod, version string) {
 	pod.Annotations[etcdVersionAnnotationKey] = version
 }
 
-// 这会直接修改 pod ownerReferences 字段
+// INFO: 这会直接修改 pod/pvc ownerReferences 字段
 func addOwnerRefToObject(obj metav1.Object, owner metav1.OwnerReference) {
 	obj.SetOwnerReferences(append(obj.GetOwnerReferences(), owner))
 }

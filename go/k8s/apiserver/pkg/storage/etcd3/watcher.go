@@ -4,7 +4,7 @@ import (
 	"k8s-lx1036/k8s/apiserver/pkg/storage"
 	"k8s-lx1036/k8s/apiserver/pkg/storage/value"
 
-	"go.etcd.io/etcd/clientv3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

@@ -1,4 +1,4 @@
-package wal
+package raft
 
 import "time"
 

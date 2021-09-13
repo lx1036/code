@@ -16,6 +16,7 @@ const (
 	EnvOperatorPodNamespace = "MY_POD_NAMESPACE"
 )
 
+// INFO: 每个 member 表示一个 etcd pod
 type Member struct {
 	Name string
 	// Kubernetes namespace this member runs in.
@@ -68,6 +69,7 @@ func (member *Member) ListenPeerURL() string {
 	return fmt.Sprintf("%s://0.0.0.0:2380", member.peerScheme())
 }
 
+// INFO: 每个 memberSet 表示一个 cluster
 type MemberSet map[string]*Member
 
 func (memberSet MemberSet) PeerURLPairs() []string {

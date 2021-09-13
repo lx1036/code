@@ -2,7 +2,6 @@ package wal
 
 import (
 	"fmt"
-	"go.etcd.io/etcd/pkg/fileutil"
 	"go.uber.org/zap"
 	"os"
 	"path/filepath"

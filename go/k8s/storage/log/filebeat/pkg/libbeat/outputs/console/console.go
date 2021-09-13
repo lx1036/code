@@ -14,15 +14,15 @@ type Config struct {
 var defaultConfig = Config{}
 
 func NewConsoleOutput(
-	_ outputs.IndexManager,
-	beat beat.Info,
-	observer outputs.Observer,
+	_ IndexManager,
+	beat Info,
+	observer Observer,
 	cfg *common.Config,
-) (outputs.Group, error) {
+) (Group, error) {
 	config := defaultConfig
 	err := cfg.Unpack(&config)
 	if err != nil {
-		return outputs.Fail(err)
+		return Fail(err)
 	}
 
 }

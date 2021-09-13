@@ -1,6 +1,6 @@
 // INFO: https://github.com/tidwall/wal/blob/master/README.md
 
-package wal
+package raft
 
 import (
 	"encoding/json"

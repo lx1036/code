@@ -1,6 +1,6 @@
 // INFO: raft state 持久化
 
-package wal
+package raft
 
 import (
 	"encoding/json"
