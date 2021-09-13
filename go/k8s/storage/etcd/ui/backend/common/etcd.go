@@ -2,8 +2,7 @@ package common
 
 import (
 	"crypto/tls"
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/pkg/transport"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"strings"
 	"sync"
 	"time"

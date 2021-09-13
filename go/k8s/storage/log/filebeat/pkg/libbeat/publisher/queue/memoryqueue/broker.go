@@ -1,7 +1,6 @@
 package memoryqueue
 
 import (
-	"github.com/elastic/beats/libbeat/publisher/queue"
 	"sync"
 )
 
@@ -19,7 +18,7 @@ type Broker struct {
 	acks          chan int
 	scheduledACKs chan chanList
 
-	ackListener queue.ACKListener
+	ackListener ACKListener
 
 	// wait group for worker shutdown
 	wg          sync.WaitGroup
@@ -64,10 +63,10 @@ func NewMemoryQueue() *Broker {
 	return broker
 }
 
-func (broker *Broker) Producer(cfg queue.ProducerConfig) queue.Producer {
+func (broker *Broker) Producer(cfg ProducerConfig) Producer {
 	return newProducer(broker, cfg.ACK, cfg.OnDrop, cfg.DropOnCancel)
 }
 
-func (broker *Broker) Consumer() queue.Consumer {
+func (broker *Broker) Consumer() Consumer {
 	return newConsumer(broker)
 }

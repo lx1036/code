@@ -8,7 +8,7 @@ import (
 
 	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/controller/backup/writer"
 
-	"go.etcd.io/etcd/clientv3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

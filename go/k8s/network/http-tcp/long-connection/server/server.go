@@ -20,7 +20,7 @@ func main() {
 		if err != nil {
 			continue
 		}
-		
+
 		select {
 		case <-stopC:
 			return

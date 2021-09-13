@@ -3,9 +3,6 @@ package wal
 import (
 	"bufio"
 	"encoding/binary"
-	"go.etcd.io/etcd/pkg/crc"
-	"go.etcd.io/etcd/pkg/pbutil"
-	"go.etcd.io/etcd/raft/raftpb"
 	"hash"
 	"io"
 	"k8s-lx1036/k8s/storage/etcd/wal/walpb"

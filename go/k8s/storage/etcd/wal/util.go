@@ -3,7 +3,6 @@ package wal
 import (
 	"errors"
 	"fmt"
-	"go.etcd.io/etcd/pkg/fileutil"
 	"go.uber.org/zap"
 	"io"
 	"k8s-lx1036/k8s/storage/etcd/wal/walpb"

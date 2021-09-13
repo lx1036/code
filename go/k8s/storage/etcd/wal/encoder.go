@@ -2,8 +2,6 @@ package wal
 
 import (
 	"encoding/binary"
-	"go.etcd.io/etcd/pkg/crc"
-	"go.etcd.io/etcd/pkg/ioutil"
 	"hash"
 	"io"
 	"k8s-lx1036/k8s/storage/etcd/wal/walpb"

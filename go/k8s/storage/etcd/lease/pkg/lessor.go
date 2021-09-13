@@ -4,8 +4,6 @@ import (
 	"math"
 	"sync"
 	"time"
-
-	store "go.etcd.io/etcd/mvcc/backend"
 )
 
 var (

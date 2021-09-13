@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"sync"
 
-	"go.etcd.io/etcd/etcdserver/api/snap"
 	"k8s.io/klog/v2"
 )
 

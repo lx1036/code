@@ -1,7 +1,6 @@
 package pkg
 
 import (
-	"go.etcd.io/etcd/mvcc/backend"
 	"io/ioutil"
 	"os"
 	"path/filepath"

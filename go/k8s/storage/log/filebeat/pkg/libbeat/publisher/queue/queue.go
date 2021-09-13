@@ -1,7 +1,6 @@
 package queue
 
 import (
-	"github.com/elastic/beats/libbeat/publisher"
 	"io"
 )
 
@@ -16,5 +15,5 @@ type Queue interface {
 }
 
 type Producer interface {
-	Publish(event publisher.Event) bool
+	Publish(event Event) bool
 }

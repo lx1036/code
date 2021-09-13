@@ -9,7 +9,7 @@ func main() {
 
 	// make pipeline
 	publisher := pipeline.NewPipeline()
-	client := publisher.Connect()
+	client := Connect()
 
 	ticker := time.NewTicker(5 * time.Second)
 	stopCh := make(chan struct{})
@@ -17,7 +17,7 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				client.Publish(beat.Event{
+				client.Publish(Event{
 					Timestamp: time.Now(),
 					Fields: common.MapStr{
 						"type":    "mock",

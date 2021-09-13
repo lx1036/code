@@ -3,7 +3,6 @@ package pkg
 import (
 	"context"
 	"fmt"
-	"go.etcd.io/etcd/pkg/fileutil"
 	"go.uber.org/zap"
 	"k8s.io/klog/v2"
 	"net"
@@ -12,15 +11,6 @@ import (
 	"os"
 	"strconv"
 	"time"
-
-	"go.etcd.io/etcd/etcdserver/api/rafthttp"
-	"go.etcd.io/etcd/etcdserver/api/snap"
-	stats "go.etcd.io/etcd/etcdserver/api/v2stats"
-	"go.etcd.io/etcd/pkg/types"
-	"go.etcd.io/etcd/raft"
-	"go.etcd.io/etcd/raft/raftpb"
-	"go.etcd.io/etcd/wal"
-	"go.etcd.io/etcd/wal/walpb"
 )
 
 const (

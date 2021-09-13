@@ -1,10 +1,6 @@
 package memoryqueue
 
-import (
-	"github.com/elastic/beats/libbeat/beat"
-	"github.com/elastic/beats/libbeat/publisher"
-	"github.com/elastic/beats/libbeat/publisher/queue"
-)
+import ()
 
 type OpenState struct {
 	done   chan struct{}
@@ -26,7 +22,7 @@ type forgetfulProducer struct {
 	openState OpenState
 }
 
-func newProducer(b *Broker, cb ackHandler, dropCB func(beat.Event), dropOnCancel bool) queue.Producer {
+func newProducer(b *Broker, cb ackHandler, dropCB func(Event), dropOnCancel bool) Producer {
 	openState := OpenState{
 		done:   make(chan struct{}),
 		events: b.events,
@@ -35,6 +31,6 @@ func newProducer(b *Broker, cb ackHandler, dropCB func(beat.Event), dropOnCancel
 	return &forgetfulProducer{broker: b, openState: openState}
 }
 
-func (p *forgetfulProducer) Publish(event publisher.Event) bool {
+func (p *forgetfulProducer) Publish(event Event) bool {
 	return p.openState.publish(p.makeRequest(event))
 }

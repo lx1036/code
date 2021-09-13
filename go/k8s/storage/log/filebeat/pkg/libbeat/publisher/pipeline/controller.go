@@ -1,12 +1,10 @@
 package pipeline
 
-import "github.com/elastic/beats/libbeat/publisher"
-
-func newOutputController(beat beat.Info, queue queue.Queue) *outputController {
+func newOutputController(beat Info, queue Queue) *outputController {
 	c := &outputController{
 		beat:      beat,
 		queue:     queue,
-		workQueue: make(chan publisher.Batch, 0),
+		workQueue: make(chan Batch, 0),
 	}
 
 	ctx := &batchContext{}

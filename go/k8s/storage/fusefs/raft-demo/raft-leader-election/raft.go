@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"math/rand"
 	"sync"
 	"time"
