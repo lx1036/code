@@ -157,7 +157,7 @@ health:
 	etcdctl --write-out=table --endpoints=$(ENDPOINTS) endpoint health
 
 health-auth:
-	etcdctl --write-out=table --endpoints=$(ENDPOINTS_AUTH) endpoint health \
+	etcdctl -w=table --endpoints=$(ENDPOINTS_AUTH) endpoint status  \
 	--cacert $(PWD)/tls/ca.pem \
     --cert $(PWD)/tls/etcd-client.pem \
     --key $(PWD)/tls/etcd-client-key.pem
