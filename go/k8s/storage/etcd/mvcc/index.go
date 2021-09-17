@@ -24,11 +24,10 @@ type treeIndex struct {
 }
 
 func (treeIdx *treeIndex) Put(key []byte, rev revision) {
-	keyIdx := &keyIndex{key: key}
-
 	treeIdx.Lock()
 	defer treeIdx.Unlock()
 
+	keyIdx := &keyIndex{key: key}
 	item := treeIdx.tree.Get(keyIdx)
 	if item == nil {
 		keyIdx.put(rev.main, rev.sub)
