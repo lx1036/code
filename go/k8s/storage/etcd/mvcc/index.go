@@ -48,7 +48,7 @@ func (treeIdx *treeIndex) keyIndex(keyIdx *keyIndex) *keyIndex {
 	return nil
 }
 
-// INFO: 查找key(atRev)的修改/创建revision，并返回当时该key的修改次数version
+// INFO: 根据(key, revision.main)获取最新 revision
 func (treeIdx *treeIndex) Get(key []byte, rev int64) (modified, created revision, ver int64, err error) {
 	keyIdx := &keyIndex{key: key}
 

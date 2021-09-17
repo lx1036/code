@@ -1,0 +1,5 @@
+package mvcc
+
+func NewWatchableStore() {
+
+}
