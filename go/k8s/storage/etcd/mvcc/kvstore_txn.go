@@ -18,6 +18,42 @@ type storeTxnRead struct {
 	rev      int64
 }
 
+func (tr *storeTxnRead) Rev() int64 {
+	panic("implement me")
+}
+
+func (tr *storeTxnRead) End() {
+	panic("implement me")
+}
+
+func (s *store) Read(mode ReadTxMode) TxnRead {
+	s.mu.RLock()
+	s.revMu.RLock()
+
+	// TODO: 没太明白这里的意思
+	// For read-only workloads, we use shared buffer by copying transaction read buffer
+	// for higher concurrency with ongoing blocking writes.
+	// For write/write-read transactions, we use the shared buffer
+	// rather than duplicating transaction read buffer to avoid transaction overhead.
+	var tx backend.ReadTx
+	if mode == ConcurrentReadTxMode {
+		tx = s.b.ConcurrentReadTx()
+	} else {
+		tx = s.b.ReadTx()
+	}
+
+	tx.RLock() // RLock is no-op. concurrentReadTx does not need to be locked after it is created.
+	firstRev, rev := s.compactMainRev, s.currentRev
+	s.revMu.RUnlock()
+
+	return &storeTxnRead{
+		s:        s,
+		tx:       tx,
+		firstRev: firstRev,
+		rev:      rev,
+	}
+}
+
 type storeTxnWrite struct {
 	storeTxnRead
 	tx backend.BatchTx
@@ -48,11 +84,76 @@ func (tw *storeTxnWrite) End() {
 	panic("implement me")
 }
 
+// INFO: range delete
+func (tw *storeTxnWrite) DeleteRange(key, end []byte) (int64, int64) {
+	if n := tw.deleteRange(key, end); n != 0 || len(tw.changes) > 0 {
+		return n, tw.beginRev + 1
+	}
+	return 0, tw.beginRev
+}
+
+func (tw *storeTxnWrite) deleteRange(key, end []byte) int64 {
+	rrev := tw.beginRev
+	if len(tw.changes) > 0 {
+		rrev++
+	}
+	keys, _ := tw.s.kvindex.Range(key, end, rrev)
+	if len(keys) == 0 {
+		return 0
+	}
+
+	// 返回删除的keys个数，从boltdb中删除
+	for _, key := range keys {
+		tw.delete(key)
+	}
+
+	return int64(len(keys))
+}
+
+func (tw *storeTxnWrite) delete(key []byte) {
+	ibytes := newRevBytes()
+	idxRev := revision{main: tw.beginRev + 1, sub: int64(len(tw.changes))}
+	revToBytes(idxRev, ibytes)
+
+	if len(ibytes) != revBytesLen {
+		klog.Errorf(fmt.Sprintf("[storeTxnWrite delete]cannot append tombstone mark to non-normal revision bytes, expected-revision-bytes-size %d given-revision-bytes-size %d",
+			revBytesLen, len(ibytes)))
+		return
+	}
+	ibytes = append(ibytes, markTombstone) // 加个 't' suffix
+
+	kv := mvccpb.KeyValue{Key: key}
+
+	data, err := kv.Marshal()
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[storeTxnWrite delete]key %s, KeyValue marshal error %v", string(key), err))
+		return
+	}
+
+	tw.tx.UnsafeSeqPut(buckets.Key, ibytes, data)
+	err = tw.s.kvindex.Tombstone(key, idxRev) // 删除keyIndex，关闭这一代 generation revisions
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[storeTxnWrite delete]key %s, tombstore err %v", string(key), err))
+		return
+	}
+	tw.changes = append(tw.changes, kv)
+
+	item := lease.LeaseItem{Key: string(key)}
+	leaseID := tw.s.le.GetLease(item)
+	if leaseID != lease.NoLease {
+		err = tw.s.le.Detach(leaseID, []lease.LeaseItem{{Key: string(key)}})
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("[storeTxnWrite put]unexpected error from lease Detach %v", err))
+		}
+	}
+}
+
 func (tw *storeTxnWrite) Put(key, value []byte, lease lease.LeaseID) (rev int64) {
 	tw.put(key, value, lease)
 	return tw.beginRev + 1
 }
 
+// INFO: 这个函数会把(key,value)构造出KeyValue结构体，并持久化到boltdb中
 func (tw *storeTxnWrite) put(key, value []byte, leaseID lease.LeaseID) {
 	rev := tw.beginRev + 1
 	c := rev
@@ -83,7 +184,7 @@ func (tw *storeTxnWrite) put(key, value []byte, leaseID lease.LeaseID) {
 	}
 	data, err := kv.Marshal()
 	if err != nil {
-		klog.Infof(fmt.Sprintf("[storeTxnWrite put]KeyValue marshal error %v", err))
+		klog.Infof(fmt.Sprintf("[storeTxnWrite put]key %s, KeyValue marshal error %v", string(key), err))
 		return
 	}
 

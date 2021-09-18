@@ -115,6 +115,7 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.0
 	go.etcd.io/etcd/client/v3 v3.5.0
 	go.etcd.io/etcd/raft/v3 v3.5.0 // indirect
+	go.etcd.io/etcd/server/v3 v3.5.0 // indirect
 	go.uber.org/zap v1.17.0
 	golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
 	golang.org/x/mod v0.4.2 // indirect

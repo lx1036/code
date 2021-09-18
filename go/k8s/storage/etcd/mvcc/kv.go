@@ -4,6 +4,15 @@ import (
 	"go.etcd.io/etcd/server/v3/lease"
 )
 
+type ReadTxMode uint32
+
+const (
+	// Use ConcurrentReadTx and the txReadBuffer is copied
+	ConcurrentReadTxMode = ReadTxMode(1)
+	// Use backend ReadTx and txReadBuffer is not copied
+	SharedBufReadTxMode = ReadTxMode(2)
+)
+
 type WatchableKV interface {
 	KV
 
@@ -12,8 +21,11 @@ type WatchableKV interface {
 
 type KV interface {
 
-	// Write creates a write transaction.
+	// INFO: 创建写事务
 	Write() TxnWrite
+
+	// INFO: 创建读事务
+	Read(mode ReadTxMode) TxnRead
 }
 
 type Watchable interface {
@@ -30,6 +42,12 @@ type ReadView interface {
 
 type WriteView interface {
 	Put(key, value []byte, lease lease.LeaseID) (rev int64)
+
+	// DeleteRange
+	// INFO: 范围删除，会触发 delete event
+	//  delete keys in [key, end)
+	//  如果end is nil, delete the key
+	DeleteRange(key, end []byte) (n, rev int64)
 }
 
 // INFO: 只读事务
