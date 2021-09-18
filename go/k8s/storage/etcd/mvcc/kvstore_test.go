@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"go.etcd.io/etcd/server/v3/lease"
-	betesting "go.etcd.io/etcd/server/v3/mvcc/backend/testing"
+	betesting "k8s-lx1036/k8s/storage/etcd/mvcc/backend/testing"
 )
 
 func TestStoreRev(t *testing.T) {

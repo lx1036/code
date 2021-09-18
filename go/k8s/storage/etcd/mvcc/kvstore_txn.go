@@ -19,11 +19,12 @@ type storeTxnRead struct {
 }
 
 func (tr *storeTxnRead) Rev() int64 {
-	panic("implement me")
+	return tr.rev
 }
 
 func (tr *storeTxnRead) End() {
-	panic("implement me")
+	tr.tx.RUnlock() // RUnlock signals the end of concurrentReadTx.
+	tr.s.mu.RUnlock()
 }
 
 func (s *store) Read(mode ReadTxMode) TxnRead {
@@ -80,8 +81,19 @@ func (tw *storeTxnWrite) Rev() int64 {
 	return tw.beginRev
 }
 
+// TODO: 没太懂这块知识
 func (tw *storeTxnWrite) End() {
-	panic("implement me")
+	// only update index if the txn modifies the mvcc state.
+	if len(tw.changes) != 0 {
+		// hold revMu lock to prevent new read txns from opening until writeback.
+		tw.s.revMu.Lock()
+		tw.s.currentRev++
+	}
+	tw.tx.Unlock()
+	if len(tw.changes) != 0 {
+		tw.s.revMu.Unlock()
+	}
+	tw.s.mu.RUnlock()
 }
 
 // INFO: range delete
