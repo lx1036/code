@@ -1,14 +1,14 @@
 package mvcc
 
 import (
-	"fmt"
+	//"fmt"
 	"sync"
 	"time"
 
 	"go.etcd.io/etcd/server/v3/lease"
 	"go.etcd.io/etcd/server/v3/mvcc/backend"
-	"go.etcd.io/etcd/server/v3/mvcc/buckets"
-	"k8s.io/klog/v2"
+	//"go.etcd.io/etcd/server/v3/mvcc/buckets"
+	//"k8s.io/klog/v2"
 )
 
 var (
@@ -20,6 +20,14 @@ var (
 	// maxWatchersPerSync is the number of watchers to sync in a single batch
 	maxWatchersPerSync = 512
 )
+
+// cancelFunc updates unsynced and synced maps when running
+// cancel operations.
+type cancelFunc func()
+
+type watchable interface {
+	watch(key, end []byte, startRev int64, id WatchID, ch chan<- WatchResponse, fcs ...FilterFunc) (*watcher, cancelFunc)
+}
 
 type watchableStore struct {
 	wg sync.WaitGroup
@@ -36,7 +44,7 @@ type watchableStore struct {
 	synced watcherGroup
 
 	// victims are watcher batches that were blocked on the watch channel
-	victims  []watcherBatch
+	//victims  []watcherBatch
 	victimCh chan struct{}
 
 	stopC chan struct{}
@@ -49,9 +57,9 @@ func NewWatchableStore(b backend.Backend, le lease.Lessor, cfg StoreConfig) *wat
 	s := &watchableStore{
 		store:    NewStore(b, le, cfg),
 		victimCh: make(chan struct{}, 1),
-		unsynced: newWatcherGroup(),
-		synced:   newWatcherGroup(),
-		stopC:    make(chan struct{}),
+		//unsynced: newWatcherGroup(),
+		//synced:   newWatcherGroup(),
+		stopC: make(chan struct{}),
 	}
 	s.store.ReadView = &readView{s}
 	s.store.WriteView = &writeView{s}
@@ -103,7 +111,7 @@ func (s *watchableStore) syncWatchersLoop() {
 
 // INFO: 选择一批unsynced watchers去追赶数据，等追赶上再去放到synced watchers组里, 返回unsynced watchers里还剩多少
 func (s *watchableStore) syncWatchers() int {
-	// INFO: 先加锁
+	/*// INFO: 先加锁
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -148,7 +156,9 @@ func (s *watchableStore) syncWatchers() int {
 	}
 	s.addVictim(victims)
 
-	return s.unsynced.size()
+	return s.unsynced.size()*/
+
+	return 0
 }
 
 func (s *watchableStore) syncVictimsLoop() {
@@ -156,6 +166,7 @@ func (s *watchableStore) syncVictimsLoop() {
 
 }
 
+// INFO: 每一个 key 都有其对应的 watcher 对象
 type watcher struct {
 	// the watcher key
 	key []byte
@@ -185,4 +196,17 @@ type watcher struct {
 	// a chan to send out the watch response.
 	// The chan might be shared with other watchers.
 	ch chan<- WatchResponse
+}
+
+func (s *watchableStore) watch(key, end []byte, startRev int64, id WatchID, ch chan<- WatchResponse, fcs ...FilterFunc) (*watcher, cancelFunc) {
+	w := &watcher{
+		key:    key,
+		end:    end,
+		minRev: startRev,
+		id:     id,
+		ch:     ch,
+		fcs:    fcs,
+	}
+
+	return w, nil
 }
