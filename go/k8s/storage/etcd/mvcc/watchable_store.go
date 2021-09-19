@@ -359,7 +359,64 @@ func (s *watchableStore) watch(key, end []byte, startRev int64, id WatchID, ch c
 		fcs:    fcs,
 	}
 
-	return w, nil
+	s.mu.Lock()
+	s.revMu.RLock()
+	synced := startRev > s.store.currentRev || startRev == 0
+	if synced {
+		w.minRev = s.store.currentRev + 1
+		if startRev > w.minRev {
+			w.minRev = startRev
+		}
+		s.synced.add(w)
+	} else {
+		//slowWatcherGauge.Inc()
+		s.unsynced.add(w)
+	}
+	s.revMu.RUnlock()
+	s.mu.Unlock()
+
+	return w, func() { s.cancelWatcher(w) }
+}
+
+// cancelWatcher removes references of the watcher from the watchableStore
+func (s *watchableStore) cancelWatcher(w *watcher) {
+	for {
+		s.mu.Lock()
+		if s.unsynced.delete(w) {
+			break
+		} else if s.synced.delete(w) {
+			break
+		} else if w.compacted {
+			break
+		} else if w.ch == nil {
+			// already canceled (e.g., cancel/close race)
+			break
+		}
+
+		if !w.victim {
+			s.mu.Unlock()
+			panic("watcher not victim but not in watch groups")
+		}
+
+		var victimBatch watcherBatch
+		for _, wb := range s.victims {
+			if wb[w] != nil {
+				victimBatch = wb
+				break
+			}
+		}
+		if victimBatch != nil {
+			delete(victimBatch, w)
+			break
+		}
+
+		// victim being processed so not accessible; retry
+		s.mu.Unlock()
+		time.Sleep(time.Millisecond)
+	}
+
+	w.ch = nil
+	s.mu.Unlock()
 }
 
 func (w *watcher) send(watchResponse WatchResponse) bool {

@@ -107,6 +107,7 @@ func (ws *watchStream) Watch(id WatchID, key, end []byte, startRev int64, fcs ..
 		return -1, ErrWatcherDuplicateID
 	}
 
+	// INFO: 加到 sync watcher group 或者 unsync watcher group
 	watcher, cancelFunc := ws.watchable.watch(key, end, startRev, id, ws.ch, fcs...)
 	ws.cancels[id] = cancelFunc
 	ws.watchers[id] = watcher
