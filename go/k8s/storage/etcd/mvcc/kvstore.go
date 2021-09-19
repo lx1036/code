@@ -15,6 +15,7 @@ const (
 	// The first `revBytesLen` bytes represents a normal revision. The last
 	// one byte is the mark.
 	markedRevBytesLen = revBytesLen + 1
+	markBytePosition  = markedRevBytesLen - 1
 
 	markTombstone byte = 't'
 )
@@ -103,4 +104,9 @@ func (s *store) Close() error {
 	close(s.stopc)
 	//s.fifoSched.Stop()
 	return nil
+}
+
+// isTombstone INFO: revision bytes is a tombstone, "xxx_xxxt"
+func isTombstone(b []byte) bool {
+	return len(b) == markedRevBytesLen && b[markBytePosition] == markTombstone
 }

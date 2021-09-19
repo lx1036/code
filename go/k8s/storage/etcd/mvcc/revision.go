@@ -40,3 +40,10 @@ func revToBytes(rev revision, bytes []byte) {
 	bytes[8] = '_'
 	binary.BigEndian.PutUint64(bytes[9:], uint64(rev.sub))
 }
+
+func bytesToRev(bytes []byte) revision {
+	return revision{
+		main: int64(binary.BigEndian.Uint64(bytes[0:8])),
+		sub:  int64(binary.BigEndian.Uint64(bytes[9:])),
+	}
+}

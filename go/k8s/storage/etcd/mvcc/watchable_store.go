@@ -1,6 +1,11 @@
 package mvcc
 
 import (
+	"fmt"
+	"go.etcd.io/etcd/api/v3/mvccpb"
+	"go.etcd.io/etcd/server/v3/mvcc/buckets"
+	"k8s.io/klog/v2"
+
 	//"fmt"
 	"sync"
 	"time"
@@ -44,7 +49,7 @@ type watchableStore struct {
 	synced watcherGroup
 
 	// victims are watcher batches that were blocked on the watch channel
-	//victims  []watcherBatch
+	victims  []watcherBatch
 	victimCh chan struct{}
 
 	stopC chan struct{}
@@ -57,9 +62,9 @@ func NewWatchableStore(b backend.Backend, le lease.Lessor, cfg StoreConfig) *wat
 	s := &watchableStore{
 		store:    NewStore(b, le, cfg),
 		victimCh: make(chan struct{}, 1),
-		//unsynced: newWatcherGroup(),
-		//synced:   newWatcherGroup(),
-		stopC: make(chan struct{}),
+		unsynced: newWatcherGroup(),
+		synced:   newWatcherGroup(),
+		stopC:    make(chan struct{}),
 	}
 	s.store.ReadView = &readView{s}
 	s.store.WriteView = &writeView{s}
@@ -111,7 +116,7 @@ func (s *watchableStore) syncWatchersLoop() {
 
 // INFO: 选择一批unsynced watchers去追赶数据，等追赶上再去放到synced watchers组里, 返回unsynced watchers里还剩多少
 func (s *watchableStore) syncWatchers() int {
-	/*// INFO: 先加锁
+	// INFO: 先加锁
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -129,10 +134,15 @@ func (s *watchableStore) syncWatchers() int {
 	// query the backend store of key-value pairs
 	curRev := s.store.currentRev
 	compactionRev := s.store.compactMainRev
+	// INFO: 每次最多只能choose 512个unsynced watchers
 	wg, minRev := s.unsynced.choose(maxWatchersPerSync, curRev, compactionRev)
+	minBytes, maxBytes := newRevBytes(), newRevBytes()
+	revToBytes(revision{main: minRev}, minBytes)
+	revToBytes(revision{main: curRev + 1}, maxBytes)
 
 	// UnsafeRange returns keys and values. And in boltdb, keys are revisions.
 	// values are actual key-value pairs in backend.
+	// INFO: 从boltdb中根据revisions来range search出其values
 	tx := s.store.b.ReadTx()
 	tx.RLock()
 	revs, vs := tx.UnsafeRange(buckets.Key, minBytes, maxBytes, 0)
@@ -143,6 +153,21 @@ func (s *watchableStore) syncWatchers() int {
 	wb := newWatcherBatch(wg, evs)
 	for w := range wg.watchers {
 
+		w.minRev = curRev + 1
+
+		eb, ok := wb[w]
+		if !ok {
+			// bring un-notified watcher to synced
+			s.synced.add(w)
+			s.unsynced.delete(w)
+			continue
+		}
+
+		if eb.moreRev != 0 {
+			w.minRev = eb.moreRev
+		}
+
+		// INFO: watcher.ch <- watchResponse
 		watchResponse := WatchResponse{WatchID: w.id, Events: eb.evs, Revision: curRev}
 		if w.send(watchResponse) {
 			klog.Infof(fmt.Sprintf("[syncWatchers]fail to send watch response %+v", watchResponse))
@@ -153,17 +178,143 @@ func (s *watchableStore) syncWatchers() int {
 			w.victim = true
 		}
 
+		if w.victim {
+			victims[w] = eb
+		} else {
+			if eb.moreRev != 0 {
+				// stay unsynced; more to read
+				continue
+			}
+			s.synced.add(w)
+		}
+		s.unsynced.delete(w)
 	}
 	s.addVictim(victims)
 
-	return s.unsynced.size()*/
-
-	return 0
+	return s.unsynced.size()
 }
 
+// INFO: syncVictimsLoop 会监听 s.victimCh 这个 channel
+func (s *watchableStore) addVictim(victim watcherBatch) {
+	if victim == nil {
+		return
+	}
+	s.victims = append(s.victims, victim)
+	select {
+	case s.victimCh <- struct{}{}:
+	default:
+	}
+}
+
+// kvsToEvents gets all events for the watchers from all key-value pairs
+func kvsToEvents(wg *watcherGroup, revs, vals [][]byte) (evs []mvccpb.Event) {
+	for i, v := range vals {
+		var kv mvccpb.KeyValue
+		if err := kv.Unmarshal(v); err != nil {
+			klog.Errorf(fmt.Sprintf("[kvsToEvents]failed to unmarshal mvccpb.KeyValue %v", err))
+			continue
+		}
+
+		if !wg.contains(string(kv.Key)) {
+			continue
+		}
+
+		ty := mvccpb.PUT
+		if isTombstone(revs[i]) {
+			ty = mvccpb.DELETE
+			// patch in mod revision so watchers won't skip
+			kv.ModRevision = bytesToRev(revs[i]).main
+		}
+		evs = append(evs, mvccpb.Event{Kv: &kv, Type: ty})
+	}
+	return evs
+}
+
+// INFO:
 func (s *watchableStore) syncVictimsLoop() {
 	defer s.wg.Done()
 
+	for {
+		// INFO:
+		for s.moveVictims() != 0 {
+			// try to update all victim watchers
+		}
+
+		s.mu.RLock()
+		isEmpty := len(s.victims) == 0
+		s.mu.RUnlock()
+
+		var tickC <-chan time.Time
+		if !isEmpty {
+			tickC = time.After(10 * time.Millisecond)
+		}
+
+		select {
+		case <-tickC:
+		case <-s.victimCh:
+		case <-s.stopc:
+			return
+		}
+	}
+}
+
+// moveVictims tries to update watches with already pending event data
+// INFO:(2)异常场景重试机制
+func (s *watchableStore) moveVictims() (moved int) {
+	s.mu.Lock()
+	victims := s.victims
+	s.victims = nil
+	s.mu.Unlock()
+
+	var newVictim watcherBatch
+	for _, wb := range victims {
+		// try to send responses again
+		for w, eb := range wb {
+			// watcher has observed the store up to, but not including, w.minRev
+			rev := w.minRev - 1
+			if w.send(WatchResponse{WatchID: w.id, Events: eb.evs, Revision: rev}) {
+				//pendingEventsGauge.Add(float64(len(eb.evs)))
+			} else {
+				if newVictim == nil {
+					newVictim = make(watcherBatch)
+				}
+				newVictim[w] = eb
+				continue
+			}
+			moved++
+		}
+
+		// assign completed victim watchers to unsync/sync
+		s.mu.Lock()
+		s.store.revMu.RLock()
+		curRev := s.store.currentRev
+		for w, eb := range wb {
+			if newVictim != nil && newVictim[w] != nil {
+				// couldn't send watch response; stays victim
+				continue
+			}
+			w.victim = false
+			if eb.moreRev != 0 {
+				w.minRev = eb.moreRev
+			}
+			if w.minRev <= curRev {
+				s.unsynced.add(w)
+			} else {
+				//slowWatcherGauge.Dec()
+				s.synced.add(w)
+			}
+		}
+		s.store.revMu.RUnlock()
+		s.mu.Unlock()
+	}
+
+	if len(newVictim) > 0 {
+		s.mu.Lock()
+		s.victims = append(s.victims, newVictim)
+		s.mu.Unlock()
+	}
+
+	return moved
 }
 
 // INFO: 每一个 key 都有其对应的 watcher 对象
@@ -209,4 +360,42 @@ func (s *watchableStore) watch(key, end []byte, startRev int64, id WatchID, ch c
 	}
 
 	return w, nil
+}
+
+func (w *watcher) send(watchResponse WatchResponse) bool {
+	progressEvent := len(watchResponse.Events) == 0
+	if progressEvent {
+		return true
+	}
+
+	// INFO: Filter events
+	if len(w.fcs) != 0 {
+		events := make([]mvccpb.Event, 0, len(watchResponse.Events))
+		for i := range watchResponse.Events {
+			filtered := false
+			for _, filter := range w.fcs {
+				if filter(watchResponse.Events[i]) {
+					filtered = true
+					break
+				}
+			}
+			if !filtered {
+				events = append(events, watchResponse.Events[i])
+			}
+		}
+
+		watchResponse.Events = events
+	}
+
+	// if all events are filtered out, we should send nothing.
+	if !progressEvent && len(watchResponse.Events) == 0 {
+		return true
+	}
+
+	select {
+	case w.ch <- watchResponse:
+		return true
+	default:
+		return false
+	}
 }
