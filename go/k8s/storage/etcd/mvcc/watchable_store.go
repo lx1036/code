@@ -195,7 +195,7 @@ func (s *watchableStore) syncWatchers() int {
 
 // INFO: syncVictimsLoop 会监听 s.victimCh 这个 channel
 func (s *watchableStore) addVictim(victim watcherBatch) {
-	if victim == nil {
+	if victim == nil || len(victim) == 0 {
 		return
 	}
 	s.victims = append(s.victims, victim)
@@ -318,7 +318,7 @@ func (s *watchableStore) moveVictims() (moved int) {
 
 // INFO: watch 核心功能，会在每次 put 之后再回调 notify，去 send WatchResponse 给 client; 把 slow watcher 放到 victim 里
 func (s *watchableStore) notify(rev int64, evs []mvccpb.Event) {
-	var victim watcherBatch
+	victim := make(watcherBatch)
 	watcherBatch := newWatcherBatch(&s.synced, evs)
 	for watcher, eventBatch := range watcherBatch {
 		if eventBatch.revs != 1 {
@@ -326,20 +326,23 @@ func (s *watchableStore) notify(rev int64, evs []mvccpb.Event) {
 			continue
 		}
 
+		// INFO: 这里 watcher.ch <- WatchResponse, 重点!!!
 		if watcher.send(WatchResponse{
-			WatchID:         0,
-			Events:          nil,
-			Revision:        0,
-			CompactRevision: 0,
+			WatchID:  watcher.id,
+			Events:   eventBatch.evs,
+			Revision: rev,
 		}) {
 			// metrics
 		} else {
 			// move slow watcher to victims
-
+			watcher.minRev = rev + 1
+			watcher.victim = true
+			victim[watcher] = eventBatch
+			s.synced.delete(watcher)
 		}
-
 	}
 
+	s.addVictim(victim)
 }
 
 // INFO: 每一个 key 都有其对应的 watcher 对象
@@ -406,6 +409,7 @@ func (s *watchableStore) watch(key, end []byte, startRev int64, id WatchID, ch c
 }
 
 // cancelWatcher removes references of the watcher from the watchableStore
+// INFO: 从 unsynced/synced/victims 中删除 watcher
 func (s *watchableStore) cancelWatcher(w *watcher) {
 	for {
 		s.mu.Lock()

@@ -44,11 +44,10 @@ type WatchStream interface {
 	// Watch INFO: 创建一个watcher, watch events keys [key, end)
 	Watch(id WatchID, key, end []byte, startRev int64, fcs ...FilterFunc) (WatchID, error)
 
-	// Chan returns a chan. All watch response will be sent to the returned chan.
+	// Chan INFO: 从 watcher.ch 中获取 event 数据
 	Chan() <-chan WatchResponse
 
-	// Cancel cancels a watcher by giving its ID. If watcher does not exist, an error will be
-	// returned.
+	// Cancel INFO: 取消 watch key
 	Cancel(id WatchID) error
 
 	// Close closes Chan and release all related resources.
@@ -128,6 +127,7 @@ func (ws *watchStream) Cancel(id WatchID) error {
 	if !ok {
 		return ErrWatcherNotExist
 	}
+	// INFO: 这里也可以 cancel(w), 不过 watchableStore.watch() 中闭包函数已经包含了 w
 	cancel()
 
 	// TODO: 这块为何需要判断???
