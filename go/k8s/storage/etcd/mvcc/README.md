@@ -17,6 +17,8 @@ keyIndex: 表示一个 key 有哪些 revision 的数据结构，包含最新的�
 ## MVCC Watch Keys
 watch 代码原理：https://time.geekbang.org/column/article/341060
 
+调用关系：etcd-server(serverWatchStream) -> mvcc(watchStream.Watch)
+watchableStore -> 创建 watchStream 对象
 
 ## 参考文献
 

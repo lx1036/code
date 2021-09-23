@@ -55,13 +55,11 @@ type WatchStream interface {
 	Close()
 }
 
-// INFO:
-//  watchStream contains a collection of watchers that share
-//  one streaming chan to send out watched events and other control events.
+// INFO: 表示多个 watchers 对一个 streaming channel
 type watchStream struct {
 	mu sync.Mutex
 
-	watchable watchable
+	watchable watchable // watchableStore 对象实现了 store/watchable 接口
 
 	ch chan WatchResponse
 
@@ -115,6 +113,7 @@ func (ws *watchStream) Watch(id WatchID, key, end []byte, startRev int64, fcs ..
 	return id, nil
 }
 
+// Chan INFO: 见 watcher.send()
 func (ws *watchStream) Chan() <-chan WatchResponse {
 	return ws.ch
 }

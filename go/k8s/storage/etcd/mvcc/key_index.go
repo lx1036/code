@@ -39,6 +39,7 @@ func (g *generation) walk(f func(rev revision) bool) int {
 	return -1
 }
 
+// INFO: treeIndex 中的每一个item
 type keyIndex struct {
 	key []byte
 
@@ -100,7 +101,7 @@ func (keyIdx *keyIndex) get(atRev int64) (modified, created revision, ver int64,
 	return revision{}, revision{}, 0, err
 }
 
-// put puts a revision to the keyIndex.
+// INFO: keyIndex 存入一个新的 revision
 func (keyIdx *keyIndex) put(main, sub int64) {
 	rev := revision{main: main, sub: sub}
 	if !rev.GreaterThan(keyIdx.modified) {

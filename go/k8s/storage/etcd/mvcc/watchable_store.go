@@ -44,8 +44,7 @@ type watchableStore struct {
 
 	// INFO: contains all unsynced watchers that needs to sync with events that have happened
 	unsynced watcherGroup
-	// contains all synced watchers that are in sync with the progress of the store.
-	// The key of the map is the key that the watcher watches on.
+	// INFO: key 是需要 watcher watch 的 key, unsynced/synced 互相转换, synced 表示已经赶上了 key 的进度
 	synced watcherGroup
 
 	// victims are watcher batches that were blocked on the watch channel
@@ -57,7 +56,7 @@ type watchableStore struct {
 
 // NewWatchableStore
 // INFO: 该对象是etcd最核心的一个功能，watch 功能，可以 watch key 和 watch range keys
-//  会启动两个goroutine,
+//  会启动两个goroutine, syncedWatchers/unsyncedWatchers/
 func NewWatchableStore(b backend.Backend, le lease.Lessor, cfg StoreConfig) *watchableStore {
 	s := &watchableStore{
 		store:    NewStore(b, le, cfg),
@@ -317,6 +316,32 @@ func (s *watchableStore) moveVictims() (moved int) {
 	return moved
 }
 
+// INFO: watch 核心功能，会在每次 put 之后再回调 notify，去 send WatchResponse 给 client; 把 slow watcher 放到 victim 里
+func (s *watchableStore) notify(rev int64, evs []mvccpb.Event) {
+	var victim watcherBatch
+	watcherBatch := newWatcherBatch(&s.synced, evs)
+	for watcher, eventBatch := range watcherBatch {
+		if eventBatch.revs != 1 {
+			klog.Errorf(fmt.Sprintf("[watchableStore notify]unexpected multiple revisions in watch notification: %d", eventBatch.revs))
+			continue
+		}
+
+		if watcher.send(WatchResponse{
+			WatchID:         0,
+			Events:          nil,
+			Revision:        0,
+			CompactRevision: 0,
+		}) {
+			// metrics
+		} else {
+			// move slow watcher to victims
+
+		}
+
+	}
+
+}
+
 // INFO: 每一个 key 都有其对应的 watcher 对象
 type watcher struct {
 	// the watcher key
@@ -349,6 +374,7 @@ type watcher struct {
 	ch chan<- WatchResponse
 }
 
+// INFO: 把 watcher 放入 synced/unsynced watcherGroup 里, 根据当前 etcd node currentRev 来判断 synced/unsynced
 func (s *watchableStore) watch(key, end []byte, startRev int64, id WatchID, ch chan<- WatchResponse, fcs ...FilterFunc) (*watcher, cancelFunc) {
 	w := &watcher{
 		key:    key,
@@ -361,6 +387,7 @@ func (s *watchableStore) watch(key, end []byte, startRev int64, id WatchID, ch c
 
 	s.mu.Lock()
 	s.revMu.RLock()
+	// INFO: 根据当前集群版本号 etcd node currentRev 来判断 synced/unsynced
 	synced := startRev > s.store.currentRev || startRev == 0
 	if synced {
 		w.minRev = s.store.currentRev + 1
@@ -419,6 +446,7 @@ func (s *watchableStore) cancelWatcher(w *watcher) {
 	s.mu.Unlock()
 }
 
+// INFO: 把 WatchResponse send 到 ch, watchStream.Chan() 会监听这个 channel
 func (w *watcher) send(watchResponse WatchResponse) bool {
 	progressEvent := len(watchResponse.Events) == 0
 	if progressEvent {

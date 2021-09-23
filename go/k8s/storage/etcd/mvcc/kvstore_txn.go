@@ -10,21 +10,13 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// INFO: "读事务"
 type storeTxnRead struct {
 	s  *store
 	tx backend.ReadTx
 
 	firstRev int64
 	rev      int64
-}
-
-func (tr *storeTxnRead) Rev() int64 {
-	return tr.rev
-}
-
-func (tr *storeTxnRead) End() {
-	tr.tx.RUnlock() // RUnlock signals the end of concurrentReadTx.
-	tr.s.mu.RUnlock()
 }
 
 func (s *store) Read(mode ReadTxMode) TxnRead {
@@ -55,12 +47,24 @@ func (s *store) Read(mode ReadTxMode) TxnRead {
 	}
 }
 
+func (tr *storeTxnRead) Rev() int64 {
+	return tr.rev
+}
+
+func (tr *storeTxnRead) End() {
+	tr.tx.RUnlock() // RUnlock signals the end of concurrentReadTx.
+	tr.s.mu.RUnlock()
+}
+
+// INFO: "写事务"
 type storeTxnWrite struct {
 	storeTxnRead
 	tx backend.BatchTx
 	// beginRev is the revision where the txn begins; it will write to the next revision.
 	beginRev int64
-	changes  []mvccpb.KeyValue
+
+	// INFO: 见 put()，存入 boltdb 里每个 (key,value)
+	changes []mvccpb.KeyValue
 }
 
 func (s *store) Write() TxnWrite {
@@ -74,6 +78,10 @@ func (s *store) Write() TxnWrite {
 		beginRev:     s.currentRev,
 		changes:      make([]mvccpb.KeyValue, 0, 4),
 	}
+}
+
+func (tw *storeTxnWrite) Changes() []mvccpb.KeyValue {
+	return tw.changes
 }
 
 // INFO:

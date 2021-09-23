@@ -1,6 +1,7 @@
 package mvcc
 
 import (
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/server/v3/lease"
 )
 
@@ -63,4 +64,7 @@ type TxnWrite interface {
 	TxnRead
 
 	WriteView
+
+	// Changes gets the changes made since opening the write txn.
+	Changes() []mvccpb.KeyValue
 }
