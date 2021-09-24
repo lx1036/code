@@ -15,6 +15,13 @@ type txWriteBuffer struct {
 	bucket2seq map[BucketID]bool
 }
 
+// txReadBuffer accesses buffered updates.
+type txReadBuffer struct {
+	txBuffer
+	// bufVersion is used to check if the buffer is modified recently
+	bufVersion uint64
+}
+
 type kv struct {
 	key []byte
 	val []byte

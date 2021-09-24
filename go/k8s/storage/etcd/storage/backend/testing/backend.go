@@ -6,8 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"go.etcd.io/etcd/server/v3/mvcc/backend"
-	"go.uber.org/zap/zaptest"
+	"k8s-lx1036/k8s/storage/etcd/storage/backend"
 )
 
 var (
@@ -25,7 +24,6 @@ func NewTmpBackendFromCfg(t testing.TB, bcfg backend.BackendConfig) (backend.Bac
 	os.MkdirAll(dir, 0777)
 	tmpPath := filepath.Join(dir, "db.txt")
 	bcfg.Path = tmpPath
-	bcfg.Logger = zaptest.NewLogger(t)
 	return backend.New(bcfg), tmpPath
 }
 
