@@ -69,6 +69,7 @@ type storeTxnWrite struct {
 
 func (s *store) Write() TxnWrite {
 	s.mu.RLock()
+	// INFO: 所有批量写事务必须先获得锁，见 backend.batchTx::Lock()
 	tx := s.b.BatchTx()
 	tx.Lock()
 
@@ -97,6 +98,7 @@ func (tw *storeTxnWrite) End() {
 		tw.s.revMu.Lock()
 		tw.s.currentRev++
 	}
+	// INFO: 所有批量写事务必须先获得锁，见 backend.batchTx::Lock()
 	tw.tx.Unlock()
 	if len(tw.changes) != 0 {
 		tw.s.revMu.Unlock()
