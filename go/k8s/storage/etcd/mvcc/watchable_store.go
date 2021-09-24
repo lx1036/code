@@ -2,18 +2,14 @@ package mvcc
 
 import (
 	"fmt"
-	"go.etcd.io/etcd/api/v3/mvccpb"
-	"go.etcd.io/etcd/server/v3/mvcc/buckets"
-	"k8s.io/klog/v2"
-
-	//"fmt"
 	"sync"
 	"time"
 
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/server/v3/lease"
 	"go.etcd.io/etcd/server/v3/mvcc/backend"
-	//"go.etcd.io/etcd/server/v3/mvcc/buckets"
-	//"k8s.io/klog/v2"
+	"go.etcd.io/etcd/server/v3/mvcc/buckets"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -148,10 +144,9 @@ func (s *watchableStore) syncWatchers() int {
 	tx.RUnlock()
 	evs := kvsToEvents(wg, revs, vs)
 
-	var victims watcherBatch
+	victims := make(watcherBatch)
 	wb := newWatcherBatch(wg, evs)
 	for w := range wg.watchers {
-
 		w.minRev = curRev + 1
 
 		eb, ok := wb[w]
@@ -168,12 +163,9 @@ func (s *watchableStore) syncWatchers() int {
 
 		// INFO: watcher.ch <- watchResponse
 		watchResponse := WatchResponse{WatchID: w.id, Events: eb.evs, Revision: curRev}
-		if w.send(watchResponse) {
-			klog.Infof(fmt.Sprintf("[syncWatchers]fail to send watch response %+v", watchResponse))
+		if w.send(watchResponse) { // 成功发送
+			klog.Infof(fmt.Sprintf("[syncWatchers]successfully send watch response %+v", watchResponse))
 		} else {
-			if victims == nil {
-				victims = make(watcherBatch)
-			}
 			w.victim = true
 		}
 

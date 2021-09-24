@@ -135,7 +135,7 @@ type watcherGroup struct {
 	// keyWatchers has the watchers that watch on a single key
 	keyWatchers watcherSetByKey
 
-	// INFO: 红黑树 ranges has the watchers that watch a range; it is sorted by interval
+	// INFO: 区间树 ranges has the watchers that watch a range; it is sorted by interval
 	ranges adt.IntervalTree
 
 	// watchers is the set of all watchers
@@ -155,13 +155,13 @@ func (wg *watcherGroup) size() int {
 	return len(wg.watchers)
 }
 
-// INFO: 这里 ranges 是红黑树，key 是否在 keyWatchers 中
+// INFO: 这里 ranges 是区间树，key 是否在 keyWatchers 中
 func (wg *watcherGroup) contains(key string) bool {
 	_, ok := wg.keyWatchers[key]
 	return ok || wg.ranges.Intersects(adt.NewStringAffinePoint(key))
 }
 
-// INFO: 重点是从红黑树中查找
+// INFO: 重点是从区间树中查找，根据 key 获取 watcherSet，这个函数挺重要的!!!
 func (wg *watcherGroup) watcherSetByKey(key string) watcherSet {
 	wkeys := wg.keyWatchers[key]
 	wranges := wg.ranges.Stab(adt.NewStringAffinePoint(key))
