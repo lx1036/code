@@ -105,7 +105,6 @@ func NewDefaultBackend(path string) Backend {
 }
 
 func newBackend(cfg BackendConfig) *backend {
-
 	boltOptions := &bolt.Options{
 		NoGrowSync:     cfg.UnsafeNoFsync,
 		NoFreelistSync: true,
@@ -147,8 +146,28 @@ func newBackend(cfg BackendConfig) *backend {
 	// We set it after newBatchTxBuffered to skip the 'empty' commit.
 	b.hooks = cfg.Hooks
 
+	// INFO: backend 异步批量提交多个写事务请求
 	go b.run()
 	return b
+}
+
+// INFO: 定时任务，每 batchInterval 内去批量提交所有事务
+//  etcd 通过合并多个写事务请求，是异步机制定时（默认每隔 100ms）将批量事务一次性提交（pending 事务过多才会触发同步提交），从而大大提高吞吐量
+func (b *backend) run() {
+	defer close(b.donec)
+	tick := time.Tick(b.batchInterval)
+	for {
+		select {
+		case <-tick:
+			if b.batchTx.safePending() != 0 {
+				b.batchTx.Commit()
+			}
+		case <-b.stopc:
+			b.batchTx.CommitAndStop()
+			return
+		}
+	}
+
 }
 
 func (b *backend) BatchTx() BatchTx {
@@ -192,6 +211,11 @@ func (b *backend) unsafeBegin(write bool) *bolt.Tx {
 	}
 
 	return tx
+}
+
+// ForceCommit forces the current batching tx to commit.
+func (b *backend) ForceCommit() {
+	b.batchTx.Commit()
 }
 
 func (b *backend) Close() error {

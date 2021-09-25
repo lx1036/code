@@ -3,28 +3,30 @@ package backend
 import (
 	"fmt"
 	"io/ioutil"
-	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
 	"testing"
 
-	betesting "k8s-lx1036/k8s/storage/etcd/storage/backend/testing"
+	"k8s.io/klog/v2"
 )
 
 func TestSnapshot(t *testing.T) {
-	b, tmpPath := betesting.NewDefaultTmpBackend(t)
+	dir := "tmp"
+	os.MkdirAll(dir, 0777)
+	tmpPath := filepath.Join(dir, "db.txt")
+	b := NewDefaultBackend(tmpPath)
 	defer b.Close()
 	defer os.RemoveAll(tmpPath)
 
 	tx := b.BatchTx()
 	tx.Lock()
-	tx.UnsafeCreateBucket(Test)
+	tx.UnsafeCreateBucket(Test) // 在 boltdb 中创建 bucket
 	tx.UnsafePut(Test, []byte("foo"), []byte("bar"))
 	tx.Unlock()
 	b.ForceCommit()
 
 	// write snapshot to a new file
-	f, err := ioutil.TempFile(filepath.Base("./tmp"), "test_snapshot")
+	f, err := ioutil.TempFile(dir, "snapshot")
 	if err != nil {
 		t.Fatal(err)
 	}

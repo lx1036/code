@@ -74,6 +74,15 @@ func (t *batchTx) UnsafeCreateBucket(bucket Bucket) {
 	t.pending++
 }
 
+func (t *batchTx) UnsafeDeleteBucket(bucket Bucket) {
+	err := t.tx.DeleteBucket(bucket.Name())
+	if err != nil && err != bolt.ErrBucketNotFound {
+		klog.Fatal(fmt.Sprintf("[UnsafeDeleteBucket]fail to delete bucket %s", bucket.Name()))
+	}
+
+	t.pending++
+}
+
 // UnsafeRange INFO: range scan @see https://github.com/etcd-io/bbolt#range-scans
 func (t *batchTx) UnsafeRange(bucketType Bucket, key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte) {
 	bucket := t.tx.Bucket(bucketType.Name())
@@ -128,6 +137,8 @@ func (t *batchTx) unsafePut(bucketType Bucket, key []byte, value []byte, seq boo
 		klog.Fatalf(fmt.Sprintf("[unsafePut]bucket %s in boltdb is not existed", bucketType.Name()))
 	}
 	// INFO: 这里也是一个小重点
+	//  首先 boltdb key 是版本号，put/delete 操作时，都会基于当前版本号递增生成新的版本号，因此属于顺序写入，
+	//  可以调整 boltdb 的 bucket.FillPercent 参数，使每个 page 填充更多数据，减少 page 的分裂次数并降低 db 空间。
 	if seq {
 		// it is useful to increase fill percent when the workloads are mostly append-only.
 		// this can delay the page split and reduce space usage.
@@ -141,10 +152,25 @@ func (t *batchTx) unsafePut(bucketType Bucket, key []byte, value []byte, seq boo
 		return
 	}
 
-	// TODO: pending 含义是啥???
+	// INFO: batchTx 中所有写事务都会 t.pending++，会定期 100ms 批量提交事务
 	t.pending++
 }
 
+func (t *batchTx) UnsafeDelete(bucketType Bucket, key []byte) {
+	bucket := t.tx.Bucket(bucketType.Name())
+	if bucket == nil {
+		klog.Fatalf(fmt.Sprintf("[UnsafeDelete]bucket %s in boltdb is not existed", bucketType.Name()))
+	}
+
+	err := bucket.Delete(key)
+	if err != nil {
+		klog.Fatalf(fmt.Sprintf("[UnsafeDelete]failed to delete a key %s from bucket %s", string(key), bucketType.Name()))
+	}
+
+	t.pending++
+}
+
+// INFO: 提交事务，数据落盘，否则在 boltdb 内存 B+tree 中
 func (t *batchTx) commit(stop bool) {
 	// commit the last tx
 	if t.tx != nil {
@@ -165,6 +191,20 @@ func (t *batchTx) commit(stop bool) {
 		t.tx = t.backend.begin(true)
 	}
 }
+
+// INFO: batchTx 中所有写事务都会 t.pending++，会定期 100ms 批量提交事务
+//  UnsafeCreateBucket()/UnsafePut()/UnsafeDeleteBucket()/UnsafeDelete()
+func (t *batchTx) safePending() int {
+	t.Lock()
+	defer t.Unlock()
+
+	return t.pending
+}
+
+// INFO:
+//  但是这优化又引发了另外的一个问题， 因为事务未提交，读请求可能无法从 boltdb 获取到最新数据？？？
+//  为了解决这个问题，etcd 引入了一个 bucket buffer 来保存暂未提交的事务数据。在更新 boltdb 的时候，etcd 也会同步数据到 bucket buffer。
+//  因此 etcd 处理读请求的时候会优先从 bucket buffer 里面读取，其次再从 boltdb 读，通过 bucket buffer 实现读写性能提升，同时保证数据一致性。
 
 // 加 buffer 的 batchTx
 type batchTxBuffered struct {
@@ -198,19 +238,11 @@ func (t *batchTxBuffered) RUnlock() {
 	panic("implement me")
 }*/
 
-func (t *batchTxBuffered) UnsafeDeleteBucket(bucket Bucket) {
-	panic("implement me")
-}
-
-func (t *batchTxBuffered) UnsafeDelete(bucket Bucket, key []byte) {
-	panic("implement me")
-}
-
 func (t *batchTxBuffered) CommitAndStop() {
 	panic("implement me")
 }
 
-// INFO:
+// Commit INFO: 提交事务
 func (t *batchTxBuffered) Commit() {
 	t.Lock()
 	t.commit(false)
@@ -229,6 +261,17 @@ func (t *batchTxBuffered) commit(stop bool) {
 }
 
 func (t *batchTxBuffered) unsafeCommit(stop bool) {
+	if t.backend.readTx.tx != nil {
+		// wait all store read transactions using the current boltdb tx to finish,
+		// then close the boltdb tx
+		go func(tx *bolt.Tx, wg *sync.WaitGroup) {
+			wg.Wait()
+			if err := tx.Rollback(); err != nil {
+				klog.Fatal(fmt.Sprintf("failed to rollback tx err %v", err))
+			}
+		}(t.backend.readTx.tx, t.backend.readTx.txWg)
+		t.backend.readTx.reset()
+	}
 
 	t.batchTx.commit(stop)
 
@@ -236,4 +279,15 @@ func (t *batchTxBuffered) unsafeCommit(stop bool) {
 		// only-read transaction
 		t.backend.readTx.tx = t.backend.begin(false)
 	}
+}
+
+// UnsafePut INFO: batchTxBuffered 除了 boltdb 写一份(key, value)数据，同时在 buffer 中写一份(key, value)数据
+func (t *batchTxBuffered) UnsafePut(bucket Bucket, key []byte, value []byte) {
+	t.batchTx.UnsafePut(bucket, key, value)
+	t.buf.put(bucket, key, value)
+}
+
+func (t *batchTxBuffered) UnsafeSeqPut(bucket Bucket, key []byte, value []byte) {
+	t.batchTx.UnsafeSeqPut(bucket, key, value)
+	t.buf.putSeq(bucket, key, value)
 }
