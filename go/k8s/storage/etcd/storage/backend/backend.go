@@ -2,12 +2,13 @@ package backend
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
+	"io"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -27,7 +28,7 @@ type Backend interface {
 	// ConcurrentReadTx non-blocking read transaction
 	ConcurrentReadTx() ReadTx
 
-	//Snapshot() Snapshot
+	Snapshot() Snapshot
 
 	ForceCommit()
 	Close() error
@@ -83,14 +84,6 @@ type BackendConfig struct {
 
 	// Hooks are getting executed during lifecycle of Backend's transactions.
 	Hooks Hooks
-}
-
-func (b *backend) BatchTx() BatchTx {
-	return b.batchTx
-}
-
-func (b *backend) ReadTx() ReadTx {
-	return b.readTx
 }
 
 func DefaultBackendConfig() BackendConfig {
@@ -158,13 +151,21 @@ func newBackend(cfg BackendConfig) *backend {
 	return b
 }
 
+func (b *backend) BatchTx() BatchTx {
+	return b.batchTx
+}
+
+func (b *backend) ReadTx() ReadTx {
+	return b.readTx
+}
+
 // ConcurrentReadTx INFO: @see https://github.com/etcd-io/etcd/commit/9c82e8c72b96eec1e7667a0e139a07b944c33b75
 // ConcurrentReadTx creates and returns a new ReadTx, which:
 // A) creates and keeps a copy of backend.readTx.txReadBuffer,
 // B) references the boltdb read Tx (and its bucket cache) of current batch interval.
-/*func (b *backend) ConcurrentReadTx() ReadTx {
-
-}*/
+func (b *backend) ConcurrentReadTx() ReadTx {
+	panic("ConcurrentReadTx")
+}
 
 // INFO: transaction begin
 func (b *backend) begin(write bool) *bolt.Tx {
@@ -197,4 +198,50 @@ func (b *backend) Close() error {
 	close(b.stopc)
 	<-b.donec
 	return b.db.Close()
+}
+
+type Snapshot interface {
+	// Size gets the size of the snapshot.
+	Size() int64
+	// WriteTo writes the snapshot into the given writer.
+	WriteTo(w io.Writer) (n int64, err error)
+	// Close closes the snapshot.
+	Close() error
+}
+
+type snapshot struct {
+	*bolt.Tx
+	stopc chan struct{}
+	donec chan struct{}
+}
+
+func (b *backend) Snapshot() Snapshot {
+	// TODO: 为何先 commit, commit 其实也是 begin transaction
+	b.batchTx.Commit()
+
+	// read-only lock
+	b.RLock()
+	defer b.RUnlock()
+	tx, err := b.db.Begin(false) // read-only
+	if err != nil {
+		klog.Fatalf(fmt.Sprintf("[Snapshot]begin transaction err %v", err))
+	}
+	stopc, donec := make(chan struct{}), make(chan struct{})
+	dbBytes := tx.Size() // returns current database size in bytes as seen by this transaction
+	mb := 100 * 1024 * 1024
+	klog.Infof(fmt.Sprintf("[Snapshot]db size %d MB", int64(float64(dbBytes)/float64(mb))))
+
+	return &snapshot{
+		Tx:    tx,
+		stopc: stopc,
+		donec: donec,
+	}
+}
+
+// Close INFO: Close 里去 Rollback
+func (s *snapshot) Close() error {
+	close(s.stopc)
+	<-s.donec
+
+	return s.Tx.Rollback()
 }

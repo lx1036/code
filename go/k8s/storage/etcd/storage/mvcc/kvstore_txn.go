@@ -3,10 +3,10 @@ package mvcc
 import (
 	"fmt"
 
+	"k8s-lx1036/k8s/storage/etcd/storage/backend"
+
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/server/v3/lease"
-	"go.etcd.io/etcd/server/v3/mvcc/backend"
-	"go.etcd.io/etcd/server/v3/mvcc/buckets"
 	"k8s.io/klog/v2"
 )
 
@@ -152,7 +152,7 @@ func (tw *storeTxnWrite) delete(key []byte) {
 		return
 	}
 
-	tw.tx.UnsafeSeqPut(buckets.Key, ibytes, data)
+	tw.tx.UnsafeSeqPut(backend.Key, ibytes, data)
 	err = tw.s.kvindex.Tombstone(key, idxRev) // 删除keyIndex，关闭这一代 generation revisions
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("[storeTxnWrite delete]key %s, tombstore err %v", string(key), err))
@@ -211,7 +211,7 @@ func (tw *storeTxnWrite) put(key, value []byte, leaseID lease.LeaseID) {
 	}
 
 	// INFO: 这里是真正要持久化到boltdb
-	tw.tx.UnsafeSeqPut(buckets.Key, ibytes, data)
+	tw.tx.UnsafeSeqPut(backend.Key, ibytes, data)
 	tw.s.kvindex.Put(key, idxRev) // 更新keyIndex到treeIndex
 	tw.changes = append(tw.changes, kv)
 

@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"k8s-lx1036/k8s/storage/etcd/storage/backend"
+
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/server/v3/lease"
-	"go.etcd.io/etcd/server/v3/mvcc/backend"
-	"go.etcd.io/etcd/server/v3/mvcc/buckets"
 	"k8s.io/klog/v2"
 )
 
@@ -140,7 +140,7 @@ func (s *watchableStore) syncWatchers() int {
 	// INFO: 从boltdb中根据revisions来range search出其values
 	tx := s.store.b.ReadTx()
 	tx.RLock()
-	revs, vs := tx.UnsafeRange(buckets.Key, minBytes, maxBytes, 0)
+	revs, vs := tx.UnsafeRange(backend.Key, minBytes, maxBytes, 0)
 	tx.RUnlock()
 	evs := kvsToEvents(wg, revs, vs)
 

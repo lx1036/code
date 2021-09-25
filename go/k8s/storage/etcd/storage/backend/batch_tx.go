@@ -1,8 +1,10 @@
 package backend
 
 import (
+	"bytes"
 	"fmt"
 	"k8s.io/klog/v2"
+	"math"
 	"sync"
 	"sync/atomic"
 
@@ -18,6 +20,7 @@ type Bucket interface {
 	IsSafeRangeBucket() bool
 }
 
+// BatchTx INFO: BatchTx 包含读事务 ReadTx，很重要
 type BatchTx interface {
 	ReadTx
 
@@ -50,6 +53,18 @@ func (t *batchTx) Unlock() {
 	t.Unlock()
 }
 
+// BatchTx interface embeds ReadTx interface. But RLock() and RUnlock() do not
+// have appropriate semantics in BatchTx interface. Therefore should not be called.
+// TODO: might want to decouple ReadTx and BatchTx
+
+func (t *batchTx) RLock() {
+	panic("unexpected RLock")
+}
+
+func (t *batchTx) RUnlock() {
+	panic("unexpected RUnlock")
+}
+
 func (t *batchTx) UnsafeCreateBucket(bucket Bucket) {
 	_, err := t.tx.CreateBucket(bucket.Name())
 	if err != nil && err != bolt.ErrBucketExists {
@@ -57,6 +72,46 @@ func (t *batchTx) UnsafeCreateBucket(bucket Bucket) {
 	}
 
 	t.pending++
+}
+
+// UnsafeRange INFO: range scan @see https://github.com/etcd-io/bbolt#range-scans
+func (t *batchTx) UnsafeRange(bucketType Bucket, key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte) {
+	bucket := t.tx.Bucket(bucketType.Name())
+	if bucket == nil {
+		klog.Fatalf(fmt.Sprintf("[UnsafeRange]"))
+	}
+
+	return unsafeRange(bucket.Cursor(), key, endKey, limit)
+}
+
+// INFO: range scan
+//  limit<=0就是没有限制; endKey=nil,就只查startKey;
+func unsafeRange(c *bolt.Cursor, startKey, endKey []byte, limit int64) ([][]byte, [][]byte) {
+	if limit <= 0 {
+		limit = math.MaxInt64
+	}
+	var isMatch func(key []byte) bool
+	if len(endKey) > 0 {
+		isMatch = func(key []byte) bool { return bytes.Compare(key, endKey) < 0 } // b < endKey
+	} else {
+		isMatch = func(key []byte) bool { return bytes.Equal(key, startKey) }
+		limit = 1
+	}
+
+	// Iterate from key to endKey
+	var (
+		keys   [][]byte
+		values [][]byte
+	)
+	for key, value := c.Seek(startKey); key != nil && isMatch(startKey); key, value = c.Next() {
+		keys = append(keys, key)
+		values = append(values, value)
+		if limit == int64(len(keys)) {
+			break
+		}
+	}
+
+	return keys, values
 }
 
 func (t *batchTx) UnsafePut(bucket Bucket, key []byte, value []byte) {
@@ -111,6 +166,7 @@ func (t *batchTx) commit(stop bool) {
 	}
 }
 
+// 加 buffer 的 batchTx
 type batchTxBuffered struct {
 	batchTx
 	buf txWriteBuffer
@@ -134,6 +190,27 @@ func newBatchTxBuffered(backend *backend) *batchTxBuffered {
 	return tx
 }
 
+/*func (t *batchTxBuffered) RLock() {
+	panic("implement me")
+}
+
+func (t *batchTxBuffered) RUnlock() {
+	panic("implement me")
+}*/
+
+func (t *batchTxBuffered) UnsafeDeleteBucket(bucket Bucket) {
+	panic("implement me")
+}
+
+func (t *batchTxBuffered) UnsafeDelete(bucket Bucket, key []byte) {
+	panic("implement me")
+}
+
+func (t *batchTxBuffered) CommitAndStop() {
+	panic("implement me")
+}
+
+// INFO:
 func (t *batchTxBuffered) Commit() {
 	t.Lock()
 	t.commit(false)

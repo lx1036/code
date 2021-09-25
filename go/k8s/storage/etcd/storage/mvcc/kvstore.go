@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
+	"k8s-lx1036/k8s/storage/etcd/storage/backend"
+
 	"go.etcd.io/etcd/server/v3/lease"
-	"go.etcd.io/etcd/server/v3/mvcc/backend"
-	"go.etcd.io/etcd/server/v3/mvcc/buckets"
 	"k8s.io/klog/v2"
 )
 
@@ -84,8 +84,8 @@ func NewStore(b backend.Backend, le lease.Lessor, cfg StoreConfig) *store {
 	// INFO: batch transaction, boltdb可以批量提交 @see https://github.com/etcd-io/bbolt#batch-read-write-transactions
 	tx := s.b.BatchTx()
 	tx.Lock()
-	tx.UnsafeCreateBucket(buckets.Key)
-	tx.UnsafeCreateBucket(buckets.Meta)
+	tx.UnsafeCreateBucket(backend.Key)
+	tx.UnsafeCreateBucket(backend.Meta)
 	tx.Unlock()
 	s.b.ForceCommit()
 

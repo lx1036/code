@@ -22,6 +22,14 @@ type txReadBuffer struct {
 	bufVersion uint64
 }
 
+func (txr *txReadBuffer) Range(bucketType Bucket, key, endKey []byte, limit int64) ([][]byte, [][]byte) {
+	if buffer := txr.buckets[bucketType.ID()]; buffer != nil {
+		return buffer.Range(key, endKey, limit)
+	}
+
+	return nil, nil
+}
+
 type kv struct {
 	key []byte
 	val []byte
@@ -39,4 +47,8 @@ func newBucketBuffer() *bucketBuffer {
 		buf:  make([]kv, bucketBufferInitialSize),
 		used: 0,
 	}
+}
+
+func (buffer *bucketBuffer) Range(key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte) {
+
 }
