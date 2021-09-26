@@ -48,10 +48,16 @@ func newLogWithSize(storage Storage, maxNextEntsSize uint64) *raftLog {
 	return rLog
 }
 
-func (l *raftLog) lastIndex() uint64 {
+func (log *raftLog) lastIndex() uint64 {
 	/*if i, ok := l.unstable.maybeLastIndex(); ok {
 		return i
 	}*/
 
-	return l.storage.LastIndex()
+	return log.storage.LastIndex()
+}
+
+// INFO:
+func (log *raftLog) hasPendingSnapshot() bool {
+	//return log.unstable.snapshot != nil && !IsEmptySnap(*log.unstable.snapshot)
+	return false
 }

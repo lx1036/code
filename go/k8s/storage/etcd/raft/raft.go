@@ -302,3 +302,9 @@ func (r *raft) becomeFollower(term uint64, lead uint64) {
 	r.state = StateFollower
 	klog.Infof("%x became follower at term %d", r.id, r.Term)
 }
+
+// INFO: state machine 是否可以 promoted to be leader
+func (r *raft) promotable() bool {
+	pr := r.prs.Progress[r.id]
+	return pr != nil && !pr.IsLearner && !r.raftLog.hasPendingSnapshot()
+}

@@ -100,4 +100,40 @@ func TestAddLearnerNode(t *testing.T) {
 		t.Fatal("expected nodes number to be 1")
 	}
 	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.prs.VoterNodes(), r.prs.LearnerNodes()))
+
+	// INFO: (6) promote state machine to be leader
+	fixtures := []struct {
+		desc       string
+		peers      []uint64
+		promotable bool
+	}{
+		{
+			desc:       "{1} promotable",
+			peers:      []uint64{1},
+			promotable: true,
+		},
+		{
+			desc:       "{1,2,3} promotable",
+			peers:      []uint64{1, 2, 3},
+			promotable: true,
+		},
+		{
+			desc:       "{} not promotable",
+			peers:      []uint64{},
+			promotable: false,
+		},
+		{
+			desc:       "{2,3} not promotable",
+			peers:      []uint64{2, 3},
+			promotable: false,
+		},
+	}
+	for _, fixture := range fixtures {
+		t.Run(fixture.desc, func(t *testing.T) {
+			r2 := newTestRaft(1, 10, 1, newTestMemoryStorage(withPeers(fixture.peers...)))
+			if promotable := r2.promotable(); promotable != fixture.promotable {
+				t.Fatalf("promotable = %v, want %v", promotable, fixture.promotable)
+			}
+		})
+	}
 }
