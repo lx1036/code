@@ -2,12 +2,29 @@ package raft
 
 import (
 	"errors"
+	"fmt"
+	"k8s.io/klog/v2"
 	"math"
+	"strings"
+
+	"go.etcd.io/etcd/raft/v3/confchange"
+	pb "go.etcd.io/etcd/raft/v3/raftpb"
+	"go.etcd.io/etcd/raft/v3/tracker"
 )
 
 // None is a placeholder node ID used when there is no leader.
 const None uint64 = 0
 const noLimit = math.MaxUint64
+
+type StateType uint64
+
+const (
+	StateFollower StateType = iota
+	StateCandidate
+	StateLeader
+	StatePreCandidate
+	numStates
+)
 
 type ReadOnlyOption int
 
@@ -91,10 +108,6 @@ type Config struct {
 	// CheckQuorum specifies if the leader should check quorum activity. Leader
 	// steps down when quorum is not active for an electionTimeout.
 	CheckQuorum bool
-
-	// Logger is the logger used for raft log. For multinode which can host
-	// multiple raft group, each raft group can have its own logger
-	Logger Logger
 }
 
 func (c *Config) validate() error {
@@ -128,10 +141,6 @@ func (c *Config) validate() error {
 		return errors.New("max inflight messages must be greater than 0")
 	}
 
-	if c.Logger == nil {
-		c.Logger = raftLogger
-	}
-
 	if c.ReadOnlyOption == ReadOnlyLeaseBased && !c.CheckQuorum {
 		return errors.New("CheckQuorum must be enabled when ReadOnlyOption is ReadOnlyLeaseBased")
 	}
@@ -152,6 +161,7 @@ type raft struct {
 	maxMsgSize         uint64
 	maxUncommittedSize uint64
 
+	state StateType
 	// isLearner is true if the local raft node is a learner.
 	isLearner bool
 
@@ -160,48 +170,135 @@ type raft struct {
 	// the leader id
 	lead uint64
 
-	// number of ticks since it reached last electionTimeout when it is leader
-	// or candidate.
-	// number of ticks since it reached last electionTimeout or received a
-	// valid message from current leader when it is a follower.
-	electionElapsed int
-
-	// number of ticks since it reached last heartbeatTimeout.
-	// only leader keeps heartbeatElapsed.
-	heartbeatElapsed int
-
-	heartbeatTimeout int
+	electionElapsed  int
 	electionTimeout  int
+	heartbeatElapsed int
+	heartbeatTimeout int
 
-	logger Logger
+	prs tracker.ProgressTracker
 }
 
-func newRaft(c *Config) *raft {
-	if err := c.validate(); err != nil {
+func newRaft(config *Config) *raft {
+	if err := config.validate(); err != nil {
 		panic(err.Error())
 	}
 
-	raftlog := newLogWithSize(c.Storage, c.Logger, c.MaxCommittedSizePerReady)
-	hardState, confState, err := c.Storage.InitialState()
+	raftlog := newLogWithSize(config.Storage, config.MaxCommittedSizePerReady)
+	hardState, confState, err := config.Storage.InitialState()
 	if err != nil {
 		panic(err)
 	}
 
 	r := &raft{
-		id:                        c.ID,
-		lead:                      None,
-		isLearner:                 false,
-		raftLog:                   raftlog,
-		maxMsgSize:                c.MaxSizePerMsg,
-		maxUncommittedSize:        c.MaxUncommittedEntriesSize,
-		electionTimeout:           c.ElectionTick,
-		heartbeatTimeout:          c.HeartbeatTick,
-		logger:                    c.Logger,
-		checkQuorum:               c.CheckQuorum,
-		preVote:                   c.PreVote,
-		readOnly:                  newReadOnly(c.ReadOnlyOption),
-		disableProposalForwarding: c.DisableProposalForwarding,
+		id:                 config.ID,
+		lead:               None,
+		isLearner:          false,
+		raftLog:            raftlog,
+		maxMsgSize:         config.MaxSizePerMsg,
+		maxUncommittedSize: config.MaxUncommittedEntriesSize,
+		electionTimeout:    config.ElectionTick,
+		heartbeatTimeout:   config.HeartbeatTick,
+
+		prs: tracker.MakeProgressTracker(config.MaxInflightMsgs),
+
+		//checkQuorum:               c.CheckQuorum,
+		//preVote:                   c.PreVote,
+		//readOnly:                  newReadOnly(c.ReadOnlyOption),
+		//disableProposalForwarding: c.DisableProposalForwarding,
 	}
 
+	cfg, prs, err := confchange.Restore(confchange.Changer{
+		Tracker:   r.prs,
+		LastIndex: raftlog.lastIndex(),
+	}, confState)
+	if err != nil {
+		panic(err)
+	}
+
+	if err = confState.Equivalent(r.switchToConfig(cfg, prs)); err != nil {
+		panic(err)
+	}
+
+	if !IsEmptyHardState(hardState) {
+		r.loadState(hardState)
+	}
+	/*if config.Applied > 0 {
+		raftlog.appliedTo(config.Applied)
+	}*/
+
+	r.becomeFollower(r.Term, None)
+
+	var nodesStrs []string
+	for _, n := range r.prs.VoterNodes() {
+		nodesStrs = append(nodesStrs, fmt.Sprintf("%x", n))
+	}
+	klog.Infof("newRaft %x [peers: [%s], term: %d, commit: %d, applied: %d, lastindex: %d, lastterm: %d]",
+		r.id, strings.Join(nodesStrs, ","), r.Term, r.raftLog.committed, r.raftLog.applied, r.raftLog.lastIndex(),
+		0, //r.raftLog.lastTerm(),
+	)
+
 	return r
+}
+
+func (r *raft) loadState(state pb.HardState) {
+	if state.Commit < r.raftLog.committed || state.Commit > r.raftLog.lastIndex() {
+		klog.Fatalf(fmt.Sprintf("[loadState]%x state.commit %d is out of range [%d, %d]", r.id, state.Commit,
+			r.raftLog.committed, r.raftLog.lastIndex()))
+	}
+
+	r.raftLog.committed = state.Commit
+	r.Term = state.Term
+	r.Vote = state.Vote
+}
+
+// INFO: 加节点
+func (r *raft) applyConfChange(confChange pb.ConfChangeV2) pb.ConfState {
+	cfg, prs, err := func() (tracker.Config, tracker.ProgressMap, error) {
+		changer := confchange.Changer{
+			Tracker:   r.prs,
+			LastIndex: r.raftLog.lastIndex(),
+		}
+		if confChange.LeaveJoint() {
+			return changer.LeaveJoint()
+		} else if autoLeave, ok := confChange.EnterJoint(); ok {
+			return changer.EnterJoint(autoLeave, confChange.Changes...)
+		}
+		return changer.Simple(confChange.Changes...)
+	}()
+	if err != nil {
+		// TODO(tbg): return the error to the caller.
+		panic(err)
+	}
+
+	return r.switchToConfig(cfg, prs)
+}
+
+func (r *raft) switchToConfig(cfg tracker.Config, prs tracker.ProgressMap) pb.ConfState {
+	r.prs.Config = cfg
+	r.prs.Progress = prs
+	klog.Infof(fmt.Sprintf("[switchToConfig]%x switched to configuration %s", r.id, r.prs.Config))
+
+	confState := r.prs.ConfState()
+	pr, ok := r.prs.Progress[r.id]
+	r.isLearner = ok && pr.IsLearner
+	if (!ok || r.isLearner) && r.state == StateLeader {
+		return confState
+	}
+
+	if r.state != StateLeader || len(confState.Voters) == 0 {
+		return confState
+	}
+
+	// TODO: r.maybeCommit()
+
+	return confState
+}
+
+func (r *raft) becomeFollower(term uint64, lead uint64) {
+	//r.step = stepFollower
+	//r.reset(term)
+	//r.tick = r.tickElection
+	r.lead = lead
+	r.state = StateFollower
+	klog.Infof("%x became follower at term %d", r.id, r.Term)
 }
