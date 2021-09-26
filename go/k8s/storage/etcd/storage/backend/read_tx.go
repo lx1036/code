@@ -29,7 +29,10 @@ type baseReadTx struct {
 	txWg *sync.WaitGroup
 }
 
-// UnsafeRange INFO: 先 range scan 下 buffer，然后 boltdb
+// UnsafeRange
+// INFO: 先 range scan 下 buffer，然后 boltdb。至于为何先buffer再boltdb，原因是：
+//  为了性能使用boltdb批量事务提交功能，但是这会导致读取key数据时，这个key还没有事务提交，还在boltdb B+tree数据结构中,
+//  这样就导致读取旧数据。所以应该先从buffer里读key，没有再从boltdb中读取。
 func (baseReadTx *baseReadTx) UnsafeRange(bucketType Bucket, key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte) {
 	if endKey == nil {
 		// forbid duplicates for single keys

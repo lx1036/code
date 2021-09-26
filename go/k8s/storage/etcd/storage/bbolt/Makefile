@@ -13,3 +13,6 @@ dump:
 
 bbolt:
 	go get go.etcd.io/bbolt/... # 安装bbolt命令，bolt cli客户端
+
+buckets:
+	bbolt buckets my.db

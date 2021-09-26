@@ -135,6 +135,7 @@ func newBackend(cfg BackendConfig) *backend {
 					bufVersion: 0,
 				},
 				buckets: make(map[BucketID]*bolt.Bucket),
+				txWg:    new(sync.WaitGroup),
 			},
 		},
 

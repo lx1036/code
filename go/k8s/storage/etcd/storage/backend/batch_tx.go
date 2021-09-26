@@ -44,13 +44,17 @@ type batchTx struct {
 	pending int
 }
 
+func (t *batchTx) Lock() {
+	t.Mutex.Lock()
+}
+
 // INFO: 所有批量写事务必须先获得锁
 func (t *batchTx) Unlock() {
 	if t.pending >= t.backend.batchLimit {
 		t.commit(false)
 	}
 
-	t.Unlock()
+	t.Mutex.Unlock()
 }
 
 // BatchTx interface embeds ReadTx interface. But RLock() and RUnlock() do not
@@ -195,8 +199,8 @@ func (t *batchTx) commit(stop bool) {
 // INFO: batchTx 中所有写事务都会 t.pending++，会定期 100ms 批量提交事务
 //  UnsafeCreateBucket()/UnsafePut()/UnsafeDeleteBucket()/UnsafeDelete()
 func (t *batchTx) safePending() int {
-	t.Lock()
-	defer t.Unlock()
+	t.Mutex.Lock()
+	defer t.Mutex.Unlock()
 
 	return t.pending
 }
