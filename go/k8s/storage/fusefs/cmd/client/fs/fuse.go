@@ -37,6 +37,11 @@ type MountOption struct {
 	FullPathName bool `json:"fullPathName"`
 }
 
+// INFO: inode operations
+//  https://www.kernel.org/doc/html/latest/filesystems/vfs.html#struct-inode-operations
+//  Directory Entry Cache (dcache): https://www.kernel.org/doc/html/latest/filesystems/vfs.html#directory-entry-cache-dcache
+//  Inode Object: https://www.kernel.org/doc/html/latest/filesystems/vfs.html#the-inode-object
+
 type FuseFS struct {
 	sync.RWMutex
 

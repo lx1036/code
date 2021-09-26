@@ -206,7 +206,7 @@ func (t *batchTx) safePending() int {
 }
 
 // INFO:
-//  但是这优化又引发了另外的一个问题， 因为事务未提交，读请求可能无法从 boltdb 获取到最新数据？？？
+//  但是这优化又引发了另外的一个问题，因为事务未提交，读请求可能无法从 boltdb 获取到最新数据？？？
 //  为了解决这个问题，etcd 引入了一个 bucket buffer 来保存暂未提交的事务数据。在更新 boltdb 的时候，etcd 也会同步数据到 bucket buffer。
 //  因此 etcd 处理读请求的时候会优先从 bucket buffer 里面读取，其次再从 boltdb 读，通过 bucket buffer 实现读写性能提升，同时保证数据一致性。
 
@@ -246,7 +246,8 @@ func (t *batchTxBuffered) CommitAndStop() {
 	panic("implement me")
 }
 
-// Commit INFO: 提交事务
+// Commit INFO: 提交事务，这里会设置 only-read transaction
+//  https://github.com/etcd-io/bbolt#managing-transactions-manually
 func (t *batchTxBuffered) Commit() {
 	t.Lock()
 	t.commit(false)
