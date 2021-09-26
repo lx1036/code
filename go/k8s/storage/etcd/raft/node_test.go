@@ -1,8 +1,12 @@
 package raft
 
 import (
-	pb "go.etcd.io/etcd/raft/v3/raftpb"
+	"fmt"
+	"k8s.io/klog/v2"
+	"reflect"
 	"testing"
+
+	pb "go.etcd.io/etcd/raft/v3/raftpb"
 )
 
 func newTestConfig(id uint64, election, heartbeat int, storage Storage) *Config {
@@ -28,6 +32,12 @@ func withPeers(peers ...uint64) testMemoryStorageOptions {
 	}
 }
 
+func withLearners(learners ...uint64) testMemoryStorageOptions {
+	return func(ms *MemoryStorage) {
+		ms.snapshot.Metadata.ConfState.Learners = learners
+	}
+}
+
 func newTestMemoryStorage(opts ...testMemoryStorageOptions) *MemoryStorage {
 	ms := NewMemoryStorage()
 	for _, o := range opts {
@@ -38,10 +48,56 @@ func newTestMemoryStorage(opts ...testMemoryStorageOptions) *MemoryStorage {
 
 func TestAddLearnerNode(t *testing.T) {
 	r := newTestRaft(1, 10, 1, newTestMemoryStorage(withPeers(1)))
-	// Add new learner peer.
+	// INFO: (1) Add new learner peer
 	r.applyConfChange(pb.ConfChange{NodeID: 2, Type: pb.ConfChangeAddLearnerNode}.AsV2())
+	if r.isLearner {
+		// 这里 raft.isLearner 是当前 local node 状态
+		t.Fatal("expected 1 to be voter")
+	}
+	nodes := r.prs.LearnerNodes()
+	wantedNodes := []uint64{2}
+	if !reflect.DeepEqual(nodes, wantedNodes) {
+		t.Errorf("nodes = %v, want %v", nodes, wantedNodes)
+	}
+	if !r.prs.Progress[2].IsLearner {
+		t.Fatal("expected 2 to be learner")
+	}
+	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.prs.VoterNodes(), r.prs.LearnerNodes()))
+
+	// INFO: (2) Promote learner to voter
+	r.applyConfChange(pb.ConfChange{NodeID: 2, Type: pb.ConfChangeAddNode}.AsV2())
+	if r.prs.Progress[2].IsLearner {
+		t.Fatal("expected 2 to be voter")
+	}
+	if r.isLearner {
+		t.Fatal("expected 2 to be voter")
+	}
+	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.prs.VoterNodes(), r.prs.LearnerNodes()))
+
+	// INFO: (3) Demote voter to learner
+	r.applyConfChange(pb.ConfChange{NodeID: 1, Type: pb.ConfChangeAddLearnerNode}.AsV2())
+	if !r.prs.Progress[1].IsLearner {
+		t.Fatal("expected 1 to be learner")
+	}
+	if !r.isLearner {
+		t.Fatal("expected 1 to be learner")
+	}
+	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.prs.VoterNodes(), r.prs.LearnerNodes()))
+
+	// INFO: (4) Promote learner to voter
+	r.applyConfChange(pb.ConfChange{NodeID: 1, Type: pb.ConfChangeAddNode}.AsV2())
+	if r.prs.Progress[1].IsLearner {
+		t.Fatal("expected 1 to be voter")
+	}
 	if r.isLearner {
 		t.Fatal("expected 1 to be voter")
 	}
+	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.prs.VoterNodes(), r.prs.LearnerNodes()))
 
+	// INFO: (5) Remove voter
+	r.applyConfChange(pb.ConfChange{NodeID: 2, Type: pb.ConfChangeRemoveNode}.AsV2())
+	if len(r.prs.VoterNodes()) != 1 {
+		t.Fatal("expected nodes number to be 1")
+	}
+	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.prs.VoterNodes(), r.prs.LearnerNodes()))
 }
