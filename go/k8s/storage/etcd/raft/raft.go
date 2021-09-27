@@ -148,7 +148,9 @@ func (c *Config) validate() error {
 	return nil
 }
 
-// raft struct是raft算法的实现
+// INFO: raft struct是raft算法的实现
+//  (1) Leader Election: campaign 竞选
+//    (1.1)
 type raft struct {
 	id uint64
 
@@ -171,8 +173,8 @@ type raft struct {
 	lead uint64
 
 	electionElapsed  int
-	electionTimeout  int
-	heartbeatElapsed int
+	electionTimeout  int // 竞选超时时间默认 1000ms
+	heartbeatElapsed int // 心跳间隔时间默认 100ms
 	heartbeatTimeout int
 
 	prs tracker.ProgressTracker

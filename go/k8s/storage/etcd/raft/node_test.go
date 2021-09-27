@@ -137,3 +137,10 @@ func TestAddLearnerNode(t *testing.T) {
 		})
 	}
 }
+
+func TestRaftFlowControl(test *testing.T) {
+	r := newTestRaft(1, 10, 1, newTestMemoryStorage(withPeers(1)))
+	r.becomeCandidate()
+	r.becomeLeader()
+	
+}
