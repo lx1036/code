@@ -148,6 +148,8 @@ func (c *Config) validate() error {
 	return nil
 }
 
+type stepFunc func(r *raft, m pb.Message) error
+
 // INFO: raft struct是raft算法的实现
 //  (1) Leader Election: campaign 竞选
 //    (1.1)
@@ -178,6 +180,10 @@ type raft struct {
 	heartbeatTimeout int
 
 	prs tracker.ProgressTracker
+
+	// TODO: 做啥的??
+	tick func()
+	step stepFunc
 }
 
 func newRaft(config *Config) *raft {
@@ -302,7 +308,48 @@ func (r *raft) becomeFollower(term uint64, lead uint64) {
 	//r.tick = r.tickElection
 	r.lead = lead
 	r.state = StateFollower
-	klog.Infof("%x became follower at term %d", r.id, r.Term)
+	klog.Infof("%x became Follower at term %d", r.id, r.Term)
+}
+
+func (r *raft) becomeCandidate() {
+	if r.state == StateLeader {
+		return
+	}
+
+	r.step = stepCandidate
+	r.reset(r.Term + 1) // INFO: 竞选时 term+1
+	r.tick = r.tickElection
+	r.Vote = r.id
+	r.state = StateCandidate
+	klog.Infof("%x became Candidate at term %d", r.id, r.Term)
+}
+
+func (r *raft) becomePreCandidate() {
+	if r.state == StateLeader {
+		return
+	}
+	// INFO: PreCandidate 不会增加 term+1, 也不会改变 r.Vote
+	r.step = stepCandidate
+	r.prs.ResetVotes()
+	r.tick = r.tickElection
+	r.lead = None
+	r.state = StatePreCandidate
+
+	klog.Infof("%x became PreCandidate at term %d", r.id, r.Term)
+}
+
+func (r *raft) becomeLeader() {
+	if r.state == StateFollower {
+		return
+	}
+
+	r.step = stepLeader
+	r.reset(r.Term)
+	r.tick = r.tickHeartbeat
+	r.lead = r.id
+	r.state = StateLeader
+	klog.Infof("%x became Leader at term %d", r.id, r.Term)
+
 }
 
 // INFO: state machine 是否可以 promoted to be leader

@@ -138,9 +138,18 @@ func TestAddLearnerNode(t *testing.T) {
 	}
 }
 
+func (r *raft) readMessages() []pb.Message {
+	msgs := r.msgs
+	r.msgs = make([]pb.Message, 0)
+
+	return msgs
+}
+
 func TestRaftFlowControl(test *testing.T) {
 	r := newTestRaft(1, 10, 1, newTestMemoryStorage(withPeers(1)))
 	r.becomeCandidate()
 	r.becomeLeader()
-	
+
+	// Throw away all the messages relating to the initial election.
+	r.readMessages()
 }
