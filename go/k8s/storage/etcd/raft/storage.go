@@ -100,7 +100,7 @@ func (storage *MemoryStorage) firstIndex() uint64 {
 	return storage.entries[0].Index + 1
 }
 
-// entries[0].Index > ms.entries[0].Index
+// Append INFO: entries[0].Index > ms.entries[0].Index, 有点类似于 log append() 追加写逻辑
 func (storage *MemoryStorage) Append(entries []pb.Entry) {
 	if len(entries) == 0 {
 		return
