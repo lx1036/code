@@ -146,10 +146,21 @@ func (r *raft) readMessages() []pb.Message {
 }
 
 func TestRaftFlowControl(test *testing.T) {
-	r := newTestRaft(1, 10, 1, newTestMemoryStorage(withPeers(1)))
+	r := newTestRaft(1, 10, 1, newTestMemoryStorage(withPeers(1, 2)))
 	r.becomeCandidate()
 	r.becomeLeader()
 
-	// Throw away all the messages relating to the initial election.
-	r.readMessages()
+	pr2 := r.prs.Progress[2]
+	// force the progress to be in replicate state
+	pr2.BecomeReplicate()
+	for i := 0; i < r.prs.MaxInflight; i++ {
+		r.Step(pb.Message{From: 1, To: 1, Type: pb.MsgProp, Entries: []pb.Entry{{Data: []byte("somedata")}}})
+		ms := r.readMessages()
+		if len(ms) != 1 {
+			test.Fatalf("#%d: len(ms) = %d, want 1", i, len(ms))
+		}
+
+		klog.Infof(fmt.Sprintf("%+v", r.readMessages()))
+	}
+
 }
