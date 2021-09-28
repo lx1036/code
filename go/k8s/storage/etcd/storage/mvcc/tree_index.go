@@ -14,6 +14,9 @@ type Index interface {
 	Range(key, end []byte, atRev int64) ([][]byte, []revision)
 	RangeSince(key, end []byte, atRev int64) []revision
 	Tombstone(key []byte, rev revision) error
+
+	Revisions(key, end []byte, atRev int64, limit int) ([]revision, int)
+	CountRevisions(key, end []byte, atRev int64) int
 }
 
 // TODO: Compact
@@ -21,6 +24,12 @@ type treeIndex struct {
 	sync.RWMutex
 
 	tree *btree.BTree // b-tree 作为存储索引的数据结构
+}
+
+func newTreeIndex() *treeIndex {
+	return &treeIndex{
+		tree: btree.New(32),
+	}
 }
 
 func (treeIdx *treeIndex) Put(key []byte, rev revision) {
@@ -146,8 +155,47 @@ func (treeIdx *treeIndex) Tombstone(key []byte, rev revision) error {
 	return item.(*keyIndex).tombstone(rev.main, rev.sub)
 }
 
-func newTreeIndex() *treeIndex {
-	return &treeIndex{
-		tree: btree.New(32),
+// Revisions INFO: [key, end] 之间的 revisions，且 revision.main > atRev, 且 len(revisions)<=limit
+func (treeIdx *treeIndex) Revisions(key, end []byte, atRev int64, limit int) (revs []revision, total int) {
+	if end == nil {
+		rev, _, _, err := treeIdx.Get(key, atRev)
+		if err != nil {
+			return nil, 0
+		}
+
+		return []revision{rev}, 1
 	}
+
+	treeIdx.visit(key, end, func(ki *keyIndex) bool {
+		if rev, _, _, err := ki.get(atRev); err == nil {
+			if limit <= 0 || len(revs) < limit {
+				revs = append(revs, rev)
+			}
+			total++
+		}
+		return true
+	})
+
+	return revs, total
+}
+
+// CountRevisions INFO: 这里返回 len(revisions)
+func (treeIdx *treeIndex) CountRevisions(key, end []byte, atRev int64) int {
+	if end == nil {
+		_, _, _, err := treeIdx.Get(key, atRev)
+		if err != nil {
+			return 0
+		}
+		return 1
+	}
+
+	total := 0
+	treeIdx.visit(key, end, func(ki *keyIndex) bool {
+		if _, _, _, err := ki.get(atRev); err == nil {
+			total++
+		}
+		return true
+	})
+
+	return total
 }

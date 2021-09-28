@@ -1,6 +1,7 @@
 package mvcc
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -18,6 +19,11 @@ const (
 	markBytePosition  = markedRevBytesLen - 1
 
 	markTombstone byte = 't'
+)
+
+var (
+	ErrCompacted = errors.New("mvcc: required revision has been compacted")
+	ErrFutureRev = errors.New("mvcc: required revision is a future revision")
 )
 
 var defaultCompactBatchLimit = 1000
@@ -69,7 +75,7 @@ func NewStore(b backend.Backend, le lease.Lessor, cfg StoreConfig) *store {
 
 		le: le,
 
-		currentRev:     1,
+		currentRev:     1, // INFO: etcd 当前全局版本号，默认为 1
 		compactMainRev: -1,
 
 		stopc: make(chan struct{}),

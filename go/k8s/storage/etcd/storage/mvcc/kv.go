@@ -1,6 +1,8 @@
 package mvcc
 
 import (
+	"context"
+
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/server/v3/lease"
 )
@@ -35,7 +37,28 @@ type Watchable interface {
 	NewWatchStream() WatchStream
 }
 
+type RangeOptions struct {
+	Limit int64
+	Rev   int64
+	Count bool // 如果是 true，只是返回 revisions 个数
+}
+
+type RangeResult struct {
+	KVs   []mvccpb.KeyValue
+	Rev   int64
+	Count int
+}
+
 type ReadView interface {
+	// Range gets the keys in the range at rangeRev.
+	// The returned rev is the current revision of the KV when the operation is executed.
+	// If rangeRev <=0, range gets the keys at currentRev.
+	// If `end` is nil, the request returns the key.
+	// If `end` is not nil and not empty, it gets the keys in range [key, range_end).
+	// If `end` is not nil and empty, it gets the keys greater than or equal to key.
+	// Limit limits the number of keys returned.
+	// If the required rev is compacted, ErrCompacted will be returned.
+	Range(ctx context.Context, key, end []byte, ro RangeOptions) (r *RangeResult, err error)
 
 	// Rev returns the revision of the KV at the time of opening the txn.
 	Rev() int64

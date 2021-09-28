@@ -1,6 +1,7 @@
 package mvcc
 
 import (
+	"context"
 	"fmt"
 
 	"k8s-lx1036/k8s/storage/etcd/storage/backend"
@@ -47,6 +48,54 @@ func (s *store) Read(mode ReadTxMode) TxnRead {
 	}
 }
 
+// Range INFO: 读事务 range read
+func (tr *storeTxnRead) Range(ctx context.Context, key, end []byte, ro RangeOptions) (r *RangeResult, err error) {
+	return tr.rangeKeys(ctx, key, end, tr.Rev(), ro)
+}
+
+func (tr *storeTxnRead) rangeKeys(ctx context.Context, key, end []byte, curRev int64, ro RangeOptions) (r *RangeResult, err error) {
+	rev := ro.Rev
+	if rev > curRev {
+		return &RangeResult{KVs: nil, Count: -1, Rev: curRev}, ErrFutureRev
+	}
+	if rev <= 0 {
+		rev = curRev
+	}
+	if rev < tr.s.compactMainRev {
+		return &RangeResult{KVs: nil, Count: -1, Rev: 0}, ErrCompacted
+	}
+	if ro.Count {
+		total := tr.s.kvindex.CountRevisions(key, end, rev)
+		return &RangeResult{KVs: nil, Count: total, Rev: curRev}, nil
+	}
+
+	revisions, total := tr.s.kvindex.Revisions(key, end, rev, int(ro.Limit))
+	if len(revisions) == 0 {
+		return &RangeResult{KVs: nil, Count: total, Rev: curRev}, nil
+	}
+	limit := int(ro.Limit)
+	if limit <= 0 || limit > len(revisions) {
+		limit = len(revisions)
+	}
+	kvs := make([]mvccpb.KeyValue, limit)
+	revBytes := newRevBytes()
+	for i, revision := range revisions[:len(kvs)] {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+		revToBytes(revision, revBytes)
+		_, vs := tr.tx.UnsafeRange(backend.Key, revBytes, nil, 0)
+		if err := kvs[i].Unmarshal(vs[0]); err != nil {
+			// TODO: 可以直接这样 Unmarshal 么???
+			klog.Fatalf(fmt.Sprintf("[rangeKeys]failed to unmarshal mvccpb.KeyValue err: %v", err))
+		}
+	}
+
+	return &RangeResult{KVs: kvs, Count: total, Rev: curRev}, nil
+}
+
 func (tr *storeTxnRead) Rev() int64 {
 	return tr.rev
 }
@@ -60,7 +109,8 @@ func (tr *storeTxnRead) End() {
 type storeTxnWrite struct {
 	storeTxnRead
 	tx backend.BatchTx
-	// beginRev is the revision where the txn begins; it will write to the next revision.
+
+	// INFO: 这是个全局版本，写事务时自增
 	beginRev int64
 
 	// INFO: 见 put()，存入 boltdb 里每个 (key,value)
@@ -177,12 +227,10 @@ func (tw *storeTxnWrite) Put(key, value []byte, lease lease.LeaseID) (rev int64)
 
 // INFO: 这个函数会把(key,value)构造出KeyValue结构体，并持久化到boltdb中
 func (tw *storeTxnWrite) put(key, value []byte, leaseID lease.LeaseID) {
-	rev := tw.beginRev + 1
+	rev := tw.beginRev + 1 // INFO: beginRev 是全局版本号，每次写事务 +1
 	c := rev
 	oldLease := lease.NoLease
 
-	// if the key exists before, use its previous created and
-	// get its previous leaseID
 	// INFO: 从 treeIndex 根据(key, revision.main)获取最新 revision
 	_, created, ver, err := tw.s.kvindex.Get(key, rev)
 	if err == nil {
@@ -190,17 +238,17 @@ func (tw *storeTxnWrite) put(key, value []byte, leaseID lease.LeaseID) {
 		oldLease = tw.s.le.GetLease(lease.LeaseItem{Key: string(key)})
 	}
 
-	ibytes := newRevBytes()
-	idxRev := revision{main: rev, sub: int64(len(tw.changes))}
-	revToBytes(idxRev, ibytes)
+	boltdbKey := newRevBytes()
+	newRev := revision{main: rev, sub: int64(len(tw.changes))}
+	revToBytes(newRev, boltdbKey) // INFO: 存储在boltdb里的key: "${main}_${sub}"
 
 	// INFO: 构造KeyValue对象，准备要存入boltdb
-	ver = ver + 1
+	ver = ver + 1 // 修改次数，版本号
 	kv := mvccpb.KeyValue{
 		Key:            key,
 		Value:          value,
 		CreateRevision: c,
-		ModRevision:    rev,
+		ModRevision:    rev, // INFO: key 最后一次修改时的版本，这个版本也是etcd写事务版本，全局的!!!
 		Version:        ver,
 		Lease:          int64(leaseID),
 	}
@@ -211,8 +259,8 @@ func (tw *storeTxnWrite) put(key, value []byte, leaseID lease.LeaseID) {
 	}
 
 	// INFO: 这里是真正要持久化到boltdb
-	tw.tx.UnsafeSeqPut(backend.Key, ibytes, data)
-	tw.s.kvindex.Put(key, idxRev) // 更新keyIndex到treeIndex
+	tw.tx.UnsafeSeqPut(backend.Key, boltdbKey, data)
+	tw.s.kvindex.Put(key, newRev) // 更新keyIndex到treeIndex
 	tw.changes = append(tw.changes, kv)
 
 	if oldLease != lease.NoLease {

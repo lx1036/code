@@ -1,6 +1,8 @@
 
+# MVCC(Multi-Version Concurrency Control)
+MVCC = treeIndex + boltdb
 
-# MVCC 解决的问题
+## MVCC 解决的问题
 数据库领域中，解决高并发环境下数据冲突的问题。它的基本思想是保存一个数据的多个历史版本，从而解决事务管理中数据隔离的问题。
 
 

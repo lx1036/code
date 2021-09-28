@@ -87,6 +87,20 @@ type readTx struct {
 	baseReadTx
 }
 
+func newReadTx() *readTx {
+	return &readTx{
+		baseReadTx{
+			buf: txReadBuffer{
+				txBuffer: txBuffer{
+					buckets: make(map[BucketID]*bucketBuffer),
+				},
+			},
+			buckets: make(map[BucketID]*bolt.Bucket),
+			txWg:    new(sync.WaitGroup),
+		},
+	}
+}
+
 func (rt *readTx) reset() {
 	rt.buf.reset()
 	rt.buckets = make(map[BucketID]*bolt.Bucket)
@@ -94,6 +108,16 @@ func (rt *readTx) reset() {
 	rt.txWg = new(sync.WaitGroup)
 }
 
+// INFO: 并发读没有加锁，和 readTx 区别在加锁这里，参考 UnsafeRange()
 type concurrentReadTx struct {
 	baseReadTx
 }
+
+func (rt *concurrentReadTx) Lock()   {}
+func (rt *concurrentReadTx) Unlock() {}
+
+// RLock is no-op. concurrentReadTx does not need to be locked after it is created.
+func (rt *concurrentReadTx) RLock() {}
+
+// RUnlock signals the end of concurrentReadTx.
+func (rt *concurrentReadTx) RUnlock() { rt.txWg.Done() }

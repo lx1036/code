@@ -126,18 +126,7 @@ func newBackend(cfg BackendConfig) *backend {
 		batchLimit:    cfg.BatchLimit,
 		mlock:         cfg.Mlock,
 
-		readTx: &readTx{
-			baseReadTx: baseReadTx{
-				buf: txReadBuffer{
-					txBuffer: txBuffer{
-						buckets: make(map[BucketID]*bucketBuffer),
-					},
-					bufVersion: 0,
-				},
-				buckets: make(map[BucketID]*bolt.Bucket),
-				txWg:    new(sync.WaitGroup),
-			},
-		},
+		readTx: newReadTx(),
 
 		stopc: make(chan struct{}),
 		donec: make(chan struct{}),
