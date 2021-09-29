@@ -7,7 +7,7 @@ import (
 	"github.com/google/btree"
 )
 
-type Index interface {
+type TreeIndex interface {
 	// INFO: 想要查询一个key的value，就必须指定版本号 revision
 	Get(key []byte, atRev int64) (rev, created revision, ver int64, err error)
 	Put(key []byte, rev revision)

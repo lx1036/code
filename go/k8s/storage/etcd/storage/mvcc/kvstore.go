@@ -43,6 +43,7 @@ type store struct {
 	// Locked before locking read txn and released after locking.
 	revMu sync.RWMutex
 
+	// INFO: store 包含读写事务功能
 	ReadView
 	WriteView
 
@@ -50,8 +51,7 @@ type store struct {
 
 	b backend.Backend
 
-	// 即 treeIndex
-	kvindex Index
+	treeIndex TreeIndex
 
 	le lease.Lessor
 
@@ -69,9 +69,9 @@ func NewStore(b backend.Backend, le lease.Lessor, cfg StoreConfig) *store {
 	}
 
 	s := &store{
-		cfg:     cfg,
-		b:       b,
-		kvindex: newTreeIndex(),
+		cfg:       cfg,
+		b:         b,
+		treeIndex: newTreeIndex(),
 
 		le: le,
 

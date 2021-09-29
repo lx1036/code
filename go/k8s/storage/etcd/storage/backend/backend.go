@@ -37,8 +37,16 @@ type Backend interface {
 type backend struct {
 	sync.RWMutex
 
-	batchTx *batchTxBuffered
-	readTx  *readTx
+	batchInterval time.Duration
+	batchLimit    int
+	batchTx       *batchTxBuffered
+
+	readTx *readTx
+	// txReadBufferCache mirrors "txReadBuffer" within "readTx" -- readTx.baseReadTx.buf.
+	// When creating "concurrentReadTx":
+	// - if the cache is up-to-date, "readTx.baseReadTx.buf" copy can be skipped
+	// - if the cache is empty or outdated, "readTx.baseReadTx.buf" copy is required
+	txReadBufferCache txReadBufferCache
 
 	db *bolt.DB
 	// Size returns current database size in bytes as seen by this transaction.
@@ -46,9 +54,8 @@ type backend struct {
 	// sizeInUse is the number of bytes actually used in the backend
 	sizeInUse int64
 	// openReadTxN is the number of currently open read transactions in the backend
-	openReadTxN   int64
-	batchInterval time.Duration
-	batchLimit    int
+	openReadTxN int64
+
 	// mlock prevents backend database file to be swapped
 	mlock bool
 	// commits counts number of commits since start
@@ -168,12 +175,64 @@ func (b *backend) ReadTx() ReadTx {
 	return b.readTx
 }
 
-// ConcurrentReadTx INFO: @see https://github.com/etcd-io/etcd/commit/9c82e8c72b96eec1e7667a0e139a07b944c33b75
+// ConcurrentReadTx
+//  INFO: @see https://github.com/etcd-io/etcd/commit/9c82e8c72b96eec1e7667a0e139a07b944c33b75
 // ConcurrentReadTx creates and returns a new ReadTx, which:
 // A) creates and keeps a copy of backend.readTx.txReadBuffer,
 // B) references the boltdb read Tx (and its bucket cache) of current batch interval.
 func (b *backend) ConcurrentReadTx() ReadTx {
-	panic("ConcurrentReadTx")
+	b.readTx.RLock()
+	defer b.readTx.RUnlock()
+	// prevent boltdb read Tx from been rolled back until store read Tx is done. Needs to be called when holding readTx.RLock().
+	b.readTx.txWg.Add(1)
+
+	// TODO: might want to copy the read buffer lazily - create copy when A) end of a write transaction B) end of a batch interval.
+
+	b.txReadBufferCache.mu.Lock()
+
+	currentCache := b.txReadBufferCache.buf
+	currentCacheVersion := b.txReadBufferCache.bufVersion
+	currentBufVersion := b.readTx.buf.bufVersion
+
+	isEmptyCache := currentCache == nil
+	isStaleCache := currentCacheVersion != currentBufVersion
+
+	var buf *txReadBuffer
+	switch {
+	case isEmptyCache:
+		curBuf := b.readTx.buf.unsafeCopy()
+		buf = &curBuf
+	case isStaleCache:
+		// to maximize the concurrency, try unsafe copy of buffer
+		// release the lock while copying buffer -- cache may become stale again and
+		// get overwritten by someone else.
+		// therefore, we need to check the readTx buffer version again
+		b.txReadBufferCache.mu.Unlock()
+		curBuf := b.readTx.buf.unsafeCopy()
+		b.txReadBufferCache.mu.Lock()
+		buf = &curBuf
+	default:
+		// neither empty nor stale cache, just use the current buffer
+		buf = currentCache
+	}
+
+	if isEmptyCache || currentCacheVersion == b.txReadBufferCache.bufVersion {
+		// continue if the cache is never set or no one has modified the cache
+		b.txReadBufferCache.buf = buf
+		b.txReadBufferCache.bufVersion = currentBufVersion
+	}
+
+	b.txReadBufferCache.mu.Unlock()
+
+	// concurrentReadTx is not supposed to write to its txReadBuffer
+	return &concurrentReadTx{
+		baseReadTx: baseReadTx{
+			buf:     *buf,
+			tx:      b.readTx.tx,
+			buckets: b.readTx.buckets,
+			txWg:    b.readTx.txWg,
+		},
+	}
 }
 
 // INFO: transaction begin

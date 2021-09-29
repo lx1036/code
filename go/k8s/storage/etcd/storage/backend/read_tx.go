@@ -62,7 +62,7 @@ func (baseReadTx *baseReadTx) UnsafeRange(bucketType Bucket, key, endKey []byte,
 	if !ok {
 		baseReadTx.Lock()
 		lockHeld = true
-		bucket = baseReadTx.tx.Bucket(bucketType.Name()) // INFO: 如果不存在返回nil
+		bucket = baseReadTx.tx.Bucket(bucketType.Name()) // INFO: 如果不存在返回nil, bucketType.Name()="key"
 		baseReadTx.buckets[bucketID] = bucket
 	}
 	if bucket == nil { // ignore missing bucket since may have been created in this batch

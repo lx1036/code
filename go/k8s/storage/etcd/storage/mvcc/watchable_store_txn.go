@@ -6,6 +6,27 @@ import (
 
 // INFO: watchable 只有写事务
 
+type WatchableKV interface {
+	KV
+
+	Watchable
+}
+
+type KV interface {
+
+	// INFO: 创建写事务
+	Write() TxnWrite
+
+	// INFO: 创建读事务
+	Read(mode ReadTxMode) TxnRead
+}
+
+type Watchable interface {
+	// NewWatchStream returns a WatchStream that can be used to
+	// watch events happened or happening on the KV.
+	NewWatchStream() WatchStream
+}
+
 type watchableStoreTxnWrite struct {
 	TxnWrite
 	store *watchableStore

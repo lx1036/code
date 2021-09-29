@@ -99,7 +99,7 @@ func (t *batchTx) UnsafeRange(bucketType Bucket, key, endKey []byte, limit int64
 
 // INFO: range scan
 //  limit<=0就是没有限制; endKey=nil,就只查startKey;
-func unsafeRange(c *bolt.Cursor, startKey, endKey []byte, limit int64) ([][]byte, [][]byte) {
+func unsafeRange(cursor *bolt.Cursor, startKey, endKey []byte, limit int64) ([][]byte, [][]byte) {
 	if limit <= 0 {
 		limit = math.MaxInt64
 	}
@@ -116,7 +116,7 @@ func unsafeRange(c *bolt.Cursor, startKey, endKey []byte, limit int64) ([][]byte
 		keys   [][]byte
 		values [][]byte
 	)
-	for key, value := c.Seek(startKey); key != nil && isMatch(startKey); key, value = c.Next() {
+	for key, value := cursor.Seek(startKey); key != nil && isMatch(startKey); key, value = cursor.Next() {
 		keys = append(keys, key)
 		values = append(values, value)
 		if limit == int64(len(keys)) {
