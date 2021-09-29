@@ -11,6 +11,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+// INFO: 读写事务 read-write txn
+
 type BucketID int
 
 type Bucket interface {
@@ -20,26 +22,10 @@ type Bucket interface {
 	IsSafeRangeBucket() bool
 }
 
-// BatchTx INFO: BatchTx 包含读事务 ReadTx，很重要
-type BatchTx interface {
-	ReadTx
-
-	UnsafeCreateBucket(bucket Bucket)
-	UnsafeDeleteBucket(bucket Bucket)
-	UnsafePut(bucket Bucket, key []byte, value []byte)
-	UnsafeSeqPut(bucket Bucket, key []byte, value []byte)
-	UnsafeDelete(bucket Bucket, key []byte)
-
-	// Commit commits a previous tx and begins a new writable one.
-	Commit()
-	// CommitAndStop commits the previous tx and does not create a new one.
-	CommitAndStop()
-}
-
 type batchTx struct {
 	sync.Mutex
 	tx      *bolt.Tx
-	backend *backend
+	backend *Backend
 
 	pending int
 }
@@ -210,13 +196,41 @@ func (t *batchTx) safePending() int {
 //  为了解决这个问题，etcd 引入了一个 bucket buffer 来保存暂未提交的事务数据。在更新 boltdb 的时候，etcd 也会同步数据到 bucket buffer。
 //  因此 etcd 处理读请求的时候会优先从 bucket buffer 里面读取，其次再从 boltdb 读，通过 bucket buffer 实现读写性能提升，同时保证数据一致性。
 
+// txWriteBuffer buffers writes of pending updates that have not yet committed.
+type txWriteBuffer struct {
+	txBuffer
+	// Map from bucket ID into information whether this bucket is edited
+	// sequentially (i.e. keys are growing monotonically).
+	bucket2seq map[BucketID]bool
+}
+
+func (writeBuffer *txWriteBuffer) put(bucketType Bucket, key []byte, value []byte) {
+	writeBuffer.bucket2seq[bucketType.ID()] = false
+	writeBuffer.putInternal(bucketType, key, value)
+}
+
+func (writeBuffer *txWriteBuffer) putSeq(bucketType Bucket, key []byte, value []byte) {
+	writeBuffer.putInternal(bucketType, key, value)
+}
+
+// INFO: (key, value) 写到 buffer 里
+func (writeBuffer *txWriteBuffer) putInternal(bucketType Bucket, key, value []byte) {
+	bucketBuffer, ok := writeBuffer.buckets[bucketType.ID()]
+	if !ok {
+		bucketBuffer = newBucketBuffer()
+		writeBuffer.buckets[bucketType.ID()] = bucketBuffer
+	}
+
+	bucketBuffer.add(key, value)
+}
+
 // 加 buffer 的 batchTx
 type batchTxBuffered struct {
 	batchTx
 	buf txWriteBuffer
 }
 
-func newBatchTxBuffered(backend *backend) *batchTxBuffered {
+func newBatchTxBuffered(backend *Backend) *batchTxBuffered {
 	tx := &batchTxBuffered{
 		batchTx: batchTx{
 			backend: backend,
@@ -243,7 +257,9 @@ func (t *batchTxBuffered) RUnlock() {
 }*/
 
 func (t *batchTxBuffered) CommitAndStop() {
-	panic("implement me")
+	t.Lock()
+	t.commit(true)
+	t.Unlock()
 }
 
 // Commit INFO: 提交事务，这里会设置 only-read transaction

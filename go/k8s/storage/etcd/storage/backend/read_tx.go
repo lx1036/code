@@ -7,13 +7,40 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-type ReadTx interface {
-	Lock()
-	Unlock()
-	RLock()
-	RUnlock()
+type txReadBufferCache struct {
+	mu         sync.Mutex
+	buf        *txReadBuffer
+	bufVersion uint64
+}
 
-	UnsafeRange(bucket Bucket, key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte)
+// txReadBuffer accesses buffered updates.
+type txReadBuffer struct {
+	txBuffer
+	// bufVersion is used to check if the buffer is modified recently
+	bufVersion uint64
+}
+
+// INFO: 这里 copy 时 bufVersion=0
+func (txr *txReadBuffer) unsafeCopy() txReadBuffer {
+	txrCopy := txReadBuffer{
+		txBuffer: txBuffer{
+			buckets: make(map[BucketID]*bucketBuffer, len(txr.txBuffer.buckets)),
+		},
+		bufVersion: 0, // 这里可以看 backend.ConcurrentReadTx() 里会重置
+	}
+	for bucketName, bucket := range txr.txBuffer.buckets {
+		txrCopy.txBuffer.buckets[bucketName] = bucket.Copy()
+	}
+
+	return txrCopy
+}
+
+func (txr *txReadBuffer) Range(bucketType Bucket, key, endKey []byte, limit int64) ([][]byte, [][]byte) {
+	if buffer := txr.buckets[bucketType.ID()]; buffer != nil {
+		return buffer.Range(key, endKey, limit)
+	}
+
+	return nil, nil
 }
 
 type baseReadTx struct {

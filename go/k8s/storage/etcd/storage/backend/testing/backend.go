@@ -19,7 +19,7 @@ var (
 	initialMmapSize = uint64(10 * 1024 * 1024 * 1024)
 )
 
-func NewTmpBackendFromCfg(t testing.TB, bcfg backend.BackendConfig) (backend.Backend, string) {
+func NewTmpBackendFromCfg(t testing.TB, bcfg backend.Config) (backend.Backend, string) {
 	dir := "tmp"
 	os.MkdirAll(dir, 0777)
 	tmpPath := filepath.Join(dir, "db.txt")
@@ -31,8 +31,8 @@ func NewDefaultTmpBackend(t testing.TB) (backend.Backend, string) {
 	return NewTmpBackendFromCfg(t, DefaultBackendConfig())
 }
 
-func DefaultBackendConfig() backend.BackendConfig {
-	return backend.BackendConfig{
+func DefaultBackendConfig() backend.Config {
+	return backend.Config{
 		BatchInterval: defaultBatchInterval,
 		BatchLimit:    defaultBatchLimit,
 		MmapSize:      initialMmapSize,

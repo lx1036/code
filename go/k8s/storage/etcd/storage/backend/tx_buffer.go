@@ -3,7 +3,6 @@ package backend
 import (
 	"bytes"
 	"sort"
-	"sync"
 )
 
 const bucketBufferInitialSize = 512
@@ -101,68 +100,4 @@ func (buffer *bucketBuffer) add(key []byte, value []byte) {
 		copy(buf, buffer.buf)
 		buffer.buf = buf
 	}
-}
-
-// txWriteBuffer buffers writes of pending updates that have not yet committed.
-type txWriteBuffer struct {
-	txBuffer
-	// Map from bucket ID into information whether this bucket is edited
-	// sequentially (i.e. keys are growing monotonically).
-	bucket2seq map[BucketID]bool
-}
-
-func (writeBuffer *txWriteBuffer) put(bucketType Bucket, key []byte, value []byte) {
-	writeBuffer.bucket2seq[bucketType.ID()] = false
-	writeBuffer.putInternal(bucketType, key, value)
-}
-
-func (writeBuffer *txWriteBuffer) putSeq(bucketType Bucket, key []byte, value []byte) {
-	writeBuffer.putInternal(bucketType, key, value)
-}
-
-// INFO: (key, value) 写到 buffer 里
-func (writeBuffer *txWriteBuffer) putInternal(bucketType Bucket, key, value []byte) {
-	bucketBuffer, ok := writeBuffer.buckets[bucketType.ID()]
-	if !ok {
-		bucketBuffer = newBucketBuffer()
-		writeBuffer.buckets[bucketType.ID()] = bucketBuffer
-	}
-
-	bucketBuffer.add(key, value)
-}
-
-type txReadBufferCache struct {
-	mu         sync.Mutex
-	buf        *txReadBuffer
-	bufVersion uint64
-}
-
-// txReadBuffer accesses buffered updates.
-type txReadBuffer struct {
-	txBuffer
-	// bufVersion is used to check if the buffer is modified recently
-	bufVersion uint64
-}
-
-// INFO: 这里 copy 时 bufVersion=0
-func (txr *txReadBuffer) unsafeCopy() txReadBuffer {
-	txrCopy := txReadBuffer{
-		txBuffer: txBuffer{
-			buckets: make(map[BucketID]*bucketBuffer, len(txr.txBuffer.buckets)),
-		},
-		bufVersion: 0, // 这里可以看 backend.ConcurrentReadTx() 里会重置
-	}
-	for bucketName, bucket := range txr.txBuffer.buckets {
-		txrCopy.txBuffer.buckets[bucketName] = bucket.Copy()
-	}
-
-	return txrCopy
-}
-
-func (txr *txReadBuffer) Range(bucketType Bucket, key, endKey []byte, limit int64) ([][]byte, [][]byte) {
-	if buffer := txr.buckets[bucketType.ID()]; buffer != nil {
-		return buffer.Range(key, endKey, limit)
-	}
-
-	return nil, nil
 }

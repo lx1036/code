@@ -10,11 +10,43 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func TestSnapshot(t *testing.T) {
+func newTmpBackend() (*Backend, string) {
 	dir := "tmp"
 	os.MkdirAll(dir, 0777)
 	tmpPath := filepath.Join(dir, "db.txt")
 	b := NewDefaultBackend(tmpPath)
+
+	return b, tmpPath
+}
+
+func TestConcurrentReadTxn(test *testing.T) {
+	b, tmpPath := newTmpBackend()
+	defer b.Close()
+	defer os.RemoveAll(tmpPath)
+
+	writeTxn1 := b.BatchTx()
+	writeTxn1.Lock()
+	writeTxn1.UnsafeCreateBucket(Key)
+	writeTxn1.UnsafePut(Key, []byte("abc"), []byte("ABC"))
+	writeTxn1.UnsafePut(Key, []byte("overwrite"), []byte("1"))
+	writeTxn1.Unlock()
+
+	writeTxn2 := b.BatchTx()
+	writeTxn2.Lock()
+	writeTxn2.UnsafePut(Key, []byte("def"), []byte("DEF"))
+	writeTxn2.UnsafePut(Key, []byte("overwrite"), []byte("2"))
+	writeTxn2.Unlock()
+
+	rtx := b.ConcurrentReadTx()
+	rtx.RLock() // no-op
+	keys, values := rtx.UnsafeRange(Key, []byte("abc"), []byte("\xff"), 0)
+	rtx.RUnlock()
+
+	klog.Infof(fmt.Sprintf("keys: %+v, values: %+v", keys, values))
+}
+
+func TestSnapshot(t *testing.T) {
+	b, tmpPath := newTmpBackend()
 	defer b.Close()
 	defer os.RemoveAll(tmpPath)
 
@@ -26,7 +58,7 @@ func TestSnapshot(t *testing.T) {
 	b.ForceCommit()
 
 	// write snapshot to a new file
-	f, err := ioutil.TempFile(dir, "snapshot")
+	f, err := ioutil.TempFile("tmp", "snapshot")
 	if err != nil {
 		t.Fatal(err)
 	}
