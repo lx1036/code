@@ -1,6 +1,8 @@
 
+# MVCC(Multi-Version Concurrency Control)
+MVCC = treeIndex + boltdb
 
-# MVCC 解决的问题
+## MVCC 解决的问题
 数据库领域中，解决高并发环境下数据冲突的问题。它的基本思想是保存一个数据的多个历史版本，从而解决事务管理中数据隔离的问题。
 
 
@@ -12,6 +14,13 @@ revision: 每一次操作的逻辑时钟，{main, sub} main表示 transaction_id
 
 keyIndex: 表示一个 key 有哪些 revision 的数据结构，包含最新的版本号 modified，以及历史版本号 generations(key在每一代中有哪些版本号)，这个最新版本号就很重要了。
 
+
+
+## MVCC Watch Keys
+watch 代码原理：https://time.geekbang.org/column/article/341060
+
+调用关系：etcd-server(serverWatchStream) -> mvcc(watchStream.Watch)
+watchableStore -> 创建 watchStream 对象
 
 ## 参考文献
 

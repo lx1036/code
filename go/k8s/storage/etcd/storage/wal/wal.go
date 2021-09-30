@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 	"hash/crc32"
 	"io"
-	"k8s-lx1036/k8s/storage/etcd/wal/walpb"
+	"k8s-lx1036/k8s/storage/etcd/storage/wal/walpb"
 	"os"
 	"path/filepath"
 	"sync"

@@ -1,4 +1,4 @@
-package test
+package bbolt
 
 import (
 	"io/ioutil"
