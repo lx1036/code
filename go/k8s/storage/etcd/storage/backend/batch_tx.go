@@ -3,12 +3,13 @@ package backend
 import (
 	"bytes"
 	"fmt"
-	"k8s.io/klog/v2"
 	"math"
+	"sort"
 	"sync"
 	"sync/atomic"
 
 	bolt "go.etcd.io/bbolt"
+	"k8s.io/klog/v2"
 )
 
 // INFO: 读写事务 read-write txn
@@ -22,19 +23,20 @@ type Bucket interface {
 	IsSafeRangeBucket() bool
 }
 
+// INFO: (1) 写事务
 type batchTx struct {
 	sync.Mutex
 	tx      *bolt.Tx
 	backend *Backend
 
-	pending int
+	pending int // pending put op 计数器
 }
 
 func (t *batchTx) Lock() {
 	t.Mutex.Lock()
 }
 
-// INFO: 所有批量写事务必须先获得锁
+// Unlock INFO: 所有批量写事务必须先获得锁, 只有 pending put op 到了 10000，会立刻提交到 boltdb 中
 func (t *batchTx) Unlock() {
 	if t.pending >= t.backend.batchLimit {
 		t.commit(false)
@@ -196,7 +198,139 @@ func (t *batchTx) safePending() int {
 //  为了解决这个问题，etcd 引入了一个 bucket buffer 来保存暂未提交的事务数据。在更新 boltdb 的时候，etcd 也会同步数据到 bucket buffer。
 //  因此 etcd 处理读请求的时候会优先从 bucket buffer 里面读取，其次再从 boltdb 读，通过 bucket buffer 实现读写性能提升，同时保证数据一致性。
 
-// txWriteBuffer buffers writes of pending updates that have not yet committed.
+// INFO: (2) 写事务 buffer, 还未 committed pending put op
+
+const bucketBufferInitialSize = 512
+
+type kv struct {
+	key []byte
+	val []byte
+}
+
+// INFO: bucketBuffer 设计还需要在研究研究
+//  但是这优化又引发了另外的一个问题， 因为事务未提交，读请求可能无法从 boltdb 获取到最新数据???
+//  为了解决这个问题，etcd 引入了一个 bucket buffer 来保存暂未提交的事务数据。在更新 boltdb 的时候，etcd 也会同步数据到 bucket buffer。
+//  因此 etcd 处理读请求的时候会优先从 bucket buffer 里面读取，其次再从 boltdb 读，通过 bucket buffer 实现读写性能提升，同时保证数据一致性。
+
+// bucketBuffer buffers key-value pairs that are pending commit.
+type bucketBuffer struct {
+	buf []kv // INFO: [](key,value) 按照 key 升序
+	// used tracks number of elements in use so buf can be reused without reallocation.
+	used int
+}
+
+func newBucketBuffer() *bucketBuffer {
+	return &bucketBuffer{
+		buf:  make([]kv, bucketBufferInitialSize),
+		used: 0,
+	}
+}
+
+func (buffer *bucketBuffer) Len() int { return buffer.used }
+func (buffer *bucketBuffer) Less(i, j int) bool {
+	return bytes.Compare(buffer.buf[i].key, buffer.buf[j].key) < 0
+}
+func (buffer *bucketBuffer) Swap(i, j int) {
+	buffer.buf[i], buffer.buf[j] = buffer.buf[j], buffer.buf[i]
+}
+
+func (buffer *bucketBuffer) Copy() *bucketBuffer {
+	bufferCopy := bucketBuffer{
+		buf:  make([]kv, len(buffer.buf)),
+		used: buffer.used,
+	}
+
+	copy(bufferCopy.buf, buffer.buf)
+
+	return &bufferCopy
+}
+
+// Range INFO: 这里重点是从 buffer 中查找 [key, endKey] 之间的 (key, value)
+func (buffer *bucketBuffer) Range(key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte) {
+	// INFO: 从[0,buffer.used)中迭代查找，找到最前面 buffer.buf[i].key >= key
+	f := func(i int) bool { return bytes.Compare(buffer.buf[i].key, key) >= 0 }
+	idx := sort.Search(buffer.used, f)
+	if idx < 0 {
+		return nil, nil
+	}
+	// [key, nil] 就是当前 key 的 (key,value)
+	if len(endKey) == 0 {
+		if bytes.Equal(key, buffer.buf[idx].key) {
+			keys = append(keys, buffer.buf[idx].key)
+			vals = append(vals, buffer.buf[idx].val)
+		}
+		return keys, vals
+	}
+
+	if bytes.Compare(endKey, buffer.buf[idx].key) <= 0 {
+		return nil, nil
+	}
+
+	// [idx, buffer.used) 开始查找一直到 endKey
+	for i := idx; i < buffer.used && int64(len(keys)) < limit; i++ {
+		if bytes.Compare(endKey, buffer.buf[idx].key) <= 0 {
+			break
+		}
+
+		keys = append(keys, buffer.buf[idx].key)
+		vals = append(vals, buffer.buf[idx].val)
+	}
+
+	return keys, vals
+}
+
+func (buffer *bucketBuffer) add(key []byte, value []byte) {
+	buffer.buf[buffer.used].key, buffer.buf[buffer.used].val = key, value
+	buffer.used++
+	// INFO: 如果满了，则buffer 1.5倍扩容
+	if buffer.used == len(buffer.buf) {
+		buf := make([]kv, (3*len(buffer.buf))/2)
+		copy(buf, buffer.buf)
+		buffer.buf = buf
+	}
+}
+
+func (buffer *bucketBuffer) merge(other *bucketBuffer) {
+	for i := 0; i < other.used; i++ {
+		buffer.add(other.buf[i].key, other.buf[i].val)
+	}
+	if buffer.used == other.used {
+		return
+	}
+	//
+	if bytes.Compare(buffer.buf[(buffer.used-other.used)-1].key, other.buf[0].key) < 0 {
+		return
+	}
+	// INFO: 按照 key 排序
+	sort.Stable(buffer)
+
+	// TODO: 没太懂这里的逻辑???
+	// remove duplicates, using only newest update
+	widx := 0
+	for ridx := 1; ridx < buffer.used; ridx++ {
+		if !bytes.Equal(buffer.buf[ridx].key, buffer.buf[widx].key) {
+			widx++
+		}
+		buffer.buf[widx] = buffer.buf[ridx]
+	}
+	buffer.used = widx + 1
+}
+
+// txBuffer handles functionality shared between txWriteBuffer and txReadBuffer.
+type txBuffer struct {
+	buckets map[BucketID]*bucketBuffer
+}
+
+func (txb *txBuffer) reset() {
+	for k, v := range txb.buckets {
+		if v.used == 0 {
+			delete(txb.buckets, k)
+		}
+		v.used = 0
+	}
+}
+
+// INFO: 参考 txReadBuffer struct
 type txWriteBuffer struct {
 	txBuffer
 	// Map from bucket ID into information whether this bucket is edited
@@ -224,6 +358,39 @@ func (writeBuffer *txWriteBuffer) putInternal(bucketType Bucket, key, value []by
 	bucketBuffer.add(key, value)
 }
 
+func (writeBuffer *txWriteBuffer) reset() {
+	writeBuffer.txBuffer.reset()
+	for bucketID := range writeBuffer.bucket2seq {
+		value, ok := writeBuffer.buckets[bucketID]
+		if !ok {
+			delete(writeBuffer.bucket2seq, bucketID)
+		} else if value.used == 0 {
+			writeBuffer.bucket2seq[bucketID] = true
+		}
+	}
+}
+
+func (writeBuffer *txWriteBuffer) writeBack(readBuffer *txReadBuffer) {
+	for id, writeBuf := range writeBuffer.buckets {
+		readBuf, ok := readBuffer.buckets[id]
+		if !ok {
+			// 从 writeBuckets 里删除，但是保存到 readBuckets
+			delete(writeBuffer.buckets, id)
+			readBuffer.buckets[id] = writeBuf
+			continue
+		}
+		if seq, ok := writeBuffer.bucket2seq[id]; ok && !seq && writeBuf.used > 1 {
+			sort.Sort(writeBuf)
+		}
+
+		// read buffer 合并 write buffer
+		readBuf.merge(writeBuf)
+	}
+
+	writeBuffer.reset()
+	readBuffer.bufVersion++
+}
+
 // 加 buffer 的 batchTx
 type batchTxBuffered struct {
 	batchTx
@@ -248,13 +415,16 @@ func newBatchTxBuffered(backend *Backend) *batchTxBuffered {
 	return tx
 }
 
-/*func (t *batchTxBuffered) RLock() {
-	panic("implement me")
-}
+// Unlock INFO: 非常重要，写事务其实是先写到 txReadBuffer 里，但是需要先 blocks txReadBuffer 阻塞读操作!!!
+func (t *batchTxBuffered) Unlock() {
+	if t.pending != 0 {
+		t.backend.readTx.Lock()
+		t.buf.writeBack(&t.backend.readTx.buf)
+		t.backend.readTx.Unlock()
+	}
 
-func (t *batchTxBuffered) RUnlock() {
-	panic("implement me")
-}*/
+	t.batchTx.Unlock()
+}
 
 func (t *batchTxBuffered) CommitAndStop() {
 	t.Lock()

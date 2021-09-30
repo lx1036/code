@@ -5,8 +5,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
-	
+
 	"k8s.io/klog/v2"
 )
 
@@ -39,10 +40,13 @@ func TestConcurrentReadTxn(test *testing.T) {
 
 	rtx := b.ConcurrentReadTx()
 	rtx.RLock() // no-op
-	keys, values := rtx.UnsafeRange(Key, []byte("abc"), []byte("def"), 0)
+	keys, values := rtx.UnsafeRange(Key, []byte("abc"), []byte("xyz"), 0)
+	//keys, values := rtx.UnsafeRange(Key, []byte("abc"), nil, 0)
 	rtx.RUnlock()
 
-	klog.Infof(fmt.Sprintf("keys: %+v, values: %+v", keys, values))
+	for index, key := range keys {
+		klog.Infof(fmt.Sprintf("key: %s, value: %s", string(key), string(values[index])))
+	}
 }
 
 func TestSnapshot(t *testing.T) {
@@ -83,4 +87,15 @@ func TestSnapshot(t *testing.T) {
 		t.Errorf("len(kvs) = %d, want 1", len(keys))
 	}
 	tx2.RUnlock()
+}
+
+type intPairs []int
+
+func (d intPairs) Len() int           { return len(d) }
+func (d intPairs) Less(i, j int) bool { return d[i] < d[j] }
+func (d intPairs) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
+func TestSortStable(test *testing.T) {
+	a := intPairs{1, 3, 66, 4, 6, 19, 5}
+	sort.Stable(a)
+	klog.Info(a) // [1 3 4 5 6 19 66]
 }

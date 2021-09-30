@@ -143,6 +143,7 @@ func (b *Backend) run() {
 		select {
 		case <-tick:
 			if b.batchTx.safePending() != 0 {
+				klog.Infof(fmt.Sprintf("[run]batchTx Commit"))
 				b.batchTx.Commit()
 			}
 		case <-b.stopc:
