@@ -4,5 +4,5 @@ package backend
 type Hooks interface {
 	// OnPreCommitUnsafe is executed before Commit of transactions.
 	// The given transaction is already locked.
-	OnPreCommitUnsafe(tx BatchTx)
+	OnPreCommitUnsafe(tx *batchTxBuffered)
 }

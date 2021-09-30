@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
+	
 	"k8s.io/klog/v2"
 )
 
@@ -39,7 +39,7 @@ func TestConcurrentReadTxn(test *testing.T) {
 
 	rtx := b.ConcurrentReadTx()
 	rtx.RLock() // no-op
-	keys, values := rtx.UnsafeRange(Key, []byte("abc"), []byte("\xff"), 0)
+	keys, values := rtx.UnsafeRange(Key, []byte("abc"), []byte("def"), 0)
 	rtx.RUnlock()
 
 	klog.Infof(fmt.Sprintf("keys: %+v, values: %+v", keys, values))
