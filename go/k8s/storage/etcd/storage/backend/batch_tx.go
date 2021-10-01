@@ -26,7 +26,7 @@ type Bucket interface {
 // INFO: (1) 写事务
 type batchTx struct {
 	sync.Mutex
-	tx      *bolt.Tx
+	tx      *bolt.Tx // 读写事务
 	backend *Backend
 
 	pending int // pending put op 计数器
@@ -75,7 +75,9 @@ func (t *batchTx) UnsafeDeleteBucket(bucket Bucket) {
 	t.pending++
 }
 
-// UnsafeRange INFO: range scan @see https://github.com/etcd-io/bbolt#range-scans
+// UnsafeRange
+// INFO: range scan @see https://github.com/etcd-io/bbolt#range-scans
+//  写事务的 range san 没有先从 buffer 里读的逻辑，直接读取磁盘文件数据
 func (t *batchTx) UnsafeRange(bucketType Bucket, key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte) {
 	bucket := t.tx.Bucket(bucketType.Name())
 	if bucket == nil {
@@ -170,6 +172,7 @@ func (t *batchTx) commit(stop bool) {
 			return
 		}
 
+		// 数据落盘
 		err := t.tx.Commit()
 		atomic.AddInt64(&t.backend.commits, 1)
 		t.pending = 0
@@ -185,7 +188,7 @@ func (t *batchTx) commit(stop bool) {
 }
 
 // INFO: batchTx 中所有写事务都会 t.pending++，会定期 100ms 批量提交事务
-//  UnsafeCreateBucket()/UnsafePut()/UnsafeDeleteBucket()/UnsafeDelete()
+//  UnsafeCreateBucket()/UnsafeDeleteBucket()/UnsafePut()/UnsafeDelete()
 func (t *batchTx) safePending() int {
 	t.Mutex.Lock()
 	defer t.Mutex.Unlock()
@@ -268,12 +271,12 @@ func (buffer *bucketBuffer) Range(key, endKey []byte, limit int64) (keys [][]byt
 
 	// [idx, buffer.used) 开始查找一直到 endKey
 	for i := idx; i < buffer.used && int64(len(keys)) < limit; i++ {
-		if bytes.Compare(endKey, buffer.buf[idx].key) <= 0 {
+		if bytes.Compare(endKey, buffer.buf[i].key) <= 0 {
 			break
 		}
 
-		keys = append(keys, buffer.buf[idx].key)
-		vals = append(vals, buffer.buf[idx].val)
+		keys = append(keys, buffer.buf[i].key)
+		vals = append(vals, buffer.buf[i].val)
 	}
 
 	return keys, vals
@@ -304,7 +307,7 @@ func (buffer *bucketBuffer) merge(other *bucketBuffer) {
 	// INFO: 按照 key 排序
 	sort.Stable(buffer)
 
-	// TODO: 没太懂这里的逻辑???
+	// TODO: 没太懂这里的逻辑???, 参考 TestConcurrentReadTxn() 有重复key
 	// remove duplicates, using only newest update
 	widx := 0
 	for ridx := 1; ridx < buffer.used; ridx++ {
@@ -370,6 +373,7 @@ func (writeBuffer *txWriteBuffer) reset() {
 	}
 }
 
+// 写事务写到 txReadBuffer 里
 func (writeBuffer *txWriteBuffer) writeBack(readBuffer *txReadBuffer) {
 	for id, writeBuf := range writeBuffer.buckets {
 		readBuf, ok := readBuffer.buckets[id]
@@ -453,6 +457,7 @@ func (t *batchTxBuffered) commit(stop bool) {
 
 func (t *batchTxBuffered) unsafeCommit(stop bool) {
 	if t.backend.readTx.tx != nil {
+		// TODO: 没太懂这里的逻辑!!!
 		// wait all store read transactions using the current boltdb tx to finish,
 		// then close the boltdb tx
 		go func(tx *bolt.Tx, wg *sync.WaitGroup) {

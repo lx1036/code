@@ -48,10 +48,11 @@ type baseReadTx struct {
 	sync.RWMutex
 	buf txReadBuffer
 
-	// INFO: boltdb transaction 对象
+	// INFO: boltdb 读事务对象
 	tx      *bolt.Tx
 	buckets map[BucketID]*bolt.Bucket
 
+	// INFO: 参考并发读 ConcurrentReadTx() 里 b.readTx.txWg.Add(1)
 	// txWg protects tx from being rolled back at the end of a batch interval until all reads using this tx are done.
 	txWg *sync.WaitGroup
 }
