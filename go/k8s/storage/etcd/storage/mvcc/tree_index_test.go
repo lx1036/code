@@ -6,10 +6,12 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
-	"go.etcd.io/etcd/server/v3/lease"
 	betesting "k8s-lx1036/k8s/storage/etcd/storage/backend/testing"
 
+	"go.etcd.io/etcd/api/v3/mvccpb"
+	"go.etcd.io/etcd/server/v3/lease"
 	"k8s.io/klog/v2"
 )
 
@@ -270,6 +272,7 @@ func TestTreeIndexTombstone(test *testing.T) {
 }
 
 func TestStoreRev(t *testing.T) {
+	// INFO: (1) basic read/write
 	b, tmpPath := betesting.NewDefaultTmpBackend(t)
 	s := NewStore(b, &lease.FakeLessor{}, StoreConfig{})
 	defer s.Close()
@@ -286,6 +289,72 @@ func TestStoreRev(t *testing.T) {
 		if err != nil {
 			klog.Fatal(err)
 		}
-		klog.Infof(fmt.Sprintf("%+v", *result))
+
+		for _, keyValue := range result.KVs {
+			klog.Infof(fmt.Sprintf("key: %s, value: %s, mod revision: %d", string(keyValue.Key), string(keyValue.Value), keyValue.ModRevision))
+		}
 	}
+
+	deletedKeysLen, rev := s.DeleteRange([]byte("foo"), []byte("goo"))
+	klog.Infof(fmt.Sprintf("deletedKeysLen: %d, revision: %d", deletedKeysLen, rev))
+	result, err := s.Range(context.TODO(), []byte("foo"), nil, RangeOptions{})
+	if err != nil {
+		klog.Fatal(err)
+	}
+	klog.Infof(fmt.Sprintf("%+v", *result))
+
+	// INFO: (2)ensures Read does not blocking Write after its creation
+	// write something to read later
+	s.Put([]byte("foo1"), []byte("bar"), lease.NoLease)
+	// readTx simulates a long read request
+	concurrentReadTx1 := s.Read(ConcurrentReadTxMode)
+	// write should not be blocked by reads
+	done := make(chan struct{}, 1)
+	go func() {
+		s.Put([]byte("foo1"), []byte("newBar"), lease.NoLease) // this is a write Txn
+		done <- struct{}{}
+	}()
+	select {
+	case <-done:
+	case <-time.After(1 * time.Second):
+		t.Fatalf("write should not be blocked by read")
+	}
+	// readTx2 simulates a short read request
+	concurrentReadTx2 := s.Read(ConcurrentReadTxMode)
+	ro := RangeOptions{Limit: 1, Rev: 0, Count: false}
+	result, err = concurrentReadTx2.Range(context.TODO(), []byte("foo1"), nil, ro)
+	if err != nil {
+		t.Fatalf("failed to range: %v", err)
+	}
+	// readTx2 should see the result of new write
+	w := mvccpb.KeyValue{
+		Key:            []byte("foo1"),
+		Value:          []byte("newBar"),
+		CreateRevision: 6, // foo1 创建时已经是 6 版本
+		ModRevision:    7, // INFO: 6 次写操作 + 1, 包含 goroutine 那一次
+		Version:        2, // 已经写操作了 2 次
+	}
+	if !reflect.DeepEqual(result.KVs[0], w) {
+		t.Fatalf("range result = %+v, want = %+v", result.KVs[0], w)
+	}
+	concurrentReadTx2.End()
+	result, err = concurrentReadTx1.Range(context.TODO(), []byte("foo1"), nil, ro)
+	if err != nil {
+		t.Fatalf("failed to range: %v", err)
+	}
+	// readTx1 should not see the result of new write
+	w = mvccpb.KeyValue{
+		Key:            []byte("foo1"),
+		Value:          []byte("bar"),
+		CreateRevision: 6,
+		ModRevision:    6, // INFO: concurrentReadTx1 时只有 5 次写操作，没有 goroutine 那一次
+		Version:        1,
+	}
+	if !reflect.DeepEqual(result.KVs[0], w) {
+		t.Fatalf("range result = %+v, want = %+v", result.KVs[0], w)
+	}
+	concurrentReadTx1.End()
+
+	// INFO: (3)creates random concurrent Reads and Writes, and ensures Reads always see latest Writes
+
 }

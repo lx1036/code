@@ -23,7 +23,7 @@ type snapshot struct {
 	donec chan struct{}
 }
 
-func (b *Backend) Snapshot() *snapshot {
+func (b *backend) Snapshot() Snapshot {
 	// INFO: 为何先 commit? 保证数据已经落盘
 	b.batchTx.Commit()
 

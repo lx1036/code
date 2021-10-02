@@ -15,7 +15,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func newTmpBackend() (*Backend, string) {
+func newTmpBackend() (*backend, string) {
 	dir := "tmp"
 	os.MkdirAll(dir, 0777)
 	tmpPath := filepath.Join(dir, "db.txt")

@@ -43,7 +43,7 @@ type Bucket interface {
 type batchTx struct {
 	sync.Mutex
 	tx      *bolt.Tx // 读写事务
-	backend *Backend
+	backend *backend
 
 	pending int // pending put op 计数器
 }
@@ -417,7 +417,7 @@ type batchTxBuffered struct {
 	buf txWriteBuffer
 }
 
-func newBatchTxBuffered(backend *Backend) *batchTxBuffered {
+func newBatchTxBuffered(backend *backend) *batchTxBuffered {
 	tx := &batchTxBuffered{
 		batchTx: batchTx{
 			backend: backend,
