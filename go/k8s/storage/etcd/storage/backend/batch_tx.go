@@ -14,6 +14,22 @@ import (
 
 // INFO: 读写事务 read-write txn
 
+// INFO:
+//  (1) write batch 优化: 像其他常规的 DB 一样，etcd 磁盘提交数据时也采用了定时批量提交、异步写盘的方式提升吞吐，并通过内存缓存的方式平衡其延时。
+
+type BatchTx interface {
+	ReadTx
+	UnsafeCreateBucket(bucket Bucket)
+	UnsafeDeleteBucket(bucket Bucket)
+	UnsafePut(bucket Bucket, key []byte, value []byte)
+	UnsafeSeqPut(bucket Bucket, key []byte, value []byte)
+	UnsafeDelete(bucket Bucket, key []byte)
+	// Commit commits a previous tx and begins a new writable one.
+	Commit()
+	// CommitAndStop commits the previous tx and does not create a new one.
+	CommitAndStop()
+}
+
 type BucketID int
 
 type Bucket interface {
@@ -45,9 +61,9 @@ func (t *batchTx) Unlock() {
 	t.Mutex.Unlock()
 }
 
-// BatchTx interface embeds ReadTx interface. But RLock() and RUnlock() do not
-// have appropriate semantics in BatchTx interface. Therefore should not be called.
-// TODO: might want to decouple ReadTx and BatchTx
+// batchTx interface embeds ReadTx interface. But RLock() and RUnlock() do not
+// have appropriate semantics in batchTx interface. Therefore should not be called.
+// TODO: might want to decouple ReadTx and batchTx
 
 func (t *batchTx) RLock() {
 	panic("unexpected RLock")

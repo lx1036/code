@@ -1,9 +1,107 @@
 package mvcc
 
 import (
+	"context"
+	"fmt"
+	"os"
 	"reflect"
 	"testing"
+
+	"go.etcd.io/etcd/server/v3/lease"
+	betesting "k8s-lx1036/k8s/storage/etcd/storage/backend/testing"
+
+	"k8s.io/klog/v2"
 )
+
+func newTestKeyIndex() *keyIndex {
+	// key: "foo"
+	// rev: 16
+	// generations:
+	//    {empty}
+	//    {{14, 0}[1], {14, 1}[2], {16, 0}(t)[3]}
+	//    {{8, 0}[1], {10, 0}[2], {12, 0}(t)[3]}
+	//    {{2, 0}[1], {4, 0}[2], {6, 0}(t)[3]}
+
+	keyIdx := &keyIndex{key: []byte("foo")}
+	keyIdx.put(2, 0)
+	keyIdx.put(4, 0)
+	keyIdx.tombstone(6, 0)
+	keyIdx.put(8, 0)
+	keyIdx.put(10, 0)
+	keyIdx.tombstone(12, 0)
+	keyIdx.put(14, 0)
+	keyIdx.put(14, 1)
+	keyIdx.tombstone(16, 0)
+
+	klog.Infof("modified revision main:%d sub:%d", keyIdx.modified.main, keyIdx.modified.sub)
+
+	return keyIdx
+}
+
+// 查看KeyIndex，即generation是否为空
+func TestKeyIndexIsEmpty(test *testing.T) {
+	fixtures := []struct {
+		keyIdx *keyIndex
+		w      bool
+	}{
+		{
+			&keyIndex{
+				key:         []byte("foo"),
+				generations: []generation{{}},
+			},
+			true,
+		},
+		{
+			&keyIndex{
+				key:      []byte("foo"),
+				modified: revision{2, 0},
+				generations: []generation{
+					{created: revision{1, 0}, version: 2, revisions: []revision{{main: 2}}},
+				},
+			},
+			false,
+		},
+	}
+
+	for i, fixture := range fixtures {
+		g := fixture.keyIdx.isEmpty()
+		if g != fixture.w {
+			test.Errorf("#%d: isEmpty = %v, want %v", i, g, fixture.w)
+		}
+	}
+}
+
+// 测试findGeneration()
+func TestKeyIndexFindGeneration(test *testing.T) {
+	keyIdx := newTestKeyIndex()
+
+	fixtures := []struct {
+		rev int64
+		wg  *generation
+	}{
+		{0, nil},
+		{1, nil},
+		{2, &keyIdx.generations[0]},
+		{3, &keyIdx.generations[0]},
+		{4, &keyIdx.generations[0]},
+		{5, &keyIdx.generations[0]},
+		{6, nil},
+		{7, nil},
+		{8, &keyIdx.generations[1]},
+		{9, &keyIdx.generations[1]},
+		{10, &keyIdx.generations[1]},
+		{11, &keyIdx.generations[1]},
+		{12, nil},
+		{13, nil},
+	}
+
+	for i, fixture := range fixtures {
+		g := keyIdx.findGeneration(fixture.rev)
+		if g != fixture.wg {
+			test.Errorf("#%d: generation = %+v, want %+v", i, g, fixture.wg)
+		}
+	}
+}
 
 func TestTreeIndexGet(test *testing.T) {
 	treeIdx := newTreeIndex()
@@ -168,5 +266,26 @@ func TestTreeIndexTombstone(test *testing.T) {
 	err = treeIdx.Tombstone([]byte("foo"), revision{main: 3})
 	if err != ErrRevisionNotFound {
 		test.Errorf("tombstone error = %v, want %v", err, ErrRevisionNotFound)
+	}
+}
+
+func TestStoreRev(t *testing.T) {
+	b, tmpPath := betesting.NewDefaultTmpBackend(t)
+	s := NewStore(b, &lease.FakeLessor{}, StoreConfig{})
+	defer s.Close()
+	defer os.RemoveAll(tmpPath)
+
+	for i := 1; i <= 3; i++ {
+		s.Put([]byte("foo"), []byte("bar"), lease.NoLease)
+		// store current revision: 2,3,4, store启动时默认初始是 1
+		if r := s.Rev(); r != int64(i+1) {
+			t.Errorf("#%d: rev = %d, want %d", i, r, i+1)
+		}
+
+		result, err := s.Range(context.TODO(), []byte("foo"), nil, RangeOptions{})
+		if err != nil {
+			klog.Fatal(err)
+		}
+		klog.Infof(fmt.Sprintf("%+v", *result))
 	}
 }

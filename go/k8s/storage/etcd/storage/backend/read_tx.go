@@ -7,6 +7,15 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+type ReadTx interface {
+	Lock()
+	Unlock()
+	RLock()
+	RUnlock()
+
+	UnsafeRange(bucket Bucket, key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte)
+}
+
 type txReadBufferCache struct {
 	mu         sync.Mutex
 	buf        *txReadBuffer
@@ -137,15 +146,15 @@ func (rt *readTx) reset() {
 }
 
 // INFO: 并发读没有加锁，和 readTx 区别在加锁这里，参考 UnsafeRange()
-type concurrentReadTx struct {
+type ConcurrentReadTx struct {
 	baseReadTx
 }
 
-func (rt *concurrentReadTx) Lock()   {}
-func (rt *concurrentReadTx) Unlock() {}
+func (concurrentReadTx *ConcurrentReadTx) Lock()   {}
+func (concurrentReadTx *ConcurrentReadTx) Unlock() {}
 
 // RLock is no-op. concurrentReadTx does not need to be locked after it is created.
-func (rt *concurrentReadTx) RLock() {}
+func (concurrentReadTx *ConcurrentReadTx) RLock() {}
 
 // RUnlock signals the end of concurrentReadTx.
-func (rt *concurrentReadTx) RUnlock() { rt.txWg.Done() }
+func (concurrentReadTx *ConcurrentReadTx) RUnlock() { concurrentReadTx.txWg.Done() }

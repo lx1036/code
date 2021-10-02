@@ -166,8 +166,8 @@ func (b *Backend) ReadTx() *readTx {
 //  INFO: @see https://github.com/etcd-io/etcd/commit/9c82e8c72b96eec1e7667a0e139a07b944c33b75
 // ConcurrentReadTx creates and returns a new ReadTx, which:
 // A) creates and keeps a copy of Backend.readTx.txReadBuffer,
-// B) references the boltdb read Tx (and its bucket cache) of current batch interval.
-func (b *Backend) ConcurrentReadTx() *concurrentReadTx {
+// B) references the boltdb readTx (and its bucket cache) of current batch interval.
+func (b *Backend) ConcurrentReadTx() *ConcurrentReadTx {
 	b.readTx.RLock()
 	defer b.readTx.RUnlock()
 	// prevent boltdb read Tx from been rolled back until store read Tx is done. Needs to be called when holding readTx.RLock().
@@ -212,7 +212,7 @@ func (b *Backend) ConcurrentReadTx() *concurrentReadTx {
 	b.txReadBufferCache.mu.Unlock()
 
 	// concurrentReadTx is not supposed to write to its txReadBuffer
-	return &concurrentReadTx{
+	return &ConcurrentReadTx{
 		baseReadTx: baseReadTx{
 			buf:     *buf,
 			tx:      b.readTx.tx,
