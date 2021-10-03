@@ -9,3 +9,6 @@
           - boltdb.BatchTxn
       - storeTxnRead
           - boltdb.ReadTxn
+  - watchable-store
+    - grpcWatchServer
+    - grpcWatchClient

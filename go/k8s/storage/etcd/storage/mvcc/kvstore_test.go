@@ -1,10 +1,15 @@
 package mvcc
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"reflect"
+	"sort"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -271,7 +276,7 @@ func TestTreeIndexTombstone(test *testing.T) {
 	}
 }
 
-func TestStoreRev(t *testing.T) {
+func TestStore(t *testing.T) {
 	// INFO: (1) basic read/write
 	b, tmpPath := betesting.NewDefaultTmpBackend(t)
 	s := NewStore(b, &lease.FakeLessor{}, StoreConfig{})
@@ -356,5 +361,91 @@ func TestStoreRev(t *testing.T) {
 	concurrentReadTx1.End()
 
 	// INFO: (3)creates random concurrent Reads and Writes, and ensures Reads always see latest Writes
+	var (
+		numOfReads           = 100
+		numOfWrites          = 100
+		maxNumOfPutsPerWrite = 10
+		committedKVs         kvs // committedKVs records the key-value pairs written by the finished Write Txns
+	)
+	var wg sync.WaitGroup
+	wg.Add(numOfWrites)
+	for i := 0; i < numOfWrites; i++ {
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond) // random starting time
+			numOfPuts := rand.Intn(maxNumOfPutsPerWrite) + 1
+			var pendingKvs kvs
+			for j := 0; j < numOfPuts; j++ {
+				k := []byte(strconv.Itoa(rand.Int()))
+				v := []byte(strconv.Itoa(rand.Int()))
+				s.Put(k, v, lease.NoLease)
+				pendingKvs = append(pendingKvs, kv{k, v})
+			}
+			// reads should not see above Puts until write is finished
+			committedKVs = merge(committedKVs, pendingKvs) // update shared data structure
+		}()
+	}
 
+	wg.Add(numOfReads)
+	for i := 0; i < numOfReads; i++ {
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond) // random starting time
+			wKVs := make(kvs, len(committedKVs))
+			copy(wKVs, committedKVs)
+			// get all keys in backend store, and compare with wKVs
+			result, err = s.Range(context.TODO(), []byte("\x00000000"), []byte("\xffffffff"), RangeOptions{})
+			if err != nil {
+				t.Errorf("failed to range keys: %v", err)
+				return
+			}
+			if len(wKVs) == 0 && len(result.KVs) == 0 { // no committed KVs yet
+				return
+			}
+			var results kvs
+			for _, keyValue := range result.KVs {
+				results = append(results, kv{keyValue.Key, keyValue.Value})
+			}
+			if !reflect.DeepEqual(wKVs, result) {
+				t.Errorf("unexpected range result") // too many key value pairs, skip printing them
+			}
+		}()
+	}
+	// INFO: wait until goroutines finish or timeout, 可以抄一抄
+	doneC := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(doneC)
+	}()
+	select {
+	case <-doneC:
+	case <-time.After(5 * time.Minute):
+		klog.Fatalf(fmt.Sprintf("timeout"))
+	}
+}
+
+type kv struct {
+	key []byte
+	val []byte
+}
+type kvs []kv
+
+func (kvs kvs) Len() int           { return len(kvs) }
+func (kvs kvs) Less(i, j int) bool { return bytes.Compare(kvs[i].key, kvs[j].key) < 0 }
+func (kvs kvs) Swap(i, j int)      { kvs[i], kvs[j] = kvs[j], kvs[i] }
+
+func merge(dst, src kvs) kvs {
+	dst = append(dst, src...)
+	sort.Stable(dst)
+	// INFO: @see batch_tx.go::merge()
+	// remove duplicates, using only newest update
+	widx := 0
+	for ridx := 1; ridx < len(dst); ridx++ {
+		if !bytes.Equal(dst[widx].key, dst[ridx].key) {
+			widx++
+		}
+		dst[widx] = dst[ridx]
+	}
+
+	return dst[:widx+1]
 }
