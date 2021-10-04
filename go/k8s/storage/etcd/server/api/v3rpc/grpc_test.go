@@ -8,7 +8,7 @@ import (
 )
 
 func TestGrpcWatchServer(test *testing.T) {
-	listener, err := net.Listen("http", "127.0.0.1:2379") // unix, /csi/polefs-csi-share.sock
+	listener, err := net.Listen("tcp", "127.0.0.1:2379") // unix or tcp, /csi/csi.sock or "127.0.0.1:2379"
 	if err != nil {
 		klog.Fatalf("Failed to listen: %v", err)
 	}

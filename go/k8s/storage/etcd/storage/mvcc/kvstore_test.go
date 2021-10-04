@@ -278,7 +278,7 @@ func TestTreeIndexTombstone(test *testing.T) {
 
 func TestStore(t *testing.T) {
 	// INFO: (1) basic read/write
-	b, tmpPath := betesting.NewDefaultTmpBackend(t)
+	b, tmpPath := betesting.NewDefaultTmpBackend()
 	s := NewStore(b, &lease.FakeLessor{}, StoreConfig{})
 	defer s.Close()
 	defer os.RemoveAll(tmpPath)

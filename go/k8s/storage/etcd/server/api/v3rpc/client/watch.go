@@ -7,6 +7,7 @@ import (
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/mvccpb"
+	v3rpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -89,13 +90,13 @@ func (w *watcher) Watch(ctx context.Context, key string) WatchChan {
 			close(ch)
 			return ch // return closed chan
 		}
-		gRPCStream := w.streams[ctxKey]
-		if gRPCStream == nil {
-			gRPCStream = w.newWatcherGrpcStream(ctx)
-			w.streams[ctxKey] = gRPCStream
+		grpcStream := w.streams[ctxKey]
+		if grpcStream == nil {
+			grpcStream = w.newWatcherGrpcStream(ctx)
+			w.streams[ctxKey] = grpcStream
 		}
-		donec := gRPCStream.donec
-		reqc := gRPCStream.reqc
+		donec := grpcStream.donec
+		reqc := grpcStream.reqc
 		w.Unlock()
 
 		// couldn't create channel; return closed channel
@@ -142,18 +143,149 @@ func streamKeyFromCtx(ctx context.Context) string {
 	return ""
 }
 
+// watchStreamRequest is a union of the supported watch request operation types
+type watchStreamRequest interface {
+	toPB() *pb.WatchRequest
+}
+
 // watchGrpcStream tracks all watch resources attached to a single grpc stream.
 type watchGrpcStream struct {
+	// wg is Done when all substream goroutines have exited
+	wg sync.WaitGroup
+
+	remote pb.WatchClient
+
+	// requestChan sends a watch request from Watch() to the main goroutine
+	requestChan chan watchStreamRequest
+	// responseChan receives data from the watch client
+	responseChan chan *pb.WatchResponse
+	// donec closes to broadcast shutdown
+	donec chan struct{}
+	// errc transmits errors from grpc Recv to the watch stream reconnect logic
+	errc chan error
 }
 
 func (w *watcher) newWatcherGrpcStream(ctx context.Context) *watchGrpcStream {
-	gRPCStream := &watchGrpcStream{}
+	grpcStream := &watchGrpcStream{}
 
-	go gRPCStream.run()
+	go grpcStream.run()
 
-	return gRPCStream
+	return grpcStream
 }
 
-func (gRPCStream *watchGrpcStream) run() {
+// run is the root of the goroutines for managing a watcher client
+func (grpcStream *watchGrpcStream) run() {
+	var wc pb.Watch_WatchClient
+	var closeErr error
+
+	// start a stream with the etcd grpc server
+	if wc, closeErr = grpcStream.newWatchClient(); closeErr != nil {
+		return
+	}
+
+	for {
+		select {
+
+		case pbRequestChan := <-grpcStream.requestChan:
+			switch pbRequestChan.(type) {
+			case *watchRequest:
+
+				grpcStream.wg.Add(1)
+				go grpcStream.serveSubstream(ws, grpcStream.resumec)
+
+			case *progressRequest:
+
+			}
+
+		// new events from the watch client
+		case pbWatchResponse := <-grpcStream.responseChan:
+
+			switch {
+			case pbWatchResponse.Created:
+
+			default:
+
+			}
+
+		}
+	}
+
+}
+
+func (grpcStream *watchGrpcStream) newWatchClient() (pb.Watch_WatchClient, error) {
+
+	watchClient, err := grpcStream.openWatchClient()
+
+	if err != nil {
+		return nil, v3rpc.Error(err)
+	}
+
+	// receive data from new grpc stream
+	go grpcStream.serveWatchClient(watchClient)
+
+	return watchClient, nil
+}
+
+// openWatchClient retries opening a watch client until success or halt.
+// manually retry in case "ws==nil && err==nil"
+// TODO: remove FailFast=false
+func (grpcStream *watchGrpcStream) openWatchClient() (watchClient pb.Watch_WatchClient, err error) {
+
+	for {
+		select {
+		case <-grpcStream.ctx.Done():
+			if err == nil {
+				return nil, grpcStream.ctx.Err()
+			}
+			return nil, err
+		default:
+		}
+
+		// 这里通过 pb.WatchClient.Watch() 来 grpc 调用 watch grpc server
+		if watchClient, err = grpcStream.remote.Watch(grpcStream.ctx, grpcStream.callOpts...); watchClient != nil && err == nil {
+			break
+		}
+
+	}
+
+	return watchClient, nil
+}
+
+// serveWatchClient forwards messages from the grpc stream to run()
+func (grpcStream *watchGrpcStream) serveWatchClient(watchClient pb.Watch_WatchClient) {
+	for {
+		watchResponse, err := watchClient.Recv()
+		if err != nil {
+			select {
+			case grpcStream.errc <- err:
+			case <-grpcStream.donec:
+			}
+			return
+		}
+		select {
+		case grpcStream.responseChan <- watchResponse:
+		case <-grpcStream.donec:
+			return
+		}
+	}
+}
+
+// watcherStream represents a registered watcher
+type watcherStream struct {
+
+	// receiveChan buffers watch responses before publishing
+	receiveChan chan *WatchResponse
+}
+
+// serveSubstream forwards watch responses from run() to the subscriber
+func (grpcStream *watchGrpcStream) serveSubstream(ws *watcherStream, resumec chan struct{}) {
+
+	for {
+
+		select {
+		case wr, ok := <-ws.receiveChan:
+
+		}
+	}
 
 }
