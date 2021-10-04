@@ -80,7 +80,7 @@ cfssl gencert -initca ca-csr.json | cfssljson -bare ca
         "expiry": "127200h",
         "pathlen": 0
     },
-    "CN": "QIHU 360 SOFTWARE CO. LIMITED",
+    "CN": "SOFTWARE CO. LIMITED",
     "key": {
         "algo": "ecdsa",
         "size": 384
@@ -90,8 +90,8 @@ cfssl gencert -initca ca-csr.json | cfssljson -bare ca
             "C": "CN",
             "ST": "Beijing",
             "L": "Beijing",
-            "O": "QIHU 360",
-            "OU": "QSSWEB"
+            "O": "Corp",
+            "OU": "Corp"
         }
     ]
 }
