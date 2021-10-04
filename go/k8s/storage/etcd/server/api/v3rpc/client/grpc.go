@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -24,13 +25,19 @@ type watcherStream struct {
 	// id is the registered watch id on the grpc stream
 	id int64
 
+	// buf holds all events received from etcd but not yet consumed by the client
+	buf []*WatchResponse
 	// outc publishes watch responses to subscriber
 	outc chan WatchResponse
-	// recvc buffers watch responses before publishing
-	recvc chan *WatchResponse
 
 	// receiveChan buffers watch responses before publishing
 	receiveChan chan *WatchResponse
+
+	// closing is set to true when stream should be scheduled to shutdown.
+	closing bool
+
+	// donec closes when the watcherStream goroutine stops.
+	donec chan struct{}
 }
 
 // watchGrpcStream tracks all watch resources attached to a single grpc stream.
@@ -44,6 +51,8 @@ type watchGrpcStream struct {
 	remote   pb.WatchClient
 	callOpts []grpc.CallOption
 
+	// substreams holds all active watchers on this grpc stream
+	substreams map[int64]*watcherStream
 	// resuming holds all resuming watchers on this grpc stream
 	resuming []*watcherStream
 	// resumec closes to signal that all substreams should begin resuming
@@ -60,9 +69,11 @@ type watchGrpcStream struct {
 	errc chan error
 	// closeErr is the error that closed the watch stream
 	closeErr error
+	// closingc gets the watcherStream of closing watchers
+	closingc chan *watcherStream
 }
 
-// grpcStream 对象会 goroutine 调用 watch grpc server Watch()
+// INFO: grpcStream 对象会 goroutine 调用 watch grpc server Watch()
 func (w *watcher) newWatcherGrpcStream(ctx context.Context) *watchGrpcStream {
 	grpcStream := &watchGrpcStream{
 		ctx:    ctx,
@@ -72,6 +83,7 @@ func (w *watcher) newWatcherGrpcStream(ctx context.Context) *watchGrpcStream {
 		responseChan: make(chan *pb.WatchResponse),
 		donec:        make(chan struct{}),
 		errc:         make(chan error),
+		resumec:      make(chan struct{}),
 	}
 
 	go grpcStream.run()
@@ -97,13 +109,14 @@ func (grpcStream *watchGrpcStream) run() {
 		case pbRequestChan := <-grpcStream.requestChan:
 			switch wreq := pbRequestChan.(type) {
 			case *watchRequest:
+				klog.Infof(fmt.Sprintf("[run]watchRequest %s", wreq.toPB().String()))
 				outc := make(chan WatchResponse, 1)
 				ws := &watcherStream{
 					initReq: *wreq,
 					id:      -1,
 					outc:    outc,
 					// unbuffered so resumes won't cause repeat events
-					recvc: make(chan *WatchResponse),
+					receiveChan: make(chan *WatchResponse),
 				}
 
 				grpcStream.wg.Add(1)
@@ -125,6 +138,7 @@ func (grpcStream *watchGrpcStream) run() {
 		// new events from the watch client
 		// INFO: 从 watch grpc server 中获取 pbWatchResponse
 		case pbWatchResponse := <-grpcStream.responseChan:
+			klog.Infof(fmt.Sprintf("[run]pbWatchResponse %s", pbWatchResponse.String()))
 			if cur == nil || pbWatchResponse.Created || pbWatchResponse.Canceled {
 				cur = pbWatchResponse
 			} else if cur != nil && cur.WatchId == pbWatchResponse.WatchId {
@@ -135,7 +149,23 @@ func (grpcStream *watchGrpcStream) run() {
 			}
 			switch {
 			case pbWatchResponse.Created:
+				// response to head of queue creation
+				if len(grpcStream.resuming) != 0 {
+					if ws := grpcStream.resuming[0]; ws != nil {
+						grpcStream.addSubstream(pbWatchResponse, ws)
+						grpcStream.dispatchEvent(pbWatchResponse)
+						grpcStream.resuming[0] = nil
+					}
+				}
 
+				if ws := grpcStream.nextResume(); ws != nil {
+					if err := watchClient.Send(ws.initReq.toPB()); err != nil {
+						klog.Errorf(fmt.Sprintf("error when sending request: %v", err))
+					}
+				}
+
+				// reset for next iteration
+				cur = nil
 			default:
 				// dispatch to appropriate watch stream
 				ok := grpcStream.dispatchEvent(cur)
@@ -166,9 +196,78 @@ func (grpcStream *watchGrpcStream) run() {
 	}
 }
 
-// dispatchEvent sends a WatchResponse to the appropriate watcher stream
-func (grpcStream *watchGrpcStream) dispatchEvent(pbresp *pb.WatchResponse) bool {
+// nextResume chooses the next resuming to register with the grpc stream. Abandoned
+// streams are marked as nil in the queue since the head must wait for its inflight registration.
+func (grpcStream *watchGrpcStream) nextResume() *watcherStream {
+	for len(grpcStream.resuming) != 0 {
+		if grpcStream.resuming[0] != nil {
+			return grpcStream.resuming[0]
+		}
+		grpcStream.resuming = grpcStream.resuming[1:len(grpcStream.resuming)]
+	}
+	return nil
+}
 
+func (grpcStream *watchGrpcStream) addSubstream(resp *pb.WatchResponse, ws *watcherStream) {
+	// check watch ID for backward compatibility (<= v3.3)
+	if resp.WatchId == -1 || (resp.Canceled && resp.CancelReason != "") {
+		grpcStream.closeErr = v3rpc.Error(errors.New(resp.CancelReason))
+		// failed; no channel
+		close(ws.receiveChan)
+		return
+	}
+	ws.id = resp.WatchId
+	grpcStream.substreams[ws.id] = ws
+}
+
+// dispatchEvent sends a WatchResponse to the appropriate watcher stream
+func (grpcStream *watchGrpcStream) dispatchEvent(watchResponse *pb.WatchResponse) bool {
+	events := make([]*Event, len(watchResponse.Events))
+	for i, ev := range watchResponse.Events {
+		events[i] = (*Event)(ev)
+	}
+	// TODO: return watch ID?
+	wr := &WatchResponse{
+		Header:          *watchResponse.Header,
+		Events:          events,
+		CompactRevision: watchResponse.CompactRevision,
+		Created:         watchResponse.Created,
+		Canceled:        watchResponse.Canceled,
+		cancelReason:    watchResponse.CancelReason,
+	}
+
+	// watch IDs are zero indexed, so request notify watch responses are assigned a watch ID of -1 to
+	// indicate they should be broadcast.
+	if wr.IsProgressNotify() && watchResponse.WatchId == -1 {
+		return grpcStream.broadcastResponse(wr)
+	}
+
+	return grpcStream.unicastResponse(wr, watchResponse.WatchId)
+}
+
+// broadcastResponse send a watch response to all watch substreams.
+func (grpcStream *watchGrpcStream) broadcastResponse(wr *WatchResponse) bool {
+	for _, ws := range grpcStream.substreams {
+		select {
+		case ws.receiveChan <- wr:
+		case <-ws.donec:
+		}
+	}
+	return true
+}
+
+// unicastResponse sends a watch response to a specific watch substream.
+func (grpcStream *watchGrpcStream) unicastResponse(wr *WatchResponse, watchId int64) bool {
+	ws, ok := grpcStream.substreams[watchId]
+	if !ok {
+		return false
+	}
+	select {
+	case ws.receiveChan <- wr:
+	case <-ws.donec:
+		return false
+	}
+	return true
 }
 
 // INFO: 重点是 grpcStream.responseChan <- watchClient.Recv()
@@ -242,6 +341,18 @@ func (grpcStream *watchGrpcStream) openWatchClient() (watchClient pb.Watch_Watch
 	return watchClient, nil
 }
 
+// joinSubstreams waits for all substream goroutines to complete.
+func (grpcStream *watchGrpcStream) joinSubstreams() {
+	for _, ws := range grpcStream.substreams {
+		<-ws.donec
+	}
+	for _, ws := range grpcStream.resuming {
+		if ws != nil {
+			<-ws.donec
+		}
+	}
+}
+
 // serveWatchClient forwards messages from the grpc stream to run()
 func (grpcStream *watchGrpcStream) serveWatchClient(watchClient pb.Watch_WatchClient) {
 	for {
@@ -263,13 +374,126 @@ func (grpcStream *watchGrpcStream) serveWatchClient(watchClient pb.Watch_WatchCl
 
 // serveSubstream forwards watch responses from run() to the subscriber
 func (grpcStream *watchGrpcStream) serveSubstream(ws *watcherStream, resumec chan struct{}) {
-
-	for {
-
-		select {
-		case wr, ok := <-ws.receiveChan:
-
-		}
+	if ws.closing {
+		panic("created substream goroutine but substream is closing")
 	}
 
+	// nextRev is the minimum expected next revision
+	nextRev := ws.initReq.rev
+	resuming := false
+	defer func() {
+		if !resuming {
+			ws.closing = true
+		}
+		close(ws.donec)
+		if !resuming {
+			grpcStream.closingc <- ws
+		}
+		grpcStream.wg.Done()
+	}()
+
+	emptyWr := &WatchResponse{}
+	for {
+		curWr := emptyWr
+		outc := ws.outc
+
+		if len(ws.buf) > 0 {
+			curWr = ws.buf[0]
+		} else {
+			outc = nil
+		}
+
+		select {
+		case outc <- *curWr:
+			if ws.buf[0].Err() != nil {
+				return
+			}
+			ws.buf[0] = nil
+			ws.buf = ws.buf[1:]
+		case wr, ok := <-ws.receiveChan:
+			if !ok {
+				// shutdown from closeSubstream
+				return
+			}
+			if len(wr.Events) != 0 {
+				for _, event := range wr.Events {
+					// {key:"hello" create_revision:2 mod_revision:3 version:2 value:"world"}
+					klog.Infof(fmt.Sprintf("[serveSubstream]{%+v}", event.Kv.String()))
+				}
+			} else {
+				klog.Infof(fmt.Sprintf("[serveSubstream]%+v", *wr))
+			}
+			if wr.Created {
+				if ws.initReq.watchResponseChan != nil {
+					ws.initReq.watchResponseChan <- ws.outc
+					// to prevent next write from taking the slot in buffered channel
+					// and posting duplicate create events
+					ws.initReq.watchResponseChan = nil
+
+					// send first creation event only if requested
+					if ws.initReq.createdNotify {
+						ws.outc <- *wr
+					}
+					if ws.initReq.rev == 0 {
+						nextRev = wr.Header.Revision
+					}
+				}
+			} else {
+				// current progress of watch; <= store revision
+				nextRev = wr.Header.Revision
+			}
+			if len(wr.Events) > 0 {
+				nextRev = wr.Events[len(wr.Events)-1].Kv.ModRevision + 1
+			}
+			ws.initReq.rev = nextRev
+
+			// created event is already sent above,
+			// watcher should not post duplicate events
+			if wr.Created {
+				continue
+			}
+
+			// TODO pause channel if buffer gets too large
+			ws.buf = append(ws.buf, wr)
+		case <-resumec:
+			resuming = true
+			return
+		}
+	}
+}
+
+func (grpcStream *watchGrpcStream) waitCancelSubstreams(stopc <-chan struct{}) <-chan struct{} {
+	var wg sync.WaitGroup
+	wg.Add(len(grpcStream.resuming))
+	donec := make(chan struct{})
+	for i := range grpcStream.resuming {
+		go func(ws *watcherStream) {
+			defer wg.Done()
+			if ws.closing {
+				if ws.initReq.ctx.Err() != nil && ws.outc != nil {
+					close(ws.outc)
+					ws.outc = nil
+				}
+				return
+			}
+			select {
+			case <-ws.initReq.ctx.Done():
+				// closed ws will be removed from resuming
+				ws.closing = true
+				close(ws.outc)
+				ws.outc = nil
+				grpcStream.wg.Add(1)
+				go func() {
+					defer grpcStream.wg.Done()
+					grpcStream.closingc <- ws
+				}()
+			case <-stopc:
+			}
+		}(grpcStream.resuming[i])
+	}
+	go func() {
+		defer close(donec)
+		wg.Wait()
+	}()
+	return donec
 }

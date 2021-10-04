@@ -1,14 +1,15 @@
-package v3rpc
+package server
 
 import (
 	"context"
 	"math"
 
-	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
+	"k8s-lx1036/k8s/storage/etcd/storage/mvcc"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
+	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -23,7 +24,7 @@ const (
 )
 
 // Server INFO: @see https://github.com/etcd-io/etcd/blob/main/server/etcdserver/api/v3rpc/grpc.go#L39-L93
-func Server() *grpc.Server {
+func Server(watchableStore mvcc.WatchableKV) *grpc.Server {
 	var opts []grpc.ServerOption
 	chainUnaryInterceptors := []grpc.UnaryServerInterceptor{
 		logGRPC,
@@ -45,7 +46,7 @@ func Server() *grpc.Server {
 
 	grpcServer := grpc.NewServer(opts...)
 
-	pb.RegisterWatchServer(grpcServer, NewWatchServer())
+	pb.RegisterWatchServer(grpcServer, NewWatchServer(watchableStore))
 
 	hsrv := health.NewServer()
 	hsrv.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)

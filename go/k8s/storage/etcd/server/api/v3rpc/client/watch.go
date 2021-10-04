@@ -7,8 +7,11 @@ import (
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/mvccpb"
+	v3rpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 type Event mvccpb.Event
@@ -29,10 +32,37 @@ type WatchResponse struct {
 	Header pb.ResponseHeader
 	Events []*Event
 
+	// CompactRevision is the minimum revision the watcher may receive.
+	CompactRevision int64
+
+	// Created is used to indicate the creation of the watcher.
+	Created bool
+
 	Canceled     bool
 	cancelReason string
 
 	closeErr error
+}
+
+// IsProgressNotify returns true if the WatchResponse is progress notification.
+func (wr *WatchResponse) IsProgressNotify() bool {
+	return len(wr.Events) == 0 && !wr.Canceled && !wr.Created && wr.CompactRevision == 0 && wr.Header.Revision != 0
+}
+
+// Err is the error value if this WatchResponse holds an error.
+func (wr *WatchResponse) Err() error {
+	switch {
+	case wr.closeErr != nil:
+		return v3rpc.Error(wr.closeErr)
+	case wr.CompactRevision != 0:
+		return v3rpc.ErrCompacted
+	case wr.Canceled:
+		if len(wr.cancelReason) != 0 {
+			return v3rpc.Error(status.Error(codes.FailedPrecondition, wr.cancelReason))
+		}
+		return v3rpc.ErrFutureRev
+	}
+	return nil
 }
 
 type watcher struct {
@@ -54,6 +84,9 @@ type watchRequest struct {
 
 	// get the previous key-value pair before the event happens
 	prevKV bool
+
+	// send created notification event if this field is true
+	createdNotify bool
 
 	// watchResponseChan receives a chan WatchResponse once the watcher is established
 	watchResponseChan chan chan WatchResponse // INFO: 可以参考
@@ -113,7 +146,7 @@ func (w *watcher) Watch(ctx context.Context, key string) WatchChan {
 			w.streams[ctxKey] = grpcStream
 		}
 		donec := grpcStream.donec
-		reqc := grpcStream.requestChan
+		requestChan := grpcStream.requestChan
 		w.Unlock()
 
 		// couldn't create channel; return closed channel
@@ -121,9 +154,9 @@ func (w *watcher) Watch(ctx context.Context, key string) WatchChan {
 			closeCh = make(chan WatchResponse, 1)
 		}
 
-		// submit request
+		// INFO: (1)submit request, 这种提交请求方式很特别!!!
 		select {
-		case reqc <- request: // INFO: 肯定监听了 grpcStream.requestChan channel
+		case requestChan <- request: // INFO: 肯定监听了 grpcStream.requestChan channel
 			ok = true
 		case <-request.ctx.Done():
 			ok = false
