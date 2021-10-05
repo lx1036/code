@@ -1,12 +1,11 @@
 package server
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s-lx1036/k8s/storage/etcd/pkg/notify"
@@ -14,7 +13,9 @@ import (
 
 	"go.etcd.io/etcd/client/pkg/v3/types"
 	"go.etcd.io/etcd/pkg/v3/idutil"
+	"go.etcd.io/etcd/pkg/v3/schedule"
 	"go.etcd.io/etcd/pkg/v3/wait"
+	"go.etcd.io/etcd/raft/v3/raftpb"
 	"k8s.io/klog/v2"
 )
 
@@ -28,6 +29,10 @@ type EtcdServer struct {
 
 	// INFO: raft
 	raftNode *RaftNode // uses 64-bit atomics; keep 64-bit aligned.
+
+	appliedIndex   uint64 // must use atomic operations to access; keep 64-bit aligned.
+	committedIndex uint64 // must use atomic operations to access; keep 64-bit aligned.
+	term           uint64 // must use atomic operations to access; keep 64-bit aligned.
 
 	// INFO: linearizable read
 	readMu sync.RWMutex
@@ -45,6 +50,7 @@ type EtcdServer struct {
 
 	// stopping is closed by run goroutine on shutdown.
 	stopping chan struct{}
+	stop     chan struct{}
 }
 
 func NewServer(config *raft.Config, peers []raft.Peer) *EtcdServer {
@@ -58,6 +64,7 @@ func NewServer(config *raft.Config, peers []raft.Peer) *EtcdServer {
 		applyWait:     wait.NewTimeList(),
 
 		stopping: make(chan struct{}, 1),
+		stop:     make(chan struct{}),
 	}
 
 	server.raftNode = newRaftNode(config, peers)
@@ -65,112 +72,125 @@ func NewServer(config *raft.Config, peers []raft.Peer) *EtcdServer {
 	return server
 }
 
+type etcdProgress struct {
+	confState raftpb.ConfState
+	snapi     uint64
+	appliedt  uint64
+	appliedi  uint64
+}
+
 func (server *EtcdServer) run() {
+	// asynchronously accept apply packets, dispatch progress in-order
+	sched := schedule.NewFIFOScheduler()
 
-	server.raftNode.start(rh)
-
-}
-
-// INFO: 线性一致性读,
-//  https://time.geekbang.org/column/article/335932
-//
-func (server *EtcdServer) linearizableReadLoop() {
-	for {
-		requestId := server.reqIDGen.Next()
-		leaderChangedNotifier := server.leaderChanged.Receive()
-		select {
-		case <-leaderChangedNotifier:
-			continue
-		case <-server.readwaitc: // INFO：给 readwaitc channel 发消息，来线性一致性读, 该 loop 会一直阻塞在这
-		case <-server.stopping:
-			return
-		}
-
-		nextnr := newNotifier()
-		server.readMu.Lock()
-		readNotifier := server.readNotifier
-		server.readNotifier = nextnr
-		server.readMu.Unlock()
-
-		// INFO: 从 leader 获取该线性一致性读请求的最新索引 committed index, 非常重要!!!
-		//  leader 状态机中最新索引是 confirmedIndex
-		confirmedIndex, err := server.requestCurrentIndex(leaderChangedNotifier, requestId) // 会阻塞
-		if isStopped(err) {
-			return
-		}
-		if err != nil {
-			readNotifier.notify(err)
-			continue
-		}
-
-		// INFO: 当前raft node状态机中已提交索引 applied index 必须大于等于 leader 中的 committed index，才会去读本状态机数据；
-		//  否则，必须等待本状态机去追赶 leader 状态机数据
-		appliedIndex := server.getAppliedIndex()
-		if appliedIndex < confirmedIndex {
-			select {
-			case <-server.applyWait.Wait(confirmedIndex):
-			case <-server.stopping:
-				return
-			}
-		}
-
-		// unblock all l-reads requested at indices before confirmedIndex
-		readNotifier.notify(nil)
-	}
-}
-
-func isStopped(err error) bool {
-	return err == raft.ErrStopped || err == ErrStopped
-}
-
-func (server *EtcdServer) requestCurrentIndex(leaderChangedNotifier <-chan struct{}, requestId uint64) (uint64, error) {
-	err := server.sendReadIndex(requestId)
+	snapshot, err := server.raftNode.raftStorage.Snapshot()
 	if err != nil {
-		return 0, err
+		klog.Fatalf(fmt.Sprintf("failed to get snapshot from Raft storage err: %v", err))
 	}
+
+	server.raftNode.start()
+
+	ep := etcdProgress{
+		confState: snapshot.Metadata.ConfState,
+		snapi:     snapshot.Metadata.Index,
+		appliedt:  snapshot.Metadata.Term,
+		appliedi:  snapshot.Metadata.Index,
+	}
+
+	defer func() {
+		sched.Stop()
+
+		server.raftNode.stop()
+	}()
 
 	for {
 		select {
-		case readState := <-server.raftNode.readStateChan:
-			requestIdBytes := uint64ToBigEndianBytes(requestId)
-			gotOwnResponse := bytes.Equal(readState.RequestCtx, requestIdBytes)
-			if !gotOwnResponse {
-				// a previous request might time out. now we should ignore the response of it and
-				// continue waiting for the response of the current requests.
-				responseId := uint64(0)
-				if len(readState.RequestCtx) == 8 {
-					responseId = binary.BigEndian.Uint64(readState.RequestCtx)
-				}
-				klog.Warningf(fmt.Sprintf("ignored out-of-date read index response; local node read indexes queueing up and waiting to be in sync with leader, sent-request-id: %d, received-request-id:%d",
-					requestId, responseId))
-				continue
-			}
+		case ap := <-server.raftNode.apply():
 
-			return readState.Index, nil
-		case <-server.stopping:
-			return 0, ErrStopped
+			sched.Schedule(func(ctx context.Context) {
+				server.applyAll(&ep, &ap)
+			})
+		case <-server.stop:
+			return
 		}
 	}
+}
+
+func (server *EtcdServer) setTerm(v uint64) {
+	atomic.StoreUint64(&server.term, v)
+}
+
+func (server *EtcdServer) getTerm() uint64 {
+	return atomic.LoadUint64(&server.term)
+}
+
+func (server *EtcdServer) setCommittedIndex(v uint64) {
+	atomic.StoreUint64(&server.committedIndex, v)
+}
+
+func (server *EtcdServer) getCommittedIndex() uint64 {
+	return atomic.LoadUint64(&server.committedIndex)
+}
+
+func (server *EtcdServer) setAppliedIndex(v uint64) {
+	atomic.StoreUint64(&server.appliedIndex, v)
+}
+
+func (server *EtcdServer) getAppliedIndex() uint64 {
+	return atomic.LoadUint64(&server.appliedIndex)
+}
+
+func (server *EtcdServer) applyAll(ep *etcdProgress, apply *apply) {
+
+	server.applyEntries(ep, apply)
 
 }
 
-func (server *EtcdServer) sendReadIndex(requestIndex uint64) error {
-	ctxToSend := uint64ToBigEndianBytes(requestIndex)
-	cctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	err := server.raftNode.ReadIndex(cctx, ctxToSend)
-	cancel()
-	if err == raft.ErrStopped {
-		return err
-	}
-	if err != nil {
-		return err
+func (server *EtcdServer) applyEntries(ep *etcdProgress, apply *apply) {
+	if len(apply.entries) == 0 {
+		return
 	}
 
-	return nil
+	firsti := apply.entries[0].Index
+	if firsti > ep.appliedi+1 {
+		klog.Fatalf(fmt.Sprintf("[applyEntries]unexpected committed entry index, current-applied-index: %d, first-committed-entry-index: %d",
+			ep.appliedi, firsti))
+	}
+
+	var ents []raftpb.Entry
+	if ep.appliedi+1-firsti < uint64(len(apply.entries)) {
+		ents = apply.entries[ep.appliedi+1-firsti:]
+	}
+	if len(ents) == 0 {
+		return
+	}
+
+	server.apply(ents, &ep.confState)
+
 }
 
-func uint64ToBigEndianBytes(number uint64) []byte {
-	byteResult := make([]byte, 8)
-	binary.BigEndian.PutUint64(byteResult, number)
-	return byteResult
+// apply takes entries received from Raft (after it has been committed) and
+// applies them to the current state of the EtcdServer.
+func (server *EtcdServer) apply(entries []raftpb.Entry, confState *raftpb.ConfState) (appliedTerm uint64, appliedIndex uint64, shouldStop bool) {
+	klog.Infof(fmt.Sprintf("[EtcdServer apply]Applying entries num-entries: %d", len(entries)))
+	for index := range entries {
+		entry := entries[index]
+		klog.Infof(fmt.Sprintf("[EtcdServer apply]Applying entry {index:%d, term:%d, type:%s}", entry.Index, entry.Term, entry.Type.String()))
+
+		switch entry.Type {
+		case raftpb.EntryNormal:
+			server.applyEntryNormal(&entry)
+			server.setAppliedIndex(entry.Index)
+			server.setTerm(entry.Term)
+
+		case raftpb.EntryConfChange:
+
+		default:
+			klog.Fatalf(fmt.Sprintf("[EtcdServer apply]must be either EntryNormal or EntryConfChange, unknown entry type: %s", entry.Type.String()))
+		}
+
+		appliedIndex, appliedTerm = entry.Index, entry.Term
+	}
+
+	return appliedTerm, appliedIndex, shouldStop
 }
