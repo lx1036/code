@@ -81,7 +81,7 @@ func (rawNode *RawNode) HasReady() bool {
 }
 
 func (rawNode *RawNode) readyWithoutAccept() Ready {
-	return newReady(rawNode.raft, rawNode.prevSoftSt, rawNode.prevHardSt)
+	return rawNode.raft.newReady(rawNode.prevSoftSt, rawNode.prevHardSt)
 }
 
 // acceptReady is called when the consumer of the RawNode has decided to go

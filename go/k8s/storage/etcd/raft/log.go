@@ -192,6 +192,15 @@ func (log *raftLog) term(i uint64) (uint64, error) {
 	panic(err)
 }
 
+func (log *raftLog) lastTerm() uint64 {
+	t, err := log.term(log.lastIndex())
+	if err != nil {
+		klog.Fatalf(fmt.Sprintf("unexpected error when getting the last term (%v)", err))
+	}
+
+	return t
+}
+
 func (log *raftLog) firstIndex() uint64 {
 	if i, ok := log.unstable.maybeFirstIndex(); ok {
 		return i
