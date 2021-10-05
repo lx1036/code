@@ -291,6 +291,21 @@ func (r *raft) loadState(state pb.HardState) {
 	r.Vote = state.Vote
 }
 
+func (r *raft) softState() *SoftState {
+	return &SoftState{
+		Lead:      r.lead,
+		RaftState: r.state,
+	}
+}
+
+func (r *raft) hardState() pb.HardState {
+	return pb.HardState{
+		Term:   r.Term,
+		Vote:   r.Vote,
+		Commit: r.raftLog.committed,
+	}
+}
+
 // INFO: 加节点
 func (r *raft) applyConfChange(confChange pb.ConfChangeV2) pb.ConfState {
 	cfg, prs, err := func() (tracker.Config, tracker.ProgressMap, error) {
