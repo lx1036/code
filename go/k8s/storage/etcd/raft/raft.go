@@ -185,6 +185,8 @@ type raft struct {
 	// the log
 	raftLog *raftLog
 
+	readStates []ReadState
+
 	maxMsgSize         uint64
 	maxUncommittedSize uint64
 
@@ -304,6 +306,10 @@ func (r *raft) hardState() pb.HardState {
 		Vote:   r.Vote,
 		Commit: r.raftLog.committed,
 	}
+}
+
+func (r *raft) hasLeader() bool {
+	return r.lead != None
 }
 
 // INFO: 加节点

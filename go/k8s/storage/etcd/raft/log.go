@@ -41,19 +41,19 @@ func newLogWithSize(storage Storage, maxNextEntsSize uint64) *raftLog {
 		log.Panic("storage must not be nil")
 	}
 
-	rLog := &raftLog{
+	rlog := &raftLog{
 		storage:         storage,
 		maxNextEntsSize: maxNextEntsSize,
 	}
 
 	firstIndex := storage.FirstIndex()
-	//lastIndex := storage.LastIndex()
-	//rLog.unstable.offset = lastIndex + 1
+	lastIndex := storage.LastIndex()
+	rlog.unstable.offset = lastIndex + 1
 	// Initialize our committed and applied pointers to the time of the last compaction.
-	rLog.committed = firstIndex - 1
-	rLog.applied = firstIndex - 1
+	rlog.committed = firstIndex - 1
+	rlog.applied = firstIndex - 1
 
-	return rLog
+	return rlog
 }
 
 func (log *raftLog) lastIndex() uint64 {
@@ -198,6 +198,38 @@ func (log *raftLog) firstIndex() uint64 {
 	}
 
 	return log.storage.FirstIndex()
+}
+
+func (log *raftLog) unstableEntries() []pb.Entry {
+	if len(log.unstable.entries) == 0 {
+		return nil
+	}
+
+	return log.unstable.entries
+}
+
+// nextEnts returns all the available entries for execution.
+// If applied is smaller than the index of snapshot, it returns all committed
+// entries after the index of snapshot.
+func (log *raftLog) nextEnts() []pb.Entry {
+	off := max(log.applied+1, log.firstIndex())
+	if log.committed+1 > off {
+		entries, err := log.slice(off, log.committed+1, log.maxNextEntsSize)
+		if err != nil {
+			klog.Fatalf(fmt.Sprintf("[]unexpected error when getting unapplied entries: %v", err))
+		}
+
+		return entries
+	}
+
+	return nil
+}
+
+// hasNextEnts returns if there is any available entries for execution. This
+// is a fast check without heavy raftLog.slice() in raftLog.nextEnts().
+func (log *raftLog) hasNextEnts() bool {
+	off := max(log.applied+1, log.firstIndex())
+	return log.committed+1 > off
 }
 
 // unstable.entries[i] has raft log position i+unstable.offset.

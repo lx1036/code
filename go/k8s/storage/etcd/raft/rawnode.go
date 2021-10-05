@@ -7,6 +7,7 @@ import (
 )
 
 // RawNode is a thread-unsafe Node.
+// INFO: RawNode 包含 raft 对象!!!
 type RawNode struct {
 	raft       *raft
 	prevSoftSt *SoftState
@@ -54,4 +55,51 @@ func (rawNode *RawNode) Bootstrap(peers []Peer) error {
 	}
 
 	return nil
+}
+
+// HasReady called when RawNode user need to check if any Ready pending.
+// Checking logic in this method should be consistent with Ready.containsUpdates().
+func (rawNode *RawNode) HasReady() bool {
+	r := rawNode.raft
+	if !r.softState().equal(rawNode.prevSoftSt) {
+		return true
+	}
+	if hardSt := r.hardState(); !IsEmptyHardState(hardSt) && !isHardStateEqual(hardSt, rawNode.prevHardSt) {
+		return true
+	}
+	if r.raftLog.hasPendingSnapshot() {
+		return true
+	}
+	if len(r.msgs) > 0 || len(r.raftLog.unstableEntries()) > 0 || r.raftLog.hasNextEnts() {
+		return true
+	}
+	if len(r.readStates) != 0 {
+		return true
+	}
+
+	return false
+}
+
+func (rawNode *RawNode) readyWithoutAccept() Ready {
+	return newReady(rawNode.raft, rawNode.prevSoftSt, rawNode.prevHardSt)
+}
+
+// acceptReady is called when the consumer of the RawNode has decided to go
+// ahead and handle a Ready. Nothing must alter the state of the RawNode between
+// this call and the prior call to Ready().
+func (rawNode *RawNode) acceptReady(ready Ready) {
+	if ready.SoftState != nil {
+		rawNode.prevSoftSt = ready.SoftState
+	}
+	if len(ready.ReadStates) != 0 {
+		rawNode.raft.readStates = nil
+	}
+
+	rawNode.raft.msgs = nil
+}
+
+// Advance notifies the RawNode that the application has applied and saved progress in the
+// last Ready results.
+func (rawNode *RawNode) Advance(rd Ready) {
+
 }

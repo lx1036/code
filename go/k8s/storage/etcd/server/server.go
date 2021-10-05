@@ -79,6 +79,13 @@ type etcdProgress struct {
 	appliedi  uint64
 }
 
+type raftReadyHandler struct {
+	getLead              func() (lead uint64)
+	updateLead           func(lead uint64)
+	updateLeadership     func(newLeader bool)
+	updateCommittedIndex func(uint64)
+}
+
 func (server *EtcdServer) run() {
 	// asynchronously accept apply packets, dispatch progress in-order
 	sched := schedule.NewFIFOScheduler()
@@ -88,7 +95,18 @@ func (server *EtcdServer) run() {
 		klog.Fatalf(fmt.Sprintf("failed to get snapshot from Raft storage err: %v", err))
 	}
 
-	server.raftNode.start()
+	rh := &raftReadyHandler{
+		getLead:          nil,
+		updateLead:       nil,
+		updateLeadership: nil,
+		updateCommittedIndex: func(committedIndex uint64) {
+			currentCommittedIndex := server.getCommittedIndex()
+			if committedIndex > currentCommittedIndex {
+				server.setCommittedIndex(committedIndex)
+			}
+		},
+	}
+	server.raftNode.start(rh)
 
 	ep := etcdProgress{
 		confState: snapshot.Metadata.ConfState,
@@ -105,6 +123,7 @@ func (server *EtcdServer) run() {
 
 	for {
 		select {
+		// INFO: 在 raft.go::start() 里会写这个 channel
 		case ap := <-server.raftNode.apply():
 
 			sched.Schedule(func(ctx context.Context) {

@@ -1,12 +1,14 @@
 package raft
 
 import (
+	"context"
 	"fmt"
 	"k8s.io/klog/v2"
 	"reflect"
 	"testing"
+	"time"
 
-	pb "go.etcd.io/etcd/raft/v3/raftpb"
+	"go.etcd.io/etcd/raft/v3/raftpb"
 )
 
 func newTestConfig(id uint64, election, heartbeat int, storage Storage) *Config {
@@ -49,7 +51,7 @@ func newTestMemoryStorage(opts ...testMemoryStorageOptions) *MemoryStorage {
 func TestAddLearnerNode(t *testing.T) {
 	r := newTestRaft(1, 10, 1, newTestMemoryStorage(withPeers(1)))
 	// INFO: (1) Add new learner peer
-	r.applyConfChange(pb.ConfChange{NodeID: 2, Type: pb.ConfChangeAddLearnerNode}.AsV2())
+	r.applyConfChange(raftpb.ConfChange{NodeID: 2, Type: raftpb.ConfChangeAddLearnerNode}.AsV2())
 	if r.isLearner {
 		// 这里 raft.isLearner 是当前 local node 状态
 		t.Fatal("expected 1 to be voter")
@@ -65,7 +67,7 @@ func TestAddLearnerNode(t *testing.T) {
 	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.prs.VoterNodes(), r.prs.LearnerNodes()))
 
 	// INFO: (2) Promote learner to voter
-	r.applyConfChange(pb.ConfChange{NodeID: 2, Type: pb.ConfChangeAddNode}.AsV2())
+	r.applyConfChange(raftpb.ConfChange{NodeID: 2, Type: raftpb.ConfChangeAddNode}.AsV2())
 	if r.prs.Progress[2].IsLearner {
 		t.Fatal("expected 2 to be voter")
 	}
@@ -75,7 +77,7 @@ func TestAddLearnerNode(t *testing.T) {
 	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.prs.VoterNodes(), r.prs.LearnerNodes()))
 
 	// INFO: (3) Demote voter to learner
-	r.applyConfChange(pb.ConfChange{NodeID: 1, Type: pb.ConfChangeAddLearnerNode}.AsV2())
+	r.applyConfChange(raftpb.ConfChange{NodeID: 1, Type: raftpb.ConfChangeAddLearnerNode}.AsV2())
 	if !r.prs.Progress[1].IsLearner {
 		t.Fatal("expected 1 to be learner")
 	}
@@ -85,7 +87,7 @@ func TestAddLearnerNode(t *testing.T) {
 	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.prs.VoterNodes(), r.prs.LearnerNodes()))
 
 	// INFO: (4) Promote learner to voter
-	r.applyConfChange(pb.ConfChange{NodeID: 1, Type: pb.ConfChangeAddNode}.AsV2())
+	r.applyConfChange(raftpb.ConfChange{NodeID: 1, Type: raftpb.ConfChangeAddNode}.AsV2())
 	if r.prs.Progress[1].IsLearner {
 		t.Fatal("expected 1 to be voter")
 	}
@@ -95,7 +97,7 @@ func TestAddLearnerNode(t *testing.T) {
 	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.prs.VoterNodes(), r.prs.LearnerNodes()))
 
 	// INFO: (5) Remove voter
-	r.applyConfChange(pb.ConfChange{NodeID: 2, Type: pb.ConfChangeRemoveNode}.AsV2())
+	r.applyConfChange(raftpb.ConfChange{NodeID: 2, Type: raftpb.ConfChangeRemoveNode}.AsV2())
 	if len(r.prs.VoterNodes()) != 1 {
 		t.Fatal("expected nodes number to be 1")
 	}
@@ -138,9 +140,9 @@ func TestAddLearnerNode(t *testing.T) {
 	}
 }
 
-func (r *raft) readMessages() []pb.Message {
+func (r *raft) readMessages() []raftpb.Message {
 	msgs := r.msgs
-	r.msgs = make([]pb.Message, 0)
+	r.msgs = make([]raftpb.Message, 0)
 
 	return msgs
 }
@@ -154,7 +156,7 @@ func TestRaftFlowControl(test *testing.T) {
 	// force the progress to be in replicate state
 	pr2.BecomeReplicate()
 	for i := 0; i < r.prs.MaxInflight; i++ {
-		r.Step(pb.Message{From: 1, To: 1, Type: pb.MsgProp, Entries: []pb.Entry{{Data: []byte("somedata")}}})
+		r.Step(raftpb.Message{From: 1, To: 1, Type: raftpb.MsgProp, Entries: []raftpb.Entry{{Data: []byte("somedata")}}})
 		ms := r.readMessages()
 		if len(ms) != 1 {
 			test.Fatalf("#%d: len(ms) = %d, want 1", i, len(ms))
@@ -163,4 +165,97 @@ func TestRaftFlowControl(test *testing.T) {
 		klog.Infof(fmt.Sprintf("%+v", r.readMessages()))
 	}
 
+}
+
+// ensures that a node can be started correctly. The node should
+// start with correct configuration change entries, and can accept and commit
+// proposals.
+func TestNode(test *testing.T) {
+	cc := raftpb.ConfChange{Type: raftpb.ConfChangeAddNode, NodeID: 1}
+	data, err := cc.Marshal()
+	if err != nil {
+		test.Fatalf("unexpected marshal error: %v", err)
+	}
+	wants := []Ready{
+		{
+			HardState: raftpb.HardState{Term: 1, Commit: 1, Vote: 0},
+			Entries: []raftpb.Entry{
+				{Type: raftpb.EntryConfChange, Term: 1, Index: 1, Data: data},
+			},
+			CommittedEntries: []raftpb.Entry{
+				{Type: raftpb.EntryConfChange, Term: 1, Index: 1, Data: data},
+			},
+			MustSync: true,
+		},
+		{
+			HardState:        raftpb.HardState{Term: 2, Commit: 3, Vote: 1},
+			Entries:          []raftpb.Entry{{Term: 2, Index: 3, Data: []byte("foo")}},
+			CommittedEntries: []raftpb.Entry{{Term: 2, Index: 3, Data: []byte("foo")}},
+			MustSync:         true,
+		},
+	}
+
+	storage := NewMemoryStorage()
+	c := &Config{
+		ID:              1,
+		ElectionTick:    10,
+		HeartbeatTick:   1,
+		Storage:         storage,
+		MaxSizePerMsg:   noLimit,
+		MaxInflightMsgs: 256,
+	}
+	node := StartNode(c, []Peer{{ID: 1}})
+	defer node.Stop()
+
+	ready := <-node.Ready()
+	if !reflect.DeepEqual(ready, wants[0]) {
+		test.Fatalf("#%d: g = %+v,\n want %+v", 1, ready, wants[0])
+	} else {
+		storage.Append(ready.Entries)
+		node.Advance()
+	}
+
+	// INFO: 参加竞选
+	if err := node.Campaign(context.TODO()); err != nil {
+		test.Fatal(err)
+	}
+	rd := <-node.Ready()
+	storage.Append(rd.Entries)
+	node.Advance()
+
+	node.Propose(context.TODO(), []byte("foo"))
+	if ready2 := <-node.Ready(); !reflect.DeepEqual(ready2, wants[1]) {
+		test.Errorf("#%d: g = %+v,\n want %+v", 2, ready2, wants[1])
+	} else {
+		storage.Append(ready2.Entries)
+		node.Advance()
+	}
+
+	select {
+	case rd := <-node.Ready():
+		test.Errorf("unexpected Ready: %+v", rd)
+	case <-time.After(time.Millisecond * 100):
+	}
+}
+
+func TestSelectChannel(test *testing.T) {
+	advanceCh := make(chan struct{})
+	doneChan := make(chan struct{})
+
+	go func() {
+		<-advanceCh
+	}()
+
+	select {
+	case advanceCh <- struct{}{}:
+		klog.Info("advanceCh <- struct{}{}")
+	case <-doneChan:
+		klog.Info("<-doneChan")
+	}
+
+	klog.Info("done")
+
+	// output:
+	// advanceCh <- struct{}{}
+	// done
 }

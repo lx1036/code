@@ -50,7 +50,7 @@ func newRaftNode(config *raft.Config, peers []raft.Peer) *RaftNode {
 	return raftNode
 }
 
-func (raftNode *RaftNode) start() {
+func (raftNode *RaftNode) start(rh *raftReadyHandler) {
 	internalTimeout := time.Second
 
 	go func() {
@@ -73,6 +73,25 @@ func (raftNode *RaftNode) start() {
 					}
 				}
 
+				notifyc := make(chan struct{}, 1)
+				ap := apply{
+					entries:  ready.CommittedEntries,
+					snapshot: ready.Snapshot,
+					notifyc:  notifyc,
+				}
+
+				// INFO: 更新全局 CommittedIndex
+				updateCommittedIndex(&ap, rh)
+
+				select {
+				case raftNode.applyChan <- ap:
+				case <-raftNode.stoppedChan:
+					return
+				}
+
+				raftNode.raftStorage.Append(ready.Entries)
+
+				raftNode.Advance()
 			case <-raftNode.stoppedChan:
 				return
 			}
@@ -87,4 +106,17 @@ func (raftNode *RaftNode) apply() chan apply {
 func (raftNode *RaftNode) stop() {
 	raftNode.stoppedChan <- struct{}{}
 	<-raftNode.doneChan
+}
+
+func updateCommittedIndex(ap *apply, rh *raftReadyHandler) {
+	var ci uint64
+	if len(ap.entries) != 0 {
+		ci = ap.entries[len(ap.entries)-1].Index
+	}
+	if ap.snapshot.Metadata.Index > ci {
+		ci = ap.snapshot.Metadata.Index
+	}
+	if ci != 0 {
+		rh.updateCommittedIndex(ci)
+	}
 }
