@@ -74,6 +74,39 @@ func TestAddAndRemoveNode(test *testing.T) {
 	r.applyConfChange(raftpb.ConfChange{NodeID: 1, Type: raftpb.ConfChangeRemoveNode}.AsV2())
 }
 
+// TestHandleHeartbeat ensures that the follower commits to the commit in the message.
+func TestHandleHeartbeat(t *testing.T) {
+	commit := uint64(2)
+	tests := []struct {
+		m       raftpb.Message
+		wCommit uint64
+	}{
+		{raftpb.Message{From: 2, To: 1, Type: raftpb.MsgHeartbeat, Term: 2, Commit: commit + 1}, commit + 1},
+		{raftpb.Message{From: 2, To: 1, Type: raftpb.MsgHeartbeat, Term: 2, Commit: commit - 1}, commit}, // do not decrease commit
+	}
+	
+	for i, tt := range tests {
+		storage := newTestMemoryStorage(withPeers(1, 2))
+		storage.Append([]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}})
+		sm := newTestRaft(1, 5, 1, storage)
+		sm.becomeFollower(2, 2)
+		sm.raftLog.commitTo(commit)
+		sm.handleHeartbeat(tt.m)
+		if sm.raftLog.committed != tt.wCommit {
+			t.Errorf("#%d: committed = %d, want %d", i, sm.raftLog.committed, tt.wCommit)
+		}
+		m := sm.readMessages()
+		if len(m) != 1 {
+			t.Fatalf("#%d: msg = nil, want 1", i)
+		}
+		if m[0].Type != raftpb.MsgHeartbeatResp {
+			t.Errorf("#%d: type = %v, want MsgHeartbeatResp", i, m[0].Type)
+		}
+		
+		klog.Infof(fmt.Sprintf("[TestHandleHeartbeat]%+v", m))
+	}
+}
+
 func TestAddLearnerNode(t *testing.T) {
 	r := newTestRaft(1, 10, 1, newTestMemoryStorage(withPeers(1)))
 	// INFO: (1) Add new learner peer

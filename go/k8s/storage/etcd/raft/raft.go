@@ -693,6 +693,11 @@ func (r *raft) tickHeartbeat() {
 	}
 }
 
+func (r *raft) handleHeartbeat(m pb.Message) {
+	r.raftLog.commitTo(m.Commit)
+	r.send(pb.Message{To: m.From, Type: pb.MsgHeartbeatResp, Context: m.Context})
+}
+
 func (r *raft) Step(message pb.Message) error {
 	// Handle the message term, which may result in our stepping down to a follower.
 	switch {
