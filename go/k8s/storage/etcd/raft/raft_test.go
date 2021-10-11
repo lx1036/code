@@ -84,7 +84,7 @@ func TestHandleHeartbeat(t *testing.T) {
 		{raftpb.Message{From: 2, To: 1, Type: raftpb.MsgHeartbeat, Term: 2, Commit: commit + 1}, commit + 1},
 		{raftpb.Message{From: 2, To: 1, Type: raftpb.MsgHeartbeat, Term: 2, Commit: commit - 1}, commit}, // do not decrease commit
 	}
-	
+
 	for i, tt := range tests {
 		storage := newTestMemoryStorage(withPeers(1, 2))
 		storage.Append([]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}})
@@ -102,7 +102,7 @@ func TestHandleHeartbeat(t *testing.T) {
 		if m[0].Type != raftpb.MsgHeartbeatResp {
 			t.Errorf("#%d: type = %v, want MsgHeartbeatResp", i, m[0].Type)
 		}
-		
+
 		klog.Infof(fmt.Sprintf("[TestHandleHeartbeat]%+v", m))
 	}
 }

@@ -28,6 +28,17 @@ var (
 
 var defaultCompactBatchLimit = 1000
 
+type KV interface {
+	ReadView
+	WriteView
+
+	// Write INFO: 创建写事务
+	Write() TxnWrite
+
+	// Read INFO: 创建读事务
+	Read(mode ReadTxMode) TxnRead
+}
+
 type StoreConfig struct {
 	CompactionBatchLimit int
 }

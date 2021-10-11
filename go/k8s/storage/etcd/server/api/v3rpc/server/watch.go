@@ -14,6 +14,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// INFO: watchServer 对象是 watch 功能 server 部分
 type watchServer struct {
 	clusterID int64
 	memberID  int64
@@ -36,6 +37,8 @@ func NewWatchServer(watchableStore mvcc.WatchableKV) pb.WatchServer {
 	return server
 }
 
+// INFO: 主要处理 watch client 的 create/cancel watcher 请求，并启动两个 goroutine loop，
+//  与 mvcc 模块交互，把来自于 mvcc 模块的 Watch 事件发给 client
 type watchServerStream struct {
 	sync.WaitGroup
 	sync.RWMutex
@@ -64,13 +67,12 @@ const ctrlStreamBufLen = 16
 // Watch INFO: 主要起两个 goroutine loop，一个是 send loop, 一个是 receive loop
 func (server *watchServer) Watch(pbWatchServer pb.Watch_WatchServer) (err error) {
 	stream := watchServerStream{
-
 		clusterID: server.clusterID,
 		memberID:  server.memberID,
 
 		pbWatchServer: pbWatchServer,
 
-		// INFO: 调用 mvcc 模块 WatchStream
+		// INFO: 调用 mvcc 模块 WatchableStore，该对象会启动两个 goroutine loop，一个是 syncedWatchers，一个是 unsyncedWatchers
 		watchStream: server.watchable.NewWatchStream(),
 		watchable:   server.watchable,
 
@@ -84,16 +86,16 @@ func (server *watchServer) Watch(pbWatchServer pb.Watch_WatchServer) (err error)
 		stream.sendLoop()
 	}()
 
-	errc := make(chan error, 1)
+	errChan := make(chan error, 1)
 	go func() {
-		if rerr := stream.receiveLoop(); rerr != nil {
-			errc <- rerr
+		if err = stream.receiveLoop(); err != nil {
+			errChan <- err
 		}
 	}()
 
 	// INFO: 可能存在 receive goroutine loop finishes before send goroutine loop
 	select {
-	case err = <-errc:
+	case err = <-errChan:
 		if err == context.Canceled {
 			err = rpctypes.ErrGRPCWatchCanceled
 		}
@@ -105,7 +107,7 @@ func (server *watchServer) Watch(pbWatchServer pb.Watch_WatchServer) (err error)
 		}
 	}
 
-	stream.close() // block and remove tmp db file
+	stream.close() // INFO: 会阻塞，block and remove tmp db file
 	return err
 }
 
