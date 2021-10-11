@@ -3,7 +3,6 @@ package testing
 import (
 	"os"
 	"path/filepath"
-	"testing"
 	"time"
 
 	"k8s-lx1036/k8s/storage/etcd/storage/backend"
@@ -19,7 +18,7 @@ var (
 	initialMmapSize = uint64(10 * 1024 * 1024 * 1024)
 )
 
-func NewTmpBackendFromCfg(t testing.TB, bcfg backend.Config) (backend.Backend, string) {
+func NewTmpBackendFromCfg(bcfg backend.Config) (backend.Backend, string) {
 	dir := "tmp"
 	os.MkdirAll(dir, 0777)
 	tmpPath := filepath.Join(dir, "db.txt")
@@ -27,8 +26,8 @@ func NewTmpBackendFromCfg(t testing.TB, bcfg backend.Config) (backend.Backend, s
 	return backend.New(bcfg), tmpPath
 }
 
-func NewDefaultTmpBackend(t testing.TB) (backend.Backend, string) {
-	return NewTmpBackendFromCfg(t, DefaultBackendConfig())
+func NewDefaultTmpBackend() (backend.Backend, string) {
+	return NewTmpBackendFromCfg(DefaultBackendConfig())
 }
 
 func DefaultBackendConfig() backend.Config {

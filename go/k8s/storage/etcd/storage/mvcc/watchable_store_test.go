@@ -14,7 +14,7 @@ import (
 
 // INFO: 测试 etcd watch feature
 func TestWatcherStore(t *testing.T) {
-	b, tmpPath := betesting.NewDefaultTmpBackend(t)
+	b, tmpPath := betesting.NewDefaultTmpBackend()
 	watchableStore := NewWatchableStore(b, &lease.FakeLessor{}, StoreConfig{})
 	defer watchableStore.store.Close()
 	defer os.RemoveAll(tmpPath)
@@ -67,7 +67,7 @@ func TestWatcherStore(t *testing.T) {
 }
 
 func TestSyncWatchers(t *testing.T) {
-	b, tmpPath := betesting.NewDefaultTmpBackend(t)
+	b, tmpPath := betesting.NewDefaultTmpBackend()
 	store := &watchableStore{
 		store:    NewStore(b, &lease.FakeLessor{}, StoreConfig{}),
 		unsynced: newWatcherGroup(),

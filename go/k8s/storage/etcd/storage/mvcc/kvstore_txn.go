@@ -84,9 +84,9 @@ func (rv *readView) Rev() int64 {
 }
 
 func (rv *readView) Range(ctx context.Context, key, end []byte, ro RangeOptions) (r *RangeResult, err error) {
-	tr := rv.kv.Read(ConcurrentReadTxMode)
-	defer tr.End()
-	return tr.Range(ctx, key, end, ro)
+	concurrentReadTx := rv.kv.Read(ConcurrentReadTxMode)
+	defer concurrentReadTx.End()
+	return concurrentReadTx.Range(ctx, key, end, ro)
 }
 
 // INFO: "读事务"

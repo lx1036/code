@@ -1,16 +1,21 @@
 package backend
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
-	
+	"time"
+
+	bolt "go.etcd.io/bbolt"
+
 	"k8s.io/klog/v2"
 )
 
-func newTmpBackend() (*Backend, string) {
+func newTmpBackend() (*backend, string) {
 	dir := "tmp"
 	os.MkdirAll(dir, 0777)
 	tmpPath := filepath.Join(dir, "db.txt")
@@ -22,6 +27,7 @@ func newTmpBackend() (*Backend, string) {
 func TestConcurrentReadTxn(test *testing.T) {
 	b, tmpPath := newTmpBackend()
 	defer b.Close()
+	//defer klog.Info(tmpPath)
 	defer os.RemoveAll(tmpPath)
 
 	writeTxn1 := b.BatchTx()
@@ -37,12 +43,57 @@ func TestConcurrentReadTxn(test *testing.T) {
 	writeTxn2.UnsafePut(Key, []byte("overwrite"), []byte("2"))
 	writeTxn2.Unlock()
 
-	rtx := b.ConcurrentReadTx()
-	rtx.RLock() // no-op
-	keys, values := rtx.UnsafeRange(Key, []byte("abc"), []byte("def"), 0)
-	rtx.RUnlock()
+	// (1)ConcurrentReadTx
+	concurrentReadTxn := b.ConcurrentReadTx()
+	concurrentReadTxn.RLock() // no-op
+	keys, values := concurrentReadTxn.UnsafeRange(Key, []byte("abc"), []byte("xyz"), 0)
+	concurrentReadTxn.RUnlock()
+	for index, key := range keys { // {"abc","def","overwrite"}, {"ABC","DEF","2"}
+		klog.Infof(fmt.Sprintf("key: %s, value: %s", string(key), string(values[index])))
+	}
 
-	klog.Infof(fmt.Sprintf("keys: %+v, values: %+v", keys, values))
+	// (2)ReadTx
+	readTxn := b.ReadTx()
+	readTxn.RLock()
+	keys, values = readTxn.UnsafeRange(Key, []byte("abc"), []byte("xyz"), 0)
+	readTxn.RUnlock()
+	for index, key := range keys { // {"abc","def","overwrite"}, {"ABC","DEF","2"}
+		klog.Infof(fmt.Sprintf("key: %s, value: %s", string(key), string(values[index])))
+	}
+
+	// (3)Interval commit
+	time.Sleep(time.Second)
+	_ = b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("key"))
+		value := bucket.Get([]byte("abc"))
+		if bytes.Compare(value, []byte("ABC")) != 0 {
+			test.Errorf("want %s, got %s", []byte("ABC"), value)
+		}
+		klog.Infof(fmt.Sprintf("value: %s", value))
+
+		return nil
+	})
+
+	// (4)backup/restore snapshot
+	snapshotPath := filepath.Join("tmp", "snapshot.txt")
+	file, _ := os.OpenFile(snapshotPath, os.O_CREATE|os.O_RDWR, 0777)
+	defer os.RemoveAll(snapshotPath)
+	klog.Infof(fmt.Sprintf("fd: %+v, file name: %s", file.Fd(), file.Name()))
+	snapshot := b.Snapshot()
+	num, err := snapshot.WriteTo(file)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	klog.Infof(fmt.Sprintf("write %d bytes to snapshot file", num))
+	b2 := NewDefaultBackend(file.Name())
+	defer b2.Close()
+	writeTxn3 := b2.BatchTx()
+	writeTxn3.Lock()
+	keys, values = writeTxn3.UnsafeRange(Key, []byte("abc"), []byte("xyz"), 0)
+	writeTxn3.Unlock()
+	for index, key := range keys { // {"abc","def","overwrite"}, {"ABC","DEF","2"}
+		klog.Infof(fmt.Sprintf("key: %s, value: %s", string(key), string(values[index])))
+	}
 }
 
 func TestSnapshot(t *testing.T) {
@@ -83,4 +134,15 @@ func TestSnapshot(t *testing.T) {
 		t.Errorf("len(kvs) = %d, want 1", len(keys))
 	}
 	tx2.RUnlock()
+}
+
+type intPairs []int
+
+func (d intPairs) Len() int           { return len(d) }
+func (d intPairs) Less(i, j int) bool { return d[i] < d[j] }
+func (d intPairs) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
+func TestSortStable(test *testing.T) {
+	a := intPairs{1, 3, 66, 4, 6, 19, 5}
+	sort.Stable(a)
+	klog.Info(a) // [1 3 4 5 6 19 66]
 }

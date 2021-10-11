@@ -23,8 +23,8 @@ type snapshot struct {
 	donec chan struct{}
 }
 
-func (b *Backend) Snapshot() *snapshot {
-	// TODO: 为何先 commit, commit 其实也是 begin transaction
+func (b *backend) Snapshot() Snapshot {
+	// INFO: 为何先 commit? 保证数据已经落盘
 	b.batchTx.Commit()
 
 	// read-only lock
@@ -36,8 +36,8 @@ func (b *Backend) Snapshot() *snapshot {
 	}
 	stopc, donec := make(chan struct{}), make(chan struct{})
 	dbBytes := tx.Size() // returns current database size in bytes as seen by this transaction
-	mb := 100 * 1024 * 1024
-	klog.Infof(fmt.Sprintf("[Snapshot]db size %d MB", int64(float64(dbBytes)/float64(mb))))
+	//kb := 1024 * 1024
+	klog.Infof(fmt.Sprintf("[Snapshot]db size %d bytes", int64(dbBytes)))
 
 	return &snapshot{
 		Tx:    tx,

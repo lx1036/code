@@ -52,6 +52,9 @@ type WatchStream interface {
 
 	// Close closes Chan and release all related resources.
 	Close()
+
+	// Rev returns the current revision of the KV the stream watches on.
+	Rev() int64
 }
 
 // INFO: 表示多个 watchers 对一个 streaming channel
@@ -155,4 +158,10 @@ func (ws *watchStream) Close() {
 
 	ws.closed = true
 	close(ws.ch)
+}
+
+func (ws *watchStream) Rev() int64 {
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+	return ws.watchable.rev()
 }

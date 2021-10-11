@@ -13,6 +13,8 @@ type WatchableKV interface {
 }
 
 type KV interface {
+	ReadView
+	WriteView
 
 	// INFO: 创建写事务
 	Write() TxnWrite

@@ -28,6 +28,8 @@ type cancelFunc func()
 
 type watchable interface {
 	watch(key, end []byte, startRev int64, id WatchID, ch chan<- WatchResponse, fcs ...FilterFunc) (*watcher, cancelFunc)
+
+	rev() int64
 }
 
 type watchableStore struct {
@@ -48,6 +50,10 @@ type watchableStore struct {
 	victimCh chan struct{}
 
 	stopC chan struct{}
+}
+
+func New(b backend.Backend, le lease.Lessor, cfg StoreConfig) WatchableKV {
+	return NewWatchableStore(b, le, cfg)
 }
 
 // NewWatchableStore
@@ -440,6 +446,10 @@ func (s *watchableStore) cancelWatcher(w *watcher) {
 
 	w.ch = nil
 	s.mu.Unlock()
+}
+
+func (s *watchableStore) rev() int64 {
+	return s.store.Rev()
 }
 
 // INFO: 把 WatchResponse send 到 ch, watchStream.Chan() 会监听这个 channel

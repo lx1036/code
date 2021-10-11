@@ -7,6 +7,15 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+type ReadTx interface {
+	Lock()
+	Unlock()
+	RLock()
+	RUnlock()
+
+	UnsafeRange(bucket Bucket, key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte)
+}
+
 type txReadBufferCache struct {
 	mu         sync.Mutex
 	buf        *txReadBuffer
@@ -48,10 +57,11 @@ type baseReadTx struct {
 	sync.RWMutex
 	buf txReadBuffer
 
-	// INFO: boltdb transaction 对象
+	// INFO: boltdb 读事务对象
 	tx      *bolt.Tx
 	buckets map[BucketID]*bolt.Bucket
 
+	// INFO: 参考并发读 ConcurrentReadTx() 里 b.readTx.txWg.Add(1)
 	// txWg protects tx from being rolled back at the end of a batch interval until all reads using this tx are done.
 	txWg *sync.WaitGroup
 }
@@ -136,15 +146,15 @@ func (rt *readTx) reset() {
 }
 
 // INFO: 并发读没有加锁，和 readTx 区别在加锁这里，参考 UnsafeRange()
-type concurrentReadTx struct {
+type ConcurrentReadTx struct {
 	baseReadTx
 }
 
-func (rt *concurrentReadTx) Lock()   {}
-func (rt *concurrentReadTx) Unlock() {}
+func (concurrentReadTx *ConcurrentReadTx) Lock()   {}
+func (concurrentReadTx *ConcurrentReadTx) Unlock() {}
 
 // RLock is no-op. concurrentReadTx does not need to be locked after it is created.
-func (rt *concurrentReadTx) RLock() {}
+func (concurrentReadTx *ConcurrentReadTx) RLock() {}
 
 // RUnlock signals the end of concurrentReadTx.
-func (rt *concurrentReadTx) RUnlock() { rt.txWg.Done() }
+func (concurrentReadTx *ConcurrentReadTx) RUnlock() { concurrentReadTx.txWg.Done() }
