@@ -1,19 +1,16 @@
-package v3rpc
+package server
 
 import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"sync"
 
-	betesting "k8s-lx1036/k8s/storage/etcd/storage/backend/testing"
 	"k8s-lx1036/k8s/storage/etcd/storage/mvcc"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
-	"go.etcd.io/etcd/server/v3/lease"
 	"k8s.io/klog/v2"
 )
 
@@ -21,24 +18,19 @@ type watchServer struct {
 	clusterID int64
 	memberID  int64
 
-	tmpPath string // tmp db file
-
 	maxRequestBytes int
 
 	watchable mvcc.WatchableKV
 }
 
-func NewWatchServer() pb.WatchServer {
-	b, tmpPath := betesting.NewDefaultTmpBackend()
-
+func NewWatchServer(watchableStore mvcc.WatchableKV) pb.WatchServer {
 	server := &watchServer{
 		clusterID: int64(1),
 		memberID:  int64(1),
-		tmpPath:   tmpPath,
 
 		maxRequestBytes: grpcOverheadBytes,
 
-		watchable: mvcc.New(b, &lease.FakeLessor{}, mvcc.StoreConfig{}),
+		watchable: watchableStore,
 	}
 
 	return server
@@ -50,7 +42,6 @@ type watchServerStream struct {
 
 	clusterID int64
 	memberID  int64
-	tmpPath   string // tmp db file
 
 	pbWatchServer pb.Watch_WatchServer
 
@@ -76,7 +67,6 @@ func (server *watchServer) Watch(pbWatchServer pb.Watch_WatchServer) (err error)
 
 		clusterID: server.clusterID,
 		memberID:  server.memberID,
-		tmpPath:   server.tmpPath,
 
 		pbWatchServer: pbWatchServer,
 
@@ -115,12 +105,11 @@ func (server *watchServer) Watch(pbWatchServer pb.Watch_WatchServer) (err error)
 		}
 	}
 
-	stream.close() // block
+	stream.close() // block and remove tmp db file
 	return err
 }
 
 func (stream *watchServerStream) close() {
-	defer os.RemoveAll(stream.tmpPath) // remove tmp db file
 	stream.watchStream.Close()
 	close(stream.closec)
 

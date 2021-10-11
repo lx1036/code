@@ -138,8 +138,18 @@ func (storage *MemoryStorage) Entries(lo, hi, maxSize uint64) ([]pb.Entry, error
 	panic("implement me")
 }
 
+// Term INFO: 这里需要 storage.entries[i - storage.entries[0].Index].Term
 func (storage *MemoryStorage) Term(i uint64) (uint64, error) {
-	panic("implement me")
+	storage.Lock()
+	defer storage.Unlock()
+	offset := storage.entries[0].Index
+	if i < offset {
+		return 0, ErrCompacted
+	}
+	if int(i-offset) >= len(storage.entries) {
+		return 0, ErrUnavailable
+	}
+	return storage.entries[i-offset].Term, nil
 }
 
 func (storage *MemoryStorage) Snapshot() (pb.Snapshot, error) {
