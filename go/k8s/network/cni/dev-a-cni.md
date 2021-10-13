@@ -1,8 +1,10 @@
 
 
 
-
-
+# CNI
+代码仓库：github.com/containernetworking/cni
+plugins: https://github.com/containernetworking/plugins
+cni debug tool: `go install github.com/containernetworking/cni/cnitool`
 
 
 

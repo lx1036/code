@@ -15,9 +15,10 @@ require (
 	github.com/caddyserver/caddy v1.0.4
 	github.com/codingsince1985/checksum v1.1.0 // indirect
 	github.com/container-storage-interface/spec v1.3.0
-	github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
-	github.com/containerd/containerd v1.4.4
-	github.com/containernetworking/cni v0.8.0
+	github.com/containerd/cgroups v1.0.1
+	github.com/containerd/containerd v1.5.1
+	github.com/containernetworking/cni v1.0.1
+	github.com/containernetworking/plugins v1.0.1 // indirect
 	github.com/coreos/etcd v3.3.13+incompatible // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
@@ -47,7 +48,7 @@ require (
 	github.com/google/cadvisor v0.37.5
 	github.com/google/go-querystring v1.0.0
 	github.com/google/gofuzz v1.1.0
-	github.com/google/uuid v1.1.2
+	github.com/google/uuid v1.2.0
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
@@ -83,7 +84,7 @@ require (
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/olivere/elastic/v7 v7.0.9 // indirect
 	github.com/onsi/ginkgo v1.16.4
-	github.com/onsi/gomega v1.14.0
+	github.com/onsi/gomega v1.15.0
 	github.com/opencontainers/runc v1.0.0-rc93
 	github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 	github.com/operator-framework/operator-sdk v0.17.1
@@ -111,8 +112,8 @@ require (
 	github.com/tiglabs/raft v0.0.0-20200304095606-b25a44ad8b33
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
 	github.com/urfave/cli v1.22.4
-	github.com/vishvananda/netlink v1.1.0
-	github.com/vishvananda/netns v0.0.0-20200520041808-52d707b772fe
+	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
+	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f
 	go.etcd.io/bbolt v1.3.6
 	go.etcd.io/etcd/api/v3 v3.5.0
 	go.etcd.io/etcd/client/v3 v3.5.0
@@ -125,15 +126,15 @@ require (
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
+	golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/grpc v1.38.0
-	google.golang.org/protobuf v1.26.0
+	google.golang.org/protobuf v1.27.1
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/sohlich/elogrus.v7 v7.0.0 // indirect
-	gopkg.in/square/go-jose.v2 v2.3.1
+	gopkg.in/square/go-jose.v2 v2.5.1
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	gotest.tools v2.2.0+incompatible
@@ -146,7 +147,7 @@ require (
 	k8s.io/code-generator v0.22.1
 	k8s.io/component-base v0.22.1
 	k8s.io/component-helpers v0.22.1
-	k8s.io/cri-api v0.0.0
+	k8s.io/cri-api v0.20.6
 	k8s.io/gengo v0.0.0-20210203185629-de9496dff47b
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kube-aggregator v0.17.3
