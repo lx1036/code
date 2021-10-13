@@ -137,7 +137,6 @@ func initDrivers(ipv4, ipv6 bool) {
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
-
 	confVersion, cniNetns, conf, k8sConfig, err := parseCmdArgs(args)
 	if err != nil {
 		return err
@@ -300,4 +299,57 @@ func cmdCheck(args *skel.CmdArgs) error {
 
 func cmdDel(args *skel.CmdArgs) error {
 
+	eniBackendClient, closeConn, err := getNetworkClient()
+	if err != nil {
+		return fmt.Errorf("error create grpc client,pod %s/%s, %w", string(k8sConfig.K8S_POD_NAMESPACE), string(k8sConfig.K8S_POD_NAME), err)
+	}
+	defer closeConn()
+
+	infoReply, err := eniBackendClient.GetIPInfo(
+		timeoutContext,
+		&rpc.GetInfoRequest{
+			K8SPodName:             string(k8sConfig.K8S_POD_NAME),
+			K8SPodNamespace:        string(k8sConfig.K8S_POD_NAMESPACE),
+			K8SPodInfraContainerId: string(k8sConfig.K8S_POD_INFRA_CONTAINER_ID),
+		})
+
+	if err != nil {
+		return fmt.Errorf("error get ip from terway, pod %s/%s, %w", string(k8sConfig.K8S_POD_NAMESPACE), string(k8sConfig.K8S_POD_NAME), err)
+	}
+
+	ipv4, ipv6 := infoReply.IPv4, infoReply.IPv6
+	initDrivers(ipv4, ipv6)
+
+	hostVETHName, _ := link.VethNameForPod(string(k8sConfig.K8S_POD_NAME), string(k8sConfig.K8S_POD_NAMESPACE), defaultVethPrefix)
+
+	switch infoReply.IPType {
+	case rpc.IPType_TypeVPCENI:
+
+	case rpc.IPType_TypeENIMultiIP:
+
+	case rpc.IPType_TypeVPCIP:
+
+	default:
+		return fmt.Errorf("not support this network type")
+	}
+
+	releaseIPReply, err := eniBackendClient.ReleaseIP(
+		context.Background(),
+		&rpc.ReleaseIPRequest{
+			K8SPodName:             string(k8sConfig.K8S_POD_NAME),
+			K8SPodNamespace:        string(k8sConfig.K8S_POD_NAMESPACE),
+			K8SPodInfraContainerId: string(k8sConfig.K8S_POD_INFRA_CONTAINER_ID),
+			IPType:                 infoResult.GetIPType(),
+			Reason:                 "normal release",
+		})
+
+	if err != nil || !releaseIPReply.GetSuccess() {
+		return fmt.Errorf("error release ip for pod, maybe cause resource leak: %v, %v", err, releaseIPReply)
+	}
+
+	result := &current.Result{
+		CNIVersion: confVersion,
+	}
+
+	return types.PrintResult(result, confVersion)
 }
