@@ -197,7 +197,7 @@ var ErrProposalDropped = errors.New("raft proposal dropped")
 //  (1) Leader Election: campaign 竞选
 //    (1.1)
 type raft struct {
-	id uint64
+	id uint64 // INFO: 对于单 node, raft id 就是 node id
 
 	Term uint64
 	Vote uint64

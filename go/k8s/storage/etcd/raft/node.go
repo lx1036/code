@@ -33,6 +33,9 @@ func (a *SoftState) equal(b *SoftState) bool {
 }
 
 type Node interface {
+	
+	// Tick INFO: 每一个 node 的逻辑时钟
+	Tick()
 
 	// Campaign INFO: Follower 变成 Candidate, 竞选成 Leader
 	Campaign(ctx context.Context) error
@@ -175,6 +178,16 @@ func (n *node) run() {
 			close(n.doneChan)
 			return
 		}
+	}
+}
+
+func (n *node) Tick()  {
+	select {
+	case n.tickChan <- struct {}{}:
+	case <-n.stopChan:
+	
+	default:
+		klog.Warningf(fmt.Sprintf("[Tick]%x tick missed to fire. Node blocks too long!", n.rawNode.raft.id))
 	}
 }
 

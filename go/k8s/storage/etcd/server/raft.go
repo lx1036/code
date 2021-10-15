@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"k8s-lx1036/k8s/storage/etcd/raft"
@@ -29,6 +30,9 @@ type RaftNode struct {
 	readStateChan chan raft.ReadState
 	// a chan to send out apply
 	applyChan chan apply
+	
+	ticker *time.Ticker
+	tickMu *sync.Mutex
 
 	stoppedChan chan struct{}
 	doneChan    chan struct{}
@@ -42,6 +46,9 @@ func newRaftNode(config *raft.Config, peers []raft.Peer) *RaftNode {
 
 		readStateChan: make(chan raft.ReadState, 1),
 		applyChan:     make(chan apply),
+		
+		ticker: time.NewTicker(time.Duration(int64(config.HeartbeatTick) * int64(time.Second))),
+		tickMu: new(sync.Mutex),
 
 		stoppedChan: make(chan struct{}),
 		doneChan:    make(chan struct{}),
@@ -60,6 +67,9 @@ func (raftNode *RaftNode) start(rh *raftReadyHandler) {
 
 		for {
 			select {
+			case <-raftNode.ticker.C:
+				raftNode.safeTick()
+			
 			case ready := <-raftNode.Ready(): // INFO:
 
 				if len(ready.ReadStates) != 0 {
@@ -97,6 +107,12 @@ func (raftNode *RaftNode) start(rh *raftReadyHandler) {
 			}
 		}
 	}()
+}
+
+func (raftNode *RaftNode) safeTick()  {
+	raftNode.tickMu.Lock()
+	raftNode.Tick()
+	raftNode.tickMu.Unlock()
 }
 
 func (raftNode *RaftNode) apply() chan apply {
