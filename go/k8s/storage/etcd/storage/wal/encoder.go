@@ -4,9 +4,12 @@ import (
 	"encoding/binary"
 	"hash"
 	"io"
-	"k8s-lx1036/k8s/storage/etcd/wal/walpb"
 	"os"
 	"sync"
+
+	"go.etcd.io/etcd/pkg/v3/crc"
+	"go.etcd.io/etcd/pkg/v3/ioutil"
+	"go.etcd.io/etcd/server/v3/wal/walpb"
 )
 
 // walPageBytes is the alignment for flushing records to the backing Writer.

@@ -6,8 +6,7 @@ import (
 	pb "go.etcd.io/etcd/raft/v3/raftpb"
 )
 
-// RawNode is a thread-unsafe Node.
-// INFO: RawNode 包含 raft 对象!!!
+// RawNode INFO: RawNode 是一个非线程安全的 Node，包含 raft 对象!!!
 type RawNode struct {
 	raft       *raft
 	prevSoftSt *SoftState
@@ -22,6 +21,11 @@ func NewRawNode(config *Config) (*RawNode, error) {
 	rn.prevSoftSt = r.softState()
 	rn.prevHardSt = r.hardState()
 	return rn, nil
+}
+
+// Tick INFO: 这里不同角色 raft node，tick() 函数不一样：对于 Leader node, tick() 就是 tickHeartbeat；对于 Follower/PreCandidate/Candidate，tick() 就是 tickElection
+func (rawNode *RawNode) Tick() {
+	rawNode.raft.tick()
 }
 
 func (rawNode *RawNode) Bootstrap(peers []Peer) error {
@@ -98,8 +102,11 @@ func (rawNode *RawNode) acceptReady(ready Ready) {
 	rawNode.raft.msgs = nil
 }
 
-// Advance notifies the RawNode that the application has applied and saved progress in the
-// last Ready results.
-func (rawNode *RawNode) Advance(rd Ready) {
+// Advance INFO: 推动用户提交的 []pb.Message 提交到 log 模块中，这里才是最终目标!!!
+func (rawNode *RawNode) Advance(ready Ready) {
+	if !IsEmptyHardState(ready.HardState) {
+		rawNode.prevHardSt = ready.HardState
+	}
 
+	rawNode.raft.advance(ready)
 }

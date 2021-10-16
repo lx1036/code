@@ -13,6 +13,14 @@ import (
 
 // INFO: 对 raft 包的封装，给 Server 调用
 
+const (
+	// The max throughput of etcd will not exceed 100MB/s (100K * 1KB value).
+	// Assuming the RTT is around 10ms, 1MB max size is large enough.
+	maxSizePerMsg = 1 * 1024 * 1024
+	// Never overflow the rafthttp buffer, which is 4096.
+	maxInflightMsgs = 4096 / 8
+)
+
 // apply contains entries, snapshot to be applied.
 type apply struct {
 	entries  []raftpb.Entry
@@ -21,16 +29,21 @@ type apply struct {
 	notifyc chan struct{}
 }
 
-type RaftNode struct {
+type RaftNodeConfig struct {
 	raft.Node
 
-	raftStorage *raft.MemoryStorage
+	raftStorage *raft.MemoryStorage // INFO: 这个 storage 是用的 raft MemoryStorage，存在内存里，这个很重要!!!
+	storage     Storage             // INFO: 这个 storage 是 wal 持久化，存在文件磁盘里，这个很重要!!!
+}
+
+type RaftNode struct {
+	RaftNodeConfig
 
 	// a chan to send out readState
 	readStateChan chan raft.ReadState
 	// a chan to send out apply
 	applyChan chan apply
-	
+
 	ticker *time.Ticker
 	tickMu *sync.Mutex
 
@@ -38,16 +51,19 @@ type RaftNode struct {
 	doneChan    chan struct{}
 }
 
-func newRaftNode(config *raft.Config, peers []raft.Peer) *RaftNode {
-	node := raft.StartNode(config, peers)
+func newRaftNode(config RaftNodeConfig) *RaftNode {
+	//func newRaftNode(config *raft.Config, peers []raft.Peer) *RaftNode {
+	//node := raft.StartNode(config, peers)
 	raftNode := &RaftNode{
-		Node:        node,
-		raftStorage: raft.NewMemoryStorage(),
+		RaftNodeConfig: config,
+
+		//Node:        node,
+		//raftStorage: raft.NewMemoryStorage(),
 
 		readStateChan: make(chan raft.ReadState, 1),
 		applyChan:     make(chan apply),
-		
-		ticker: time.NewTicker(time.Duration(int64(config.HeartbeatTick) * int64(time.Second))),
+
+		ticker: time.NewTicker(time.Duration(config.HeartbeatTick) * time.Second),
 		tickMu: new(sync.Mutex),
 
 		stoppedChan: make(chan struct{}),
@@ -69,8 +85,8 @@ func (raftNode *RaftNode) start(rh *raftReadyHandler) {
 			select {
 			case <-raftNode.ticker.C:
 				raftNode.safeTick()
-			
-			case ready := <-raftNode.Ready(): // INFO:
+
+			case ready := <-raftNode.Ready(): // INFO: Ready() 里返回的是用户提交的 []pb.Entry
 
 				if len(ready.ReadStates) != 0 {
 					select {
@@ -99,6 +115,12 @@ func (raftNode *RaftNode) start(rh *raftReadyHandler) {
 					return
 				}
 
+				// INFO: 持久化 []pb.Entry 到 WAL
+				if err := raftNode.storage.Save(ready.HardState, ready.Entries); err != nil {
+					klog.Fatalf(fmt.Sprintf("[EtcdServer raftNode start]failed to save Raft hard state and entries err: %v", err))
+				}
+
+				// INFO: 保存到 raft log 内存里
 				raftNode.raftStorage.Append(ready.Entries)
 
 				raftNode.Advance()
@@ -109,7 +131,7 @@ func (raftNode *RaftNode) start(rh *raftReadyHandler) {
 	}()
 }
 
-func (raftNode *RaftNode) safeTick()  {
+func (raftNode *RaftNode) safeTick() {
 	raftNode.tickMu.Lock()
 	raftNode.Tick()
 	raftNode.tickMu.Unlock()

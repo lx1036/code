@@ -2,27 +2,24 @@ package raft
 
 import (
 	"fmt"
-	"log"
 
 	pb "go.etcd.io/etcd/raft/v3/raftpb"
 	"k8s.io/klog/v2"
 )
 
 type raftLog struct {
+	// INFO: 这个 storage 是用的 raft MemoryStorage，存在内存里，这个很重要!!!
+	//  @see EtcdServer 模块中的 RaftNode.storage，这个是 wal 持久化文件
 	// storage contains all stable entries since the last snapshot.
 	storage Storage
 
-	// unstable contains all unstable entries and snapshot.
-	// they will be saved into storage.
+	// INFO: 表示还未 commit 的 log entry，committed log entry 会保存到 raftLog.storage，也就是 stable
 	unstable unstable
 
-	// committed is the highest log position that is known to be in
-	// stable storage on a quorum of nodes.
+	// INFO: position 记录已经提交的 log entry
 	committed uint64
 
-	// applied is the highest log position that the application has
-	// been instructed to apply to its state machine.
-	// Invariant: applied <= committed
+	// INFO: position 记录 state machine 状态机已经 applied应用的 log entry，并且 applied <= committed
 	applied uint64
 
 	// maxNextEntsSize is the maximum number aggregate byte size of the messages
@@ -34,26 +31,24 @@ func newLog(storage Storage) *raftLog {
 	return newLogWithSize(storage, noLimit)
 }
 
-// newLogWithSize returns a log using the given storage and max
-// message size.
 func newLogWithSize(storage Storage, maxNextEntsSize uint64) *raftLog {
 	if storage == nil {
-		log.Panic("storage must not be nil")
+		klog.Fatalf("storage must not be nil")
 	}
 
-	rlog := &raftLog{
+	log := &raftLog{
 		storage:         storage,
 		maxNextEntsSize: maxNextEntsSize,
 	}
 
 	firstIndex := storage.FirstIndex()
 	lastIndex := storage.LastIndex()
-	rlog.unstable.offset = lastIndex + 1
+	log.unstable.offset = lastIndex + 1
 	// Initialize our committed and applied pointers to the time of the last compaction.
-	rlog.committed = firstIndex - 1
-	rlog.applied = firstIndex - 1
+	log.committed = firstIndex - 1
+	log.applied = firstIndex - 1
 
-	return rlog
+	return log
 }
 
 func (log *raftLog) lastIndex() uint64 {
@@ -164,6 +159,25 @@ func (log *raftLog) commitTo(tocommit uint64) {
 	}
 }
 
+func (log *raftLog) appliedTo(index uint64) {
+	if index == 0 {
+		return
+	}
+	if log.committed < index || index < log.applied {
+		klog.Fatalf(fmt.Sprintf("[raft log appliedTo]applied(%d) is out of range [prevApplied(%d), committed(%d)]", index, log.applied, log.committed))
+	}
+
+	log.applied = index
+}
+
+func (log *raftLog) stableTo(index, term uint64) {
+	log.unstable.stableTo(index, term)
+}
+
+func (log *raftLog) stableSnapTo(i uint64) {
+	log.unstable.stableSnapTo(i)
+}
+
 // INFO:
 func (log *raftLog) hasPendingSnapshot() bool {
 	//return log.unstable.snapshot != nil && !IsEmptySnap(*log.unstable.snapshot)
@@ -253,6 +267,41 @@ type unstable struct {
 	offset  uint64
 }
 
+func (u *unstable) stableTo(i, t uint64) {
+	term, ok := u.maybeTerm(i)
+	if !ok {
+		return
+	}
+
+	// if i < offset, term is matched with the snapshot
+	// only update the unstable entries if term is matched with
+	// an unstable entry.
+	if term == t && i >= u.offset {
+		u.entries = u.entries[i+1-u.offset:]
+		u.offset = i + 1
+		u.shrinkEntriesArray()
+	}
+}
+
+func (u *unstable) stableSnapTo(i uint64) {
+	if u.snapshot != nil && u.snapshot.Metadata.Index == i {
+		u.snapshot = nil
+	}
+}
+
+// INFO: 其实就是压缩下 u.entries 空间避免浪费，减少内存，u.entries 值内容不动
+//  Avoid holding unneeded memory in unstable log's entries array
+func (u *unstable) shrinkEntriesArray() {
+	const lenMultiple = 2
+	if len(u.entries) == 0 {
+		u.entries = nil
+	} else if len(u.entries)*lenMultiple < cap(u.entries) {
+		newEntries := make([]pb.Entry, len(u.entries))
+		copy(newEntries, u.entries)
+		u.entries = newEntries
+	}
+}
+
 // maybeFirstIndex returns the index of the first possible entry in entries
 // if it has a snapshot.
 func (u *unstable) maybeFirstIndex() (uint64, bool) {
@@ -262,8 +311,7 @@ func (u *unstable) maybeFirstIndex() (uint64, bool) {
 	return 0, false
 }
 
-// maybeTerm returns the term of the entry at index i, if there
-// is any.
+// INFO: 返回 index 对应的 term
 func (u *unstable) maybeTerm(i uint64) (uint64, bool) {
 	if i < u.offset {
 		if u.snapshot != nil && u.snapshot.Metadata.Index == i {

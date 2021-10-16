@@ -33,8 +33,8 @@ func (a *SoftState) equal(b *SoftState) bool {
 }
 
 type Node interface {
-	
-	// Tick INFO: 每一个 node 的逻辑时钟
+
+	// Tick INFO: 每一个 node 的逻辑时钟，用来判断 heartbeatTimeout 和 electionTimeout
 	Tick()
 
 	// Campaign INFO: Follower 变成 Candidate, 竞选成 Leader
@@ -93,6 +93,8 @@ type msgWithResult struct {
 type node struct {
 	rawNode *RawNode
 
+	tickChan chan struct{}
+
 	receiveChan chan pb.Message
 
 	readyChan   chan Ready
@@ -106,6 +108,9 @@ type node struct {
 func newNode(rawNode *RawNode) *node {
 	return &node{
 		rawNode: rawNode,
+
+		// INFO: 这里 tickChan 是一个 buffer chan，这样消费者(run goroutine)消费不过来时，可以 buffer 下
+		tickChan: make(chan struct{}, 128),
 
 		readyChan: make(chan Ready),
 
@@ -131,6 +136,7 @@ func (n *node) run() {
 		if advanceChan != nil {
 			readyChan = nil
 		} else if n.rawNode.HasReady() {
+			// INFO: 会从 raft.msgs 获取用户提交的 []pb.Message
 			ready = n.rawNode.readyWithoutAccept()
 			readyChan = n.readyChan
 		}
@@ -152,6 +158,9 @@ func (n *node) run() {
 		}
 
 		select {
+		case <-n.tickChan:
+			n.rawNode.Tick()
+
 		case msgResult := <-proposeChan:
 			message := msgResult.message
 			message.From = r.id
@@ -165,12 +174,12 @@ func (n *node) run() {
 			if pr := r.progress.Progress[message.From]; pr != nil || !IsResponseMsg(message.Type) {
 				r.Step(message)
 			}
+		// INFO: 用户提交的 pb.Message 从这 readyChan 获取
 		case readyChan <- ready:
-			klog.Infof(fmt.Sprintf("readyChan <- ready"))
 			n.rawNode.acceptReady(ready)
 			advanceChan = n.advanceChan
+		// INFO: @see Advance(), 推动用户提交的 []pb.Message 提交到 log 模块中，这里才是最终目标!!!
 		case <-advanceChan:
-			klog.Infof(fmt.Sprintf("<-advanceChan"))
 			n.rawNode.Advance(ready)
 			ready = Ready{}
 			advanceChan = nil
@@ -181,11 +190,11 @@ func (n *node) run() {
 	}
 }
 
-func (n *node) Tick()  {
+// Tick INFO: raft node 逻辑时钟，用来判断 heartbeatTimeout 和 electionTimeout
+func (n *node) Tick() {
 	select {
-	case n.tickChan <- struct {}{}:
-	case <-n.stopChan:
-	
+	case n.tickChan <- struct{}{}:
+	case <-n.doneChan:
 	default:
 		klog.Warningf(fmt.Sprintf("[Tick]%x tick missed to fire. Node blocks too long!", n.rawNode.raft.id))
 	}

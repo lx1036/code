@@ -67,7 +67,8 @@ func NewServer(config *raft.Config, peers []raft.Peer) *EtcdServer {
 		stop:     make(chan struct{}),
 	}
 
-	server.raftNode = newRaftNode(config, peers)
+	r := bootstrapFromWAL()
+	server.raftNode = r.newRaftNode(config, peers)
 
 	return server
 }
@@ -186,6 +187,10 @@ func (server *EtcdServer) applyEntries(ep *etcdProgress, apply *apply) {
 
 	server.apply(ents, &ep.confState)
 
+}
+
+func (server *EtcdServer) applyEntryNormal(entry *raftpb.Entry) {
+	panic("not implemented")
 }
 
 // apply takes entries received from Raft (after it has been committed) and

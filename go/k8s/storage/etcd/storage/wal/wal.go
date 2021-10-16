@@ -4,15 +4,18 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/coreos/pkg/capnslog"
-	"go.uber.org/zap"
 	"hash/crc32"
 	"io"
-	"k8s-lx1036/k8s/storage/etcd/storage/wal/walpb"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"go.etcd.io/etcd/client/pkg/v3/fileutil"
+	"go.etcd.io/etcd/pkg/v3/pbutil"
+	"go.etcd.io/etcd/raft/v3/raftpb"
+	"go.etcd.io/etcd/server/v3/wal/walpb"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -36,7 +39,6 @@ var (
 	// value should be used, but this is defined as an exported variable
 	// so that tests can set a different segment size.
 	SegmentSizeBytes int64 = 64 * 1000 * 1000 // 64MB
-	plog                   = capnslog.NewPackageLogger("go.etcd.io/etcd", "wal")
 
 	ErrFileNotFound     = errors.New("wal: file not found")
 	ErrSnapshotNotFound = errors.New("wal: snapshot not found")
@@ -49,8 +51,6 @@ var (
 // 只可能处于append模式或者读模式，但是不能同时处于两种模式中
 // 新创建的WAL处于append模式，刚打开的WAL处于读模式
 type WAL struct {
-	lg *zap.Logger
-
 	// 存放WAL文件的目录
 	dir string // the living directory of the underlay files
 
@@ -77,6 +77,7 @@ type WAL struct {
 func (w *WAL) saveCrc(prevCrc uint32) error {
 	return w.encoder.encode(&walpb.Record{Type: crcType, Crc: prevCrc})
 }
+
 func (w *WAL) SaveSnapshot(e walpb.Snapshot) error {
 	b := pbutil.MustMarshal(&e)
 
@@ -107,27 +108,21 @@ func (w *WAL) sync() error {
 
 	took := time.Since(start)
 	if took > warnSyncDuration {
-		if w.lg != nil {
-			w.lg.Warn(
-				"slow fdatasync",
-				zap.Duration("took", took),
-				zap.Duration("expected-duration", warnSyncDuration),
-			)
-		} else {
-			plog.Warningf("sync duration of %v, expected less than %v", took, warnSyncDuration)
-		}
+		klog.Errorf(fmt.Sprintf("sync duration of %v, expected less than %v", took, warnSyncDuration))
 	}
 
 	walFsyncSec.Observe(took.Seconds())
 
 	return err
 }
+
 func (w *WAL) tail() *fileutil.LockedFile {
 	if len(w.locks) > 0 {
 		return w.locks[len(w.locks)-1]
 	}
 	return nil
 }
+
 func (w *WAL) renameWAL(tmpdirpath string) (*WAL, error) {
 	if err := os.RemoveAll(w.dir); err != nil {
 		return nil, err
@@ -144,23 +139,16 @@ func (w *WAL) renameWAL(tmpdirpath string) (*WAL, error) {
 		}
 		return nil, err
 	}
-	w.fp = newFilePipeline(w.lg, w.dir, SegmentSizeBytes)
+	w.fp = newFilePipeline(w.dir, SegmentSizeBytes)
 	df, err := fileutil.OpenDir(w.dir)
 	w.dirFile = df
 	return w, err
 }
+
 func (w *WAL) renameWALUnlock(tmpdirpath string) (*WAL, error) {
 	// rename of directory with locked files doesn't work on windows/cifs;
 	// close the WAL to release the locks so the directory can be renamed.
-	if w.lg != nil {
-		w.lg.Info(
-			"closing WAL to release flock and retry directory renaming",
-			zap.String("from", tmpdirpath),
-			zap.String("to", w.dir),
-		)
-	} else {
-		plog.Infof("releasing file lock to rename %q to %q", tmpdirpath, w.dir)
-	}
+	klog.Infof(fmt.Sprintf("closing WAL to release flock and retry directory renaming from %s to %s", tmpdirpath, w.dir))
 	w.Close()
 
 	if err := os.Rename(tmpdirpath, w.dir); err != nil {
@@ -168,7 +156,7 @@ func (w *WAL) renameWALUnlock(tmpdirpath string) (*WAL, error) {
 	}
 
 	// reopen and relock
-	newWAL, oerr := Open(w.lg, w.dir, walpb.Snapshot{})
+	newWAL, oerr := Open(w.dir, walpb.Snapshot{})
 	if oerr != nil {
 		return nil, oerr
 	}
@@ -179,7 +167,7 @@ func (w *WAL) renameWALUnlock(tmpdirpath string) (*WAL, error) {
 	return newWAL, nil
 }
 
-// ReadAll函数负责从当前WAL实例中读取所有的记录
+// ReadAll ReadAll函数负责从当前WAL实例中读取所有的记录
 // 如果是可写模式，那么必须独处所有的记录，否则将报错
 // 如果是只读模式，将尝试读取所有的记录，但是如果读出的记录没有满足快照数据的要求，将返回ErrSnapshotNotFound
 // 而如果读出来的快照数据与要求的快照数据不匹配，返回所有的记录以及ErrSnapshotMismatch
@@ -326,102 +314,59 @@ func (w *WAL) Close() error {
 			continue
 		}
 		if err := l.Close(); err != nil {
-			if w.lg != nil {
-				w.lg.Warn("failed to close WAL", zap.Error(err))
-			} else {
-				plog.Errorf("failed to unlock during closing wal: %s", err)
-			}
+			klog.Errorf(fmt.Sprintf("failed to unlock during closing wal: %v", err))
 		}
 	}
 
 	return w.dirFile.Close()
 }
-func (w *WAL) cleanupWAL(lg *zap.Logger) {
+
+func (w *WAL) cleanupWAL() {
 	var err error
 	if err = w.Close(); err != nil {
-		if lg != nil {
-			lg.Panic("failed to close WAL during cleanup", zap.Error(err))
-		} else {
-			plog.Panicf("failed to close WAL during cleanup: %v", err)
-		}
+		klog.Fatalf(fmt.Sprintf("failed to close WAL during cleanup err:%v", err))
 	}
 	brokenDirName := fmt.Sprintf("%s.broken.%v", w.dir, time.Now().Format("20060102.150405.999999"))
 	if err = os.Rename(w.dir, brokenDirName); err != nil {
-		if lg != nil {
-			lg.Panic(
-				"failed to rename WAL during cleanup",
-				zap.Error(err),
-				zap.String("source-path", w.dir),
-				zap.String("rename-path", brokenDirName),
-			)
-		} else {
-			plog.Panicf("failed to rename WAL during cleanup: %v", err)
-		}
+		klog.Fatalf(fmt.Sprintf("failed to rename WAL during cleanup source-path:%s rename-path:%s err:%v", w.dir, brokenDirName, err))
 	}
 }
 
 // Create creates a WAL ready for appending records. The given metadata is
 // recorded at the head of each WAL file, and can be retrieved with ReadAll.
-func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
-	if Exist(dirpath) {
+func Create(dataDir string, metadata []byte) (*WAL, error) {
+	if Exist(dataDir) {
 		return nil, os.ErrExist
 	}
 	// keep temporary wal directory so WAL initialization appears atomic
-	tmpdirpath := filepath.Clean(dirpath) + ".tmp"
+	tmpdirpath := filepath.Clean(dataDir) + ".tmp"
 	if fileutil.Exist(tmpdirpath) {
 		if err := os.RemoveAll(tmpdirpath); err != nil {
 			return nil, err
 		}
 	}
 	if err := fileutil.CreateDirAll(tmpdirpath); err != nil {
-		if lg != nil {
-			lg.Warn(
-				"failed to create a temporary WAL directory",
-				zap.String("tmp-dir-path", tmpdirpath),
-				zap.String("dir-path", dirpath),
-				zap.Error(err),
-			)
-		}
+		klog.Errorf(fmt.Sprintf("[WAL Create]failed to create a temporary WAL directory tmp-dir-path:%s dir-path:%s err:%v", tmpdirpath, dataDir, err))
 		return nil, err
 	}
 
 	p := filepath.Join(tmpdirpath, walName(0, 0))
 	f, err := fileutil.LockFile(p, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
 	if err != nil {
-		if lg != nil {
-			lg.Warn(
-				"failed to flock an initial WAL file",
-				zap.String("path", p),
-				zap.Error(err),
-			)
-		}
+		klog.Errorf(fmt.Sprintf("[WAL Create]failed to flock an initial WAL file path:%s err:%v", p, err))
 		return nil, err
 	}
 	if _, err = f.Seek(0, io.SeekEnd); err != nil {
-		if lg != nil {
-			lg.Warn(
-				"failed to seek an initial WAL file",
-				zap.String("path", p),
-				zap.Error(err),
-			)
-		}
+		klog.Errorf(fmt.Sprintf("[WAL Create]failed to seek an initial WAL file path:%s err:%v", p, err))
 		return nil, err
 	}
 	if err = fileutil.Preallocate(f.File, SegmentSizeBytes, true); err != nil {
-		if lg != nil {
-			lg.Warn(
-				"failed to preallocate an initial WAL file",
-				zap.String("path", p),
-				zap.Int64("segment-bytes", SegmentSizeBytes),
-				zap.Error(err),
-			)
-		}
+		klog.Errorf(fmt.Sprintf("[WAL Create]failed to preallocate an initial WAL file path:%s segment-bytes:%d err:%v", p, SegmentSizeBytes, err))
 		return nil, err
 	}
 
 	w := &WAL{
-		lg:       lg,
-		dir:      dirpath,
+		dir:      dataDir,
 		metadata: metadata,
 	}
 	w.encoder, err = newFileEncoder(f.File, 0)
@@ -440,61 +385,32 @@ func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 	}
 
 	if w, err = w.renameWAL(tmpdirpath); err != nil {
-		if lg != nil {
-			lg.Warn(
-				"failed to rename the temporary WAL directory",
-				zap.String("tmp-dir-path", tmpdirpath),
-				zap.String("dir-path", w.dir),
-				zap.Error(err),
-			)
-		}
+		klog.Errorf(fmt.Sprintf("[WAL Create]failed to rename the temporary WAL directory tmp-dir-path:%s dir-path:%s err:%v", tmpdirpath, w.dir, err))
 		return nil, err
 	}
 
-	var perr error
 	defer func() {
-		if perr != nil {
-			w.cleanupWAL(lg)
+		if err != nil {
+			w.cleanupWAL()
 		}
 	}()
 
 	// directory was renamed; sync parent dir to persist rename
-	pdir, perr := fileutil.OpenDir(filepath.Dir(w.dir))
-	if perr != nil {
-		if lg != nil {
-			lg.Warn(
-				"failed to open the parent data directory",
-				zap.String("parent-dir-path", filepath.Dir(w.dir)),
-				zap.String("dir-path", w.dir),
-				zap.Error(perr),
-			)
-		}
-		return nil, perr
+	pdir, err := fileutil.OpenDir(filepath.Dir(w.dir))
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[WAL Create]failed to open the parent data directory parent-dir-path:%s dir-path:%s err:%v", filepath.Dir(w.dir), w.dir, err))
+		return nil, err
 	}
 	start := time.Now()
-	if perr = fileutil.Fsync(pdir); perr != nil {
-		if lg != nil {
-			lg.Warn(
-				"failed to fsync the parent data directory file",
-				zap.String("parent-dir-path", filepath.Dir(w.dir)),
-				zap.String("dir-path", w.dir),
-				zap.Error(perr),
-			)
-		}
-		return nil, perr
+	if err = fileutil.Fsync(pdir); err != nil {
+		klog.Errorf(fmt.Sprintf("[WAL Create]failed to fsync the parent data directory file parent-dir-path:%s dir-path:%s err:%v", filepath.Dir(w.dir), w.dir, err))
+		return nil, err
 	}
 	walFsyncSec.Observe(time.Since(start).Seconds())
 
-	if perr = pdir.Close(); perr != nil {
-		if lg != nil {
-			lg.Warn(
-				"failed to close the parent data directory file",
-				zap.String("parent-dir-path", filepath.Dir(w.dir)),
-				zap.String("dir-path", w.dir),
-				zap.Error(perr),
-			)
-		}
-		return nil, perr
+	if err = pdir.Close(); err != nil {
+		klog.Errorf(fmt.Sprintf("[WAL Create]failed to close the parent data directory file parent-dir-path:%s dir-path:%s err:%v", filepath.Dir(w.dir), w.dir, err))
+		return nil, err
 	}
 
 	return w, nil
@@ -506,8 +422,8 @@ func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 // The returned WAL is ready to read and the first record will be the one after
 // the given snap. The WAL cannot be appended to before reading out all of its
 // previous records.
-func Open(lg *zap.Logger, dirpath string, snap walpb.Snapshot) (*WAL, error) {
-	w, err := openAtIndex(lg, dirpath, snap, true)
+func Open(dirpath string, snap walpb.Snapshot) (*WAL, error) {
+	w, err := openAtIndex(dirpath, snap, true)
 	if err != nil {
 		return nil, err
 	}
