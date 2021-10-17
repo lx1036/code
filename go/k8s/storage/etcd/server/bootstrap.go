@@ -11,7 +11,6 @@ import (
 	"go.etcd.io/etcd/pkg/v3/pbutil"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
 	"k8s.io/klog/v2"
-
 )
 
 const (
