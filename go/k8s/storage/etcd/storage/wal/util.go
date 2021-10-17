@@ -24,10 +24,6 @@ func Exist(dir string) bool {
 	return len(names) != 0
 }
 
-func walName(seq, index uint64) string {
-	return fmt.Sprintf("%016x-%016x.wal", seq, index)
-}
-
 func openAtIndex(dirpath string, snap walpb.Snapshot, write bool) (*WAL, error) {
 	names, nameIndex, err := selectWALFiles(dirpath, snap)
 	if err != nil {
@@ -164,6 +160,7 @@ func openWALFiles(dirpath string, names []string, nameIndex int, write bool) ([]
 
 	return rs, ls, closer, nil
 }
+
 func closeAll(rcs ...io.ReadCloser) error {
 	for _, f := range rcs {
 		if err := f.Close(); err != nil {
@@ -172,10 +169,15 @@ func closeAll(rcs ...io.ReadCloser) error {
 	}
 	return nil
 }
+
 func parseWALName(str string) (seq, index uint64, err error) {
 	if !strings.HasSuffix(str, ".wal") {
 		return 0, 0, errBadWALName
 	}
 	_, err = fmt.Sscanf(str, "%016x-%016x.wal", &seq, &index)
 	return seq, index, err
+}
+
+func walName(seq, index uint64) string {
+	return fmt.Sprintf("%016x-%016x.wal", seq, index)
 }

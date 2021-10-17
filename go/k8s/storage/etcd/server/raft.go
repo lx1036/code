@@ -32,6 +32,8 @@ type apply struct {
 type RaftNodeConfig struct {
 	raft.Node
 
+	heartbeat time.Duration
+
 	raftStorage *raft.MemoryStorage // INFO: 这个 storage 是用的 raft MemoryStorage，存在内存里，这个很重要!!!
 	storage     Storage             // INFO: 这个 storage 是 wal 持久化，存在文件磁盘里，这个很重要!!!
 }
@@ -52,7 +54,6 @@ type RaftNode struct {
 }
 
 func newRaftNode(config RaftNodeConfig) *RaftNode {
-	//func newRaftNode(config *raft.Config, peers []raft.Peer) *RaftNode {
 	//node := raft.StartNode(config, peers)
 	raftNode := &RaftNode{
 		RaftNodeConfig: config,
@@ -63,7 +64,7 @@ func newRaftNode(config RaftNodeConfig) *RaftNode {
 		readStateChan: make(chan raft.ReadState, 1),
 		applyChan:     make(chan apply),
 
-		ticker: time.NewTicker(time.Duration(config.HeartbeatTick) * time.Second),
+		ticker: time.NewTicker(config.heartbeat), // 1000ms
 		tickMu: new(sync.Mutex),
 
 		stoppedChan: make(chan struct{}),

@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s-lx1036/k8s/storage/etcd/raft"
+
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
 	"go.etcd.io/etcd/pkg/v3/pbutil"
 	"go.etcd.io/etcd/raft/v3/raftpb"
@@ -74,11 +76,156 @@ type WAL struct {
 	fp    *filePipeline
 }
 
+func (w *WAL) Save(hardState raftpb.HardState, entries []raftpb.Entry) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// short cut, do not call sync
+	if raft.IsEmptyHardState(hardState) && len(entries) == 0 {
+		return nil
+	}
+
+	mustSync := raft.MustSync(hardState, w.state, len(entries))
+
+	for i := range entries {
+		if err := w.saveEntry(&entries[i]); err != nil {
+			return err
+		}
+	}
+	if err := w.saveState(&hardState); err != nil {
+		return err
+	}
+
+	curOff, err := w.tail().Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+	if curOff < SegmentSizeBytes {
+		if mustSync {
+			return w.sync()
+		}
+		return nil
+	}
+
+	return w.cut()
+}
+
+func (w *WAL) saveEntry(e *raftpb.Entry) error {
+	b := pbutil.MustMarshal(e)
+	rec := &walpb.Record{Type: entryType, Data: b}
+	if err := w.encoder.encode(rec); err != nil {
+		return err
+	}
+	w.enti = e.Index
+	return nil
+}
+
+func (w *WAL) saveState(s *raftpb.HardState) error {
+	if raft.IsEmptyHardState(*s) {
+		return nil
+	}
+	w.state = *s
+	b := pbutil.MustMarshal(s)
+	rec := &walpb.Record{Type: stateType, Data: b}
+	return w.encoder.encode(rec)
+}
+
+// cut closes current file written and creates a new one ready to append.
+// cut first creates a temp wal file and writes necessary headers into it.
+// Then cut atomically rename temp wal file to a wal file.
+func (w *WAL) cut() error {
+	// close old wal file; truncate to avoid wasting space if an early cut
+	off, serr := w.tail().Seek(0, io.SeekCurrent)
+	if serr != nil {
+		return serr
+	}
+
+	if err := w.tail().Truncate(off); err != nil {
+		return err
+	}
+
+	if err := w.sync(); err != nil {
+		return err
+	}
+
+	fpath := filepath.Join(w.dir, walName(w.seq()+1, w.enti+1))
+
+	// create a temp wal file with name sequence + 1, or truncate the existing one
+	newTail, err := w.fp.Open()
+	if err != nil {
+		return err
+	}
+
+	// update writer and save the previous crc
+	w.locks = append(w.locks, newTail)
+	prevCrc := w.encoder.crc.Sum32()
+	w.encoder, err = newFileEncoder(w.tail().File, prevCrc)
+	if err != nil {
+		return err
+	}
+
+	if err = w.saveCrc(prevCrc); err != nil {
+		return err
+	}
+
+	if err = w.encoder.encode(&walpb.Record{Type: metadataType, Data: w.metadata}); err != nil {
+		return err
+	}
+
+	if err = w.saveState(&w.state); err != nil {
+		return err
+	}
+
+	// atomically move temp wal file to wal file
+	if err = w.sync(); err != nil {
+		return err
+	}
+
+	off, err = w.tail().Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+
+	if err = os.Rename(newTail.Name(), fpath); err != nil {
+		return err
+	}
+	start := time.Now()
+	if err = fileutil.Fsync(w.dirFile); err != nil {
+		return err
+	}
+	walFsyncSec.Observe(time.Since(start).Seconds())
+
+	// reopen newTail with its new path so calls to Name() match the wal filename format
+	newTail.Close()
+
+	if newTail, err = fileutil.LockFile(fpath, os.O_WRONLY, fileutil.PrivateFileMode); err != nil {
+		return err
+	}
+	if _, err = newTail.Seek(off, io.SeekStart); err != nil {
+		return err
+	}
+
+	w.locks[len(w.locks)-1] = newTail
+
+	prevCrc = w.encoder.crc.Sum32()
+	w.encoder, err = newFileEncoder(w.tail().File, prevCrc)
+	if err != nil {
+		return err
+	}
+
+	klog.Infof(fmt.Sprintf("created a new WAL segment path:%s", fpath))
+	return nil
+}
+
 func (w *WAL) saveCrc(prevCrc uint32) error {
 	return w.encoder.encode(&walpb.Record{Type: crcType, Crc: prevCrc})
 }
 
 func (w *WAL) SaveSnapshot(e walpb.Snapshot) error {
+	if err := walpb.ValidateSnapshotForWrite(&e); err != nil {
+		return err
+	}
+
 	b := pbutil.MustMarshal(&e)
 
 	w.mu.Lock()
@@ -121,6 +268,19 @@ func (w *WAL) tail() *fileutil.LockedFile {
 		return w.locks[len(w.locks)-1]
 	}
 	return nil
+}
+
+// walName: %016x-%016x.wal, seq-index
+func (w *WAL) seq() uint64 {
+	t := w.tail()
+	if t == nil {
+		return 0
+	}
+	seq, _, err := parseWALName(filepath.Base(t.Name()))
+	if err != nil {
+		klog.Fatalf(fmt.Sprintf("failed to parse WAL name:%s err:%v", t.Name(), err))
+	}
+	return seq
 }
 
 func (w *WAL) renameWAL(tmpdirpath string) (*WAL, error) {
@@ -345,26 +505,28 @@ func Create(dataDir string, metadata []byte) (*WAL, error) {
 			return nil, err
 		}
 	}
+	defer os.RemoveAll(tmpdirpath)
+
 	if err := fileutil.CreateDirAll(tmpdirpath); err != nil {
 		klog.Errorf(fmt.Sprintf("[WAL Create]failed to create a temporary WAL directory tmp-dir-path:%s dir-path:%s err:%v", tmpdirpath, dataDir, err))
 		return nil, err
 	}
-
-	p := filepath.Join(tmpdirpath, walName(0, 0))
-	f, err := fileutil.LockFile(p, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
+	path := filepath.Join(tmpdirpath, walName(0, 0))
+	f, err := fileutil.LockFile(path, os.O_WRONLY|os.O_CREATE, fileutil.PrivateFileMode)
 	if err != nil {
-		klog.Errorf(fmt.Sprintf("[WAL Create]failed to flock an initial WAL file path:%s err:%v", p, err))
+		klog.Errorf(fmt.Sprintf("[WAL Create]failed to flock an initial WAL file path:%s err:%v", path, err))
 		return nil, err
 	}
 	if _, err = f.Seek(0, io.SeekEnd); err != nil {
-		klog.Errorf(fmt.Sprintf("[WAL Create]failed to seek an initial WAL file path:%s err:%v", p, err))
+		klog.Errorf(fmt.Sprintf("[WAL Create]failed to seek an initial WAL file path:%s err:%v", path, err))
 		return nil, err
 	}
 	if err = fileutil.Preallocate(f.File, SegmentSizeBytes, true); err != nil {
-		klog.Errorf(fmt.Sprintf("[WAL Create]failed to preallocate an initial WAL file path:%s segment-bytes:%d err:%v", p, SegmentSizeBytes, err))
+		klog.Errorf(fmt.Sprintf("[WAL Create]failed to preallocate an initial WAL file path:%s segment-bytes:%d err:%v", path, SegmentSizeBytes, err))
 		return nil, err
 	}
 
+	// INFO: crcType -> metadataType -> snapshotType -> entryType -> stateType
 	w := &WAL{
 		dir:      dataDir,
 		metadata: metadata,
@@ -396,20 +558,14 @@ func Create(dataDir string, metadata []byte) (*WAL, error) {
 	}()
 
 	// directory was renamed; sync parent dir to persist rename
-	pdir, err := fileutil.OpenDir(filepath.Dir(w.dir))
+	parentDir, err := fileutil.OpenDir(filepath.Dir(w.dir))
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("[WAL Create]failed to open the parent data directory parent-dir-path:%s dir-path:%s err:%v", filepath.Dir(w.dir), w.dir, err))
 		return nil, err
 	}
-	start := time.Now()
-	if err = fileutil.Fsync(pdir); err != nil {
+	defer parentDir.Close()
+	if err = fileutil.Fsync(parentDir); err != nil {
 		klog.Errorf(fmt.Sprintf("[WAL Create]failed to fsync the parent data directory file parent-dir-path:%s dir-path:%s err:%v", filepath.Dir(w.dir), w.dir, err))
-		return nil, err
-	}
-	walFsyncSec.Observe(time.Since(start).Seconds())
-
-	if err = pdir.Close(); err != nil {
-		klog.Errorf(fmt.Sprintf("[WAL Create]failed to close the parent data directory file parent-dir-path:%s dir-path:%s err:%v", filepath.Dir(w.dir), w.dir, err))
 		return nil, err
 	}
 

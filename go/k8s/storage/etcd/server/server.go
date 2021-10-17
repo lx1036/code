@@ -68,7 +68,7 @@ func NewServer(config *raft.Config, peers []raft.Peer) *EtcdServer {
 	}
 
 	r := bootstrapFromWAL()
-	server.raftNode = r.newRaftNode(config, peers)
+	server.raftNode = r.newRaftNode()
 
 	return server
 }

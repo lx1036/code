@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 	"time"
 
 	"k8s-lx1036/k8s/storage/etcd/raft"
@@ -10,6 +9,9 @@ import (
 
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/pkg/v3/pbutil"
+	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
+	"k8s.io/klog/v2"
+
 )
 
 const (
@@ -20,6 +22,7 @@ const (
 	TickMS = 1000
 
 	DataDIR = "tmp"
+	SnapDIR = "tmp/snap"
 )
 
 type bootstrappedRaft struct {
@@ -28,7 +31,9 @@ type bootstrappedRaft struct {
 	peers  []raft.Peer
 	config *raft.Config
 
-	storage *raft.MemoryStorage
+	storage     *raft.MemoryStorage
+	wal         *wal.WAL
+	snapShotter *snap.Snapshotter
 }
 
 func bootstrapFromWAL() *bootstrappedRaft {
@@ -46,30 +51,31 @@ func bootstrapFromWAL() *bootstrappedRaft {
 		klog.Fatalf(fmt.Sprintf("[bootstrapFromWAL]failed to create WAL err: %v", err))
 	}
 
+	snapShotter := snap.New(nil, SnapDIR)
+
 	return &bootstrappedRaft{
-		heartbeat: time.Duration(TickMS) * time.Millisecond,
-		config:    raftConfig(NodeID, s),
-		storage:   s,
+		heartbeat:   time.Duration(TickMS) * time.Millisecond,
+		config:      raftConfig(NodeID, s),
+		storage:     s,
+		wal:         w,
+		snapShotter: snapShotter,
 	}
 }
 
-func (b *bootstrappedRaft) newRaftNode(ss *snap.Snapshotter, wal *wal.WAL, cl *membership.RaftCluster) *RaftNode {
-	var n raft.Node
+func (b *bootstrappedRaft) newRaftNode() *RaftNode {
+	var node raft.Node
 	if len(b.peers) == 0 {
-		n = raft.RestartNode(b.config)
+		node = raft.RestartNode(b.config)
 	} else {
-		n = raft.StartNode(b.config, b.peers)
+		node = raft.StartNode(b.config, b.peers)
 	}
-	raftStatusMu.Lock()
-	raftStatus = n.Status
-	raftStatusMu.Unlock()
+
 	return newRaftNode(
 		RaftNodeConfig{
-			isIDRemoved: func(id uint64) bool { return cl.IsIDRemoved(types.ID(id)) },
-			Node:        n,
+			Node:        node,
 			heartbeat:   b.heartbeat,
 			raftStorage: b.storage,
-			storage:     NewStorage(wal),
+			storage:     NewStorage(b.wal, b.snapShotter),
 		},
 	)
 }

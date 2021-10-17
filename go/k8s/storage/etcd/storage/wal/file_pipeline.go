@@ -55,6 +55,16 @@ func (fp *filePipeline) run() {
 	}
 }
 
+// Open returns a fresh file for writing. Rename the file before calling
+// Open again or there will be file collisions.
+func (fp *filePipeline) Open() (f *fileutil.LockedFile, err error) {
+	select {
+	case f = <-fp.filec:
+	case err = <-fp.errc:
+	}
+	return f, err
+}
+
 func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
 	// count % 2 so this file isn't the same as the one last published
 	fpath := filepath.Join(fp.dir, fmt.Sprintf("%d.tmp", fp.count%2))

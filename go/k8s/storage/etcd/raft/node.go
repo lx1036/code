@@ -64,17 +64,32 @@ type Peer struct {
 	Context []byte
 }
 
-func StartNode(c *Config, peers []Peer) Node {
+// StartNode INFO: 启动 raft node，同时 ConfChangeAddNode 添加 peers
+func StartNode(config *Config, peers []Peer) Node {
 	if len(peers) == 0 {
 		panic("no peers given; use RestartNode instead")
 	}
-	rawNode, err := NewRawNode(c)
+	rawNode, err := NewRawNode(config)
 	if err != nil {
 		panic(err)
 	}
 	err = rawNode.Bootstrap(peers)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("error occurred during starting a new node: %v", err))
+	}
+
+	n := newNode(rawNode)
+
+	go n.run()
+
+	return n
+}
+
+// RestartNode INFO: 启动 raft node，没有添加 peers
+func RestartNode(config *Config) Node {
+	rawNode, err := NewRawNode(config)
+	if err != nil {
+		panic(err)
 	}
 
 	n := newNode(rawNode)
