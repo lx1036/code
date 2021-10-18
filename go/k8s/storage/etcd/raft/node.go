@@ -176,7 +176,7 @@ func (n *node) run() {
 		case <-n.tickChan:
 			n.rawNode.Tick()
 
-		case msgResult := <-proposeChan:
+		case msgResult := <-proposeChan: // INFO: 用户提交的 Put/Delete Propose
 			message := msgResult.message
 			message.From = r.id
 			err := r.Step(message) // INFO: raft Step 提交消息到状态机

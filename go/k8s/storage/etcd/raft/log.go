@@ -147,15 +147,15 @@ func (log *raftLog) maybeCommit(maxIndex, term uint64) bool {
 	return false
 }
 
-func (log *raftLog) commitTo(tocommit uint64) {
+func (log *raftLog) commitTo(toCommittedIndex uint64) {
 	// never decrease commit
-	if log.committed < tocommit {
-		if log.lastIndex() < tocommit {
+	if log.committed < toCommittedIndex {
+		if log.lastIndex() < toCommittedIndex {
 			klog.Errorf(fmt.Sprintf("tocommit(%d) is out of range [lastIndex(%d)]. Was the raft log corrupted, truncated, or lost?",
-				tocommit, log.lastIndex()))
+				toCommittedIndex, log.lastIndex()))
 		}
 
-		log.committed = tocommit
+		log.committed = toCommittedIndex
 	}
 }
 

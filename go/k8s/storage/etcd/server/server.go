@@ -162,21 +162,21 @@ func (server *EtcdServer) applyEntries(ep *etcdProgress, apply *apply) {
 		return
 	}
 
-	firsti := apply.entries[0].Index
-	if firsti > ep.appliedi+1 {
+	firstIndex := apply.entries[0].Index
+	if firstIndex > ep.appliedi+1 {
 		klog.Fatalf(fmt.Sprintf("[applyEntries]unexpected committed entry index, current-applied-index: %d, first-committed-entry-index: %d",
-			ep.appliedi, firsti))
+			ep.appliedi, firstIndex))
 	}
 
-	var ents []raftpb.Entry
-	if ep.appliedi+1-firsti < uint64(len(apply.entries)) {
-		ents = apply.entries[ep.appliedi+1-firsti:]
+	var entries []raftpb.Entry
+	if ep.appliedi+1-firstIndex < uint64(len(apply.entries)) {
+		entries = apply.entries[ep.appliedi+1-firstIndex:]
 	}
-	if len(ents) == 0 {
+	if len(entries) == 0 {
 		return
 	}
 
-	server.apply(ents, &ep.confState)
+	server.apply(entries, &ep.confState)
 
 }
 

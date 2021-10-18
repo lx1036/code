@@ -50,14 +50,14 @@ func bootstrapFromWAL() *bootstrappedRaft {
 		klog.Fatalf(fmt.Sprintf("[bootstrapFromWAL]failed to create WAL err: %v", err))
 	}
 
-	snapShotter := snap.New(nil, SnapDIR)
+	snapshotter := snap.New(nil, SnapDIR)
 
 	return &bootstrappedRaft{
 		heartbeat:   time.Duration(TickMS) * time.Millisecond,
 		config:      raftConfig(NodeID, s),
 		storage:     s,
 		wal:         w,
-		snapShotter: snapShotter,
+		snapShotter: snapshotter,
 	}
 }
 

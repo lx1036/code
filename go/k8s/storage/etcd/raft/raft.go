@@ -30,21 +30,6 @@ const (
 	numStates
 )
 
-type ReadOnlyOption int
-
-const (
-	// ReadOnlySafe guarantees the linearizability of the read only request by
-	// communicating with the quorum. It is the default and suggested option.
-	ReadOnlySafe ReadOnlyOption = iota
-
-	// ReadOnlyLeaseBased ensures linearizability of the read only request by
-	// relying on the leader lease. It can be affected by clock drift.
-	// If the clock drift is unbounded, leader might keep the lease longer than it
-	// should (clock can move backward/pause without any bound). ReadIndex is not safe
-	// in that case.
-	ReadOnlyLeaseBased
-)
-
 type CampaignType string
 
 // Possible values for CampaignType
@@ -205,6 +190,7 @@ type raft struct {
 	// the log
 	raftLog *raftLog
 
+	readOnly   *readOnly
 	readStates []ReadState
 
 	maxMsgSize         uint64
@@ -281,7 +267,8 @@ func newRaft(config *Config) *raft {
 
 		progress: tracker.MakeProgressTracker(config.MaxInflightMsgs),
 
-		//readOnly:                  newReadOnly(c.ReadOnlyOption),
+		readOnly: newReadOnly(config.ReadOnlyOption),
+
 		//disableProposalForwarding: c.DisableProposalForwarding,
 	}
 
@@ -451,7 +438,11 @@ func (r *raft) becomeLeader() {
 // INFO: pb.Message https://pkg.go.dev/go.etcd.io/etcd/raft/v3#hdr-MessageType
 func (r *raft) stepFollower(message pb.Message) error {
 	switch message.Type {
-	//
+	case pb.MsgHeartbeat: // 收到来自 leader 的 MsgHeartbeat
+		r.electionElapsed = 0
+		r.lead = message.From
+		r.handleHeartbeat(message)
+
 	case pb.MsgProp:
 		// Follower -> Leader
 		if r.lead == None {
@@ -483,12 +474,20 @@ func (r *raft) stepFollower(message pb.Message) error {
 // whether they respond to MsgVoteResp or MsgPreVoteResp.
 func (r *raft) stepCandidate(message pb.Message) error {
 
+	switch message.Type {
+	case pb.MsgHeartbeat:
+
+	}
+
 	return nil
 }
 
+// INFO: leader 节点接收到了用户提交的 Put/Delete propose, 见 stepLeader()
 func (r *raft) stepLeader(message pb.Message) error {
-
 	switch message.Type {
+	case pb.MsgBeat:
+		r.bcastHeartbeat()
+		return nil
 	case pb.MsgReadIndex:
 		// TODO: 线性一致性读!!!
 	case pb.MsgProp: // INFO: 只有 leader 才可以接收写请求
@@ -503,6 +502,7 @@ func (r *raft) stepLeader(message pb.Message) error {
 			return ErrProposalDropped
 		}
 
+		// INFO: 如果 entry 是 ConfChange type
 		for i := range message.Entries {
 			entry := &message.Entries[i]
 			var cc pb.ConfChangeI
@@ -518,7 +518,7 @@ func (r *raft) stepLeader(message pb.Message) error {
 			}
 		}
 
-		// INFO: 把 entries 先提交给自己
+		// INFO: 把 entries 先提交给自己 raft log 模块，这时 entries 存储在 memory storage 中
 		if !r.appendEntry(message.Entries...) {
 			return ErrProposalDropped
 		}
@@ -537,14 +537,18 @@ func (r *raft) stepLeader(message pb.Message) error {
 	return nil
 }
 
+// INFO: 把 entries 先提交给自己 raft log 模块，这时 entries 存储在 memory storage 中
 func (r *raft) appendEntry(entries ...pb.Entry) (accepted bool) {
 	lastIndex := r.raftLog.lastIndex()
-	for i := range entries {
+	for i := range entries { // leader 需要更新下 entry Term 和 Index
 		entries[i].Term = r.Term
 		entries[i].Index = lastIndex + 1 + uint64(i)
 	}
 
-	// TODO:
+	if !r.increaseUncommittedSize(entries) {
+		klog.Warningf(fmt.Sprintf("%x appending new entries to log would exceed uncommitted entry size limit; dropping proposal", r.id))
+		return false
+	}
 
 	// INFO: 追加写append raft log entry, use latest "last" index after truncate/append
 	lastIndex = r.raftLog.append(entries...)
@@ -558,8 +562,41 @@ func (r *raft) appendEntry(entries ...pb.Entry) (accepted bool) {
 // the commit index changed (in which case the caller should call
 // r.bcastAppend).
 func (r *raft) maybeCommit() bool {
-	mci := r.progress.Committed()
-	return r.raftLog.maybeCommit(mci, r.Term)
+	commitedIndex := r.progress.Committed()
+	return r.raftLog.maybeCommit(commitedIndex, r.Term)
+}
+
+// bcastHeartbeat sends RPC, without entries to all the peers.
+func (r *raft) bcastHeartbeat() {
+	lastCtx := r.readOnly.lastPendingRequestCtx()
+	if len(lastCtx) == 0 {
+		r.bcastHeartbeatWithCtx(nil)
+	} else {
+		r.bcastHeartbeatWithCtx([]byte(lastCtx))
+	}
+}
+
+func (r *raft) bcastHeartbeatWithCtx(ctx []byte) {
+	r.progress.Visit(func(id uint64, _ *tracker.Progress) {
+		if id == r.id {
+			return
+		}
+
+		r.sendHeartbeat(id, ctx)
+	})
+}
+
+// sendHeartbeat sends a heartbeat RPC to the given peer.
+func (r *raft) sendHeartbeat(to uint64, ctx []byte) {
+	commit := min(r.progress.Progress[to].Match, r.raftLog.committed)
+	m := pb.Message{
+		To:      to,
+		Type:    pb.MsgHeartbeat,
+		Commit:  commit,
+		Context: ctx,
+	}
+
+	r.send(m)
 }
 
 // INFO: leader 把 append log 发送给 follower, r.progress 会记录进度
@@ -668,9 +705,10 @@ func (r *raft) tickHeartbeat() {
 
 func (r *raft) handleHeartbeat(m pb.Message) {
 	r.raftLog.commitTo(m.Commit)
-	r.send(pb.Message{To: m.From, Type: pb.MsgHeartbeatResp, Context: m.Context})
+	r.send(pb.Message{To: m.From, Type: pb.MsgHeartbeatResp, Context: m.Context}) // 返回的是 MsgHeartbeatResp
 }
 
+// Step INFO: node 里会监听用户的 propose channel，并调用 raft.Step 来推动 raft
 func (r *raft) Step(message pb.Message) error {
 	// Handle the message term, which may result in our stepping down to a follower.
 	switch {
@@ -728,13 +766,27 @@ func (r *raft) Step(message pb.Message) error {
 		// TODO:
 
 	default:
-		err := r.step(message)
+		err := r.step(message) // INFO: leader 节点接收到了用户提交的 Put/Delete propose, 见 stepLeader()
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (r *raft) increaseUncommittedSize(ents []pb.Entry) bool {
+	var s uint64
+	for _, e := range ents {
+		s += uint64(len(e.Data))
+	}
+
+	if r.uncommittedSize > 0 && s > 0 && r.uncommittedSize+s > r.maxUncommittedSize {
+		return false
+	}
+
+	r.uncommittedSize += s
+	return true
 }
 
 func (r *raft) reduceUncommittedSize(entries []pb.Entry) {
@@ -809,8 +861,8 @@ func (r *raft) advance(ready Ready) {
 	}
 }
 
-// send schedules persisting state to a stable storage and AFTER that
-// sending the message (as part of next Ready message processing).
+// INFO: raft 没有去实现 transport 模块，交给用户去实现。所以只是把 []pb.Message 存储到 r.msgs，然后在 node.Ready() 中被 raft 外部调用
+//  参考 KVServer 中上层调用模块 raft 中, 获得 raftNode.Ready() 之后在使用 transport.Send() 发给各个 follower
 func (r *raft) send(message pb.Message) {
 	if message.From == None {
 		message.From = r.id
