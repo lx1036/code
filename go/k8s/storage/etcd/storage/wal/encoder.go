@@ -4,9 +4,12 @@ import (
 	"encoding/binary"
 	"hash"
 	"io"
-	"k8s-lx1036/k8s/storage/etcd/wal/walpb"
 	"os"
 	"sync"
+
+	"go.etcd.io/etcd/pkg/v3/crc"
+	"go.etcd.io/etcd/pkg/v3/ioutil"
+	"go.etcd.io/etcd/server/v3/wal/walpb"
 )
 
 // walPageBytes is the alignment for flushing records to the backing Writer.
@@ -90,10 +93,9 @@ func encodeFrameSize(dataBytes int) (lenField uint64, padBytes int) {
 
 func newEncoder(w io.Writer, prevCrc uint32, pageOffset int) *encoder {
 	return &encoder{
-		bw:  ioutil.NewPageWriter(w, walPageBytes, pageOffset),
-		crc: crc.New(prevCrc, crcTable),
-		// 1MB buffer
-		buf:       make([]byte, 1024*1024),
+		bw:        ioutil.NewPageWriter(w, walPageBytes, pageOffset),
+		crc:       crc.New(prevCrc, crcTable),
+		buf:       make([]byte, 1024*1024), // 1MB buffer
 		uint64buf: make([]byte, 8),
 	}
 }

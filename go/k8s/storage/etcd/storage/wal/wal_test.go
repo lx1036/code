@@ -2,13 +2,14 @@ package wal
 
 import (
 	"bytes"
-	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
-	"k8s-lx1036/k8s/storage/etcd/storage/wal/walpb"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.etcd.io/etcd/pkg/v3/pbutil"
+	"go.etcd.io/etcd/server/v3/wal/walpb"
 )
 
 func TestNew(test *testing.T) {
@@ -18,7 +19,7 @@ func TestNew(test *testing.T) {
 	}
 	defer os.RemoveAll(p)
 
-	w, err := Create(zap.NewExample(), p, []byte("somedata"))
+	w, err := Create(p, []byte("somedata"))
 	if err != nil {
 		test.Fatalf("err = %v, want nil", err)
 	}

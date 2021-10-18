@@ -16,6 +16,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// INFO:
+//  etcd-线性一致性(linearizability): https://zhuanlan.zhihu.com/p/386335327
+//  线性一致性和 Raft: https://pingcap.com/zh/blog/linearizability-and-raft
+
 // None is a placeholder node ID used when there is no leader.
 const None uint64 = 0
 const noLimit = math.MaxUint64
@@ -28,21 +32,6 @@ const (
 	StateLeader
 	StatePreCandidate
 	numStates
-)
-
-type ReadOnlyOption int
-
-const (
-	// ReadOnlySafe guarantees the linearizability of the read only request by
-	// communicating with the quorum. It is the default and suggested option.
-	ReadOnlySafe ReadOnlyOption = iota
-
-	// ReadOnlyLeaseBased ensures linearizability of the read only request by
-	// relying on the leader lease. It can be affected by clock drift.
-	// If the clock drift is unbounded, leader might keep the lease longer than it
-	// should (clock can move backward/pause without any bound). ReadIndex is not safe
-	// in that case.
-	ReadOnlyLeaseBased
 )
 
 type CampaignType string
@@ -197,7 +186,7 @@ var ErrProposalDropped = errors.New("raft proposal dropped")
 //  (1) Leader Election: campaign 竞选
 //    (1.1)
 type raft struct {
-	id uint64
+	id uint64 // INFO: 对于单 node, raft id 就是 node id
 
 	Term uint64
 	Vote uint64
@@ -205,6 +194,7 @@ type raft struct {
 	// the log
 	raftLog *raftLog
 
+	readOnly   *readOnly
 	readStates []ReadState
 
 	maxMsgSize         uint64
@@ -218,6 +208,18 @@ type raft struct {
 
 	// the leader id, 每一个node缓存leader id
 	lead uint64
+	// an estimate of the size of the uncommitted tail of the Raft log. Used to
+	// prevent unbounded log growth. Only maintained by the leader. Reset on
+	// term changes.
+	uncommittedSize uint64
+	// Only one conf change may be pending (in the log, but not yet
+	// applied) at a time. This is enforced via pendingConfIndex, which
+	// is set to a value >= the log index of the latest pending
+	// configuration change (if any). Config changes are only allowed to
+	// be proposed if the leader's applied index is greater than this
+	// value.
+	pendingConfIndex uint64
+
 	// leadTransferee is id of the leader transfer target when its value is not zero.
 	// Follow the procedure defined in raft thesis 3.10.
 	leadTransferee uint64
@@ -238,9 +240,15 @@ type raft struct {
 	checkQuorum bool
 	preVote     bool
 
-	// TODO: 做啥的??
+	// INFO: 这里不同角色 raft node，tick() 函数不一样：对于 Leader node, tick() 就是 tickHeartbeat；对于 Follower/PreCandidate/Candidate，tick() 就是 tickElection
 	tick func()
 	step stepFunc
+
+	// pendingReadIndexMessages is used to store messages of type MsgReadIndex
+	// that can't be answered as new leader didn't committed any log in
+	// current term. Those will be handled as fast as first log is committed in
+	// current term.
+	pendingReadIndexMessages []pb.Message
 }
 
 func newRaft(config *Config) *raft {
@@ -269,7 +277,8 @@ func newRaft(config *Config) *raft {
 
 		progress: tracker.MakeProgressTracker(config.MaxInflightMsgs),
 
-		//readOnly:                  newReadOnly(c.ReadOnlyOption),
+		readOnly: newReadOnly(config.ReadOnlyOption),
+
 		//disableProposalForwarding: c.DisableProposalForwarding,
 	}
 
@@ -383,16 +392,67 @@ func (r *raft) switchToConfig(cfg tracker.Config, progress tracker.ProgressMap) 
 func (r *raft) becomeFollower(term uint64, lead uint64) {
 	r.step = r.stepFollower
 	r.reset(term)
+	// INFO: 这里不同角色 raft node，tick() 函数不一样：对于 Leader node, tick() 就是 tickHeartbeat；对于 Follower/PreCandidate/Candidate，tick() 就是 tickElection
 	r.tick = r.tickElection
 	r.lead = lead
 	r.state = StateFollower
 	klog.Infof("node %x became Follower at term %d", r.id, r.Term)
 }
 
+// INFO: Follower/PreCandidate/Candidate tick 都是 tickElection() 会在 electionTimeout 之后发起选举
+func (r *raft) becomePreCandidate() {
+	if r.state == StateLeader {
+		return
+	}
+	// INFO: PreCandidate 不会增加 term+1, 也不会改变 r.Vote
+	r.step = r.stepCandidate
+	r.progress.ResetVotes()
+	// INFO: 这里不同角色 raft node，tick() 函数不一样：对于 Leader node, tick() 就是 tickHeartbeat；对于 Follower/PreCandidate/Candidate，tick() 就是 tickElection
+	r.tick = r.tickElection
+	r.lead = None
+	r.state = StatePreCandidate
+
+	klog.Infof("node %x became PreCandidate at term %d", r.id, r.Term)
+}
+
+// INFO: Follower/PreCandidate/Candidate tick 都是 tickElection() 会在 electionTimeout 之后发起选举
+func (r *raft) becomeCandidate() {
+	if r.state == StateLeader {
+		return
+	}
+
+	r.step = r.stepCandidate
+	r.reset(r.Term + 1) // INFO: 竞选时 term+1
+	// INFO: 这里不同角色 raft node，tick() 函数不一样：对于 Leader node, tick() 就是 tickHeartbeat；对于 Follower/PreCandidate/Candidate，tick() 就是 tickElection
+	r.tick = r.tickElection
+	r.Vote = r.id
+	r.state = StateCandidate
+	klog.Infof("node %x became Candidate at term %d", r.id, r.Term)
+}
+
+// INFO: Leader tick 是 tickHeartbeat(), 会发心跳给 Follower/PreCandidate/Candidate
+func (r *raft) becomeLeader() {
+	if r.state == StateFollower {
+		return
+	}
+
+	r.step = r.stepLeader
+	r.reset(r.Term)
+	// INFO: 这里不同角色 raft node，tick() 函数不一样：对于 Leader node, tick() 就是 tickHeartbeat；对于 Follower/PreCandidate/Candidate，tick() 就是 tickElection
+	r.tick = r.tickHeartbeat
+	r.lead = r.id
+	r.state = StateLeader
+	klog.Infof("node %x became Leader at term %d", r.id, r.Term)
+}
+
 // INFO: pb.Message https://pkg.go.dev/go.etcd.io/etcd/raft/v3#hdr-MessageType
 func (r *raft) stepFollower(message pb.Message) error {
 	switch message.Type {
-	//
+	case pb.MsgHeartbeat: // 收到来自 leader 的 MsgHeartbeat
+		r.electionElapsed = 0
+		r.lead = message.From
+		r.handleHeartbeat(message)
+
 	case pb.MsgProp:
 		// Follower -> Leader
 		if r.lead == None {
@@ -405,6 +465,25 @@ func (r *raft) stepFollower(message pb.Message) error {
 		message.To = r.lead
 		r.send(message)
 
+	// INFO: Follower 的线性一致性读处理逻辑
+	case pb.MsgReadIndex:
+		if r.lead == None {
+			klog.Infof(fmt.Sprintf("%x no leader at term %d; dropping index reading msg", r.id, r.Term))
+			return nil
+		}
+
+		// INFO: follower 转发 MsgReadIndex 给 leader，获取 leader 中状态机已经应用的 appliedIndex。只有 leader 处理 MsgReadIndex 请求
+		message.To = r.lead
+		r.send(message)
+	case pb.MsgReadIndexResp:
+		if len(message.Entries) != 1 {
+			klog.Errorf(fmt.Sprintf("%x invalid format of MsgReadIndexResp from %x, entries count: %d", r.id, m.From, len(m.Entries)))
+			return nil
+		}
+		r.readStates = append(r.readStates, ReadState{
+			Index:      message.Index,
+			RequestCtx: message.Entries[0].Data,
+		})
 	}
 
 	return nil
@@ -414,43 +493,43 @@ func (r *raft) stepFollower(message pb.Message) error {
 // whether they respond to MsgVoteResp or MsgPreVoteResp.
 func (r *raft) stepCandidate(message pb.Message) error {
 
+	switch message.Type {
+	case pb.MsgHeartbeat:
+
+	}
+
 	return nil
 }
 
-// INFO: Follower/PreCandidate/Candidate tick 都是 tickElection() 会在 electionTimeout 之后发起选举
-func (r *raft) becomeCandidate() {
-	if r.state == StateLeader {
-		return
-	}
-
-	r.step = r.stepCandidate
-	r.reset(r.Term + 1) // INFO: 竞选时 term+1
-	r.tick = r.tickElection
-	r.Vote = r.id
-	r.state = StateCandidate
-	klog.Infof("node %x became Candidate at term %d", r.id, r.Term)
-}
-
-// INFO: Follower/PreCandidate/Candidate tick 都是 tickElection() 会在 electionTimeout 之后发起选举
-func (r *raft) becomePreCandidate() {
-	if r.state == StateLeader {
-		return
-	}
-	// INFO: PreCandidate 不会增加 term+1, 也不会改变 r.Vote
-	r.step = r.stepCandidate
-	r.progress.ResetVotes()
-	r.tick = r.tickElection
-	r.lead = None
-	r.state = StatePreCandidate
-
-	klog.Infof("node %x became PreCandidate at term %d", r.id, r.Term)
-}
-
+// INFO: leader 节点接收到了用户提交的 Put/Delete propose, 见 stepLeader()
 func (r *raft) stepLeader(message pb.Message) error {
-
 	switch message.Type {
+	case pb.MsgBeat:
+		r.bcastHeartbeat()
+		return nil
+
+	// INFO: Leader 的线性一致性读处理逻辑
 	case pb.MsgReadIndex:
-		// TODO: 线性一致性读!!!
+		// INFO: 线性一致性读!!!
+		// only one leader member in cluster
+		if r.progress.IsSingleton() {
+			if resp := r.responseToReadIndexReq(message, r.raftLog.committed); resp.To != None {
+				r.send(resp)
+			}
+
+			return nil
+		}
+
+		// Postpone read only request when this leader has not committed
+		// any log entry at its term.
+		if !r.committedEntryInCurrentTerm() {
+			r.pendingReadIndexMessages = append(r.pendingReadIndexMessages, message)
+			return nil
+		}
+
+		sendMsgReadIndexResponse(r, message)
+		return nil
+
 	case pb.MsgProp: // INFO: 只有 leader 才可以接收写请求
 		if len(message.Entries) == 0 {
 			return fmt.Errorf("%x stepped empty MsgProp", r.id)
@@ -463,6 +542,7 @@ func (r *raft) stepLeader(message pb.Message) error {
 			return ErrProposalDropped
 		}
 
+		// INFO: 如果 entry 是 ConfChange type
 		for i := range message.Entries {
 			entry := &message.Entries[i]
 			var cc pb.ConfChangeI
@@ -478,7 +558,7 @@ func (r *raft) stepLeader(message pb.Message) error {
 			}
 		}
 
-		// INFO: 把 entries 先提交给自己
+		// INFO: 把 entries 先提交给自己 raft log 模块，这时 entries 存储在 memory storage 中
 		if !r.appendEntry(message.Entries...) {
 			return ErrProposalDropped
 		}
@@ -497,14 +577,23 @@ func (r *raft) stepLeader(message pb.Message) error {
 	return nil
 }
 
+// INFO: 如果 committed term 已经追赶到了当前的 term
+func (r *raft) committedEntryInCurrentTerm() bool {
+	return r.raftLog.zeroTermOnErrCompacted(r.raftLog.term(r.raftLog.committed)) == r.Term
+}
+
+// INFO: 把 entries 先提交给自己 raft log 模块，这时 entries 存储在 memory storage 中
 func (r *raft) appendEntry(entries ...pb.Entry) (accepted bool) {
 	lastIndex := r.raftLog.lastIndex()
-	for i := range entries {
+	for i := range entries { // leader 需要更新下 entry Term 和 Index
 		entries[i].Term = r.Term
 		entries[i].Index = lastIndex + 1 + uint64(i)
 	}
 
-	// TODO:
+	if !r.increaseUncommittedSize(entries) {
+		klog.Warningf(fmt.Sprintf("%x appending new entries to log would exceed uncommitted entry size limit; dropping proposal", r.id))
+		return false
+	}
 
 	// INFO: 追加写append raft log entry, use latest "last" index after truncate/append
 	lastIndex = r.raftLog.append(entries...)
@@ -518,8 +607,41 @@ func (r *raft) appendEntry(entries ...pb.Entry) (accepted bool) {
 // the commit index changed (in which case the caller should call
 // r.bcastAppend).
 func (r *raft) maybeCommit() bool {
-	mci := r.progress.Committed()
-	return r.raftLog.maybeCommit(mci, r.Term)
+	commitedIndex := r.progress.Committed()
+	return r.raftLog.maybeCommit(commitedIndex, r.Term)
+}
+
+// bcastHeartbeat sends RPC, without entries to all the peers.
+func (r *raft) bcastHeartbeat() {
+	lastCtx := r.readOnly.lastPendingRequestCtx()
+	if len(lastCtx) == 0 {
+		r.bcastHeartbeatWithCtx(nil)
+	} else {
+		r.bcastHeartbeatWithCtx([]byte(lastCtx))
+	}
+}
+
+func (r *raft) bcastHeartbeatWithCtx(ctx []byte) {
+	r.progress.Visit(func(id uint64, _ *tracker.Progress) {
+		if id == r.id {
+			return
+		}
+
+		r.sendHeartbeat(id, ctx)
+	})
+}
+
+// sendHeartbeat sends a heartbeat RPC to the given peer.
+func (r *raft) sendHeartbeat(to uint64, ctx []byte) {
+	commit := min(r.progress.Progress[to].Match, r.raftLog.committed)
+	m := pb.Message{
+		To:      to,
+		Type:    pb.MsgHeartbeat,
+		Commit:  commit,
+		Context: ctx,
+	}
+
+	r.send(m)
 }
 
 // INFO: leader 把 append log 发送给 follower, r.progress 会记录进度
@@ -586,52 +708,6 @@ func (r *raft) maybeSendAppend(to uint64, sendIfEmpty bool) bool {
 	return true
 }
 
-// INFO: Leader tick 是 tickHeartbeat(), 会发心跳给 Follower/PreCandidate/Candidate
-func (r *raft) becomeLeader() {
-	if r.state == StateFollower {
-		return
-	}
-
-	r.step = r.stepLeader
-	r.reset(r.Term)
-	r.tick = r.tickHeartbeat
-	r.lead = r.id
-	r.state = StateLeader
-	klog.Infof("node %x became Leader at term %d", r.id, r.Term)
-}
-
-// INFO: 重置一些关键字段值
-func (r *raft) reset(term uint64) {
-	if r.Term != term {
-		r.Term = term
-		r.Vote = None
-	}
-	r.lead = None
-
-	r.electionElapsed = 0
-	r.heartbeatElapsed = 0
-	r.resetRandomizedElectionTimeout()
-
-	r.abortLeaderTransfer()
-
-	r.progress.ResetVotes()
-	r.progress.Visit(func(id uint64, pr *tracker.Progress) {
-		*pr = tracker.Progress{
-			Match:     0,
-			Next:      r.raftLog.lastIndex() + 1,
-			Inflights: tracker.NewInflights(r.progress.MaxInflight),
-			IsLearner: pr.IsLearner,
-		}
-		if id == r.id {
-			pr.Match = r.raftLog.lastIndex()
-		}
-	})
-
-	//r.pendingConfIndex = 0
-	//r.uncommittedSize = 0
-	//r.readOnly = newReadOnly(r.readOnly.option)
-}
-
 func (r *raft) abortLeaderTransfer() {
 	r.leadTransferee = None
 }
@@ -639,27 +715,6 @@ func (r *raft) abortLeaderTransfer() {
 // Raft 为了优化选票被瓜分导致选举失败的问题，引入了随机数，每个节点等待发起选举的时间点不一致，优雅的解决了潜在的竞选活锁，同时易于理解
 func (r *raft) resetRandomizedElectionTimeout() {
 	r.randomizedElectionTimeout = r.electionTimeout + globalRand.Intn(r.electionTimeout)
-}
-
-// send schedules persisting state to a stable storage and AFTER that
-// sending the message (as part of next Ready message processing).
-func (r *raft) send(message pb.Message) {
-	if message.Type == pb.MsgVote || message.Type == pb.MsgVoteResp || message.Type == pb.MsgPreVote || message.Type == pb.MsgPreVoteResp {
-		if message.Term == 0 {
-			klog.Fatalf(fmt.Sprintf("term should be set when sending %s", message.Type))
-		}
-	} else {
-		if message.Term != 0 {
-			klog.Fatalf(fmt.Sprintf("term should not be set when sending %s (was %d)", message.Type, message.Term))
-		}
-
-		if message.Type != pb.MsgProp && message.Type != pb.MsgReadIndex {
-			message.Term = r.Term
-		}
-	}
-
-	// INFO: @see newReady()
-	r.msgs = append(r.msgs, message)
 }
 
 // tickElection INFO: r.electionTimeout 过期之后，Follower/Candidate 发起选举
@@ -695,9 +750,10 @@ func (r *raft) tickHeartbeat() {
 
 func (r *raft) handleHeartbeat(m pb.Message) {
 	r.raftLog.commitTo(m.Commit)
-	r.send(pb.Message{To: m.From, Type: pb.MsgHeartbeatResp, Context: m.Context})
+	r.send(pb.Message{To: m.From, Type: pb.MsgHeartbeatResp, Context: m.Context}) // 返回的是 MsgHeartbeatResp
 }
 
+// Step INFO: node 里会监听用户的 propose channel，并调用 raft.Step 来推动 raft
 func (r *raft) Step(message pb.Message) error {
 	// Handle the message term, which may result in our stepping down to a follower.
 	switch {
@@ -755,13 +811,48 @@ func (r *raft) Step(message pb.Message) error {
 		// TODO:
 
 	default:
-		err := r.step(message)
+		err := r.step(message) // INFO: leader 节点接收到了用户提交的 Put/Delete propose, 见 stepLeader()
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (r *raft) increaseUncommittedSize(ents []pb.Entry) bool {
+	var s uint64
+	for _, e := range ents {
+		s += uint64(len(e.Data))
+	}
+
+	if r.uncommittedSize > 0 && s > 0 && r.uncommittedSize+s > r.maxUncommittedSize {
+		return false
+	}
+
+	r.uncommittedSize += s
+	return true
+}
+
+func (r *raft) reduceUncommittedSize(entries []pb.Entry) {
+	if r.uncommittedSize == 0 {
+		// Fast-path for followers, who do not track or enforce the limit.
+		return
+	}
+
+	var s uint64
+	for _, e := range entries {
+		s += uint64(len(e.Data))
+	}
+
+	if s > r.uncommittedSize {
+		// uncommittedSize may underestimate the size of the uncommitted Raft
+		// log tail but will never overestimate it. Saturate at 0 instead of
+		// allowing overflow.
+		r.uncommittedSize = 0
+	} else {
+		r.uncommittedSize -= s
+	}
 }
 
 func (r *raft) hup(t CampaignType) {
@@ -779,6 +870,98 @@ func (r *raft) pastElectionTimeout() bool {
 func (r *raft) promotable() bool {
 	pr := r.progress.Progress[r.id]
 	return pr != nil && !pr.IsLearner && !r.raftLog.hasPendingSnapshot()
+}
+
+// INFO: 推动用户提交的 []pb.Message 在 ready 结构体中，然后要提交到 log 模块中，这里才是最终目标!!!
+//  调用 Node.Advance() 通知Node，之前调用 Node.Ready() 所接受的数据已经被异步应用到状态机了
+func (r *raft) advance(ready Ready) {
+	r.reduceUncommittedSize(ready.CommittedEntries)
+
+	if newApplied := ready.appliedCursor(); newApplied > 0 {
+		oldApplied := r.raftLog.applied
+		r.raftLog.appliedTo(newApplied)
+
+		// INFO: 必须是 leader
+		if r.state == StateLeader && r.progress.Config.AutoLeave && oldApplied <= r.pendingConfIndex && newApplied >= r.pendingConfIndex {
+			ent := pb.Entry{
+				Type: pb.EntryConfChangeV2,
+				Data: nil,
+			}
+			// There's no way in which this proposal should be able to be rejected.
+			if !r.appendEntry(ent) {
+				panic("refused un-refusable auto-leaving ConfChangeV2")
+			}
+
+			r.pendingConfIndex = r.raftLog.lastIndex()
+			klog.Infof(fmt.Sprintf("[raft advance]initiating automatic transition out of joint configuration %s", r.progress.Config))
+		}
+	}
+
+	if len(ready.Entries) > 0 {
+		e := ready.Entries[len(ready.Entries)-1]
+		r.raftLog.stableTo(e.Index, e.Term)
+	}
+
+	if !IsEmptySnap(ready.Snapshot) {
+		r.raftLog.stableSnapTo(ready.Snapshot.Metadata.Index)
+	}
+}
+
+// INFO: raft 没有去实现 transport 模块，交给用户去实现。所以只是把 []pb.Message 存储到 r.msgs，然后在 node.Ready() 中被 raft 外部调用
+//  参考 KVServer 中上层调用模块 raft 中, 获得 raftNode.Ready() 之后在使用 transport.Send() 发给各个 follower
+func (r *raft) send(message pb.Message) {
+	if message.From == None {
+		message.From = r.id
+	}
+
+	if message.Type == pb.MsgVote || message.Type == pb.MsgVoteResp || message.Type == pb.MsgPreVote || message.Type == pb.MsgPreVoteResp {
+		if message.Term == 0 {
+			klog.Fatalf(fmt.Sprintf("term should be set when sending %s", message.Type))
+		}
+	} else {
+		if message.Term != 0 {
+			klog.Fatalf(fmt.Sprintf("term should not be set when sending %s (was %d)", message.Type, message.Term))
+		}
+
+		if message.Type != pb.MsgProp && message.Type != pb.MsgReadIndex {
+			message.Term = r.Term
+		}
+	}
+
+	// INFO: @see newReady()
+	r.msgs = append(r.msgs, message)
+}
+
+// INFO: 重置一些关键字段值
+func (r *raft) reset(term uint64) {
+	if r.Term != term {
+		r.Term = term
+		r.Vote = None
+	}
+	r.lead = None
+
+	r.electionElapsed = 0
+	r.heartbeatElapsed = 0
+	r.resetRandomizedElectionTimeout()
+
+	r.abortLeaderTransfer()
+
+	r.progress.ResetVotes()
+	r.progress.Visit(func(id uint64, pr *tracker.Progress) {
+		*pr = tracker.Progress{
+			Match:     0,
+			Next:      r.raftLog.lastIndex() + 1,
+			Inflights: tracker.NewInflights(r.progress.MaxInflight),
+			IsLearner: pr.IsLearner,
+		}
+		if id == r.id {
+			pr.Match = r.raftLog.lastIndex()
+		}
+	})
+
+	r.pendingConfIndex = 0
+	r.uncommittedSize = 0
+	//r.readOnly = newReadOnly(r.readOnly.option)
 }
 
 // Ready encapsulates the entries and messages that are ready to read,
@@ -817,6 +1000,8 @@ func MustSync(st, prevst pb.HardState, entsnum int) bool {
 	// log entries[]
 	return entsnum != 0 || st.Vote != prevst.Vote || st.Term != prevst.Term
 }
+
+// INFO: @see RawNode.readyWithoutAccept()
 func (r *raft) newReady(prevSoftSt *SoftState, prevHardSt pb.HardState) Ready {
 	ready := Ready{
 		Entries:          r.raftLog.unstableEntries(),
@@ -838,4 +1023,17 @@ func (r *raft) newReady(prevSoftSt *SoftState, prevHardSt pb.HardState) Ready {
 	ready.MustSync = MustSync(r.hardState(), prevHardSt, len(ready.Entries))
 
 	return ready
+}
+
+// appliedCursor extracts from the Ready the highest index the client has
+// applied (once the Ready is confirmed via Advance). If no information is
+// contained in the Ready, returns zero.
+func (ready Ready) appliedCursor() uint64 {
+	if n := len(ready.CommittedEntries); n > 0 {
+		return ready.CommittedEntries[n-1].Index
+	}
+	if index := ready.Snapshot.Metadata.Index; index > 0 {
+		return index
+	}
+	return 0
 }

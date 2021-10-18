@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -13,7 +12,6 @@ import (
 
 	"go.etcd.io/etcd/client/pkg/v3/types"
 	"go.etcd.io/etcd/pkg/v3/idutil"
-	"go.etcd.io/etcd/pkg/v3/schedule"
 	"go.etcd.io/etcd/pkg/v3/wait"
 	"go.etcd.io/etcd/raft/v3/raftpb"
 	"k8s.io/klog/v2"
@@ -67,7 +65,8 @@ func NewServer(config *raft.Config, peers []raft.Peer) *EtcdServer {
 		stop:     make(chan struct{}),
 	}
 
-	server.raftNode = newRaftNode(config, peers)
+	r := bootstrapFromWAL()
+	server.raftNode = r.newRaftNode()
 
 	return server
 }
@@ -87,9 +86,6 @@ type raftReadyHandler struct {
 }
 
 func (server *EtcdServer) run() {
-	// asynchronously accept apply packets, dispatch progress in-order
-	sched := schedule.NewFIFOScheduler()
-
 	snapshot, err := server.raftNode.raftStorage.Snapshot()
 	if err != nil {
 		klog.Fatalf(fmt.Sprintf("failed to get snapshot from Raft storage err: %v", err))
@@ -116,19 +112,14 @@ func (server *EtcdServer) run() {
 	}
 
 	defer func() {
-		sched.Stop()
-
 		server.raftNode.stop()
 	}()
 
 	for {
 		select {
-		// INFO: 在 raft.go::start() 里会写这个 channel
+		// INFO: 在 raft.go::start() 里会写这个 channel，获取已经 committed entries
 		case ap := <-server.raftNode.apply():
-
-			sched.Schedule(func(ctx context.Context) {
-				server.applyAll(&ep, &ap)
-			})
+			server.applyAll(&ep, &ap)
 		case <-server.stop:
 			return
 		}
@@ -163,6 +154,7 @@ func (server *EtcdServer) applyAll(ep *etcdProgress, apply *apply) {
 
 	server.applyEntries(ep, apply)
 
+	<-apply.notifyc
 }
 
 func (server *EtcdServer) applyEntries(ep *etcdProgress, apply *apply) {
@@ -170,22 +162,26 @@ func (server *EtcdServer) applyEntries(ep *etcdProgress, apply *apply) {
 		return
 	}
 
-	firsti := apply.entries[0].Index
-	if firsti > ep.appliedi+1 {
+	firstIndex := apply.entries[0].Index
+	if firstIndex > ep.appliedi+1 {
 		klog.Fatalf(fmt.Sprintf("[applyEntries]unexpected committed entry index, current-applied-index: %d, first-committed-entry-index: %d",
-			ep.appliedi, firsti))
+			ep.appliedi, firstIndex))
 	}
 
-	var ents []raftpb.Entry
-	if ep.appliedi+1-firsti < uint64(len(apply.entries)) {
-		ents = apply.entries[ep.appliedi+1-firsti:]
+	var entries []raftpb.Entry
+	if ep.appliedi+1-firstIndex < uint64(len(apply.entries)) {
+		entries = apply.entries[ep.appliedi+1-firstIndex:]
 	}
-	if len(ents) == 0 {
+	if len(entries) == 0 {
 		return
 	}
 
-	server.apply(ents, &ep.confState)
+	server.apply(entries, &ep.confState)
 
+}
+
+func (server *EtcdServer) applyEntryNormal(entry *raftpb.Entry) {
+	panic("not implemented")
 }
 
 // apply takes entries received from Raft (after it has been committed) and

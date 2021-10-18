@@ -39,7 +39,7 @@ func TestNode(test *testing.T) {
 	}
 
 	storage := NewMemoryStorage()
-	c := &Config{
+	config := &Config{
 		ID:              1,
 		ElectionTick:    10,
 		HeartbeatTick:   1,
@@ -47,7 +47,7 @@ func TestNode(test *testing.T) {
 		MaxSizePerMsg:   noLimit,
 		MaxInflightMsgs: 256,
 	}
-	node := StartNode(c, []Peer{{ID: 1}})
+	node := StartNode(config, []Peer{{ID: 1}})
 	defer node.Stop()
 
 	ready := <-node.Ready()
