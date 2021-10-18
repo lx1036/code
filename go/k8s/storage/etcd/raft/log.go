@@ -139,8 +139,7 @@ func (log *raftLog) append(ents ...pb.Entry) uint64 {
 }
 
 func (log *raftLog) maybeCommit(maxIndex, term uint64) bool {
-	//if maxIndex > log.committed && log.zeroTermOnErrCompacted(log.term(maxIndex)) == term {
-	if maxIndex > log.committed {
+	if maxIndex > log.committed && log.zeroTermOnErrCompacted(log.term(maxIndex)) == term {
 		log.commitTo(maxIndex)
 		return true
 	}
@@ -253,6 +252,19 @@ func (log *raftLog) nextEnts() []pb.Entry {
 func (log *raftLog) hasNextEnts() bool {
 	off := max(log.applied+1, log.firstIndex())
 	return log.committed+1 > off
+}
+
+// 如果是 ErrCompacted, 返回 term=0
+func (log *raftLog) zeroTermOnErrCompacted(t uint64, err error) uint64 {
+	if err == nil {
+		return t
+	}
+	if err == ErrCompacted {
+		return 0
+	}
+
+	klog.Fatalf(fmt.Sprintf("unexpected error (%v)", err))
+	return 0
 }
 
 // unstable.entries[i] has raft log position i+unstable.offset.

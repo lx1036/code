@@ -16,6 +16,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// INFO:
+//  etcd-线性一致性(linearizability): https://zhuanlan.zhihu.com/p/386335327
+//  线性一致性和 Raft: https://pingcap.com/zh/blog/linearizability-and-raft
+
 // None is a placeholder node ID used when there is no leader.
 const None uint64 = 0
 const noLimit = math.MaxUint64
@@ -239,6 +243,12 @@ type raft struct {
 	// INFO: 这里不同角色 raft node，tick() 函数不一样：对于 Leader node, tick() 就是 tickHeartbeat；对于 Follower/PreCandidate/Candidate，tick() 就是 tickElection
 	tick func()
 	step stepFunc
+
+	// pendingReadIndexMessages is used to store messages of type MsgReadIndex
+	// that can't be answered as new leader didn't committed any log in
+	// current term. Those will be handled as fast as first log is committed in
+	// current term.
+	pendingReadIndexMessages []pb.Message
 }
 
 func newRaft(config *Config) *raft {
@@ -455,16 +465,25 @@ func (r *raft) stepFollower(message pb.Message) error {
 		message.To = r.lead
 		r.send(message)
 
-	// INFO: Follower 的线性一致性读
+	// INFO: Follower 的线性一致性读处理逻辑
 	case pb.MsgReadIndex:
 		if r.lead == None {
 			klog.Infof(fmt.Sprintf("%x no leader at term %d; dropping index reading msg", r.id, r.Term))
 			return nil
 		}
 
-		// follower 需要发 ReadIndex Msg 给 leader 获取 leader 中状态机已经应用的 appliedIndex
+		// INFO: follower 转发 MsgReadIndex 给 leader，获取 leader 中状态机已经应用的 appliedIndex。只有 leader 处理 MsgReadIndex 请求
 		message.To = r.lead
 		r.send(message)
+	case pb.MsgReadIndexResp:
+		if len(message.Entries) != 1 {
+			klog.Errorf(fmt.Sprintf("%x invalid format of MsgReadIndexResp from %x, entries count: %d", r.id, m.From, len(m.Entries)))
+			return nil
+		}
+		r.readStates = append(r.readStates, ReadState{
+			Index:      message.Index,
+			RequestCtx: message.Entries[0].Data,
+		})
 	}
 
 	return nil
@@ -488,8 +507,29 @@ func (r *raft) stepLeader(message pb.Message) error {
 	case pb.MsgBeat:
 		r.bcastHeartbeat()
 		return nil
+
+	// INFO: Leader 的线性一致性读处理逻辑
 	case pb.MsgReadIndex:
-		// TODO: 线性一致性读!!!
+		// INFO: 线性一致性读!!!
+		// only one leader member in cluster
+		if r.progress.IsSingleton() {
+			if resp := r.responseToReadIndexReq(message, r.raftLog.committed); resp.To != None {
+				r.send(resp)
+			}
+
+			return nil
+		}
+
+		// Postpone read only request when this leader has not committed
+		// any log entry at its term.
+		if !r.committedEntryInCurrentTerm() {
+			r.pendingReadIndexMessages = append(r.pendingReadIndexMessages, message)
+			return nil
+		}
+
+		sendMsgReadIndexResponse(r, message)
+		return nil
+
 	case pb.MsgProp: // INFO: 只有 leader 才可以接收写请求
 		if len(message.Entries) == 0 {
 			return fmt.Errorf("%x stepped empty MsgProp", r.id)
@@ -535,6 +575,11 @@ func (r *raft) stepLeader(message pb.Message) error {
 	}
 
 	return nil
+}
+
+// INFO: 如果 committed term 已经追赶到了当前的 term
+func (r *raft) committedEntryInCurrentTerm() bool {
+	return r.raftLog.zeroTermOnErrCompacted(r.raftLog.term(r.raftLog.committed)) == r.Term
 }
 
 // INFO: 把 entries 先提交给自己 raft log 模块，这时 entries 存储在 memory storage 中
@@ -828,6 +873,7 @@ func (r *raft) promotable() bool {
 }
 
 // INFO: 推动用户提交的 []pb.Message 在 ready 结构体中，然后要提交到 log 模块中，这里才是最终目标!!!
+//  调用 Node.Advance() 通知Node，之前调用 Node.Ready() 所接受的数据已经被异步应用到状态机了
 func (r *raft) advance(ready Ready) {
 	r.reduceUncommittedSize(ready.CommittedEntries)
 
