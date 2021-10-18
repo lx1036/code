@@ -15,6 +15,8 @@ const (
 	daemonModeVPC        = "VPC"
 	daemonModeENIMultiIP = "ENIMultiIP"
 	daemonModeENIOnly    = "ENIOnly"
+
+	cniDefaultPath = "/opt/cni/bin"
 )
 
 type EniBackendServer struct {
@@ -53,7 +55,15 @@ func newEniBackendServer(daemonMode string) (rpc.EniBackendServer, error) {
 
 func (server *EniBackendServer) AllocateIP(ctx context.Context, request *rpc.AllocateIPRequest) (*rpc.AllocateIPReply, error) {
 
+	// 0. Get pod Info
+	podinfo, err := server.k8s.GetPod(r.K8SPodNamespace, r.K8SPodName)
+
+	// 1. Init Context
 	allocIPReply := &rpc.AllocateIPReply{IPv4: server.ipFamily.IPv4, IPv6: server.ipFamily.IPv6}
+
+	// 3. Allocate network resource for pod
+	switch podInfo {
+	}
 
 	// 4. grpc connection
 	if ctx.Err() != nil {
