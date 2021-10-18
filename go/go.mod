@@ -1,6 +1,6 @@
 module k8s-lx1036
 
-go 1.16
+go 1.17
 
 require (
 	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05
@@ -11,34 +11,25 @@ require (
 	github.com/astaxie/beego v1.12.1
 	github.com/aws/aws-sdk-go v1.38.49
 	github.com/bep/debounce v1.2.0
-	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/caddyserver/caddy v1.0.4
-	github.com/codingsince1985/checksum v1.1.0 // indirect
+	github.com/cilium/cilium v1.10.5
 	github.com/container-storage-interface/spec v1.3.0
 	github.com/containerd/cgroups v1.0.1
 	github.com/containerd/containerd v1.5.1
 	github.com/containernetworking/cni v1.0.1
-	github.com/containernetworking/plugins v1.0.1 // indirect
-	github.com/coreos/etcd v3.3.13+incompatible // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/cyphar/filepath-securejoin v0.2.2
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
 	github.com/docker/go-connections v0.4.0
-	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
-	github.com/docker/go-units v0.4.0 // indirect
 	github.com/emicklei/go-restful v2.14.3+incompatible
-	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
-	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
-	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
-	github.com/fsnotify/fsnotify v1.4.9
+	github.com/fsnotify/fsnotify v1.4.10-0.20200417215612-7f4cf4dd2b52
 	github.com/getsentry/sentry-go v0.3.0
 	github.com/gin-gonic/gin v1.5.0
 	github.com/go-logr/logr v0.4.0
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
-	github.com/go-sql-driver/mysql v1.4.1
-	github.com/gogo/googleapis v1.4.0 // indirect
+	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/gohouse/gorose/v2 v2.1.3
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
@@ -49,23 +40,16 @@ require (
 	github.com/google/go-querystring v1.0.0
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.2.0
-	github.com/gorilla/mux v1.7.3
-	github.com/gorilla/websocket v1.4.2 // indirect
-	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
-	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
+	github.com/gorilla/mux v1.8.0
 	github.com/hanwen/go-fuse/v2 v2.1.1-0.20210611132105-24a1dfe6b4f8
 	github.com/hashicorp/go-msgpack v0.5.5
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/raft v1.3.1
-	github.com/jacobsa/fuse v0.0.0-20210606185441-fac69e018fad // indirect
 	github.com/jacobsa/oglematchers v0.0.0-20150720000706-141901ea67cd
 	github.com/jacobsa/syncutil v0.0.0-20180201203307-228ac8e5a6c3
-	github.com/jacobsa/timeutil v0.0.0-20170205232429-577e5acbbcf6 // indirect
-	github.com/jedib0t/go-pretty v4.3.0+incompatible // indirect
 	github.com/jinzhu/gorm v1.9.11
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/jwhited/corebgp v0.2.0
-	github.com/kavu/go_reuseport v1.5.0 // indirect
 	github.com/klauspost/cpuid v1.2.1
 	github.com/kubernetes-csi/csi-lib-utils v0.9.0
 	github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0
@@ -80,9 +64,7 @@ require (
 	github.com/miekg/dns v1.1.26
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/moby/ipvs v1.0.1
-	github.com/moby/sys/mountinfo v0.4.1 // indirect
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
-	github.com/olivere/elastic/v7 v7.0.9 // indirect
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.15.0
 	github.com/opencontainers/runc v1.0.0-rc93
@@ -98,42 +80,34 @@ require (
 	github.com/robfig/cron v1.1.0
 	github.com/romanyx/polluter v1.2.2
 	github.com/rs/cors v1.7.0
-	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cast v1.3.1
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.8.1
 	github.com/stretchr/testify v1.7.0
-	github.com/syndtr/goleveldb v0.0.0-20181127023241-353a9fca669c // indirect
 	github.com/tecbot/gorocksdb v0.0.0-20191217155057-f0fad39f321c
 	github.com/tidwall/evio v1.0.2
 	github.com/tidwall/wal v0.1.4
 	github.com/tiglabs/raft v0.0.0-20200304095606-b25a44ad8b33
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
 	github.com/urfave/cli v1.22.4
-	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
+	github.com/vishvananda/netlink v1.1.1-0.20210510164352-d17758a128bf
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f
 	go.etcd.io/bbolt v1.3.6
 	go.etcd.io/etcd/api/v3 v3.5.0
 	go.etcd.io/etcd/client/v3 v3.5.0
-	go.etcd.io/etcd/pkg/v3 v3.5.0 // indirect
-	go.etcd.io/etcd/raft/v3 v3.5.0 // indirect
-	go.etcd.io/etcd/server/v3 v3.5.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0 // indirect
 	go.uber.org/zap v1.17.0
 	golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
-	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e
+	golang.org/x/sys v0.0.0-20210823070655-63515b42dcdf
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-	gopkg.in/sohlich/elogrus.v7 v7.0.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.5.1
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
@@ -159,9 +133,65 @@ require (
 	k8s.io/sample-controller v0.22.1
 	k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
 	sigs.k8s.io/controller-runtime v0.6.2
-	sigs.k8s.io/controller-tools v0.6.2 // indirect
 	sigs.k8s.io/metrics-server v0.4.4
 	volcano.sh/apis v0.0.0-20210603070204-70005b2d502a
+)
+
+require (
+	github.com/PuerkitoBio/purell v1.1.1 // indirect
+	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
+	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef // indirect
+	github.com/boltdb/bolt v1.3.1 // indirect
+	github.com/codingsince1985/checksum v1.1.0 // indirect
+	github.com/containernetworking/plugins v1.0.1 // indirect
+	github.com/coreos/etcd v3.3.13+incompatible // indirect
+	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
+	github.com/docker/go-units v0.4.0 // indirect
+	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
+	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
+	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
+	github.com/go-openapi/analysis v0.19.16 // indirect
+	github.com/go-openapi/errors v0.19.9 // indirect
+	github.com/go-openapi/jsonpointer v0.19.5 // indirect
+	github.com/go-openapi/jsonreference v0.19.5 // indirect
+	github.com/go-openapi/loads v0.20.0 // indirect
+	github.com/go-openapi/runtime v0.19.26 // indirect
+	github.com/go-openapi/spec v0.20.3 // indirect
+	github.com/go-openapi/strfmt v0.20.0 // indirect
+	github.com/go-openapi/swag v0.19.14 // indirect
+	github.com/go-openapi/validate v0.20.1 // indirect
+	github.com/go-stack/stack v1.8.0 // indirect
+	github.com/gogo/googleapis v1.4.0 // indirect
+	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
+	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
+	github.com/hashicorp/hcl v1.0.0 // indirect
+	github.com/jacobsa/fuse v0.0.0-20210606185441-fac69e018fad // indirect
+	github.com/jacobsa/timeutil v0.0.0-20170205232429-577e5acbbcf6 // indirect
+	github.com/jedib0t/go-pretty v4.3.0+incompatible // indirect
+	github.com/josharian/intern v1.0.0 // indirect
+	github.com/kavu/go_reuseport v1.5.0 // indirect
+	github.com/magiconair/properties v1.8.5 // indirect
+	github.com/mailru/easyjson v0.7.6 // indirect
+	github.com/moby/sys/mountinfo v0.4.1 // indirect
+	github.com/olivere/elastic/v7 v7.0.9 // indirect
+	github.com/opentracing/opentracing-go v1.2.0 // indirect
+	github.com/pelletier/go-toml v1.9.3 // indirect
+	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
+	github.com/spf13/afero v1.6.0 // indirect
+	github.com/spf13/jwalterweatherman v1.1.0 // indirect
+	github.com/subosito/gotenv v1.2.0 // indirect
+	github.com/syndtr/goleveldb v0.0.0-20181127023241-353a9fca669c // indirect
+	go.etcd.io/etcd/pkg/v3 v3.5.0 // indirect
+	go.etcd.io/etcd/raft/v3 v3.5.0 // indirect
+	go.etcd.io/etcd/server/v3 v3.5.0 // indirect
+	go.mongodb.org/mongo-driver v1.5.1 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0 // indirect
+	golang.org/x/mod v0.4.2 // indirect
+	golang.org/x/text v0.3.6 // indirect
+	gopkg.in/ini.v1 v1.62.0 // indirect
+	gopkg.in/sohlich/elogrus.v7 v7.0.0 // indirect
+	sigs.k8s.io/controller-tools v0.6.2 // indirect
 )
 
 replace (

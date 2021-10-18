@@ -62,7 +62,17 @@ func (server *EniBackendServer) AllocateIP(ctx context.Context, request *rpc.All
 	allocIPReply := &rpc.AllocateIPReply{IPv4: server.ipFamily.IPv4, IPv6: server.ipFamily.IPv6}
 
 	// 3. Allocate network resource for pod
-	switch podInfo {
+	switch podInfo.PodNetworkType {
+
+	case podNetworkTypeVPCENI:
+		var eni *types.ENI
+		eni, err = networkService.allocateENI(networkContext, &oldRes)
+		if err != nil {
+			return nil, fmt.Errorf("error get allocated vpc ENI ip for: %+v, result: %+v", podinfo, err)
+		}
+
+	default:
+		return nil, fmt.Errorf("not support pod network type")
 	}
 
 	// 4. grpc connection
