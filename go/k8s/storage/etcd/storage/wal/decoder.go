@@ -5,8 +5,12 @@ import (
 	"encoding/binary"
 	"hash"
 	"io"
-	"k8s-lx1036/k8s/storage/etcd/wal/walpb"
 	"sync"
+
+	"go.etcd.io/etcd/pkg/v3/crc"
+	"go.etcd.io/etcd/pkg/v3/pbutil"
+	"go.etcd.io/etcd/raft/v3/raftpb"
+	"go.etcd.io/etcd/server/v3/wal/walpb"
 )
 
 const minSectorSize = 512

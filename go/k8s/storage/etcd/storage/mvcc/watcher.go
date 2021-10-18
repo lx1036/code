@@ -40,7 +40,6 @@ type WatchResponse struct {
 }
 
 type WatchStream interface {
-
 	// Watch INFO: 创建一个watcher, watch events keys [key, end)
 	Watch(id WatchID, key, end []byte, startRev int64, fcs ...FilterFunc) (WatchID, error)
 
@@ -57,7 +56,8 @@ type WatchStream interface {
 	Rev() int64
 }
 
-// INFO: 表示多个 watchers 对一个 streaming channel
+// INFO: 表示多个 watchers 对一个 streaming channel，
+//  etcd 设计如此：一个 watch client 的 watch 请求过来，watch server 会创建一个 watchStream 对象，
 type watchStream struct {
 	mu sync.Mutex
 

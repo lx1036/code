@@ -7,7 +7,6 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.etcd.io/etcd/raft/v3"
 	"k8s.io/klog/v2"
 )
 
@@ -47,29 +46,6 @@ func TestClient(test *testing.T) {
 
 	for _, member := range memberListResponse.Members {
 		klog.Infof(fmt.Sprintf("member %+v", *member))
-	}
-}
-
-func TestRaftNode(test *testing.T) {
-	storage := raft.NewMemoryStorage()
-	c := &raft.Config{
-		ID:              0x01,
-		ElectionTick:    10,
-		HeartbeatTick:   1,
-		Storage:         storage,
-		MaxSizePerMsg:   4096,
-		MaxInflightMsgs: 256,
-	}
-	// Set peer list to the other nodes in the cluster.
-	// Note that they need to be started separately as well.
-	peers := []raft.Peer{{ID: 0x01}, {ID: 0x02}, {ID: 0x03}}
-	node := raft.StartNode(c, peers)
-
-	for {
-		select {
-		case ready := <-node.Ready():
-
-		}
 	}
 }
 

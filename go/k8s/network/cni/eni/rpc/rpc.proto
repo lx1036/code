@@ -1,0 +1,122 @@
+
+syntax = "proto3";
+
+package rpc;
+option go_package = "./;rpc";
+
+service EniBackend {
+  rpc AllocateIP (AllocateIPRequest) returns (AllocateIPReply) {
+  }
+  rpc ReleaseIP (ReleaseIPRequest) returns (ReleaseIPReply) {
+  }
+  rpc GetIPInfo(GetInfoRequest) returns (GetInfoReply) {
+  }
+  rpc RecordEvent(EventRequest) returns (EventReply) {
+  }
+}
+
+message AllocateIPRequest {
+  string K8sPodName = 1;
+  string K8sPodNamespace = 2;
+  string K8sPodInfraContainerId = 3;
+  string Netns = 4;
+  string IfName = 5;
+}
+
+// IPSet declare a string set contain v4 v6 info
+message IPSet {
+  string IPv4 = 1;
+  string IPv6 = 2;
+}
+
+message BasicInfo {
+  IPSet PodIP = 1;
+  IPSet PodCIDR = 2; // subnet for pod, value form vSwitch CIDR or podCIDR
+  IPSet GatewayIP = 3; // gw for the subnet
+  IPSet ServiceCIDR = 4;
+}
+
+message ENIInfo {
+  string MAC = 1;
+  bool Trunk = 2; // eni is trunk
+}
+
+enum IPType {
+  TypeVPCIP = 0;
+  TypeVPCENI = 1;
+  TypeENIMultiIP = 2;
+}
+
+// VETH Basic
+message Pod {
+  uint64 Ingress = 1;
+  uint64 Egress = 2;
+}
+
+message AllocateIPReply {
+  bool Success = 1;
+  IPType IPType = 2;
+  BasicInfo BasicInfo = 3;
+  ENIInfo ENIInfo = 4;
+  Pod Pod = 5;
+  bool IPv4 = 6;
+  bool IPv6 = 7;
+}
+
+message ReleaseIPRequest {
+  string K8sPodName = 1;
+  string K8sPodNamespace = 2;
+  string K8sPodInfraContainerId = 3;
+  IPType IPType = 4;
+  IPSet IPv4Addr = 5;
+  string MacAddr = 6;
+  string Reason = 7;
+}
+
+message ReleaseIPReply {
+  bool Success = 1;
+  IPSet IPv4Addr = 2;
+  int32 DeviceNumber = 3;
+  bool IPv4 = 4;
+  bool IPv6 = 5;
+}
+
+message GetInfoRequest {
+  string K8sPodName = 1;
+  string K8sPodNamespace = 2;
+  string K8sPodInfraContainerId = 3;
+}
+
+message GetInfoReply {
+  IPType IPType = 1;
+  BasicInfo BasicInfo = 2;
+  ENIInfo ENIInfo = 3;
+  Pod Pod = 4;
+  bool IPv4 = 5;
+  bool IPv6 = 6;
+}
+
+
+enum EventTarget {
+  EventTargetNode = 0;
+  EventTargetPod = 1;
+}
+
+enum EventType {
+  EventTypeNormal = 0;
+  EventTypeWarning = 1;
+}
+
+message EventRequest {
+  EventTarget EventTarget = 1;
+  string K8sPodName = 2;
+  string K8sPodNamespace = 3;
+  EventType EventType = 4;
+  string Reason = 5;
+  string Message = 6;
+}
+
+message EventReply {
+  bool Succeed = 1;
+  string Error = 2;
+}

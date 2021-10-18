@@ -2,13 +2,69 @@ package bbolt
 
 import (
 	"fmt"
-	bolt "go.etcd.io/bbolt"
-	"log"
 	"testing"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
+	"k8s.io/klog/v2"
 )
 
 var testBucket = []byte("test-bucket")
+
+func TestBasic(test *testing.T) {
+	db, err := bolt.Open("my.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
+		klog.Fatal(err)
+	}
+	// 参数true表示创建一个写事务，false读事务
+	tx, err := db.Begin(true)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	bucket, err := tx.CreateBucketIfNotExists([]byte("key"))
+	if err != nil {
+		klog.Fatal(err)
+	}
+	// 使用bucket对象更新一个key
+	if err = bucket.Put([]byte("hello"), []byte("world")); err != nil {
+		klog.Fatal(err)
+	}
+	// 提交事务
+	if err := tx.Commit(); err != nil {
+		klog.Fatal(err)
+	}
+	db.Close()
+
+	stopChan := make(chan struct{})
+	readView := func() {
+		db2, err := bolt.Open("my.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+		if err != nil {
+			klog.Fatal(err)
+		}
+		defer db2.Close()
+		tx2, err := db2.Begin(false)
+		if err != nil {
+			klog.Fatal(err)
+		}
+		defer tx2.Rollback()
+		bucket2 := tx2.Bucket([]byte("key"))
+		if bucket2 == nil {
+			klog.Fatal(fmt.Sprintf("bucket (key) is not existed in db"))
+		}
+		value := bucket2.Get([]byte("hello"))
+		klog.Infof(fmt.Sprintf("value=%s", string(value)))
+	}
+
+	tick := time.Tick(time.Second * 3)
+	for {
+		select {
+		case <-tick:
+			readView()
+		case <-stopChan:
+			return
+		}
+	}
+}
 
 // https://zhengyinyong.com/post/bbolt-first-experience/
 func TestBbolt(test *testing.T) {
@@ -16,7 +72,7 @@ func TestBbolt(test *testing.T) {
 	// 如果文件不存在，将会自动创建
 	db, err := bolt.Open("my.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
-		log.Fatal(err)
+		klog.Fatal(err)
 	}
 	defer db.Close()
 
@@ -37,7 +93,7 @@ func TestBbolt(test *testing.T) {
 		return bucket.Put(key, value)
 	})
 	if err != nil {
-		log.Fatal(err)
+		klog.Fatal(err)
 	}
 
 	// 创建一个 read-only transaction 来获取数据
@@ -52,6 +108,12 @@ func TestBbolt(test *testing.T) {
 		value := bucket.Get(key)
 		fmt.Printf("%s: %s\n", string(key), string(value))
 
+		// read-only txn 内不能写操作
+		/*err = bucket.Put(key, []byte("world2"))
+		if err != nil { // error: "tx not writable"
+			return err
+		}*/
+
 		cursor := bucket.Cursor()
 		for key, value := cursor.First(); key != nil; key, value = cursor.Next() {
 			fmt.Printf("key=%s, value=%s\n", key, value)
@@ -60,6 +122,6 @@ func TestBbolt(test *testing.T) {
 		return nil
 	})
 	if err != nil {
-		log.Fatal(err)
+		klog.Fatal(err)
 	}
 }

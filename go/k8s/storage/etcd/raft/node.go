@@ -34,6 +34,9 @@ func (a *SoftState) equal(b *SoftState) bool {
 
 type Node interface {
 
+	// Tick INFO: 每一个 node 的逻辑时钟，用来判断 heartbeatTimeout 和 electionTimeout
+	Tick()
+
 	// Campaign INFO: Follower 变成 Candidate, 竞选成 Leader
 	Campaign(ctx context.Context) error
 
@@ -61,17 +64,32 @@ type Peer struct {
 	Context []byte
 }
 
-func StartNode(c *Config, peers []Peer) Node {
+// StartNode INFO: 启动 raft node，同时 ConfChangeAddNode 添加 peers
+func StartNode(config *Config, peers []Peer) Node {
 	if len(peers) == 0 {
 		panic("no peers given; use RestartNode instead")
 	}
-	rawNode, err := NewRawNode(c)
+	rawNode, err := NewRawNode(config)
 	if err != nil {
 		panic(err)
 	}
 	err = rawNode.Bootstrap(peers)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("error occurred during starting a new node: %v", err))
+	}
+
+	n := newNode(rawNode)
+
+	go n.run()
+
+	return n
+}
+
+// RestartNode INFO: 启动 raft node，没有添加 peers
+func RestartNode(config *Config) Node {
+	rawNode, err := NewRawNode(config)
+	if err != nil {
+		panic(err)
 	}
 
 	n := newNode(rawNode)
@@ -90,6 +108,8 @@ type msgWithResult struct {
 type node struct {
 	rawNode *RawNode
 
+	tickChan chan struct{}
+
 	receiveChan chan pb.Message
 
 	readyChan   chan Ready
@@ -103,6 +123,9 @@ type node struct {
 func newNode(rawNode *RawNode) *node {
 	return &node{
 		rawNode: rawNode,
+
+		// INFO: 这里 tickChan 是一个 buffer chan，这样消费者(run goroutine)消费不过来时，可以 buffer 下
+		tickChan: make(chan struct{}, 128),
 
 		readyChan: make(chan Ready),
 
@@ -128,6 +151,7 @@ func (n *node) run() {
 		if advanceChan != nil {
 			readyChan = nil
 		} else if n.rawNode.HasReady() {
+			// INFO: 会从 raft.msgs 获取用户提交的 []pb.Message
 			ready = n.rawNode.readyWithoutAccept()
 			readyChan = n.readyChan
 		}
@@ -149,7 +173,10 @@ func (n *node) run() {
 		}
 
 		select {
-		case msgResult := <-proposeChan:
+		case <-n.tickChan:
+			n.rawNode.Tick()
+
+		case msgResult := <-proposeChan: // INFO: 用户提交的 Put/Delete Propose
 			message := msgResult.message
 			message.From = r.id
 			err := r.Step(message) // INFO: raft Step 提交消息到状态机
@@ -162,12 +189,12 @@ func (n *node) run() {
 			if pr := r.progress.Progress[message.From]; pr != nil || !IsResponseMsg(message.Type) {
 				r.Step(message)
 			}
+		// INFO: 用户提交的 pb.Message 从这 readyChan 获取
 		case readyChan <- ready:
-			klog.Infof(fmt.Sprintf("readyChan <- ready"))
 			n.rawNode.acceptReady(ready)
 			advanceChan = n.advanceChan
+		// INFO: @see Advance(), 推动用户提交的 []pb.Message 提交到 log 模块中，这里才是最终目标!!!
 		case <-advanceChan:
-			klog.Infof(fmt.Sprintf("<-advanceChan"))
 			n.rawNode.Advance(ready)
 			ready = Ready{}
 			advanceChan = nil
@@ -175,6 +202,16 @@ func (n *node) run() {
 			close(n.doneChan)
 			return
 		}
+	}
+}
+
+// Tick INFO: raft node 逻辑时钟，用来判断 heartbeatTimeout 和 electionTimeout
+func (n *node) Tick() {
+	select {
+	case n.tickChan <- struct{}{}:
+	case <-n.doneChan:
+	default:
+		klog.Warningf(fmt.Sprintf("[Tick]%x tick missed to fire. Node blocks too long!", n.rawNode.raft.id))
 	}
 }
 
