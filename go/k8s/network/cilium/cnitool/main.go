@@ -4,22 +4,24 @@ import (
 	"context"
 	"crypto/sha512"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/containernetworking/cni/libcni"
+	"github.com/containernetworking/cni/pkg/types"
+	"k8s.io/klog/v2"
 )
 
 const (
-	EnvCNIPath        = "CNI_PATH"
-	EnvNetDir         = "NETCONFPATH"
 	EnvCapabilityArgs = "CAP_ARGS"
 	EnvCNIArgs        = "CNI_ARGS"
 	EnvCNIIfname      = "CNI_IFNAME"
 
 	DefaultNetDir = "/etc/cni/net.d"
+	DefaultBINDir = "/usr/bin"
 
 	CmdAdd   = "add"
 	CmdCheck = "check"
@@ -42,92 +44,76 @@ func parseArgs(args string) ([][2]string, error) {
 	return result, nil
 }
 
+// go run . --cmd=add --pid=2049 --name=cilium --bin=./bin --conf=./05-cilium.conf
 func main() {
-	if len(os.Args) < 4 {
-		usage()
-		return
-	}
+	cmd := flag.String("cmd", CmdAdd, "cni cmd, e.g. add/check/del")
+	pid := flag.Int("pid", 0, "container pid, e.g. /proc/2949/ns/net, 2949=`docker inspect ${container_id} | grep Pid`")
+	name := flag.String("name", "cilium", "cni conf name, e.g. cilium in 05-cilium.conf 'name' field")
+	cniBinDir := flag.String("bin", DefaultBINDir, "cni bin dir, e.g. /usr/bin. cilium-cni in 05-cilium.conf 'type' field")
+	cniConfDir := flag.String("conf", DefaultNetDir, "cni net conf dir, e.g. /etc/cni/net.d")
 
-	netdir := os.Getenv(EnvNetDir)
-	if netdir == "" {
-		netdir = DefaultNetDir
+	flag.Parse()
+
+	if *pid == 0 {
+		klog.Fatalf(fmt.Sprintf("pid is required"))
 	}
-	netconf, err := libcni.LoadConfList(netdir, os.Args[2])
+	netns := fmt.Sprintf("/proc/%d/ns/net", *pid)
+
+	netConfDir, _ := filepath.Abs(*cniConfDir)
+	netconf, err := libcni.LoadConfList(netConfDir, *name)
 	if err != nil {
-		exit(err)
+		klog.Fatal(err)
 	}
 
 	var capabilityArgs map[string]interface{}
 	capabilityArgsValue := os.Getenv(EnvCapabilityArgs)
 	if len(capabilityArgsValue) > 0 {
 		if err = json.Unmarshal([]byte(capabilityArgsValue), &capabilityArgs); err != nil {
-			exit(err)
+			klog.Fatal(err)
 		}
 	}
-
 	var cniArgs [][2]string
 	args := os.Getenv(EnvCNIArgs)
 	if len(args) > 0 {
 		cniArgs, err = parseArgs(args)
 		if err != nil {
-			exit(err)
+			klog.Fatal(err)
 		}
 	}
-
 	ifName, ok := os.LookupEnv(EnvCNIIfname)
 	if !ok {
 		ifName = "eth0"
 	}
 
-	netns := os.Args[3]
-	netns, err = filepath.Abs(netns)
-	if err != nil {
-		exit(err)
-	}
-
-	// Generate the containerid by hashing the netns path
+	// Generate the containerID by hashing the netns path
 	s := sha512.Sum512([]byte(netns))
 	containerID := fmt.Sprintf("cnitool-%x", s[:10])
 
-	cninet := libcni.NewCNIConfig(filepath.SplitList(os.Getenv(EnvCNIPath)), nil)
+	netBinDir, _ := filepath.Abs(*cniBinDir)
+	cninet := libcni.NewCNIConfig(filepath.SplitList(netBinDir), nil)
 
-	rt := &libcni.RuntimeConf{
+	runtimeConf := &libcni.RuntimeConf{
 		ContainerID:    containerID,
-		NetNS:          netns,
-		IfName:         ifName,
+		NetNS:          netns,  // /proc/2949/ns/net
+		IfName:         ifName, // eth0
 		Args:           cniArgs,
 		CapabilityArgs: capabilityArgs,
 	}
 
-	switch os.Args[1] {
+	switch *cmd {
 	case CmdAdd:
-		result, err := cninet.AddNetworkList(context.TODO(), netconf, rt)
+		var result types.Result
+		result, err = cninet.AddNetworkList(context.TODO(), netconf, runtimeConf)
 		if result != nil {
 			_ = result.Print()
 		}
-		exit(err)
 	case CmdCheck:
-		err := cninet.CheckNetworkList(context.TODO(), netconf, rt)
-		exit(err)
+		err = cninet.CheckNetworkList(context.TODO(), netconf, runtimeConf)
 	case CmdDel:
-		exit(cninet.DelNetworkList(context.TODO(), netconf, rt))
+		err = cninet.DelNetworkList(context.TODO(), netconf, runtimeConf)
 	}
-}
 
-func usage() {
-	exe := filepath.Base(os.Args[0])
-
-	fmt.Fprintf(os.Stderr, "%s: Add, check, or remove network interfaces from a network namespace\n", exe)
-	fmt.Fprintf(os.Stderr, "  %s add   <net> <netns>\n", exe)
-	fmt.Fprintf(os.Stderr, "  %s check <net> <netns>\n", exe)
-	fmt.Fprintf(os.Stderr, "  %s del   <net> <netns>\n", exe)
-	os.Exit(1)
-}
-
-func exit(err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
-		os.Exit(1)
+		klog.Fatal(err)
 	}
-	os.Exit(0)
 }
