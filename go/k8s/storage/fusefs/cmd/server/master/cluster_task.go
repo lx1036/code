@@ -1,11 +1,7 @@
 package master
 
 import (
-	"fmt"
-
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
-
-	"k8s.io/klog/v2"
 )
 
 func (cluster *Cluster) addMetaNodeTasks(tasks []*proto.AdminTask) {
@@ -13,10 +9,10 @@ func (cluster *Cluster) addMetaNodeTasks(tasks []*proto.AdminTask) {
 		if task == nil {
 			continue
 		}
-		if node, err := cluster.metaNode(task.OperatorAddr); err != nil {
-			klog.Warningf(fmt.Sprintf("action[putTasks],nodeAddr:%v,taskID:%v,err:%v", task.OperatorAddr, task.ID, err))
-		} else {
-			node.Sender.AddTask(task)
-		}
+		//if node, err := cluster.metaNode(task.OperatorAddr); err != nil {
+		//	klog.Warningf(fmt.Sprintf("action[putTasks],nodeAddr:%v,taskID:%v,err:%v", task.OperatorAddr, task.ID, err))
+		//} else {
+		//	//node.Sender.AddTask(task)
+		//}
 	}
 }

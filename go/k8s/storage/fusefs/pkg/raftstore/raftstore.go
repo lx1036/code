@@ -36,12 +36,6 @@ type raftStore struct {
 
 // CreatePartition creates a new partition in the raft store.
 func (store *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err error) {
-	// Init WaL Storage for this partition.
-	// Variables:
-	// wc: WaL Configuration.
-	// wp: WaL Path.
-	// ws: WaL Storage.
-
 	var walPath string
 	if cfg.WalPath == "" {
 		walPath = path.Join(store.raftPath, strconv.FormatUint(cfg.ID, 10))
@@ -64,7 +58,7 @@ func (store *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err 
 			peerAddress.ReplicaPort,
 		)
 	}
-	rc := &raft.RaftConfig{
+	raftConfig := &raft.RaftConfig{
 		ID:           cfg.ID,
 		Peers:        peers,
 		Leader:       cfg.Leader,
@@ -73,7 +67,7 @@ func (store *raftStore) CreatePartition(cfg *PartitionConfig) (p Partition, err 
 		StateMachine: cfg.SM,
 		Applied:      cfg.Applied,
 	}
-	if err = store.raftServer.CreateRaft(rc); err != nil {
+	if err = store.raftServer.CreateRaft(raftConfig); err != nil {
 		return
 	}
 	p = newPartition(cfg, store.raftServer, walPath)

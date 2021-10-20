@@ -17,6 +17,6 @@ func (cluster *Cluster) updateStatInfo() {
 		}
 	}()
 
-	cluster.updateMetaNodeStatInfo()
-	cluster.updateVolStatInfo()
+	//cluster.updateMetaNodeStatInfo()
+	//cluster.updateVolStatInfo()
 }

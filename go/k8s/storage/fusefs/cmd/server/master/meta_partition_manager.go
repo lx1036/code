@@ -12,7 +12,7 @@ func (cluster *Cluster) scheduleToLoadMetaPartitions() {
 		//check vols after switching leader two minutes
 		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
 			if cluster.vols != nil {
-				cluster.checkLoadMetaPartitions()
+				//cluster.checkLoadMetaPartitions()
 			}
 		}
 	}, time.Second*defaultIntervalToCheckMetaPartition)

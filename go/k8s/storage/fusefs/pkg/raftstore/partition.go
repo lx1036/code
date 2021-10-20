@@ -11,7 +11,6 @@ import (
 // It extends from raft StateMachine and Store.
 type PartitionFsm interface {
 	raft.StateMachine
-	Store
 }
 
 // Partition wraps necessary methods for raft store partition operation.

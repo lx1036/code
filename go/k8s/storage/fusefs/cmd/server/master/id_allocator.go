@@ -16,7 +16,7 @@ import (
 type IDAllocator struct {
 	metaPartitionID uint64
 	commonID        uint64
-	store           *raftstore.RocksDBStore
+	store           *raftstore.BoltdbStore
 	partition       raftstore.Partition
 	mpIDLock        sync.RWMutex
 	metaNodeIDLock  sync.RWMutex
@@ -60,11 +60,11 @@ func (alloc *IDAllocator) restore() {
 }
 
 func (alloc *IDAllocator) restoreMaxMetaPartitionID() {
-	value, err := alloc.store.Get(maxMetaPartitionIDKey)
+	value, err := alloc.store.Get([]byte(maxMetaPartitionIDKey))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to restore maxPartitionID,err:%v ", err.Error()))
 	}
-	bytes := value.([]byte)
+	bytes := value
 	if len(bytes) == 0 {
 		alloc.metaPartitionID = 0
 		return
@@ -79,11 +79,11 @@ func (alloc *IDAllocator) restoreMaxMetaPartitionID() {
 
 // The data node, meta node, and node set share the same ID allocator.
 func (alloc *IDAllocator) restoreMaxCommonID() {
-	value, err := alloc.store.Get(maxCommonIDKey)
+	value, err := alloc.store.Get([]byte(maxCommonIDKey))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to restore maxCommonID,err:%v ", err.Error()))
 	}
-	bytes := value.([]byte)
+	bytes := value
 	if len(bytes) == 0 {
 		alloc.commonID = 0
 		return
@@ -96,7 +96,7 @@ func (alloc *IDAllocator) restoreMaxCommonID() {
 	klog.Infof("action[restoreMaxCommonID] maxMnID[%v]", alloc.commonID)
 }
 
-func NewIDAllocator(store *raftstore.RocksDBStore, partition raftstore.Partition) *IDAllocator {
+func NewIDAllocator(store *raftstore.BoltdbStore, partition raftstore.Partition) *IDAllocator {
 	return &IDAllocator{
 		store:     store,
 		partition: partition,

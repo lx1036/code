@@ -29,14 +29,14 @@ func (server *Server) handleLeaderChange(leader uint64) {
 		klog.Infof(server.clusterName, fmt.Sprintf("clusterID[%v] leader is changed to %v",
 			server.clusterName, server.leaderInfo.addr))
 		if oldLeaderAddr != server.leaderInfo.addr {
-			server.loadMetadata()
+			//server.loadMetadata()
 			server.metaReady = true
 		}
 		server.cluster.checkMetaNodeHeartbeat()
 	} else {
 		klog.Infof(server.clusterName, fmt.Sprintf("clusterID[%v] leader is changed to %v",
 			server.clusterName, server.leaderInfo.addr))
-		server.clearMetadata()
+		//server.clearMetadata()
 		server.metaReady = false
 	}
 }

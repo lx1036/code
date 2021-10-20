@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/projectcalico/libcalico-go/lib/apiconfig"
-	client "github.com/projectcalico/libcalico-go/lib/clientv3"
+	//client "github.com/projectcalico/libcalico-go/lib/clientv3"
 	"github.com/spf13/viper"
 )
 
