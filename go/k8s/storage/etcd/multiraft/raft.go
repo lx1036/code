@@ -98,9 +98,10 @@ type Raft struct {
 	//pending map[uint64]*Future
 	//snapping          map[uint64]*snapshotStatus
 	//mStatus           *monitorStatus
-	//propc       chan *proposal
 	//applyc      chan *apply
 	receiveChan chan *proto.Message
+	proposeChan chan *proposal
+
 	//snapRecvc         chan *snapshotRequest
 	truncatec chan uint64
 	//readIndexC        chan *Future
@@ -130,9 +131,11 @@ func newRaft(config *NodeConfig, raftConfig *RaftConfig) (*Raft, error) {
 		//mStatus:    mStatus,
 		//pending:    make(map[uint64]*Future),
 		//snapping:      make(map[uint64]*snapshotStatus),
+
 		receiveChan: make(chan *proto.Message, config.ReqBufferSize),
+		proposeChan: make(chan *proposal, 256),
+
 		//applyc:      make(chan *apply, config.AppBufferSize),
-		//propc:       make(chan *proposal, 256),
 		//snapRecvc:     make(chan *snapshotRequest, 1),
 		truncatec: make(chan uint64, 1),
 		//readIndexC:    make(chan *Future, 256),
@@ -191,6 +194,32 @@ func (r *Raft) run() {
 				r.raftFsm.Step(message)
 			}
 
+		case propose := <-r.proposeChan:
+
+			msg := proto.NewMessage()
+			msg.Type = proto.LocalMsgProp
+			msg.From = r.config.NodeID
+			startIndex := r.raftFsm.log.LastIndex() + 1 // leader raft 中的 log LastIndex+1
+			msg.Entries = append(msg.Entries, &proto.Entry{Term: r.raftFsm.term, Index: startIndex, Type: propose.cmdType, Data: propose.data})
+
+			// TODO: 这里从 r.proposeChan 批量取值，总共最多批量取 64 个。后续重构！！！
+			flag := false
+			for i := 1; i < 64; i++ {
+				startIndex = startIndex + 1
+				select {
+				case propose2 := <-r.proposeChan:
+					msg.Entries = append(msg.Entries, &proto.Entry{Term: r.raftFsm.term, Index: startIndex, Type: propose2.cmdType, Data: propose2.data})
+				default:
+					flag = true
+				}
+				if flag {
+					break
+				}
+			}
+
+			// INFO: leader raft 收到外部输入，然后推动 leader raft 和 follower raft 转动
+			r.raftFsm.Step(msg)
+
 		case <-readyc:
 			// Send all messages.
 			for _, msg := range r.raftFsm.msgs {
@@ -206,6 +235,29 @@ func (r *Raft) run() {
 		}
 	}
 
+}
+
+type proposal struct {
+	cmdType proto.EntryType
+	//future  *Future
+	data []byte
+}
+
+// INFO: raft 输入来自于 propose(cmd)
+func (r *Raft) propose(cmd []byte) {
+	if !r.isLeader() {
+		return
+	}
+
+	propose := &proposal{
+		data:    cmd,
+		cmdType: proto.EntryNormal,
+	}
+
+	select {
+	case <-r.stopc:
+	case r.proposeChan <- propose:
+	}
 }
 
 // INFO: 每一个 partition 是一个 raft，并且只有 leader node 上的 partition raft 都是 leader

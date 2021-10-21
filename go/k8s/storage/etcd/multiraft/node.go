@@ -252,6 +252,19 @@ func (node *Node) CreateRaft(raftConfig *RaftConfig) error {
 	return nil
 }
 
+// Propose INFO: raft node 输入接口，一般来自于上层的输入
+func (node *Node) Propose(id uint64, cmd []byte) {
+	node.mu.RLock()
+	raft, ok := node.rafts[id]
+	node.mu.RUnlock()
+
+	if !ok {
+		return
+	}
+
+	raft.propose(cmd)
+}
+
 // INFO: leader 给 peers 发送心跳
 func (node *Node) sendHeartbeat() {
 	// INFO: 每一个 partition 是一个 raft，并且只有 leader node 上的 partition raft 都是 leader

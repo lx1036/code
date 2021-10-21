@@ -38,8 +38,26 @@ func (r *raftFsm) stepLeader(message *proto.Message) {
 
 		klog.Infof(fmt.Sprintf("[raftFsm stepLeader]RespMsgHeartBeat %+v", *replica))
 
+	case proto.LocalMsgProp:
+		if _, ok := r.replicas[r.nodeConfig.NodeID]; !ok || len(message.Entries) == 0 {
+			return
+		}
+
+		r.appendEntry(message.Entries...) // commit 到自己的 raft log 模块中
+		r.bcastAppend()                   // 广播给 follower
+
 	}
 
+}
+
+// INFO: leader 先提交到自己的 raft log 中
+func (r *raftFsm) appendEntry(entries ...*proto.Entry) {
+	r.log.append(entries...)
+
+	// 记录下leader自己 commit raft log 中的 committed index 记录
+	r.replicas[r.nodeConfig.NodeID].maybeUpdate(r.log.LastIndex(), r.log.committed)
+
+	r.maybeCommit()
 }
 
 func (r *raftFsm) bcastAppend() {
