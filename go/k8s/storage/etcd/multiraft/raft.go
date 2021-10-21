@@ -157,7 +157,13 @@ func newRaft(config *NodeConfig, raftConfig *RaftConfig) (*Raft, error) {
 func (r *Raft) run() {
 	r.updateCurrentSoftState()
 
+	var readyc chan struct{}
 	for {
+		if readyc == nil && r.containsUpdate() {
+			readyc = r.readyc
+			readyc <- struct{}{}
+		}
+
 		select {
 		case <-r.tickc:
 			r.updateCurrentSoftState()
@@ -180,7 +186,23 @@ func (r *Raft) run() {
 					r.raftFsm.Step(message)
 				}
 
+			// INFO: 所有非心跳消息，发给 raft peers 推动 raft peer 状态机转动
+			default:
+				r.raftFsm.Step(message)
 			}
+
+		case <-readyc:
+			// Send all messages.
+			for _, msg := range r.raftFsm.msgs {
+				if msg.Type == proto.ReqMsgSnapShot {
+					//r.sendSnapshot(msg)
+					continue
+				}
+				r.sendMessage(msg)
+			}
+			r.raftFsm.msgs = nil
+
+			readyc = nil
 		}
 	}
 
@@ -260,4 +282,8 @@ func (r *Raft) updateCurrentSoftState() {
 
 	curSoftState := (*softState)(atomic.LoadPointer(&r.curSoftSt))
 	klog.Infof(fmt.Sprintf("[Raft updateCurrentSoftState]current leader:%d, term:%d", curSoftState.leader, curSoftState.term))
+}
+
+func (r *Raft) sendMessage(m *proto.Message) {
+	r.config.transport.Send(m)
 }

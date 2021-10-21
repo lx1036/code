@@ -80,6 +80,7 @@ type raftFsm struct {
 
 	//readOnly    *readOnly
 	msgs []*proto.Message
+
 	tick func()
 }
 
@@ -185,7 +186,7 @@ func NewRaftFsm(nodeConfig *NodeConfig, raftConfig *RaftConfig) (*raftFsm, error
 	return r, nil
 }
 
-// Step INFO: 根据不同类型 message 推动状态机运转
+// Step INFO: 根据不同类型 message 推动状态机运转, message 都会存在 r.msgs，都会被 raft.sendMessage() 发送给 peers
 func (r *raftFsm) Step(message *proto.Message) {
 
 	switch {
@@ -201,4 +202,14 @@ func (r *raftFsm) Step(message *proto.Message) {
 	}
 
 	r.step(message)
+}
+
+func (r *raftFsm) send(message *proto.Message) {
+	message.ID = r.id
+	message.From = r.nodeConfig.NodeID
+	if message.Type != proto.LocalMsgProp {
+		message.Term = r.term
+	}
+
+	r.msgs = append(r.msgs, message)
 }

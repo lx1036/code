@@ -207,6 +207,7 @@ func NewNode(config *NodeConfig) (*Node, error) {
 	return node, nil
 }
 
+// INFO: Node 主要就是处理 node 级别的心跳消息
 func (node *Node) run() {
 	ticks := 0
 	for {
