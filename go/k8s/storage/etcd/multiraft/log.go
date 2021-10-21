@@ -22,14 +22,14 @@ var (
 )
 
 // raftLog 主要用来持久化 operation log
-type RaftLog struct {
-	Unstable           unstable
+type raftLog struct {
+	unstable           unstable
 	Storage            storage.Storage
-	Committed, Applied uint64
+	committed, applied uint64
 }
 
-func NewRaftLog(storage storage.Storage) (*RaftLog, error) {
-	log := &RaftLog{
+func newRaftLog(storage storage.Storage) (*raftLog, error) {
+	log := &raftLog{
 		Storage: storage,
 	}
 
@@ -42,17 +42,17 @@ func NewRaftLog(storage storage.Storage) (*RaftLog, error) {
 		return nil, err
 	}
 
-	log.Unstable.offset = lastIndex + 1
-	log.Unstable.entries = make([]*proto.Entry, 0, 256)
-	log.Committed = firstIndex - 1
-	log.Applied = firstIndex - 1
+	log.unstable.offset = lastIndex + 1
+	log.unstable.entries = make([]*proto.Entry, 0, 256)
+	log.committed = firstIndex - 1
+	log.applied = firstIndex - 1
 
 	return log, nil
 }
 
 // INFO: 获取 raftlog 的 last index
-func (log *RaftLog) LastIndex() uint64 {
-	if i, ok := log.Unstable.maybeLastIndex(); ok {
+func (log *raftLog) LastIndex() uint64 {
+	if i, ok := log.unstable.maybeLastIndex(); ok {
 		return i
 	}
 	i, err := log.Storage.LastIndex()
@@ -64,24 +64,24 @@ func (log *RaftLog) LastIndex() uint64 {
 	return i
 }
 
-func (log *RaftLog) append(ents ...*proto.Entry) uint64 {
+func (log *raftLog) append(ents ...*proto.Entry) uint64 {
 	if len(ents) == 0 {
 		return log.LastIndex()
 	}
 
-	if after := ents[0].Index - 1; after < log.Committed {
-		errMsg := fmt.Sprintf("[raftLog->append]after(%d) is out of range [committed(%d)]", after, log.Committed)
+	if after := ents[0].Index - 1; after < log.committed {
+		errMsg := fmt.Sprintf("[raftLog->append]after(%d) is out of range [committed(%d)]", after, log.committed)
 		klog.Error(errMsg)
 		panic(fmt.Errorf(errMsg))
 	}
 
 	// unstable 存储还未提交到 Storage 的 entry
-	log.Unstable.truncateAndAppend(ents)
+	log.unstable.truncateAndAppend(ents)
 
 	return log.LastIndex()
 }
 
-func (log *RaftLog) entries(i uint64, maxsize uint64) ([]*proto.Entry, error) {
+func (log *raftLog) entries(i uint64, maxsize uint64) ([]*proto.Entry, error) {
 	if i > log.LastIndex() {
 		return nil, nil
 	}
@@ -89,7 +89,7 @@ func (log *RaftLog) entries(i uint64, maxsize uint64) ([]*proto.Entry, error) {
 	return log.slice(i, log.LastIndex()+1, maxsize)
 }
 
-func (log *RaftLog) firstIndex() uint64 {
+func (log *raftLog) firstIndex() uint64 {
 	index, err := log.Storage.FirstIndex()
 	if err != nil {
 		errMsg := fmt.Sprintf("[raftLog->firstIndex]get firstindex from storage err:[%v].", err)
@@ -100,7 +100,7 @@ func (log *RaftLog) firstIndex() uint64 {
 }
 
 // log.firstIndex <= lo <= hi <= log.firstIndex + len(log.entries)
-func (log *RaftLog) mustCheckOutOfBounds(lo, hi uint64) error {
+func (log *raftLog) mustCheckOutOfBounds(lo, hi uint64) error {
 	if lo > hi {
 		errMsg := fmt.Sprintf("[raftLog->mustCheckOutOfBounds]invalid slice %d > %d", lo, hi)
 		klog.Error(errMsg)
@@ -120,7 +120,7 @@ func (log *RaftLog) mustCheckOutOfBounds(lo, hi uint64) error {
 	return nil
 }
 
-func (log *RaftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error) {
+func (log *raftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error) {
 	if lo == hi {
 		return nil, nil
 	}
@@ -130,8 +130,8 @@ func (log *RaftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error)
 	}
 
 	var ents []*proto.Entry
-	if lo < log.Unstable.offset {
-		storedhi := util.Min(hi, log.Unstable.offset)
+	if lo < log.unstable.offset {
+		storedhi := util.Min(hi, log.unstable.offset)
 		storedEnts, cmp, err := log.Storage.Entries(lo, storedhi, maxSize)
 		if cmp {
 			return nil, ErrCompacted
@@ -146,8 +146,8 @@ func (log *RaftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error)
 		}
 		ents = storedEnts
 	}
-	if hi > log.Unstable.offset {
-		unstable := log.Unstable.slice(util.Max(lo, log.Unstable.offset), hi)
+	if hi > log.unstable.offset {
+		unstable := log.unstable.slice(util.Max(lo, log.unstable.offset), hi)
 		if len(ents) > 0 {
 			ents = append([]*proto.Entry{}, ents...)
 			ents = append(ents, unstable...)
@@ -161,6 +161,13 @@ func (log *RaftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error)
 	}
 
 	return limitSize(ents, maxSize), nil
+}
+
+func (log *raftLog) unstableEntries() []*proto.Entry {
+	if len(log.unstable.entries) == 0 {
+		return nil
+	}
+	return log.unstable.entries
 }
 
 // unstable temporary deposit the unpersistent log entries.It has log position i+unstable.offset.

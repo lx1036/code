@@ -144,7 +144,7 @@ func newRaft(config *NodeConfig, raftConfig *RaftConfig) (*Raft, error) {
 		stopc:  make(chan struct{}),
 		done:   make(chan struct{}),
 	}
-	raft.curApplied.Set(raftFSM.raftLog.Applied)
+	raft.curApplied.Set(raftFSM.log.applied)
 	raft.peerState.replace(raftConfig.Peers)
 
 	//go raft.runApply()
@@ -286,4 +286,10 @@ func (r *Raft) updateCurrentSoftState() {
 
 func (r *Raft) sendMessage(m *proto.Message) {
 	r.config.transport.Send(m)
+}
+
+func (r *Raft) containsUpdate() bool {
+	return len(r.raftFsm.log.unstableEntries()) > 0 || r.raftFsm.log.committed > r.raftFsm.log.applied || len(r.raftFsm.msgs) > 0
+	//s.raftFsm.raftLog.committed != s.prevHardSt.Commit || s.raftFsm.term != s.prevHardSt.Term || s.raftFsm.vote != s.prevHardSt.Vote ||
+	//	s.raftFsm.readOnly.containsUpdate(s.curApplied.Get())
 }

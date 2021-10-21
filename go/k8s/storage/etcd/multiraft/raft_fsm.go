@@ -68,7 +68,7 @@ type raftFsm struct {
 	pendingConf bool
 	state       fsmState
 	sm          StateMachine
-	raftLog     *RaftLog
+	log         *raftLog
 	rand        *rand.Rand
 	votes       map[uint64]bool
 	acks        map[uint64]bool
@@ -85,7 +85,7 @@ type raftFsm struct {
 }
 
 func NewRaftFsm(nodeConfig *NodeConfig, raftConfig *RaftConfig) (*raftFsm, error) {
-	raftLog, err := NewRaftLog(raftConfig.Storage)
+	log, err := newRaftLog(raftConfig.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func NewRaftFsm(nodeConfig *NodeConfig, raftConfig *RaftConfig) (*raftFsm, error
 		sm:         raftConfig.StateMachine,
 		nodeConfig: nodeConfig,
 		leader:     NoLeader,
-		raftLog:    raftLog,
+		log:        log,
 		replicas:   make(map[uint64]*Replica),
 		//readOnly: newReadOnly(raftConfig.ID, config.ReadOnlyOption),
 	}
@@ -119,7 +119,7 @@ func NewRaftFsm(nodeConfig *NodeConfig, raftConfig *RaftConfig) (*raftFsm, error
 		}
 	}*/
 
-	klog.Info(fmt.Sprintf("newRaft[%v] [commit: %d, applied: %d, lastindex: %d]", r.id, raftLog.Committed, raftConfig.Applied, raftLog.LastIndex()))
+	klog.Info(fmt.Sprintf("newRaft[%v] [commit: %d, applied: %d, lastindex: %d]", r.id, r.log.committed, raftConfig.Applied, r.log.LastIndex()))
 
 	/*if raftConfig.Applied > 0 {
 		lasti := raftLog.LastIndex()

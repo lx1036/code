@@ -49,7 +49,6 @@ const (
 	cfgElectionTick   = "electionTick"
 )
 
-// Keys in the request
 const (
 	addrKey               = "addr"
 	diskPathKey           = "disk"
@@ -64,13 +63,13 @@ const (
 	volOwnerKey           = "owner"
 	replicaNumKey         = "replicaNum"
 	s3EndpointKey         = "endpoint"
-	accessKeyKey          = "accesskey"
-	secretKeyKey          = "secretkey"
-	regionKey             = "region"
-	createBackendKey      = "createBackend"
-	deleteBackendKey      = "deleteBackend"
-	clientIdKey           = "clientId"
-	clientMemoryUsedKey   = "clientMemoryUsed"
+
+	secretKeyKey        = "secretkey"
+	regionKey           = "region"
+	createBackendKey    = "createBackend"
+	deleteBackendKey    = "deleteBackend"
+	clientIdKey         = "clientId"
+	clientMemoryUsedKey = "clientMemoryUsed"
 )
 
 // Server represents the server in a cluster
