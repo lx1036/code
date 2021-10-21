@@ -124,6 +124,10 @@ type Message struct {
 	Snapshot     Snapshot // No need for codec
 }
 
+func (m *Message) IsHeartbeatMsg() bool {
+	return m.Type == ReqMsgHeartBeat || m.Type == RespMsgHeartBeat
+}
+
 func (m *Message) Decode(r *util.BufferReader) error {
 	var (
 		datas []byte

@@ -123,8 +123,6 @@ func (rs *RaftServer) run() {
 // INFO: 处理心跳请求
 func (rs *RaftServer) handleHeartbeat(message *proto.Message) {
 	rs.mu.RLock() // TODO: 这里为何需要加锁
-	defer rs.mu.RUnlock()
-
 	ctx := proto.DecodeHBContext(message.Context)
 	var respCtx proto.HeartbeatContext
 	for _, id := range ctx { // id 是每一个字节的 uint64 值
@@ -133,6 +131,8 @@ func (rs *RaftServer) handleHeartbeat(message *proto.Message) {
 			respCtx = append(respCtx, id)
 		}
 	}
+
+	rs.mu.RUnlock()
 
 	msg := proto.NewMessage()
 	msg.Type = proto.RespMsgHeartBeat
