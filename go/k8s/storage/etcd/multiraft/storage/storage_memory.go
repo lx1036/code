@@ -3,7 +3,6 @@ package storage
 import (
 	"errors"
 	"fmt"
-	"runtime"
 
 	"k8s-lx1036/k8s/storage/raft/proto"
 
@@ -253,10 +252,4 @@ func NewStorage(raftServer *raft.RaftServer) *MemoryStorage {
 
 func DefaultMemoryStorage() *MemoryStorage {
 	return NewMemoryStorage(nil, 0, 4096)
-}
-
-func init() {
-	numCpu := runtime.NumCPU()
-	runtime.GOMAXPROCS(numCpu)
-	klog.Infof("[System], Cpu Num = [%d]\r\n", numCpu)
 }

@@ -2,6 +2,8 @@ package multiraft
 
 import (
 	"errors"
+	"fmt"
+	"k8s.io/klog/v2"
 	"strings"
 	"sync"
 	"time"
@@ -18,8 +20,8 @@ const (
 )
 
 const (
-	defaultTickInterval    = time.Second * 5
-	defaultHeartbeatTick   = 10
+	defaultTickInterval    = time.Second * 30
+	defaultHeartbeatTick   = 2
 	defaultElectionTick    = 5
 	defaultInflightMsgs    = 128
 	defaultSizeReqBuffer   = 2048
@@ -29,11 +31,11 @@ const (
 	defaultReplConcurrency = 5
 	defaultSnapConcurrency = 10
 	defaultSizePerMsg      = MB
-	defaultHeartbeatAddr   = ":3016"
-	defaultReplicateAddr   = ":2015"
+	defaultHeartbeatAddr   = "127.0.0.1:2020"
+	defaultReplicateAddr   = "127.0.0.1:2021"
 )
 
-type Config struct {
+type NodeConfig struct {
 	TransportConfig
 	// NodeID is the identity of the local node. NodeID cannot be 0.
 	// This parameter is required.
@@ -89,13 +91,34 @@ type Config struct {
 	transport Transport
 }
 
-func (c *Config) validate() error {
+func DefaultConfig() *NodeConfig {
+	conf := &NodeConfig{
+		TickInterval:    defaultTickInterval,
+		HeartbeatTick:   defaultHeartbeatTick,
+		ElectionTick:    defaultElectionTick,
+		MaxSizePerMsg:   defaultSizePerMsg,
+		MaxInflightMsgs: defaultInflightMsgs,
+		ReqBufferSize:   defaultSizeReqBuffer,
+		AppBufferSize:   defaultSizeAppBuffer,
+		RetainLogs:      defaultRetainLogs,
+		LeaseCheck:      false,
+	}
+	conf.HeartbeatAddr = defaultHeartbeatAddr
+	conf.ReplicateAddr = defaultReplicateAddr
+	conf.SendBufferSize = defaultSizeSendBuffer
+	conf.MaxReplConcurrency = defaultReplConcurrency
+	conf.MaxSnapConcurrency = defaultSnapConcurrency
+
+	return conf
+}
+
+func (c *NodeConfig) validate() error {
 	if c.NodeID == 0 {
 		return errors.New("NodeID is required")
 	}
-	if c.TransportConfig.Resolver == nil {
+	/*if c.TransportConfig.Resolver == nil {
 		return errors.New("Resolver is required")
-	}
+	}*/
 	if c.MaxSizePerMsg > 4*MB {
 		return errors.New("MaxSizePerMsg it too high")
 	}
@@ -108,9 +131,9 @@ func (c *Config) validate() error {
 	if c.MaxReplConcurrency > 256 {
 		return errors.New("MaxReplConcurrency is too high")
 	}
-	if c.ReadOnlyOption == ReadOnlyLeaseBased && !c.LeaseCheck {
+	/*if c.ReadOnlyOption == ReadOnlyLeaseBased && !c.LeaseCheck {
 		return errors.New("LeaseCheck MUST be enabled when use ReadOnlyLeaseBased")
-	}
+	}*/
 
 	if strings.TrimSpace(c.TransportConfig.HeartbeatAddr) == "" {
 		c.TransportConfig.HeartbeatAddr = defaultHeartbeatAddr
@@ -154,14 +177,14 @@ func (c *Config) validate() error {
 type Node struct {
 	mu sync.RWMutex
 
-	config    *Config
+	config    *NodeConfig
 	ticker    *time.Ticker
 	heartChan chan *proto.Message
 	stopc     chan struct{}
 	rafts     map[uint64]*Raft
 }
 
-func StartNode(config *Config) (*Node, error) {
+func NewNode(config *NodeConfig) (*Node, error) {
 	if err := config.validate(); err != nil {
 		return nil, err
 	}
@@ -191,14 +214,18 @@ func (node *Node) run() {
 		case <-node.stopc:
 			return
 
+		// 每 60s 每一个 raft 心跳一次，60s * 10 当前 node 心跳一次
 		case <-node.ticker.C:
 			ticks++
+			klog.Infof(fmt.Sprintf("ticks:%d, HeartbeatTick:%d", ticks, node.config.HeartbeatTick))
 			if ticks >= node.config.HeartbeatTick {
 				ticks = 0
 				node.sendHeartbeat()
 			}
 
 			for _, raft := range node.rafts {
+				leader, term := raft.leaderTerm()
+				klog.Infof(fmt.Sprintf("leader:%d, term:%d", leader, term))
 				raft.tick()
 			}
 
@@ -213,9 +240,20 @@ func (node *Node) run() {
 	}
 }
 
-// leader给peers发送心跳
+func (node *Node) CreateRaft(raftConfig *RaftConfig) error {
+	r, err := newRaft(node.config, raftConfig)
+	if err != nil {
+		return err
+	}
+
+	node.rafts[raftConfig.ID] = r
+
+	return nil
+}
+
+// INFO: leader 给 peers 发送心跳
 func (node *Node) sendHeartbeat() {
-	// key: sendto nodeId; value: range ids
+	// INFO: 每一个 partition 是一个 raft，并且只有 leader node 上的 partition raft 都是 leader
 	nodes := make(map[uint64]proto.HeartbeatContext)
 	node.mu.RLock()
 	for id, raft := range node.rafts {
@@ -230,6 +268,8 @@ func (node *Node) sendHeartbeat() {
 	node.mu.RUnlock()
 
 	for to, ctx := range nodes {
+		klog.Infof(fmt.Sprintf("to:%d, ctx:%+v", to, ctx))
+
 		if to == node.config.NodeID {
 			continue
 		}
@@ -239,7 +279,10 @@ func (node *Node) sendHeartbeat() {
 		msg.From = node.config.NodeID
 		msg.To = to
 		msg.Context = proto.EncodeHBConext(ctx)
-		node.config.transport.Send(msg)
+
+		klog.Infof(fmt.Sprintf("[node sendHeartbeat]transport send %+v", *msg))
+		//node.config.transport.Send(msg)
+		node.heartChan <- msg // 本地调试，不走 transport
 	}
 }
 
@@ -256,12 +299,15 @@ func (node *Node) handleHeartbeat(message *proto.Message) {
 	}
 	node.mu.RUnlock()
 
+	// TODO: 发心跳时候为何 message 加 term
 	msg := proto.NewMessage()
 	msg.Type = proto.RespMsgHeartBeat
 	msg.From = node.config.NodeID
 	msg.To = message.From
 	msg.Context = proto.EncodeHBConext(respCtx)
-	node.config.transport.Send(msg)
+	klog.Infof(fmt.Sprintf("[node handleHeartbeat]transport send %+v", *msg))
+	//node.config.transport.Send(msg)
+	node.heartChan <- msg // 本地调试，不走 transport
 }
 
 func (node *Node) handleHeartbeatResp(message *proto.Message) {

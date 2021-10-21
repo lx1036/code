@@ -19,6 +19,11 @@ const (
 	Replicate SocketType = 1
 )
 
+// The SocketResolver interface is supplied by the application to resolve NodeID to net.Addr addresses.
+type SocketResolver interface {
+	NodeAddress(nodeID uint64, stype SocketType) (addr string, err error)
+}
+
 // Transport raft server transport
 type Transport interface {
 	Send(m *proto.Message)
@@ -42,7 +47,7 @@ type TransportConfig struct {
 	// The default value is 10.
 	MaxSnapConcurrency int
 	// This parameter is required.
-	//Resolver SocketResolver
+	Resolver SocketResolver
 }
 
 type MultiTransport struct {

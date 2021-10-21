@@ -142,6 +142,7 @@ func (server *Server) Start(cfg *config.Config) error {
 	return nil
 }
 
+// INFO: master 里只有一个 partition raft
 func (server *Server) createRaftServer() error {
 	var err error
 	raftCfg := &raftstore.Config{
