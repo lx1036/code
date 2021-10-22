@@ -14,6 +14,13 @@ import (
 //  整套代码里，开启一个对象，然后通过 stop/done channel 来 start()/stop() 一个 loop，这种方式值得学习!!!
 //  ///////////////////////////////////////////////////////////////////////////////////////////
 
+type SnapshotStatus int
+
+const (
+	SnapshotFinish  SnapshotStatus = 1
+	SnapshotFailure SnapshotStatus = 2
+)
+
 var (
 	emptyState = pb.HardState{}
 
@@ -45,6 +52,12 @@ type Node interface {
 
 	// Propose INFO: 提交数据到 raft log
 	Propose(ctx context.Context, data []byte) error
+
+	// ProposeConfChange proposes a configuration change.
+	ProposeConfChange(ctx context.Context, cc pb.ConfChangeI) error
+
+	// Step advances the state machine using the given message. ctx.Err() will be returned, if any.
+	Step(ctx context.Context, msg pb.Message) error
 
 	// Ready returns a channel that returns the current point-in-time state.
 	// Users of the Node must call Advance after retrieving the state returned by Ready.
@@ -229,6 +242,26 @@ func (n *node) Propose(ctx context.Context, data []byte) error {
 	return n.stepWait(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Data: data}}})
 }
 
+func confChangeToMsg(c pb.ConfChangeI) (pb.Message, error) {
+	typ, data, err := pb.MarshalConfChange(c)
+	if err != nil {
+		return pb.Message{}, err
+	}
+	return pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: typ, Data: data}}}, nil
+}
+
+func (n *node) ProposeConfChange(ctx context.Context, cc pb.ConfChangeI) error {
+	msg, err := confChangeToMsg(cc)
+	if err != nil {
+		return err
+	}
+
+	return n.Step(ctx, msg)
+}
+
+func (n *node) Step(ctx context.Context, m pb.Message) error {
+	return n.step(ctx, m)
+}
 func (n *node) step(ctx context.Context, m pb.Message) error {
 	return n.stepWithWaitOption(ctx, m, false)
 }
@@ -249,7 +282,6 @@ func (n *node) stepWithWaitOption(ctx context.Context, message pb.Message, wait 
 		}
 	}
 
-	// TODO: pb.MsgProp
 	ch := n.proposeChan
 	msgResult := msgWithResult{message: message}
 	if wait {

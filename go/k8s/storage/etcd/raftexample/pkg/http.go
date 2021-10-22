@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"go.etcd.io/etcd/raft/v3/raftpb"
 	"k8s.io/klog/v2"
 )
 
@@ -18,8 +19,8 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := r.RequestURI
 	defer r.Body.Close()
 
-	switch {
-	case r.Method == http.MethodPut:
+	switch r.Method {
+	case http.MethodPut:
 		v, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			klog.Errorf("Failed to read on PUT (%v)\n", err)
@@ -32,12 +33,16 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Optimistic-- no waiting for ack from raft. Value is not yet
 		// committed so a subsequent GET on the key may return old value
 		w.WriteHeader(http.StatusNoContent)
-	case r.Method == "GET":
+	case http.MethodGet:
 		if v, ok := h.store.Lookup(key); ok {
 			w.Write([]byte(v))
 		} else {
 			http.Error(w, "Failed to GET", http.StatusNotFound)
 		}
+	case http.MethodPost:
+
+	case http.MethodDelete:
+
 	default:
 		w.Header().Set("Allow", "PUT")
 		w.Header().Add("Allow", "GET")
@@ -48,7 +53,7 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// serveHttpKVAPI starts a key-value server with a GET/PUT API and listens.
+// ServeHttpKVAPI starts a key-value server with a GET/PUT API and listens.
 func ServeHttpKVAPI(kv *KVStore, port int, confChangeC chan<- raftpb.ConfChange, errorC <-chan error) {
 	srv := http.Server{
 		Addr: ":" + strconv.Itoa(port),

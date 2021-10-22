@@ -44,7 +44,7 @@ func (r *raftFsm) stepLeader(message *proto.Message) {
 		}
 
 		r.appendEntry(message.Entries...) // commit 到自己的 raft log 模块中
-		r.bcastAppend()                   // 广播给 follower
+		r.broadcastAppend()               // 广播给 follower
 
 	}
 
@@ -57,10 +57,10 @@ func (r *raftFsm) appendEntry(entries ...*proto.Entry) {
 	// 记录下leader自己 commit raft log 中的 committed index 记录
 	r.replicas[r.nodeConfig.NodeID].maybeUpdate(r.log.LastIndex(), r.log.committed)
 
-	r.maybeCommit()
+	//r.maybeCommit()
 }
 
-func (r *raftFsm) bcastAppend() {
+func (r *raftFsm) broadcastAppend() {
 	for id := range r.replicas {
 		if id == r.nodeConfig.NodeID {
 			continue
@@ -72,4 +72,44 @@ func (r *raftFsm) bcastAppend() {
 
 func (r *raftFsm) sendAppend(to uint64) {
 
+	replica := r.replicas[to]
+
+	var (
+		term       uint64
+		ents       []*proto.Entry
+		errt, erre error
+		m          *proto.Message
+	)
+	firstIndex := r.log.firstIndex()
+	if replica.next >= firstIndex {
+		term, errt = r.log.term(replica.next - 1)
+		ents, erre = r.log.entries(replica.next, r.nodeConfig.MaxSizePerMsg)
+	}
+
+	if replica.next < firstIndex || errt != nil || erre != nil {
+
+	} else {
+		m = proto.NewMessage()
+		m.Type = proto.ReqMsgAppend
+		m.To = to
+		m.Index = replica.next - 1
+		m.LogTerm = term
+		m.Commit = r.log.committed
+		m.Entries = append(m.Entries, ents...)
+		if n := len(m.Entries); n != 0 {
+			switch replica.state {
+			case replicaStateReplicate:
+				last := m.Entries[n-1].Index
+				replica.update(last)
+				replica.inflight.add(last)
+			case replicaStateProbe:
+				replica.pause()
+			default:
+				klog.Fatalf(fmt.Sprintf("node %x is sending append in unhandled state %s", r.id, replica.state))
+			}
+		}
+	}
+
+	replica.pending = true
+	r.send(m)
 }

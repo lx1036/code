@@ -24,13 +24,13 @@ var (
 // raftLog 主要用来持久化 operation log
 type raftLog struct {
 	unstable           unstable
-	Storage            storage.Storage
+	storage            storage.Storage
 	committed, applied uint64
 }
 
 func newRaftLog(storage storage.Storage) (*raftLog, error) {
 	log := &raftLog{
-		Storage: storage,
+		storage: storage,
 	}
 
 	firstIndex, err := storage.FirstIndex()
@@ -55,7 +55,7 @@ func (log *raftLog) LastIndex() uint64 {
 	if i, ok := log.unstable.maybeLastIndex(); ok {
 		return i
 	}
-	i, err := log.Storage.LastIndex()
+	i, err := log.storage.LastIndex()
 	if err != nil {
 		errMsg := fmt.Sprintf("[raftLog->lastIndex]get lastIndex from storage err:[%v]", err)
 		klog.Errorf(errMsg)
@@ -90,7 +90,7 @@ func (log *raftLog) entries(i uint64, maxsize uint64) ([]*proto.Entry, error) {
 }
 
 func (log *raftLog) firstIndex() uint64 {
-	index, err := log.Storage.FirstIndex()
+	index, err := log.storage.FirstIndex()
 	if err != nil {
 		errMsg := fmt.Sprintf("[raftLog->firstIndex]get firstindex from storage err:[%v].", err)
 		klog.Error(errMsg)
@@ -132,7 +132,7 @@ func (log *raftLog) slice(lo, hi uint64, maxSize uint64) ([]*proto.Entry, error)
 	var ents []*proto.Entry
 	if lo < log.unstable.offset {
 		storedhi := util.Min(hi, log.unstable.offset)
-		storedEnts, cmp, err := log.Storage.Entries(lo, storedhi, maxSize)
+		storedEnts, cmp, err := log.storage.Entries(lo, storedhi, maxSize)
 		if cmp {
 			return nil, ErrCompacted
 		} else if err != nil {
@@ -170,6 +170,31 @@ func (log *raftLog) unstableEntries() []*proto.Entry {
 	return log.unstable.entries
 }
 
+func (log *raftLog) term(i uint64) (uint64, error) {
+	// the valid term range is [index of dummy entry, last index]
+	dummyIndex := log.firstIndex() - 1
+	if i < dummyIndex || i > log.LastIndex() {
+		// TODO: return an error instead?
+		return 0, nil
+	}
+
+	if t, ok := log.unstable.maybeTerm(i); ok {
+		return t, nil
+	}
+
+	t, c, err := log.storage.Term(i)
+	if c {
+		return 0, ErrCompacted
+	}
+	if err == nil {
+		return t, nil
+	}
+	if err == ErrCompacted {
+		return 0, err
+	}
+	panic(err)
+}
+
 // unstable temporary deposit the unpersistent log entries.It has log position i+unstable.offset.
 // unstable can support group commit.
 // Note that unstable.offset may be less than the highest log position in storage;
@@ -178,6 +203,26 @@ type unstable struct {
 	offset uint64
 	// all entries that have not yet been written to storage.
 	entries []*proto.Entry
+}
+
+// INFO: 返回 index 对应的 term
+func (u *unstable) maybeTerm(i uint64) (uint64, bool) {
+	if i < u.offset {
+		/*if u.snapshot != nil && u.snapshot.Metadata.Index == i {
+			return u.snapshot.Metadata.Term, true
+		}*/
+		return 0, false
+	}
+
+	last, ok := u.maybeLastIndex()
+	if !ok {
+		return 0, false
+	}
+	if i > last {
+		return 0, false
+	}
+
+	return u.entries[i-u.offset].Term, true
 }
 
 // maybeLastIndex returns the last index if it has at least one unstable entry.

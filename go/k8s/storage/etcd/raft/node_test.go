@@ -10,9 +10,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// ensures that a node can be started correctly. The node should
-// start with correct configuration change entries, and can accept and commit
-// proposals.
+// INFO: raft node 可以 proposeChan/readyChan
 func TestNode(test *testing.T) {
 	cc := raftpb.ConfChange{Type: raftpb.ConfChangeAddNode, NodeID: 1}
 	data, err := cc.Marshal()

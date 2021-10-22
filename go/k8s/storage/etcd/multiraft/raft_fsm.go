@@ -73,7 +73,7 @@ type raftFsm struct {
 	votes       map[uint64]bool
 	acks        map[uint64]bool
 
-	replicas map[uint64]*Replica
+	replicas map[uint64]*Replica // INFO: 记录每个 role raft 写到 raft log 的进度
 
 	// INFO: 主要函数，根据 Leader/Follower 不同，函数不同
 	step stepFunc
@@ -169,7 +169,7 @@ func NewRaftFsm(nodeConfig *NodeConfig, raftConfig *RaftConfig) (*raftFsm, error
 			r.term = raftConfig.Term
 			r.state = stateLeader
 			r.becomeLeader()
-			r.bcastAppend()
+			r.broadcastAppend()
 		} else {
 			//r.becomeFollower(r.term, NoLeader)
 		}

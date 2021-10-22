@@ -477,7 +477,7 @@ func (r *raft) stepFollower(message pb.Message) error {
 		r.send(message)
 	case pb.MsgReadIndexResp:
 		if len(message.Entries) != 1 {
-			klog.Errorf(fmt.Sprintf("%x invalid format of MsgReadIndexResp from %x, entries count: %d", r.id, m.From, len(m.Entries)))
+			klog.Errorf(fmt.Sprintf("%x invalid format of MsgReadIndexResp from %x, entries count: %d", r.id, message.From, len(message.Entries)))
 			return nil
 		}
 		r.readStates = append(r.readStates, ReadState{
@@ -513,9 +513,9 @@ func (r *raft) stepLeader(message pb.Message) error {
 		// INFO: 线性一致性读!!!
 		// only one leader member in cluster
 		if r.progress.IsSingleton() {
-			if resp := r.responseToReadIndexReq(message, r.raftLog.committed); resp.To != None {
+			/*if resp := r.responseToReadIndexReq(message, r.raftLog.committed); resp.To != None {
 				r.send(resp)
-			}
+			}*/
 
 			return nil
 		}
@@ -527,7 +527,7 @@ func (r *raft) stepLeader(message pb.Message) error {
 			return nil
 		}
 
-		sendMsgReadIndexResponse(r, message)
+		//sendMsgReadIndexResponse(r, message)
 		return nil
 
 	case pb.MsgProp: // INFO: 只有 leader 才可以接收写请求
