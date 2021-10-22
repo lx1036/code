@@ -197,12 +197,14 @@ func (n *node) run() {
 				msgResult.result <- err
 				close(msgResult.result)
 			}
+
 		case message := <-n.receiveChan:
 			// filter out response message from unknown From.
 			if pr := r.progress.Progress[message.From]; pr != nil || !IsResponseMsg(message.Type) {
 				r.Step(message)
 			}
 		// INFO: 用户提交的 pb.Message 从这 readyChan 获取
+
 		case readyChan <- ready:
 			n.rawNode.acceptReady(ready)
 			advanceChan = n.advanceChan
@@ -273,7 +275,8 @@ func (n *node) stepWait(ctx context.Context, m pb.Message) error {
 func (n *node) stepWithWaitOption(ctx context.Context, message pb.Message, wait bool) error {
 	if message.Type != pb.MsgProp {
 		select {
-		case n.receiveChan <- message: // run() 里监听了 n.receiveChan
+		// INFO: campaign 走这个 n.receiveChan, run() 里监听了 n.receiveChan
+		case n.receiveChan <- message:
 			return nil
 		case <-ctx.Done():
 			return ctx.Err()
@@ -282,13 +285,12 @@ func (n *node) stepWithWaitOption(ctx context.Context, message pb.Message, wait 
 		}
 	}
 
-	ch := n.proposeChan
 	msgResult := msgWithResult{message: message}
 	if wait {
 		msgResult.result = make(chan error, 1)
 	}
 	select {
-	case ch <- msgResult: // INFO: 参考 run() msgResult := <-proposeChan
+	case n.proposeChan <- msgResult: // INFO: 参考 run() msgResult := <-proposeChan
 		if !wait {
 			return nil
 		}

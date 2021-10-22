@@ -30,9 +30,6 @@ func NewKVStore(snapshotter *snap.Snapshotter, proposeC chan<- string, commitC <
 		snapshotter: snapshotter,
 	}
 
-	// replay log into key-value map
-	s.readCommits(commitC, errorC)
-
 	// read commits from raft into kvStore map until error
 	go s.readCommits(commitC, errorC)
 
@@ -41,6 +38,10 @@ func NewKVStore(snapshotter *snap.Snapshotter, proposeC chan<- string, commitC <
 
 func (s *KVStore) readCommits(commitC <-chan *commit, errorC <-chan error) {
 	for commit := range commitC { // commitC 没有值不会阻塞，而 <-commitC 会阻塞
+		if commit == nil {
+			continue
+		}
+
 		for _, data := range commit.data {
 			var dataKv kv
 			dec := gob.NewDecoder(bytes.NewBufferString(data))

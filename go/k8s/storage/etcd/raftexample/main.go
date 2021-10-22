@@ -13,7 +13,7 @@ import (
 var (
 	cluster = flag.String("cluster", "http://127.0.0.1:12379", "comma separated cluster peers")
 	id      = flag.Int("id", 1, "node id")
-	port    = flag.Int("port", 12379, "key-value server port")
+	port    = flag.Int("port", 12380, "key-value server port")
 	join    = flag.Bool("join", false, "join an existing cluster")
 )
 

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.etcd.io/etcd/raft/v3/confchange"
+	"go.etcd.io/etcd/raft/v3/quorum"
 	pb "go.etcd.io/etcd/raft/v3/raftpb"
 	"go.etcd.io/etcd/raft/v3/tracker"
 	"k8s.io/klog/v2"
@@ -855,8 +856,83 @@ func (r *raft) reduceUncommittedSize(entries []pb.Entry) {
 	}
 }
 
+// INFO: campaign 成为 follower -> leader
 func (r *raft) hup(t CampaignType) {
-	// TODO:
+	if r.state == StateLeader {
+		klog.Warningf(fmt.Sprintf("%x ignoring MsgHup because already leader", r.id))
+		return
+	}
+	if !r.promotable() {
+		klog.Warningf(fmt.Sprintf("%x is unpromotable and can not campaign", r.id))
+		return
+	}
+
+	// INFO: 检查 ConfChange 是否有 pending
+	ents, err := r.raftLog.slice(r.raftLog.applied+1, r.raftLog.committed+1, noLimit)
+	if err != nil {
+		klog.Fatalf(fmt.Sprintf("unexpected error getting unapplied entries (%v)", err))
+	}
+	if n := numOfPendingConf(ents); n != 0 && r.raftLog.committed > r.raftLog.applied {
+		klog.Warningf(fmt.Sprintf("%x cannot campaign at term %d since there are still %d pending configuration changes to apply", r.id, r.Term, n))
+		return
+	}
+
+	klog.Infof(fmt.Sprintf("%x is starting a new election at term %d", r.id, r.Term))
+	r.campaign(t)
+}
+
+func (r *raft) campaign(t CampaignType) {
+	if !r.promotable() {
+		klog.Warningf(fmt.Sprintf("%x is unpromotable; campaign() should have been called", r.id))
+	}
+
+	//var term uint64
+	var voteMsg pb.MessageType
+	if t == campaignPreElection {
+		r.becomePreCandidate()
+		voteMsg = pb.MsgPreVote
+		// PreVote RPCs are sent for the next term before we've incremented r.Term.
+		//term = r.Term + 1
+	} else {
+		r.becomeCandidate()
+		voteMsg = pb.MsgVote
+		//term = r.Term
+	}
+
+	if _, _, res := r.poll(r.id, voteRespMsgType(voteMsg), true); res == quorum.VoteWon {
+		// We won the election after voting for ourselves (which must mean that
+		// this is a single-node cluster). Advance to the next state.
+		if t == campaignPreElection {
+			r.campaign(campaignElection)
+		} else {
+			r.becomeLeader()
+		}
+		return
+	}
+
+	// TODO: campaignPreElection
+}
+
+func (r *raft) poll(id uint64, t pb.MessageType, v bool) (granted int, rejected int, result quorum.VoteResult) {
+	if v {
+		klog.Infof(fmt.Sprintf("%x received %s from %x at term %d", r.id, t, id, r.Term))
+	} else {
+		klog.Infof(fmt.Sprintf("%x received %s rejection from %x at term %d", r.id, t, id, r.Term))
+	}
+
+	r.progress.RecordVote(id, v)
+
+	return r.progress.TallyVotes()
+}
+
+func numOfPendingConf(ents []pb.Entry) int {
+	n := 0
+	for i := range ents {
+		if ents[i].Type == pb.EntryConfChange || ents[i].Type == pb.EntryConfChangeV2 {
+			n++
+		}
+	}
+	return n
 }
 
 // pastElectionTimeout returns true iff r.electionElapsed is greater
