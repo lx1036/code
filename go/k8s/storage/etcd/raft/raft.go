@@ -368,6 +368,7 @@ func (r *raft) applyConfChange(confChange pb.ConfChangeV2) pb.ConfState {
 	return r.switchToConfig(cfg, progress)
 }
 
+// switchToConfig reconfigures this node to use the provided configuration.
 func (r *raft) switchToConfig(cfg tracker.Config, progress tracker.ProgressMap) pb.ConfState {
 	r.progress.Config = cfg
 	r.progress.Progress = progress
@@ -1006,6 +1007,66 @@ func (r *raft) send(message pb.Message) {
 
 	// INFO: @see newReady()
 	r.msgs = append(r.msgs, message)
+}
+
+func (r *raft) checkRaftID(snapshot pb.Snapshot) bool {
+	confState := snapshot.Metadata.ConfState
+	// `LearnersNext` doesn't need to be checked. According to the rules, if a peer in `LearnersNext`, it has to be in `VotersOutgoing`.
+	for _, ids := range [][]uint64{confState.Voters, confState.Learners, confState.LearnersNext} {
+		for _, id := range ids {
+			if id == r.id {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// restore recovers the state machine from a snapshot.
+func (r *raft) restore(snapshot pb.Snapshot) bool {
+	if snapshot.Metadata.Index <= r.raftLog.committed {
+		return false
+	}
+
+	// INFO: 从 snapshot recover 还必须是 Follower
+	if r.state != StateFollower {
+		klog.Warningf(fmt.Sprintf("%x attempted to restore snapshot as leader; should never happen", r.id))
+		r.becomeFollower(r.Term+1, None)
+		return false
+	}
+
+	if !r.checkRaftID(snapshot) {
+		klog.Warningf(fmt.Sprintf("%x attempted to restore snapshot but it is not in the ConfState %v; should never happen", r.id, snapshot.Metadata.ConfState))
+		return false
+	}
+
+	if r.raftLog.matchTerm(snapshot.Metadata.Index, snapshot.Metadata.Term) {
+		klog.Infof(fmt.Sprintf("%x [commit: %d, lastindex: %d, lastterm: %d] fast-forwarded commit to snapshot [index: %d, term: %d]",
+			r.id, r.raftLog.committed, r.raftLog.lastIndex(), r.raftLog.lastTerm(), snapshot.Metadata.Index, snapshot.Metadata.Term))
+		r.raftLog.commitTo(snapshot.Metadata.Index)
+		return false
+	}
+
+	r.raftLog.restore(snapshot)
+	r.progress = tracker.MakeProgressTracker(r.progress.MaxInflight)
+	cfg, progress, err := confchange.Restore(confchange.Changer{
+		Tracker:   r.progress,
+		LastIndex: r.raftLog.lastIndex(),
+	}, snapshot.Metadata.ConfState)
+	if err != nil {
+		panic(err)
+	}
+	if err = snapshot.Metadata.ConfState.Equivalent(r.switchToConfig(cfg, progress)); err != nil {
+		panic(err)
+	}
+
+	pr := r.progress.Progress[r.id]
+	pr.MaybeUpdate(pr.Next - 1)
+
+	klog.Infof(fmt.Sprintf("%x [commit: %d, lastindex: %d, lastterm: %d] restored snapshot [index: %d, term: %d]",
+		r.id, r.raftLog.committed, r.raftLog.lastIndex(), r.raftLog.lastTerm(), snapshot.Metadata.Index, snapshot.Metadata.Term))
+	return true
 }
 
 // INFO: 重置一些关键字段值

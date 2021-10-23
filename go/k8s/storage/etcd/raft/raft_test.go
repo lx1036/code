@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"go.etcd.io/etcd/raft/v3/raftpb"
+	pb "go.etcd.io/etcd/raft/v3/raftpb"
 	"k8s.io/klog/v2"
 )
 
@@ -51,7 +51,7 @@ func TestAddAndRemoveNode(test *testing.T) {
 	r := newTestRaft(2, 10, 1, newTestMemoryStorage(withPeers(2)))
 
 	// INFO: (1) Add node, 加一个 node=1 节点
-	r.applyConfChange(raftpb.ConfChange{NodeID: 1, Type: raftpb.ConfChangeAddNode}.AsV2())
+	r.applyConfChange(pb.ConfChange{NodeID: 1, Type: pb.ConfChangeAddNode}.AsV2())
 	nodes := r.progress.VoterNodes()
 	wnodes := []uint64{1, 2}
 	if !reflect.DeepEqual(nodes, wnodes) {
@@ -59,7 +59,7 @@ func TestAddAndRemoveNode(test *testing.T) {
 	}
 
 	// INFO: (2) Remove node
-	r.applyConfChange(raftpb.ConfChange{NodeID: 2, Type: raftpb.ConfChangeRemoveNode}.AsV2())
+	r.applyConfChange(pb.ConfChange{NodeID: 2, Type: pb.ConfChangeRemoveNode}.AsV2())
 	w := []uint64{1}
 	if g := r.progress.VoterNodes(); !reflect.DeepEqual(g, w) {
 		test.Errorf("nodes = %v, want %v", g, w)
@@ -71,13 +71,13 @@ func TestAddAndRemoveNode(test *testing.T) {
 			test.Error("did not panic")
 		}
 	}()
-	r.applyConfChange(raftpb.ConfChange{NodeID: 1, Type: raftpb.ConfChangeRemoveNode}.AsV2())
+	r.applyConfChange(pb.ConfChange{NodeID: 1, Type: pb.ConfChangeRemoveNode}.AsV2())
 }
 
 func TestAddLearnerNode(t *testing.T) {
 	r := newTestRaft(1, 10, 1, newTestMemoryStorage(withPeers(1)))
 	// INFO: (1) Add new learner peer
-	r.applyConfChange(raftpb.ConfChange{NodeID: 2, Type: raftpb.ConfChangeAddLearnerNode}.AsV2())
+	r.applyConfChange(pb.ConfChange{NodeID: 2, Type: pb.ConfChangeAddLearnerNode}.AsV2())
 	if r.isLearner {
 		// 这里 raft.isLearner 是当前 local node 状态
 		t.Fatal("expected 1 to be voter")
@@ -93,7 +93,7 @@ func TestAddLearnerNode(t *testing.T) {
 	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.progress.VoterNodes(), r.progress.LearnerNodes()))
 
 	// INFO: (2) Promote learner to voter
-	r.applyConfChange(raftpb.ConfChange{NodeID: 2, Type: raftpb.ConfChangeAddNode}.AsV2())
+	r.applyConfChange(pb.ConfChange{NodeID: 2, Type: pb.ConfChangeAddNode}.AsV2())
 	if r.progress.Progress[2].IsLearner {
 		t.Fatal("expected 2 to be voter")
 	}
@@ -103,7 +103,7 @@ func TestAddLearnerNode(t *testing.T) {
 	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.progress.VoterNodes(), r.progress.LearnerNodes()))
 
 	// INFO: (3) Demote voter to learner
-	r.applyConfChange(raftpb.ConfChange{NodeID: 1, Type: raftpb.ConfChangeAddLearnerNode}.AsV2())
+	r.applyConfChange(pb.ConfChange{NodeID: 1, Type: pb.ConfChangeAddLearnerNode}.AsV2())
 	if !r.progress.Progress[1].IsLearner {
 		t.Fatal("expected 1 to be learner")
 	}
@@ -113,7 +113,7 @@ func TestAddLearnerNode(t *testing.T) {
 	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.progress.VoterNodes(), r.progress.LearnerNodes()))
 
 	// INFO: (4) Promote learner to voter
-	r.applyConfChange(raftpb.ConfChange{NodeID: 1, Type: raftpb.ConfChangeAddNode}.AsV2())
+	r.applyConfChange(pb.ConfChange{NodeID: 1, Type: pb.ConfChangeAddNode}.AsV2())
 	if r.progress.Progress[1].IsLearner {
 		t.Fatal("expected 1 to be voter")
 	}
@@ -123,7 +123,7 @@ func TestAddLearnerNode(t *testing.T) {
 	klog.Infof(fmt.Sprintf("VoterNodes: %+v, LearnerNodes: %+v", r.progress.VoterNodes(), r.progress.LearnerNodes()))
 
 	// INFO: (5) Remove voter
-	r.applyConfChange(raftpb.ConfChange{NodeID: 2, Type: raftpb.ConfChangeRemoveNode}.AsV2())
+	r.applyConfChange(pb.ConfChange{NodeID: 2, Type: pb.ConfChangeRemoveNode}.AsV2())
 	if len(r.progress.VoterNodes()) != 1 {
 		t.Fatal("expected nodes number to be 1")
 	}
@@ -166,9 +166,9 @@ func TestAddLearnerNode(t *testing.T) {
 	}
 }
 
-func (r *raft) readMessages() []raftpb.Message {
+func (r *raft) readMessages() []pb.Message {
 	msgs := r.msgs
-	r.msgs = make([]raftpb.Message, 0)
+	r.msgs = make([]pb.Message, 0)
 
 	return msgs
 }
@@ -185,7 +185,7 @@ func TestRaftFlowControl(test *testing.T) {
 	// force the progress to be in replicate state
 	pr2.BecomeReplicate()
 	for i := 0; i < r.progress.MaxInflight; i++ {
-		r.Step(raftpb.Message{From: 1, To: 1, Type: raftpb.MsgProp, Entries: []raftpb.Entry{{Data: []byte("somedata")}}})
+		r.Step(pb.Message{From: 1, To: 1, Type: pb.MsgProp, Entries: []pb.Entry{{Data: []byte("somedata")}}})
 		message := r.readMessages()
 		if len(message) != 1 {
 			test.Fatalf("#%d: len(ms) = %d, want 1", i, len(message))
@@ -201,7 +201,7 @@ func TestRaftFlowControl(test *testing.T) {
 
 	// ensure 2
 	for i := 0; i < 10; i++ {
-		r.Step(raftpb.Message{From: 1, To: 1, Type: raftpb.MsgProp, Entries: []raftpb.Entry{{Data: []byte("somedata")}}})
+		r.Step(pb.Message{From: 1, To: 1, Type: pb.MsgProp, Entries: []pb.Entry{{Data: []byte("somedata")}}})
 		ms := r.readMessages()
 		if len(ms) != 0 { // INFO: 这里 len == 0
 			test.Fatalf("#%d: len(ms) = %d, want 0", i, len(ms))
@@ -214,16 +214,16 @@ func TestRaftFlowControl(test *testing.T) {
 func TestHandleHeartbeat(t *testing.T) {
 	commit := uint64(2)
 	fixtures := []struct {
-		message raftpb.Message
+		message pb.Message
 		wCommit uint64
 	}{
-		{raftpb.Message{From: 2, To: 1, Type: raftpb.MsgHeartbeat, Term: 2, Commit: commit + 1}, commit + 1},
-		{raftpb.Message{From: 2, To: 1, Type: raftpb.MsgHeartbeat, Term: 2, Commit: commit - 1}, commit}, // do not decrease commit
+		{pb.Message{From: 2, To: 1, Type: pb.MsgHeartbeat, Term: 2, Commit: commit + 1}, commit + 1},
+		{pb.Message{From: 2, To: 1, Type: pb.MsgHeartbeat, Term: 2, Commit: commit - 1}, commit}, // do not decrease commit
 	}
 
 	for i, fixture := range fixtures {
 		storage := newTestMemoryStorage(withPeers(1, 2))
-		storage.Append([]raftpb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}})
+		storage.Append([]pb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}, {Index: 3, Term: 3}})
 		r := newTestRaft(1, 5, 1, storage)
 		r.becomeFollower(2, 2)
 		r.raftLog.commitTo(commit)
@@ -235,7 +235,7 @@ func TestHandleHeartbeat(t *testing.T) {
 		if len(m) != 1 {
 			t.Fatalf("#%d: msg = nil, want 1", i)
 		}
-		if m[0].Type != raftpb.MsgHeartbeatResp {
+		if m[0].Type != pb.MsgHeartbeatResp {
 			t.Errorf("#%d: type = %v, want MsgHeartbeatResp", i, m[0].Type)
 		}
 
@@ -246,3 +246,32 @@ func TestHandleHeartbeat(t *testing.T) {
 // INFO: (2) log replication
 
 // INFO: (3) safety
+
+// INFO: (4) snapshot
+
+// INFO: 起始只有 {1,2}，snapshot 里有 {1,2,3}
+func TestRestore(test *testing.T) {
+	snapshot := pb.Snapshot{
+		Metadata: pb.SnapshotMetadata{
+			Index:     11, // magic number
+			Term:      11, // magic number
+			ConfState: pb.ConfState{Voters: []uint64{1, 2, 3}},
+		},
+	}
+	storage := newTestMemoryStorage(withPeers(1, 2))
+	r := newTestRaft(1, 5, 1, storage)
+	if !r.restore(snapshot) {
+		test.Fatal("restore fail, want succeed")
+	}
+	if r.raftLog.lastIndex() != snapshot.Metadata.Index {
+		test.Errorf("log.lastIndex = %d, want %d", r.raftLog.lastIndex(), snapshot.Metadata.Index)
+	}
+	if term, err := r.raftLog.term(snapshot.Metadata.Index); err != nil || term != snapshot.Metadata.Term {
+		test.Errorf("log.lastTerm = %d, want %d", term, snapshot.Metadata.Term)
+	}
+	voters := r.progress.VoterNodes()
+	if !reflect.DeepEqual(voters, snapshot.Metadata.ConfState.Voters) {
+		test.Errorf("sm.Voters = %+v, want %+v", voters, snapshot.Metadata.ConfState.Voters)
+	}
+
+}
