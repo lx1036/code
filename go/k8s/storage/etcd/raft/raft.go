@@ -381,7 +381,23 @@ func (r *raft) switchToConfig(cfg tracker.Config, progress tracker.ProgressMap) 
 		return confState
 	}
 
-	// TODO: r.maybeCommit()
+	if r.maybeCommit() {
+		// If the configuration change means that more entries are committed now,
+		// broadcast/append to everyone in the updated config.
+		r.bcastAppend()
+	} else {
+		// Otherwise, still probe the newly added replicas; there's no reason to
+		// let them wait out a heartbeat interval (or the next incoming
+		// proposal).
+		r.progress.Visit(func(id uint64, pr *tracker.Progress) {
+			r.maybeSendAppend(id, false /* sendIfEmpty */)
+		})
+	}
+
+	// If the leadTransferee was removed or demoted, abort the leadership transfer.
+	if _, ok := r.progress.Config.Voters.IDs()[r.leadTransferee]; !ok && r.leadTransferee != 0 {
+		r.abortLeaderTransfer()
+	}
 
 	return confState
 }
@@ -540,7 +556,7 @@ func (r *raft) stepLeader(message pb.Message) error {
 			return ErrProposalDropped
 		}
 
-		// INFO: 如果 entry 是 ConfChange type
+		// INFO: 如果 entry 是 ConfChange type, @see node.ProposeConfChange()
 		for i := range message.Entries {
 			entry := &message.Entries[i]
 			var cc pb.ConfChangeI
@@ -552,7 +568,26 @@ func (r *raft) stepLeader(message pb.Message) error {
 				cc = ccc
 			}
 			if cc != nil {
+				// 多个成员变更不能同时进行, 同时只能有一个成员变更
+				alreadyPending := r.pendingConfIndex > r.raftLog.applied
+				alreadyJoint := len(r.progress.Config.Voters[1]) > 0
+				wantsLeaveJoint := len(cc.AsV2().Changes) == 0
 
+				var refused string
+				if alreadyPending {
+					refused = fmt.Sprintf("possible unapplied conf change at index %d (applied to %d)", r.pendingConfIndex, r.raftLog.applied)
+				} else if alreadyJoint && !wantsLeaveJoint {
+					refused = "must transition out of joint config first"
+				} else if !alreadyJoint && wantsLeaveJoint {
+					refused = "not in joint state; refusing empty conf change"
+				}
+
+				if refused != "" {
+					klog.Infof(fmt.Sprintf("%x ignoring conf change %v at config %s: %s", r.id, cc, r.progress.Config, refused))
+					message.Entries[i] = pb.Entry{Type: pb.EntryNormal}
+				} else {
+					r.pendingConfIndex = r.raftLog.lastIndex() + uint64(i) + 1
+				}
 			}
 		}
 
@@ -1094,7 +1129,7 @@ func (r *raft) reset(term uint64) {
 
 	r.pendingConfIndex = 0
 	r.uncommittedSize = 0
-	//r.readOnly = newReadOnly(r.readOnly.option)
+	r.readOnly = newReadOnly(r.readOnly.option)
 }
 
 // Ready encapsulates the entries and messages that are ready to read,

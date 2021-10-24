@@ -103,6 +103,59 @@ func RestartNode(config *Config) Node {
 	return n
 }
 
+// ReadState INFO: 线性一致性读, 返回给 read-only node 该 ReadState
+type ReadState struct {
+	Index      uint64
+	RequestCtx []byte
+}
+
+type ReadOnlyOption int
+
+const (
+	// ReadOnlySafe guarantees the linearizability of the read only request by
+	// communicating with the quorum. It is the default and suggested option.
+	ReadOnlySafe ReadOnlyOption = iota
+
+	// ReadOnlyLeaseBased ensures linearizability of the read only request by
+	// relying on the leader lease. It can be affected by clock drift.
+	// If the clock drift is unbounded, leader might keep the lease longer than it
+	// should (clock can move backward/pause without any bound). ReadIndex is not safe
+	// in that case.
+	ReadOnlyLeaseBased
+)
+
+type readIndexStatus struct {
+	req   pb.Message
+	index uint64
+	// NB: this never records 'false', but it's more convenient to use this
+	// instead of a map[uint64]struct{} due to the API of quorum.VoteResult. If
+	// this becomes performance sensitive enough (doubtful), quorum.VoteResult
+	// can change to an API that is closer to that of CommittedIndex.
+	acks map[uint64]bool
+}
+
+type readOnly struct {
+	option           ReadOnlyOption
+	pendingReadIndex map[string]*readIndexStatus
+	readIndexQueue   []string
+}
+
+func newReadOnly(option ReadOnlyOption) *readOnly {
+	return &readOnly{
+		option:           option,
+		pendingReadIndex: make(map[string]*readIndexStatus),
+	}
+}
+
+// lastPendingRequestCtx returns the context of the last pending read only
+// request in readonly struct.
+func (ro *readOnly) lastPendingRequestCtx() string {
+	if len(ro.readIndexQueue) == 0 {
+		return ""
+	}
+	return ro.readIndexQueue[len(ro.readIndexQueue)-1]
+}
+
 type msgWithResult struct {
 	message pb.Message
 	result  chan error
@@ -116,11 +169,12 @@ type node struct {
 
 	tickChan chan struct{}
 
-	receiveChan chan pb.Message
-
-	readyChan   chan Ready
-	advanceChan chan struct{} // 只是个标记 channel
-	proposeChan chan msgWithResult
+	proposeChan    chan msgWithResult
+	confChangeChan chan pb.ConfChangeV2
+	confStateChan  chan pb.ConfState
+	receiveChan    chan pb.Message
+	readyChan      chan Ready
+	advanceChan    chan struct{} // 只是个标记 channel
 
 	doneChan chan struct{}
 	stopChan chan struct{}
@@ -136,9 +190,11 @@ func newNode(config *Config) *node {
 
 		readyChan: make(chan Ready),
 
-		receiveChan: make(chan pb.Message),
-		advanceChan: make(chan struct{}),
-		proposeChan: make(chan msgWithResult),
+		proposeChan:    make(chan msgWithResult),
+		confChangeChan: make(chan pb.ConfChangeV2),
+		confStateChan:  make(chan pb.ConfState),
+		receiveChan:    make(chan pb.Message),
+		advanceChan:    make(chan struct{}),
 
 		doneChan: make(chan struct{}),
 		stopChan: make(chan struct{}),
@@ -201,16 +257,44 @@ func (n *node) run() {
 			if pr := r.progress.Progress[message.From]; pr != nil || !IsResponseMsg(message.Type) {
 				r.Step(message)
 			}
-		// INFO: 用户提交的 pb.Message 从这 readyChan 获取
 
+		case confChange := <-n.confChangeChan:
+			_, okBefore := r.progress.Progress[r.id]
+			confState := r.applyConfChange(confChange)
+			if _, okAfter := r.progress.Progress[r.id]; okBefore && !okAfter {
+				var found bool
+				for _, sl := range [][]uint64{confState.Voters, confState.VotersOutgoing} {
+					for _, id := range sl {
+						if id == r.id {
+							found = true
+							break
+						}
+					}
+					if found {
+						break
+					}
+				}
+				if !found {
+					proposeChan = nil
+				}
+			}
+
+			select {
+			case n.confStateChan <- confState:
+			case <-n.doneChan:
+			}
+
+		// INFO: 用户提交的 pb.Message 从这 readyChan 获取
 		case readyChan <- ready:
 			n.acceptReady(ready)
 			advanceChan = n.advanceChan
+
 		// INFO: @see Advance(), 推动用户提交的 []pb.Message 提交到 log 模块中，这里才是最终目标!!!
 		case <-advanceChan:
 			n.AdvanceRaft(ready)
 			ready = Ready{}
 			advanceChan = nil
+
 		case <-n.stopChan:
 			close(n.doneChan)
 			return
@@ -333,6 +417,7 @@ func confChangeToMsg(c pb.ConfChangeI) (pb.Message, error) {
 	return pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: typ, Data: data}}}, nil
 }
 
+// ProposeConfChange INFO: raft 成员变更也是一个 pb.MsgProp message, 和普通的 log entry 一样，
 func (n *node) ProposeConfChange(ctx context.Context, cc pb.ConfChangeI) error {
 	msg, err := confChangeToMsg(cc)
 	if err != nil {
@@ -340,6 +425,21 @@ func (n *node) ProposeConfChange(ctx context.Context, cc pb.ConfChangeI) error {
 	}
 
 	return n.Step(ctx, msg)
+}
+
+func (n *node) ApplyConfChange(cc pb.ConfChangeI) *pb.ConfState {
+	var confState pb.ConfState
+	select {
+	case n.confChangeChan <- cc.AsV2():
+	case <-n.doneChan:
+	}
+	// block until async goroutine done
+	select {
+	case confState = <-n.confStateChan:
+	case <-n.doneChan:
+	}
+
+	return &confState
 }
 
 func (n *node) Step(ctx context.Context, m pb.Message) error {

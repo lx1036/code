@@ -3,6 +3,7 @@ package raft
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -207,4 +208,40 @@ func TestSelectChannel(test *testing.T) {
 	// output:
 	// advanceCh <- struct{}{}
 	// done
+}
+
+func TestForBreak(test *testing.T) {
+	// 尽量不要使用 jump tag，代码难理解
+	voter := uint64(1)
+	var found bool
+	var index int
+outer:
+	for _, ids := range [][]uint64{{1, 2, 3}, {4}} {
+		for _, id := range ids {
+			if id == voter {
+				found = true
+				break outer
+			}
+
+			index++
+		}
+	}
+
+	if found {
+		klog.Infof(fmt.Sprintf("success %d", index)) // success 0
+	}
+
+	// 尽量不要使用 jump tag，代码难理解
+	for _, ids := range [][]uint64{{1, 2, 3}, {4}} {
+		for _, id := range ids {
+			if id == voter {
+				found = true
+				break
+			}
+
+			if found {
+				break
+			}
+		}
+	}
 }
