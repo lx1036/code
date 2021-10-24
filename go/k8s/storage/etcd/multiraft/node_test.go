@@ -1,10 +1,10 @@
 package multiraft
 
 import (
-	"k8s-lx1036/k8s/storage/etcd/multiraft/storage"
+	"testing"
+
 	"k8s-lx1036/k8s/storage/raft/proto"
 	"k8s.io/klog/v2"
-	"testing"
 )
 
 func TestNode(test *testing.T) {
@@ -27,7 +27,7 @@ func TestNode(test *testing.T) {
 			Type: proto.PeerNormal,
 		},
 	}
-	memoryStorage := storage.DefaultMemoryStorage()
+	memoryStorage := DefaultMemoryStorage()
 	raftConfig := &RaftConfig{
 		ID:           1,
 		Term:         1,

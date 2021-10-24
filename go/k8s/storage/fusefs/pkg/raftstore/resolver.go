@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/tiglabs/raft"
+	"k8s-lx1036/k8s/storage/etcd/multiraft"
 )
 
 var (
@@ -27,7 +27,7 @@ type NodeManager interface {
 // NodeResolver defines the methods for node address resolving and management.
 // It is extended from SocketResolver and NodeManager.
 type NodeResolver interface {
-	raft.SocketResolver
+	multiraft.SocketResolver
 	NodeManager
 }
 
@@ -42,7 +42,7 @@ type nodeResolver struct {
 	nodeMap sync.Map
 }
 
-func (resolver *nodeResolver) NodeAddress(nodeID uint64, socketType raft.SocketType) (addr string, err error) {
+func (resolver *nodeResolver) NodeAddress(nodeID uint64, socketType multiraft.SocketType) (addr string, err error) {
 	val, ok := resolver.nodeMap.Load(nodeID)
 	if !ok {
 		err = ErrNoSuchNode
@@ -55,9 +55,9 @@ func (resolver *nodeResolver) NodeAddress(nodeID uint64, socketType raft.SocketT
 		return
 	}
 	switch socketType {
-	case raft.HeartBeat:
+	case multiraft.HeartBeat:
 		addr = address.Heartbeat
-	case raft.Replicate:
+	case multiraft.Replicate:
 		addr = address.Replicate
 	default:
 		err = ErrUnknownSocketType

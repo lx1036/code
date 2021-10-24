@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 
-	"k8s-lx1036/k8s/storage/etcd/multiraft/storage"
 	"k8s-lx1036/k8s/storage/raft/proto"
 	"k8s-lx1036/k8s/storage/raft/util"
 
@@ -24,11 +23,11 @@ var (
 // raftLog 主要用来持久化 operation log
 type raftLog struct {
 	unstable           unstable
-	storage            storage.Storage
+	storage            Storage
 	committed, applied uint64
 }
 
-func newRaftLog(storage storage.Storage) (*raftLog, error) {
+func newRaftLog(storage Storage) (*raftLog, error) {
 	log := &raftLog{
 		storage: storage,
 	}

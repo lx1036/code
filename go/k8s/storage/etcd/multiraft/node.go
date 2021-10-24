@@ -3,12 +3,13 @@ package multiraft
 import (
 	"errors"
 	"fmt"
-	"k8s.io/klog/v2"
 	"strings"
 	"sync"
 	"time"
 
 	"k8s-lx1036/k8s/storage/raft/proto"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -67,10 +68,7 @@ type NodeConfig struct {
 	// AppBufferSize limits the max number of apply chan buffer.
 	// The default value is 2048.
 	AppBufferSize int
-	// RetainLogs controls how many logs we leave after truncate.
-	// This is used so that we can quickly replay logs on a follower instead of being forced to send an entire snapshot.
-	// The default value is 20000.
-	RetainLogs uint64
+
 	// LeaseCheck whether to use the lease mechanism.
 	// The default value is false.
 	LeaseCheck bool
@@ -100,7 +98,6 @@ func DefaultConfig() *NodeConfig {
 		MaxInflightMsgs: defaultInflightMsgs,
 		ReqBufferSize:   defaultSizeReqBuffer,
 		AppBufferSize:   defaultSizeAppBuffer,
-		RetainLogs:      defaultRetainLogs,
 		LeaseCheck:      false,
 	}
 	conf.HeartbeatAddr = defaultHeartbeatAddr
@@ -174,6 +171,8 @@ func (c *NodeConfig) validate() error {
 	return nil
 }
 
+// TODO: 把 transport 抽出来交给用户层实现，像 etcd raft 一样
+
 type Node struct {
 	mu sync.RWMutex
 
@@ -237,6 +236,9 @@ func (node *Node) run() {
 			case proto.RespMsgHeartBeat:
 				node.handleHeartbeatResp(message)
 			}
+
+		case message := <-node.proposeChan:
+
 		}
 	}
 }
@@ -252,7 +254,7 @@ func (node *Node) CreateRaft(raftConfig *RaftConfig) error {
 	return nil
 }
 
-// Propose INFO: raft node 输入接口，一般来自于上层的输入
+// Propose INFO: (INPUT)raft node 输入接口，一般来自于上层的输入
 func (node *Node) Propose(id uint64, cmd []byte) {
 	node.mu.RLock()
 	raft, ok := node.rafts[id]
@@ -263,6 +265,11 @@ func (node *Node) Propose(id uint64, cmd []byte) {
 	}
 
 	raft.propose(cmd)
+}
+
+// Ready INFO: OUTPUT
+func (node *Node) Ready() {
+
 }
 
 // INFO: leader 给 peers 发送心跳
@@ -348,4 +355,133 @@ func (node *Node) receiveMessage(message *proto.Message) {
 	if ok {
 		raft.receiveMessage(message)
 	}
+}
+
+func (node *Node) ChangeMember(id uint64, changeType proto.ConfChangeType, peer proto.Peer, context []byte) error {
+	node.mu.RLock()
+	raft, ok := node.rafts[id]
+	node.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("[raftNode Submit]raft id %d is not found in rafts", id)
+	}
+
+	raft.proposeMemberChange(&proto.ConfChange{Type: changeType, Peer: peer, Context: context})
+
+	return nil
+}
+
+func (node *Node) LeaderTerm(id uint64) (leader, term uint64) {
+	node.mu.RLock()
+	raft, ok := node.rafts[id]
+	node.mu.RUnlock()
+	if ok {
+		return raft.leaderTerm()
+	}
+
+	return NoLeader, 0
+}
+
+func (node *Node) IsLeader(id uint64) bool {
+	node.mu.RLock()
+	raft, ok := node.rafts[id]
+	node.mu.RUnlock()
+
+	if ok {
+		return raft.isLeader()
+	}
+
+	return false
+}
+
+func (node *Node) AppliedIndex(id uint64) uint64 {
+	node.mu.RLock()
+	raft, ok := node.rafts[id]
+	node.mu.RUnlock()
+
+	if ok {
+		return raft.applied()
+	}
+
+	return 0
+}
+
+// Status raft status
+type Status struct {
+	ID                uint64
+	NodeID            uint64
+	Leader            uint64
+	Term              uint64
+	Index             uint64
+	Commit            uint64
+	Applied           uint64
+	Vote              uint64
+	PendQueue         int
+	RecvQueue         int
+	AppQueue          int
+	Stopped           bool
+	RestoringSnapshot bool
+	State             string // leader、follower、candidate
+	Replicas          map[uint64]*ReplicaStatus
+}
+
+// ReplicaStatus  replica status
+type ReplicaStatus struct {
+	Match       uint64 // 复制进度
+	Commit      uint64 // commmit位置
+	Next        uint64
+	State       string
+	Snapshoting bool
+	Paused      bool
+	Active      bool
+	LastActive  time.Time
+	Inflight    int
+}
+
+func (s *Status) String() string {
+	st := "running"
+	if s.Stopped {
+		st = "stopped"
+	} else if s.RestoringSnapshot {
+		st = "snapshot"
+	}
+	j := fmt.Sprintf(`{"id":"%v","nodeID":"%v","state":"%v","leader":"%v","term":"%v","index":"%v","commit":"%v","applied":"%v","vote":"%v","pendingQueue":"%v",
+					"recvQueue":"%v","applyQueue":"%v","status":"%v","replication":{`, s.ID, s.NodeID, s.State, s.Leader, s.Term, s.Index, s.Commit, s.Applied, s.Vote, s.PendQueue, s.RecvQueue, s.AppQueue, st)
+	if len(s.Replicas) == 0 {
+		j += "}}"
+	} else {
+		for k, v := range s.Replicas {
+			p := "false"
+			if v.Paused {
+				p = "true"
+			}
+			subj := fmt.Sprintf(`"%v":{"match":"%v","commit":"%v","next":"%v","state":"%v","paused":"%v","inflight":"%v","active":"%v"},`, k, v.Match, v.Commit, v.Next, v.State, p, v.Inflight, v.Active)
+			j += subj
+		}
+		j = j[:len(j)-1] + "}}"
+	}
+	return j
+}
+
+func (node *Node) Status(raftID uint64) (status *Status) {
+	node.mu.RLock()
+	raft, ok := node.rafts[raftID]
+	node.mu.RUnlock()
+	if !ok {
+		klog.Fatalf(fmt.Sprintf("[raftNode status]raftID %d is not in rafts", raftID))
+	}
+
+	status = raft.status()
+	if status == nil {
+		status = &Status{
+			ID:      raftID,
+			NodeID:  node.config.NodeID,
+			Stopped: true,
+		}
+	}
+
+	return nil
+}
+
+func (node *Node) Stop() {
+
 }

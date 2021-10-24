@@ -69,8 +69,8 @@ func NewMultiTransport(node *Node, config *TransportConfig) (Transport, error) {
 		mt.replicate = rt
 	}
 
-	mt.heartbeat.start()
-	mt.replicate.start()
+	mt.heartbeat.run()
+	mt.replicate.run()
 
 	return mt, nil
 }
@@ -118,7 +118,7 @@ func newHeartbeatTransport(node *Node, config *TransportConfig) (*heartbeatTrans
 	return t, nil
 }
 
-func (t *heartbeatTransport) start() {
+func (t *heartbeatTransport) run() {
 	go func() {
 		for {
 			select {
@@ -222,7 +222,7 @@ func newReplicateTransport(node *Node, config *TransportConfig) (*replicateTrans
 	return t, nil
 }
 
-func (t *replicateTransport) start() {
+func (t *replicateTransport) run() {
 	go func() {
 		for {
 			select {

@@ -335,6 +335,16 @@ func (n *node) Bootstrap(peers []Peer) error {
 	return nil
 }
 
+// Propose INFO: (INPUT)提交数据到 raft log
+func (n *node) Propose(ctx context.Context, data []byte) error {
+	return n.stepWait(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Data: data}}})
+}
+
+// Ready INFO: OUTPUT
+func (n *node) Ready() <-chan Ready {
+	return n.readyChan
+}
+
 // Tick INFO: raft node 逻辑时钟，用来判断 heartbeatTimeout 和 electionTimeout
 func (n *node) Tick() {
 	select {
@@ -402,11 +412,6 @@ func (n *node) ReadIndex(ctx context.Context, readCtx []byte) error {
 // Campaign INFO: 参加竞选，选为 leader
 func (n *node) Campaign(ctx context.Context) error {
 	return n.step(ctx, pb.Message{Type: pb.MsgHup})
-}
-
-// Propose INFO: 提交数据到 raft log
-func (n *node) Propose(ctx context.Context, data []byte) error {
-	return n.stepWait(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Data: data}}})
 }
 
 func confChangeToMsg(c pb.ConfChangeI) (pb.Message, error) {
@@ -493,10 +498,6 @@ func (n *node) stepWithWaitOption(ctx context.Context, message pb.Message, wait 
 	}
 
 	return nil
-}
-
-func (n *node) Ready() <-chan Ready {
-	return n.readyChan
 }
 
 func (n *node) Advance() {

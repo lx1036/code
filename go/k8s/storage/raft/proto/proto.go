@@ -220,6 +220,12 @@ type Peer struct {
 	PeerID   uint64 // Replica ID, unique over all raft groups and all replicas in the same group
 }
 
+func (p *Peer) Encode(datas []byte) {
+	datas[0] = byte(p.Type)
+	binary.BigEndian.PutUint16(datas[1:], p.Priority)
+	binary.BigEndian.PutUint64(datas[3:], p.ID)
+}
+
 func (p *Peer) Decode(datas []byte) {
 	p.Type = PeerType(datas[0])
 	p.Priority = binary.BigEndian.Uint16(datas[1:])
@@ -237,4 +243,15 @@ type ConfChange struct {
 	Type    ConfChangeType
 	Peer    Peer
 	Context []byte
+}
+
+func (c *ConfChange) Encode() []byte {
+	datas := make([]byte, 1+peer_size+uint64(len(c.Context)))
+	datas[0] = byte(c.Type)
+	c.Peer.Encode(datas[1:])
+	if len(c.Context) > 0 {
+		copy(datas[peer_size+1:], c.Context)
+	}
+
+	return datas
 }

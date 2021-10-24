@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"k8s-lx1036/k8s/storage/etcd/multiraft/storage"
 	"k8s-lx1036/k8s/storage/raft/proto"
 	"k8s-lx1036/k8s/storage/raft/util"
 
@@ -24,7 +23,7 @@ type RaftConfig struct {
 	Leader       uint64
 	Applied      uint64
 	Peers        []proto.Peer
-	Storage      storage.Storage
+	Storage      Storage
 	StateMachine StateMachine
 }
 
@@ -260,6 +259,23 @@ func (r *Raft) propose(cmd []byte) {
 	}
 }
 
+func (r *Raft) proposeMemberChange(cc *proto.ConfChange) {
+	if !r.isLeader() {
+		return
+	}
+
+	data := cc.Encode()
+	propose := &proposal{
+		data:    data,
+		cmdType: proto.EntryConfChange,
+	}
+
+	select {
+	case <-r.stopc:
+	case r.proposeChan <- propose:
+	}
+}
+
 // INFO: 每一个 partition 是一个 raft，并且只有 leader node 上的 partition raft 都是 leader
 func (r *Raft) isLeader() bool {
 	leader, _ := r.leaderTerm()
@@ -272,6 +288,10 @@ func (r *Raft) leaderTerm() (leader, term uint64) {
 		return NoLeader, 0
 	}
 	return st.leader, st.term
+}
+
+func (r *Raft) applied() uint64 {
+	return r.curApplied.Get()
 }
 
 func (r *Raft) getPeers() (peers []uint64) {
@@ -344,4 +364,8 @@ func (r *Raft) containsUpdate() bool {
 	return len(r.raftFsm.log.unstableEntries()) > 0 || r.raftFsm.log.committed > r.raftFsm.log.applied || len(r.raftFsm.msgs) > 0
 	//s.raftFsm.raftLog.committed != s.prevHardSt.Commit || s.raftFsm.term != s.prevHardSt.Term || s.raftFsm.vote != s.prevHardSt.Vote ||
 	//	s.raftFsm.readOnly.containsUpdate(s.curApplied.Get())
+}
+
+func (r *Raft) status() *Status {
+	panic("not implemented")
 }
