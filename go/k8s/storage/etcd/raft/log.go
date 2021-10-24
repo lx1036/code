@@ -177,10 +177,9 @@ func (log *raftLog) stableSnapTo(i uint64) {
 	log.unstable.stableSnapTo(i)
 }
 
-// INFO:
+// hasPendingSnapshot returns if there is pending snapshot waiting for applying.
 func (log *raftLog) hasPendingSnapshot() bool {
-	//return log.unstable.snapshot != nil && !IsEmptySnap(*log.unstable.snapshot)
-	return false
+	return log.unstable.snapshot != nil && !IsEmptySnap(*log.unstable.snapshot)
 }
 
 func (log *raftLog) term(i uint64) (uint64, error) {
@@ -333,8 +332,7 @@ func (u *unstable) shrinkEntriesArray() {
 	}
 }
 
-// maybeFirstIndex returns the index of the first possible entry in entries
-// if it has a snapshot.
+// INFO: unstable log 从 snapshot.Index + 1 开始
 func (u *unstable) maybeFirstIndex() (uint64, bool) {
 	if u.snapshot != nil {
 		return u.snapshot.Metadata.Index + 1, true

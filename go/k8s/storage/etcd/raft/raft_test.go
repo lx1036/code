@@ -255,14 +255,15 @@ func TestRestore(test *testing.T) {
 		Metadata: pb.SnapshotMetadata{
 			Index:     11, // magic number
 			Term:      11, // magic number
-			ConfState: pb.ConfState{Voters: []uint64{1, 2, 3}},
+			ConfState: pb.ConfState{Voters: []uint64{1, 2, 3}, Learners: []uint64{4}},
 		},
 	}
-	storage := newTestMemoryStorage(withPeers(1, 2))
+	storage := newTestMemoryStorage(withPeers(1, 2), withLearners(4))
 	r := newTestRaft(1, 5, 1, storage)
 	if !r.restore(snapshot) {
 		test.Fatal("restore fail, want succeed")
 	}
+
 	if r.raftLog.lastIndex() != snapshot.Metadata.Index {
 		test.Errorf("log.lastIndex = %d, want %d", r.raftLog.lastIndex(), snapshot.Metadata.Index)
 	}
@@ -273,5 +274,19 @@ func TestRestore(test *testing.T) {
 	if !reflect.DeepEqual(voters, snapshot.Metadata.ConfState.Voters) {
 		test.Errorf("sm.Voters = %+v, want %+v", voters, snapshot.Metadata.ConfState.Voters)
 	}
+	learners := r.progress.LearnerNodes()
+	if !reflect.DeepEqual(learners, snapshot.Metadata.ConfState.Learners) {
+		test.Errorf("sm.Learners = %+v, length not equal with %+v", learners, snapshot.Metadata.ConfState.Learners)
+	}
 
+	if ok := r.restore(snapshot); ok {
+		test.Fatal("restore succeed, want fail")
+	}
+	// It should not campaign before actually applying data.
+	for i := 0; i < r.randomizedElectionTimeout; i++ {
+		r.tick()
+	}
+	if r.state != StateFollower {
+		test.Errorf("state = %d, want %d", r.state, StateFollower)
+	}
 }

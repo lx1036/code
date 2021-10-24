@@ -10,10 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"go.etcd.io/etcd/raft/v3/confchange"
+	"k8s-lx1036/k8s/storage/etcd/raft/confchange"
+	"k8s-lx1036/k8s/storage/etcd/raft/tracker"
+
 	"go.etcd.io/etcd/raft/v3/quorum"
 	pb "go.etcd.io/etcd/raft/v3/raftpb"
-	"go.etcd.io/etcd/raft/v3/tracker"
 	"k8s.io/klog/v2"
 )
 
@@ -111,11 +112,6 @@ type Config struct {
 	// errors. Note: 0 for no limit.
 	MaxUncommittedEntriesSize uint64
 
-	// MaxInflightMsgs limits the max number of in-flight append messages during
-	// optimistic replication phase. The application transportation layer usually
-	// has its own sending buffer over TCP/UDP. Setting MaxInflightMsgs to avoid
-	// overflowing that sending buffer. TODO (xiangli): feedback to application to
-	// limit the proposal rate?
 	MaxInflightMsgs int
 
 	// ReadOnlyOption specifies how the read only request is processed.
