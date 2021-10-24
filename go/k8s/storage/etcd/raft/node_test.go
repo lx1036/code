@@ -28,10 +28,9 @@ func TestNodePropose(test *testing.T) {
 		MaxSizePerMsg:   noLimit,
 		MaxInflightMsgs: 256,
 	}
-	rawNode, _ := NewRawNode(config)
-	n := newNode(rawNode)
+	n := newNode(config)
 	defer n.Stop()
-	r := rawNode.raft
+	r := n.raft
 	go n.run()
 
 	// campaign leader
@@ -82,10 +81,9 @@ func TestNodeReadIndex(t *testing.T) {
 		MaxSizePerMsg:   noLimit,
 		MaxInflightMsgs: 256,
 	}
-	rawNode, _ := NewRawNode(config)
-	n := newNode(rawNode)
+	n := newNode(config)
 	defer n.Stop()
-	r := rawNode.raft
+	r := n.raft
 	r.readStates = wrs
 	go n.run()
 

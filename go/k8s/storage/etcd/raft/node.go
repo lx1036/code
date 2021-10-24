@@ -82,16 +82,12 @@ func StartNode(config *Config, peers []Peer) Node {
 	if len(peers) == 0 {
 		panic("no peers given; use RestartNode instead")
 	}
-	rawNode, err := NewRawNode(config)
-	if err != nil {
-		panic(err)
-	}
-	err = rawNode.Bootstrap(peers)
+
+	n := newNode(config)
+	err := n.Bootstrap(peers)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("error occurred during starting a new node: %v", err))
 	}
-
-	n := newNode(rawNode)
 
 	go n.run()
 
@@ -100,12 +96,7 @@ func StartNode(config *Config, peers []Peer) Node {
 
 // RestartNode INFO: 启动 raft node，没有添加 peers
 func RestartNode(config *Config) Node {
-	rawNode, err := NewRawNode(config)
-	if err != nil {
-		panic(err)
-	}
-
-	n := newNode(rawNode)
+	n := newNode(config)
 
 	go n.run()
 
@@ -119,7 +110,9 @@ type msgWithResult struct {
 
 // INFO: node in raft cluster
 type node struct {
-	rawNode *RawNode
+	raft       *raft
+	prevSoftSt *SoftState
+	prevHardSt pb.HardState
 
 	tickChan chan struct{}
 
@@ -133,9 +126,10 @@ type node struct {
 	stopChan chan struct{}
 }
 
-func newNode(rawNode *RawNode) *node {
-	return &node{
-		rawNode: rawNode,
+func newNode(config *Config) *node {
+	r := newRaft(config)
+	n := &node{
+		raft: r,
 
 		// INFO: 这里 tickChan 是一个 buffer chan，这样消费者(run goroutine)消费不过来时，可以 buffer 下
 		tickChan: make(chan struct{}, 128),
@@ -149,6 +143,10 @@ func newNode(rawNode *RawNode) *node {
 		doneChan: make(chan struct{}),
 		stopChan: make(chan struct{}),
 	}
+	n.prevHardSt = r.hardState()
+	n.prevSoftSt = r.softState()
+
+	return n
 }
 
 func (n *node) run() {
@@ -157,15 +155,15 @@ func (n *node) run() {
 	var advanceChan chan struct{}
 	var proposeChan chan msgWithResult
 
-	r := n.rawNode.raft
+	r := n.raft
 	lead := None
 
 	for {
 		if advanceChan != nil {
 			readyChan = nil
-		} else if n.rawNode.HasReady() {
+		} else if n.HasReady() {
 			// INFO: 会从 raft.msgs 获取用户提交的 []pb.Message
-			ready = n.rawNode.readyWithoutAccept()
+			ready = n.readyWithoutAccept()
 			readyChan = n.readyChan
 		}
 
@@ -187,7 +185,7 @@ func (n *node) run() {
 
 		select {
 		case <-n.tickChan:
-			n.rawNode.Tick()
+			n.raft.tick()
 
 		case msgResult := <-proposeChan: // INFO: 用户提交的 Put/Delete Propose
 			message := msgResult.message
@@ -206,11 +204,11 @@ func (n *node) run() {
 		// INFO: 用户提交的 pb.Message 从这 readyChan 获取
 
 		case readyChan <- ready:
-			n.rawNode.acceptReady(ready)
+			n.acceptReady(ready)
 			advanceChan = n.advanceChan
 		// INFO: @see Advance(), 推动用户提交的 []pb.Message 提交到 log 模块中，这里才是最终目标!!!
 		case <-advanceChan:
-			n.rawNode.Advance(ready)
+			n.AdvanceRaft(ready)
 			ready = Ready{}
 			advanceChan = nil
 		case <-n.stopChan:
@@ -220,14 +218,97 @@ func (n *node) run() {
 	}
 }
 
+func (n *node) Bootstrap(peers []Peer) error {
+	if len(peers) == 0 {
+		return errors.New("must provide at least one peer to Bootstrap")
+	}
+
+	lastIndex := n.raft.raftLog.storage.LastIndex()
+	if lastIndex != 0 {
+		return errors.New("can't bootstrap a nonempty Storage")
+	}
+
+	n.prevHardSt = emptyState
+
+	n.raft.becomeFollower(1, None)
+	ents := make([]pb.Entry, len(peers))
+	for i, peer := range peers {
+		cc := pb.ConfChange{Type: pb.ConfChangeAddNode, NodeID: peer.ID, Context: peer.Context}
+		data, err := cc.Marshal()
+		if err != nil {
+			return err
+		}
+
+		ents[i] = pb.Entry{Type: pb.EntryConfChange, Term: 1, Index: uint64(i + 1), Data: data}
+	}
+	n.raft.raftLog.append(ents...)
+
+	n.raft.raftLog.committed = uint64(len(ents))
+	for _, peer := range peers {
+		n.raft.applyConfChange(pb.ConfChange{NodeID: peer.ID, Type: pb.ConfChangeAddNode}.AsV2())
+	}
+
+	return nil
+}
+
 // Tick INFO: raft node 逻辑时钟，用来判断 heartbeatTimeout 和 electionTimeout
 func (n *node) Tick() {
 	select {
 	case n.tickChan <- struct{}{}:
 	case <-n.doneChan:
 	default:
-		klog.Warningf(fmt.Sprintf("[Tick]%x tick missed to fire. Node blocks too long!", n.rawNode.raft.id))
+		klog.Warningf(fmt.Sprintf("[Tick]%x tick missed to fire. Node blocks too long!", n.raft.id))
 	}
+}
+
+// HasReady called when RawNode user need to check if any Ready pending.
+// Checking logic in this method should be consistent with Ready.containsUpdates().
+func (n *node) HasReady() bool {
+	r := n.raft
+	if !r.softState().equal(n.prevSoftSt) {
+		return true
+	}
+	if hardSt := r.hardState(); !IsEmptyHardState(hardSt) && !isHardStateEqual(hardSt, n.prevHardSt) {
+		return true
+	}
+	if r.raftLog.hasPendingSnapshot() {
+		return true
+	}
+	if len(r.msgs) > 0 || len(r.raftLog.unstableEntries()) > 0 || r.raftLog.hasNextEnts() {
+		return true
+	}
+	if len(r.readStates) != 0 {
+		return true
+	}
+
+	return false
+}
+
+func (n *node) readyWithoutAccept() Ready {
+	return n.raft.newReady(n.prevSoftSt, n.prevHardSt)
+}
+
+// acceptReady is called when the consumer of the RawNode has decided to go
+// ahead and handle a Ready. Nothing must alter the state of the RawNode between
+// this call and the prior call to Ready().
+func (n *node) acceptReady(ready Ready) {
+	if ready.SoftState != nil {
+		n.prevSoftSt = ready.SoftState
+	}
+	if len(ready.ReadStates) != 0 {
+		n.raft.readStates = nil
+	}
+
+	n.raft.msgs = nil
+}
+
+// AdvanceRaft INFO: 推动用户提交的 []pb.Message 提交到 log 模块中，这里才是最终目标!!!
+func (n *node) AdvanceRaft(ready Ready) {
+	if !IsEmptyHardState(ready.HardState) {
+		n.prevHardSt = ready.HardState
+	}
+
+	n.raft.advance(ready)
 }
 
 func (n *node) ReadIndex(ctx context.Context, readCtx []byte) error {
