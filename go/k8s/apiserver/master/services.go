@@ -5,7 +5,6 @@ import (
 	"net"
 
 	"k8s.io/klog/v2"
-	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/utils/integer"
 	utilnet "k8s.io/utils/net"
 )
@@ -17,8 +16,8 @@ import (
 func ServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, net.IP, error) {
 	serviceClusterIPRange := passedServiceClusterIPRange
 	if passedServiceClusterIPRange.IP == nil {
-		klog.Warningf("No CIDR for service cluster IPs specified. Default value which was %s is deprecated and will be removed in future releases. Please specify it using --service-cluster-ip-range on kube-apiserver.", kubeoptions.DefaultServiceIPCIDR.String())
-		serviceClusterIPRange = kubeoptions.DefaultServiceIPCIDR
+		klog.Warningf("No CIDR for service cluster IPs specified. Default value which was %s is deprecated and will be removed in future releases. Please specify it using --service-cluster-ip-range on kube-apiserver.")
+		//serviceClusterIPRange = kubeoptions.DefaultServiceIPCIDR
 	}
 
 	size := integer.Int64Min(utilnet.RangeSize(&serviceClusterIPRange), 1<<16)

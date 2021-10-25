@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/tiglabs/raft/proto"
-	"github.com/tiglabs/raft/storage/wal"
+	"k8s-lx1036/k8s/storage/raft/proto"
+
 	"k8s.io/klog/v2"
 )
 
@@ -20,7 +20,7 @@ func TestStorage(test *testing.T) {
 	}
 	//defer os.RemoveAll(dir)
 
-	storage, err := wal.NewStorage(dir, nil)
+	storage, err := NewStorage(dir, nil)
 	if err != nil {
 		klog.Fatal(err)
 	}

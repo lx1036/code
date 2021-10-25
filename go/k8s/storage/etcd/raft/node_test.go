@@ -1,7 +1,9 @@
 package raft
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -10,9 +12,114 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// ensures that a node can be started correctly. The node should
-// start with correct configuration change entries, and can accept and commit
-// proposals.
+// INFO: (1) 测试 node.Propose()
+func TestNodePropose(test *testing.T) {
+	msgs := []raftpb.Message{}
+	appendStep := func(m raftpb.Message) error {
+		msgs = append(msgs, m)
+		return nil
+	}
+
+	storage := newTestMemoryStorage(withPeers(1))
+	config := &Config{
+		ID:              1,
+		ElectionTick:    20,
+		HeartbeatTick:   2,
+		Storage:         storage,
+		MaxSizePerMsg:   noLimit,
+		MaxInflightMsgs: 256,
+	}
+	n := newNode(config)
+	defer n.Stop()
+	r := n.raft
+	go n.run()
+
+	// campaign leader
+	if err := n.Campaign(context.TODO()); err != nil {
+		test.Fatal(err)
+	}
+
+	for {
+		rd := <-n.Ready()
+		storage.Append(rd.Entries)
+		// change the step function to appendStep until this raft becomes leader
+		if rd.SoftState.Lead == r.id {
+			r.step = appendStep
+			n.Advance()
+			break
+		}
+		n.Advance()
+	}
+
+	n.Propose(context.TODO(), []byte("somedata"))
+
+	if len(msgs) != 1 {
+		test.Fatalf("len(msgs) = %d, want %d", len(msgs), 1)
+	}
+	if msgs[0].Type != raftpb.MsgProp {
+		test.Errorf("msg type = %d, want %d", msgs[0].Type, raftpb.MsgProp)
+	}
+	if !bytes.Equal(msgs[0].Entries[0].Data, []byte("somedata")) {
+		test.Errorf("data = %v, want %v", msgs[0].Entries[0].Data, []byte("somedata"))
+	}
+}
+
+func TestNodeReadIndex(t *testing.T) {
+	msgs := []raftpb.Message{}
+	appendStep := func(m raftpb.Message) error {
+		msgs = append(msgs, m)
+		return nil
+	}
+
+	wrs := []ReadState{{Index: uint64(1), RequestCtx: []byte("somedata")}}
+
+	storage := newTestMemoryStorage(withPeers(1))
+	config := &Config{
+		ID:              1,
+		ElectionTick:    20,
+		HeartbeatTick:   2,
+		Storage:         storage,
+		MaxSizePerMsg:   noLimit,
+		MaxInflightMsgs: 256,
+	}
+	n := newNode(config)
+	defer n.Stop()
+	r := n.raft
+	r.readStates = wrs
+	go n.run()
+
+	n.Campaign(context.TODO())
+	for {
+		rd := <-n.Ready()
+		if !reflect.DeepEqual(rd.ReadStates, wrs) {
+			t.Errorf("ReadStates = %v, want %v", rd.ReadStates, wrs)
+		}
+
+		storage.Append(rd.Entries)
+
+		if rd.SoftState.Lead == r.id {
+			n.Advance()
+			break
+		}
+		n.Advance()
+	}
+
+	r.step = appendStep
+	wrequestCtx := []byte("somedata2")
+	n.ReadIndex(context.TODO(), wrequestCtx)
+
+	if len(msgs) != 1 {
+		t.Fatalf("len(msgs) = %d, want %d", len(msgs), 1)
+	}
+	if msgs[0].Type != raftpb.MsgReadIndex {
+		t.Errorf("msg type = %d, want %d", msgs[0].Type, raftpb.MsgReadIndex)
+	}
+	if !bytes.Equal(msgs[0].Entries[0].Data, wrequestCtx) {
+		t.Errorf("data = %v, want %v", msgs[0].Entries[0].Data, wrequestCtx)
+	}
+}
+
+// INFO: raft node 可以 proposeChan/readyChan
 func TestNode(test *testing.T) {
 	cc := raftpb.ConfChange{Type: raftpb.ConfChangeAddNode, NodeID: 1}
 	data, err := cc.Marshal()
@@ -101,4 +208,40 @@ func TestSelectChannel(test *testing.T) {
 	// output:
 	// advanceCh <- struct{}{}
 	// done
+}
+
+func TestForBreak(test *testing.T) {
+	// 尽量不要使用 jump tag，代码难理解
+	voter := uint64(1)
+	var found bool
+	var index int
+outer:
+	for _, ids := range [][]uint64{{1, 2, 3}, {4}} {
+		for _, id := range ids {
+			if id == voter {
+				found = true
+				break outer
+			}
+
+			index++
+		}
+	}
+
+	if found {
+		klog.Infof(fmt.Sprintf("success %d", index)) // success 0
+	}
+
+	// 尽量不要使用 jump tag，代码难理解
+	for _, ids := range [][]uint64{{1, 2, 3}, {4}} {
+		for _, id := range ids {
+			if id == voter {
+				found = true
+				break
+			}
+
+			if found {
+				break
+			}
+		}
+	}
 }

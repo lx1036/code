@@ -14,6 +14,13 @@ import (
 //  整套代码里，开启一个对象，然后通过 stop/done channel 来 start()/stop() 一个 loop，这种方式值得学习!!!
 //  ///////////////////////////////////////////////////////////////////////////////////////////
 
+type SnapshotStatus int
+
+const (
+	SnapshotFinish  SnapshotStatus = 1
+	SnapshotFailure SnapshotStatus = 2
+)
+
 var (
 	emptyState = pb.HardState{}
 
@@ -46,6 +53,12 @@ type Node interface {
 	// Propose INFO: 提交数据到 raft log
 	Propose(ctx context.Context, data []byte) error
 
+	// ProposeConfChange proposes a configuration change.
+	ProposeConfChange(ctx context.Context, cc pb.ConfChangeI) error
+
+	// Step advances the state machine using the given message. ctx.Err() will be returned, if any.
+	Step(ctx context.Context, msg pb.Message) error
+
 	// Ready returns a channel that returns the current point-in-time state.
 	// Users of the Node must call Advance after retrieving the state returned by Ready.
 	//
@@ -69,16 +82,12 @@ func StartNode(config *Config, peers []Peer) Node {
 	if len(peers) == 0 {
 		panic("no peers given; use RestartNode instead")
 	}
-	rawNode, err := NewRawNode(config)
-	if err != nil {
-		panic(err)
-	}
-	err = rawNode.Bootstrap(peers)
+
+	n := newNode(config)
+	err := n.Bootstrap(peers)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("error occurred during starting a new node: %v", err))
 	}
-
-	n := newNode(rawNode)
 
 	go n.run()
 
@@ -87,16 +96,64 @@ func StartNode(config *Config, peers []Peer) Node {
 
 // RestartNode INFO: 启动 raft node，没有添加 peers
 func RestartNode(config *Config) Node {
-	rawNode, err := NewRawNode(config)
-	if err != nil {
-		panic(err)
-	}
-
-	n := newNode(rawNode)
+	n := newNode(config)
 
 	go n.run()
 
 	return n
+}
+
+// ReadState INFO: 线性一致性读, 返回给 read-only node 该 ReadState
+type ReadState struct {
+	Index      uint64
+	RequestCtx []byte
+}
+
+type ReadOnlyOption int
+
+const (
+	// ReadOnlySafe guarantees the linearizability of the read only request by
+	// communicating with the quorum. It is the default and suggested option.
+	ReadOnlySafe ReadOnlyOption = iota
+
+	// ReadOnlyLeaseBased ensures linearizability of the read only request by
+	// relying on the leader lease. It can be affected by clock drift.
+	// If the clock drift is unbounded, leader might keep the lease longer than it
+	// should (clock can move backward/pause without any bound). ReadIndex is not safe
+	// in that case.
+	ReadOnlyLeaseBased
+)
+
+type readIndexStatus struct {
+	req   pb.Message
+	index uint64
+	// NB: this never records 'false', but it's more convenient to use this
+	// instead of a map[uint64]struct{} due to the API of quorum.VoteResult. If
+	// this becomes performance sensitive enough (doubtful), quorum.VoteResult
+	// can change to an API that is closer to that of CommittedIndex.
+	acks map[uint64]bool
+}
+
+type readOnly struct {
+	option           ReadOnlyOption
+	pendingReadIndex map[string]*readIndexStatus
+	readIndexQueue   []string
+}
+
+func newReadOnly(option ReadOnlyOption) *readOnly {
+	return &readOnly{
+		option:           option,
+		pendingReadIndex: make(map[string]*readIndexStatus),
+	}
+}
+
+// lastPendingRequestCtx returns the context of the last pending read only
+// request in readonly struct.
+func (ro *readOnly) lastPendingRequestCtx() string {
+	if len(ro.readIndexQueue) == 0 {
+		return ""
+	}
+	return ro.readIndexQueue[len(ro.readIndexQueue)-1]
 }
 
 type msgWithResult struct {
@@ -106,36 +163,46 @@ type msgWithResult struct {
 
 // INFO: node in raft cluster
 type node struct {
-	rawNode *RawNode
+	raft       *raft
+	prevSoftSt *SoftState
+	prevHardSt pb.HardState
 
 	tickChan chan struct{}
 
-	receiveChan chan pb.Message
-
-	readyChan   chan Ready
-	advanceChan chan struct{} // 只是个标记 channel
-	proposeChan chan msgWithResult
+	proposeChan    chan msgWithResult
+	confChangeChan chan pb.ConfChangeV2
+	confStateChan  chan pb.ConfState
+	receiveChan    chan pb.Message
+	readyChan      chan Ready
+	advanceChan    chan struct{} // 只是个标记 channel
 
 	doneChan chan struct{}
 	stopChan chan struct{}
 }
 
-func newNode(rawNode *RawNode) *node {
-	return &node{
-		rawNode: rawNode,
+func newNode(config *Config) *node {
+	r := newRaft(config)
+	n := &node{
+		raft: r,
 
 		// INFO: 这里 tickChan 是一个 buffer chan，这样消费者(run goroutine)消费不过来时，可以 buffer 下
 		tickChan: make(chan struct{}, 128),
 
 		readyChan: make(chan Ready),
 
-		receiveChan: make(chan pb.Message),
-		advanceChan: make(chan struct{}),
-		proposeChan: make(chan msgWithResult),
+		proposeChan:    make(chan msgWithResult),
+		confChangeChan: make(chan pb.ConfChangeV2),
+		confStateChan:  make(chan pb.ConfState),
+		receiveChan:    make(chan pb.Message),
+		advanceChan:    make(chan struct{}),
 
 		doneChan: make(chan struct{}),
 		stopChan: make(chan struct{}),
 	}
+	n.prevHardSt = r.hardState()
+	n.prevSoftSt = r.softState()
+
+	return n
 }
 
 func (n *node) run() {
@@ -144,15 +211,15 @@ func (n *node) run() {
 	var advanceChan chan struct{}
 	var proposeChan chan msgWithResult
 
-	r := n.rawNode.raft
+	r := n.raft
 	lead := None
 
 	for {
 		if advanceChan != nil {
 			readyChan = nil
-		} else if n.rawNode.HasReady() {
+		} else if n.HasReady() {
 			// INFO: 会从 raft.msgs 获取用户提交的 []pb.Message
-			ready = n.rawNode.readyWithoutAccept()
+			ready = n.readyWithoutAccept()
 			readyChan = n.readyChan
 		}
 
@@ -174,7 +241,7 @@ func (n *node) run() {
 
 		select {
 		case <-n.tickChan:
-			n.rawNode.Tick()
+			n.raft.tick()
 
 		case msgResult := <-proposeChan: // INFO: 用户提交的 Put/Delete Propose
 			message := msgResult.message
@@ -184,25 +251,98 @@ func (n *node) run() {
 				msgResult.result <- err
 				close(msgResult.result)
 			}
+
 		case message := <-n.receiveChan:
 			// filter out response message from unknown From.
 			if pr := r.progress.Progress[message.From]; pr != nil || !IsResponseMsg(message.Type) {
 				r.Step(message)
 			}
+
+		case confChange := <-n.confChangeChan:
+			_, okBefore := r.progress.Progress[r.id]
+			confState := r.applyConfChange(confChange)
+			if _, okAfter := r.progress.Progress[r.id]; okBefore && !okAfter {
+				var found bool
+				for _, sl := range [][]uint64{confState.Voters, confState.VotersOutgoing} {
+					for _, id := range sl {
+						if id == r.id {
+							found = true
+							break
+						}
+					}
+					if found {
+						break
+					}
+				}
+				if !found {
+					proposeChan = nil
+				}
+			}
+
+			select {
+			case n.confStateChan <- confState:
+			case <-n.doneChan:
+			}
+
 		// INFO: 用户提交的 pb.Message 从这 readyChan 获取
 		case readyChan <- ready:
-			n.rawNode.acceptReady(ready)
+			n.acceptReady(ready)
 			advanceChan = n.advanceChan
+
 		// INFO: @see Advance(), 推动用户提交的 []pb.Message 提交到 log 模块中，这里才是最终目标!!!
 		case <-advanceChan:
-			n.rawNode.Advance(ready)
+			n.AdvanceRaft(ready)
 			ready = Ready{}
 			advanceChan = nil
+
 		case <-n.stopChan:
 			close(n.doneChan)
 			return
 		}
 	}
+}
+
+func (n *node) Bootstrap(peers []Peer) error {
+	if len(peers) == 0 {
+		return errors.New("must provide at least one peer to Bootstrap")
+	}
+
+	lastIndex := n.raft.raftLog.storage.LastIndex()
+	if lastIndex != 0 {
+		return errors.New("can't bootstrap a nonempty Storage")
+	}
+
+	n.prevHardSt = emptyState
+
+	n.raft.becomeFollower(1, None)
+	ents := make([]pb.Entry, len(peers))
+	for i, peer := range peers {
+		cc := pb.ConfChange{Type: pb.ConfChangeAddNode, NodeID: peer.ID, Context: peer.Context}
+		data, err := cc.Marshal()
+		if err != nil {
+			return err
+		}
+
+		ents[i] = pb.Entry{Type: pb.EntryConfChange, Term: 1, Index: uint64(i + 1), Data: data}
+	}
+	n.raft.raftLog.append(ents...)
+
+	n.raft.raftLog.committed = uint64(len(ents))
+	for _, peer := range peers {
+		n.raft.applyConfChange(pb.ConfChange{NodeID: peer.ID, Type: pb.ConfChangeAddNode}.AsV2())
+	}
+
+	return nil
+}
+
+// Propose INFO: (INPUT)提交数据到 raft log
+func (n *node) Propose(ctx context.Context, data []byte) error {
+	return n.stepWait(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Data: data}}})
+}
+
+// Ready INFO: OUTPUT
+func (n *node) Ready() <-chan Ready {
+	return n.readyChan
 }
 
 // Tick INFO: raft node 逻辑时钟，用来判断 heartbeatTimeout 和 electionTimeout
@@ -211,8 +351,58 @@ func (n *node) Tick() {
 	case n.tickChan <- struct{}{}:
 	case <-n.doneChan:
 	default:
-		klog.Warningf(fmt.Sprintf("[Tick]%x tick missed to fire. Node blocks too long!", n.rawNode.raft.id))
+		klog.Warningf(fmt.Sprintf("[Tick]%x tick missed to fire. Node blocks too long!", n.raft.id))
 	}
+}
+
+// HasReady called when RawNode user need to check if any Ready pending.
+// Checking logic in this method should be consistent with Ready.containsUpdates().
+func (n *node) HasReady() bool {
+	r := n.raft
+	if !r.softState().equal(n.prevSoftSt) {
+		return true
+	}
+	if hardSt := r.hardState(); !IsEmptyHardState(hardSt) && !isHardStateEqual(hardSt, n.prevHardSt) {
+		return true
+	}
+	if r.raftLog.hasPendingSnapshot() {
+		return true
+	}
+	if len(r.msgs) > 0 || len(r.raftLog.unstableEntries()) > 0 || r.raftLog.hasNextEnts() {
+		return true
+	}
+	if len(r.readStates) != 0 {
+		return true
+	}
+
+	return false
+}
+
+func (n *node) readyWithoutAccept() Ready {
+	return n.raft.newReady(n.prevSoftSt, n.prevHardSt)
+}
+
+// acceptReady is called when the consumer of the RawNode has decided to go
+// ahead and handle a Ready. Nothing must alter the state of the RawNode between
+// this call and the prior call to Ready().
+func (n *node) acceptReady(ready Ready) {
+	if ready.SoftState != nil {
+		n.prevSoftSt = ready.SoftState
+	}
+	if len(ready.ReadStates) != 0 {
+		n.raft.readStates = nil
+	}
+
+	n.raft.msgs = nil
+}
+
+// AdvanceRaft INFO: 推动用户提交的 []pb.Message 提交到 log 模块中，这里才是最终目标!!!
+func (n *node) AdvanceRaft(ready Ready) {
+	if !IsEmptyHardState(ready.HardState) {
+		n.prevHardSt = ready.HardState
+	}
+
+	n.raft.advance(ready)
 }
 
 func (n *node) ReadIndex(ctx context.Context, readCtx []byte) error {
@@ -224,11 +414,42 @@ func (n *node) Campaign(ctx context.Context) error {
 	return n.step(ctx, pb.Message{Type: pb.MsgHup})
 }
 
-// Propose INFO: 提交数据到 raft log
-func (n *node) Propose(ctx context.Context, data []byte) error {
-	return n.stepWait(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Data: data}}})
+func confChangeToMsg(c pb.ConfChangeI) (pb.Message, error) {
+	typ, data, err := pb.MarshalConfChange(c)
+	if err != nil {
+		return pb.Message{}, err
+	}
+	return pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: typ, Data: data}}}, nil
 }
 
+// ProposeConfChange INFO: raft 成员变更也是一个 pb.MsgProp message, 和普通的 log entry 一样，
+func (n *node) ProposeConfChange(ctx context.Context, cc pb.ConfChangeI) error {
+	msg, err := confChangeToMsg(cc)
+	if err != nil {
+		return err
+	}
+
+	return n.Step(ctx, msg)
+}
+
+func (n *node) ApplyConfChange(cc pb.ConfChangeI) *pb.ConfState {
+	var confState pb.ConfState
+	select {
+	case n.confChangeChan <- cc.AsV2():
+	case <-n.doneChan:
+	}
+	// block until async goroutine done
+	select {
+	case confState = <-n.confStateChan:
+	case <-n.doneChan:
+	}
+
+	return &confState
+}
+
+func (n *node) Step(ctx context.Context, m pb.Message) error {
+	return n.step(ctx, m)
+}
 func (n *node) step(ctx context.Context, m pb.Message) error {
 	return n.stepWithWaitOption(ctx, m, false)
 }
@@ -240,7 +461,8 @@ func (n *node) stepWait(ctx context.Context, m pb.Message) error {
 func (n *node) stepWithWaitOption(ctx context.Context, message pb.Message, wait bool) error {
 	if message.Type != pb.MsgProp {
 		select {
-		case n.receiveChan <- message: // run() 里监听了 n.receiveChan
+		// INFO: campaign 走这个 n.receiveChan, run() 里监听了 n.receiveChan
+		case n.receiveChan <- message:
 			return nil
 		case <-ctx.Done():
 			return ctx.Err()
@@ -249,14 +471,12 @@ func (n *node) stepWithWaitOption(ctx context.Context, message pb.Message, wait 
 		}
 	}
 
-	// TODO: pb.MsgProp
-	ch := n.proposeChan
 	msgResult := msgWithResult{message: message}
 	if wait {
 		msgResult.result = make(chan error, 1)
 	}
 	select {
-	case ch <- msgResult: // INFO: 参考 run() msgResult := <-proposeChan
+	case n.proposeChan <- msgResult: // INFO: 参考 run() msgResult := <-proposeChan
 		if !wait {
 			return nil
 		}
@@ -278,10 +498,6 @@ func (n *node) stepWithWaitOption(ctx context.Context, message pb.Message, wait 
 	}
 
 	return nil
-}
-
-func (n *node) Ready() <-chan Ready {
-	return n.readyChan
 }
 
 func (n *node) Advance() {

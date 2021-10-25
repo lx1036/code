@@ -19,19 +19,19 @@ type MetaReplica struct {
 
 // MetaPartition defines the structure of a meta partition
 type MetaPartition struct {
-	PartitionID  uint64
-	Start        uint64
-	End          uint64
-	MaxInodeID   uint64
-	Size         uint64
-	Replicas     []*MetaReplica
-	ReplicaNum   uint8
-	Status       int8
-	volID        uint64
-	volName      string
-	Hosts        []string
-	Peers        []proto.Peer
-	MissNodes    map[string]int64
-	LoadResponse []*proto.MetaPartitionLoadResponse
+	PartitionID uint64
+	Start       uint64
+	End         uint64
+	MaxInodeID  uint64
+	Size        uint64
+	Replicas    []*MetaReplica
+	ReplicaNum  uint8
+	Status      int8
+	volID       uint64
+	volName     string
+	Hosts       []string
+	Peers       []proto.Peer
+	MissNodes   map[string]int64
+	//LoadResponse []*proto.MetaPartitionLoadResponse
 	sync.RWMutex
 }

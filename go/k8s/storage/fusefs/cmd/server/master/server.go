@@ -49,7 +49,6 @@ const (
 	cfgElectionTick   = "electionTick"
 )
 
-// Keys in the request
 const (
 	addrKey               = "addr"
 	diskPathKey           = "disk"
@@ -64,13 +63,13 @@ const (
 	volOwnerKey           = "owner"
 	replicaNumKey         = "replicaNum"
 	s3EndpointKey         = "endpoint"
-	accessKeyKey          = "accesskey"
-	secretKeyKey          = "secretkey"
-	regionKey             = "region"
-	createBackendKey      = "createBackend"
-	deleteBackendKey      = "deleteBackend"
-	clientIdKey           = "clientId"
-	clientMemoryUsedKey   = "clientMemoryUsed"
+
+	secretKeyKey        = "secretkey"
+	regionKey           = "region"
+	createBackendKey    = "createBackend"
+	deleteBackendKey    = "deleteBackend"
+	clientIdKey         = "clientId"
+	clientMemoryUsedKey = "clientMemoryUsed"
 )
 
 // Server represents the server in a cluster
@@ -85,10 +84,13 @@ type Server struct {
 	retainLogs   uint64
 	tickInterval int
 	electionTick int
-	leaderInfo   *LeaderInfo
-	config       *clusterConfig
-	cluster      *Cluster
-	store        raftstore.Store
+
+	leaderInfo *LeaderInfo
+	config     *clusterConfig
+	cluster    *Cluster
+
+	store *raftstore.BoltdbStore
+
 	raftStore    raftstore.RaftStore
 	fsm          *MetadataFsm
 	partition    raftstore.Partition
@@ -97,6 +99,49 @@ type Server struct {
 	metaReady    bool
 }
 
+// NewServer creates a new server
+func NewServer() *Server {
+	return &Server{}
+}
+
+func (server *Server) Start(cfg *config.Config) error {
+	// (1) config 初始化
+	server.config = &clusterConfig{
+		NodeTimeOutSec:      defaultNodeTimeOutSec,
+		MetaNodeThreshold:   defaultMetaPartitionMemUsageThreshold,
+		metaNodeReservedMem: defaultMetaNodeReservedMem,
+	}
+	if err := server.checkConfig(cfg); err != nil {
+		klog.Error(err)
+		return err
+	}
+
+	server.leaderInfo = &LeaderInfo{}
+
+	// (2) 启动 raft
+	var err error
+	server.store = raftstore.NewBoltdbStore("./tmp/my.db")
+	if err = server.createRaftServer(); err != nil {
+		klog.Error(err)
+		return err
+	}
+
+	// (3) 启动 cluster
+	server.cluster = NewCluster(server.clusterName, server.leaderInfo, server.fsm, server.partition, server.config)
+	server.cluster.retainLogs = server.retainLogs
+	server.cluster.partition = server.partition
+	server.cluster.idAlloc.partition = server.partition
+	server.cluster.scheduleTask()
+
+	// (4) http server
+	//server.reverseProxy = server.newReverseProxy()
+	//server.startHTTPService()
+
+	server.wg.Add(1)
+	return nil
+}
+
+// INFO: master 里只有一个 partition raft
 func (server *Server) createRaftServer() error {
 	var err error
 	raftCfg := &raftstore.Config{
@@ -205,44 +250,8 @@ func (server *Server) checkConfig(cfg *config.Config) (err error) {
 	if server.electionTick <= 3 {
 		server.electionTick = 5
 	}
+
 	return
-}
-
-func (server *Server) Start(cfg *config.Config) error {
-	server.config = &clusterConfig{
-		NodeTimeOutSec:      defaultNodeTimeOutSec,
-		MetaNodeThreshold:   defaultMetaPartitionMemUsageThreshold,
-		metaNodeReservedMem: defaultMetaNodeReservedMem,
-	}
-	server.leaderInfo = &LeaderInfo{}
-	server.reverseProxy = server.newReverseProxy()
-	if err := server.checkConfig(cfg); err != nil {
-		klog.Error(err)
-		return err
-	}
-
-	var err error
-	server.store, err = raftstore.NewMemoryStore()
-	if err != nil {
-		return fmt.Errorf("NewRocksDBStore error: %v", err)
-	}
-
-	if err = server.createRaftServer(); err != nil {
-		klog.Error(err)
-		return err
-	}
-
-	server.cluster = NewCluster(server.clusterName, server.leaderInfo, server.fsm, server.partition, server.config)
-	server.cluster.retainLogs = server.retainLogs
-	server.cluster.partition = server.partition
-	server.cluster.idAlloc.partition = server.partition
-	server.cluster.scheduleTask()
-
-	// INFO: server http service
-	server.startHTTPService()
-
-	server.wg.Add(1)
-	return nil
 }
 
 func (server *Server) Shutdown() {
@@ -251,9 +260,4 @@ func (server *Server) Shutdown() {
 
 func (server *Server) Wait() {
 	server.wg.Wait()
-}
-
-// NewServer creates a new server
-func NewServer() *Server {
-	return &Server{}
 }

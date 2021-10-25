@@ -101,14 +101,15 @@ type Cluster struct {
 func (cluster *Cluster) scheduleToCheckHeartbeat() {
 	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
 		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
-			leaderID, _ := cluster.partition.LeaderTerm()
+			leaderID, term := cluster.partition.LeaderTerm()
+			klog.Infof(fmt.Sprintf("[scheduleToCheckHeartbeat]leaderID:%d, term:%d", leaderID, term))
 			cluster.leaderInfo.addr = AddrDatabase[leaderID]
 		}
 	}, time.Second*defaultIntervalToCheckHeartbeat)
 
 	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
 		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
-			cluster.checkMetaNodeHeartbeat()
+			//cluster.checkMetaNodeHeartbeat()
 		}
 	}, time.Second*defaultIntervalToCheckHeartbeat)
 }
@@ -203,9 +204,9 @@ func (cluster *Cluster) scheduleToCheckVolStatus() {
 		//check vols after switching leader two minutes
 		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
 			cluster.checkDeleteBucket()
-			for _, vol := range cluster.vols {
-				vol.checkStatus(cluster)
-			}
+			//for _, vol := range cluster.vols {
+			//	//vol.checkStatus(cluster)
+			//}
 		}
 	}, time.Second*defaultIntervalToCheckMetaPartition)
 }
@@ -229,7 +230,7 @@ func (cluster *Cluster) checkDeleteBucket() {
 func (cluster *Cluster) scheduleToCheckVolMountClients() {
 	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
 		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
-			cluster.checkVolMountClients()
+			//cluster.checkVolMountClients()
 		}
 	}, time.Second*defaultIntervalToCheckVolMountClient)
 }
@@ -263,11 +264,11 @@ func (cluster *Cluster) checkMetaPartitions() {
 
 func (cluster *Cluster) scheduleTask() {
 	cluster.scheduleToCheckHeartbeat()
-	cluster.scheduleToCheckMetaPartitions()
-	cluster.scheduleToUpdateStatInfo()
-	cluster.scheduleToCheckVolStatus()
-	cluster.scheduleToLoadMetaPartitions()
-	cluster.scheduleToCheckVolMountClients()
+	//cluster.scheduleToCheckMetaPartitions()
+	//cluster.scheduleToUpdateStatInfo()
+	//cluster.scheduleToCheckVolStatus()
+	//cluster.scheduleToLoadMetaPartitions()
+	//cluster.scheduleToCheckVolMountClients()
 }
 
 func (cluster *Cluster) getVolume(volName string) (*Volume, error) {

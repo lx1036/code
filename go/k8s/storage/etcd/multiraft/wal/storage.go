@@ -1,7 +1,7 @@
 package wal
 
 import (
-	"github.com/tiglabs/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/proto"
 )
 
 type Storage struct {
@@ -20,6 +20,46 @@ type Storage struct {
 
 	// 最重要的字段，log entry
 	logEntry *logEntryStorage
+}
+
+func (s Storage) InitialState() (proto.HardState, error) {
+	panic("implement me")
+}
+
+func (s Storage) Entries(lo, hi uint64, maxSize uint64) (entries []*proto.Entry, isCompact bool, err error) {
+	panic("implement me")
+}
+
+func (s Storage) Term(i uint64) (term uint64, isCompact bool, err error) {
+	panic("implement me")
+}
+
+func (s Storage) FirstIndex() (uint64, error) {
+	panic("implement me")
+}
+
+func (s Storage) LastIndex() (uint64, error) {
+	panic("implement me")
+}
+
+func (s Storage) StoreEntries(entries []*proto.Entry) error {
+	panic("implement me")
+}
+
+func (s Storage) StoreHardState(st proto.HardState) error {
+	panic("implement me")
+}
+
+func (s Storage) Truncate(index uint64) error {
+	panic("implement me")
+}
+
+func (s Storage) ApplySnapshot(meta proto.SnapshotMeta) error {
+	panic("implement me")
+}
+
+func (s Storage) Close() {
+	panic("implement me")
 }
 
 func NewStorage(dir string, config *Config) (*Storage, error) {

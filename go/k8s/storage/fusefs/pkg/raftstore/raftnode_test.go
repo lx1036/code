@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tiglabs/raft"
-	raftproto "github.com/tiglabs/raft/proto"
+	"k8s-lx1036/k8s/storage/raft/proto"
+
 	"k8s.io/klog/v2"
 )
 
@@ -18,20 +18,20 @@ func (partition *MetaPartition) Apply(command []byte, index uint64) (interface{}
 	return nil, nil
 }
 
-func (partition *MetaPartition) ApplyMemberChange(confChange *raftproto.ConfChange, index uint64) (interface{}, error) {
+func (partition *MetaPartition) ApplyMemberChange(confChange *proto.ConfChange, index uint64) (interface{}, error) {
 	panic("implement me")
 }
 
-func (partition *MetaPartition) Snapshot() (raftproto.Snapshot, error) {
+func (partition *MetaPartition) Snapshot() (proto.Snapshot, error) {
 	panic("implement me")
 }
 
-func (partition *MetaPartition) ApplySnapshot(peers []raftproto.Peer, iter raftproto.SnapIterator) error {
+func (partition *MetaPartition) ApplySnapshot(peers []proto.Peer, iter proto.SnapIterator) error {
 	panic("implement me")
 }
 
-func (partition *MetaPartition) HandleFatalEvent(err *raft.FatalError) {
-	klog.Errorf(fmt.Sprintf("ID: %d, err %s", err.ID, err.Err.Error()))
+func (partition *MetaPartition) HandleFatalEvent(err error) {
+	klog.Errorf(fmt.Sprintf("err %v", err))
 }
 
 func (partition *MetaPartition) HandleLeaderChange(leader uint64) {
@@ -58,33 +58,33 @@ func TestRaftStoreCreatePartition(test *testing.T) {
 		HeartbeatPort:     0,
 		ReplicaPort:       0,
 		NumOfLogsToRetain: 0,
-		TickInterval:      0,
+		TickInterval:      5000, // 5000ms
 		ElectionTick:      0,
 	}
 
-	raftstore, err := NewRaftStore(config)
+	n, err := NewRaftNode(config)
 	if err != nil {
 		klog.Fatal(err)
 	}
 
-	partition := &MetaPartition{}
-	p, err := raftstore.CreatePartition(&PartitionConfig{
+	sm := &MetaPartition{}
+	r, err := n.CreatePartition(&PartitionConfig{
 		ID:      1,
 		Applied: 0,
 		Leader:  3,
 		Term:    0,
 		Peers: []PeerAddress{
-			{Peer: raftproto.Peer{ID: uint64(1)}, Address: "127.0.0.1:9021"},
-			{Peer: raftproto.Peer{ID: uint64(2)}, Address: "127.0.0.1:9022"},
-			{Peer: raftproto.Peer{ID: uint64(3)}, Address: "127.0.0.1:9023"},
+			{Peer: proto.Peer{ID: uint64(1)}, Address: "127.0.0.1:9021"},
+			{Peer: proto.Peer{ID: uint64(2)}, Address: "127.0.0.1:9022"},
+			{Peer: proto.Peer{ID: uint64(3)}, Address: "127.0.0.1:9023"},
 		},
-		SM: partition,
+		SM: sm,
 	})
 	if err != nil {
 		klog.Fatal(err)
 	}
 
-	if p.IsRaftLeader() {
+	if r.IsRaftLeader() {
 		klog.Info("success")
 	} else {
 		klog.Info("fail")

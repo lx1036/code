@@ -79,6 +79,14 @@ func (storage *MemoryStorage) InitialState() (pb.HardState, pb.ConfState, error)
 	return storage.hardState, storage.snapshot.Metadata.ConfState, nil
 }
 
+// SetHardState saves the current HardState.
+func (storage *MemoryStorage) SetHardState(st pb.HardState) error {
+	storage.Lock()
+	defer storage.Unlock()
+	storage.hardState = st
+	return nil
+}
+
 func (storage *MemoryStorage) LastIndex() uint64 {
 	storage.Lock()
 	defer storage.Unlock()
@@ -153,5 +161,8 @@ func (storage *MemoryStorage) Term(i uint64) (uint64, error) {
 }
 
 func (storage *MemoryStorage) Snapshot() (pb.Snapshot, error) {
-	panic("implement me")
+	storage.Lock()
+	defer storage.Unlock()
+
+	return storage.snapshot, nil
 }

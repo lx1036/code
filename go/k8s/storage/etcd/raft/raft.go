@@ -10,9 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"go.etcd.io/etcd/raft/v3/confchange"
+	"k8s-lx1036/k8s/storage/etcd/raft/confchange"
+	"k8s-lx1036/k8s/storage/etcd/raft/tracker"
+
+	"go.etcd.io/etcd/raft/v3/quorum"
 	pb "go.etcd.io/etcd/raft/v3/raftpb"
-	"go.etcd.io/etcd/raft/v3/tracker"
 	"k8s.io/klog/v2"
 )
 
@@ -110,11 +112,6 @@ type Config struct {
 	// errors. Note: 0 for no limit.
 	MaxUncommittedEntriesSize uint64
 
-	// MaxInflightMsgs limits the max number of in-flight append messages during
-	// optimistic replication phase. The application transportation layer usually
-	// has its own sending buffer over TCP/UDP. Setting MaxInflightMsgs to avoid
-	// overflowing that sending buffer. TODO (xiangli): feedback to application to
-	// limit the proposal rate?
 	MaxInflightMsgs int
 
 	// ReadOnlyOption specifies how the read only request is processed.
@@ -367,6 +364,7 @@ func (r *raft) applyConfChange(confChange pb.ConfChangeV2) pb.ConfState {
 	return r.switchToConfig(cfg, progress)
 }
 
+// switchToConfig reconfigures this node to use the provided configuration.
 func (r *raft) switchToConfig(cfg tracker.Config, progress tracker.ProgressMap) pb.ConfState {
 	r.progress.Config = cfg
 	r.progress.Progress = progress
@@ -383,7 +381,23 @@ func (r *raft) switchToConfig(cfg tracker.Config, progress tracker.ProgressMap) 
 		return confState
 	}
 
-	// TODO: r.maybeCommit()
+	if r.maybeCommit() {
+		// If the configuration change means that more entries are committed now,
+		// broadcast/append to everyone in the updated config.
+		r.bcastAppend()
+	} else {
+		// Otherwise, still probe the newly added replicas; there's no reason to
+		// let them wait out a heartbeat interval (or the next incoming
+		// proposal).
+		r.progress.Visit(func(id uint64, pr *tracker.Progress) {
+			r.maybeSendAppend(id, false /* sendIfEmpty */)
+		})
+	}
+
+	// If the leadTransferee was removed or demoted, abort the leadership transfer.
+	if _, ok := r.progress.Config.Voters.IDs()[r.leadTransferee]; !ok && r.leadTransferee != 0 {
+		r.abortLeaderTransfer()
+	}
 
 	return confState
 }
@@ -477,7 +491,7 @@ func (r *raft) stepFollower(message pb.Message) error {
 		r.send(message)
 	case pb.MsgReadIndexResp:
 		if len(message.Entries) != 1 {
-			klog.Errorf(fmt.Sprintf("%x invalid format of MsgReadIndexResp from %x, entries count: %d", r.id, m.From, len(m.Entries)))
+			klog.Errorf(fmt.Sprintf("%x invalid format of MsgReadIndexResp from %x, entries count: %d", r.id, message.From, len(message.Entries)))
 			return nil
 		}
 		r.readStates = append(r.readStates, ReadState{
@@ -513,9 +527,9 @@ func (r *raft) stepLeader(message pb.Message) error {
 		// INFO: 线性一致性读!!!
 		// only one leader member in cluster
 		if r.progress.IsSingleton() {
-			if resp := r.responseToReadIndexReq(message, r.raftLog.committed); resp.To != None {
+			/*if resp := r.responseToReadIndexReq(message, r.raftLog.committed); resp.To != None {
 				r.send(resp)
-			}
+			}*/
 
 			return nil
 		}
@@ -527,7 +541,7 @@ func (r *raft) stepLeader(message pb.Message) error {
 			return nil
 		}
 
-		sendMsgReadIndexResponse(r, message)
+		//sendMsgReadIndexResponse(r, message)
 		return nil
 
 	case pb.MsgProp: // INFO: 只有 leader 才可以接收写请求
@@ -542,7 +556,7 @@ func (r *raft) stepLeader(message pb.Message) error {
 			return ErrProposalDropped
 		}
 
-		// INFO: 如果 entry 是 ConfChange type
+		// INFO: 如果 entry 是 ConfChange type, @see node.ProposeConfChange()
 		for i := range message.Entries {
 			entry := &message.Entries[i]
 			var cc pb.ConfChangeI
@@ -554,7 +568,26 @@ func (r *raft) stepLeader(message pb.Message) error {
 				cc = ccc
 			}
 			if cc != nil {
+				// 多个成员变更不能同时进行, 同时只能有一个成员变更
+				alreadyPending := r.pendingConfIndex > r.raftLog.applied
+				alreadyJoint := len(r.progress.Config.Voters[1]) > 0
+				wantsLeaveJoint := len(cc.AsV2().Changes) == 0
 
+				var refused string
+				if alreadyPending {
+					refused = fmt.Sprintf("possible unapplied conf change at index %d (applied to %d)", r.pendingConfIndex, r.raftLog.applied)
+				} else if alreadyJoint && !wantsLeaveJoint {
+					refused = "must transition out of joint config first"
+				} else if !alreadyJoint && wantsLeaveJoint {
+					refused = "not in joint state; refusing empty conf change"
+				}
+
+				if refused != "" {
+					klog.Infof(fmt.Sprintf("%x ignoring conf change %v at config %s: %s", r.id, cc, r.progress.Config, refused))
+					message.Entries[i] = pb.Entry{Type: pb.EntryNormal}
+				} else {
+					r.pendingConfIndex = r.raftLog.lastIndex() + uint64(i) + 1
+				}
 			}
 		}
 
@@ -855,8 +888,83 @@ func (r *raft) reduceUncommittedSize(entries []pb.Entry) {
 	}
 }
 
+// INFO: campaign 成为 follower -> leader
 func (r *raft) hup(t CampaignType) {
-	// TODO:
+	if r.state == StateLeader {
+		klog.Warningf(fmt.Sprintf("%x ignoring MsgHup because already leader", r.id))
+		return
+	}
+	if !r.promotable() {
+		klog.Warningf(fmt.Sprintf("%x is unpromotable and can not campaign", r.id))
+		return
+	}
+
+	// INFO: 检查 ConfChange 是否有 pending
+	ents, err := r.raftLog.slice(r.raftLog.applied+1, r.raftLog.committed+1, noLimit)
+	if err != nil {
+		klog.Fatalf(fmt.Sprintf("unexpected error getting unapplied entries (%v)", err))
+	}
+	if n := numOfPendingConf(ents); n != 0 && r.raftLog.committed > r.raftLog.applied {
+		klog.Warningf(fmt.Sprintf("%x cannot campaign at term %d since there are still %d pending configuration changes to apply", r.id, r.Term, n))
+		return
+	}
+
+	klog.Infof(fmt.Sprintf("%x is starting a new election at term %d", r.id, r.Term))
+	r.campaign(t)
+}
+
+func (r *raft) campaign(t CampaignType) {
+	if !r.promotable() {
+		klog.Warningf(fmt.Sprintf("%x is unpromotable; campaign() should have been called", r.id))
+	}
+
+	//var term uint64
+	var voteMsg pb.MessageType
+	if t == campaignPreElection {
+		r.becomePreCandidate()
+		voteMsg = pb.MsgPreVote
+		// PreVote RPCs are sent for the next term before we've incremented r.Term.
+		//term = r.Term + 1
+	} else {
+		r.becomeCandidate()
+		voteMsg = pb.MsgVote
+		//term = r.Term
+	}
+
+	if _, _, res := r.poll(r.id, voteRespMsgType(voteMsg), true); res == quorum.VoteWon {
+		// We won the election after voting for ourselves (which must mean that
+		// this is a single-node cluster). Advance to the next state.
+		if t == campaignPreElection {
+			r.campaign(campaignElection)
+		} else {
+			r.becomeLeader()
+		}
+		return
+	}
+
+	// TODO: campaignPreElection
+}
+
+func (r *raft) poll(id uint64, t pb.MessageType, v bool) (granted int, rejected int, result quorum.VoteResult) {
+	if v {
+		klog.Infof(fmt.Sprintf("%x received %s from %x at term %d", r.id, t, id, r.Term))
+	} else {
+		klog.Infof(fmt.Sprintf("%x received %s rejection from %x at term %d", r.id, t, id, r.Term))
+	}
+
+	r.progress.RecordVote(id, v)
+
+	return r.progress.TallyVotes()
+}
+
+func numOfPendingConf(ents []pb.Entry) int {
+	n := 0
+	for i := range ents {
+		if ents[i].Type == pb.EntryConfChange || ents[i].Type == pb.EntryConfChangeV2 {
+			n++
+		}
+	}
+	return n
 }
 
 // pastElectionTimeout returns true iff r.electionElapsed is greater
@@ -932,6 +1040,66 @@ func (r *raft) send(message pb.Message) {
 	r.msgs = append(r.msgs, message)
 }
 
+func (r *raft) checkRaftID(snapshot pb.Snapshot) bool {
+	confState := snapshot.Metadata.ConfState
+	// `LearnersNext` doesn't need to be checked. According to the rules, if a peer in `LearnersNext`, it has to be in `VotersOutgoing`.
+	for _, ids := range [][]uint64{confState.Voters, confState.Learners, confState.LearnersNext} {
+		for _, id := range ids {
+			if id == r.id {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// restore recovers the state machine from a snapshot.
+func (r *raft) restore(snapshot pb.Snapshot) bool {
+	if snapshot.Metadata.Index <= r.raftLog.committed {
+		return false
+	}
+
+	// INFO: 从 snapshot recover 还必须是 Follower
+	if r.state != StateFollower {
+		klog.Warningf(fmt.Sprintf("%x attempted to restore snapshot as leader; should never happen", r.id))
+		r.becomeFollower(r.Term+1, None)
+		return false
+	}
+
+	if !r.checkRaftID(snapshot) {
+		klog.Warningf(fmt.Sprintf("%x attempted to restore snapshot but it is not in the ConfState %v; should never happen", r.id, snapshot.Metadata.ConfState))
+		return false
+	}
+
+	if r.raftLog.matchTerm(snapshot.Metadata.Index, snapshot.Metadata.Term) {
+		klog.Infof(fmt.Sprintf("%x [commit: %d, lastindex: %d, lastterm: %d] fast-forwarded commit to snapshot [index: %d, term: %d]",
+			r.id, r.raftLog.committed, r.raftLog.lastIndex(), r.raftLog.lastTerm(), snapshot.Metadata.Index, snapshot.Metadata.Term))
+		r.raftLog.commitTo(snapshot.Metadata.Index)
+		return false
+	}
+
+	r.raftLog.restore(snapshot)
+	r.progress = tracker.MakeProgressTracker(r.progress.MaxInflight)
+	cfg, progress, err := confchange.Restore(confchange.Changer{
+		Tracker:   r.progress,
+		LastIndex: r.raftLog.lastIndex(),
+	}, snapshot.Metadata.ConfState)
+	if err != nil {
+		panic(err)
+	}
+	if err = snapshot.Metadata.ConfState.Equivalent(r.switchToConfig(cfg, progress)); err != nil {
+		panic(err)
+	}
+
+	pr := r.progress.Progress[r.id]
+	pr.MaybeUpdate(pr.Next - 1)
+
+	klog.Infof(fmt.Sprintf("%x [commit: %d, lastindex: %d, lastterm: %d] restored snapshot [index: %d, term: %d]",
+		r.id, r.raftLog.committed, r.raftLog.lastIndex(), r.raftLog.lastTerm(), snapshot.Metadata.Index, snapshot.Metadata.Term))
+	return true
+}
+
 // INFO: 重置一些关键字段值
 func (r *raft) reset(term uint64) {
 	if r.Term != term {
@@ -961,7 +1129,7 @@ func (r *raft) reset(term uint64) {
 
 	r.pendingConfIndex = 0
 	r.uncommittedSize = 0
-	//r.readOnly = newReadOnly(r.readOnly.option)
+	r.readOnly = newReadOnly(r.readOnly.option)
 }
 
 // Ready encapsulates the entries and messages that are ready to read,
