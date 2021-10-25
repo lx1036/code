@@ -213,3 +213,50 @@ func (r *raftFsm) send(message *proto.Message) {
 
 	r.msgs = append(r.msgs, message)
 }
+
+func (r *raftFsm) reset(term, lasti uint64, isLeader bool) {
+	if r.term != term {
+		r.term = term
+		r.vote = NoLeader
+	}
+	r.leader = NoLeader
+	r.electionElapsed = 0
+	r.heartbeatElapsed = 0
+	r.votes = make(map[uint64]bool)
+	r.pendingConf = false
+	//r.readOnly.reset(ErrNotLeader)
+
+	if isLeader {
+		r.randElectionTick = r.nodeConfig.ElectionTick - 1
+		for id, p := range r.replicas {
+			r.replicas[id] = NewReplica(p.peer, r.nodeConfig.MaxInflightMsgs)
+			r.replicas[id].next = lasti + 1
+			if id == r.nodeConfig.NodeID {
+				r.replicas[id].match = lasti
+				r.replicas[id].committed = r.log.committed
+			}
+		}
+	} else {
+		r.resetRandomizedElectionTimeout()
+		for id, p := range r.replicas {
+			r.replicas[id] = NewReplica(p.peer, 0)
+		}
+	}
+}
+
+func (r *raftFsm) resetRandomizedElectionTimeout() {
+	randTick := r.rand.Intn(r.nodeConfig.ElectionTick)
+	r.randElectionTick = r.nodeConfig.ElectionTick + randTick
+	klog.Infof(fmt.Sprintf("raft[%v] random election timeout randElectionTick=%v, config.ElectionTick=%v, randTick=%v", r.id,
+		r.randElectionTick, r.nodeConfig.ElectionTick, randTick))
+}
+
+func numOfPendingConf(ents []*proto.Entry) int {
+	n := 0
+	for i := range ents {
+		if ents[i].Type == proto.EntryConfChange {
+			n++
+		}
+	}
+	return n
+}

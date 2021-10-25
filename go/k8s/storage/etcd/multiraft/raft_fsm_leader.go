@@ -10,14 +10,38 @@ import (
 )
 
 func (r *raftFsm) becomeLeader() {
+	if r.state == stateFollower {
+		klog.Fatalf(fmt.Sprintf("[raft->becomeLeader][%v] invalid transition [follower -> leader].", r.id))
+	}
 
-	//lasti := r.raftLog.LastIndex()
+	lastIndex := r.log.LastIndex()
 	r.step = r.stepLeader
-	//r.reset(r.term, lasti, true)
-	//r.tick = r.tickHeartbeat
+	r.reset(r.term, lastIndex, true)
+	r.tick = r.tickHeartbeat
 	r.leader = r.nodeConfig.NodeID
 	r.state = stateLeader
 	r.acks = nil
+	if pr, ok := r.replicas[r.nodeConfig.NodeID]; ok {
+		pr.active = true
+	}
+
+	ents, err := r.log.entries(r.log.committed+1, noLimit)
+	if err != nil {
+		klog.Fatalf(fmt.Sprintf("[raft->becomeLeader][%v] unexpected error getting uncommitted entries (%v).", r.id, err))
+	}
+	nconf := numOfPendingConf(ents)
+	if nconf > 1 {
+		klog.Fatalf(fmt.Sprintf("[raft->becomeLeader][%v] unexpected double uncommitted config entry.", r.id))
+	}
+	if nconf == 1 {
+		r.pendingConf = true
+	}
+
+	r.appendEntry(&proto.Entry{Term: r.term, Index: lastIndex + 1, Data: nil})
+	klog.Infof(fmt.Sprintf("raft[%v] became leader at term %d.", r.id, r.term))
+}
+
+func (r *raftFsm) tickHeartbeat() {
 
 }
 
@@ -29,6 +53,8 @@ func (r *raftFsm) stepLeader(message *proto.Message) {
 		klog.Warningf(fmt.Sprintf("[raftFsm stepLeader]raftFsm[%v] no progress available for %v", r.id, message.From))
 		return
 	}
+
+	klog.Info(fmt.Sprintf("message Type %s", message.Type))
 
 	switch message.Type {
 
@@ -71,8 +97,10 @@ func (r *raftFsm) broadcastAppend() {
 }
 
 func (r *raftFsm) sendAppend(to uint64) {
-
 	replica := r.replicas[to]
+	if replica.isPaused() {
+		return
+	}
 
 	var (
 		term       uint64
@@ -87,6 +115,10 @@ func (r *raftFsm) sendAppend(to uint64) {
 	}
 
 	if replica.next < firstIndex || errt != nil || erre != nil {
+		if !replica.active {
+			klog.Infof(fmt.Sprintf("[raft->sendAppend][%v]ignore sending snapshot to %v since it is not recently active.", r.id, to))
+			return
+		}
 
 	} else {
 		m = proto.NewMessage()
