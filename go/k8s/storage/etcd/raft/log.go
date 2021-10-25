@@ -177,10 +177,9 @@ func (log *raftLog) stableSnapTo(i uint64) {
 	log.unstable.stableSnapTo(i)
 }
 
-// INFO:
+// hasPendingSnapshot returns if there is pending snapshot waiting for applying.
 func (log *raftLog) hasPendingSnapshot() bool {
-	//return log.unstable.snapshot != nil && !IsEmptySnap(*log.unstable.snapshot)
-	return false
+	return log.unstable.snapshot != nil && !IsEmptySnap(*log.unstable.snapshot)
 }
 
 func (log *raftLog) term(i uint64) (uint64, error) {
@@ -212,6 +211,15 @@ func (log *raftLog) lastTerm() uint64 {
 	}
 
 	return t
+}
+
+func (log *raftLog) matchTerm(index, term uint64) bool {
+	t, err := log.term(index)
+	if err != nil {
+		return false
+	}
+
+	return t == term
 }
 
 func (log *raftLog) firstIndex() uint64 {
@@ -267,6 +275,16 @@ func (log *raftLog) zeroTermOnErrCompacted(t uint64, err error) uint64 {
 	return 0
 }
 
+func (log *raftLog) restore(snapshot pb.Snapshot) {
+	klog.Infof(fmt.Sprintf("log [%s] starts to restore snapshot [index: %d, term: %d]", log, snapshot.Metadata.Index, snapshot.Metadata.Term))
+	log.committed = snapshot.Metadata.Index
+	log.unstable.restore(snapshot)
+}
+
+func (log *raftLog) String() string {
+	return fmt.Sprintf("committed=%d, applied=%d, unstable.offset=%d, len(unstable.Entries)=%d", log.committed, log.applied, log.unstable.offset, len(log.unstable.entries))
+}
+
 // unstable.entries[i] has raft log position i+unstable.offset.
 // Note that unstable.offset may be less than the highest log
 // position in storage; this means that the next write to storage
@@ -314,8 +332,7 @@ func (u *unstable) shrinkEntriesArray() {
 	}
 }
 
-// maybeFirstIndex returns the index of the first possible entry in entries
-// if it has a snapshot.
+// INFO: unstable log 从 snapshot.Index + 1 开始
 func (u *unstable) maybeFirstIndex() (uint64, bool) {
 	if u.snapshot != nil {
 		return u.snapshot.Metadata.Index + 1, true
@@ -391,6 +408,12 @@ func (u *unstable) mustCheckOutOfBounds(lo, hi uint64) {
 	if lo < u.offset || hi > upper {
 		klog.Fatalf("unstable.slice[%d,%d) out of bound [%d,%d]", lo, hi, u.offset, upper)
 	}
+}
+
+func (u *unstable) restore(snapshot pb.Snapshot) {
+	u.offset = snapshot.Metadata.Index + 1
+	u.entries = nil
+	u.snapshot = &snapshot
 }
 
 func min(a, b uint64) uint64 {

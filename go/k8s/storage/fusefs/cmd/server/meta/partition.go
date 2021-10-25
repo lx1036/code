@@ -2,7 +2,6 @@ package meta
 
 import (
 	"os"
-	"path"
 	"strings"
 
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"

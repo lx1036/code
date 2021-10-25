@@ -12,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/projectcalico/libcalico-go/lib/apiconfig"
-	client "github.com/projectcalico/libcalico-go/lib/clientv3"
+	//client "github.com/projectcalico/libcalico-go/lib/clientv3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
@@ -76,7 +76,7 @@ func main() {
 	}
 }
 
-func getCalicoClientOrDie(kubeconfig, datastoreType string) client.Interface {
+/*func getCalicoClientOrDie(kubeconfig, datastoreType string) client.Interface {
 	c, err := client.New(apiconfig.CalicoAPIConfig{
 		Spec: apiconfig.CalicoAPIConfigSpec{
 			DatastoreType: apiconfig.DatastoreType(datastoreType),
@@ -90,7 +90,7 @@ func getCalicoClientOrDie(kubeconfig, datastoreType string) client.Interface {
 	}
 
 	return c
-}
+}*/
 
 func getKubernetesClientOrDie(kubeconfig string) *kubernetes.Clientset {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)

@@ -26,17 +26,17 @@ type Volume struct {
 
 func (vol *Volume) checkMetaPartitions(c *Cluster) {
 	var tasks []*proto.AdminTask
-	vol.checkSplitMetaPartition(c)
-	maxPartitionID := vol.maxPartitionID()
-	mps := vol.cloneMetaPartitionMap()
-	for _, mp := range mps {
-		mp.checkStatus(c.Name, true, int(vol.mpReplicaNum), maxPartitionID)
-		mp.checkLeader()
-		mp.checkReplicaNum(c, vol.Name, vol.mpReplicaNum)
-		mp.checkEnd(c, maxPartitionID)
-		mp.reportMissingReplicas(c.Name, c.leaderInfo.addr, defaultMetaPartitionTimeOutSec, defaultIntervalToAlarmMissingMetaPartition)
-		tasks = append(tasks, mp.replicaCreationTasks(c.Name, vol.Name)...)
-	}
+	//vol.checkSplitMetaPartition(c)
+	//maxPartitionID := vol.maxPartitionID()
+	//mps := vol.cloneMetaPartitionMap()
+	//for _, mp := range mps {
+	//	mp.checkStatus(c.Name, true, int(vol.mpReplicaNum), maxPartitionID)
+	//	mp.checkLeader()
+	//	mp.checkReplicaNum(c, vol.Name, vol.mpReplicaNum)
+	//	mp.checkEnd(c, maxPartitionID)
+	//	mp.reportMissingReplicas(c.Name, c.leaderInfo.addr, defaultMetaPartitionTimeOutSec, defaultIntervalToAlarmMissingMetaPartition)
+	//	tasks = append(tasks, mp.replicaCreationTasks(c.Name, vol.Name)...)
+	//}
 	c.addMetaNodeTasks(tasks)
 }
 

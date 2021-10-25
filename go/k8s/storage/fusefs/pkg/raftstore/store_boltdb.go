@@ -9,11 +9,11 @@ const (
 	DefaultBucket = "default"
 )
 
-type BoltDBStore struct {
+type BoltdbStore struct {
 	*bolt.DB
 }
 
-func (store *BoltDBStore) Get(key []byte) ([]byte, error) {
+func (store *BoltdbStore) Get(key []byte) ([]byte, error) {
 	var value []byte
 	err := store.DB.Update(func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte(DefaultBucket))
@@ -30,7 +30,7 @@ func (store *BoltDBStore) Get(key []byte) ([]byte, error) {
 	return value, nil
 }
 
-func (store *BoltDBStore) Put(key, value []byte) error {
+func (store *BoltdbStore) Put(key, value []byte) error {
 	err := store.DB.Update(func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte(DefaultBucket))
 		if err != nil {
@@ -42,7 +42,7 @@ func (store *BoltDBStore) Put(key, value []byte) error {
 	return err
 }
 
-func (store *BoltDBStore) Delete(key []byte) error {
+func (store *BoltdbStore) Delete(key []byte) error {
 	err := store.DB.Update(func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte(DefaultBucket))
 		if err != nil {
@@ -54,16 +54,16 @@ func (store *BoltDBStore) Delete(key []byte) error {
 	return err
 }
 
-func (store *BoltDBStore) Close() error {
+func (store *BoltdbStore) Close() error {
 	return store.DB.Close()
 }
 
-// "./raft/my.db"
-func newBoltDBStore(dbPath string) *BoltDBStore {
+// NewBoltdbStore "./raft/my.db"
+func NewBoltdbStore(dbPath string) *BoltdbStore {
 	db, err := bolt.Open(dbPath, 0666, nil)
 	if err != nil {
 		klog.Fatalf("init boltdb failed: %v, path: %v", err, dbPath)
 	}
 
-	return &BoltDBStore{DB: db}
+	return &BoltdbStore{DB: db}
 }

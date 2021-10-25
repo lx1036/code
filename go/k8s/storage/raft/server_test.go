@@ -41,7 +41,5 @@ func TestCreateRaft(test *testing.T) {
 		klog.Fatal(err)
 	}
 
-	go server.run()
-
 	<-server.stopc
 }
