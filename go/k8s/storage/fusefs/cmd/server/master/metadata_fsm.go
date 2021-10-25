@@ -6,8 +6,6 @@ import (
 	"io"
 	"strconv"
 
-	"k8s-lx1036/k8s/storage/fusefs/pkg/raftstore"
-
 	"github.com/tiglabs/raft"
 	"github.com/tiglabs/raft/proto"
 	"k8s.io/klog/v2"
@@ -25,7 +23,7 @@ type raftApplySnapshotHandler func()
 
 // MetadataFsm INFO: MetadataFsm 是一个 state machine
 type MetadataFsm struct {
-	store               *raftstore.BoltdbStore
+	store               *BoltdbStore
 	raftServer          *raft.RaftServer
 	applied             uint64
 	retainLogs          uint64
@@ -226,7 +224,7 @@ func (metadataFsm *MetadataFsm) restoreApplied() {
 }
 
 // INFO: https://github.com/tiglabs/raft/blob/master/test/memory_statemachine.go
-func newMetadataFsm(store *raftstore.BoltdbStore, retainsLog uint64, raftServer *raft.RaftServer) *MetadataFsm {
+func newMetadataFsm(store *BoltdbStore, retainsLog uint64, raftServer *raft.RaftServer) *MetadataFsm {
 	return &MetadataFsm{
 		store:      store,
 		raftServer: raftServer,
