@@ -8,6 +8,13 @@ cni debug tool: `go install github.com/containernetworking/cni/cnitool`
 
 
 
+## ENI 弹性网卡
+弹性网卡概念: https://help.aliyun.com/document_detail/58496.html
+
+## VSwitch 虚拟交换机
+VSwitch: https://help.aliyun.com/document_detail/65387.htm
+
+
 
 ## 参考文献
 **[使用 Go 从零开始实现 CNI](https://morven.life/posts/write_your_own_cni_with_golang/)**

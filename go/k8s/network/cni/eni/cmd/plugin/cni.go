@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/network/cni/eni/cmd/plugin/driver"
-	"k8s-lx1036/k8s/network/cni/eni/cmd/plugin/version"
 	"k8s-lx1036/k8s/network/cni/eni/pkg/link"
 	"k8s-lx1036/k8s/network/cni/eni/pkg/rpc"
 	eniTypes "k8s-lx1036/k8s/network/cni/eni/pkg/types"
@@ -79,7 +78,7 @@ func init() {
 }
 
 func main() {
-	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.GetSpecVersionSupported(), "")
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, GetSpecVersionSupported(), "")
 }
 
 func parseCmdArgs(args *skel.CmdArgs) (string, ns.NetNS, *NetConf, *K8SArgs, error) {
