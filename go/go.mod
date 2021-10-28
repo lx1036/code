@@ -8,6 +8,7 @@ require (
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Shopify/sarama v1.19.0
+	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1185
 	github.com/astaxie/beego v1.12.1
 	github.com/aws/aws-sdk-go v1.38.49
 	github.com/bep/debounce v1.2.0
@@ -19,6 +20,7 @@ require (
 	github.com/containernetworking/plugins v1.0.1
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/cyphar/filepath-securejoin v0.2.2
+	github.com/denverdino/aliyungo v0.0.0-20201215054313-f635de23c5e0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
 	github.com/docker/go-connections v0.4.0
