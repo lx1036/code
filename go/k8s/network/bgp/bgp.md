@@ -2,6 +2,11 @@
 # BGP
 BGP使用 TCP 作为传输协议，使用端口 179 建立连接，允许基于策略的路由，可以使用路由策略在目标的多个路径之间选择，并控制路由信息的再分配。
 
+概念名词：
+* ROA: Route Origin Authorization
+* BMP: BGP Monitoring Protocol, provides a convenient interface for obtaining route views
+* VRF: virtual routing and forwarding(Configuring a VRF to Provide BGP VPN Services)
+
 https://github.com/osrg/gobgp
 **[bgp route server](https://github.com/osrg/gobgp/blob/master/docs/sources/route-server.md)**
 

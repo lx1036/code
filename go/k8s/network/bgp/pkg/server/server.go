@@ -50,6 +50,9 @@ type BgpServer struct {
 	globalRib *table.TableManager // rib: route information based
 	rsRib     *table.TableManager
 
+	// bgp monitor protocol
+	bmpManager *bmpClientManager
+
 	policy *table.RoutingPolicy
 
 	mgmtCh chan *mgmtOp
@@ -174,17 +177,4 @@ func (server *BgpServer) active() error {
 	}
 
 	return nil
-}
-
-func (server *BgpServer) AddPeer(ctx context.Context, r *api.AddPeerRequest) error {
-	if r == nil || r.Peer == nil {
-		return fmt.Errorf("nil request")
-	}
-	return server.mgmtOperation(func() error {
-		config, err := newNeighborFromAPIStruct(r.Peer)
-		if err != nil {
-			return err
-		}
-		return server.addNeighbor(config)
-	}, true)
 }

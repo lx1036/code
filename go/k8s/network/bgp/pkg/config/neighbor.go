@@ -206,7 +206,7 @@ func (v AdminState) ToInt() int {
 	return i
 }
 
-// struct for container bgp:neighbor.
+// Neighbor struct for container bgp:neighbor.
 // List of BGP neighbors configured on the local system,
 // uniquely identified by peer IPv[46] address.
 type Neighbor struct {
@@ -269,6 +269,17 @@ type Neighbor struct {
 	// original -> gobgp:ttl-security
 	// Configure TTL Security feature.
 	TtlSecurity TtlSecurity `mapstructure:"ttl-security" json:"ttl-security,omitempty"`
+}
+
+func (n *Neighbor) ExtractNeighborAddress() (string, error) {
+	addr := n.State.NeighborAddress
+	if addr == "" {
+		addr = n.Config.NeighborAddress
+		if addr == "" {
+			return "", fmt.Errorf("NeighborAddress is not configured")
+		}
+	}
+	return addr, nil
 }
 
 // struct for container bgp:state.

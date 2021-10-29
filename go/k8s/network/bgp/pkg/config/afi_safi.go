@@ -121,6 +121,70 @@ type AfiSafi struct {
 	AddPaths AddPaths `mapstructure:"add-paths" json:"add-paths,omitempty"`
 }
 
+func (lhs *AfiSafi) Equal(rhs *AfiSafi) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+	if !lhs.MpGracefulRestart.Equal(&(rhs.MpGracefulRestart)) {
+		return false
+	}
+	if !lhs.Config.Equal(&(rhs.Config)) {
+		return false
+	}
+	if !lhs.ApplyPolicy.Equal(&(rhs.ApplyPolicy)) {
+		return false
+	}
+	if !lhs.Ipv4Unicast.Equal(&(rhs.Ipv4Unicast)) {
+		return false
+	}
+	if !lhs.Ipv6Unicast.Equal(&(rhs.Ipv6Unicast)) {
+		return false
+	}
+	if !lhs.Ipv4LabelledUnicast.Equal(&(rhs.Ipv4LabelledUnicast)) {
+		return false
+	}
+	if !lhs.Ipv6LabelledUnicast.Equal(&(rhs.Ipv6LabelledUnicast)) {
+		return false
+	}
+	if !lhs.L3vpnIpv4Unicast.Equal(&(rhs.L3vpnIpv4Unicast)) {
+		return false
+	}
+	if !lhs.L3vpnIpv6Unicast.Equal(&(rhs.L3vpnIpv6Unicast)) {
+		return false
+	}
+	if !lhs.L3vpnIpv4Multicast.Equal(&(rhs.L3vpnIpv4Multicast)) {
+		return false
+	}
+	if !lhs.L3vpnIpv6Multicast.Equal(&(rhs.L3vpnIpv6Multicast)) {
+		return false
+	}
+	if !lhs.L2vpnVpls.Equal(&(rhs.L2vpnVpls)) {
+		return false
+	}
+	if !lhs.L2vpnEvpn.Equal(&(rhs.L2vpnEvpn)) {
+		return false
+	}
+	if !lhs.RouteSelectionOptions.Equal(&(rhs.RouteSelectionOptions)) {
+		return false
+	}
+	if !lhs.UseMultiplePaths.Equal(&(rhs.UseMultiplePaths)) {
+		return false
+	}
+	if !lhs.PrefixLimit.Equal(&(rhs.PrefixLimit)) {
+		return false
+	}
+	if !lhs.RouteTargetMembership.Equal(&(rhs.RouteTargetMembership)) {
+		return false
+	}
+	if !lhs.LongLivedGracefulRestart.Equal(&(rhs.LongLivedGracefulRestart)) {
+		return false
+	}
+	if !lhs.AddPaths.Equal(&(rhs.AddPaths)) {
+		return false
+	}
+	return true
+}
+
 // struct for container bgp-mp:state.
 // State information for BGP graceful-restart.
 type MpGracefulRestartState struct {
@@ -991,27 +1055,6 @@ func (lhs *UseMultiplePaths) Equal(rhs *UseMultiplePaths) bool {
 		return false
 	}
 	if !lhs.Ibgp.Equal(&(rhs.Ibgp)) {
-		return false
-	}
-	return true
-}
-
-// struct for container bgp-mp:ebgp.
-// Multipath parameters for eBGP.
-type Ebgp struct {
-	// original -> bgp-mp:ebgp-config
-	// Configuration parameters relating to eBGP multipath.
-	Config EbgpConfig `mapstructure:"config" json:"config,omitempty"`
-	// original -> bgp-mp:ebgp-state
-	// State information relating to eBGP multipath.
-	State EbgpState `mapstructure:"state" json:"state,omitempty"`
-}
-
-func (lhs *Ebgp) Equal(rhs *Ebgp) bool {
-	if lhs == nil || rhs == nil {
-		return false
-	}
-	if !lhs.Config.Equal(&(rhs.Config)) {
 		return false
 	}
 	return true
