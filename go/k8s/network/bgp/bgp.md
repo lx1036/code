@@ -1,5 +1,7 @@
 
-## BGP
+# BGP
+BGP使用 TCP 作为传输协议，使用端口 179 建立连接，允许基于策略的路由，可以使用路由策略在目标的多个路径之间选择，并控制路由信息的再分配。
+
 https://github.com/osrg/gobgp
 **[bgp route server](https://github.com/osrg/gobgp/blob/master/docs/sources/route-server.md)**
 
@@ -86,6 +88,24 @@ https://github.com/osrg/gobgp
 #    Received:               0
 #    Accepted:               0
 ```
+
+# Route Server
+Route Server: https://github.com/osrg/gobgp/blob/master/docs/sources/route-server.md
+route server 就类似于交换机那一侧，可以使用 gobgp 来模拟路由器那一侧。
+这里 openlb 使用 bird 来模拟路由器：https://github.com/kubesphere/openelb/blob/master/doc/zh/simulate_with_bird.md
+
+
+## RIB
+RIB： Routing Information Base，由三部分组成：
+The Adj-RIBs-In: BGP RIB-In stores BGP routing information received from different peers. 
+The stored information is used as an input to BGP decision process. In other words this is the information received from
+peers before applying any attribute modifications or route filtering to them.
+
+The Local RIB: The local routing information base stores the resulted information from processing the RIBs-In database’s information. 
+These are the routes that are used locally after applying BGP policies and decision process.
+
+The Adj-RIBs-out: This one stores the routing information that was selected by the local BGP router to advertise to its peers through BGP update messages. Do not forget;  BGP only advertises best routes if they are allowed by local outbound policies.
+
 
 ## kube-ovn 支持 bgp(使用 gobgp 包)
 https://github.com/kubeovn/kube-ovn/wiki/BGP-%E6%94%AF%E6%8C%81
