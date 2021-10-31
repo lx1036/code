@@ -96,11 +96,11 @@ func (server *BgpServer) AddPeer(ctx context.Context, r *api.AddPeerRequest) err
 		return fmt.Errorf("nil request")
 	}
 	return server.mgmtOperation(func() error {
-		config, err := newNeighborFromAPIStruct(r.Peer)
+		c, err := newNeighborFromAPIStruct(r.Peer)
 		if err != nil {
 			return err
 		}
-		return server.addNeighbor(config)
+		return server.addNeighbor(c)
 	}, true)
 }
 

@@ -52,7 +52,8 @@ type BgpServer struct {
 
 	// bgp monitor protocol
 	bmpManager *bmpClientManager
-
+	mrtManager   *mrtManager
+	
 	policy *table.RoutingPolicy
 
 	mgmtCh chan *mgmtOp

@@ -1,5 +1,10 @@
 package config
 
+import (
+	api "github.com/osrg/gobgp/api"
+	"strings"
+)
+
 // struct for container bgp:peer-group.
 // List of BGP peer-groups configured on the local system -
 // uniquely identified by peer-group name.
@@ -255,4 +260,111 @@ func (lhs *PeerGroupConfig) Equal(rhs *PeerGroupConfig) bool {
 		return false
 	}
 	return true
+}
+
+
+func NewPeerFromConfigStruct(neighbor *Neighbor) *api.Peer {
+	
+	
+	s := neighbor.State
+	timer := neighbor.Timers
+	
+	return &api.Peer{
+		ApplyPolicy: newApplyPolicyFromConfigStruct(&neighbor.ApplyPolicy),
+		Conf: &api.PeerConf{
+			NeighborAddress:   neighbor.Config.NeighborAddress,
+			PeerAs:            neighbor.Config.PeerAs,
+			LocalAs:           neighbor.Config.LocalAs,
+			//PeerType:          uint32(neighbor.Config.PeerType.ToInt()),
+			AuthPassword:      neighbor.Config.AuthPassword,
+			RouteFlapDamping:  neighbor.Config.RouteFlapDamping,
+			Description:       neighbor.Config.Description,
+			PeerGroup:         neighbor.Config.PeerGroup,
+			NeighborInterface: neighbor.Config.NeighborInterface,
+			Vrf:               neighbor.Config.Vrf,
+			AllowOwnAs:        uint32(neighbor.AsPathOptions.Config.AllowOwnAs),
+			//RemovePrivateAs:   removePrivateAs,
+			ReplacePeerAs:     neighbor.AsPathOptions.Config.ReplacePeerAs,
+			AdminDown:         neighbor.Config.AdminDown,
+		},
+		State: &api.PeerState{
+			SessionState: api.PeerState_SessionState(api.PeerState_SessionState_value[strings.ToUpper(string(s.SessionState))]),
+			AdminState:   api.PeerState_AdminState(s.AdminState.ToInt()),
+			Messages: &api.Messages{
+				Received: &api.Message{
+					Notification:   s.Messages.Received.Notification,
+					Update:         s.Messages.Received.Update,
+					Open:           s.Messages.Received.Open,
+					Keepalive:      s.Messages.Received.Keepalive,
+					Refresh:        s.Messages.Received.Refresh,
+					Discarded:      s.Messages.Received.Discarded,
+					Total:          s.Messages.Received.Total,
+					WithdrawUpdate: uint64(s.Messages.Received.WithdrawUpdate),
+					WithdrawPrefix: uint64(s.Messages.Received.WithdrawPrefix),
+				},
+				Sent: &api.Message{
+					Notification: s.Messages.Sent.Notification,
+					Update:       s.Messages.Sent.Update,
+					Open:         s.Messages.Sent.Open,
+					Keepalive:    s.Messages.Sent.Keepalive,
+					Refresh:      s.Messages.Sent.Refresh,
+					Discarded:    s.Messages.Sent.Discarded,
+					Total:        s.Messages.Sent.Total,
+				},
+			},
+			PeerAs:          s.PeerAs,
+			//PeerType:        uint32(s.PeerType.ToInt()),
+			NeighborAddress: neighbor.State.NeighborAddress,
+			Queues:          &api.Queues{},
+			//RemoteCap:       remoteCap,
+			//LocalCap:        localCap,
+			RouterId:        s.RemoteRouterId,
+		},
+		EbgpMultihop: &api.EbgpMultihop{
+			Enabled:     neighbor.EbgpMultihop.Config.Enabled,
+			MultihopTtl: uint32(neighbor.EbgpMultihop.Config.MultihopTtl),
+		},
+		TtlSecurity: &api.TtlSecurity{
+			Enabled: neighbor.TtlSecurity.Config.Enabled,
+			TtlMin:  uint32(neighbor.TtlSecurity.Config.TtlMin),
+		},
+		Timers: &api.Timers{
+			Config: &api.TimersConfig{
+				ConnectRetry:           uint64(timer.Config.ConnectRetry),
+				HoldTime:               uint64(timer.Config.HoldTime),
+				KeepaliveInterval:      uint64(timer.Config.KeepaliveInterval),
+				IdleHoldTimeAfterReset: uint64(timer.Config.IdleHoldTimeAfterReset),
+			},
+			State: &api.TimersState{
+				KeepaliveInterval:  uint64(timer.State.KeepaliveInterval),
+				NegotiatedHoldTime: uint64(timer.State.NegotiatedHoldTime),
+				//Uptime:             ProtoTimestamp(timer.State.Uptime),
+				//Downtime:           ProtoTimestamp(timer.State.Downtime),
+			},
+		},
+		RouteReflector: &api.RouteReflector{
+			RouteReflectorClient:    neighbor.RouteReflector.Config.RouteReflectorClient,
+			RouteReflectorClusterId: string(neighbor.RouteReflector.State.RouteReflectorClusterId),
+		},
+		RouteServer: &api.RouteServer{
+			RouteServerClient: neighbor.RouteServer.Config.RouteServerClient,
+			SecondaryRoute:    neighbor.RouteServer.Config.SecondaryRoute,
+		},
+		GracefulRestart: &api.GracefulRestart{
+			Enabled:             neighbor.GracefulRestart.Config.Enabled,
+			RestartTime:         uint32(neighbor.GracefulRestart.Config.RestartTime),
+			HelperOnly:          neighbor.GracefulRestart.Config.HelperOnly,
+			DeferralTime:        uint32(neighbor.GracefulRestart.Config.DeferralTime),
+			NotificationEnabled: neighbor.GracefulRestart.Config.NotificationEnabled,
+			LonglivedEnabled:    neighbor.GracefulRestart.Config.LongLivedEnabled,
+			LocalRestarting:     neighbor.GracefulRestart.State.LocalRestarting,
+		},
+		Transport: &api.Transport{
+			RemotePort:    uint32(neighbor.Transport.Config.RemotePort),
+			//LocalAddress:  localAddress,
+			PassiveMode:   neighbor.Transport.Config.PassiveMode,
+			BindInterface: neighbor.Transport.Config.BindInterface,
+		},
+		//AfiSafis: afiSafis,
+	}
 }
