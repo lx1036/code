@@ -1,10 +1,10 @@
 package server
 
 import (
-	"fmt"
 	"context"
+	"fmt"
 	"os"
-	
+
 	api "github.com/osrg/gobgp/api"
 	"k8s-lx1036/k8s/network/bgp/pkg/config"
 )
@@ -24,7 +24,7 @@ type mrtManager struct {
 }
 
 func (m *mrtManager) enable(c *config.MrtConfig) error {
-	
+
 	return nil
 }
 

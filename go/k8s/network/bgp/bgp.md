@@ -114,3 +114,11 @@ The Adj-RIBs-out: This one stores the routing information that was selected by t
 
 ## kube-ovn 支持 bgp(使用 gobgp 包)
 https://github.com/kubeovn/kube-ovn/wiki/BGP-%E6%94%AF%E6%8C%81
+
+
+# 参考文献
+**[bgp](https://datatracker.ietf.org/doc/html/rfc4271)**
+
+**[bgp-route-server](https://datatracker.ietf.org/doc/html/rfc7947)**
+
+**[bgp-route-reflection](https://datatracker.ietf.org/doc/html/rfc4456)**

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"net"
 
 	api "github.com/osrg/gobgp/api"
 	"github.com/osrg/gobgp/pkg/packet/bgp"
@@ -102,6 +103,10 @@ func (server *BgpServer) AddPeer(ctx context.Context, r *api.AddPeerRequest) err
 		}
 		return server.addNeighbor(c)
 	}, true)
+}
+
+func (s *BgpServer) passConnToPeer(conn *net.TCPConn) {
+
 }
 
 func newNeighborFromAPIStruct(a *api.Peer) (*config.Neighbor, error) {

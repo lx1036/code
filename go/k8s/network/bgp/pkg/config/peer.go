@@ -262,19 +262,17 @@ func (lhs *PeerGroupConfig) Equal(rhs *PeerGroupConfig) bool {
 	return true
 }
 
-
 func NewPeerFromConfigStruct(neighbor *Neighbor) *api.Peer {
-	
-	
+
 	s := neighbor.State
 	timer := neighbor.Timers
-	
+
 	return &api.Peer{
 		ApplyPolicy: newApplyPolicyFromConfigStruct(&neighbor.ApplyPolicy),
 		Conf: &api.PeerConf{
-			NeighborAddress:   neighbor.Config.NeighborAddress,
-			PeerAs:            neighbor.Config.PeerAs,
-			LocalAs:           neighbor.Config.LocalAs,
+			NeighborAddress: neighbor.Config.NeighborAddress,
+			PeerAs:          neighbor.Config.PeerAs,
+			LocalAs:         neighbor.Config.LocalAs,
 			//PeerType:          uint32(neighbor.Config.PeerType.ToInt()),
 			AuthPassword:      neighbor.Config.AuthPassword,
 			RouteFlapDamping:  neighbor.Config.RouteFlapDamping,
@@ -284,8 +282,8 @@ func NewPeerFromConfigStruct(neighbor *Neighbor) *api.Peer {
 			Vrf:               neighbor.Config.Vrf,
 			AllowOwnAs:        uint32(neighbor.AsPathOptions.Config.AllowOwnAs),
 			//RemovePrivateAs:   removePrivateAs,
-			ReplacePeerAs:     neighbor.AsPathOptions.Config.ReplacePeerAs,
-			AdminDown:         neighbor.Config.AdminDown,
+			ReplacePeerAs: neighbor.AsPathOptions.Config.ReplacePeerAs,
+			AdminDown:     neighbor.Config.AdminDown,
 		},
 		State: &api.PeerState{
 			SessionState: api.PeerState_SessionState(api.PeerState_SessionState_value[strings.ToUpper(string(s.SessionState))]),
@@ -312,13 +310,13 @@ func NewPeerFromConfigStruct(neighbor *Neighbor) *api.Peer {
 					Total:        s.Messages.Sent.Total,
 				},
 			},
-			PeerAs:          s.PeerAs,
+			PeerAs: s.PeerAs,
 			//PeerType:        uint32(s.PeerType.ToInt()),
 			NeighborAddress: neighbor.State.NeighborAddress,
 			Queues:          &api.Queues{},
 			//RemoteCap:       remoteCap,
 			//LocalCap:        localCap,
-			RouterId:        s.RemoteRouterId,
+			RouterId: s.RemoteRouterId,
 		},
 		EbgpMultihop: &api.EbgpMultihop{
 			Enabled:     neighbor.EbgpMultihop.Config.Enabled,
@@ -360,7 +358,7 @@ func NewPeerFromConfigStruct(neighbor *Neighbor) *api.Peer {
 			LocalRestarting:     neighbor.GracefulRestart.State.LocalRestarting,
 		},
 		Transport: &api.Transport{
-			RemotePort:    uint32(neighbor.Transport.Config.RemotePort),
+			RemotePort: uint32(neighbor.Transport.Config.RemotePort),
 			//LocalAddress:  localAddress,
 			PassiveMode:   neighbor.Transport.Config.PassiveMode,
 			BindInterface: neighbor.Transport.Config.BindInterface,

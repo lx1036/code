@@ -41,6 +41,8 @@ type mgmtOp struct {
 type BgpServer struct {
 	bgpConfig config.Bgp
 
+	incomingCh chan struct{}
+
 	listeners []*tcpListener
 	acceptCh  chan *net.TCPConn
 
@@ -52,8 +54,8 @@ type BgpServer struct {
 
 	// bgp monitor protocol
 	bmpManager *bmpClientManager
-	mrtManager   *mrtManager
-	
+	mrtManager *mrtManager
+
 	policy *table.RoutingPolicy
 
 	mgmtCh chan *mgmtOp
@@ -97,8 +99,8 @@ func (server *BgpServer) Serve() {
 
 	for {
 		select {
-		case op := <-server.mgmtCh:
-			server.handleMGMTOp(op)
+
+		default:
 
 		}
 	}
@@ -111,65 +113,39 @@ func (server *BgpServer) StartBgp(ctx context.Context, r *api.StartBgpRequest) e
 		return fmt.Errorf("nil request")
 	}
 
-	return server.mgmtOperation(func() error {
-		g := r.Global
-		if net.ParseIP(g.RouterId) == nil {
-			return fmt.Errorf("invalid router-id format: %s", g.RouterId)
-		}
+	g := r.Global
+	if net.ParseIP(g.RouterId) == nil {
+		return fmt.Errorf("invalid router-id format: %s", g.RouterId)
+	}
 
-		c := newGlobalFromAPIStruct(g)
-		if err := config.SetDefaultGlobalConfigValues(c); err != nil {
-			return err
-		}
+	c := newGlobalFromAPIStruct(g)
+	if err := config.SetDefaultGlobalConfigValues(c); err != nil {
+		return err
+	}
 
-		if c.Config.Port > 0 {
-			acceptCh := make(chan *net.TCPConn, 4096)
-			for _, addr := range c.Config.LocalAddressList {
-				l, err := newTCPListener(addr, uint32(c.Config.Port), g.BindToDevice, acceptCh)
-				if err != nil {
-					return err
-				}
-				server.listeners = append(server.listeners, l)
+	if c.Config.Port > 0 {
+		acceptCh := make(chan *net.TCPConn, 4096)
+		for _, addr := range c.Config.LocalAddressList {
+			l, err := newTCPListener(addr, uint32(c.Config.Port), g.BindToDevice, acceptCh)
+			if err != nil {
+				return err
 			}
-			server.acceptCh = acceptCh
+			server.listeners = append(server.listeners, l)
 		}
-
-		rfs, _ := config.AfiSafis(c.AfiSafis).ToRfList()
-		server.globalRib = table.NewTableManager(rfs)
-		server.rsRib = table.NewTableManager(rfs)
-
-		if err := server.policy.Initialize(); err != nil {
-			return err
-		}
-
-		server.bgpConfig.Global = *c
-
-		return nil
-	}, false)
-
-}
-
-func (server *BgpServer) mgmtOperation(f func() error, checkActive bool) (err error) {
-	ch := make(chan error)
-	defer func() { err = <-ch }()
-	server.mgmtCh <- &mgmtOp{
-		f:           f,
-		errCh:       ch,
-		checkActive: checkActive,
+		server.acceptCh = acceptCh
 	}
 
-	return
-}
+	rfs, _ := config.AfiSafis(c.AfiSafis).ToRfList()
+	server.globalRib = table.NewTableManager(rfs)
+	server.rsRib = table.NewTableManager(rfs)
 
-func (server *BgpServer) handleMGMTOp(op *mgmtOp) {
-	if op.checkActive {
-		if err := server.active(); err != nil {
-			op.errCh <- err
-			return
-		}
+	if err := server.policy.Initialize(); err != nil {
+		return err
 	}
 
-	op.errCh <- op.f()
+	server.bgpConfig.Global = *c
+
+	return nil
 }
 
 func (server *BgpServer) active() error {
@@ -178,4 +154,15 @@ func (server *BgpServer) active() error {
 	}
 
 	return nil
+}
+
+func (server *BgpServer) handleFSMMessage(peer *peer, message *fsmMsg) {
+	switch message.Type {
+	case fsmMsgStateChange:
+
+	case fsmMsgBGPMessage:
+
+	case fsmMsgRouteRefresh:
+
+	}
 }

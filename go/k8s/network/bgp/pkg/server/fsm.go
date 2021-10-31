@@ -91,9 +91,10 @@ func (r fsmStateReason) String() string {
 }
 
 type fsm struct {
+	lock sync.RWMutex
+
 	gConf                *config.Global
 	pConf                *config.Neighbor
-	lock                 sync.RWMutex
 	state                bgp.FSMState
 	outgoingCh           *channels.InfiniteChannel
 	incomingCh           *channels.InfiniteChannel
@@ -142,12 +143,68 @@ func newFSM(gConf *config.Global, pConf *config.Neighbor) *fsm {
 	return fsm
 }
 
+func (f *fsm) loop() {
+	f.lock.RLock()
+	fsmState := f.state
+	f.lock.RUnlock()
+
+	switch fsmState {
+	case bgp.BGP_FSM_IDLE:
+		nextState, reason = f.idle(ctx)
+		// case bgp.BGP_FSM_CONNECT:
+		// 	nextState = h.connect()
+	case bgp.BGP_FSM_ACTIVE:
+		nextState, reason = f.active(ctx)
+	case bgp.BGP_FSM_OPENSENT:
+		nextState, reason = f.opensent(ctx)
+	case bgp.BGP_FSM_OPENCONFIRM:
+		nextState, reason = f.openconfirm(ctx)
+	case bgp.BGP_FSM_ESTABLISHED:
+		nextState, reason = f.established(ctx)
+	}
+
+	f.lock.RLock()
+	f.incoming <- &fsmMsg{
+		MsgType:     fsmMsgStateChange,
+		MsgSrc:      fsm.pConf.State.NeighborAddress,
+		MsgData:     nextState,
+		StateReason: reason,
+	}
+	f.lock.RUnlock()
+}
+
+func (f *fsm) established() {
+
+}
+
+type fsmMsgType int
+
+const (
+	_ fsmMsgType = iota
+	fsmMsgStateChange
+	fsmMsgBGPMessage
+	fsmMsgRouteRefresh
+)
+
+type fsmMsg struct {
+	Type        fsmMsgType
+	fsm         *fsm
+	MsgSrc      string
+	MsgData     interface{}
+	StateReason *fsmStateReason
+	PathList    []*table.Path
+	timestamp   time.Time
+	payload     []byte
+}
+
 type fsmHandler struct {
-	fsm              *fsm
+	fsm *fsm
+
+	incoming chan *fsmMsg
+
 	conn             net.Conn
 	msgCh            *channels.InfiniteChannel
 	stateReasonCh    chan fsmStateReason
-	incoming         *channels.InfiniteChannel
 	outgoing         *channels.InfiniteChannel
 	holdTimerResetCh chan bool
 	sentNotification *bgp.BGPMessage
@@ -169,10 +226,16 @@ func newFSMHandler(fsm *fsm, outgoing *channels.InfiniteChannel) *fsmHandler {
 		ctxCancel:        cancel,
 	}
 	h.wg.Add(1)
-	go h.loop(ctx, h.wg)
+
+	go h.loop(ctx)
+
 	return h
 }
 
-func (h *fsmHandler) loop(ctx context.Context, wg *sync.WaitGroup) error {
+func (h *fsmHandler) loop(ctx context.Context) error {
+	defer h.wg.Done()
 
+	fsm := h.fsm
+
+	return nil
 }
