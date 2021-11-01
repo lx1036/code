@@ -2,11 +2,13 @@ module k8s-lx1036
 
 go 1.17
 
+// 只需要 go get github.com/osrg/gobgp@v2.32.0 就会生成: github.com/osrg/gobgp v0.0.0-20211001064702-91b91278600d
+
 require (
 	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05
 	bou.ke/monkey v1.0.2
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
-	github.com/BurntSushi/toml v0.3.1
+	github.com/BurntSushi/toml v0.4.1
 	github.com/Shopify/sarama v1.19.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1185
 	github.com/astaxie/beego v1.12.1
@@ -40,7 +42,7 @@ require (
 	github.com/google/cadvisor v0.37.5
 	github.com/google/go-querystring v1.0.0
 	github.com/google/gofuzz v1.2.0
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
@@ -106,7 +108,7 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
 	go.uber.org/zap v1.17.0
 	golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
-	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
+	golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210823070655-63515b42dcdf
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
@@ -233,7 +235,7 @@ require (
 	github.com/kavu/go_reuseport v1.5.0 // indirect
 	github.com/kelseyhightower/envconfig v0.0.0-20180517194557-dd1402a4d99d // indirect
 	github.com/klauspost/compress v1.11.13 // indirect
-	github.com/kr/pretty v0.2.1 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/lithammer/dedent v1.1.0 // indirect
@@ -262,6 +264,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/selinux v1.8.0 // indirect
+	github.com/osrg/gobgp v0.0.0-20211001064702-91b91278600d // indirect
 	github.com/pelletier/go-toml v1.9.3 // indirect
 	github.com/pierrec/lz4 v2.0.5+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
