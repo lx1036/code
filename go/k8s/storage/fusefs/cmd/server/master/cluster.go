@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
-	"k8s-lx1036/k8s/storage/fusefs/pkg/raftstore"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -95,7 +94,7 @@ type Cluster struct {
 
 	DisableAutoAllocate bool
 	fsm                 *MetadataFsm
-	partition           raftstore.Partition
+	partition           Partition
 }
 
 func (cluster *Cluster) scheduleToCheckHeartbeat() {
@@ -282,7 +281,7 @@ func (cluster *Cluster) getVolume(volName string) (*Volume, error) {
 	return vol, nil
 }
 
-func NewCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition raftstore.Partition, cfg *clusterConfig) *Cluster {
+func NewCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition Partition, cfg *clusterConfig) *Cluster {
 	return &Cluster{
 		Name:            name,
 		vols:            make(map[string]*Volume),

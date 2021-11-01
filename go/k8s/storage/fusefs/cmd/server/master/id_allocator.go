@@ -7,8 +7,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"k8s-lx1036/k8s/storage/fusefs/pkg/raftstore"
-
 	"k8s.io/klog/v2"
 )
 
@@ -16,8 +14,8 @@ import (
 type IDAllocator struct {
 	metaPartitionID uint64
 	commonID        uint64
-	store           *raftstore.BoltdbStore
-	partition       raftstore.Partition
+	store           *BoltdbStore
+	partition       Partition
 	mpIDLock        sync.RWMutex
 	metaNodeIDLock  sync.RWMutex
 }
@@ -96,7 +94,7 @@ func (alloc *IDAllocator) restoreMaxCommonID() {
 	klog.Infof("action[restoreMaxCommonID] maxMnID[%v]", alloc.commonID)
 }
 
-func NewIDAllocator(store *raftstore.BoltdbStore, partition raftstore.Partition) *IDAllocator {
+func NewIDAllocator(store *BoltdbStore, partition Partition) *IDAllocator {
 	return &IDAllocator{
 		store:     store,
 		partition: partition,

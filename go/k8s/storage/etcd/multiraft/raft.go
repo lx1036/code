@@ -157,6 +157,9 @@ func newRaft(config *NodeConfig, raftConfig *RaftConfig) (*Raft, error) {
 }
 
 func (r *Raft) run() {
+	r.prevHardSt.Term = r.raftFsm.term
+	r.prevHardSt.Vote = r.raftFsm.vote
+	r.prevHardSt.Commit = r.raftFsm.log.committed
 	r.updateCurrentSoftState()
 
 	var readyc chan struct{}
@@ -357,13 +360,19 @@ func (r *Raft) updateCurrentSoftState() {
 }
 
 func (r *Raft) sendMessage(m *proto.Message) {
-	r.config.transport.Send(m)
+	if r.config.transport != nil {
+		r.config.transport.Send(m)
+	} else {
+		if len(m.Entries) != 0 {
+			klog.Infof(fmt.Sprintf("[raft sendMessage]%s", m.Entries[0].Data))
+		}
+	}
 }
 
 func (r *Raft) containsUpdate() bool {
-	return len(r.raftFsm.log.unstableEntries()) > 0 || r.raftFsm.log.committed > r.raftFsm.log.applied || len(r.raftFsm.msgs) > 0
-	//s.raftFsm.raftLog.committed != s.prevHardSt.Commit || s.raftFsm.term != s.prevHardSt.Term || s.raftFsm.vote != s.prevHardSt.Vote ||
-	//	s.raftFsm.readOnly.containsUpdate(s.curApplied.Get())
+	return len(r.raftFsm.log.unstableEntries()) > 0 || r.raftFsm.log.committed > r.raftFsm.log.applied || len(r.raftFsm.msgs) > 0 ||
+		r.raftFsm.log.committed != r.prevHardSt.Commit || r.raftFsm.term != r.prevHardSt.Term || r.raftFsm.vote != r.prevHardSt.Vote //||
+	//r.raftFsm.readOnly.containsUpdate(r.curApplied.Get())
 }
 
 func (r *Raft) status() *Status {

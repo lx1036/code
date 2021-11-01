@@ -3,7 +3,7 @@ package driver
 import (
 	"fmt"
 	"k8s-lx1036/k8s/network/cni/eni/pkg/sysctl"
-	"k8s-lx1036/k8s/network/cni/eni/types"
+	"k8s-lx1036/k8s/network/cni/eni/pkg/types"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
@@ -204,4 +204,12 @@ func (driver *VETHDriver) Setup(cfg *SetupConfig, netNS ns.NetNS) error {
 	}
 
 	return nil
+}
+
+func (driver *VETHDriver) Teardown(cfg *TeardownCfg, netNS ns.NetNS) error {
+	panic("implement me")
+}
+
+func (driver *VETHDriver) Check(cfg *CheckConfig) error {
+	panic("implement me")
 }

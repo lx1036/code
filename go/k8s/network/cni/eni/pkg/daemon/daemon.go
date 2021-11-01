@@ -7,8 +7,8 @@ import (
 	"os"
 	"sync"
 
-	"k8s-lx1036/k8s/network/cni/eni/rpc"
-	"k8s-lx1036/k8s/network/cni/eni/types"
+	"k8s-lx1036/k8s/network/cni/eni/pkg/rpc"
+	"k8s-lx1036/k8s/network/cni/eni/pkg/types"
 )
 
 const (
@@ -19,18 +19,37 @@ const (
 	cniDefaultPath = "/opt/cni/bin"
 )
 
+// ResourceManager Allocate/Release/Pool/Stick/GC pod resource
+// managed pod and resource relationship
+type ResourceManager interface {
+	Allocate(context *networkContext, prefer string) (types.NetworkResource, error)
+	Release(context *networkContext, resItem types.ResourceItem) error
+	GarbageCollection(inUseResSet map[string]types.ResourceItem, expireResSet map[string]types.ResourceItem) error
+	Stat(context *networkContext, resID string) (types.NetworkResource, error)
+	//tracing.ResourceMappingHandler
+}
+
 type EniBackendServer struct {
 	rpc.UnimplementedEniBackendServer
+
+	sync.RWMutex
 
 	daemonMode     string
 	configFilePath string
 	kubeConfig     string
 	master         string
 
+	cniBinPath string
+
+	eniResMgr ResourceManager
+
 	ipFamily *types.IPFamily
+
+	pendingPods sync.Map // 并发安全的 map
+
 }
 
-func newEniBackendServer(daemonMode string) (rpc.EniBackendServer, error) {
+func newEniBackendServer(daemonMode, configFilePath, kubeconfig string) (rpc.EniBackendServer, error) {
 	cniBinPath := os.Getenv("CNI_PATH")
 	if cniBinPath == "" {
 		cniBinPath = cniDefaultPath
@@ -38,9 +57,9 @@ func newEniBackendServer(daemonMode string) (rpc.EniBackendServer, error) {
 	server := &EniBackendServer{
 		configFilePath: configFilePath,
 		kubeConfig:     kubeconfig,
-		master:         master,
-		pendingPods:    sync.Map{},
-		cniBinPath:     cniBinPath,
+		//master:         master,
+		pendingPods: sync.Map{},
+		cniBinPath:  cniBinPath,
 	}
 
 	switch daemonMode {
@@ -50,10 +69,20 @@ func newEniBackendServer(daemonMode string) (rpc.EniBackendServer, error) {
 		return nil, fmt.Errorf("unsupport daemon mode %s", daemonMode)
 	}
 
+	var err error
+	switch daemonMode {
+	case daemonModeENIOnly:
+		server.eniResMgr, err = newENIResourceManager(poolConfig, ecs, localResource[types.ResourceTypeENI], ipFamily)
+
+	}
+
 	return server, nil
 }
 
 func (server *EniBackendServer) AllocateIP(ctx context.Context, request *rpc.AllocateIPRequest) (*rpc.AllocateIPReply, error) {
+
+	server.RLock()
+	defer server.RUnlock()
 
 	// 0. Get pod Info
 	podinfo, err := server.k8s.GetPod(r.K8SPodNamespace, r.K8SPodName)
@@ -66,11 +95,27 @@ func (server *EniBackendServer) AllocateIP(ctx context.Context, request *rpc.All
 
 	case podNetworkTypeVPCENI:
 		var eni *types.ENI
-		eni, err = networkService.allocateENI(networkContext, &oldRes)
+		eni, err = server.allocateENI(networkContext, &oldRes)
 		if err != nil {
 			return nil, fmt.Errorf("error get allocated vpc ENI ip for: %+v, result: %+v", podinfo, err)
 		}
 
+		allocIPReply.IPType = rpc.IPType_TypeVPCENI
+		allocIPReply.Success = true
+		allocIPReply.BasicInfo = &rpc.BasicInfo{
+			PodIP:       eni.PrimaryIP.ToRPC(),
+			PodCIDR:     eni.VSwitchCIDR.ToRPC(),
+			GatewayIP:   eni.GatewayIP.ToRPC(),
+			ServiceCIDR: server.k8s.GetServiceCIDR().ToRPC(),
+		}
+		allocIPReply.ENIInfo = &rpc.ENIInfo{
+			MAC:   eni.MAC,
+			Trunk: podinfo.PodENI && server.enableTrunk && eni.Trunk,
+		}
+		allocIPReply.Pod = &rpc.Pod{
+			Ingress: podinfo.TcIngress,
+			Egress:  podinfo.TcEgress,
+		}
 	default:
 		return nil, fmt.Errorf("not support pod network type")
 	}
@@ -83,6 +128,16 @@ func (server *EniBackendServer) AllocateIP(ctx context.Context, request *rpc.All
 
 	// 5. return allocate result
 	return allocIPReply, err
+}
+
+func (server *EniBackendServer) allocateENI() (*types.ENI, error) {
+
+	res, err := server.eniResMgr.Allocate(ctx, oldENIID)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.(*types.ENI), nil
 }
 
 func (server *EniBackendServer) ReleaseIP(ctx context.Context, request *rpc.ReleaseIPRequest) (*rpc.ReleaseIPReply, error) {

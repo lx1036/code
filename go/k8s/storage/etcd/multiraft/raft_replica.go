@@ -88,3 +88,14 @@ func (r *Replica) update(index uint64) {
 func (r *Replica) pause() {
 	r.paused = true
 }
+
+func (r *Replica) isPaused() bool {
+	switch r.state {
+	case replicaStateProbe:
+		return r.paused
+	case replicaStateSnapshot:
+		return true
+	default:
+		return r.full()
+	}
+}

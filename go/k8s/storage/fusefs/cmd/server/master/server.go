@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/storage/fusefs/pkg/config"
-	"k8s-lx1036/k8s/storage/fusefs/pkg/raftstore"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
 
 	"k8s.io/klog/v2"
@@ -89,11 +88,11 @@ type Server struct {
 	config     *clusterConfig
 	cluster    *Cluster
 
-	store *raftstore.BoltdbStore
+	store *BoltdbStore
 
-	raftStore    raftstore.RaftStore
+	raftStore    RaftNode
 	fsm          *MetadataFsm
-	partition    raftstore.Partition
+	partition    Partition
 	wg           sync.WaitGroup
 	reverseProxy *httputil.ReverseProxy
 	metaReady    bool
@@ -120,7 +119,7 @@ func (server *Server) Start(cfg *config.Config) error {
 
 	// (2) 启动 raft
 	var err error
-	server.store = raftstore.NewBoltdbStore("./tmp/my.db")
+	server.store = NewBoltdbStore("./tmp/my.db")
 	if err = server.createRaftServer(); err != nil {
 		klog.Error(err)
 		return err
@@ -144,7 +143,7 @@ func (server *Server) Start(cfg *config.Config) error {
 // INFO: master 里只有一个 partition raft
 func (server *Server) createRaftServer() error {
 	var err error
-	raftCfg := &raftstore.Config{
+	raftCfg := &Config{
 		NodeID:            server.id,
 		RaftPath:          server.walDir,
 		NumOfLogsToRetain: server.retainLogs,
@@ -153,18 +152,18 @@ func (server *Server) createRaftServer() error {
 		TickInterval:      server.tickInterval,
 		ElectionTick:      server.electionTick,
 	}
-	if server.raftStore, err = raftstore.NewRaftStore(raftCfg); err != nil {
+	if server.raftStore, err = NewRaftNode(raftCfg); err != nil {
 		return fmt.Errorf("NewRaftStore failed! id[%v] walPath[%v] err: %v", server.id, server.walDir, err)
 	}
 
 	klog.Infof("peers[%v],tickInterval[%v],electionTick[%v]\n", server.config.peers, server.tickInterval, server.electionTick)
-	server.fsm = newMetadataFsm(server.store, server.retainLogs, server.raftStore.RaftServer())
+	server.fsm = newMetadataFsm(server.store, server.retainLogs, server.raftStore.RaftNode())
 	server.fsm.registerLeaderChangeHandler(server.handleLeaderChange)
 	server.fsm.registerPeerChangeHandler(server.handlePeerChange)
 	server.fsm.registerApplySnapshotHandler(server.handleApplySnapshot)
 	server.fsm.restore()
 
-	partitionCfg := &raftstore.PartitionConfig{
+	partitionCfg := &PartitionConfig{
 		ID:      GroupID,
 		Peers:   server.config.peers,
 		Applied: server.fsm.GetApply(),
@@ -203,10 +202,10 @@ func (server *Server) checkConfig(cfg *config.Config) (err error) {
 	server.config.heartbeatPort = cfg.GetInt64(heartbeatPortKey)
 	server.config.replicaPort = cfg.GetInt64(replicaPortKey)
 	if server.config.heartbeatPort <= 1024 {
-		server.config.heartbeatPort = raftstore.DefaultHeartbeatPort
+		server.config.heartbeatPort = DefaultHeartbeatPort
 	}
 	if server.config.replicaPort <= 1024 {
-		server.config.replicaPort = raftstore.DefaultReplicaPort
+		server.config.replicaPort = DefaultReplicaPort
 	}
 	fmt.Printf("heartbeatPort[%v],replicaPort[%v]\n", server.config.heartbeatPort, server.config.replicaPort)
 	if err = server.config.parsePeers(peerAddrs); err != nil {

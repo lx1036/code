@@ -237,8 +237,6 @@ func (node *Node) run() {
 				node.handleHeartbeatResp(message)
 			}
 
-		case message := <-node.proposeChan:
-
 		}
 	}
 }
