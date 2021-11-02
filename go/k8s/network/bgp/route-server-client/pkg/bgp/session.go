@@ -13,27 +13,27 @@ import (
 )
 
 type session struct {
-	mu sync.Mutex
-	cond           *sync.Cond
-	conn           net.Conn
+	mu   sync.Mutex
+	cond *sync.Cond
+	conn net.Conn
 
-	routerID    net.IP // May be nil, meaning "derive from context"
+	routerID net.IP // May be nil, meaning "derive from context"
 
 	addr     string
 	srcAddr  net.IP
 	localASN uint32
 	peerASN  uint32
-	
-	newHoldTime chan bool
-	holdTime time.Duration
+
+	newHoldTime    chan bool
+	holdTime       time.Duration
 	actualHoldTime time.Duration
 
-	defaultNextHop net.IP
-	advertisement     map[string]*Advertisement
-	newAdvertisement            map[string]*Advertisement
-	
+	defaultNextHop   net.IP
+	advertisement    map[string]*Advertisement
+	newAdvertisement map[string]*Advertisement
+
 	peerFBASNSupport bool
-	
+
 	closed bool
 }
 
@@ -48,12 +48,12 @@ func NewSession(addr string, srcAddr net.IP, localASN, peerASN uint32, routerID 
 		peerASN:  peerASN,
 		routerID: routerID.To4(),
 
-		holdTime: holdTime,
-		advertisement: map[string]*Advertisement{},
+		holdTime:         holdTime,
+		advertisement:    map[string]*Advertisement{},
 		newAdvertisement: map[string]*Advertisement{},
 	}
 	s.cond = sync.NewCond(&s.mu)
-	
+
 	go s.sendKeepalives()
 	go s.run()
 
@@ -156,9 +156,7 @@ func (s *session) connect() error {
 // them. It does minimal checks for the well-formedness of messages,
 // and terminates the connection if something looks wrong.
 func (s *session) consumeBGP(conn io.ReadCloser) {
-	
-	
-	
+
 	for {
 		hdr := struct {
 			Marker1, Marker2 uint64
@@ -193,7 +191,7 @@ func (s *session) consumeBGP(conn io.ReadCloser) {
 func (s *session) Set(advs ...*Advertisement) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	newAdvertisement := map[string]*Advertisement{}
 	for _, adv := range advs {
 		err := validate(adv)
@@ -202,7 +200,7 @@ func (s *session) Set(advs ...*Advertisement) error {
 		}
 		newAdvertisement[adv.Prefix.String()] = adv
 	}
-	
+
 	s.newAdvertisement = newAdvertisement
 	//stats.PendingPrefixes(s.addr, len(s.new))
 	s.cond.Broadcast()
@@ -239,7 +237,7 @@ func validate(adv *Advertisement) error {
 	if adv.Prefix.IP.To4() == nil {
 		return fmt.Errorf("cannot advertise non-v4 prefix %q", adv.Prefix)
 	}
-	
+
 	if adv.NextHop != nil && adv.NextHop.To4() == nil {
 		return fmt.Errorf("next-hop must be IPv4, got %q", adv.NextHop)
 	}

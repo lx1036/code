@@ -10,7 +10,7 @@ import (
 	"os"
 	"syscall"
 	"time"
-	
+
 	"golang.org/x/sys/unix"
 )
 
@@ -88,7 +88,7 @@ var notificationCodes = map[uint16]string{
 	0x0101: "Connection not synchronized",
 	0x0102: "Bad message length",
 	0x0103: "Bad message type",
-	
+
 	0x0200: "OPEN message error (unspecific)",
 	0x0201: "Unsupported version number",
 	0x0202: "Bad peer AS",
@@ -96,7 +96,7 @@ var notificationCodes = map[uint16]string{
 	0x0204: "Unsupported optional parameter",
 	0x0206: "Unacceptable hold time",
 	0x0207: "Unsupported capability",
-	
+
 	0x0300: "UPDATE message error (unspecific)",
 	0x0301: "Malformed Attribute List",
 	0x0302: "Unrecognized Well-known Attribute",
@@ -108,14 +108,14 @@ var notificationCodes = map[uint16]string{
 	0x0309: "Optional Attribute Error",
 	0x030a: "Invalid Network Field",
 	0x030b: "Malformed AS_PATH",
-	
+
 	0x0400: "Hold Timer Expired (unspecific)",
-	
+
 	0x0500: "BGP FSM state error (unspecific)",
 	0x0501: "Receive Unexpected Message in OpenSent State",
 	0x0502: "Receive Unexpected Message in OpenConfirm State",
 	0x0503: "Receive Unexpected Message in Established State",
-	
+
 	0x0601: "Maximum Number of Prefixes Reached",
 	0x0602: "Administrative Shutdown",
 	0x0603: "Peer De-configured",
@@ -164,7 +164,7 @@ func readOpen(r io.Reader) (*openResult, error) {
 	if hdr.Len < 37 {
 		return nil, fmt.Errorf("message length %d too small to be OPEN", hdr.Len)
 	}
-	
+
 	lr := &io.LimitedReader{
 		R: r,
 		N: int64(hdr.Len) - 19,
@@ -186,16 +186,16 @@ func readOpen(r io.Reader) (*openResult, error) {
 	if open.HoldTime != 0 && open.HoldTime < 3 {
 		return nil, fmt.Errorf("invalid hold time %q, must be 0 or >=3s", open.HoldTime)
 	}
-	
+
 	ret := &openResult{
 		asn:      uint32(open.ASN16),
 		holdTime: time.Duration(open.HoldTime) * time.Second,
 	}
-	
+
 	if err := readOptions(lr, ret); err != nil {
 		return nil, err
 	}
-	
+
 	return ret, nil
 }
 
@@ -211,7 +211,7 @@ func readOptions(r io.Reader, ret *openResult) error {
 			}
 			return err
 		}
-		
+
 		if hdr.Type != 2 {
 			return fmt.Errorf("unknown BGP option type %d", hdr.Type)
 		}
