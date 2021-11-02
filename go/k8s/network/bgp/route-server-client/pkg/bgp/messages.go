@@ -82,3 +82,17 @@ func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) 
 
 	return binary.Write(w, binary.BigEndian, msg)
 }
+
+func sendKeepalive(w io.Writer) error {
+	msg := struct {
+		Marker1, Marker2 uint64
+		Len              uint16
+		Type             uint8
+	}{
+		Marker1: 0xffffffffffffffff,
+		Marker2: 0xffffffffffffffff,
+		Len:     19,
+		Type:    4,
+	}
+	return binary.Write(w, binary.BigEndian, msg)
+}
