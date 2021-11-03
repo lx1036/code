@@ -1,0 +1,120 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.2
+  creationTimestamp: null
+  name: bgpconfs.bgplb.k9s.io
+spec:
+  group: bgplb.k9s.io
+  names:
+    kind: BgpConf
+    listKind: BgpConfList
+    plural: bgpconfs
+    shortNames:
+    - conf
+    singular: bgpconf
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.as
+      name: As
+      type: integer
+    - jsonPath: .spec.listenPort
+      name: ListenPort
+      type: integer
+    - jsonPath: .spec.routerId
+      name: RouterId
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              as:
+                format: int32
+                type: integer
+              asPerRack:
+                additionalProperties:
+                  format: int32
+                  type: integer
+                type: object
+              families:
+                items:
+                  format: int32
+                  type: integer
+                type: array
+              gracefulRestart:
+                properties:
+                  deferralTime:
+                    format: int32
+                    type: integer
+                  enabled:
+                    type: boolean
+                  helperOnly:
+                    type: boolean
+                  localRestarting:
+                    type: boolean
+                  longlivedEnabled:
+                    type: boolean
+                  mode:
+                    type: string
+                  notificationEnabled:
+                    type: boolean
+                  peerRestartTime:
+                    format: int32
+                    type: integer
+                  peerRestarting:
+                    type: boolean
+                  restartTime:
+                    format: int32
+                    type: integer
+                  staleRoutesTime:
+                    format: int32
+                    type: integer
+                type: object
+              listenAddresses:
+                items:
+                  type: string
+                type: array
+              listenPort:
+                format: int32
+                type: integer
+              routerId:
+                type: string
+              useMultiplePaths:
+                type: boolean
+            type: object
+          status:
+            properties:
+              nodesConfStatus:
+                additionalProperties:
+                  properties:
+                    as:
+                      format: int32
+                      type: integer
+                    routerId:
+                      type: string
+                  type: object
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
