@@ -220,3 +220,60 @@ func TestBGPMonitor(test *testing.T) {
 
 	<-ch
 }
+
+
+// gobgpd -f ./route-server-conf.conf -l debug --api-hosts ":50052" --pprof-disable
+// gobgpd -f ./route-client-conf.conf -l debug --api-hosts ":50053" --pprof-disable
+// node这边添加路由：gobgp -p 50053 -d global rib add -a ipv4 100.0.0.0/24 nexthop 20.20.20.20
+// 验证交换机那边是否收到路由：gobgp -p 50052 -d neighbor 127.0.0.1 adj-in
+// 交换机这边添加路由：gobgp -p 50052 -d global rib add -a ipv4 200.0.0.0/24 nexthop 20.20.20.20
+// 验证node这边是否收到路由，不应该收到路由：gobgp -p 50053 -d neighbor 127.0.0.1 adj-in
+func TestRouteServer(test *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	ch := make(chan struct{})
+	
+	// bgp1
+	s := gobgp.NewBgpServer(gobgp.GrpcListenAddress(":50053"))
+	go s.Serve()
+	_ = s.StartBgp(context.Background(), &api.StartBgpRequest{
+		Global: &api.Global{
+			As:         65001, // AS Number, 公司内需要调用 NetOPS API 会给本机和交换机 AS Number
+			RouterId:   "2.2.2.2", // 一般选择当前机器 IP
+			ListenPort: 1791,
+		},
+	})
+	defer s.StopBgp(context.Background(), &api.StopBgpRequest{})
+	
+	// 把 route-server(即交换机那一端) 加入到本地 bgp-server 中来
+	p1 := &api.Peer{
+		Conf: &api.PeerConf{
+			NeighborAddress: "127.0.0.1",
+			PeerAs:          64512,
+		},
+		Transport: &api.Transport{
+			RemotePort:  1790,
+		},
+	}
+	_ = s.AddPeer(context.Background(), &api.AddPeerRequest{Peer: p1})
+	
+	nlri, _ := ptypes.MarshalAny(&api.IPAddressPrefix{
+		Prefix:    "10.20.30.0",
+		PrefixLen: 24,
+	})
+	a1, _ := ptypes.MarshalAny(&api.OriginAttribute{
+		Origin: 0,
+	})
+	a2, _ := ptypes.MarshalAny(&api.NextHopAttribute{
+		NextHop: "30.30.30.30",
+	})
+	attrs := []*anypb.Any{a1, a2}
+	s.AddPath(context.TODO(), &api.AddPathRequest{
+		Path: &api.Path{
+			Family: &api.Family{Afi: api.Family_AFI_IP, Safi: api.Family_SAFI_UNICAST},
+			Nlri:   nlri,
+			Pattrs: attrs,
+		},
+	})
+	
+	<-ch
+}
