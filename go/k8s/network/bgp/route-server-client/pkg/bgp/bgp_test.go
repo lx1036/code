@@ -6,15 +6,15 @@ import (
 	"net"
 	"testing"
 	"time"
-	
+
 	gobgpapi "github.com/osrg/gobgp/api"
 	gobgp "github.com/osrg/gobgp/pkg/server"
 
 	"github.com/golang/protobuf/ptypes"
 	log "github.com/sirupsen/logrus"
+	"github.com/vishvananda/netlink"
 	"google.golang.org/protobuf/types/known/anypb"
 	"k8s.io/klog/v2"
-	"github.com/vishvananda/netlink"
 )
 
 // https://github.com/metallb/metallb/blob/main/internal/bgp/native/native_test.go
@@ -211,14 +211,13 @@ func TestBGPMonitor(test *testing.T) {
 		}
 	})
 
-	
 	injectRoute := func(path *gobgpapi.Path) {
 		dst, nextHop, err := parseBGPPath(path)
 		if err != nil {
 			klog.Error(err)
 			return
 		}
-		
+
 		klog.Infof(fmt.Sprintf("dst:%s, nextHop:%s", dst.String(), nextHop.String()))
 	}
 	// gobgp -p 50065 global rib add -a ipv4 100.0.0.0/24 nexthop 20.20.20.20
@@ -237,7 +236,6 @@ func TestBGPMonitor(test *testing.T) {
 	<-ch
 }
 
-
 // parseBGPPath takes in a GoBGP Path and parses out the destination subnet and the next hop from its attributes.
 // If successful, it will return the destination of the BGP path as a subnet form and the next hop. If it
 // can't parse the destination or the next hop IP, it returns an error.
@@ -246,7 +244,7 @@ func parseBGPPath(path *gobgpapi.Path) (*net.IPNet, net.IP, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	
+
 	nlri := path.GetNlri()
 	var prefix gobgpapi.IPAddressPrefix
 	err = ptypes.UnmarshalAny(nlri, &prefix)
@@ -292,19 +290,19 @@ func parseBGPNextHop(path *gobgpapi.Path) (net.IP, error) {
 func TestRouteServer(test *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	ch := make(chan struct{})
-	
+
 	// bgp1
 	s := gobgp.NewBgpServer(gobgp.GrpcListenAddress(":50053"))
 	go s.Serve()
 	_ = s.StartBgp(context.Background(), &gobgpapi.StartBgpRequest{
 		Global: &gobgpapi.Global{
-			As:         65001, // AS Number, 公司内需要调用 NetOPS API 会给本机和交换机 AS Number
+			As:         65001,     // AS Number, 公司内需要调用 NetOPS API 会给本机和交换机 AS Number
 			RouterId:   "2.2.2.2", // 一般选择当前机器 IP
 			ListenPort: 1791,
 		},
 	})
 	defer s.StopBgp(context.Background(), &gobgpapi.StopBgpRequest{})
-	
+
 	// 把 route-server(即交换机那一端) 加入到本地 bgp-server 中来
 	p1 := &gobgpapi.Peer{
 		Conf: &gobgpapi.PeerConf{
@@ -312,11 +310,11 @@ func TestRouteServer(test *testing.T) {
 			PeerAs:          64512,
 		},
 		Transport: &gobgpapi.Transport{
-			RemotePort:  1790,
+			RemotePort: 1790,
 		},
 	}
 	_ = s.AddPeer(context.Background(), &gobgpapi.AddPeerRequest{Peer: p1})
-	
+
 	nlri, _ := ptypes.MarshalAny(&gobgpapi.IPAddressPrefix{
 		Prefix:    "10.20.30.0",
 		PrefixLen: 24,
@@ -335,6 +333,6 @@ func TestRouteServer(test *testing.T) {
 			Pattrs: attrs,
 		},
 	})
-	
+
 	<-ch
 }
