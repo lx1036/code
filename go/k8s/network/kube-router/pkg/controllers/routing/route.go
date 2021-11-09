@@ -1,13 +1,18 @@
 package routing
 
 import (
+	"context"
 	"fmt"
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/sys/unix"
 	"io/ioutil"
+	"k8s-lx1036/k8s/network/kube-router/pkg/metrics"
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	gobgpapi "github.com/osrg/gobgp/api"
@@ -205,4 +210,50 @@ func (controller *NetworkRoutingController) disablePolicyBasedRouting() error {
 	}
 
 	return nil
+}
+
+func (controller *NetworkRoutingController) advertisePodRoute() error {
+	metrics.ControllerBGPAdvertisementsSent.Inc()
+
+	subnet, mask, err := controller.splitPodCidr()
+	if err != nil {
+		return err
+	}
+
+	// only ipv4
+	klog.Infof(fmt.Sprintf("Advertising route: '%s/%d via %s' to peers", subnet, mask, controller.nodeIP.String()))
+	nlri, _ := ptypes.MarshalAny(&gobgpapi.IPAddressPrefix{
+		PrefixLen: uint32(mask),
+		Prefix:    subnet,
+	})
+	a1, _ := ptypes.MarshalAny(&gobgpapi.OriginAttribute{
+		Origin: 0,
+	})
+	a2, _ := ptypes.MarshalAny(&gobgpapi.NextHopAttribute{
+		NextHop: controller.nodeIP.String(),
+	})
+	attrs := []*any.Any{a1, a2}
+	_, err = controller.bgpServer.AddPath(context.Background(), &gobgpapi.AddPathRequest{
+		Path: &gobgpapi.Path{
+			Family: &gobgpapi.Family{Afi: gobgpapi.Family_AFI_IP, Safi: gobgpapi.Family_SAFI_UNICAST},
+			Nlri:   nlri,
+			Pattrs: attrs,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("advertise pod cidr %s err:%v", controller.podCidr, err))
+	}
+
+	return nil
+}
+
+func (controller *NetworkRoutingController) splitPodCidr() (subnet string, mask int, err error) {
+	cidrStr := strings.Split(controller.podCidr, "/")
+	subnet = cidrStr[0]
+	mask, err = strconv.Atoi(cidrStr[1])
+	if err != nil || mask < 0 || mask > 32 {
+		return "", 0, fmt.Errorf("the pod CIDR IP given is not a proper mask: %d", mask)
+	}
+
+	return subnet, mask, nil
 }

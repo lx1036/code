@@ -32,6 +32,7 @@ const (
 
 type NetworkRoutingController struct {
 	CondMutex *sync.Cond
+	mu        sync.Mutex
 
 	nodeInformer     cache.SharedIndexInformer
 	serviceInformer  cache.SharedIndexInformer
@@ -42,6 +43,7 @@ type NetworkRoutingController struct {
 
 	enableOverlays          bool
 	enablePodEgress         bool
+	enableIBGP              bool
 	isIpv6                  bool
 	autoMTU                 bool
 	advertiseClusterIP      bool
@@ -55,6 +57,8 @@ type NetworkRoutingController struct {
 	bgpGracefulRestartTime         time.Duration
 	bgpGracefulRestartDeferralTime time.Duration
 	peerMultihopTTL                uint8
+	defaultNodeAsnNumber           uint32
+	bgpPort                        uint32
 
 	nodeSubnet net.IPNet // pod subnet for node
 	podCidr    string    // INFO: 使用 kube-controller-manager IPAM 分配的 pod cidr
@@ -87,10 +91,14 @@ func NewNetworkRoutingController(
 
 		enableOverlays:          option.EnableOverlays,
 		enablePodEgress:         option.EnablePodEgress,
+		enableIBGP:              option.EnableIBGP,
 		autoMTU:                 option.AutoMTU,
 		advertiseClusterIP:      option.AdvertiseClusterIP,
 		advertiseExternalIP:     option.AdvertiseExternalIP,
 		advertiseLoadBalancerIP: option.AdvertiseLoadBalancerIP,
+
+		defaultNodeAsnNumber: 64512, // this magic number is first of the private ASN range, use it as default
+		bgpPort:              option.BGPPort,
 	}
 
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -292,7 +300,7 @@ func (controller *NetworkRoutingController) Run(stopCh <-chan struct{}) {
 		}()
 	}
 
-	// loop forever and block
+	// INFO: loop forever and block
 	wait.Until(func() {
 		// Update ipset entries
 		if controller.enablePodEgress || controller.enableOverlays {
@@ -330,9 +338,8 @@ func (controller *NetworkRoutingController) Run(stopCh <-chan struct{}) {
 			klog.Errorf("Error adding BGP policies: %s", err.Error())
 		}
 
-		if controller.bgpEnableInternal {
-			controller.syncInternalPeers()
+		if controller.enableIBGP {
+			controller.syncFullMeshIBGPPeers()
 		}
-
 	}, time.Second*5, stopCh)
 }

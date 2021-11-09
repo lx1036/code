@@ -13,9 +13,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// INFO: ECMP(Equal Cost Multi-Path) 等价路由: 多条不同链路到达同一目的地址的网络环境，即同一个 dst 多个 next hop
+
 func (controller *NetworkRoutingController) advertiseVIPs(vips []string) {
 	for _, vip := range vips {
-		klog.Infof(fmt.Sprintf("Advertising route: '%s/32 via %s' to peers", vip, controller.nodeIP.String()))
+		klog.Infof(fmt.Sprintf("advertising route: '%s/32 via %s' to peers", vip, controller.nodeIP.String()))
 
 		a1, _ := ptypes.MarshalAny(&gobgpapi.OriginAttribute{
 			Origin: 0,
@@ -36,9 +38,42 @@ func (controller *NetworkRoutingController) advertiseVIPs(vips []string) {
 			},
 		})
 		if err != nil {
-			klog.Errorf(fmt.Sprintf("error advertising IP: %q, error: %v", vip, err))
+			klog.Errorf(fmt.Sprintf("advertising IP: %q, error: %v", vip, err))
 		}
 	}
+}
+
+func (controller *NetworkRoutingController) withdrawVIPs(vips []string) {
+	for _, vip := range vips {
+		klog.Infof(fmt.Sprintf("withdrawing route: '%s/32 via %s' to peers", vip, controller.nodeIP.String()))
+
+		a1, _ := ptypes.MarshalAny(&gobgpapi.OriginAttribute{
+			Origin: 0,
+		})
+		a2, _ := ptypes.MarshalAny(&gobgpapi.NextHopAttribute{
+			NextHop: controller.nodeIP.String(),
+		})
+		attrs := []*any.Any{a1, a2}
+		nlri, _ := ptypes.MarshalAny(&gobgpapi.IPAddressPrefix{
+			Prefix:    vip,
+			PrefixLen: 32,
+		})
+		err := controller.bgpServer.DeletePath(context.Background(), &gobgpapi.DeletePathRequest{
+			TableType: gobgpapi.TableType_GLOBAL,
+			Path: &gobgpapi.Path{
+				Family: &gobgpapi.Family{Afi: gobgpapi.Family_AFI_IP, Safi: gobgpapi.Family_SAFI_UNICAST},
+				Nlri:   nlri,
+				Pattrs: attrs,
+			},
+		})
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("withdraw IP: %q, error: %v", vip, err))
+		}
+	}
+}
+
+func (controller *NetworkRoutingController) getAllVIPs() ([]string, []string, error) {
+	return controller.getVIPs(false)
 }
 
 func (controller *NetworkRoutingController) getActiveVIPs() ([]string, []string, error) {
