@@ -6,6 +6,14 @@ BGP使用 TCP 作为传输协议，使用端口 179 建立连接，允许基于�
 * ROA: Route Origin Authorization
 * BMP: BGP Monitoring Protocol, provides a convenient interface for obtaining route views
 * VRF: virtual routing and forwarding(Configuring a VRF to Provide BGP VPN Services)
+* FIB: Forwarding Information Based
+
+## GoBGP
+```shell
+# mac本地安装
+go get github.com/osrg/gobgp/cmd/gobgp@v2.32.0
+go get github.com/osrg/gobgp/cmd/gobgpd@v2.32.0
+```
 
 https://github.com/osrg/gobgp
 **[bgp route server](https://github.com/osrg/gobgp/blob/master/docs/sources/route-server.md)**

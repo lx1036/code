@@ -177,13 +177,16 @@ require (
 	github.com/containerd/ttrpc v1.0.2 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
 	github.com/coreos/prometheus-operator v0.38.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/eapache/channels v1.1.0 // indirect
 	github.com/eapache/go-resiliency v1.1.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
@@ -226,11 +229,13 @@ require (
 	github.com/jacobsa/oglemock v0.0.0-20150831005832-e94d794d06ff // indirect
 	github.com/jacobsa/ogletest v0.0.0-20170503003838-80d50a735a11 // indirect
 	github.com/jacobsa/reqtrace v0.0.0-20150505043853-245c9e0234cb // indirect
+	github.com/jessevdk/go-flags v1.5.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/juju/ratelimit v1.0.2-0.20191002062651-f60b32039441 // indirect
+	github.com/k-sone/critbitgo v1.4.0 // indirect
 	github.com/karrick/godirwalk v1.10.12 // indirect
 	github.com/kavu/go_reuseport v1.5.0 // indirect
 	github.com/kelseyhightower/envconfig v0.0.0-20180517194557-dd1402a4d99d // indirect
@@ -273,6 +278,7 @@ require (
 	github.com/projectcalico/go-yaml-wrapper v0.0.0-20191112210931-090425220c54 // indirect
 	github.com/prometheus/client_model v0.2.1-0.20200623203004-60555c9708c7 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
+	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/romanyx/jwalk v1.0.0 // indirect
 	github.com/russross/blackfriday v1.5.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
