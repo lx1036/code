@@ -26,7 +26,7 @@ func TestEIP(test *testing.T) {
 }
 
 func TestName(test *testing.T) {
-	client, err := sdk.NewClientWithAccessKey("cn-hangzhou", "LTAI5t7ZdfvNoEBcryy8kT5B", "flwZBQQXDMm4gZ1Cc9OQrvl9NiUTFJ")
+	client, err := sdk.NewClientWithAccessKey("cn-hangzhou", "ak", "sk")
 	if err != nil {
 		// Handle exceptions
 		panic(err)
