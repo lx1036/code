@@ -6,6 +6,8 @@ import (
 	"fmt"
 	gobgp "github.com/osrg/gobgp/pkg/server"
 	"k8s-lx1036/k8s/network/kube-router/pkg/utils"
+	"k8s.io/apimachinery/pkg/util/wait"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	"net"
 	"os/exec"
 	"sync"
@@ -34,11 +36,17 @@ type NetworkRoutingController struct {
 	nodeInformer     cache.SharedIndexInformer
 	serviceInformer  cache.SharedIndexInformer
 	endpointInformer cache.SharedIndexInformer
+	nodeLister       corev1.NodeLister
+	serviceLister    corev1.ServiceLister
+	endpointLister   corev1.EndpointsLister
 
-	enableOverlays  bool
-	enablePodEgress bool
-	isIpv6          bool
-	autoMTU         bool
+	enableOverlays          bool
+	enablePodEgress         bool
+	isIpv6                  bool
+	autoMTU                 bool
+	advertiseClusterIP      bool
+	advertiseExternalIP     bool
+	advertiseLoadBalancerIP bool
 
 	bgpServerStarted               bool
 	bgpServer                      *gobgp.BgpServer
@@ -61,8 +69,11 @@ func NewNetworkRoutingController(
 
 	factory := informers.NewSharedInformerFactory(clientSet, 0)
 	nodeInformer := factory.Core().V1().Nodes().Informer()
+	nodeLister := factory.Core().V1().Nodes().Lister()
 	serviceInformer := factory.Core().V1().Services().Informer()
+	serviceLister := factory.Core().V1().Services().Lister()
 	endpointInformer := factory.Core().V1().Endpoints().Informer()
+	endpointLister := factory.Core().V1().Endpoints().Lister()
 
 	controller := &NetworkRoutingController{
 		CondMutex: sync.NewCond(&sync.Mutex{}),
@@ -70,10 +81,16 @@ func NewNetworkRoutingController(
 		nodeInformer:     nodeInformer,
 		serviceInformer:  serviceInformer,
 		endpointInformer: endpointInformer,
+		nodeLister:       nodeLister,
+		serviceLister:    serviceLister,
+		endpointLister:   endpointLister,
 
-		enableOverlays:  option.EnableOverlays,
-		enablePodEgress: option.EnablePodEgress,
-		autoMTU:         option.AutoMTU,
+		enableOverlays:          option.EnableOverlays,
+		enablePodEgress:         option.EnablePodEgress,
+		autoMTU:                 option.AutoMTU,
+		advertiseClusterIP:      option.AdvertiseClusterIP,
+		advertiseExternalIP:     option.AdvertiseExternalIP,
+		advertiseLoadBalancerIP: option.AdvertiseLoadBalancerIP,
 	}
 
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -265,7 +282,6 @@ func (controller *NetworkRoutingController) Run(stopCh <-chan struct{}) {
 			break
 		}
 	}
-
 	controller.bgpServerStarted = true
 	if !controller.bgpGracefulRestart {
 		defer func() {
@@ -276,16 +292,8 @@ func (controller *NetworkRoutingController) Run(stopCh <-chan struct{}) {
 		}()
 	}
 
-	// loop forever till notified to stop on stopCh
-	for {
-		var err error
-		select {
-		case <-stopCh:
-			klog.Infof("Shutting down network routes controller")
-			return
-		default:
-		}
-
+	// loop forever and block
+	wait.Until(func() {
 		// Update ipset entries
 		if controller.enablePodEgress || controller.enableOverlays {
 			klog.V(1).Info("Syncing ipsets")
@@ -326,18 +334,5 @@ func (controller *NetworkRoutingController) Run(stopCh <-chan struct{}) {
 			controller.syncInternalPeers()
 		}
 
-		if err == nil {
-			//healthcheck.SendHeartBeat(healthChan, "NRC")
-		} else {
-			klog.Errorf("Error during periodic sync in network routing controller. Error: " + err.Error())
-			klog.Errorf("Skipping sending heartbeat from network routing controller as periodic sync failed.")
-		}
-
-		select {
-		case <-stopCh:
-			klog.Infof("Shutting down network routes controller")
-			return
-		case <-t.C:
-		}
-	}
+	}, time.Second*5, stopCh)
 }
