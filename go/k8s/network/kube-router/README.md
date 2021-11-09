@@ -44,3 +44,8 @@ bridge-nf使得netfilter可以对Linux网桥上的IPv4/ARP/IPv6包过滤。比�
 二层的网桥在转发包时也会被iptables的FORWARD规则所过滤，这样有时会出现L3层的iptables rules去过滤L2的帧的问题
 
 net.bridge.bridge-nf-call-iptables(/proc/sys/net/bridge/bridge-nf-call-iptables)：是否在iptables链中过滤IPv4包
+
+
+(3) linux policy based route 策略路由
+linux 策略路由: https://linuxgeeks.github.io/2017/03/17/170119-Linux%E7%9A%84%E7%AD%96%E7%95%A5%E8%B7%AF%E7%94%B1/
+linux 支持路由可以有多个表，每个表包含自己的路由，同时可以添加路由策略。

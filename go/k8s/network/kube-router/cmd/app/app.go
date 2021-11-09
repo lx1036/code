@@ -41,32 +41,17 @@ func runCommand(option *options.Options, stopCh <-chan struct{}) error {
 		return err
 	}
 
-	factory := informers.NewSharedInformerFactory(clientSet, 0)
-	nodeInformer := factory.Core().V1().Nodes().Informer()
-	serviceInformer := factory.Core().V1().Services().Informer()
-	endpointInformer := factory.Core().V1().Endpoints().Informer()
-	factory.Start(stopCh)
-	syncCh := make(chan struct{})
-	go func() {
-		factory.WaitForCacheSync(stopCh)
-		close(syncCh)
-	}()
-	t := time.Second * 60
-	select {
-	case <-time.After(t):
-		return fmt.Errorf(fmt.Sprintf("timeout %s for sync cache", t.String()))
-	case <-syncCh:
-	}
-
 	controller, err := routing.NewNetworkRoutingController(option)
 	if err != nil {
 		return err
 	}
 	klog.Info("starting run server...")
-	err = controller.Start(option.ControllerThreads, stopCh)
-	if err != nil {
-		return err
-	}
+	go controller.Run(stopCh) // INFO: 注意这里是异步
+
+	controller.CondMutex.L.Lock()
+	controller.CondMutex.Wait() // INFO: sync.Cond 等待 Start() 里 Cond.Broadcast()，这个编码技巧可以复制!!!
+	klog.Infof(fmt.Sprintf("wait for the pod networking related firewall rules to be setup before network policies"))
+	controller.CondMutex.L.Unlock()
 
 	<-stopCh
 

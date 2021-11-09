@@ -3,17 +3,13 @@ package routing
 import (
 	"context"
 	"fmt"
-	"github.com/vishvananda/netlink"
+	"time"
+
 	"k8s-lx1036/k8s/network/kube-router/pkg/metrics"
 
 	gobgpapi "github.com/osrg/gobgp/api"
 	gobgp "github.com/osrg/gobgp/pkg/server"
 	"k8s.io/klog/v2"
-)
-
-const (
-	// Taken from: https://github.com/torvalds/linux/blob/master/include/uapi/linux/rtnetlink.h#L284
-	zebraRouteOriginator = 0x11
 )
 
 func (controller *NetworkRoutingController) startBgpServer() error {
@@ -76,90 +72,57 @@ func (controller *NetworkRoutingController) watchBgpUpdates() {
 	}
 }
 
-func (controller *NetworkRoutingController) injectRoute(path *gobgpapi.Path) error {
-	klog.Infof("injectRoute Path Looks Like: %s", path.String())
-	var route *netlink.Route
-	var link netlink.Link
+// connectToExternalBGPPeers adds all the configured eBGP peers (global or node specific) as neighbours
+func connectToExternalBGPPeers(server *gobgp.BgpServer, peerNeighbors []*gobgpapi.Peer, bgpGracefulRestart bool,
+	bgpGracefulRestartDeferralTime time.Duration, bgpGracefulRestartTime time.Duration, peerMultihopTTL uint8) error {
+	for _, neighbor := range peerNeighbors {
+		if bgpGracefulRestart {
+			neighbor.GracefulRestart = &gobgpapi.GracefulRestart{
+				Enabled:         true,
+				RestartTime:     uint32(bgpGracefulRestartTime.Seconds()),
+				DeferralTime:    uint32(bgpGracefulRestartDeferralTime.Seconds()),
+				LocalRestarting: true,
+			}
 
-	dst, nextHop, err := parseBGPPath(path)
-	if err != nil {
-		return err
-	}
-
-	tunnelName := generateTunnelName(nextHop.String())
-	sameSubnet := controller.nodeSubnet.Contains(nextHop)
-
-	// INFO: 如果是删除路由请求
-	if path.IsWithdraw {
-		klog.Infof("Removing route: '%s via %s' from peer in the routing table", dst, nextHop)
-
-		// The path might be withdrawn because the peer became unestablished or it may be withdrawn because just the
-		// path was withdrawn. Check to see if the peer is still established before deciding whether to clean the
-		// tunnel and tunnel routes or whether to just delete the destination route.
-		peerEstablished, err := controller.isPeerEstablished(nextHop.String())
+			neighbor.AfiSafis = []*gobgpapi.AfiSafi{
+				{
+					Config: &gobgpapi.AfiSafiConfig{
+						Family:  &gobgpapi.Family{Afi: gobgpapi.Family_AFI_IP, Safi: gobgpapi.Family_SAFI_UNICAST},
+						Enabled: true,
+					},
+					MpGracefulRestart: &gobgpapi.MpGracefulRestart{
+						Config: &gobgpapi.MpGracefulRestartConfig{
+							Enabled: true,
+						},
+					},
+				},
+				{
+					Config: &gobgpapi.AfiSafiConfig{
+						Family:  &gobgpapi.Family{Afi: gobgpapi.Family_AFI_IP6, Safi: gobgpapi.Family_SAFI_UNICAST},
+						Enabled: true,
+					},
+					MpGracefulRestart: &gobgpapi.MpGracefulRestart{
+						Config: &gobgpapi.MpGracefulRestartConfig{
+							Enabled: true,
+						},
+					},
+				},
+			}
+		}
+		if peerMultihopTTL > 1 {
+			neighbor.EbgpMultihop = &gobgpapi.EbgpMultihop{
+				Enabled:     true,
+				MultihopTtl: uint32(peerMultihopTTL),
+			}
+		}
+		err := server.AddPeer(context.Background(), &gobgpapi.AddPeerRequest{Peer: neighbor})
 		if err != nil {
-			klog.Errorf("encountered error while checking peer status: %v", err)
-		}
-		if err == nil && !peerEstablished {
-			klog.Infof("Peer '%s' was not found any longer, removing tunnel and routes", nextHop.String())
-			controller.cleanupTunnel(dst, tunnelName)
-			return nil
+			return fmt.Errorf("error peering with peer router %q due to: %v", neighbor.Conf.NeighborAddress, err)
 		}
 
-		return deleteRoutesByDestination(dst)
+		klog.Infof("Successfully configured %s in ASN %v as BGP peer to the node",
+			neighbor.Conf.NeighborAddress, neighbor.Conf.PeerAs)
 	}
 
-	shouldCreateTunnel := func() bool {
-		if !controller.enableOverlays {
-			return false
-		}
-		if controller.overlayType == "full" {
-			return true
-		}
-		if controller.overlayType == "subnet" && !sameSubnet {
-			return true
-		}
-		return false
-	}
-
-	// create IPIP tunnels only when node is not in same subnet or overlay-type is set to 'full'
-	// if the user has disabled overlays, don't create tunnels. If we're not creating a tunnel, check to see if there is
-	// any cleanup that needs to happen.
-	if shouldCreateTunnel() {
-		link, err = controller.setupOverlayTunnel(tunnelName, nextHop)
-		if err != nil {
-			return err
-		}
-	} else {
-		// knowing that a tunnel shouldn't exist for this route, check to see if there are any lingering tunnels /
-		// routes that need to be cleaned up.
-		controller.cleanupTunnel(dst, tunnelName)
-	}
-
-	switch {
-	case link != nil:
-		// if we setup an overlay tunnel link, then use it for destination routing
-		route = &netlink.Route{
-			LinkIndex: link.Attrs().Index,
-			Src:       controller.nodeIP,
-			Dst:       dst,
-			Protocol:  zebraRouteOriginator,
-		}
-	case sameSubnet:
-		// if the nextHop is within the same subnet, add a route for the destination so that traffic can bet routed
-		// at layer 2 and minimize the need to traverse a router
-		route = &netlink.Route{
-			Dst:      dst,
-			Gw:       nextHop,
-			Protocol: zebraRouteOriginator,
-		}
-	default:
-		// otherwise, let BGP do its thing, nothing to do here
-		return nil
-	}
-
-	// Alright, everything is in place, and we have our route configured, let's add it to the host's routing table
-	klog.Infof("Inject route: '%s via %s' from peer to routing table", dst, nextHop)
-	return netlink.RouteReplace(route)
-	//return nil // for debug in local
+	return nil
 }

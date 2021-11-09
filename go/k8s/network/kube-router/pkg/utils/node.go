@@ -1,9 +1,15 @@
 package utils
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"net"
+	"os"
 
+	"github.com/vishvananda/netlink"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -25,4 +31,77 @@ func GetNodeIP(node *corev1.Node) (net.IP, error) {
 	}
 
 	return nil, errors.New("host IP unknown")
+}
+
+const (
+	PodCIDRAnnotation = "kube-router.io/pod-cidr"
+)
+
+func GetPodCidrFromNodeSpec(clientset kubernetes.Interface) (string, error) {
+	node, err := GetNodeObject(clientset)
+	if err != nil {
+		return "", fmt.Errorf("Failed to get pod CIDR allocated for the node due to: " + err.Error())
+	}
+
+	if cidr, ok := node.Annotations[PodCIDRAnnotation]; ok {
+		_, _, err = net.ParseCIDR(cidr)
+		if err != nil {
+			return "", fmt.Errorf("error parsing pod CIDR in node annotation: %v", err)
+		}
+
+		return cidr, nil
+	}
+
+	if node.Spec.PodCIDR == "" {
+		return "", fmt.Errorf("node.Spec.PodCIDR not set for node: %v", node.Name)
+	}
+
+	return node.Spec.PodCIDR, nil
+}
+
+func GetNodeObject(clientset kubernetes.Interface) (*corev1.Node, error) {
+	nodeName := os.Getenv("NODE_NAME")
+	if nodeName != "" {
+		node, err := clientset.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+		if err == nil {
+			return node, nil
+		}
+	}
+
+	// if env NODE_NAME is not set then check if node is register with hostname
+	hostName, _ := os.Hostname()
+	node, err := clientset.CoreV1().Nodes().Get(context.Background(), hostName, metav1.GetOptions{})
+	if err == nil {
+		return node, nil
+	}
+
+	return nil, fmt.Errorf("failed to identify the node by NODE_NAME, hostname or --hostname-override")
+}
+
+const (
+	IPInIPHeaderLength = 20
+)
+
+// GetMTUFromNodeIP returns the MTU by detecting it from the IP on the node and figuring in tunneling configurations
+func GetMTUFromNodeIP(nodeIP net.IP, overlayEnabled bool) (int, error) {
+	links, err := netlink.LinkList()
+	if err != nil {
+		return 0, errors.New("failed to get list of links")
+	}
+	for _, link := range links {
+		addresses, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+		if err != nil {
+			return 0, errors.New("failed to get list of addr")
+		}
+		for _, addr := range addresses {
+			if addr.IPNet.IP.Equal(nodeIP) {
+				linkMTU := link.Attrs().MTU
+				if overlayEnabled {
+					return linkMTU - IPInIPHeaderLength, nil // -20 to accommodate IPIP header
+				}
+				return linkMTU, nil
+			}
+		}
+	}
+	return 0, errors.New("failed to find interface with specified node IP")
 }
