@@ -24,6 +24,7 @@ type Options struct {
 	AdvertiseClusterIP      bool
 	AdvertiseExternalIP     bool
 	AdvertiseLoadBalancerIP bool
+	AdvertisePodCidr        bool
 
 	BGPPort uint32
 }
@@ -48,6 +49,8 @@ func (o *Options) Flags(cmd *cobra.Command) {
 		"Add External IP of service to the RIB so that it gets advertised to the BGP peers.")
 	flags.BoolVar(&o.AdvertiseLoadBalancerIP, "advertise-loadbalancer-ip", true,
 		"Add LoadbBalancer IP of service status as set by the LB provider to the RIB so that it gets advertised to the BGP peers.")
+	flags.BoolVar(&o.AdvertisePodCidr, "advertise-pod-cidr", true,
+		"Add Node's POD cidr to the RIB so that it gets advertised to the BGP peers.")
 	flags.Uint32Var(&o.BGPPort, "bgp-port", DefaultBGPPort,
 		"The port open for incoming BGP connections and to use for connecting with other BGP peers.")
 }

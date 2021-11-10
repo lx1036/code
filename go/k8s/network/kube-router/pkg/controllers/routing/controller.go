@@ -49,6 +49,7 @@ type NetworkRoutingController struct {
 	advertiseClusterIP      bool
 	advertiseExternalIP     bool
 	advertiseLoadBalancerIP bool
+	advertisePodCidr        bool
 
 	bgpServerStarted               bool
 	bgpServer                      *gobgp.BgpServer
@@ -96,6 +97,7 @@ func NewNetworkRoutingController(
 		advertiseClusterIP:      option.AdvertiseClusterIP,
 		advertiseExternalIP:     option.AdvertiseExternalIP,
 		advertiseLoadBalancerIP: option.AdvertiseLoadBalancerIP,
+		advertisePodCidr:        option.AdvertisePodCidr,
 
 		defaultNodeAsnNumber: 64512, // this magic number is first of the private ASN range, use it as default
 		bgpPort:              option.BGPPort,
