@@ -3,47 +3,34 @@ package routing
 import (
 	"context"
 	"fmt"
-	gobgpapi "github.com/osrg/gobgp/api"
-	"k8s-lx1036/k8s/network/kube-router/pkg/metrics"
-	"k8s-lx1036/k8s/network/kube-router/pkg/utils"
-	"k8s.io/apimachinery/pkg/labels"
 	"strings"
 	"time"
 
+	"k8s-lx1036/k8s/network/kube-router/pkg/metrics"
+	"k8s-lx1036/k8s/network/kube-router/pkg/utils"
+
+	gobgpapi "github.com/osrg/gobgp/api"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 )
 
-func (controller *NetworkRoutingController) onNodeAdd(obj interface{}) {
-	node := obj.(*corev1.Node)
+func (controller *NetworkRoutingController) onNodeAdd(node *corev1.Node) error {
 	nodeIP, err := utils.GetNodeIP(node)
 	if err != nil {
-		klog.Errorf("New node received, but we were unable to add it as we were couldn't find its node IP: %v", err)
-		return
+		return fmt.Errorf(fmt.Sprintf("New node received, but we were unable to add it as we were couldn't find its node IP: %v", err))
 	}
 
 	klog.Infof("Received node %s added update from watch API so peer with new node", nodeIP)
-	controller.handleNodeUpdate(obj)
+	return controller.handleNodeUpdate(node)
 }
 
-func (controller *NetworkRoutingController) onNodeUpdate(oldObj, newObj interface{}) {
+func (controller *NetworkRoutingController) onNodeUpdate(oldNode, newNode *corev1.Node) error {
 	// we are only interested in node add/delete, so skip update
+	return nil
 }
 
-func (controller *NetworkRoutingController) onNodeDelete(obj interface{}) {
-	node, ok := obj.(*corev1.Node)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			klog.Errorf("unexpected object type: %v", obj)
-			return
-		}
-		if node, ok = tombstone.Obj.(*corev1.Node); !ok {
-			klog.Errorf("unexpected object type: %v", obj)
-			return
-		}
-	}
+func (controller *NetworkRoutingController) onNodeDelete(node *corev1.Node) error {
 	nodeIP, err := utils.GetNodeIP(node)
 	// INFO: 如果 node 被删除则 node ip 获取可能获取不了，这样在 nodeLister.List() 时也没有这个 node
 	if err == nil {
@@ -52,12 +39,12 @@ func (controller *NetworkRoutingController) onNodeDelete(obj interface{}) {
 		klog.Infof("Received node (IP unavailable) removed update from watch API, so remove node from peer")
 	}
 
-	controller.handleNodeUpdate(obj)
+	return controller.handleNodeUpdate(node)
 }
 
-func (controller *NetworkRoutingController) handleNodeUpdate(obj interface{}) {
+func (controller *NetworkRoutingController) handleNodeUpdate(node *corev1.Node) error {
 	if !controller.bgpServerStarted {
-		return
+		return nil
 	}
 
 	// update export policies so that NeighborSet gets updated with new set of nodes
@@ -69,6 +56,8 @@ func (controller *NetworkRoutingController) handleNodeUpdate(obj interface{}) {
 	if controller.bgpEnableInternal {
 		controller.syncInternalPeers()
 	}
+
+	return nil
 }
 
 func (controller *NetworkRoutingController) isPeerEstablished(peerIP string) (bool, error) {

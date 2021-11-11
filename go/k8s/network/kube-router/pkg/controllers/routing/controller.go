@@ -4,23 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	gobgp "github.com/osrg/gobgp/pkg/server"
-	"k8s-lx1036/k8s/network/kube-router/pkg/utils"
-	"k8s.io/apimachinery/pkg/util/wait"
-	corev1 "k8s.io/client-go/listers/core/v1"
 	"net"
 	"os/exec"
 	"sync"
 	"time"
 
 	"k8s-lx1036/k8s/network/kube-router/cmd/app/options"
+	"k8s-lx1036/k8s/network/kube-router/pkg/utils"
 
 	gobgpapi "github.com/osrg/gobgp/api"
+	gobgp "github.com/osrg/gobgp/pkg/server"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 )
 
 const (
@@ -104,9 +105,9 @@ func NewNetworkRoutingController(
 	}
 
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    controller.onNodeAdd,
-		UpdateFunc: controller.onNodeUpdate,
-		DeleteFunc: controller.onNodeDelete,
+		AddFunc:    nodeutil.CreateAddNodeHandler(controller.onNodeAdd),
+		UpdateFunc: nodeutil.CreateUpdateNodeHandler(controller.onNodeUpdate),
+		DeleteFunc: nodeutil.CreateDeleteNodeHandler(controller.onNodeDelete),
 	})
 	serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    nil,
