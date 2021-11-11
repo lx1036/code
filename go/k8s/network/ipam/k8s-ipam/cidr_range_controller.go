@@ -1,11 +1,11 @@
-package ipam
+package k8s_ipam
 
 import (
 	"fmt"
 	"net"
 	"sync"
 
-	"k8s-lx1036/k8s/network/ipam/ipam/cidrset"
+	"k8s-lx1036/k8s/network/ipam/k8s-ipam/cidrset"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
