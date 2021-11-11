@@ -217,6 +217,7 @@ github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c/go.mod h1:MKsuJm
 github.com/bketelsen/crypt v0.0.4/go.mod h1:aI6NrJ0pMGgvZKL1iVgXLnfIFJtfV+bKCoqOes/6LfM=
 github.com/blang/semver v3.1.0+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
 github.com/blang/semver v3.5.0+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
+github.com/blang/semver v3.5.1+incompatible h1:cQNTCjp13qL8KC3Nbxr/y2Bqb63oX6wdnnjpJbkM4JQ=
 github.com/blang/semver v3.5.1+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
 github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869/go.mod h1:Ekp36dRnpXw/yCqJaO+ZrUyxD+3VXMFFr56k5XYrpB4=
 github.com/boltdb/bolt v1.3.1/go.mod h1:clJnj/oiGkjum5o1McbSZDSLxVThjynRyGBgiAx27Ps=
@@ -2267,6 +2268,7 @@ k8s.io/client-go v0.22.1/go.mod h1:BquC5A4UOo4qVDUtoc04/+Nxp1MeHcVc1HJm1KmG8kk=
 k8s.io/cloud-provider v0.22.1/go.mod h1:Dm3xJ4j3l88rZ0LBCRLrt7V9Pz0avRAzZSU6ENwYnrw=
 k8s.io/cluster-bootstrap v0.22.1/go.mod h1:dSWw6aox00AA9YCdRDY+ca7TVtoXRzuLpDxhV6HPevk=
 k8s.io/code-generator v0.22.1/go.mod h1:eV77Y09IopzeXOJzndrDyCI88UBok2h6WxAlBwpxa+o=
+k8s.io/component-base v0.22.1 h1:SFqIXsEN3v3Kkr1bS6rstrs1wd45StJqbtgbQ4nRQdo=
 k8s.io/component-base v0.22.1/go.mod h1:0D+Bl8rrnsPN9v0dyYvkqFfBeAd4u7n77ze+p8CMiPo=
 k8s.io/component-helpers v0.22.1/go.mod h1:QvBcDbX+qU5I2tMZABBF5fRwAlQwiv771IGBHK9WYh4=
 k8s.io/controller-manager v0.22.1/go.mod h1:HN5qzvZs8A4fd/xuqDZwqe+Nsz249a2Kbq/YqZ903n8=
