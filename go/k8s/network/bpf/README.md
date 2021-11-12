@@ -2,6 +2,9 @@
 
 
 # eBPF
+eBPF go 包：https://github.com/cilium/ebpf
+examples: https://github.com/cilium/ebpf/blob/master/examples/README.md
+
 
 大规模微服务利器：eBPF + Kubernetes（KubeCon, 2020）: http://arthurchiao.art/blog/ebpf-and-k8s-zh/ (非常好的文章)
 这篇文章讲清楚了 Cilium eBPF 比 kube-proxy 好在哪里，网络路径在哪里减少的:
