@@ -133,6 +133,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 	}
 
+	// INFO: 使用 tc 设置 egress，和 ingress 还不一样，需要先创建一个 IFB 网卡
 	if bandwidth.EgressRate > 0 && bandwidth.EgressBurst > 0 {
 		mtu, err := getMTU(hostInterface.Name)
 		if err != nil {
@@ -164,6 +165,142 @@ func cmdAdd(args *skel.CmdArgs) error {
 	return types.PrintResult(result, conf.CNIVersion)
 }
 
+func cmdCheck(args *skel.CmdArgs) error {
+	bwConf, err := parseConfig(args.StdinData)
+	if err != nil {
+		return err
+	}
+
+	if bwConf.PrevResult == nil {
+		return fmt.Errorf("must be called as a chained plugin")
+	}
+
+	result, err := current.NewResultFromResult(bwConf.PrevResult)
+	if err != nil {
+		return fmt.Errorf("could not convert result to current version: %v", err)
+	}
+
+	netns, err := ns.GetNS(args.Netns)
+	if err != nil {
+		return fmt.Errorf("failed to open netns %q: %v", netns, err)
+	}
+	defer netns.Close()
+
+	hostInterface, err := getHostInterface(result.Interfaces, args.IfName, netns)
+	if err != nil {
+		return err
+	}
+	link, err := netlink.LinkByName(hostInterface.Name)
+	if err != nil {
+		return err
+	}
+
+	bandwidth := getBandwidth(bwConf)
+
+	if bandwidth.IngressRate > 0 && bandwidth.IngressBurst > 0 {
+		rateInBytes := bandwidth.IngressRate / 8
+		burstInBytes := bandwidth.IngressBurst / 8
+		bufferInBytes := buffer(uint64(rateInBytes), uint32(burstInBytes))
+		latency := latencyInUsec(latencyInMillis)
+		limitInBytes := limit(uint64(rateInBytes), latency, uint32(burstInBytes))
+
+		qdiscs, err := SafeQdiscList(link)
+		if err != nil {
+			return err
+		}
+		if len(qdiscs) == 0 {
+			return fmt.Errorf("Failed to find qdisc")
+		}
+
+		for _, qdisc := range qdiscs {
+			tbf, isTbf := qdisc.(*netlink.Tbf)
+			if !isTbf {
+				break
+			}
+			if tbf.Rate != uint64(rateInBytes) {
+				return fmt.Errorf("Rate doesn't match")
+			}
+			if tbf.Limit != uint32(limitInBytes) {
+				return fmt.Errorf("Limit doesn't match")
+			}
+			if tbf.Buffer != uint32(bufferInBytes) {
+				return fmt.Errorf("Buffer doesn't match")
+			}
+		}
+	}
+
+	if bandwidth.EgressRate > 0 && bandwidth.EgressBurst > 0 {
+		rateInBytes := bandwidth.EgressRate / 8
+		burstInBytes := bandwidth.EgressBurst / 8
+		bufferInBytes := buffer(uint64(rateInBytes), uint32(burstInBytes))
+		latency := latencyInUsec(latencyInMillis)
+		limitInBytes := limit(uint64(rateInBytes), latency, uint32(burstInBytes))
+		ifbDeviceName := getIfbDeviceName(bwConf.Name, args.ContainerID)
+		ifbDevice, err := netlink.LinkByName(ifbDeviceName)
+		if err != nil {
+			return fmt.Errorf("get ifb device: %s", err)
+		}
+
+		qdiscs, err := SafeQdiscList(ifbDevice)
+		if err != nil {
+			return err
+		}
+		if len(qdiscs) == 0 {
+			return fmt.Errorf("Failed to find qdisc")
+		}
+
+		for _, qdisc := range qdiscs {
+			tbf, isTbf := qdisc.(*netlink.Tbf)
+			if !isTbf {
+				break
+			}
+			if tbf.Rate != uint64(rateInBytes) {
+				return fmt.Errorf("Rate doesn't match")
+			}
+			if tbf.Limit != uint32(limitInBytes) {
+				return fmt.Errorf("Limit doesn't match")
+			}
+			if tbf.Buffer != uint32(bufferInBytes) {
+				return fmt.Errorf("Buffer doesn't match")
+			}
+		}
+	}
+
+	return nil
+}
+
+func cmdDel(args *skel.CmdArgs) error {
+	conf, err := parseConfig(args.StdinData)
+	if err != nil {
+		return err
+	}
+
+	ifbDeviceName := getIfbDeviceName(conf.Name, args.ContainerID)
+
+	if err := TeardownIfb(ifbDeviceName); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func SafeQdiscList(link netlink.Link) ([]netlink.Qdisc, error) {
+	qdiscs, err := netlink.QdiscList(link)
+	if err != nil {
+		return nil, err
+	}
+	result := []netlink.Qdisc{}
+	for _, qdisc := range qdiscs {
+		// filter out pfifo_fast qdiscs because
+		// older kernels don't return them
+		_, pfifo := qdisc.(*netlink.PfifoFast)
+		if !pfifo {
+			result = append(result, qdisc)
+		}
+	}
+	return result, nil
+}
+
 func getBandwidth(conf *PluginConf) *BandwidthEntry {
 	if conf.BandwidthEntry == nil && conf.RuntimeConfig.Bandwidth != nil {
 		return conf.RuntimeConfig.Bandwidth
@@ -186,7 +323,6 @@ func validateRateAndBurst(rate, burst uint64) error {
 	return nil
 }
 
-// get the veth peer of container interface in host namespace
 // INFO: 根据 container net namespace 侧的 containerIfName 找出其 veth peer 的 host net namespace侧的对端网卡
 func getHostInterface(interfaces []*current.Interface, containerIfName string, netns ns.NetNS) (*current.Interface, error) {
 	if len(interfaces) == 0 {
@@ -216,4 +352,13 @@ func getHostInterface(interfaces []*current.Interface, containerIfName string, n
 	}
 
 	return nil, fmt.Errorf("no veth peer of container interface found in host ns")
+}
+
+func getMTU(deviceName string) (int, error) {
+	link, err := netlink.LinkByName(deviceName)
+	if err != nil {
+		return -1, err
+	}
+
+	return link.Attrs().MTU, nil
 }
