@@ -1,7 +1,7 @@
 
 
 
-# TC(Traffic Control)
+# TC(Traffic Controller)
 TC工作原理：使用classful的qdisc(排队规则queueing discipline)，通过tc对流量进行控制，使用HTB算法实现带宽优先级和抢占控制。
 使用tc中的classful队列规定（qdisc）进行流量限制，涉及tc的几个基本概念：
 * qdisc：队列，流量根据Filter的计算后会放入队列中，然后根据队列的算法和规则进行发送数据

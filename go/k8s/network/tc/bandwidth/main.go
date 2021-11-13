@@ -52,6 +52,9 @@ func (bw *BandwidthEntry) isZero() bool {
 type PluginConf struct {
 	types.NetConf
 
+	// INFO: 如果 Pod 有 annotation "kubernetes.io/ingress-bandwidth"/"kubernetes.io/egress-bandwidth" , kubelet 会注入 runtimeConfig
+	//  @see https://github.com/kubernetes/kubernetes/blob/v1.22.3/pkg/util/bandwidth/utils.go#L39-L66 ，
+	//  然后被 CNI 注入到 runtimeConfig 中 @see https://github.com/containernetworking/cni/blob/master/libcni/api.go#L146-L179 传到 PluginConf 对象中
 	RuntimeConfig struct {
 		Bandwidth *BandwidthEntry `json:"bandwidth,omitempty"`
 	} `json:"runtimeConfig,omitempty"`
@@ -92,10 +95,10 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 	}
 
 	return &conf, nil
-
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
+	// args.StdinData: {"egressBurst":456,"egressRate":123,"ingressBurst":456,"ingressRate":123,"name":"slowdown","type":"bandwidth"}
 	conf, err := parseConfig(args.StdinData)
 	if err != nil {
 		return err
