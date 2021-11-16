@@ -3,7 +3,9 @@ package driver
 import (
 	"fmt"
 	"k8s-lx1036/k8s/network/cni/eni/pkg/sysctl"
+	"k8s-lx1036/k8s/network/cni/eni/pkg/tc"
 	"k8s-lx1036/k8s/network/cni/eni/pkg/types"
+	"k8s.io/klog/v2"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
@@ -27,13 +29,17 @@ func NewVETHDriver(ipv4, ipv6 bool) *VETHDriver {
 func (driver *VETHDriver) Setup(cfg *SetupConfig, netNS ns.NetNS) error {
 	prevHostLink, err := netlink.LinkByName(cfg.HostVETHName)
 	if err == nil {
-		if err = LinkDel(prevHostLink); err != nil {
-			return fmt.Errorf("error del pre host link, %w", err)
+		err = netlink.LinkDel(prevHostLink)
+		if err != nil {
+			_, ok := err.(netlink.LinkNotFoundError)
+			if !ok {
+				return fmt.Errorf(fmt.Sprintf("[veth driver]`ip link del %s` err:%v", prevHostLink.Attrs().Name, err))
+			}
 		}
 	}
 
-	// disabled accept_ra if local forwarding is enabled
-	// @see https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt
+	// INFO: disabled accept_ra if local forwarding is enabled
+	//  @see https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt
 	if cfg.ENIIndex != 0 {
 		parentLink, err := netlink.LinkByIndex(cfg.ENIIndex)
 		if err != nil {
@@ -46,8 +52,14 @@ func (driver *VETHDriver) Setup(cfg *SetupConfig, netNS ns.NetNS) error {
 		}
 	}
 
-	var hostVETH, containerVETH netlink.Link
+	hostNetNS, err := ns.GetCurrentNS()
+	if err != nil {
+		return fmt.Errorf("err get host net ns, %w", err)
+	}
+	defer hostNetNS.Close()
 
+	var hostVETH, containerVETH netlink.Link
+	// configure in container netns
 	err = netNS.Do(func(_ ns.NetNS) error {
 		if driver.ipv6 {
 			err := EnableIPv6()
@@ -62,7 +74,7 @@ func (driver *VETHDriver) Setup(cfg *SetupConfig, netNS ns.NetNS) error {
 			return fmt.Errorf("error create veth pair, %w", err)
 		}
 
-		// 2. add address for container interface
+		// 2. add address for container interface，注意这里用的是 containerVETH，而不是 hostVETH，有点奇怪!!!
 		containerLink, err := netlink.LinkByName(containerVETH.Attrs().Name)
 		if err != nil {
 			return fmt.Errorf("error find link %s in container, %w", containerVETH.Attrs().Name, err)
@@ -212,4 +224,57 @@ func (driver *VETHDriver) Teardown(cfg *TeardownCfg, netNS ns.NetNS) error {
 
 func (driver *VETHDriver) Check(cfg *CheckConfig) error {
 	panic("implement me")
+}
+
+func (driver *VETHDriver) setupTC(link netlink.Link, bandwidthInBytes uint64) error {
+	rule := &tc.TrafficShapingRule{
+		Rate: bandwidthInBytes,
+	}
+	return tc.SetRule(link, rule)
+}
+
+func setupVETHPair(contVethName, pairName string, mtu int, hostNetNS ns.NetNS) (netlink.Link, netlink.Link, error) {
+	veth := &netlink.Veth{
+		LinkAttrs: netlink.LinkAttrs{
+			Name: contVethName,
+			MTU:  mtu,
+		},
+		PeerName: pairName,
+	}
+
+	var err error
+	if err = netlink.LinkAdd(veth); err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		if err != nil {
+			if err = netlink.LinkDel(veth); err != nil {
+				klog.Errorf(fmt.Sprintf("failed to clean up veth %s err:%v", veth.Name, err))
+			}
+		}
+	}()
+
+	// INFO: move host veth-peer in container netns to host netns
+	hostVeth, err := netlink.LinkByName(pairName)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = netlink.LinkSetNsFd(hostVeth, int(hostNetNS.Fd()))
+	if err != nil {
+		return nil, nil, fmt.Errorf("[veth driver]`ip link set %s netns %s` err:%v",
+			hostVeth.Attrs().Name, hostNetNS.Path(), err)
+	}
+
+	err = hostNetNS.Do(func(netNS ns.NetNS) error {
+		hostVeth, err = netlink.LinkByName(pairName)
+		if err != nil {
+			return fmt.Errorf(fmt.Sprintf("failed to lookup %q in %q: %v", pairName, hostNetNS.Path(), err))
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return hostVeth, veth, nil
 }
