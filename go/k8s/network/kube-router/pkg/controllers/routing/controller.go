@@ -4,21 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	gobgp "github.com/osrg/gobgp/pkg/server"
-	"k8s-lx1036/k8s/network/kube-router/pkg/utils"
 	"net"
 	"os/exec"
 	"sync"
 	"time"
 
 	"k8s-lx1036/k8s/network/kube-router/cmd/app/options"
+	"k8s-lx1036/k8s/network/kube-router/pkg/utils"
 
 	gobgpapi "github.com/osrg/gobgp/api"
+	gobgp "github.com/osrg/gobgp/pkg/server"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 )
 
 const (
@@ -30,15 +33,24 @@ const (
 
 type NetworkRoutingController struct {
 	CondMutex *sync.Cond
+	mu        sync.Mutex
 
 	nodeInformer     cache.SharedIndexInformer
 	serviceInformer  cache.SharedIndexInformer
 	endpointInformer cache.SharedIndexInformer
+	nodeLister       corev1.NodeLister
+	serviceLister    corev1.ServiceLister
+	endpointLister   corev1.EndpointsLister
 
-	enableOverlays  bool
-	enablePodEgress bool
-	isIpv6          bool
-	autoMTU         bool
+	enableOverlays          bool
+	enablePodEgress         bool
+	enableIBGP              bool
+	isIpv6                  bool
+	autoMTU                 bool
+	advertiseClusterIP      bool
+	advertiseExternalIP     bool
+	advertiseLoadBalancerIP bool
+	advertisePodCidr        bool
 
 	bgpServerStarted               bool
 	bgpServer                      *gobgp.BgpServer
@@ -47,6 +59,8 @@ type NetworkRoutingController struct {
 	bgpGracefulRestartTime         time.Duration
 	bgpGracefulRestartDeferralTime time.Duration
 	peerMultihopTTL                uint8
+	defaultNodeAsnNumber           uint32
+	bgpPort                        uint32
 
 	nodeSubnet net.IPNet // pod subnet for node
 	podCidr    string    // INFO: 使用 kube-controller-manager IPAM 分配的 pod cidr
@@ -61,8 +75,11 @@ func NewNetworkRoutingController(
 
 	factory := informers.NewSharedInformerFactory(clientSet, 0)
 	nodeInformer := factory.Core().V1().Nodes().Informer()
+	nodeLister := factory.Core().V1().Nodes().Lister()
 	serviceInformer := factory.Core().V1().Services().Informer()
+	serviceLister := factory.Core().V1().Services().Lister()
 	endpointInformer := factory.Core().V1().Endpoints().Informer()
+	endpointLister := factory.Core().V1().Endpoints().Lister()
 
 	controller := &NetworkRoutingController{
 		CondMutex: sync.NewCond(&sync.Mutex{}),
@@ -70,16 +87,27 @@ func NewNetworkRoutingController(
 		nodeInformer:     nodeInformer,
 		serviceInformer:  serviceInformer,
 		endpointInformer: endpointInformer,
+		nodeLister:       nodeLister,
+		serviceLister:    serviceLister,
+		endpointLister:   endpointLister,
 
-		enableOverlays:  option.EnableOverlays,
-		enablePodEgress: option.EnablePodEgress,
-		autoMTU:         option.AutoMTU,
+		enableOverlays:          option.EnableOverlays,
+		enablePodEgress:         option.EnablePodEgress,
+		enableIBGP:              option.EnableIBGP,
+		autoMTU:                 option.AutoMTU,
+		advertiseClusterIP:      option.AdvertiseClusterIP,
+		advertiseExternalIP:     option.AdvertiseExternalIP,
+		advertiseLoadBalancerIP: option.AdvertiseLoadBalancerIP,
+		advertisePodCidr:        option.AdvertisePodCidr,
+
+		defaultNodeAsnNumber: 64512, // this magic number is first of the private ASN range, use it as default
+		bgpPort:              option.BGPPort,
 	}
 
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    controller.onNodeAdd,
-		UpdateFunc: controller.onNodeUpdate,
-		DeleteFunc: controller.onNodeDelete,
+		AddFunc:    nodeutil.CreateAddNodeHandler(controller.onNodeAdd),
+		UpdateFunc: nodeutil.CreateUpdateNodeHandler(controller.onNodeUpdate),
+		DeleteFunc: nodeutil.CreateDeleteNodeHandler(controller.onNodeDelete),
 	})
 	serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    nil,
@@ -265,7 +293,6 @@ func (controller *NetworkRoutingController) Run(stopCh <-chan struct{}) {
 			break
 		}
 	}
-
 	controller.bgpServerStarted = true
 	if !controller.bgpGracefulRestart {
 		defer func() {
@@ -276,16 +303,8 @@ func (controller *NetworkRoutingController) Run(stopCh <-chan struct{}) {
 		}()
 	}
 
-	// loop forever till notified to stop on stopCh
-	for {
-		var err error
-		select {
-		case <-stopCh:
-			klog.Infof("Shutting down network routes controller")
-			return
-		default:
-		}
-
+	// INFO: loop forever and block
+	wait.Until(func() {
 		// Update ipset entries
 		if controller.enablePodEgress || controller.enableOverlays {
 			klog.V(1).Info("Syncing ipsets")
@@ -322,22 +341,8 @@ func (controller *NetworkRoutingController) Run(stopCh <-chan struct{}) {
 			klog.Errorf("Error adding BGP policies: %s", err.Error())
 		}
 
-		if controller.bgpEnableInternal {
-			controller.syncInternalPeers()
+		if controller.enableIBGP {
+			controller.syncFullMeshIBGPPeers()
 		}
-
-		if err == nil {
-			//healthcheck.SendHeartBeat(healthChan, "NRC")
-		} else {
-			klog.Errorf("Error during periodic sync in network routing controller. Error: " + err.Error())
-			klog.Errorf("Skipping sending heartbeat from network routing controller as periodic sync failed.")
-		}
-
-		select {
-		case <-stopCh:
-			klog.Infof("Shutting down network routes controller")
-			return
-		case <-t.C:
-		}
-	}
+	}, time.Second*5, stopCh)
 }

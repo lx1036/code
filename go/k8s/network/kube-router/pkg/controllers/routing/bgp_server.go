@@ -17,6 +17,7 @@ func (controller *NetworkRoutingController) startBgpServer() error {
 	controller.bgpServer = gobgp.NewBgpServer(gobgp.GrpcListenAddress(addr))
 	go controller.bgpServer.Serve()
 
+	nodeAsnNumber := controller.defaultNodeAsnNumber
 	global := &gobgpapi.Global{
 		As:              nodeAsnNumber,
 		RouterId:        controller.routerID,

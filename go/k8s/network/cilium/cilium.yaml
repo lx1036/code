@@ -140,10 +140,12 @@ data:
   enable-remote-node-identity: "true"
   operator-api-serve-addr: "127.0.0.1:9234"
   ipam: "cluster-pool"
-  cluster-pool-ipv4-cidr: "10.217.122.0/21"
+  cluster-pool-ipv4-cidr:
+  - "100.217.122.0/21"
+  - "200.217.122.0/21"
   cluster-pool-ipv4-mask-size: "26" # 从 /19 网段分出每个节点 /26 网段，可以部署 2^(26-19) = 128 台机器，每个机器可以分配 2^(32-26) = 64 个 pods
   disable-cnp-status-updates: "true"
-  native-routing-cidr: "10.217.122.0/21"
+  native-routing-cidr: "100.217.122.0/21"
   node-port-mode: "dsr"
 ---
 # Source: cilium/charts/agent/templates/clusterrole.yaml
