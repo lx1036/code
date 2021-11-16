@@ -44,7 +44,8 @@ func parseArgs(args string) ([][2]string, error) {
 	return result, nil
 }
 
-// go run . --cmd=add --pid=2049 --name=cilium --bin=./bin --conf=./05-cilium.conf
+// INFO: @see https://github.com/containernetworking/cni/blob/master/cnitool/README.md
+// go run . --cmd=add --pid=2049 --name=bandwidth --bin=./bin --conf=.
 func main() {
 	cmd := flag.String("cmd", CmdAdd, "cni cmd, e.g. add/check/del")
 	pid := flag.Int("pid", 0, "container pid, e.g. /proc/2949/ns/net, 2949=`docker inspect ${container_id} | grep Pid`")
