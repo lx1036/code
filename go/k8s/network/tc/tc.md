@@ -62,6 +62,45 @@ tc qdisc add dev ifb0 parent 1:11 handle 11: sfq
 
 ```
 
+```shell
+tc qdisc del dev eth0 root # 清除 eth0 上所有队列
+
+tc class show dev eth0 parent 1:
+tc qdisc show
+
+tc qdisc add dev eth0 root handle 1: htb default 1
+tc class add dev eth0 parent 1: classid 1:1 htb rate 1Gbit
+tc class add dev eth0 parent 1: classid 1:2 htb rate 1Gbit
+tc class add dev eth0 parent 1:2 classid 1:3 htb rate 500Mbit ceil 1Gbit prio 3
+tc class add dev eth0 parent 1:2 classid 1:5 htb rate 300Mbit ceil 1Gbit prio 5
+tc class add dev eth0 parent 1:2 classid 1:7 htb rate 200Mbit ceil 1Gbit prio 7
+
+# 将cgroup与物理网卡的qdisc绑定
+# https://android.googlesource.com/kernel/common/+/bcmdhd-3.10/Documentation/cgroups/net_cls.txt
+# The Traffic Controller (tc) can be used to assign different priorities to packets from different cgroups
+tc filter add dev eth0 parent 1: protocol ip handle 1: cgroup
+
+# 创建高优先级cgroup组high
+mkdir /sys/fs/cgroup/net_cls/high
+# 设定high组的classid 1:3
+# classid的设定为16进制设定，前4位:后4位表示，1:3写为0x00010003，省略前置0后为0x10003
+echo 0x10003 > /sys/fs/cgroup/net_cls/high/net_cls.classid
+# 创建高优先级cgroup组low
+mkdir /sys/fs/cgroup/net_cls/low
+# 设定low组的classid 1:7
+echo 0x10007 > /sys/fs/cgroup/net_cls/low/net_cls.classid
+
+# 在 nodeIP 100.211.55.3 里启动网络服务端
+iperf3 -s -p 5000 & iperf3 -s -p 5001 &
+# 在客户端机器上开启两个terminal，然后压测网络
+iperf3 -c 100.211.55.3 -p 5000 --bandwidth 10G -t 1000
+iperf3 -c 100.211.55.3 -p 5001 --bandwidth 10G -t 1000
+```
+
+(1) 如何给 network packet 打标签？如何设置优先级？
+* 打标签：Network classifier cgroup, https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/net_cls.html
+* 设置优先级：https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/net_prio.html
+
 
 
 ## 参考文献

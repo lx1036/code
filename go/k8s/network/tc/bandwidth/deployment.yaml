@@ -1,0 +1,38 @@
+
+
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tc-demo
+  namespace: kube-system
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: tc-demo
+      annotations:
+        kubernetes.io/ingress-bandwidth: 1M
+        kubernetes.io/egress-bandwidth: 1M
+      labels:
+        app1: nginx-demo-1
+    spec:
+      containers:
+        - name: nginx-demo-1
+          image: nginx:1.17.8
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          livenessProbe:
+            httpGet:
+              port: 80
+              path: /index.html # /status(会不断重启), /index.html(正确的) 测试 RestartCount
+            failureThreshold: 10
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app1: nginx-demo-1
