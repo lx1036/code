@@ -21,7 +21,7 @@ func TestFSMHandlerEstablishHoldTimeExpired(t *testing.T) {
 	p.fsm.conn = m
 	p.fsm.h = h
 
-	// set keepalive ticker
+	// INFO: 3s 一个 keepalive 心跳
 	p.fsm.pConf.Timers.State.NegotiatedHoldTime = 3
 
 	msg := bgp.NewBGPKeepAliveMessage()
@@ -34,7 +34,7 @@ func TestFSMHandlerEstablishHoldTimeExpired(t *testing.T) {
 		m.setData(body)
 	}
 
-	// set holdtime
+	// INFO: 但是过期时间是 2s
 	p.fsm.pConf.Timers.Config.HoldTime = 2
 	p.fsm.pConf.Timers.State.NegotiatedHoldTime = 2
 
