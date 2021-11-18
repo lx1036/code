@@ -1,7 +1,12 @@
 
 
 
-# TC(Traffic Controller)
+# TC(Traffic Control)
+基本概念 Components of Linux Traffic Control 链接：
+https://tldp.org/HOWTO/Traffic-Control-HOWTO/
+https://tldp.org/HOWTO/Traffic-Control-HOWTO/components.html
+https://tldp.org/HOWTO/Traffic-Control-HOWTO/software.html
+
 TC工作原理：使用classful的qdisc(排队规则queueing discipline)，通过tc对流量进行控制，使用HTB算法实现带宽优先级和抢占控制。
 使用tc中的classful队列规定（qdisc）进行流量限制，涉及tc的几个基本概念：
 * qdisc：队列，流量根据Filter的计算后会放入队列中，然后根据队列的算法和规则进行发送数据
@@ -126,6 +131,11 @@ tc class add dev ifb0 parent 1:1 classid 1:10 htb rate 1mbit
 
 ## 参考文献
 linux使用TC并借助ifb实现入向限速: https://blog.csdn.net/bestjie01/article/details/107404231
+
 HTB实现原理：http://luxik.cdi.cz/~devik/qos/htb/manual/theory.htm
+
 tc man手册： https://man7.org/linux/man-pages/man8/tc.8.html
+
 cgroup和tc结合设置文档参考：https://android.googlesource.com/kernel/common/+/bcmdhd-3.10/Documentation/cgroups/net_cls.txt
+
+《Linux 高级路由与流量控制手册（2012）》第九章 用 tc qdisc 管理 Linux 网络带宽: http://arthurchiao.art/blog/lartc-qdisc-zh/

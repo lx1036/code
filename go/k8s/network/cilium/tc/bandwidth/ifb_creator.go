@@ -27,7 +27,6 @@ func CreateIngressQdisc(rateInBits, burstInBits uint64, hostDeviceName string) e
 
 // throttle traffic on ifb device，对 linkIndex 网卡限流
 func createTBF(rateInBits, burstInBits uint64, linkIndex int) error {
-	// tc qdisc add dev link root tbf rate netConf.BandwidthLimits.Rate burst netConf.BandwidthLimits.Burst
 	if rateInBits <= 0 {
 		return fmt.Errorf("invalid rate: %d", rateInBits)
 	}
@@ -53,6 +52,7 @@ func createTBF(rateInBits, burstInBits uint64, linkIndex int) error {
 		Rate:   uint64(rateInBytes),
 		Buffer: uint32(bufferInBytes),
 	}
+	// tc qdisc add dev lxcXXX root tbf rate netConf.BandwidthLimits.Rate burst netConf.BandwidthLimits.Burst
 	err := netlink.QdiscAdd(qdisc)
 	if err != nil {
 		return fmt.Errorf("create qdisc: %s", err)
