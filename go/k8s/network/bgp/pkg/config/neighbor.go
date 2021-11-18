@@ -282,6 +282,15 @@ func (n *Neighbor) ExtractNeighborAddress() (string, error) {
 	return addr, nil
 }
 
+func (n *Neighbor) IsConfederationMember(g *Global) bool {
+	for _, member := range g.Confederation.Config.MemberAsList {
+		if member == n.Config.PeerAs {
+			return true
+		}
+	}
+	return false
+}
+
 // struct for container bgp:state.
 // State information relating to the BGP neighbor or group.
 type NeighborState struct {

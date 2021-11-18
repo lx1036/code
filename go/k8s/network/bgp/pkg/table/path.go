@@ -26,3 +26,7 @@ type Path struct {
 	IsNexthopInvalid bool
 	IsWithdraw       bool
 }
+
+type Bitmap struct {
+	bitmap []uint64
+}
