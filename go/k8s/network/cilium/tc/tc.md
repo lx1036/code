@@ -63,6 +63,7 @@ tc qdisc add dev ifb0 parent 1:11 handle 11: sfq
 ```
 
 ```shell
+# 测试流量出方向
 tc qdisc del dev eth0 root # 清除 eth0 上所有队列
 
 tc class show dev eth0 parent 1:
@@ -95,6 +96,26 @@ iperf3 -s -p 5000 & iperf3 -s -p 5001 &
 # 在客户端机器上开启两个terminal，然后压测网络
 iperf3 -c 100.211.55.3 -p 5000 --bandwidth 10G -t 1000
 iperf3 -c 100.211.55.3 -p 5001 --bandwidth 10G -t 1000
+
+# 测试流量入方向
+# https://serverfault.com/questions/350023/tc-ingress-policing-and-ifb-mirroring
+modprobe ifb numifbs=1
+ip link set dev ifb0 up # repeat for ifb1, ifb2, ...
+
+# And redirect ingress traffic from the physical interfaces to corresponding ifb interface. For eth0 -> ifb0:
+tc qdisc add dev eth0 handle ffff: ingress
+tc filter add dev eth0 parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb0
+
+# Egress rules for eth0 go as usual in eth0. Let's limit bandwidth, for example:
+tc qdisc add dev eth0 root handle 1: htb default 10
+tc class add dev eth0 parent 1: classid 1:1 htb rate 1mbit
+tc class add dev eth0 parent 1:1 classid 1:10 htb rate 1mbit
+
+# Ingress rules for eth0, now go as egress rules on ifb0
+tc qdisc add dev ifb0 root handle 1: htb default 10
+tc class add dev ifb0 parent 1: classid 1:1 htb rate 1mbit
+tc class add dev ifb0 parent 1:1 classid 1:10 htb rate 1mbit
+
 ```
 
 (1) 如何给 network packet 打标签？如何设置优先级？
