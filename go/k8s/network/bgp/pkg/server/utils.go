@@ -89,7 +89,6 @@ func newGlobalFromAPIStruct(a *api.Global) *config.Global {
 	return global
 }
 
-
 // Parses the given NOTIFICATION message data as a binary value and returns
 // the Administrative Shutdown Communication in string and the rest binary.
 func decodeAdministrativeCommunication(data []byte) (string, []byte) {

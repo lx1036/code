@@ -10,6 +10,22 @@ read-write transaction 会锁文件。
 read-only transaction 没有锁文件，性能好。
 
 
+## (1) boltdb 数据组织
+* page:
+
+* node:
+
+
+
+## (2) boltdb 索引结构
+索引有两种数据结构：B-tree/B+tree 和 LSM-tree，LSM-tree 随机写性能更好，B-tree/B+tree 范围查询读性能更好。
+所以 etcd 选择 B-tree, boltdb 选择 B+tree 作为索引数据结构，是有道理的。 
+
+
+
+## (3) boltdb 事务实现
+
+
 
 
 ## 参考文献

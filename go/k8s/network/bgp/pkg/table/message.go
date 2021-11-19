@@ -31,17 +31,17 @@ type packerMP struct {
 
 func (p *packerMP) add(path *Path) {
 	p.packer.total++
-	
+
 	if path.IsEOR() {
 		p.packer.eof = true
 		return
 	}
-	
+
 	if path.IsWithdraw {
 		p.withdrawals = append(p.withdrawals, path)
 		return
 	}
-	
+
 	p.paths = append(p.paths, path)
 }
 
@@ -60,16 +60,16 @@ func createMPReachMessage(path *Path) *bgp.BGPMessage {
 
 func (p *packerMP) pack(options ...*bgp.MarshallingOption) []*bgp.BGPMessage {
 	msgs := make([]*bgp.BGPMessage, 0, p.packer.total)
-	
+
 	for _, path := range p.withdrawals {
 		nlris := []bgp.AddrPrefixInterface{path.GetNlri()}
 		msgs = append(msgs, bgp.NewBGPUpdateMessage(nil, []bgp.PathAttributeInterface{bgp.NewPathAttributeMpUnreachNLRI(nlris)}, nil))
 	}
-	
+
 	for _, path := range p.paths {
 		msgs = append(msgs, createMPReachMessage(path))
 	}
-	
+
 	if p.eof {
 		msgs = append(msgs, bgp.NewEndOfRib(p.family))
 	}
@@ -95,30 +95,30 @@ type packerV4 struct {
 
 func (p *packerV4) add(path *Path) {
 	p.packer.total++
-	
+
 	if path.IsEOR() {
 		p.packer.eof = true
 		return
 	}
-	
+
 	if path.IsWithdraw {
 		p.withdrawals = append(p.withdrawals, path)
 		return
 	}
-	
+
 	if path.GetNexthop().To4() == nil {
 		// RFC 5549
 		p.mpPaths = append(p.mpPaths, path)
 		return
 	}
-	
+
 	key := path.GetHash()
 	attrsB := bytes.NewBuffer(make([]byte, 0))
 	for _, v := range path.GetPathAttrs() {
 		b, _ := v.Serialize()
 		attrsB.Write(b)
 	}
-	
+
 	if cages, y := p.hashmap[key]; y {
 		added := false
 		for _, c := range cages {
@@ -158,7 +158,7 @@ func (p *packerV4) pack(options ...*bgp.MarshallingOption) []*bgp.BGPMessage {
 	maxNLRIs := func(attrsLen int) int {
 		return (bgp.BGP_MAX_MESSAGE_LENGTH - (19 + 2 + 2 + attrsLen)) / (5 + addpathNLRILen)
 	}
-	
+
 	loop := func(attrsLen int, paths []*Path, cb func([]*bgp.IPAddrPrefix)) {
 		max := maxNLRIs(attrsLen)
 		var nlris []*bgp.IPAddrPrefix
@@ -170,17 +170,17 @@ func (p *packerV4) pack(options ...*bgp.MarshallingOption) []*bgp.BGPMessage {
 			cb(nlris)
 		}
 	}
-	
+
 	msgs := make([]*bgp.BGPMessage, 0, p.packer.total)
-	
+
 	loop(0, p.withdrawals, func(nlris []*bgp.IPAddrPrefix) {
 		msgs = append(msgs, bgp.NewBGPUpdateMessage(nlris, nil, nil))
 	})
-	
+
 	for _, cages := range p.hashmap {
 		for _, c := range cages {
 			paths := c.paths
-			
+
 			attrs := paths[0].GetPathAttrs()
 			// we can apply a fix here when gobgp receives from MP peer
 			// and propagtes to non-MP peer
@@ -202,17 +202,17 @@ func (p *packerV4) pack(options ...*bgp.MarshallingOption) []*bgp.BGPMessage {
 			for _, a := range attrs_without_mp {
 				attrsLen += a.Len()
 			}
-			
+
 			loop(attrsLen, paths, func(nlris []*bgp.IPAddrPrefix) {
 				msgs = append(msgs, bgp.NewBGPUpdateMessage(nil, attrs_without_mp, nlris))
 			})
 		}
 	}
-	
+
 	for _, path := range p.mpPaths {
 		msgs = append(msgs, createMPReachMessage(path))
 	}
-	
+
 	if p.eof {
 		msgs = append(msgs, bgp.NewEndOfRib(p.family))
 	}
@@ -252,11 +252,11 @@ func UpdatePathAttrs2ByteAs(msg *bgp.BGPUpdate) error {
 			break
 		}
 	}
-	
+
 	if asAttr == nil {
 		return nil
 	}
-	
+
 	as4Params := make([]*bgp.As4PathParam, 0, len(asAttr.Value))
 	as2Params := make([]bgp.AsPathParamInterface, 0, len(asAttr.Value))
 	mkAs4 := false
@@ -273,7 +273,7 @@ func UpdatePathAttrs2ByteAs(msg *bgp.BGPUpdate) error {
 			}
 		}
 		as2Params = append(as2Params, bgp.NewAsPathParam(segType, as2Path))
-		
+
 		// RFC 6793 4.2.2 Generating Updates
 		//
 		// Whenever the AS path information contains the AS_CONFED_SEQUENCE or
@@ -315,7 +315,6 @@ func UpdatePathAggregator2ByteAs(msg *bgp.BGPUpdate) {
 	}
 }
 
-
 type packerInterface interface {
 	add(*Path)
 	pack(options ...*bgp.MarshallingOption) []*bgp.BGPMessage
@@ -323,7 +322,7 @@ type packerInterface interface {
 
 func CreateUpdateMsgFromPaths(pathList []*Path, options ...*bgp.MarshallingOption) []*bgp.BGPMessage {
 	msgs := make([]*bgp.BGPMessage, 0, len(pathList))
-	
+
 	m := make(map[bgp.RouteFamily]packerInterface)
 	for _, path := range pathList {
 		f := path.GetRouteFamily()
@@ -332,7 +331,7 @@ func CreateUpdateMsgFromPaths(pathList []*Path, options ...*bgp.MarshallingOptio
 		}
 		m[f].add(path)
 	}
-	
+
 	for _, p := range m {
 		msgs = append(msgs, p.pack(options...)...)
 	}

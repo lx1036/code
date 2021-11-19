@@ -455,7 +455,7 @@ func (h *fsmHandler) established(ctx context.Context) (bgp.FSMState, *fsmStateRe
 				holdTimer.Reset(time.Second * time.Duration(fsm.pConf.Timers.State.NegotiatedHoldTime))
 			}
 			fsm.lock.RUnlock()
-		/*case stateOp := <-fsm.adminStateCh:
+			/*case stateOp := <-fsm.adminStateCh:
 			err := h.changeadminState(stateOp.State)
 			if err == nil {
 				switch stateOp.State {
@@ -536,7 +536,7 @@ func (h *fsmHandler) sendMessageloop(ctx context.Context, wg *sync.WaitGroup) er
 			return fmt.Errorf("closed")
 		}
 		fsm.bgpMessageStateUpdate(m.Header.Type, false)
-		
+
 		switch m.Header.Type {
 		case bgp.BGP_MSG_NOTIFICATION:
 			body := m.Body.(*bgp.BGPNotification)

@@ -181,7 +181,7 @@ func (c *Cursor) search(key []byte, pgid pgid) {
 	e := elemRef{page: p, node: n}
 	c.stack = append(c.stack, e)
 
-	// If we're on a leaf page/node then find the specific node.
+	/*// If we're on a leaf page/node then find the specific node.
 	if e.isLeaf() {
 		c.nsearch(key)
 		return
@@ -191,7 +191,7 @@ func (c *Cursor) search(key []byte, pgid pgid) {
 		c.searchNode(key, n)
 		return
 	}
-	c.searchPage(key, p)
+	c.searchPage(key, p)*/
 }
 
 // node returns the node that the cursor is currently positioned on.
@@ -205,13 +205,13 @@ func (c *Cursor) node() *node {
 
 	// Start from root and traverse down the hierarchy.
 	var n = c.stack[0].node
-	if n == nil {
+	/*if n == nil {
 		n = c.bucket.node(c.stack[0].page.id, nil)
 	}
 	for _, ref := range c.stack[:len(c.stack)-1] {
 		_assert(!n.isLeaf, "expected branch node")
 		n = n.childAt(int(ref.index))
-	}
+	}*/
 	_assert(n.isLeaf, "expected leaf node")
 	return n
 }
