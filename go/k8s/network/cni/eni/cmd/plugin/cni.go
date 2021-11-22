@@ -134,7 +134,7 @@ func getNetworkClient() (rpc.EniBackendClient, func(), error) {
 
 func initDrivers(ipv4, ipv6 bool) {
 	veth = driver.NewVETHDriver(ipv4, ipv6)
-	//ipvlan = driver.NewIPVlanDriver(ipv4, ipv6)
+	ipvlan = driver.NewIPVlanDriver(ipv4, ipv6)
 	rawNIC = driver.NewRawNICDriver(ipv4, ipv6)
 }
 

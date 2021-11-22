@@ -13,6 +13,7 @@ import (
 // INFO: 和tun一样，ifb(Intermediate Functional Block)也是一个虚拟网卡
 //  linux使用TC并借助ifb实现入向限速: https://blog.csdn.net/bestjie01/article/details/107404231
 //  Qdisc(queueing discipline)
+//  TBF(Token Bucket Filter): 桶算法
 
 const latencyInMillis = 25
 
@@ -24,8 +25,8 @@ func CreateIngressQdisc(rateInBits, burstInBits uint64, hostDeviceName string) e
 	return createTBF(rateInBits, burstInBits, hostDevice.Attrs().Index)
 }
 
+// throttle traffic on ifb device，对 linkIndex 网卡限流
 func createTBF(rateInBits, burstInBits uint64, linkIndex int) error {
-	// tc qdisc add dev link root tbf rate netConf.BandwidthLimits.Rate burst netConf.BandwidthLimits.Burst
 	if rateInBits <= 0 {
 		return fmt.Errorf("invalid rate: %d", rateInBits)
 	}
@@ -42,13 +43,16 @@ func createTBF(rateInBits, burstInBits uint64, linkIndex int) error {
 	qdisc := &netlink.Tbf{
 		QdiscAttrs: netlink.QdiscAttrs{
 			LinkIndex: linkIndex,
-			Handle:    netlink.MakeHandle(1, 0),
-			Parent:    netlink.HANDLE_ROOT,
+			// https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/net_cls.html
+			// 0x10000 classid is 1:0，如果 classid is 10:1 0x100001
+			Handle: netlink.MakeHandle(1, 0),
+			Parent: netlink.HANDLE_ROOT,
 		},
 		Limit:  uint32(limitInBytes),
 		Rate:   uint64(rateInBytes),
 		Buffer: uint32(bufferInBytes),
 	}
+	// tc qdisc add dev lxcXXX root tbf rate netConf.BandwidthLimits.Rate burst netConf.BandwidthLimits.Burst
 	err := netlink.QdiscAdd(qdisc)
 	if err != nil {
 		return fmt.Errorf("create qdisc: %s", err)
@@ -99,7 +103,7 @@ func CreateEgressQdisc(rateInBits, burstInBits uint64, hostDeviceName string, if
 			Parent:    netlink.HANDLE_INGRESS,
 		},
 	}
-	err = netlink.QdiscAdd(ingress)
+	err = netlink.QdiscAdd(ingress) // `tc qdisc add dev eth0 handle ffff: ingress`
 	if err != nil {
 		return fmt.Errorf("create ingress qdisc: %s", err)
 	}
@@ -114,7 +118,7 @@ func CreateEgressQdisc(rateInBits, burstInBits uint64, hostDeviceName string, if
 			Priority:  1,
 			Protocol:  syscall.ETH_P_ALL,
 		},
-		ClassId:    netlink.MakeHandle(1, 1),
+		ClassId:    netlink.MakeHandle(1, 1), // 0x10001
 		RedirIndex: ifbDevice.Attrs().Index,
 		Actions: []netlink.Action{
 			&netlink.MirredAction{

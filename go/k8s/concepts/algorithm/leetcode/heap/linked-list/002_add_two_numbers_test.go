@@ -1,4 +1,4 @@
-package leetcode
+package linked_list
 
 import (
 	"fmt"

@@ -13,3 +13,7 @@ func ToIP(addr string) (net.IP, error) {
 	}
 	return ip, nil
 }
+
+func IPv6(ip net.IP) bool {
+	return ip.To4() == nil
+}

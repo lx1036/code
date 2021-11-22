@@ -20,6 +20,9 @@ func main() {
 }
 
 // INFO: @see https://www.cni.dev/plugins/current/meta/bandwidth/
+//  原理(总感觉两个应该是相反的)：
+//   (1)Ingress: 对 host veth 使用 tc 做限流
+//   (2)Egress: 创建一个 ifb 网卡，host veth 网卡把流量转发到 ifb 网卡，然后使用 tc 对 ifb 网卡做 ingress 限流
 /*
 {
   "cniVersion": "0.3.1",
