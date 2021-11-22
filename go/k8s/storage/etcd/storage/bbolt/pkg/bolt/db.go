@@ -2,7 +2,6 @@ package bolt
 
 import (
 	"fmt"
-	"hash/fnv"
 	"os"
 	"sync"
 	"time"
@@ -19,35 +18,6 @@ const magic uint32 = 0xED0CDAED
 
 // The data file format version.
 const version = 2
-
-type meta struct {
-	magic    uint32 // 文件标识
-	version  uint32 // 版本号
-	pageSize uint32 // 页大小
-	flags    uint32 // 页类型
-	root     bucket // 根bucket
-	freelist pgid   // freelist页面id
-	pgid     pgid   // 总的页面数量
-	txid     txid   // 上一次写事务id
-	checksum uint64 // 校验码
-}
-
-// validate checks the marker bytes and version of the meta page to ensure it matches this binary.
-func (m *meta) validate() error {
-	if m.magic != magic {
-		return ErrInvalid
-	} else if m.version != version {
-		return ErrVersionMismatch
-	} else if m.checksum != 0 && m.checksum != m.sum64() {
-		return ErrChecksum
-	}
-	return nil
-}
-func (m *meta) sum64() uint64 {
-	var h = fnv.New64a()
-	_, _ = h.Write((*[unsafe.Offsetof(meta{}.checksum)]byte)(unsafe.Pointer(m))[:])
-	return h.Sum64()
-}
 
 // Options represents the options that can be set when opening a database.
 type Options struct {

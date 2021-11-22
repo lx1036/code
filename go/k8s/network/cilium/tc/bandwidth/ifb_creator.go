@@ -45,8 +45,8 @@ func createTBF(rateInBits, burstInBits uint64, linkIndex int) error {
 			LinkIndex: linkIndex,
 			// https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/net_cls.html
 			// 0x10000 classid is 1:0，如果 classid is 10:1 0x100001
-			Handle:    netlink.MakeHandle(1, 0),
-			Parent:    netlink.HANDLE_ROOT,
+			Handle: netlink.MakeHandle(1, 0),
+			Parent: netlink.HANDLE_ROOT,
 		},
 		Limit:  uint32(limitInBytes),
 		Rate:   uint64(rateInBytes),

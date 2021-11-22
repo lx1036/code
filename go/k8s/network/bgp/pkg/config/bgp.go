@@ -111,6 +111,11 @@ type Global struct {
 	// routing table, i.e., export (send) and import (receive),
 	// depending on the context.
 	ApplyPolicy ApplyPolicy `mapstructure:"apply-policy" json:"apply-policy,omitempty"`
+
+	// original -> bgp:confederation
+	// Parameters indicating whether the local system acts as part
+	// of a BGP confederation.
+	Confederation Confederation `mapstructure:"confederation" json:"confederation,omitempty"`
 }
 
 func NewGlobalFromConfigStruct(c *Global) *api.Global {
@@ -157,6 +162,87 @@ func NewGlobalFromConfigStruct(c *Global) *api.Global {
 		},
 		ApplyPolicy: applyPolicy,
 	}
+}
+
+// struct for container bgp:state.
+// State information relating to the BGP confederations.
+type ConfederationState struct {
+	// original -> bgp:enabled
+	// bgp:enabled's original type is boolean.
+	// When this leaf is set to true it indicates that
+	// the local-AS is part of a BGP confederation.
+	Enabled bool `mapstructure:"enabled" json:"enabled,omitempty"`
+	// original -> bgp:identifier
+	// bgp:identifier's original type is inet:as-number.
+	// Confederation identifier for the autonomous system.
+	Identifier uint32 `mapstructure:"identifier" json:"identifier,omitempty"`
+	// original -> bgp:member-as
+	// original type is list of inet:as-number
+	// Remote autonomous systems that are to be treated
+	// as part of the local confederation.
+	MemberAsList []uint32 `mapstructure:"member-as-list" json:"member-as-list,omitempty"`
+}
+
+// struct for container bgp:config.
+// Configuration parameters relating to BGP confederations.
+type ConfederationConfig struct {
+	// original -> bgp:enabled
+	// bgp:enabled's original type is boolean.
+	// When this leaf is set to true it indicates that
+	// the local-AS is part of a BGP confederation.
+	Enabled bool `mapstructure:"enabled" json:"enabled,omitempty"`
+	// original -> bgp:identifier
+	// bgp:identifier's original type is inet:as-number.
+	// Confederation identifier for the autonomous system.
+	Identifier uint32 `mapstructure:"identifier" json:"identifier,omitempty"`
+	// original -> bgp:member-as
+	// original type is list of inet:as-number
+	// Remote autonomous systems that are to be treated
+	// as part of the local confederation.
+	MemberAsList []uint32 `mapstructure:"member-as-list" json:"member-as-list,omitempty"`
+}
+
+func (lhs *ConfederationConfig) Equal(rhs *ConfederationConfig) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+	if lhs.Enabled != rhs.Enabled {
+		return false
+	}
+	if lhs.Identifier != rhs.Identifier {
+		return false
+	}
+	if len(lhs.MemberAsList) != len(rhs.MemberAsList) {
+		return false
+	}
+	for idx, l := range lhs.MemberAsList {
+		if l != rhs.MemberAsList[idx] {
+			return false
+		}
+	}
+	return true
+}
+
+// struct for container bgp:confederation.
+// Parameters indicating whether the local system acts as part
+// of a BGP confederation.
+type Confederation struct {
+	// original -> bgp:confederation-config
+	// Configuration parameters relating to BGP confederations.
+	Config ConfederationConfig `mapstructure:"config" json:"config,omitempty"`
+	// original -> bgp:confederation-state
+	// State information relating to the BGP confederations.
+	State ConfederationState `mapstructure:"state" json:"state,omitempty"`
+}
+
+func (lhs *Confederation) Equal(rhs *Confederation) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+	if !lhs.Config.Equal(&(rhs.Config)) {
+		return false
+	}
+	return true
 }
 
 // struct for container bgp:bgp.

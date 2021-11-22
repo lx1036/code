@@ -95,6 +95,12 @@ func (b *Bucket) Bucket(name []byte) *Bucket {
 	return child
 }
 
+// Helper method that re-interprets a sub-bucket value
+// from a parent into a Bucket
+func (b *Bucket) openBucket(value []byte) *Bucket {
+	panic("not implemented")
+}
+
 // CreateBucket creates a new bucket at the given key and returns the new bucket.
 // Returns an error if the key already exists, if the bucket name is blank, or if the bucket name is too long.
 // The bucket instance is only valid for the lifetime of the transaction.

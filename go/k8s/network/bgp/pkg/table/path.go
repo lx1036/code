@@ -26,3 +26,30 @@ type Path struct {
 	IsNexthopInvalid bool
 	IsWithdraw       bool
 }
+
+func (path *Path) GetRouteFamily() bgp.RouteFamily {
+	return bgp.AfiSafiToRouteFamily(path.OriginInfo().nlri.AFI(), path.OriginInfo().nlri.SAFI())
+}
+
+func (path *Path) OriginInfo() *originInfo {
+	return path.root().info
+}
+
+func (path *Path) root() *Path {
+	p := path
+	for p.parent != nil {
+		p = p.parent
+	}
+	return p
+}
+
+func (path *Path) IsEOR() bool {
+	if path.info != nil && path.info.eor {
+		return true
+	}
+	return false
+}
+
+type Bitmap struct {
+	bitmap []uint64
+}
