@@ -7,6 +7,24 @@ import (
 	"unsafe"
 )
 
+// INFO: 表示一个node里的(key,value)数组元素，同时有pageid
+type inode struct {
+	flags uint32
+	pgid  pgid
+	key   []byte
+	value []byte
+}
+
+type inodes []inode
+
+type nodes []*node
+
+func (s nodes) Len() int      { return len(s) }
+func (s nodes) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s nodes) Less(i, j int) bool {
+	return bytes.Compare(s[i].inodes[0].key, s[j].inodes[0].key) == -1 // a < b
+}
+
 // node represents an in-memory, deserialized page.
 type node struct {
 	bucket     *Bucket
@@ -17,7 +35,7 @@ type node struct {
 	pgid       pgid
 	parent     *node
 	children   nodes
-	inodes     inodes
+	inodes     inodes // 存放(key,value)数据，或者叫kvs更好些
 }
 
 // put inserts a key/value.
@@ -51,10 +69,10 @@ func (n *node) put(oldKey, newKey, value []byte, pgid pgid, flags uint32) {
 	_assert(len(inode.key) > 0, "put: zero-length inode key")
 }
 
-// read initializes the node from a page.
+// INFO: page 是磁盘上数据结构，需要读取 disk page(一个page默认4KB)为一个node，inode 就是 kvs，存储key-value数据
 func (n *node) read(p *page) {
 	n.pgid = p.id
-	n.isLeaf = ((p.flags & leafPageFlag) != 0)
+	n.isLeaf = (p.flags & leafPageFlag) != 0
 	n.inodes = make(inodes, int(p.count))
 
 	for i := 0; i < int(p.count); i++ {
@@ -65,7 +83,7 @@ func (n *node) read(p *page) {
 			inode.key = elem.key()
 			inode.value = elem.value()
 		} else {
-
+			// TODO: read branch page
 		}
 
 		_assert(len(inode.key) > 0, "read: zero-length inode key")
@@ -100,40 +118,33 @@ func (n *node) write(p *page) {
 	}
 
 	// Loop over each item and write it to the page.
-	b := (*[maxAllocSize]byte)(unsafe.Pointer(&p.ptr))[n.pageElementSize()*len(n.inodes):]
+	off := unsafe.Sizeof(*p) + n.pageElementSize()*uintptr(len(n.inodes))
 	for i, item := range n.inodes {
 		_assert(len(item.key) > 0, "write: zero-length inode key")
+		// INFO: allocate 出一个 ksize+vsize 空间出来, offset 指针已经后移
+		//  buffer 指向数据的空间
+		sz := len(item.key) + len(item.value)
+		buffer := unsafeByteSlice(unsafe.Pointer(p), off, 0, sz)
+		off += uintptr(sz)
 
-		// Write the page element.
 		if n.isLeaf {
 			elem := p.leafPageElement(uint16(i))
-			elem.pos = uint32(uintptr(unsafe.Pointer(&b[0])) - uintptr(unsafe.Pointer(elem)))
+			elem.pos = uint32(uintptr(unsafe.Pointer(&buffer[0])) - uintptr(unsafe.Pointer(elem)))
 			elem.flags = item.flags
 			elem.ksize = uint32(len(item.key))
 			elem.vsize = uint32(len(item.value))
 		} else {
-
+			// TODO: write branch node
 		}
 
-		// If the length of key+value is larger than the max allocation size
-		// then we need to reallocate the byte array pointer.
-		//
-		// See: https://github.com/boltdb/bolt/pull/335
-		klen, vlen := len(item.key), len(item.value)
-		if len(b) < klen+vlen {
-			b = (*[maxAllocSize]byte)(unsafe.Pointer(&b[0]))[:]
-		}
-
-		// Write data for the element to the end of the page.
-		copy(b[0:], item.key)
-		b = b[klen:]
-		copy(b[0:], item.value)
-		b = b[vlen:]
+		// write data into leaf node
+		l := copy(buffer, item.key)
+		copy(buffer[l:], item.value)
 	}
 }
 
 // pageElementSize returns the size of each page element based on the type of node.
-func (n *node) pageElementSize() int {
+func (n *node) pageElementSize() uintptr {
 	if n.isLeaf {
 		return leafPageElementSize
 	}
@@ -142,7 +153,7 @@ func (n *node) pageElementSize() int {
 
 // split breaks up a node into multiple smaller nodes, if appropriate.
 // This should only be called from the spill() function.
-func (n *node) split(pageSize int) []*node {
+func (n *node) split(pageSize uintptr) []*node {
 	var nodes []*node
 	node := n
 	for {
@@ -161,7 +172,7 @@ func (n *node) split(pageSize int) []*node {
 
 	return nodes
 }
-func (n *node) splitTwo(pageSize int) (*node, *node) {
+func (n *node) splitTwo(pageSize uintptr) (*node, *node) {
 	// Ignore the split if the page doesn't have at least enough nodes for
 	// two pages or if the nodes can fit in a single page.
 	if len(n.inodes) <= (minKeysPerPage*2) || n.sizeLessThan(pageSize) {
@@ -203,18 +214,18 @@ func (n *node) splitTwo(pageSize int) (*node, *node) {
 // splitIndex finds the position where a page will fill a given threshold.
 // It returns the index as well as the size of the first page.
 // This is only be called from split().
-func (n *node) splitIndex(threshold int) (index, sz int) {
+func (n *node) splitIndex(threshold int) (index, sz uintptr) {
 	sz = pageHeaderSize
 
 	// Loop until we only have the minimum number of keys required for the second page.
 	for i := 0; i < len(n.inodes)-minKeysPerPage; i++ {
-		index = i
+		index = uintptr(i)
 		inode := n.inodes[i]
-		elsize := n.pageElementSize() + len(inode.key) + len(inode.value)
+		elsize := n.pageElementSize() + uintptr(len(inode.key)) + uintptr(len(inode.value))
 
 		// If we have at least the minimum number of keys and adding another
 		// node would put us over the threshold then exit and return.
-		if i >= minKeysPerPage && sz+elsize > threshold {
+		if i >= minKeysPerPage && sz+elsize > uintptr(threshold) {
 			break
 		}
 
@@ -228,11 +239,11 @@ func (n *node) splitIndex(threshold int) (index, sz int) {
 // sizeLessThan returns true if the node is less than a given size.
 // This is an optimization to avoid calculating a large node when we only need
 // to know if it fits inside a certain page size.
-func (n *node) sizeLessThan(v int) bool {
+func (n *node) sizeLessThan(v uintptr) bool {
 	sz, elsz := pageHeaderSize, n.pageElementSize()
 	for i := 0; i < len(n.inodes); i++ {
 		item := &n.inodes[i]
-		sz += elsz + len(item.key) + len(item.value)
+		sz += elsz + uintptr(len(item.key)) + uintptr(len(item.value))
 		if sz >= v {
 			return false
 		}
@@ -245,27 +256,7 @@ func (n *node) size() int {
 	sz, elsz := pageHeaderSize, n.pageElementSize()
 	for i := 0; i < len(n.inodes); i++ {
 		item := &n.inodes[i]
-		sz += elsz + len(item.key) + len(item.value)
+		sz += elsz + uintptr(len(item.key)) + uintptr(len(item.value))
 	}
-	return sz
-}
-
-// inode represents an internal node inside of a node.
-// It can be used to point to elements in a page or point
-// to an element which hasn't been added to a page yet.
-type inode struct {
-	flags uint32
-	pgid  pgid
-	key   []byte
-	value []byte
-}
-
-type inodes []inode
-
-type nodes []*node
-
-func (s nodes) Len() int      { return len(s) }
-func (s nodes) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s nodes) Less(i, j int) bool {
-	return bytes.Compare(s[i].inodes[0].key, s[j].inodes[0].key) == -1
+	return int(sz)
 }

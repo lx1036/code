@@ -10,11 +10,11 @@ import (
 
 // INFO: boltdb page 概念 https://time.geekbang.org/column/article/342527
 
-const branchPageElementSize = int(unsafe.Sizeof(branchPageElement{}))
-const leafPageElementSize = int(unsafe.Sizeof(leafPageElement{}))
+const branchPageElementSize = unsafe.Sizeof(branchPageElement{})
+const leafPageElementSize = unsafe.Sizeof(leafPageElement{})
 
 const minKeysPerPage = 2
-const pageHeaderSize = int(unsafe.Offsetof(((*page)(nil)).ptr))
+const pageHeaderSize = unsafe.Offsetof(((*page)(nil)).ptr)
 
 const (
 	bucketLeafFlag = 0x01
@@ -123,8 +123,8 @@ func (p *page) hexdump(n int) {
 
 // leafPageElement retrieves the leaf node by index
 func (p *page) leafPageElement(index uint16) *leafPageElement {
-	n := &((*[0x7FFFFFF]leafPageElement)(unsafe.Pointer(&p.ptr)))[index]
-	return n
+	return (*leafPageElement)(unsafeIndex(unsafe.Pointer(p), unsafe.Sizeof(*p),
+		leafPageElementSize, int(index)))
 }
 
 // branchPageElement retrieves the branch node by index
@@ -195,14 +195,16 @@ type leafPageElement struct {
 
 // key returns a byte slice of the node key.
 func (n *leafPageElement) key() []byte {
-	buf := (*[maxAllocSize]byte)(unsafe.Pointer(n))
-	return (*[maxAllocSize]byte)(unsafe.Pointer(&buf[n.pos]))[:n.ksize:n.ksize]
+	i := int(n.pos)
+	j := i + int(n.ksize)
+	return unsafeByteSlice(unsafe.Pointer(n), 0, i, j)
 }
 
 // value returns a byte slice of the node value.
 func (n *leafPageElement) value() []byte {
-	buf := (*[maxAllocSize]byte)(unsafe.Pointer(n))
-	return (*[maxAllocSize]byte)(unsafe.Pointer(&buf[n.pos+n.ksize]))[:n.vsize:n.vsize]
+	i := int(n.pos) + int(n.ksize)
+	j := i + int(n.vsize)
+	return unsafeByteSlice(unsafe.Pointer(n), 0, i, j)
 }
 
 // branchPageElement represents a node on a branch page.
