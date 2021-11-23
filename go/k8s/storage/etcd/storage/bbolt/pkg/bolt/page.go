@@ -14,7 +14,7 @@ const branchPageElementSize = unsafe.Sizeof(branchPageElement{})
 const leafPageElementSize = unsafe.Sizeof(leafPageElement{})
 
 const minKeysPerPage = 2
-const pageHeaderSize = unsafe.Offsetof(((*page)(nil)).ptr)
+const pageHeaderSize = unsafe.Sizeof(page{})
 
 const (
 	bucketLeafFlag = 0x01
@@ -27,7 +27,7 @@ func (s pgids) Len() int           { return len(s) }
 func (s pgids) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s pgids) Less(i, j int) bool { return s[i] < s[j] }
 
-// merge returns the sorted union of a and b.
+// INFO: 合并两个有序数组
 func (s pgids) merge(b pgids) pgids {
 	// Return the opposite slice if one is nil.
 	if len(s) == 0 {
@@ -42,6 +42,7 @@ func (s pgids) merge(b pgids) pgids {
 	return merged
 }
 
+// INFO: 合并两个有序数组, @see 088_merge_sorted_array_test.go
 func mergepgids(dst, a, b pgids) {
 	if len(dst) < len(a)+len(b) {
 		panic(fmt.Errorf("mergepgids bad len %d < %d + %d", len(dst), len(a), len(b)))
@@ -56,21 +57,15 @@ func mergepgids(dst, a, b pgids) {
 		return
 	}
 
-	// ?????????
-	// 这块不知道用了什么算法merge了两个排序数组，leetcode上找下
+	merged := dst[:0] // []
 
-	// 首元素最小当lead
+	// 首元素最小当 lead
 	lead, follow := a, b
 	if b[0] < a[0] {
 		lead, follow = b, a
 	}
 
-	// Merged will hold all elements from both lists.
-	merged := dst[:0] // []
-
-	// Continue while there are elements in the lead.
 	for len(lead) > 0 {
-		// Merge largest prefix of lead that is ahead of follow[0].
 		n := sort.Search(len(lead), func(i int) bool { return lead[i] > follow[0] })
 		merged = append(merged, lead[:n]...)
 		if n >= len(lead) {
@@ -82,7 +77,7 @@ func mergepgids(dst, a, b pgids) {
 	}
 
 	// Append what's left in follow.
-	_ = append(merged, follow...)
+	merged = append(merged, follow...)
 }
 
 const (
@@ -96,7 +91,7 @@ const (
 type page struct {
 	id       pgid    // 页ID
 	flags    uint16  // 页类型，这块内容标识：可以为元数据、空闲列表、树枝、叶子 这四种中的一种
-	count    uint16  // 数量，存储数据的数量
+	count    uint16  // 数量，存储数据的数量，the number of key-value pairs
 	overflow uint32  // 溢出页数量，溢出的页数量
 	ptr      uintptr // 页数据起始位置，内存中存储数据的指针，没有落盘
 }

@@ -105,9 +105,112 @@ type DB struct {
 	NoFreelistSync bool
 	freelist       *freelist
 	pageSize       int
+	pagePool sync.Pool
 
 	// statistics
 	stats Stats
+}
+
+// DefaultOptions represent the options used if nil options are passed into Open().
+// No timeout is used which will cause Bolt to wait indefinitely for a lock.
+var DefaultOptions = &Options{
+	Timeout:      0,
+	NoGrowSync:   false,
+	FreelistType: FreelistArrayType,
+}
+
+// Default values if not set in a DB instance.
+const (
+	DefaultMaxBatchSize  int = 1000
+	DefaultMaxBatchDelay     = 10 * time.Millisecond
+	DefaultAllocSize         = 16 * 1024 * 1024
+)
+
+// 打开一个文件用来保存数据，如果不存在则创建
+func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
+	db := &DB{
+		opened: true,
+	}
+	// Set default options if no options are provided.
+	if options == nil {
+		options = DefaultOptions
+	}
+	db.NoSync = options.NoSync
+	db.NoGrowSync = options.NoGrowSync
+	db.MmapFlags = options.MmapFlags
+	db.NoFreelistSync = options.NoFreelistSync
+	db.FreelistType = options.FreelistType
+	
+	// Set default values for later DB operations.
+	db.MaxBatchSize = DefaultMaxBatchSize
+	db.MaxBatchDelay = DefaultMaxBatchDelay
+	db.AllocSize = DefaultAllocSize
+	
+	flag := os.O_RDWR
+	if options.ReadOnly {
+		flag = os.O_RDONLY
+		db.readOnly = true
+	}
+	
+	db.openFile = options.OpenFile
+	if db.openFile == nil {
+		db.openFile = os.OpenFile
+	}
+	
+	// Open data file and separate sync handler for metadata writes.
+	var err error
+	if db.file, err = db.openFile(path, flag|os.O_CREATE, mode); err != nil {
+		_ = db.close()
+		return nil, err
+	}
+	db.path = db.file.Name()
+	
+	// 获取 file lock
+	if err := flock(db, !db.readOnly, options.Timeout); err != nil {
+		_ = db.close()
+		return nil, err
+	}
+	
+	if db.readOnly {
+		return db, nil
+	}
+	
+	db.loadFreelist()
+	
+	// Mark the database as opened and return.
+	return db, nil
+}
+
+// allocate returns a contiguous block of memory starting at a given page.
+func (db *DB) allocate(txid txid, count int) (*page, error) {
+	// Allocate a temporary buffer for the page.
+	var buf []byte
+	if count == 1 {
+		buf = db.pagePool.Get().([]byte)
+	} else {
+		buf = make([]byte, count*db.pageSize)
+	}
+	p := (*page)(unsafe.Pointer(&buf[0]))
+	p.overflow = uint32(count - 1)
+	
+	// Use pages from the freelist if they are available.
+	if p.id = db.freelist.allocate(txid, count); p.id != 0 {
+		return p, nil
+	}
+	
+	// Resize mmap() if we're at the end.
+	p.id = db.rwtx.meta.pgid
+	var minsz = int((p.id+pgid(count))+1) * db.pageSize
+	if minsz >= db.datasz {
+		if err := db.mmap(minsz); err != nil {
+			return nil, fmt.Errorf("mmap allocate error: %s", err)
+		}
+	}
+	
+	// Move the page id high water mark.
+	db.rwtx.meta.pgid += pgid(count)
+	
+	return p, nil
 }
 
 // Begin starts a new transaction.
@@ -281,72 +384,3 @@ func (db *DB) page(id pgid) *page {
 	return (*page)(unsafe.Pointer(&db.data[pos]))
 }
 
-// DefaultOptions represent the options used if nil options are passed into Open().
-// No timeout is used which will cause Bolt to wait indefinitely for a lock.
-var DefaultOptions = &Options{
-	Timeout:      0,
-	NoGrowSync:   false,
-	FreelistType: FreelistArrayType,
-}
-
-// Default values if not set in a DB instance.
-const (
-	DefaultMaxBatchSize  int = 1000
-	DefaultMaxBatchDelay     = 10 * time.Millisecond
-	DefaultAllocSize         = 16 * 1024 * 1024
-)
-
-// 打开一个文件用来保存数据，如果不存在则创建
-func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
-	db := &DB{
-		opened: true,
-	}
-	// Set default options if no options are provided.
-	if options == nil {
-		options = DefaultOptions
-	}
-	db.NoSync = options.NoSync
-	db.NoGrowSync = options.NoGrowSync
-	db.MmapFlags = options.MmapFlags
-	db.NoFreelistSync = options.NoFreelistSync
-	db.FreelistType = options.FreelistType
-
-	// Set default values for later DB operations.
-	db.MaxBatchSize = DefaultMaxBatchSize
-	db.MaxBatchDelay = DefaultMaxBatchDelay
-	db.AllocSize = DefaultAllocSize
-
-	flag := os.O_RDWR
-	if options.ReadOnly {
-		flag = os.O_RDONLY
-		db.readOnly = true
-	}
-
-	db.openFile = options.OpenFile
-	if db.openFile == nil {
-		db.openFile = os.OpenFile
-	}
-
-	// Open data file and separate sync handler for metadata writes.
-	var err error
-	if db.file, err = db.openFile(path, flag|os.O_CREATE, mode); err != nil {
-		_ = db.close()
-		return nil, err
-	}
-	db.path = db.file.Name()
-
-	// 获取 file lock
-	if err := flock(db, !db.readOnly, options.Timeout); err != nil {
-		_ = db.close()
-		return nil, err
-	}
-
-	if db.readOnly {
-		return db, nil
-	}
-
-	db.loadFreelist()
-
-	// Mark the database as opened and return.
-	return db, nil
-}

@@ -125,3 +125,18 @@ func TestBbolt(test *testing.T) {
 		klog.Fatal(err)
 	}
 }
+
+func TestBuckets(test *testing.T) {
+	db, err := bolt.Open("/Users/lx1036/Code/lx1036/code/go/k8s/storage/etcd/cluster1/etcd1/member/snap/db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
+		klog.Fatal(err)
+	}
+	defer db.Close()
+
+	db.View(func(tx *bolt.Tx) error {
+		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+			klog.Info(string(name))
+			return nil
+		})
+	})
+}

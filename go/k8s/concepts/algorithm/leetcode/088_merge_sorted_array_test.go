@@ -51,6 +51,14 @@ func TestMerge(test *testing.T) {
 	result := []int{1, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 25, 27, 30}
 	r := merge(nums1, nums2)
 	if !assert.Equal(test, result, r) {
-		klog.Fatal("not equal")
+		klog.Fatal("r not equal")
+	}
+
+	r2 := append(nums1, nums2...)
+	sort.Slice(r2, func(i, j int) bool {
+		return r2[i] < r2[j]
+	})
+	if !assert.Equal(test, result, r2) {
+		klog.Fatal("r2 not equal")
 	}
 }

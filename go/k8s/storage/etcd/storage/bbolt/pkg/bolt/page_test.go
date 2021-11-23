@@ -1,6 +1,7 @@
 package bolt
 
 import (
+	"k8s.io/klog/v2"
 	"reflect"
 	"sort"
 	"testing"
@@ -70,4 +71,10 @@ func TestPgids_merge_quick(t *testing.T) {
 	}, nil); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestName(test *testing.T) {
+	dst := []int{1, 2}
+	merged := dst[:0]
+	klog.Info(merged)
 }

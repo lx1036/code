@@ -42,21 +42,38 @@ type freelist struct {
 	//pending        map[txid]*txPending         // mapping of soon-to-be free page ids by tx.
 	pending map[txid][]pgid // 存放当前事务要被free的 page ids
 	cache   map[pgid]bool   // 缓存判断当前page id是否需要被free，可以快速查找
-	//freemaps       map[uint64]pidSet           // key is the size of continuous pages(span), value is a set which contains the starting pgids of same size
-	//forwardMap     map[pgid]uint64             // key is start pgid, value is its span size
-	//backwardMap    map[pgid]uint64             // key is end pgid, value is its span size
-	//allocate       func(txid txid, n int) pgid // the freelist allocate func
-	//free_count     func() int                  // the function which gives you free page number
-	//mergeSpans     func(ids pgids)             // the mergeSpan func
-	//getFreePageIDs func() []pgid               // get free pgids func
-	//readIDs        func(pgids []pgid)          // readIDs func reads list of pages and init the freelist
+	freemaps       map[uint64]pidSet           // key is the size of continuous pages(span), value is a set which contains the starting pgids of same size
+	forwardMap     map[pgid]uint64             // key is start pgid, value is its span size
+	backwardMap    map[pgid]uint64             // key is end pgid, value is its span size
+	allocate       func(txid txid, n int) pgid // the freelist allocate func
+	free_count     func() int                  // the function which gives you free page number
+	mergeSpans     func(ids pgids)             // the mergeSpan func
+	getFreePageIDs func() []pgid               // get free pgids func
+	readIDs        func(pgids []pgid)          // readIDs func reads list of pages and init the freelist
 }
 
-func newFreelist() *freelist {
-	return &freelist{
+func newFreelist(freelistType FreelistType) *freelist {
+	f := &freelist{
 		pending: make(map[txid][]pgid),
 		cache:   make(map[pgid]bool),
 	}
+	
+	if freelistType == FreelistMapType {
+		f.allocate = f.hashmapAllocate
+		f.free_count = f.hashmapFreeCount
+		f.mergeSpans = f.hashmapMergeSpans
+		f.getFreePageIDs = f.hashmapGetFreePageIDs
+		f.readIDs = f.hashmapReadIDs
+	} else {
+		f.allocate = f.arrayAllocate
+		f.free_count = f.arrayFreeCount
+		f.mergeSpans = f.arrayMergeSpans
+		f.getFreePageIDs = f.arrayGetFreePageIDs
+		f.readIDs = f.arrayReadIDs
+	}
+	
+	
+	return f
 }
 
 // free releases a page and its overflow for a given transaction id.
@@ -98,7 +115,7 @@ func (f *freelist) release(txid txid) {
 
 // 分配连续的n个page，这里连续意思是：pgid,pgid+1,pgid+2
 // 比如{1,2,3,5,6,7,8,10}，allocate(4)就是分配了{5,6,7,8}出去，剩下{1,2,3}
-func (f *freelist) allocate(n int) pgid {
+func (f *freelist) arrayAllocate(txid txid, n int) pgid {
 	if len(f.ids) == 0 {
 		return 0
 	}
