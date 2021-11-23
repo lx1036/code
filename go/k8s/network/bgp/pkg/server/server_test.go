@@ -18,6 +18,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 	"net"
 	"runtime"
 	"strconv"
@@ -746,6 +747,7 @@ func TestFilterpathWitheBGP(t *testing.T) {
 
 	path1 := table.NewPath(pi1, nlri, false, pa1, time.Now(), false)
 	path2 := table.NewPath(pi2, nlri, false, pa2, time.Now(), false)
+	klog.Info(path2.GetRouteFamily().String()) // ipv4-unicast
 	rib.Update(path2)
 	d := rib.Update(path1)
 	new, old, _ := d[0].GetChanges(table.GLOBAL_RIB_NAME, 0, false)

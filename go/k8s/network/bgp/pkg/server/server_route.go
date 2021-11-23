@@ -209,6 +209,7 @@ func (s *BgpServer) updatePath(vrfId string, pathList []*table.Path) error {
 	return nil
 }
 
+// INFO: 应用 route policy，判断是否需要 export route
 func (s *BgpServer) processOutgoingPaths(peer *peer, paths, olds []*table.Path) []*table.Path {
 	if !needToAdvertise(peer) {
 		return nil
@@ -609,6 +610,7 @@ func (s *BgpServer) postFilterpath(peer *peer, path *table.Path) *table.Path {
 	return path
 }
 
+// INFO: 应用 route policy，判断是否需要 export route
 func (s *BgpServer) filterpath(peer *peer, path, old *table.Path) *table.Path {
 	path, options, stop := s.prePolicyFilterpath(peer, path, old)
 	if stop {

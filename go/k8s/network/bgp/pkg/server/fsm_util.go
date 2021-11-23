@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"time"
 )
 
 func capAddPathFromConfig(pConf *config.Neighbor) bgp.ParameterCapabilityInterface {
@@ -232,15 +231,4 @@ func open2Cap(open *bgp.BGPOpen, n *config.Neighbor) (map[bgp.BGPCapabilityCode]
 		}
 	}
 	return capMap, negotiated
-}
-
-func keepaliveTicker(fsm *fsm) *time.Ticker {
-	fsm.lock.RLock()
-	defer fsm.lock.RUnlock()
-
-	sec := time.Second * time.Duration(fsm.pConf.Timers.State.KeepaliveInterval)
-	if sec == 0 {
-		sec = time.Second
-	}
-	return time.NewTicker(sec)
 }

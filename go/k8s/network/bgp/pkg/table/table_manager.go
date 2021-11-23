@@ -197,6 +197,7 @@ func (manager *TableManager) update(newPath *Path) *Update {
 	return u
 }
 
+// Update INFO: 更新本地 route table
 func (manager *TableManager) Update(newPath *Path) []*Update {
 	if newPath == nil || newPath.IsEOR() {
 		return nil

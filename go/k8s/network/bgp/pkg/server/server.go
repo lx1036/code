@@ -283,26 +283,15 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 	switch e.MsgType {
 	case fsmMsgStateChange:
 		nextState := e.MsgData.(bgp.FSMState)
-		peer.fsm.lock.Lock()
 		oldState := bgp.FSMState(peer.fsm.pConf.State.SessionState.ToInt())
 		peer.fsm.pConf.State.SessionState = config.IntToSessionStateMap[int(nextState)]
-		peer.fsm.lock.Unlock()
 
 		peer.fsm.StateChange(nextState)
-
-		peer.fsm.lock.RLock()
 		nextStateIdle := peer.fsm.pConf.GracefulRestart.State.PeerRestarting && nextState == bgp.BGP_FSM_IDLE
-		peer.fsm.lock.RUnlock()
 
 		// PeerDown
 		if oldState == bgp.BGP_FSM_ESTABLISHED {
-			t := time.Now()
-			peer.fsm.lock.Lock()
-			if t.Sub(time.Unix(peer.fsm.pConf.Timers.State.Uptime, 0)) < flopThreshold {
-				peer.fsm.pConf.State.Flops++
-			}
 			graceful := peer.fsm.reason.Type == fsmGracefulRestart
-			peer.fsm.lock.Unlock()
 			var drop []bgp.RouteFamily
 			if graceful {
 				peer.fsm.lock.Lock()
@@ -320,12 +309,10 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 			peer.prefixLimitWarned = make(map[bgp.RouteFamily]bool)
 			s.propagateUpdate(peer, peer.DropAll(drop))
 
-			peer.fsm.lock.Lock()
 			if peer.fsm.pConf.Config.PeerAs == 0 {
 				peer.fsm.pConf.State.PeerAs = 0
 				peer.fsm.peerInfo.AS = 0
 			}
-			peer.fsm.lock.Unlock()
 		} else if nextStateIdle {
 			peer.fsm.lock.RLock()
 			longLivedEnabled := peer.fsm.pConf.GracefulRestart.State.LongLivedEnabled
@@ -483,21 +470,14 @@ func (s *BgpServer) handleFSMMessage(peer *peer, e *fsmMsg) {
 				}
 			}
 		} else {
-			peer.fsm.lock.Lock()
 			peer.fsm.pConf.Timers.State.Downtime = time.Now().Unix()
-			peer.fsm.lock.Unlock()
 		}
 		// clear counter
-		peer.fsm.lock.RLock()
-		adminStateDown := peer.fsm.adminState == adminStateDown
-		peer.fsm.lock.RUnlock()
-		if adminStateDown {
-			peer.fsm.lock.Lock()
+		if peer.fsm.adminState == adminStateDown {
 			peer.fsm.pConf.State = config.NeighborState{}
 			peer.fsm.pConf.State.NeighborAddress = peer.fsm.pConf.Config.NeighborAddress
 			peer.fsm.pConf.State.PeerAs = peer.fsm.pConf.Config.PeerAs
 			peer.fsm.pConf.Timers.State = config.TimersState{}
-			peer.fsm.lock.Unlock()
 		}
 		go peer.fsm.start(context.TODO())
 		s.broadcastPeerState(peer, oldState, e)
@@ -1008,9 +988,7 @@ func (s *BgpServer) propagateUpdate(peer *peer, pathList []*table.Path) {
 
 	for _, path := range pathList {
 		if vrf {
-			peer.fsm.lock.RLock()
 			peerVrf := peer.fsm.pConf.Config.Vrf
-			peer.fsm.lock.RUnlock()
 			path = path.ToGlobal(rib.Vrfs[peerVrf])
 		}
 
@@ -1019,11 +997,10 @@ func (s *BgpServer) propagateUpdate(peer *peer, pathList []*table.Path) {
 		}
 
 		if !rs && peer != nil {
-			peer.fsm.lock.RLock()
 			policyOptions.Info = peer.fsm.peerInfo
-			peer.fsm.lock.RUnlock()
 		}
 
+		// INFO: apply route policy
 		if p := s.policy.ApplyPolicy(tableId, table.POLICY_DIRECTION_IMPORT, path, policyOptions); p != nil {
 			path = p
 		} else {
@@ -1032,74 +1009,17 @@ func (s *BgpServer) propagateUpdate(peer *peer, pathList []*table.Path) {
 
 		if !rs {
 			s.notifyPostPolicyUpdateWatcher(peer, []*table.Path{path})
-
-			// RFC4684 Constrained Route Distribution 6. Operation
-			//
-			// When a BGP speaker receives a BGP UPDATE that advertises or withdraws
-			// a given Route Target membership NLRI, it should examine the RIB-OUTs
-			// of VPN NLRIs and re-evaluate the advertisement status of routes that
-			// match the Route Target in question.
-			//
-			// A BGP speaker should generate the minimum set of BGP VPN route
-			// updates (advertisements and/or withdraws) necessary to transition
-			// between the previous and current state of the route distribution
-			// graph that is derived from Route Target membership information.
-			if peer != nil && path != nil && path.GetRouteFamily() == bgp.RF_RTC_UC {
-				rt := path.GetNlri().(*bgp.RouteTargetMembershipNLRI).RouteTarget
-				fs := make([]bgp.RouteFamily, 0, len(peer.negotiatedRFList()))
-				for _, f := range peer.negotiatedRFList() {
-					if f != bgp.RF_RTC_UC {
-						fs = append(fs, f)
-					}
-				}
-				var candidates []*table.Path
-				if path.IsWithdraw {
-					// Note: The paths to be withdrawn are filtered because the
-					// given RT on RTM NLRI is already removed from adj-RIB-in.
-					_, candidates = s.getBestFromLocal(peer, fs)
-				} else {
-					// https://k8s-lx1036/k8s/network/bgp/issues/1777
-					// Ignore duplicate Membership announcements
-					membershipsForSource := s.globalRib.GetPathListWithSource(table.GLOBAL_RIB_NAME, []bgp.RouteFamily{bgp.RF_RTC_UC}, path.GetSource())
-					found := false
-					for _, membership := range membershipsForSource {
-						if membership.GetNlri().(*bgp.RouteTargetMembershipNLRI).RouteTarget.String() == rt.String() {
-							found = true
-							break
-						}
-					}
-					if !found {
-						candidates = s.globalRib.GetBestPathList(peer.TableID(), 0, fs)
-					}
-				}
-				paths := make([]*table.Path, 0, len(candidates))
-				for _, p := range candidates {
-					for _, ext := range p.GetExtCommunities() {
-						if rt == nil || ext.String() == rt.String() {
-							if path.IsWithdraw {
-								p = p.Clone(true)
-							}
-							paths = append(paths, p)
-							break
-						}
-					}
-				}
-				if path.IsWithdraw {
-					// Skips filtering because the paths are already filtered
-					// and the withdrawal does not need the path attributes.
-				} else {
-					paths = s.processOutgoingPaths(peer, paths, nil)
-				}
-				sendfsmOutgoingMsg(peer, paths, nil, false)
-			}
 		}
 
+		// INFO: 更新本地 route table
 		if dsts := rib.Update(path); len(dsts) > 0 {
 			s.propagateUpdateToNeighbors(peer, path, dsts, true)
 		}
 	}
 }
 
+// INFO: 把 advertise/withdraw 路由发给 router server
+//  @see fsm.sendMessageloop()
 func (s *BgpServer) propagateUpdateToNeighbors(source *peer, newPath *table.Path, dsts []*table.Update, needOld bool) {
 	if table.SelectionOptions.DisableBestPathSelection {
 		return

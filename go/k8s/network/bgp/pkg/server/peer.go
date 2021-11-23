@@ -692,6 +692,8 @@ func (s *BgpServer) addNeighbor(c *config.Neighbor) error {
 	if c.RouteServer.Config.RouteServerClient {
 		rib = s.rsRib
 	}
+
+	// INFO: 这里传入指针，把 server.incomingCh 传入 fsm.incomingCh
 	peer := newPeer(&s.bgpConfig.Global, c, rib, s.policy)
 	peer.fsm.incomingCh = s.incomingCh
 
