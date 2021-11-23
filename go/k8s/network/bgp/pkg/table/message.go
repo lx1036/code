@@ -1,9 +1,264 @@
+// Copyright (C) 2014 Nippon Telegraph and Telephone Corporation.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package table
 
 import (
 	"bytes"
-	"github.com/osrg/gobgp/pkg/packet/bgp"
+	"reflect"
+
+	log "github.com/sirupsen/logrus"
+	"k8s-lx1036/k8s/network/bgp/pkg/packet/bgp"
 )
+
+func UpdatePathAttrs2ByteAs(msg *bgp.BGPUpdate) error {
+	ps := msg.PathAttributes
+	msg.PathAttributes = make([]bgp.PathAttributeInterface, len(ps))
+	copy(msg.PathAttributes, ps)
+	var asAttr *bgp.PathAttributeAsPath
+	idx := 0
+	for i, attr := range msg.PathAttributes {
+		if a, ok := attr.(*bgp.PathAttributeAsPath); ok {
+			asAttr = a
+			idx = i
+			break
+		}
+	}
+
+	if asAttr == nil {
+		return nil
+	}
+
+	as4Params := make([]*bgp.As4PathParam, 0, len(asAttr.Value))
+	as2Params := make([]bgp.AsPathParamInterface, 0, len(asAttr.Value))
+	mkAs4 := false
+	for _, param := range asAttr.Value {
+		segType := param.GetType()
+		asList := param.GetAS()
+		as2Path := make([]uint16, 0, len(asList))
+		for _, as := range asList {
+			if as > (1<<16)-1 {
+				mkAs4 = true
+				as2Path = append(as2Path, bgp.AS_TRANS)
+			} else {
+				as2Path = append(as2Path, uint16(as))
+			}
+		}
+		as2Params = append(as2Params, bgp.NewAsPathParam(segType, as2Path))
+
+		// RFC 6793 4.2.2 Generating Updates
+		//
+		// Whenever the AS path information contains the AS_CONFED_SEQUENCE or
+		// AS_CONFED_SET path segment, the NEW BGP speaker MUST exclude such
+		// path segments from the AS4_PATH attribute being constructed.
+		switch segType {
+		case bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SEQ, bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SET:
+			// pass
+		default:
+			if as4param, ok := param.(*bgp.As4PathParam); ok {
+				as4Params = append(as4Params, as4param)
+			}
+		}
+	}
+	msg.PathAttributes[idx] = bgp.NewPathAttributeAsPath(as2Params)
+	if mkAs4 {
+		msg.PathAttributes = append(msg.PathAttributes, bgp.NewPathAttributeAs4Path(as4Params))
+	}
+	return nil
+}
+
+func UpdatePathAttrs4ByteAs(msg *bgp.BGPUpdate) error {
+	var asAttr *bgp.PathAttributeAsPath
+	var as4Attr *bgp.PathAttributeAs4Path
+	asAttrPos := 0
+	as4AttrPos := 0
+	for i, attr := range msg.PathAttributes {
+		switch a := attr.(type) {
+		case *bgp.PathAttributeAsPath:
+			asAttr = a
+			for j, param := range asAttr.Value {
+				as2Param, ok := param.(*bgp.AsPathParam)
+				if ok {
+					asPath := make([]uint32, 0, len(as2Param.AS))
+					for _, as := range as2Param.AS {
+						asPath = append(asPath, uint32(as))
+					}
+					as4Param := bgp.NewAs4PathParam(as2Param.Type, asPath)
+					asAttr.Value[j] = as4Param
+				}
+			}
+			asAttrPos = i
+			msg.PathAttributes[i] = asAttr
+		case *bgp.PathAttributeAs4Path:
+			as4AttrPos = i
+			as4Attr = a
+		}
+	}
+
+	if as4Attr != nil {
+		msg.PathAttributes = append(msg.PathAttributes[:as4AttrPos], msg.PathAttributes[as4AttrPos+1:]...)
+	}
+
+	if asAttr == nil || as4Attr == nil {
+		return nil
+	}
+
+	asLen := 0
+	asConfedLen := 0
+	asParams := make([]bgp.AsPathParamInterface, 0, len(asAttr.Value))
+	for _, param := range asAttr.Value {
+		asLen += param.ASLen()
+		switch param.GetType() {
+		case bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SET:
+			asConfedLen++
+		case bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SEQ:
+			asConfedLen += len(param.GetAS())
+		}
+		asParams = append(asParams, param)
+	}
+
+	as4Len := 0
+	var as4Params []bgp.AsPathParamInterface
+	if as4Attr != nil {
+		as4Params = make([]bgp.AsPathParamInterface, 0, len(as4Attr.Value))
+		for _, p := range as4Attr.Value {
+			// RFC 6793 6. Error Handling
+			//
+			// the path segment types AS_CONFED_SEQUENCE and AS_CONFED_SET [RFC5065]
+			// MUST NOT be carried in the AS4_PATH attribute of an UPDATE message.
+			// A NEW BGP speaker that receives these path segment types in the AS4_PATH
+			// attribute of an UPDATE message from an OLD BGP speaker MUST discard
+			// these path segments, adjust the relevant attribute fields accordingly,
+			// and continue processing the UPDATE message.
+			// This case SHOULD be logged locally for analysis.
+			switch p.Type {
+			case bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SEQ, bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SET:
+				typ := "CONFED_SEQ"
+				if p.Type == bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SET {
+					typ = "CONFED_SET"
+				}
+				log.WithFields(log.Fields{
+					"Topic": "Table",
+				}).Warnf("AS4_PATH contains %s segment %s. ignore", typ, p.String())
+				continue
+			}
+			as4Len += p.ASLen()
+			as4Params = append(as4Params, p)
+		}
+	}
+
+	if asLen+asConfedLen < as4Len {
+		log.WithFields(log.Fields{
+			"Topic": "Table",
+		}).Warn("AS4_PATH is longer than AS_PATH. ignore AS4_PATH")
+		return nil
+	}
+
+	keepNum := asLen + asConfedLen - as4Len
+
+	newParams := make([]bgp.AsPathParamInterface, 0, len(asAttr.Value))
+	for _, param := range asParams {
+		if keepNum-param.ASLen() >= 0 {
+			newParams = append(newParams, param)
+			keepNum -= param.ASLen()
+		} else {
+			// only SEQ param reaches here
+			newParams = append(newParams, bgp.NewAs4PathParam(param.GetType(), param.GetAS()[:keepNum]))
+			keepNum = 0
+		}
+
+		if keepNum <= 0 {
+			break
+		}
+	}
+
+	for _, param := range as4Params {
+		lastParam := newParams[len(newParams)-1]
+		lastParamAS := lastParam.GetAS()
+		paramType := param.GetType()
+		paramAS := param.GetAS()
+		if paramType == lastParam.GetType() && paramType == bgp.BGP_ASPATH_ATTR_TYPE_SEQ {
+			if len(lastParamAS)+len(paramAS) > 255 {
+				newParams[len(newParams)-1] = bgp.NewAs4PathParam(paramType, append(lastParamAS, paramAS[:255-len(lastParamAS)]...))
+				newParams = append(newParams, bgp.NewAs4PathParam(paramType, paramAS[255-len(lastParamAS):]))
+			} else {
+				newParams[len(newParams)-1] = bgp.NewAs4PathParam(paramType, append(lastParamAS, paramAS...))
+			}
+		} else {
+			newParams = append(newParams, param)
+		}
+	}
+
+	newIntfParams := make([]bgp.AsPathParamInterface, 0, len(asAttr.Value))
+	newIntfParams = append(newIntfParams, newParams...)
+
+	msg.PathAttributes[asAttrPos] = bgp.NewPathAttributeAsPath(newIntfParams)
+	return nil
+}
+
+func UpdatePathAggregator2ByteAs(msg *bgp.BGPUpdate) {
+	as := uint32(0)
+	var addr string
+	for i, attr := range msg.PathAttributes {
+		switch agg := attr.(type) {
+		case *bgp.PathAttributeAggregator:
+			addr = agg.Value.Address.String()
+			if agg.Value.AS > (1<<16)-1 {
+				as = agg.Value.AS
+				msg.PathAttributes[i] = bgp.NewPathAttributeAggregator(uint16(bgp.AS_TRANS), addr)
+			} else {
+				msg.PathAttributes[i] = bgp.NewPathAttributeAggregator(uint16(agg.Value.AS), addr)
+			}
+		}
+	}
+	if as != 0 {
+		msg.PathAttributes = append(msg.PathAttributes, bgp.NewPathAttributeAs4Aggregator(as, addr))
+	}
+}
+
+func UpdatePathAggregator4ByteAs(msg *bgp.BGPUpdate) error {
+	var aggAttr *bgp.PathAttributeAggregator
+	var agg4Attr *bgp.PathAttributeAs4Aggregator
+	agg4AttrPos := 0
+	for i, attr := range msg.PathAttributes {
+		switch agg := attr.(type) {
+		case *bgp.PathAttributeAggregator:
+			attr := agg
+			if attr.Value.Askind == reflect.Uint16 {
+				aggAttr = attr
+				aggAttr.Value.Askind = reflect.Uint32
+			}
+		case *bgp.PathAttributeAs4Aggregator:
+			agg4Attr = agg
+			agg4AttrPos = i
+		}
+	}
+	if aggAttr == nil && agg4Attr == nil {
+		return nil
+	}
+
+	if aggAttr == nil && agg4Attr != nil {
+		return bgp.NewMessageError(bgp.BGP_ERROR_UPDATE_MESSAGE_ERROR, bgp.BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, "AS4 AGGREGATOR attribute exists, but AGGREGATOR doesn't")
+	}
+
+	if agg4Attr != nil {
+		msg.PathAttributes = append(msg.PathAttributes[:agg4AttrPos], msg.PathAttributes[agg4AttrPos+1:]...)
+		aggAttr.Value.AS = agg4Attr.Value.AS
+	}
+	return nil
+}
 
 type cage struct {
 	attrsBytes []byte
@@ -15,6 +270,11 @@ func newCage(b []byte, path *Path) *cage {
 		attrsBytes: b,
 		paths:      []*Path{path},
 	}
+}
+
+type packerInterface interface {
+	add(*Path)
+	pack(options ...*bgp.MarshallingOption) []*bgp.BGPMessage
 }
 
 type packer struct {
@@ -237,87 +497,6 @@ func newPacker(f bgp.RouteFamily) packerInterface {
 	default:
 		return newPackerMP(f)
 	}
-}
-
-func UpdatePathAttrs2ByteAs(msg *bgp.BGPUpdate) error {
-	ps := msg.PathAttributes
-	msg.PathAttributes = make([]bgp.PathAttributeInterface, len(ps))
-	copy(msg.PathAttributes, ps)
-	var asAttr *bgp.PathAttributeAsPath
-	idx := 0
-	for i, attr := range msg.PathAttributes {
-		if a, ok := attr.(*bgp.PathAttributeAsPath); ok {
-			asAttr = a
-			idx = i
-			break
-		}
-	}
-
-	if asAttr == nil {
-		return nil
-	}
-
-	as4Params := make([]*bgp.As4PathParam, 0, len(asAttr.Value))
-	as2Params := make([]bgp.AsPathParamInterface, 0, len(asAttr.Value))
-	mkAs4 := false
-	for _, param := range asAttr.Value {
-		segType := param.GetType()
-		asList := param.GetAS()
-		as2Path := make([]uint16, 0, len(asList))
-		for _, as := range asList {
-			if as > (1<<16)-1 {
-				mkAs4 = true
-				as2Path = append(as2Path, bgp.AS_TRANS)
-			} else {
-				as2Path = append(as2Path, uint16(as))
-			}
-		}
-		as2Params = append(as2Params, bgp.NewAsPathParam(segType, as2Path))
-
-		// RFC 6793 4.2.2 Generating Updates
-		//
-		// Whenever the AS path information contains the AS_CONFED_SEQUENCE or
-		// AS_CONFED_SET path segment, the NEW BGP speaker MUST exclude such
-		// path segments from the AS4_PATH attribute being constructed.
-		switch segType {
-		case bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SEQ, bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SET:
-			// pass
-		default:
-			if as4param, ok := param.(*bgp.As4PathParam); ok {
-				as4Params = append(as4Params, as4param)
-			}
-		}
-	}
-	msg.PathAttributes[idx] = bgp.NewPathAttributeAsPath(as2Params)
-	if mkAs4 {
-		msg.PathAttributes = append(msg.PathAttributes, bgp.NewPathAttributeAs4Path(as4Params))
-	}
-	return nil
-}
-
-func UpdatePathAggregator2ByteAs(msg *bgp.BGPUpdate) {
-	as := uint32(0)
-	var addr string
-	for i, attr := range msg.PathAttributes {
-		switch agg := attr.(type) {
-		case *bgp.PathAttributeAggregator:
-			addr = agg.Value.Address.String()
-			if agg.Value.AS > (1<<16)-1 {
-				as = agg.Value.AS
-				msg.PathAttributes[i] = bgp.NewPathAttributeAggregator(uint16(bgp.AS_TRANS), addr)
-			} else {
-				msg.PathAttributes[i] = bgp.NewPathAttributeAggregator(uint16(agg.Value.AS), addr)
-			}
-		}
-	}
-	if as != 0 {
-		msg.PathAttributes = append(msg.PathAttributes, bgp.NewPathAttributeAs4Aggregator(as, addr))
-	}
-}
-
-type packerInterface interface {
-	add(*Path)
-	pack(options ...*bgp.MarshallingOption) []*bgp.BGPMessage
 }
 
 func CreateUpdateMsgFromPaths(pathList []*Path, options ...*bgp.MarshallingOption) []*bgp.BGPMessage {
