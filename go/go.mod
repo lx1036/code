@@ -70,6 +70,7 @@ require (
 	github.com/mattbaird/jsonpatch v0.0.0-20200820163806-098863c1fc24
 	github.com/mholt/certmagic v0.8.3
 	github.com/miekg/dns v1.1.26
+	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/moby/ipvs v1.0.1
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32

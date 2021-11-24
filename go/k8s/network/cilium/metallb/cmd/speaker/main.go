@@ -13,6 +13,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// go run . --kubeconfig=`echo $HOME`/.kube/config --v=2 --config=`pwd`/config.yaml
 func main() {
 	var (
 		//port       = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")

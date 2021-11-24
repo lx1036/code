@@ -2,7 +2,6 @@ package speaker
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/k8s"
 	"k8s-lx1036/k8s/network/cilium/metallb/pkg/k8s/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -19,6 +18,13 @@ type Protocol interface {
 	SetBalancer(string, net.IP, *config.Pool) error
 	DeleteBalancer(string, string) error
 	SetNodeLabels(map[string]string) error
+}
+
+// Service offers methods to mutate a Kubernetes service object.
+type service interface {
+	UpdateStatus(svc *corev1.Service) error
+	Infof(svc *corev1.Service, desc, msg string, args ...interface{})
+	Errorf(svc *corev1.Service, desc, msg string, args ...interface{})
 }
 
 // Speakerlist represents a list of healthy speakers.
@@ -95,6 +101,37 @@ type Service struct {
 	Ingress       []corev1.LoadBalancerIngress
 }
 
+type Endpoint struct {
+	IP       string
+	NodeName *string
+}
+
+// Endpoints represents an object containing the minimal representation of a
+// v1.Endpoints similar to Service.
+type Endpoints struct {
+	Ready, NotReady []Endpoint
+}
+
+func toEndpoints(in *corev1.Endpoints) *Endpoints {
+	out := new(Endpoints)
+	for _, sub := range in.Subsets {
+		for _, ep := range sub.Addresses {
+			out.Ready = append(out.Ready, Endpoint{
+				IP:       ep.IP,
+				NodeName: ep.NodeName,
+			})
+		}
+		for _, ep := range sub.NotReadyAddresses {
+			out.NotReady = append(out.NotReady, Endpoint{
+				IP:       ep.IP,
+				NodeName: ep.NodeName,
+			})
+		}
+	}
+
+	return out
+}
+
 func (speaker *Speaker) SetBalancer(name string, svc *corev1.Service, eps *corev1.Endpoints) types.SyncState {
 	s := speaker.SetService(name, &Service{
 		Type:          string(svc.Spec.Type),
@@ -133,6 +170,12 @@ func (speaker *Speaker) SetService(name string, svc *Service, eps *Endpoints) ty
 		return speaker.deleteBalancer(name, "ipNotAllowed")
 	}
 
+	return types.SyncStateSuccess
+}
+
+func (speaker *Speaker) deleteBalancer(name, reason string) types.SyncState {
+
+	return types.SyncStateSuccess
 }
 
 func poolFor(pools map[string]*config.Pool, ip net.IP) string {

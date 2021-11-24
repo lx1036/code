@@ -1,6 +1,7 @@
 
 peers:
   - peer-address: 10.0.0.1
+    peer-port: 1790
     peer-asn: 64501
     my-asn: 64500
 
