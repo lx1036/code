@@ -16,3 +16,7 @@ bbolt:
 
 buckets:
 	bbolt buckets my.db
+
+# 打印 hex 数据
+hexdump:
+	hexdump -C my.db

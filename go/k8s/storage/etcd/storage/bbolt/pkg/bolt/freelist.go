@@ -6,10 +6,6 @@ import (
 	"unsafe"
 )
 
-//******************************
-// https://github.com/boltdb/bolt
-//******************************
-
 const pgidNoFreelist pgid = 0xffffffffffffffff
 
 // FreelistType is the type of the freelist backend
@@ -193,21 +189,26 @@ func (f *freelist) reindex() {
 }
 
 func (f *freelist) write(p *page) error {
-
 	p.flags |= freelistPageFlag
 
 	// The page.count can only hold up to 64k elements so if we overflow that
 	// number then we handle it by putting the size in the first element.
-	lenids := f.count()
-	if lenids == 0 {
-		p.count = uint16(lenids)
-	} else if lenids < 0xFFFF {
-		p.count = uint16(lenids)
-		f.copyall(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[:])
+	l := f.count()
+	if l == 0 {
+		p.count = uint16(l)
+	} else if l < 0xFFFF {
+		p.count = uint16(l)
+		var ids []pgid
+		data := unsafeAdd(unsafe.Pointer(p), unsafe.Sizeof(*p))
+		unsafeSlice(unsafe.Pointer(&ids), data, l)
+		f.copyall(ids)
 	} else {
 		p.count = 0xFFFF
-		((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0] = pgid(lenids)
-		f.copyall(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[1:])
+		var ids []pgid
+		data := unsafeAdd(unsafe.Pointer(p), unsafe.Sizeof(*p))
+		unsafeSlice(unsafe.Pointer(&ids), data, l+1)
+		ids[0] = pgid(l)
+		f.copyall(ids[1:])
 	}
 
 	return nil
@@ -216,11 +217,6 @@ func (f *freelist) write(p *page) error {
 // count returns count of pages on the freelist
 func (f *freelist) count() int {
 	return f.free_count() + f.pending_count()
-}
-
-// free_count returns count of free pages
-func (f *freelist) free_count() int {
-	return len(f.ids)
 }
 
 // pending_count returns count of pending pages
@@ -245,12 +241,6 @@ func (f *freelist) copyall(dst []pgid) {
 
 // hashmapAllocate serves the same purpose as arrayAllocate, but use hashmap as backend
 func (f *freelist) hashmapAllocate(txid txid, n int) pgid {
-	return 0
-}
-
-// arrayAllocate returns the starting page id of a contiguous list of pages of a given size.
-// If a contiguous block cannot be found then 0 is returned.
-func (f *freelist) arrayAllocate(txid txid, n int) pgid {
 	return 0
 }
 

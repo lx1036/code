@@ -19,6 +19,9 @@ const magic uint32 = 0xED0CDAED
 // The data file format version.
 const version = 2
 
+// default page size for db is set to the OS page size.
+var defaultPageSize = os.Getpagesize()
+
 // Options represents the options that can be set when opening a database.
 type Options struct {
 	opened bool
@@ -27,6 +30,8 @@ type Options struct {
 	// When set to zero it will wait indefinitely. This option is only
 	// available on Darwin and Linux.
 	Timeout time.Duration
+
+	PageSize int
 
 	// Sets the DB.NoGrowSync flag before memory mapping the file.
 	NoGrowSync bool
@@ -169,6 +174,47 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	if err := flock(db, !db.readOnly, options.Timeout); err != nil {
 		_ = db.close()
 		return nil, err
+	}
+
+	// Default values for test hooks
+	db.ops.writeAt = db.file.WriteAt
+
+	if db.pageSize = options.PageSize; db.pageSize == 0 {
+		// Set the default page size to the OS page size.
+		db.pageSize = defaultPageSize
+	}
+
+	// Initialize the database if it doesn't exist.
+	if info, err := db.file.Stat(); err != nil {
+		_ = db.close()
+		return nil, err
+	} else if info.Size() == 0 {
+		// Initialize new files with meta pages.
+		if err := db.init(); err != nil {
+			// clean up file descriptor on initialization fail
+			_ = db.close()
+			return nil, err
+		}
+	} else {
+		// Read the first meta page to determine the page size.
+		var buf [0x1000]byte
+		// If we can't read the page size, but can read a page, assume
+		// it's the same as the OS or one given -- since that's how the
+		// page size was chosen in the first place.
+		//
+		// If the first page is invalid and this OS uses a different
+		// page size than what the database was created with then we
+		// are out of luck and cannot access the database.
+		//
+		// TODO: scan for next page
+		if bw, err := db.file.ReadAt(buf[:], 0); err == nil && bw == len(buf) {
+			if m := db.pageInBuffer(buf[:], 0).meta(); m.validate() == nil {
+				db.pageSize = int(m.pageSize)
+			}
+		} else {
+			_ = db.close()
+			return nil, ErrInvalid
+		}
 	}
 
 	if db.readOnly {

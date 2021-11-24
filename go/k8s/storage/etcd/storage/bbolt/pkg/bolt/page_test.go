@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 	"testing/quick"
+	"unsafe"
 )
 
 // Ensure that the page type can be returned in human readable format.
@@ -73,8 +74,10 @@ func TestPgids_merge_quick(t *testing.T) {
 	}
 }
 
-func TestName(test *testing.T) {
+func TestPage(test *testing.T) {
 	dst := []int{1, 2}
 	merged := dst[:0]
 	klog.Info(merged)
+
+	klog.Info(unsafe.Sizeof(branchPageElement{}))
 }

@@ -10,17 +10,28 @@ read-write transaction 会锁文件。
 read-only transaction 没有锁文件，性能好。
 
 
+### meta page
+
+```shell
+# 前两页是 meta page，至于为何有两个 meta page，主要是用来实现事务的!!!
+bbolt page my.db 0
+bbolt page my.db 1
+```
+
+
 ## (1) boltdb 数据组织
 * page:
 
 * node:
 
+boltdb 源码导读（一）：boltdb 数据组织: https://zhuanlan.zhihu.com/p/332439403
 
 
 ## (2) boltdb 索引结构
 索引有两种数据结构：B-tree/B+tree 和 LSM-tree，LSM-tree 随机写性能更好，B-tree/B+tree 范围查询读性能更好。
 所以 etcd 选择 B-tree, boltdb 选择 B+tree 作为索引数据结构，是有道理的。 
 
+boltdb 源码导读（二）：boltdb 索引设计: https://zhuanlan.zhihu.com/p/341416264
 
 
 ## (3) boltdb 事务实现

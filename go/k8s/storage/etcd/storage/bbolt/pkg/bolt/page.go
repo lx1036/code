@@ -89,11 +89,14 @@ const (
 
 // page 是操作系统页大小，读写数据最小原子单位
 type page struct {
-	id       pgid    // 页ID
-	flags    uint16  // 页类型，这块内容标识：可以为元数据、空闲列表、树枝、叶子 这四种中的一种
-	count    uint16  // 数量，存储数据的数量，the number of key-value pairs
-	overflow uint32  // 溢出页数量，溢出的页数量
-	ptr      uintptr // 页数据起始位置，内存中存储数据的指针，没有落盘
+	// Header
+	id       pgid   // 页ID
+	flags    uint16 // 页类型，这块内容标识：可以为元数据、空闲列表、树枝、叶子 这四种中的一种
+	count    uint16 // 数量，存储数据的数量，the number of key-value pairs
+	overflow uint32 // 溢出页数量，溢出的页数量
+
+	// Data
+	ptr uintptr // 页数据起始位置，内存中存储数据的指针，没有落盘
 }
 
 // typ returns a human readable page type string used for debugging.
