@@ -15,8 +15,6 @@ func (c *Controller) allocateService(key string, svc *corev1.Service) bool {
 	// in the past, so we still need to clear LB state.
 	if svc.Spec.Type != corev1.ServiceTypeLoadBalancer {
 		c.clearServiceState(key, svc)
-		// Early return, we explicitly do *not* want to reallocate
-		// an IP.
 		return true
 	}
 

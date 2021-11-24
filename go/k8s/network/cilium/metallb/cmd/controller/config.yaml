@@ -1,0 +1,11 @@
+
+peers:
+  - peer-address: 10.0.0.1
+    peer-asn: 64501
+    my-asn: 64500
+
+address-pools:
+  - name: default
+    protocol: bgp
+    addresses:
+      - 192.168.10.0/24

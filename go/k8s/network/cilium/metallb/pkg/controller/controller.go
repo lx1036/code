@@ -39,8 +39,8 @@ func (c *Controller) SetConfig(cfg *config.Config) types.SyncState {
 	return types.SyncStateReprocessAll
 }
 
-func (c *Controller) SetBalancer(key string, svcRo *corev1.Service, _ *corev1.Endpoints) types.SyncState {
-	if svcRo == nil {
+func (c *Controller) SetBalancer(key string, rawSvc *corev1.Service, _ *corev1.Endpoints) types.SyncState {
+	if rawSvc == nil {
 		c.deleteBalancer(key)
 		// There might be other LBs stuck waiting for an IP, so when
 		// we delete a balancer we should reprocess all of them to
@@ -56,20 +56,20 @@ func (c *Controller) SetBalancer(key string, svcRo *corev1.Service, _ *corev1.En
 	// always need to update the service. But, making an unconditional
 	// copy makes the code much easier to follow, and we have a GC for
 	// a reason.
-	svc := svcRo.DeepCopy()
+	svc := rawSvc.DeepCopy()
 	if !c.allocateService(key, svc) {
 		return types.SyncStateError
 	}
-	if reflect.DeepEqual(svcRo, svc) {
+	if reflect.DeepEqual(rawSvc, svc) {
 		klog.Infof(fmt.Sprintf("service %s/%s no change", svc.Namespace, svc.Name))
 		return types.SyncStateSuccess
 	}
 
-	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
-		var st corev1.ServiceStatus
-		st, svc = svc.Status, svcRo.DeepCopy()
-		svc.Status = st
-		if err := c.Client.UpdateStatus(svc); err != nil {
+	if !reflect.DeepEqual(rawSvc.Status, svc.Status) {
+		// svc 被 allocateService() 后可能不仅仅 status 发生了修改，所以重新 DeepCopy
+		updatedSvc := rawSvc.DeepCopy()
+		updatedSvc.Status = svc.Status
+		if err := c.Client.UpdateStatus(updatedSvc); err != nil {
 			klog.Errorf(fmt.Sprintf("failed to update service status: %v", err))
 			return types.SyncStateError
 		}
