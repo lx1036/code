@@ -204,7 +204,10 @@ func getIPAM(path string) *controller.Controller {
 		klog.Fatal(err)
 	}
 
-	ipam.SetConfig(c) // 设置 ip pool
+	// 设置 ip pool
+	if ipam.SetConfig(c) == types.SyncStateError {
+		klog.Fatalf(fmt.Sprintf("failed to set config"))
+	}
 
 	return ipam
 }

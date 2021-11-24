@@ -21,6 +21,12 @@ type Protocol interface {
 	SetNodeLabels(map[string]string) error
 }
 
+// Speakerlist represents a list of healthy speakers.
+type SpeakerList interface {
+	UsableSpeakers() map[string]bool
+	Rejoin()
+}
+
 type Config struct {
 	MyNode string
 	SList  SpeakerList
