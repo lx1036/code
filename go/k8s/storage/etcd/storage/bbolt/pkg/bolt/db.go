@@ -105,7 +105,7 @@ type DB struct {
 	NoFreelistSync bool
 	freelist       *freelist
 	pageSize       int
-	pagePool sync.Pool
+	pagePool       sync.Pool
 
 	// statistics
 	stats Stats
@@ -140,23 +140,23 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	db.MmapFlags = options.MmapFlags
 	db.NoFreelistSync = options.NoFreelistSync
 	db.FreelistType = options.FreelistType
-	
+
 	// Set default values for later DB operations.
 	db.MaxBatchSize = DefaultMaxBatchSize
 	db.MaxBatchDelay = DefaultMaxBatchDelay
 	db.AllocSize = DefaultAllocSize
-	
+
 	flag := os.O_RDWR
 	if options.ReadOnly {
 		flag = os.O_RDONLY
 		db.readOnly = true
 	}
-	
+
 	db.openFile = options.OpenFile
 	if db.openFile == nil {
 		db.openFile = os.OpenFile
 	}
-	
+
 	// Open data file and separate sync handler for metadata writes.
 	var err error
 	if db.file, err = db.openFile(path, flag|os.O_CREATE, mode); err != nil {
@@ -164,19 +164,19 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 		return nil, err
 	}
 	db.path = db.file.Name()
-	
+
 	// 获取 file lock
 	if err := flock(db, !db.readOnly, options.Timeout); err != nil {
 		_ = db.close()
 		return nil, err
 	}
-	
+
 	if db.readOnly {
 		return db, nil
 	}
-	
+
 	db.loadFreelist()
-	
+
 	// Mark the database as opened and return.
 	return db, nil
 }
@@ -192,12 +192,12 @@ func (db *DB) allocate(txid txid, count int) (*page, error) {
 	}
 	p := (*page)(unsafe.Pointer(&buf[0]))
 	p.overflow = uint32(count - 1)
-	
+
 	// Use pages from the freelist if they are available.
 	if p.id = db.freelist.allocate(txid, count); p.id != 0 {
 		return p, nil
 	}
-	
+
 	// Resize mmap() if we're at the end.
 	p.id = db.rwtx.meta.pgid
 	var minsz = int((p.id+pgid(count))+1) * db.pageSize
@@ -206,10 +206,10 @@ func (db *DB) allocate(txid txid, count int) (*page, error) {
 			return nil, fmt.Errorf("mmap allocate error: %s", err)
 		}
 	}
-	
+
 	// Move the page id high water mark.
 	db.rwtx.meta.pgid += pgid(count)
-	
+
 	return p, nil
 }
 
@@ -383,4 +383,3 @@ func (db *DB) page(id pgid) *page {
 	pos := id * pgid(db.pageSize)
 	return (*page)(unsafe.Pointer(&db.data[pos]))
 }
-

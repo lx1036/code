@@ -2,7 +2,9 @@ package speaker
 
 import (
 	"fmt"
+	"k8s-lx1036/k8s/network/cilium/metallb/pkg/k8s"
 	"k8s-lx1036/k8s/network/cilium/metallb/pkg/k8s/types"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"net"
 
@@ -77,6 +79,54 @@ func (speaker *Speaker) SetConfig(cfg *config.Config) types.SyncState {
 	speaker.config = cfg
 
 	return types.SyncStateReprocessAll
+}
+
+// Service represents an object containing the minimal representation of a
+// v1.Service object needed for announcements.
+type Service struct {
+	Type          string
+	TrafficPolicy string
+	Ingress       []corev1.LoadBalancerIngress
+}
+
+func (speaker *Speaker) SetBalancer(name string, svc *corev1.Service, eps *corev1.Endpoints) types.SyncState {
+	s := speaker.SetService(name, &Service{
+		Type:          string(svc.Spec.Type),
+		TrafficPolicy: string(svc.Spec.ExternalTrafficPolicy),
+		Ingress:       svc.Status.LoadBalancer.Ingress,
+	}, toEndpoints(eps))
+	if s == types.SyncStateSuccess {
+		klog.Infof(fmt.Sprintf("announcing from node %q", speaker.myNode))
+	}
+	return s
+}
+
+func (speaker *Speaker) SetService(name string, svc *Service, eps *Endpoints) types.SyncState {
+	if svc == nil {
+		return speaker.deleteBalancer(name, "serviceDeleted")
+	}
+
+	if svc.Type != string(corev1.ServiceTypeLoadBalancer) {
+		return speaker.deleteBalancer(name, "notLoadBalancer")
+	}
+
+	if speaker.config == nil {
+		return types.SyncStateSuccess
+	}
+
+	if len(svc.Ingress) != 1 {
+		return speaker.deleteBalancer(name, "noIPAllocated")
+	}
+
+	lbIP := net.ParseIP(svc.Ingress[0].IP)
+	if lbIP == nil {
+		return speaker.deleteBalancer(name, "invalidIP")
+	}
+	poolName := poolFor(speaker.config.Pools, lbIP)
+	if poolName == "" {
+		return speaker.deleteBalancer(name, "ipNotAllowed")
+	}
+
 }
 
 func poolFor(pools map[string]*config.Pool, ip net.IP) string {

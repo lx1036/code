@@ -66,14 +66,14 @@ func (tx *Tx) allocate(count int) (*page, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Save to our page cache.
 	tx.pages[p.id] = p
-	
+
 	// Update statistics.
 	tx.stats.PageCount += count
 	tx.stats.PageAlloc += count * tx.db.pageSize
-	
+
 	return p, nil
 }
 

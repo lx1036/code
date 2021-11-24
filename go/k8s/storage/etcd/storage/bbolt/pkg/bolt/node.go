@@ -146,7 +146,7 @@ func (n *node) spill() error {
 	if n.spilled {
 		return nil
 	}
-	
+
 	// Spill child nodes first. Child nodes can materialize sibling nodes in
 	// the case of split-merge so we cannot use a range loop. We have to check
 	// the children size on every loop iteration.
@@ -156,7 +156,7 @@ func (n *node) spill() error {
 			return err
 		}
 	}
-	
+
 	// We no longer need the child list because it's only used for spill tracking.
 	n.children = nil
 	// Split nodes into appropriate sizes. The first node will always be n.
@@ -167,13 +167,13 @@ func (n *node) spill() error {
 			tx.db.freelist.free(tx.meta.txid, tx.page(node.pgid))
 			node.pgid = 0
 		}
-		
+
 		// Allocate contiguous space for the node.
 		p, err := tx.allocate((node.size() + tx.db.pageSize - 1) / tx.db.pageSize)
 		if err != nil {
 			return err
 		}
-		
+
 		// Write the node.
 		if p.id >= tx.meta.pgid {
 			panic(fmt.Sprintf("pgid (%d) above high water mark (%d)", p.id, tx.meta.pgid))
@@ -193,16 +193,16 @@ func (n *node) split(pageSize uintptr) []*node {
 		// Split node into two.
 		a, b := node.splitTwo(pageSize)
 		nodes = append(nodes, a)
-		
+
 		// If we can't split then exit the loop.
 		if b == nil {
 			break
 		}
-		
+
 		// Set node to b so it gets split on the next iteration.
 		node = b
 	}
-	
+
 	return nodes
 }
 func (n *node) splitTwo(pageSize uintptr) (*node, *node) {
@@ -211,7 +211,7 @@ func (n *node) splitTwo(pageSize uintptr) (*node, *node) {
 	if len(n.inodes) <= (minKeysPerPage*2) || n.sizeLessThan(pageSize) {
 		return n, nil
 	}
-	
+
 	// Determine the threshold before starting a new node.
 	var fillPercent = n.bucket.FillPercent
 	if fillPercent < minFillPercent {
@@ -220,27 +220,27 @@ func (n *node) splitTwo(pageSize uintptr) (*node, *node) {
 		fillPercent = maxFillPercent
 	}
 	threshold := int(float64(pageSize) * fillPercent)
-	
+
 	// Determine split position and sizes of the two pages.
 	splitIndex, _ := n.splitIndex(threshold)
-	
+
 	// Split node into two separate nodes.
 	// If there's no parent then we'll need to create one.
 	if n.parent == nil {
 		n.parent = &node{bucket: n.bucket, children: []*node{n}}
 	}
-	
+
 	// Create a new node and add it to the parent.
 	next := &node{bucket: n.bucket, isLeaf: n.isLeaf, parent: n.parent}
 	n.parent.children = append(n.parent.children, next)
-	
+
 	// Split inodes across two nodes.
 	next.inodes = n.inodes[splitIndex:]
 	n.inodes = n.inodes[:splitIndex]
-	
+
 	// Update the statistics.
 	n.bucket.tx.stats.Split++
-	
+
 	return n, next
 }
 
@@ -249,7 +249,7 @@ func (n *node) splitTwo(pageSize uintptr) (*node, *node) {
 // This is only be called from split().
 func (n *node) splitIndex(threshold int) (index, sz uintptr) {
 	sz = pageHeaderSize
-	
+
 	// Loop until we only have the minimum number of keys required for the second page.
 	for i := 0; i < len(n.inodes)-minKeysPerPage; i++ {
 		index = uintptr(i)
@@ -260,14 +260,13 @@ func (n *node) splitIndex(threshold int) (index, sz uintptr) {
 		if i >= minKeysPerPage && sz+elsize > uintptr(threshold) {
 			break
 		}
-		
+
 		// Add the element size to the total size.
 		sz += elsize
 	}
-	
+
 	return
 }
-
 
 // write writes the items onto one or more pages.
 func (n *node) write(p *page) {
@@ -328,7 +327,6 @@ func (n *node) pageElementSize() uintptr {
 	}
 	return branchPageElementSize
 }
-
 
 // sizeLessThan returns true if the node is less than a given size.
 // This is an optimization to avoid calculating a large node when we only need

@@ -40,8 +40,8 @@ type freelist struct {
 	ids []pgid // 已经被release的page ids
 	//allocs         map[pgid]txid               // mapping of txid that allocated a pgid.
 	//pending        map[txid]*txPending         // mapping of soon-to-be free page ids by tx.
-	pending map[txid][]pgid // 存放当前事务要被free的 page ids
-	cache   map[pgid]bool   // 缓存判断当前page id是否需要被free，可以快速查找
+	pending        map[txid][]pgid             // 存放当前事务要被free的 page ids
+	cache          map[pgid]bool               // 缓存判断当前page id是否需要被free，可以快速查找
 	freemaps       map[uint64]pidSet           // key is the size of continuous pages(span), value is a set which contains the starting pgids of same size
 	forwardMap     map[pgid]uint64             // key is start pgid, value is its span size
 	backwardMap    map[pgid]uint64             // key is end pgid, value is its span size
@@ -57,7 +57,7 @@ func newFreelist(freelistType FreelistType) *freelist {
 		pending: make(map[txid][]pgid),
 		cache:   make(map[pgid]bool),
 	}
-	
+
 	if freelistType == FreelistMapType {
 		f.allocate = f.hashmapAllocate
 		f.free_count = f.hashmapFreeCount
@@ -71,8 +71,7 @@ func newFreelist(freelistType FreelistType) *freelist {
 		f.getFreePageIDs = f.arrayGetFreePageIDs
 		f.readIDs = f.arrayReadIDs
 	}
-	
-	
+
 	return f
 }
 
