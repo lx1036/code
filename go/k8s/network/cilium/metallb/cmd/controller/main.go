@@ -29,7 +29,7 @@ import (
 type svcKey string
 type cmKey string
 
-// go run . --kubeconfig=`echo $HOME`/.kube/config --v=2 --config=`pwd`/config.yaml
+// go run . --kubeconfig=`echo $HOME`/.kube/config --config=`pwd`/config.yaml
 func main() {
 	var (
 		//port       = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
@@ -42,7 +42,6 @@ func main() {
 		klog.Fatalf(fmt.Sprintf("config file is required"))
 	}
 
-	c := getIPAM(*path)
 
 	restConfig, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
@@ -52,7 +51,9 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-
+	
+	c := getIPAM(*path, clientset)
+	
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: corev1.New(clientset.CoreV1().RESTClient()).Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "lb-controller"})
@@ -129,6 +130,7 @@ func main() {
 	stopCh := make(chan struct{})
 	go cmInformer.Run(stopCh)
 	go svcInformer.Run(stopCh)
+	go epInformer.Run(stopCh)
 	if !cache.WaitForCacheSync(stopCh, cmInformer.HasSynced, svcInformer.HasSynced, epInformer.HasSynced) {
 		klog.Fatalf(fmt.Sprintf("time out waiting for cache sync"))
 	}
@@ -189,9 +191,10 @@ func main() {
 	}
 }
 
-func getIPAM(path string) *controller.Controller {
+func getIPAM(path string, clientset *kubernetes.Clientset) *controller.Controller {
 	ipam := &controller.Controller{
 		IPs: allocator.New(),
+		Clientset: clientset,
 	}
 
 	file, _ := filepath.Abs(path)

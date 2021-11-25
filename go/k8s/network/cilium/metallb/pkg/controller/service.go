@@ -62,7 +62,6 @@ func (c *Controller) allocateService(key string, svc *corev1.Service) bool {
 		// allocated.
 		desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
 		if lbIP != nil && desiredPool != "" && c.IPs.Pool(key) != desiredPool {
-			//l.Log("event", "clearAssignment", "reason", "differentPoolRequested", "msg", "user requested a different pool than the one currently assigned")
 			c.clearServiceState(key, svc)
 			lbIP = nil
 		}
@@ -72,7 +71,6 @@ func (c *Controller) allocateService(key string, svc *corev1.Service) bool {
 	// state. allocateIP will pay attention to LoadBalancerIP and try
 	// to meet the user's demands.
 	if svc.Spec.LoadBalancerIP != "" && svc.Spec.LoadBalancerIP != lbIP.String() {
-		//l.Log("event", "clearAssignment", "reason", "differentIPRequested", "msg", "user requested a different IP than the one currently assigned")
 		c.clearServiceState(key, svc)
 		lbIP = nil
 	}
@@ -81,29 +79,20 @@ func (c *Controller) allocateService(key string, svc *corev1.Service) bool {
 	if lbIP == nil {
 		ip, err := c.allocateIP(key, svc)
 		if err != nil {
-			//l.Log("op", "allocateIP", "error", err, "msg", "IP allocation failed")
-			c.Client.Errorf(svc, "AllocationFailed", "Failed to allocate IP for %q: %s", key, err)
-			// The outer controller loop will retry converging this
-			// service when another service gets deleted, so there's
-			// nothing to do here but wait to get called again later.
+			klog.Errorf(fmt.Sprintf("Failed to allocate IP for %q: %s", key, err))
 			return true
 		}
 		lbIP = ip
-		//l.Log("event", "ipAllocated", "ip", lbIP, "msg", "IP address assigned by controller")
-		c.Client.Infof(svc, "IPAllocated", "Assigned IP %q", lbIP)
+		klog.Infof(fmt.Sprintf("Assigned IP %q", lbIP))
 	}
 
 	if lbIP == nil {
-		//l.Log("bug", "true", "msg", "internal error: failed to allocate an IP, but did not exit convergeService early!")
-		//c.Client.Errorf(svc, "InternalError", "didn't allocate an IP but also did not fail")
 		c.clearServiceState(key, svc)
 		return true
 	}
 
 	pool := c.IPs.Pool(key)
 	if pool == "" || c.config.Pools[pool] == nil {
-		//l.Log("bug", "true", "ip", lbIP, "msg", "internal error: allocated IP has no matching address pool")
-		//c.Client.Errorf(svc, "InternalError", "allocated an IP that has no pool")
 		c.clearServiceState(key, svc)
 		return true
 	}

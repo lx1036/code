@@ -175,7 +175,8 @@ func (s *Session) sendUpdates() bool {
 		if s.new == nil {
 			continue
 		}
-
+		
+		//s.defaultNextHop = net.ParseIP("10.20.30.40")
 		for c, adv := range s.new {
 			if adv2, ok := s.advertised[c]; ok && adv.Equal(adv2) {
 				// Peer already has correct state for this advertisement, nothing to do.
@@ -188,6 +189,7 @@ func (s *Session) sendUpdates() bool {
 			}
 		}
 
+		// INFO: 如果 s.new 是 empty map，则删除已经宣告的 s.advertised 路由
 		wdr := []*net.IPNet{}
 		for c, adv := range s.advertised {
 			if s.new[c] == nil {
@@ -233,6 +235,19 @@ func (s *Session) AddPath(advs ...*Advertisement) error {
 	return nil
 }
 
+func (s *Session) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.closed = true
+	//s.abort()
+	if s.conn != nil {
+		s.conn.Close()
+		s.conn = nil
+	}
+	s.cond.Broadcast()
+	return nil
+}
+
 // connect establishes the BGP session with the peer.
 // sets TCP_MD5 sockopt if password is !="",
 func (s *Session) connect() error {
@@ -257,6 +272,7 @@ func (s *Session) connect() error {
 		return fmt.Errorf("getting local addr for default nexthop to %q: %s", s.raddr, err)
 	}
 	s.defaultNextHop = laddr.IP
+	//s.defaultNextHop = net.ParseIP("10.20.30.40")
 	routerID := s.routerID
 	if routerID == nil {
 		routerID = s.defaultNextHop // ipv4
@@ -284,6 +300,7 @@ func (s *Session) connect() error {
 		conn.Close()
 		return fmt.Errorf("unexpected peer ASN %d, want %d", msg.asn, s.peerASN)
 	}
+	s.peerFBASNSupport = msg.fbasn
 	// BGP session is established, clear the connect timeout deadline.
 	if err := conn.SetDeadline(time.Time{}); err != nil {
 		conn.Close()

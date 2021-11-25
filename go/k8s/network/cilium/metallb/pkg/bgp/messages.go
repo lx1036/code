@@ -256,6 +256,8 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, defaultNextH
 		0x40, 3, // mandatory, next-hop
 		4, // len
 	})
+	
+	klog.Info(adv.NextHop.To4(), defaultNextHop)
 	if adv.NextHop != nil {
 		b.Write(adv.NextHop.To4())
 	} else {

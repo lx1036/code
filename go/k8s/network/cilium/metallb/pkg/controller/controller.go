@@ -1,7 +1,10 @@
 package controller
 
 import (
+	"context"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"reflect"
 
@@ -12,15 +15,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Service offers methods to mutate a Kubernetes service object.
-type service interface {
-	UpdateStatus(svc *corev1.Service) error
-	Infof(svc *corev1.Service, desc, msg string, args ...interface{})
-	Errorf(svc *corev1.Service, desc, msg string, args ...interface{})
-}
-
 type Controller struct {
-	Client service
+	Clientset *kubernetes.Clientset
 	IPs    *allocator.Allocator
 
 	config *config.Config
@@ -69,7 +65,7 @@ func (c *Controller) SetBalancer(key string, rawSvc *corev1.Service, _ *corev1.E
 		// svc 被 allocateService() 后可能不仅仅 status 发生了修改，所以重新 DeepCopy
 		updatedSvc := rawSvc.DeepCopy()
 		updatedSvc.Status = svc.Status
-		if err := c.Client.UpdateStatus(updatedSvc); err != nil {
+		if _, err := c.Clientset.CoreV1().Services(updatedSvc.GetNamespace()).UpdateStatus(context.TODO(), updatedSvc, metav1.UpdateOptions{}); err != nil {
 			klog.Errorf(fmt.Sprintf("failed to update service status: %v", err))
 			return types.SyncStateError
 		}

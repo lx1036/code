@@ -1,9 +1,9 @@
 
 peers:
-  - peer-address: 10.0.0.1
+  - peer-address: 127.0.0.1
     peer-port: 1790
-    peer-asn: 64501
-    my-asn: 64500
+    peer-asn: 64512
+    my-asn: 65001
 
 address-pools:
   - name: default
