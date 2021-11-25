@@ -19,17 +19,23 @@ import (
 
 // https://github.com/metallb/metallb/blob/main/internal/bgp/native/native_test.go
 
-func TestTCP(test *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+// INFO: 查看接收的路由：gobgp -p 50063 -d neighbor 127.0.0.1 adj-in
+func TestBGPClient(test *testing.T) {
+	log.SetLevel(log.DebugLevel)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
 
 	paths, err := runBGPRouteServer(ctx, 1790)
 	if err != nil {
-		test.Fatalf("starting GoBGP: %s", err)
+		test.Fatalf("starting BGP Server: %s", err)
 	}
 
-	sess := NewSession("127.0.0.1:1790", net.ParseIP("10.20.30.40"), 64543, 64543, net.ParseIP("2.3.4.5"), 10*time.Second)
-	defer sess.Close()
+	sess, err := New("127.0.0.1:1790", net.ParseIP("127.0.0.1"), 64543, 64544, time.Second*10, "")
+	//defer sess.Close()
+	if err != nil {
+		test.Fatalf("starting BGP Client: %s", err)
+	}
 
 	adv := &Advertisement{
 		Prefix:      ipnet("1.2.3.0/24"),
@@ -37,7 +43,7 @@ func TestTCP(test *testing.T) {
 		LocalPref:   42,
 		Communities: []uint32{1234, 2345},
 	}
-	if err = sess.Set(adv); err != nil {
+	if err = sess.AddPath(adv); err != nil {
 		test.Fatalf("setting advertisement: %s", err)
 	}
 
@@ -50,7 +56,7 @@ func TestTCP(test *testing.T) {
 			/*if err := checkPath(path, adv); err != nil {
 				test.Fatalf("path did not match expectations: %s", err)
 			}*/
-			return
+			//return
 		}
 	}
 }
@@ -110,11 +116,11 @@ func runBGPRouteServer(ctx context.Context, port int32) (chan *gobgpapi.Peer, er
 		Peer: &gobgpapi.Peer{
 			Conf: &gobgpapi.PeerConf{
 				NeighborAddress: "127.0.0.1",
-				PeerAs:          64543,
+				PeerAs:          64544,
 			},
 			Transport: &gobgpapi.Transport{
 				PassiveMode: true,
-				RemotePort:  1792,
+				RemotePort:  1791,
 			},
 		},
 	}
