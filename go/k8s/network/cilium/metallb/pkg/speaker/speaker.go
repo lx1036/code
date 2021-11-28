@@ -185,23 +185,23 @@ func (speaker *Speaker) SetService(name string, svc *Service, eps *Endpoints) ty
 		klog.Errorf("internal error: unknown balancer protocol!")
 		return speaker.deleteBalancer(name, "internalError")
 	}
-	
+
 	// INFO: 根据 service TrafficPolicy 来判断是否有合适的 endpoint
-	if reason, ok := handler.ShouldAnnounce( name, svc.TrafficPolicy, eps); !ok {
+	if reason, ok := handler.ShouldAnnounce(name, svc.TrafficPolicy, eps); !ok {
 		return speaker.deleteBalancer(name, reason)
 	}
-	
+
 	// INFO: 宣告 loadbalancer service ip
 	if err := handler.SetBalancer(name, lbIP, pool); err != nil {
 		klog.Infof("failed to announce service")
 		return types.SyncStateError
 	}
-	
+
 	if speaker.announced[name] == "" {
 		speaker.announced[name] = pool.Protocol
 		speaker.svcIP[name] = lbIP
 	}
-	
+
 	return types.SyncStateSuccess
 }
 

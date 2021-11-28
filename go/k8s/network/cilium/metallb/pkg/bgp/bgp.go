@@ -175,7 +175,7 @@ func (s *Session) sendUpdates() bool {
 		if s.new == nil {
 			continue
 		}
-		
+
 		//s.defaultNextHop = net.ParseIP("10.20.30.40")
 		for c, adv := range s.new {
 			if adv2, ok := s.advertised[c]; ok && adv.Equal(adv2) {

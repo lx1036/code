@@ -63,7 +63,7 @@ func (controller *BGPController) syncPeers() error {
 			if p.peer.RouterID != nil {
 				routerID = p.peer.RouterID
 			}
-			session, err := bgp.New(net.JoinHostPort(p.peer.Addr.String(),strconv.Itoa(int(p.peer.Port))),
+			session, err := bgp.New(net.JoinHostPort(p.peer.Addr.String(), strconv.Itoa(int(p.peer.Port))),
 				routerID, p.peer.ASN, p.peer.MyASN, p.peer.HoldTime, controller.MyNode)
 			if err != nil {
 				klog.Errorf(fmt.Sprintf("[BGPController syncPeers]failed to establish BGP session with router server %s/%d",
@@ -92,7 +92,7 @@ func (controller *BGPController) updateLoadBalancerAds() error {
 	for _, ads := range controller.svcAds {
 		allAds = append(allAds, ads...)
 	}
-	
+
 	for _, session := range controller.PeerSessions() {
 		if session == nil {
 			continue
@@ -101,7 +101,7 @@ func (controller *BGPController) updateLoadBalancerAds() error {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -110,7 +110,7 @@ func (controller *BGPController) PeerSessions() []*bgp.Session {
 	for i, peer := range controller.peers {
 		s[i] = peer.bgp
 	}
-	
+
 	return s
 }
 
@@ -146,7 +146,7 @@ func (controller *BGPController) SetBalancer(name string, lbIP net.IP, pool *con
 				Mask: m,
 			},
 			LocalPref: adCfg.LocalPref,
-			NextHop:     net.ParseIP("10.20.30.40"),
+			NextHop:   net.ParseIP("10.20.30.40"),
 			//LocalPref:   42,
 			Communities: []uint32{1234, 2345},
 		}
@@ -158,12 +158,12 @@ func (controller *BGPController) SetBalancer(name string, lbIP net.IP, pool *con
 		})
 		controller.svcAds[name] = append(controller.svcAds[name], ad)
 	}
-	
+
 	if err := controller.updateLoadBalancerAds(); err != nil {
 		klog.Errorf("failed to update BGP advertisements")
 		return err
 	}
-	
+
 	return nil
 }
 

@@ -10,11 +10,7 @@ import (
 
 // INFO: boltdb page 概念 https://time.geekbang.org/column/article/342527
 
-const branchPageElementSize = unsafe.Sizeof(branchPageElement{})
-const leafPageElementSize = unsafe.Sizeof(leafPageElement{})
-
 const minKeysPerPage = 2
-const pageHeaderSize = unsafe.Sizeof(page{})
 
 const (
 	bucketLeafFlag = 0x01
@@ -87,20 +83,28 @@ const (
 	freelistPageFlag = 0x10 // freelist page
 )
 
+// 16 字节=8+2+2+4
+const pageHeaderSize = unsafe.Sizeof(page{})
+
 // page 是操作系统页大小，读写数据最小原子单位
 type page struct {
 	// Header
-	id       pgid   // 页ID
-	flags    uint16 // 页类型，这块内容标识：可以为元数据、空闲列表、树枝、叶子 这四种中的一种
-	count    uint16 // 数量，存储数据的数量，the number of key-value pairs
-	overflow uint32 // 溢出页数量，溢出的页数量
+	id       pgid   // 8字节，页ID
+	flags    uint16 // 2字节, 页类型，这块内容标识：可以为元数据、空闲列表、树枝、叶子 这四种中的一种
+	count    uint16 // 数量，存储数据的数量，the number of key-value pairs 2字节，统计叶子节点、非叶子节点、空闲列表页的个数
+	overflow uint32 // 4 字节，溢出页数量，溢出的页数量
 
 	// Data
-	ptr uintptr // 页数据起始位置，内存中存储数据的指针，没有落盘
+	ptr uintptr // 无类型指针，可变长度，页数据起始位置，内存中存储数据的指针，没有落盘
 }
 
 // typ returns a human readable page type string used for debugging.
 func (p *page) typ() string {
+	switch p.flags {
+	case branchPageFlag:
+		return ""
+	}
+
 	if (p.flags & branchPageFlag) != 0 {
 		return "branch"
 	} else if (p.flags & leafPageFlag) != 0 {
@@ -183,12 +187,15 @@ func (m *meta) sum64() uint64 {
 	return h.Sum64()
 }
 
+// 16字节=4+4+4+4
+const leafPageElementSize = unsafe.Sizeof(leafPageElement{})
+
 // leafPageElement represents a node on a leaf page.
 type leafPageElement struct {
-	flags uint32
-	pos   uint32
-	ksize uint32
-	vsize uint32
+	flags uint32 // 4字节
+	pos   uint32 // 4字节
+	ksize uint32 // 4字节
+	vsize uint32 // 4字节
 }
 
 // key returns a byte slice of the node key.
@@ -205,11 +212,14 @@ func (n *leafPageElement) value() []byte {
 	return unsafeByteSlice(unsafe.Pointer(n), 0, i, j)
 }
 
+// 16字节=8+4+4
+const branchPageElementSize = unsafe.Sizeof(branchPageElement{})
+
 // branchPageElement represents a node on a branch page.
 type branchPageElement struct {
-	pos   uint32
-	ksize uint32
-	pgid  pgid
+	pos   uint32 // 4字节
+	ksize uint32 // 4字节
+	pgid  pgid   // 8字节
 }
 
 // key returns a byte slice of the node key.

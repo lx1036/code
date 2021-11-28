@@ -42,7 +42,6 @@ func main() {
 		klog.Fatalf(fmt.Sprintf("config file is required"))
 	}
 
-
 	restConfig, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		klog.Fatal(err)
@@ -51,9 +50,9 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	
+
 	c := getIPAM(*path, clientset)
-	
+
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: corev1.New(clientset.CoreV1().RESTClient()).Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "lb-controller"})
@@ -193,7 +192,7 @@ func main() {
 
 func getIPAM(path string, clientset *kubernetes.Clientset) *controller.Controller {
 	ipam := &controller.Controller{
-		IPs: allocator.New(),
+		IPs:       allocator.New(),
 		Clientset: clientset,
 	}
 

@@ -21,18 +21,16 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-
 )
 
 type svcKey string
-
 
 // go run . --kubeconfig=`echo $HOME`/.kube/config --config=`pwd`/config.yaml
 func main() {
 	var (
 		//port       = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
 		//name       = flag.String("name", "lb-ippool", "configmap name in default namespace")
-		path = flag.String("config", "", "config file")
+		path       = flag.String("config", "", "config file")
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
 	)
 
@@ -40,7 +38,7 @@ func main() {
 	if len(*path) == 0 {
 		klog.Fatalf(fmt.Sprintf("config file is required"))
 	}
-	
+
 	restConfig, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		klog.Fatal(err)
@@ -53,12 +51,10 @@ func main() {
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: corev1.New(clientset.CoreV1().RESTClient()).Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "lb-controller"})
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	
-	
+
 	// INFO: (1) 与 router server 建立 bgp session
 	s := getSpeaker(*path)
-	
-	
+
 	svcWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "services",
 		metav1.NamespaceAll, fields.Everything())
 	svcIndexer, svcInformer := cache.NewIndexerInformer(svcWatcher, &v1.Service{}, 0, cache.ResourceEventHandlerFuncs{
@@ -83,7 +79,7 @@ func main() {
 			//}
 		},
 	}, cache.Indexers{})
-	
+
 	epWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "endpoints",
 		metav1.NamespaceAll, fields.Everything())
 	epIndexer, epInformer := cache.NewIndexerInformer(epWatcher, &v1.Endpoints{}, 0, cache.ResourceEventHandlerFuncs{
@@ -109,17 +105,17 @@ func main() {
 			//}
 		},
 	}, cache.Indexers{})
-	
+
 	stopCh := make(chan struct{})
 	go svcInformer.Run(stopCh)
 	go epInformer.Run(stopCh)
 	if !cache.WaitForCacheSync(stopCh, svcInformer.HasSynced, epInformer.HasSynced) {
 		klog.Fatalf(fmt.Sprintf("time out waiting for cache sync"))
 	}
-	
+
 	sync := func(key interface{}, queue workqueue.RateLimitingInterface) error {
 		defer queue.Done(key)
-		
+
 		switch k := key.(type) {
 		case svcKey:
 			svc, exists, err := svcIndexer.GetByKey(string(k))
@@ -137,11 +133,11 @@ func main() {
 			if !exists {
 				return fmt.Errorf("not exist")
 			}
-			
+
 			if svc.(*v1.Service).Spec.Type != v1.ServiceTypeLoadBalancer {
 				return nil
 			}
-			
+
 			recorder.Eventf(svc.(*v1.Service), v1.EventTypeNormal, "SetBalancer", "advertise svc ip")
 			s.SetBalancer(string(k), svc.(*v1.Service), endpoints.(*v1.Endpoints))
 			return nil
@@ -149,13 +145,13 @@ func main() {
 			panic(fmt.Sprintf("unknown key type for %s %T", key, key))
 		}
 	}
-	
+
 	for {
 		key, quit := queue.Get()
 		if quit {
 			return
 		}
-		
+
 		err := sync(key, queue)
 		if err != nil {
 			klog.Error(err)

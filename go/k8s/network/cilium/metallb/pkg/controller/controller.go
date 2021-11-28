@@ -17,7 +17,7 @@ import (
 
 type Controller struct {
 	Clientset *kubernetes.Clientset
-	IPs    *allocator.Allocator
+	IPs       *allocator.Allocator
 
 	config *config.Config
 }
