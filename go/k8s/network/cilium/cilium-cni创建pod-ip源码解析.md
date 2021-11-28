@@ -21,6 +21,9 @@ types.LoadNetConf(args.StdinData) -> connector.SetupVeth(ep.ContainerID, int(con
 (1) 根据 containerID 获取 PID
 ```shell
 docker inspect ${containerID} | jq '.[] | .State | .Pid' # 27219
+docker inspect ${containerID} | grep "Pid" # 27219
+
+# nsenter -t <pid> -n <command>
 nsenter -t 27219 -n
 ip addr # 获得 Cilium 创建的 veth peer 在 container side 一侧
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN qlen 1000

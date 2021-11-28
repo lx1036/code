@@ -26,13 +26,52 @@ http://arthurchiao.art/blog/understanding-ebpf-datapath-in-cilium-zh/ :
 
 
 > 如何查看已加载的 eBPF 程序，可参考 [Cilium Network Topology and Traffic Path on AWS](http://arthurchiao.art/blog/cilium-network-topology-on-aws/)
+
+**[Life of a Packet in Cilium：实地探索 Pod-to-Service 转发路径及 BPF 处理逻辑](https://arthurchiao.art/blog/cilium-life-of-a-packet-pod-to-service-zh/)**
+
+在 `/var/run/cilium/state/${CiliumEndpointID}/` 目录中包含 `lxc_config.h` 和 `bpf_lxc.o`二进制文件(源码是 `bpf_lxc.c`)，`bpf_lxc.c` 
+包含了 `from-container` 和 `to-container` tc eBPF 程序:
 ```shell
 yum update -y && yum update iproute2 -y
-tc filter show dev cilium_net ingress
-# 查看host namespace这侧的 tc filter ingress挂载的ebpf程序
-tc filter show dev lxcdf20e7cb3f7b ingress
+
+# (1)给宿主机默认网卡 eth0 挂载 tc eBPF 程序
+tc filter show dev eth0 ingress
+#filter protocol all pref 1 bpf chain 0
+#filter protocol all pref 1 bpf chain 0 handle 0x1 bpf_netdev_eth0.o:[from-netdev] direct-action not_in_hw tag 524a2ea93d920b5f
+tc filter show dev eth0 egress
+#filter protocol all pref 1 bpf chain 0
+#filter protocol all pref 1 bpf chain 0 handle 0x1 bpf_netdev_eth0.o:[to-netdev] direct-action not_in_hw tag a04f5eef06a7f555
+
+# (2)给 cilium 网卡 cilium_host/cilium_net 挂载 tc eBPF 程序
+# 只有 cilium_host 网卡挂载了 ebpf 程序，cilium_net 网卡没有 tc egress，cilium_host 和 cilium_net 是一对 veth pair 
+# https://github.com/cilium/cilium/blob/v1.10.5/bpf/bpf_host.c
+tc filter show dev cilium_host ingress
+#filter protocol all pref 1 bpf chain 0
+#filter protocol all pref 1 bpf chain 0 handle 0x1 bpf_host.o:[to-host] direct-action not_in_hw tag 7afe1afd2f393b1b
+tc filter show dev cilium_host egress
+#filter protocol all pref 1 bpf chain 0
+#filter protocol all pref 1 bpf chain 0 handle 0x1 bpf_host.o:[from-host] direct-action not_in_hw tag 9b2b3e068f78309b
+tc filter show dev cilium_net ingress # https://github.com/cilium/cilium/blob/v1.10.5/bpf/bpf_host.c
+#filter protocol all pref 1 bpf chain 0
+#filter protocol all pref 1 bpf chain 0 handle 0x1 bpf_host_cilium_net.o:[to-host] direct-action not_in_hw tag 7afe1afd2f393b1b
+
+# (2)给容器网卡宿主机侧 lxcdf20e7cb3f7b 挂载 tc eBPF 程序，容器侧没挂载
+# 查看host namespace这侧的 tc filter ingress挂载的ebpf程序 https://github.com/cilium/cilium/blob/v1.10.5/bpf/bpf_lxc.c
+tc filter show dev lxcdf20e7cb3f7b ingress # 表示 packets 从 container 出去时，会运行该 eBPF 程序
 #filter protocol all pref 1 bpf chain 0
 #filter protocol all pref 1 bpf chain 0 handle 0x1 bpf_lxc.o:[from-container] direct-action not_in_hw tag ddd77f293c0a5e6a
+tc filter show dev lxc28c29fad770b egress # 表示 packets 进入 container 时，会运行该 eBPF 程序
+#filter protocol all pref 1 bpf chain 0
+#filter protocol all pref 1 bpf chain 0 handle 0x1 bpf_lxc.o:[to-container] direct-action not_in_hw tag 610fb24c15536f9b
+# 查看容器内eth0网卡有没有挂载 tc ingress/egress eBPF 程序，貌似没有挂载
+docker inspect 8dba621397f0 | grep Pid
+nsenter -t 18421 -n tc filter show dev eth0 ingress
+nsenter -t 18421 -n tc filter show dev eth0 egress
+nsenter -t 18421 -n arp -n # 查看 arp(Address Resolution Packet)
+#Address                  HWtype  HWaddress           Flags Mask            Iface
+#10.216.136.172           ether   92:36:a1:12:9b:1b   C                     eth0
+#10.208.40.96             ether   92:36:a1:12:9b:1b   C                     eth0
+
 yum install -y bpftool
 # 查看所有loaded bpf程序
 bpftool prog

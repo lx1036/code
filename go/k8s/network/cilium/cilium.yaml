@@ -128,7 +128,6 @@ data:
   enable-bpf-masquerade: "true"
   enable-xt-socket-fallback: "true"
   install-iptables-rules: "true"
-  auto-direct-node-routes: "false"
   kube-proxy-replacement:  "probe"
   node-port-bind-protection: "true"
   enable-auto-protect-node-port-range: "true"
@@ -145,7 +144,12 @@ data:
   - "200.217.122.0/21"
   cluster-pool-ipv4-mask-size: "26" # 从 /19 网段分出每个节点 /26 网段，可以部署 2^(26-19) = 128 台机器，每个机器可以分配 2^(32-26) = 64 个 pods
   disable-cnp-status-updates: "true"
+
+  # https://docs.cilium.io/en/v1.8/concepts/networking/routing/#native-routing
+  auto-direct-node-routes: "false" # "Enable automatic L2 routing between nodes"
   native-routing-cidr: "100.217.122.0/21"
+  enable-endpoint-routes: 'true' # "Use per endpoint routes instead of routing via cilium_host"
+
   node-port-mode: "dsr"
 ---
 # Source: cilium/charts/agent/templates/clusterrole.yaml
