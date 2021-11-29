@@ -1,0 +1,46 @@
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: speaker-demo
+  labels:
+    app: speaker-demo
+spec:
+  replicas: 3
+  template:
+    metadata:
+      name: speaker-demo
+      labels:
+        app: speaker-demo
+    spec:
+      containers:
+        - name: speaker-demo
+          image: nginx:1.17.8
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app: speaker-demo
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: speaker-demo
+spec:
+  selector:
+    app: speaker-demo
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+#status:
+#  loadBalancer:
+#    ingress:
+#      - ip: 192.0.2.127
+#

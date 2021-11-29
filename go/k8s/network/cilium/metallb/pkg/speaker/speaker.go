@@ -14,7 +14,7 @@ import (
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(*config.Config) error
-	ShouldAnnounce(string, string, *Endpoints) string
+	ShouldAnnounce(string, string, *Endpoints) (string, bool)
 	SetBalancer(string, net.IP, *config.Pool) error
 	DeleteBalancer(string, string) error
 	SetNodeLabels(map[string]string) error
@@ -53,7 +53,7 @@ func NewSpeaker(cfg Config) (*Speaker, error) {
 	protocols := map[config.Proto]Protocol{
 		config.BGP: &BGPController{
 			MyNode: cfg.MyNode,
-			SvcAds: make(map[string][]*bgp.Advertisement),
+			svcAds: make(map[string][]*bgp.Advertisement),
 		},
 	}
 
@@ -148,19 +148,15 @@ func (speaker *Speaker) SetService(name string, svc *Service, eps *Endpoints) ty
 	if svc == nil {
 		return speaker.deleteBalancer(name, "serviceDeleted")
 	}
-
 	if svc.Type != string(corev1.ServiceTypeLoadBalancer) {
 		return speaker.deleteBalancer(name, "notLoadBalancer")
 	}
-
 	if speaker.config == nil {
 		return types.SyncStateSuccess
 	}
-
 	if len(svc.Ingress) != 1 {
 		return speaker.deleteBalancer(name, "noIPAllocated")
 	}
-
 	lbIP := net.ParseIP(svc.Ingress[0].IP)
 	if lbIP == nil {
 		return speaker.deleteBalancer(name, "invalidIP")
@@ -168,6 +164,42 @@ func (speaker *Speaker) SetService(name string, svc *Service, eps *Endpoints) ty
 	poolName := poolFor(speaker.config.Pools, lbIP)
 	if poolName == "" {
 		return speaker.deleteBalancer(name, "ipNotAllowed")
+	}
+	pool := speaker.config.Pools[poolName]
+	if pool == nil {
+		klog.Errorf("internal error: allocated IP has no matching address pool")
+		return speaker.deleteBalancer(name, "internalError")
+	}
+	if proto, ok := speaker.announced[name]; ok && proto != pool.Protocol {
+		if st := speaker.deleteBalancer(name, "protocolChanged"); st == types.SyncStateError {
+			return st
+		}
+	}
+	if svcIP, ok := speaker.svcIP[name]; ok && !lbIP.Equal(svcIP) {
+		if st := speaker.deleteBalancer(name, "loadBalancerIPChanged"); st == types.SyncStateError {
+			return st
+		}
+	}
+	handler := speaker.protocols[pool.Protocol]
+	if handler == nil {
+		klog.Errorf("internal error: unknown balancer protocol!")
+		return speaker.deleteBalancer(name, "internalError")
+	}
+
+	// INFO: 根据 service TrafficPolicy 来判断是否有合适的 endpoint
+	if reason, ok := handler.ShouldAnnounce(name, svc.TrafficPolicy, eps); !ok {
+		return speaker.deleteBalancer(name, reason)
+	}
+
+	// INFO: 宣告 loadbalancer service ip
+	if err := handler.SetBalancer(name, lbIP, pool); err != nil {
+		klog.Infof("failed to announce service")
+		return types.SyncStateError
+	}
+
+	if speaker.announced[name] == "" {
+		speaker.announced[name] = pool.Protocol
+		speaker.svcIP[name] = lbIP
 	}
 
 	return types.SyncStateSuccess
