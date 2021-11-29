@@ -33,6 +33,9 @@ There are only a few types in BoltDB: DB, Bucket, Tx, and Cursor.
 
 
 ## 参考文献
+**[自底向上分析boltdb源码](https://jaydenwen123.github.io/boltdb/)**
+**[自底向上分析boltdb源码 bilibili 视频](https://www.bilibili.com/video/BV1Zv411G7ty?p=11)**
+
 **[boltdb源码阅读](https://zhuanlan.zhihu.com/p/346954004)**
 
 **[boltdb 源码分析](https://youjiali1995.github.io/storage/boltdb/)**

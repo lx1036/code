@@ -123,6 +123,32 @@ tc class add dev ifb0 parent 1:1 classid 1:10 htb rate 1mbit
 
 ```
 
+```shell
+# 创建 tc 重定向两个网卡流量
+# create tc eth0<->tap0 redirect rules
+tc qdisc add dev eth0 ingress
+tc filter add dev eth0 parent ffff: protocol all u32 match u8 0 0 action mirred egress redirect dev tap1
+
+tc qdisc add dev tap0 ingress
+tc filter add dev tap0 parent ffff: protocol all u32 match u8 0 0 action mirred egress redirect dev eth1
+
+# 使用 tc 加载 ebpf 程序到网卡上
+tc filter add dev veth09e1d2e egress bpf da obj tc-xdp-drop-tcp.o sec tc
+
+# 加载 ebpf 程序到 xdp 上
+# 但是 Cilium 默认没有下发 xdp ebpf 程序
+ip link set dev [network-device-name] xdp obj xdp_drop_all.o sec xdp
+ip link set dev [network-device-name] xdp off # 卸载 xdp ebpf 程序
+# 由于机器上没有最新的 iproute 和 glibc，只有 cilium pod namespace 里有，还得需要把 xdp.o 拷贝过去然后使用最新的 `ip` 命令
+docker cp ./xdp.o 64d6796758b4:/mnt/xdp.o
+nsenter -t 26416 -m -n ip -force link set dev lxc6e7eb5daff06 xdp obj /mnt/xdp.o sec xdp
+nsenter -t 26416 -m -n ip -force link set dev lxc6e7eb5daff06 xdp off
+
+# 抓包 tcp 且 80 端口
+tcpdump -i lxc6e7eb5daff06 -nn tcp and port 80
+```
+
+
 (1) 如何给 network packet 打标签？如何设置优先级？
 * 打标签：Network classifier cgroup, https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/net_cls.html
 * 设置优先级：https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/net_prio.html

@@ -135,7 +135,7 @@ bridge link # brctl show
 # 10: br-veth0 state UP @br-veth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master br0 state forwarding priority 32 cost 2
 # br-veth0 没法 ping 通 br-veth1
 ping -c 1 -w 1 -I br-veth0 172.17.186.102
-tcpdump -n -i br-veth1 # 抓包
+tcpdump -i lxc6e7eb5daff06 -nn tcp and port 80 # 抓包 tcp 且 80 端口
 
 # veth0 的 IP 给 bridge
 ip addr del 172.17.186.101/24 dev br-veth0

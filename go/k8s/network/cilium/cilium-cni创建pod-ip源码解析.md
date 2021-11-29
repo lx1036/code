@@ -38,6 +38,10 @@ ip addr # 获得 Cilium 创建的 veth peer 在 container side 一侧
 
 
 ## 参考文献
+**[Cilium Code Walk Through: CNI Create Network](https://arthurchiao.art/blog/cilium-code-cni-create-network/)**
+
+**[Life of a Packet in Cilium：实地探索 Pod-to-Service 转发路径及 BPF 处理逻辑](https://arthurchiao.art/blog/cilium-life-of-a-packet-pod-to-service-zh/)**
+
 **[Cilium Code Walk Through Series](http://arthurchiao.art/blog/cilium-code-series/)**
 
 **[L4LB for Kubernetes: Theory and Practice with Cilium+BGP+ECMP](http://arthurchiao.art/blog/k8s-l4lb/)**
