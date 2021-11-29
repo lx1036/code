@@ -39,6 +39,7 @@ There are only a few types in BoltDB: DB, Bucket, Tx, and Cursor.
 
 **[boltdb B+ tree](https://youjiali1995.github.io/database/CMU-15445/)**
 
+**[boltdb：如何持久化存储你的key-value数据？](https://time.geekbang.org/column/article/342527)**
 
 **[boltdb 源码导读（一）：boltdb 数据组织](https://zhuanlan.zhihu.com/p/332439403)**
 

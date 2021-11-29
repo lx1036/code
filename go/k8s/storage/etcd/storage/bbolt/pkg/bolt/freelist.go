@@ -6,10 +6,6 @@ import (
 	"unsafe"
 )
 
-//******************************
-// https://github.com/boltdb/bolt
-//******************************
-
 const pgidNoFreelist pgid = 0xffffffffffffffff
 
 // FreelistType is the type of the freelist backend
@@ -40,23 +36,39 @@ type freelist struct {
 	ids []pgid // 已经被release的page ids
 	//allocs         map[pgid]txid               // mapping of txid that allocated a pgid.
 	//pending        map[txid]*txPending         // mapping of soon-to-be free page ids by tx.
-	pending map[txid][]pgid // 存放当前事务要被free的 page ids
-	cache   map[pgid]bool   // 缓存判断当前page id是否需要被free，可以快速查找
-	//freemaps       map[uint64]pidSet           // key is the size of continuous pages(span), value is a set which contains the starting pgids of same size
-	//forwardMap     map[pgid]uint64             // key is start pgid, value is its span size
-	//backwardMap    map[pgid]uint64             // key is end pgid, value is its span size
-	//allocate       func(txid txid, n int) pgid // the freelist allocate func
-	//free_count     func() int                  // the function which gives you free page number
-	//mergeSpans     func(ids pgids)             // the mergeSpan func
-	//getFreePageIDs func() []pgid               // get free pgids func
-	//readIDs        func(pgids []pgid)          // readIDs func reads list of pages and init the freelist
+	pending        map[txid][]pgid             // 存放当前事务要被free的 page ids
+	cache          map[pgid]bool               // 缓存判断当前page id是否需要被free，可以快速查找
+	freemaps       map[uint64]pidSet           // key is the size of continuous pages(span), value is a set which contains the starting pgids of same size
+	forwardMap     map[pgid]uint64             // key is start pgid, value is its span size
+	backwardMap    map[pgid]uint64             // key is end pgid, value is its span size
+	allocate       func(txid txid, n int) pgid // the freelist allocate func
+	free_count     func() int                  // the function which gives you free page number
+	mergeSpans     func(ids pgids)             // the mergeSpan func
+	getFreePageIDs func() []pgid               // get free pgids func
+	readIDs        func(pgids []pgid)          // readIDs func reads list of pages and init the freelist
 }
 
-func newFreelist() *freelist {
-	return &freelist{
+func newFreelist(freelistType FreelistType) *freelist {
+	f := &freelist{
 		pending: make(map[txid][]pgid),
 		cache:   make(map[pgid]bool),
 	}
+
+	if freelistType == FreelistMapType {
+		f.allocate = f.hashmapAllocate
+		f.free_count = f.hashmapFreeCount
+		f.mergeSpans = f.hashmapMergeSpans
+		f.getFreePageIDs = f.hashmapGetFreePageIDs
+		f.readIDs = f.hashmapReadIDs
+	} else {
+		f.allocate = f.arrayAllocate
+		f.free_count = f.arrayFreeCount
+		f.mergeSpans = f.arrayMergeSpans
+		f.getFreePageIDs = f.arrayGetFreePageIDs
+		f.readIDs = f.arrayReadIDs
+	}
+
+	return f
 }
 
 // free releases a page and its overflow for a given transaction id.
@@ -98,7 +110,7 @@ func (f *freelist) release(txid txid) {
 
 // 分配连续的n个page，这里连续意思是：pgid,pgid+1,pgid+2
 // 比如{1,2,3,5,6,7,8,10}，allocate(4)就是分配了{5,6,7,8}出去，剩下{1,2,3}
-func (f *freelist) allocate(n int) pgid {
+func (f *freelist) arrayAllocate(txid txid, n int) pgid {
 	if len(f.ids) == 0 {
 		return 0
 	}
@@ -177,21 +189,26 @@ func (f *freelist) reindex() {
 }
 
 func (f *freelist) write(p *page) error {
-
 	p.flags |= freelistPageFlag
 
 	// The page.count can only hold up to 64k elements so if we overflow that
 	// number then we handle it by putting the size in the first element.
-	lenids := f.count()
-	if lenids == 0 {
-		p.count = uint16(lenids)
-	} else if lenids < 0xFFFF {
-		p.count = uint16(lenids)
-		f.copyall(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[:])
+	l := f.count()
+	if l == 0 {
+		p.count = uint16(l)
+	} else if l < 0xFFFF {
+		p.count = uint16(l)
+		var ids []pgid
+		data := unsafeAdd(unsafe.Pointer(p), unsafe.Sizeof(*p))
+		unsafeSlice(unsafe.Pointer(&ids), data, l)
+		f.copyall(ids)
 	} else {
 		p.count = 0xFFFF
-		((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[0] = pgid(lenids)
-		f.copyall(((*[maxAllocSize]pgid)(unsafe.Pointer(&p.ptr)))[1:])
+		var ids []pgid
+		data := unsafeAdd(unsafe.Pointer(p), unsafe.Sizeof(*p))
+		unsafeSlice(unsafe.Pointer(&ids), data, l+1)
+		ids[0] = pgid(l)
+		f.copyall(ids[1:])
 	}
 
 	return nil
@@ -200,11 +217,6 @@ func (f *freelist) write(p *page) error {
 // count returns count of pages on the freelist
 func (f *freelist) count() int {
 	return f.free_count() + f.pending_count()
-}
-
-// free_count returns count of free pages
-func (f *freelist) free_count() int {
-	return len(f.ids)
 }
 
 // pending_count returns count of pending pages
@@ -229,12 +241,6 @@ func (f *freelist) copyall(dst []pgid) {
 
 // hashmapAllocate serves the same purpose as arrayAllocate, but use hashmap as backend
 func (f *freelist) hashmapAllocate(txid txid, n int) pgid {
-	return 0
-}
-
-// arrayAllocate returns the starting page id of a contiguous list of pages of a given size.
-// If a contiguous block cannot be found then 0 is returned.
-func (f *freelist) arrayAllocate(txid txid, n int) pgid {
 	return 0
 }
 

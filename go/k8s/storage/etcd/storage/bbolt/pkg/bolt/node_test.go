@@ -1,6 +1,7 @@
 package bolt
 
 import (
+	"k8s.io/klog/v2"
 	"testing"
 	"unsafe"
 )
@@ -30,7 +31,13 @@ func TestNodePut(test *testing.T) {
 	}
 }
 
-func TestNodeReadLeftPage(test *testing.T) {
+func TestName(test *testing.T) {
+	a := []int{1, 2, 3, 4, 5, 6, 7}
+	b := a[1:3:5]
+	klog.Info(b) // [2 3]
+}
+
+func TestNodeReadLeafPage(test *testing.T) {
 	// Create a page.
 	var buf [4096]byte
 	page := (*page)(unsafe.Pointer(&buf[0]))
@@ -38,13 +45,14 @@ func TestNodeReadLeftPage(test *testing.T) {
 	page.count = 2
 
 	// Insert 2 elements at the beginning. sizeof(leafPageElement) == 16
-	nodes := (*[3]leafPageElement)(unsafe.Pointer(&page.ptr))
+	nodes := (*[3]leafPageElement)(unsafe.Pointer(uintptr(unsafe.Pointer(page)) + unsafe.Sizeof(*page)))
 	nodes[0] = leafPageElement{flags: 0, pos: 32, ksize: 3, vsize: 4}  // pos = sizeof(leafPageElement) * 2
 	nodes[1] = leafPageElement{flags: 0, pos: 23, ksize: 10, vsize: 3} // pos = sizeof(leafPageElement) + 3 + 4
+
 	// Write data for the nodes at the end.
-	data := (*[4096]byte)(unsafe.Pointer(&nodes[2]))
-	copy(data[:], []byte("barfooz"))
-	copy(data[7:], []byte("helloworldbye"))
+	const s = "barfoozhelloworldbye"
+	data := unsafeByteSlice(unsafe.Pointer(&nodes[2]), 0, 0, len(s))
+	copy(data, s)
 
 	// Deserialize page into a leaf.
 	// node读取page
@@ -66,23 +74,21 @@ func TestNodeReadLeftPage(test *testing.T) {
 }
 
 // Ensure that a node can serialize into a leaf page.
-func TestNodeWriteLeftPage(test *testing.T) {
-	// Create a node.
+func TestNodeWriteLeafPage(test *testing.T) {
 	n := &node{isLeaf: true, inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
 	n.put([]byte("susy"), []byte("susy"), []byte("que"), 0, 0)
 	n.put([]byte("ricki"), []byte("ricki"), []byte("lake"), 0, 0)
 	n.put([]byte("john"), []byte("john"), []byte("johnson"), 0, 0)
 
-	// Write it to a page.
+	// node 写到 page 中
 	var buf [4096]byte
 	p := (*page)(unsafe.Pointer(&buf[0]))
 	n.write(p)
 
-	// Read the page back in.
+	// 从 page 中读取到 node 中
 	n2 := &node{}
 	n2.read(p)
 
-	// Check that the two pages are the same.
 	if len(n2.inodes) != 3 {
 		test.Fatalf("exp=3; got=%d", len(n2.inodes))
 	}
@@ -98,13 +104,13 @@ func TestNodeWriteLeftPage(test *testing.T) {
 }
 
 func TestSplit(test *testing.T) {
-	// Create a node.
 	n := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
 	n.put([]byte("00000001"), []byte("00000001"), []byte("0123456701234567"), 0, 0)
 	n.put([]byte("00000002"), []byte("00000002"), []byte("0123456701234567"), 0, 0)
 	n.put([]byte("00000003"), []byte("00000003"), []byte("0123456701234567"), 0, 0)
 	n.put([]byte("00000004"), []byte("00000004"), []byte("0123456701234567"), 0, 0)
 	n.put([]byte("00000005"), []byte("00000005"), []byte("0123456701234567"), 0, 0)
+
 	// Split between 2 & 3.
 	n.split(100)
 	var parent = n.parent
@@ -117,26 +123,34 @@ func TestSplit(test *testing.T) {
 	if len(parent.children[1].inodes) != 3 {
 		test.Fatalf("exp=3; got=%d", len(parent.children[1].inodes))
 	}
+}
 
+func TestSplitMinKeys(test *testing.T) {
 	// split min keys
-	n2 := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
-	n2.put([]byte("00000001"), []byte("00000001"), []byte("0123456701234567"), 0, 0)
-	n2.put([]byte("00000002"), []byte("00000002"), []byte("0123456701234567"), 0, 0)
-	// Split.
-	n2.split(20)
-	if n2.parent != nil {
+	// 总共 16+(16+24)*2=96 字节
+	n := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
+	n.put([]byte("00000001"), []byte("00000001"), []byte("0123456701234567"), 0, 0)
+	n.put([]byte("00000002"), []byte("00000002"), []byte("0123456701234567"), 0, 0)
+
+	// kvs 至少得有4个，才能split
+	n.split(20)
+	if n.parent != nil {
 		test.Fatalf("expected nil parent")
 	}
+}
 
+func TestSplitSinglePage(test *testing.T) {
 	// split single page
-	n3 := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
-	n3.put([]byte("00000001"), []byte("00000001"), []byte("0123456701234567"), 0, 0)
-	n3.put([]byte("00000002"), []byte("00000002"), []byte("0123456701234567"), 0, 0)
-	n3.put([]byte("00000003"), []byte("00000003"), []byte("0123456701234567"), 0, 0)
-	n3.put([]byte("00000004"), []byte("00000004"), []byte("0123456701234567"), 0, 0)
-	n3.put([]byte("00000005"), []byte("00000005"), []byte("0123456701234567"), 0, 0)
-	n3.split(4096) // 4k
-	if n3.parent != nil {
+	// pageElementSize 16 字节，(16+24)*5=200字节，再加上起始的 header size 16 字节，总共 216 字节
+	n := &node{inodes: make(inodes, 0), bucket: &Bucket{tx: &Tx{db: &DB{}, meta: &meta{pgid: 1}}}}
+	n.put([]byte("00000001"), []byte("00000001"), []byte("0123456701234567"), 0, 0)
+	n.put([]byte("00000002"), []byte("00000002"), []byte("0123456701234567"), 0, 0)
+	n.put([]byte("00000003"), []byte("00000003"), []byte("0123456701234567"), 0, 0)
+	n.put([]byte("00000004"), []byte("00000004"), []byte("0123456701234567"), 0, 0)
+	n.put([]byte("00000005"), []byte("00000005"), []byte("0123456701234567"), 0, 0)
+
+	n.split(4096) // 4k，根本不够 split
+	if n.parent != nil {
 		test.Fatalf("expected nil parent")
 	}
 }

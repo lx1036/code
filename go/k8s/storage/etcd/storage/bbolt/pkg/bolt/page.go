@@ -10,11 +10,7 @@ import (
 
 // INFO: boltdb page 概念 https://time.geekbang.org/column/article/342527
 
-const branchPageElementSize = int(unsafe.Sizeof(branchPageElement{}))
-const leafPageElementSize = int(unsafe.Sizeof(leafPageElement{}))
-
 const minKeysPerPage = 2
-const pageHeaderSize = int(unsafe.Offsetof(((*page)(nil)).ptr))
 
 const (
 	bucketLeafFlag = 0x01
@@ -27,7 +23,7 @@ func (s pgids) Len() int           { return len(s) }
 func (s pgids) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s pgids) Less(i, j int) bool { return s[i] < s[j] }
 
-// merge returns the sorted union of a and b.
+// INFO: 合并两个有序数组
 func (s pgids) merge(b pgids) pgids {
 	// Return the opposite slice if one is nil.
 	if len(s) == 0 {
@@ -42,6 +38,7 @@ func (s pgids) merge(b pgids) pgids {
 	return merged
 }
 
+// INFO: 合并两个有序数组, @see 088_merge_sorted_array_test.go
 func mergepgids(dst, a, b pgids) {
 	if len(dst) < len(a)+len(b) {
 		panic(fmt.Errorf("mergepgids bad len %d < %d + %d", len(dst), len(a), len(b)))
@@ -56,21 +53,15 @@ func mergepgids(dst, a, b pgids) {
 		return
 	}
 
-	// ?????????
-	// 这块不知道用了什么算法merge了两个排序数组，leetcode上找下
+	merged := dst[:0] // []
 
-	// 首元素最小当lead
+	// 首元素最小当 lead
 	lead, follow := a, b
 	if b[0] < a[0] {
 		lead, follow = b, a
 	}
 
-	// Merged will hold all elements from both lists.
-	merged := dst[:0] // []
-
-	// Continue while there are elements in the lead.
 	for len(lead) > 0 {
-		// Merge largest prefix of lead that is ahead of follow[0].
 		n := sort.Search(len(lead), func(i int) bool { return lead[i] > follow[0] })
 		merged = append(merged, lead[:n]...)
 		if n >= len(lead) {
@@ -82,7 +73,7 @@ func mergepgids(dst, a, b pgids) {
 	}
 
 	// Append what's left in follow.
-	_ = append(merged, follow...)
+	merged = append(merged, follow...)
 }
 
 const (
@@ -92,17 +83,28 @@ const (
 	freelistPageFlag = 0x10 // freelist page
 )
 
+// 16 字节=8+2+2+4
+const pageHeaderSize = unsafe.Sizeof(page{})
+
 // page 是操作系统页大小，读写数据最小原子单位
 type page struct {
-	id       pgid    // 页ID
-	flags    uint16  // 页类型，这块内容标识：可以为元数据、空闲列表、树枝、叶子 这四种中的一种
-	count    uint16  // 数量，存储数据的数量
-	overflow uint32  // 溢出页数量，溢出的页数量
-	ptr      uintptr // 页数据起始位置，内存中存储数据的指针，没有落盘
+	// Header
+	id       pgid   // 8字节，页ID
+	flags    uint16 // 2字节, 页类型，这块内容标识：可以为元数据、空闲列表、树枝、叶子 这四种中的一种
+	count    uint16 // 数量，存储数据的数量，the number of key-value pairs 2字节，统计叶子节点、非叶子节点、空闲列表页的个数
+	overflow uint32 // 4 字节，溢出页数量，溢出的页数量
+
+	// Data
+	ptr uintptr // 无类型指针，可变长度，页数据起始位置，内存中存储数据的指针，没有落盘
 }
 
 // typ returns a human readable page type string used for debugging.
 func (p *page) typ() string {
+	switch p.flags {
+	case branchPageFlag:
+		return ""
+	}
+
 	if (p.flags & branchPageFlag) != 0 {
 		return "branch"
 	} else if (p.flags & leafPageFlag) != 0 {
@@ -123,8 +125,8 @@ func (p *page) hexdump(n int) {
 
 // leafPageElement retrieves the leaf node by index
 func (p *page) leafPageElement(index uint16) *leafPageElement {
-	n := &((*[0x7FFFFFF]leafPageElement)(unsafe.Pointer(&p.ptr)))[index]
-	return n
+	return (*leafPageElement)(unsafeIndex(unsafe.Pointer(p), unsafe.Sizeof(*p),
+		leafPageElementSize, int(index)))
 }
 
 // branchPageElement retrieves the branch node by index
@@ -185,31 +187,39 @@ func (m *meta) sum64() uint64 {
 	return h.Sum64()
 }
 
+// 16字节=4+4+4+4
+const leafPageElementSize = unsafe.Sizeof(leafPageElement{})
+
 // leafPageElement represents a node on a leaf page.
 type leafPageElement struct {
-	flags uint32
-	pos   uint32
-	ksize uint32
-	vsize uint32
+	flags uint32 // 4字节
+	pos   uint32 // 4字节
+	ksize uint32 // 4字节
+	vsize uint32 // 4字节
 }
 
 // key returns a byte slice of the node key.
 func (n *leafPageElement) key() []byte {
-	buf := (*[maxAllocSize]byte)(unsafe.Pointer(n))
-	return (*[maxAllocSize]byte)(unsafe.Pointer(&buf[n.pos]))[:n.ksize:n.ksize]
+	i := int(n.pos)
+	j := i + int(n.ksize)
+	return unsafeByteSlice(unsafe.Pointer(n), 0, i, j)
 }
 
 // value returns a byte slice of the node value.
 func (n *leafPageElement) value() []byte {
-	buf := (*[maxAllocSize]byte)(unsafe.Pointer(n))
-	return (*[maxAllocSize]byte)(unsafe.Pointer(&buf[n.pos+n.ksize]))[:n.vsize:n.vsize]
+	i := int(n.pos) + int(n.ksize)
+	j := i + int(n.vsize)
+	return unsafeByteSlice(unsafe.Pointer(n), 0, i, j)
 }
+
+// 16字节=8+4+4
+const branchPageElementSize = unsafe.Sizeof(branchPageElement{})
 
 // branchPageElement represents a node on a branch page.
 type branchPageElement struct {
-	pos   uint32
-	ksize uint32
-	pgid  pgid
+	pos   uint32 // 4字节
+	ksize uint32 // 4字节
+	pgid  pgid   // 8字节
 }
 
 // key returns a byte slice of the node key.
