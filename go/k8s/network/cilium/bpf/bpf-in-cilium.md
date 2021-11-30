@@ -79,7 +79,13 @@ bpftool prog dump xlated id 4409 # dump the interpreted BPF code
 bpftool prog dump jited id 4409 # dump the JITed BPF code
 ```
 
+使用 LLVM 编译 bpf 程序:
+```shell
+# To enable eBPF/eBPF JIT support
+echo 1 > /proc/sys/net/core/bpf_jit_enable
+clang -O2 -emit-llvm -c bpf.c -o - | llc -march=bpf -filetype=obj -o bpf.o
 
+```
 
 
 ## 参考文献
@@ -89,3 +95,5 @@ bpftool prog dump jited id 4409 # dump the JITed BPF code
 
 **[Cilium：BPF 和 XDP 参考指南](http://arthurchiao.art/blog/cilium-bpf-xdp-reference-guide-zh/)**
 
+## 常见缩写
+ELF: executable and linkable format
