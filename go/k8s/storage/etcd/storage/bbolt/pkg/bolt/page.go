@@ -192,7 +192,7 @@ const leafPageElementSize = unsafe.Sizeof(leafPageElement{})
 
 // leafPageElement represents a node on a leaf page.
 type leafPageElement struct {
-	flags uint32 // 4字节
+	flags uint32 // 4字节 bucketLeafFlag 判断
 	pos   uint32 // 4字节
 	ksize uint32 // 4字节
 	vsize uint32 // 4字节

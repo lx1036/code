@@ -374,7 +374,7 @@ static __always_inline int ipv4_l3(struct __ctx_buff *ctx, int l3_off,
 ```
 
 from-container 的经过 tc eBPF 后进入内核网络协议栈，上文介绍过容器内的路由网关是 cilium_host，packet 达到 cilium_host 网卡的 tc egress，
-即走 from-host BPF 程序 **[bpf_host.c#L990-L1002](https://github.com/cilium/cilium/blob/master/bpf/bpf_host.c#L990-L1002)**，主要逻辑：
+即走 from-host BPF 程序 **[bpf_host.c#L990-L1002](https://github.com/cilium/cilium/blob/master/bpf/bpf_host.c#L990-L1002)** ，主要逻辑：
 * 调用 from-netdev()
   * identity = resolve_srcid_ipv4() 解析这个包所属的 identity，从 ipcache map 中根据 IP 查询 identity
   * ctx_store_meta(ctx, CB_SRC_IDENTITY, identity) 把 identity 存储到 ctx->cb[CB_SRC_IDENTITY]。

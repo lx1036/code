@@ -88,6 +88,42 @@ clang -O2 -emit-llvm -c bpf.c -o - | llc -march=bpf -filetype=obj -o bpf.o
 ```
 
 
+## BPF Map Types
+* Hash tables
+* Arrays
+* LRU(Least recently used)
+* Ring Buffer
+* Stack trace
+* LPM(Longest prefix match)
+
+BPF Helpers:
+* bpf_get_prandom_u32()
+* bpf_skb_store_bytes()
+* bpf_redirect()
+* bpf_get_current_pid_tgid()
+* bpf_perf_event_output()
+
+eBPF Tail Calls 作用:
+* chain programs together
+* split programs into independent logical components
+* make bpf programs compasable
+
+eBPF Function Calls 作用：
+* reuse inside of a programs
+* reduce programs size
+
+
+## 常用 BPF 工具
+
+### bpftool
+```shell
+# https://manpages.ubuntu.com/manpages/focal/man8/bpftool-map.8.html
+yum install -y bpftool
+
+```
+
+
+
 ## 参考文献
 **[深入理解 Cilium 的 eBPF 收发包路径(datapath)](http://arthurchiao.art/blog/understanding-ebpf-datapath-in-cilium-zh/)**
 
