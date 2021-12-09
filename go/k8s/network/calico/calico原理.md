@@ -1,4 +1,8 @@
 
+
+
+
+(1) 配置 veth pair 和网卡 ip
 ```shell script
 ip link add veth0 type veth peer name eth0
 ip netns add ns0
