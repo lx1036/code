@@ -1,0 +1,26 @@
+
+apiVersion: crihookserver.k9s.io/v1
+kind: HookConfiguration
+timeout: 10
+listenAddress: unix:///var/run/cri-hook-server.sock
+webhooks:
+  - name: docker
+    endpoint: unix:///var/run/cri-hook-server-plugin.sock
+    failurePolicy: Fail
+    stages:
+      - urlPattern: /containers/create
+        method: post
+        type: PreHook
+      - urlPattern: /containers/create
+        method: post
+        type: PostHook
+  - name: containerd
+    endpoint: unix:///var/run/cri-hook-server-plugin.sock
+    failurePolicy: Fail
+    stages:
+      - urlPattern: /containers/create
+        method: post
+        type: PreHook
+      - urlPattern: /containers/create
+        method: post
+        type: PostHook
