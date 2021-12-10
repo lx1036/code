@@ -15,4 +15,9 @@ lmp: https://github.com/linuxkerneltravel/lmp/blob/master/plugins/fs/vfsstat.py
 (1) 在 centos 机器上安装 bcc
 ```shell
 yum update && yum install -y bcc-tools bcc bcc-devel
+
+# 安装好 bcc 和 bcc-tools 后，可以运行相关 tools 工具
+echo 'export PATH="$PATH:/usr/share/bcc/tools/"' >> /etc/profile
+source /etc/profile
+vfsstat # https://github.com/iovisor/bcc/blob/master/tools/vfsstat_example.txt
 ```
