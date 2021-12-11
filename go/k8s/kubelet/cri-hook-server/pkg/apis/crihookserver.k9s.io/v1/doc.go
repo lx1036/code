@@ -1,5 +1,3 @@
-
-
 // +k8s:deepcopy-gen=package,register
 
 // +groupName=crihookserver.k9s.io

@@ -23,12 +23,11 @@ webhooks:
 	type: PostHook
 */
 
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:defaulter-gen=true
 
 type HookConfiguration struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Timeout tell hook manager how long to wait each requests
 	// +optional
 	Timeout time.Duration `json:"timeout,omitempty"`
@@ -86,5 +85,3 @@ const (
 	// PostHookType means the response should be handled after receiving from the original backend
 	PostHookType HookType = "PostHook"
 )
-
-

@@ -4,8 +4,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 var Scheme = runtime.NewScheme()
@@ -21,7 +21,3 @@ func init() {
 	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: Version})
 	utilruntime.Must(localAddToScheme(Scheme))
 }
-
-
-
-

@@ -8,7 +8,9 @@ import (
 
 const (
 	MaxKV = 255
+	//MaxKV = 5
 	MaxKC = 511
+	//MaxKC = 5
 )
 
 type node interface {
@@ -16,117 +18,6 @@ type node interface {
 	parent() *branchNode
 	setParent(*branchNode)
 	full() bool
-}
-
-// branch node 只存储 key
-type kc struct {
-	key   int
-	child node
-}
-
-// one empty slot for split
-type kcs [MaxKC + 1]kc
-
-func (a *kcs) Len() int      { return len(a) }
-func (a *kcs) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a *kcs) Less(i, j int) bool {
-	if a[i].key == 0 {
-		return false
-	}
-
-	if a[j].key == 0 {
-		return true
-	}
-
-	return a[i].key < a[j].key
-}
-
-type branchNode struct {
-	kcs kcs
-
-	count int
-	p     *branchNode
-}
-
-func newBranchNode(p *branchNode, largestChild node) *branchNode {
-	b := &branchNode{
-		count: 1,
-		p:     p,
-	}
-
-	if largestChild != nil {
-		b.kcs[0].child = largestChild
-	}
-
-	return b
-}
-
-func (b *branchNode) find(key int) (int, bool) {
-	i := sort.Search(b.count-1, func(i int) bool {
-		return b.kcs[i].key > key
-	})
-
-	return i, true
-}
-
-func (b *branchNode) insert(key int, child node) (int, *branchNode, bool) {
-	i, _ := b.find(key)
-
-	// 节点数量还未到 m-1，m 是 degree，在 i 处后移一位
-	if !b.full() {
-		copy(b.kcs[i+1:], b.kcs[i:b.count])
-		b.kcs[i].key = key
-		b.kcs[i].child = child
-		child.setParent(b)
-		b.count++
-		return 0, nil, false
-	}
-
-	// insert the new node into the empty slot
-	b.kcs[MaxKC].key = key
-	b.kcs[MaxKC].child = child
-	child.setParent(b)
-	next, midKey := b.split()
-
-	return midKey, next, true
-}
-
-func (b *branchNode) split() (*branchNode, int) {
-	sort.Sort(&b.kcs)
-
-	// get the mid info
-	midIndex := MaxKC / 2
-	midChild := b.kcs[midIndex].child
-	midKey := b.kcs[midIndex].key
-
-	// create the split node with out a parent
-	next := newBranchNode(nil, nil)
-	copy(next.kcs[0:], b.kcs[midIndex+1:]) // 后半部分
-	next.count = MaxKC - midIndex
-	// update parent
-	for i := 0; i < next.count; i++ {
-		next.kcs[i].child.setParent(next)
-	}
-
-	// modify the original node
-	b.count = midIndex + 1
-	//b.kcs[b.count-1].key = 0
-	//b.kcs[b.count-1].child = midChild
-	midChild.setParent(b)
-
-	return next, midKey
-}
-
-func (b *branchNode) parent() *branchNode {
-	return b.p
-}
-
-func (b *branchNode) setParent(p *branchNode) {
-	b.p = p
-}
-
-func (b *branchNode) full() bool {
-	return b.count == MaxKC
 }
 
 type kv struct {
