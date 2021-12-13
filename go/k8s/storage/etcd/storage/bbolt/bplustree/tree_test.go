@@ -23,6 +23,7 @@ func TestInsert(test *testing.T) {
 
 func TestSearch(test *testing.T) {
 	testCount := 1000000
+	//testCount := 20
 	tree := New()
 
 	for i := testCount; i > 0; i-- {
@@ -47,7 +48,7 @@ func verifyTree(b *BTree, count int, t *testing.T) {
 	verifyRoot(b, t)
 
 	for i := 0; i < b.root.count; i++ {
-		verifyNode(b.root.kcs[i].child, b.root, t)
+		verifyNode(b.root.inodes[i].child, b.root, t)
 	}
 
 	leftMost := findLeftMost(b.root)
@@ -115,7 +116,7 @@ func verifyNode(n node, parent *branchNode, t *testing.T) {
 
 		var last int
 		for i := 0; i < nn.count; i++ {
-			key := nn.kcs[i].key
+			key := nn.inodes[i].key
 			if key != 0 && key < last {
 				t.Errorf("interior.sort.key: want > %d, got = %d", last, key)
 			}
@@ -125,7 +126,7 @@ func verifyNode(n node, parent *branchNode, t *testing.T) {
 				t.Errorf("interior.last.key: want = 0, got = %d", key)
 			}*/
 
-			verifyNode(nn.kcs[i].child, nn, t)
+			verifyNode(nn.inodes[i].child, nn, t)
 		}
 
 	case *leafNode:
@@ -146,7 +147,7 @@ func verifyNode(n node, parent *branchNode, t *testing.T) {
 func findLeftMost(n node) *leafNode {
 	switch nn := n.(type) {
 	case *branchNode:
-		return findLeftMost(nn.kcs[0].child)
+		return findLeftMost(nn.inodes[0].child)
 	case *leafNode:
 		return nn
 	default:

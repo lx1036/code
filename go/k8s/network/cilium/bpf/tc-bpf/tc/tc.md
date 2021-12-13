@@ -132,8 +132,11 @@ tc filter add dev eth0 parent ffff: protocol all u32 match u8 0 0 action mirred 
 tc qdisc add dev tap0 ingress
 tc filter add dev tap0 parent ffff: protocol all u32 match u8 0 0 action mirred egress redirect dev eth1
 
-# 使用 tc 加载 ebpf 程序到网卡上
-tc filter add dev veth09e1d2e egress bpf da obj tc-xdp-drop-tcp.o sec tc
+# 使用 tc 加载 ebpf 程序到网卡上，tc 命令一般用来下发 tc bpf 程序
+tc filter add dev veth09e1d2e egress bpf da obj tc-xdp-drop-tcp.o sec tc-test
+# ip 命令一般用来下发 xdp bpf 程序
+ip link set dev veth09e1d2e tc obj tc-xdp-drop-tcp.o sec tc-test
+
 
 # 加载 ebpf 程序到 xdp 上
 # 但是 Cilium 默认没有下发 xdp ebpf 程序
