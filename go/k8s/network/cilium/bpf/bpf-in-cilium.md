@@ -18,6 +18,11 @@ https://docs.cilium.io/en/v1.10/concepts/ebpf/intro/ :
 * Socket eBPF Hook: 
 
 
+## from-container bpf
+
+
+
+
 
 # Cilium 基于 eBPF 收发包路径 datapath
 http://arthurchiao.art/blog/understanding-ebpf-datapath-in-cilium-zh/ :
@@ -79,6 +84,48 @@ bpftool prog dump xlated id 4409 # dump the interpreted BPF code
 bpftool prog dump jited id 4409 # dump the JITed BPF code
 ```
 
+使用 LLVM 编译 bpf 程序:
+```shell
+# To enable eBPF/eBPF JIT support
+echo 1 > /proc/sys/net/core/bpf_jit_enable
+clang -O2 -emit-llvm -c bpf.c -o - | llc -march=bpf -filetype=obj -o bpf.o
+
+```
+
+
+## BPF Map Types
+* Hash tables
+* Arrays
+* LRU(Least recently used)
+* Ring Buffer
+* Stack trace
+* LPM(Longest prefix match)
+
+BPF Helpers:
+* bpf_get_prandom_u32()
+* bpf_skb_store_bytes()
+* bpf_redirect()
+* bpf_get_current_pid_tgid()
+* bpf_perf_event_output()
+
+eBPF Tail Calls 作用:
+* chain programs together
+* split programs into independent logical components
+* make bpf programs compasable
+
+eBPF Function Calls 作用：
+* reuse inside of a programs
+* reduce programs size
+
+
+## 常用 BPF 工具
+
+### bpftool
+```shell
+# https://manpages.ubuntu.com/manpages/focal/man8/bpftool-map.8.html
+yum install -y bpftool
+
+```
 
 
 
@@ -89,3 +136,5 @@ bpftool prog dump jited id 4409 # dump the JITed BPF code
 
 **[Cilium：BPF 和 XDP 参考指南](http://arthurchiao.art/blog/cilium-bpf-xdp-reference-guide-zh/)**
 
+## 常见缩写
+ELF: executable and linkable format

@@ -90,3 +90,7 @@ if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
            "$@"
 fi
 
+if [ "${GENS}" = "all" ] || grep -qw "defaulter" <<<"${GENS}"; then
+  echo "Generating defaulter funcs"
+  "${gobin}/defaulter-gen" --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" -O zz_generated.defaulter "$@"
+fi
