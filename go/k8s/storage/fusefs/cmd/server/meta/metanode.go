@@ -52,6 +52,56 @@ type MetaNode struct {
 	wg                sync.WaitGroup
 }
 
+func NewServer() *MetaNode {
+	return &MetaNode{}
+}
+
+// Start starts up the meta node with the specified configuration.
+//  1. Start and load each meta partition from the snapshot.
+//  2. Restore raftStore fsm of each meta node range.
+//  3. Start server and accept connection from the master and clients.
+func (m *MetaNode) Start(cfg *config.Config) error {
+	var err error
+	if err = m.parseConfig(cfg); err != nil {
+		return err
+	}
+
+	// INFO: 向 master 注册 meta, POST /metaNode/add
+	m.nodeId = 1 // for debug in local
+	/*if err = m.register(); err != nil {
+		return err
+	}*/
+
+	// INFO: 启动 raft，等待 meta manager 来提交 raft log
+	if err = m.startRaftServer(); err != nil {
+		return err
+	}
+
+	// TODO: http handler 后续实现
+	/*if err = m.registerAPIHandler(); err != nil {
+		return err
+	}*/
+	// INFO: 用来处理来自 client 的请求，并把数据写到 raft log 里
+	if err = m.startMetaManager(); err != nil {
+		return err
+	}
+
+	// check local partition compare with master ,if lack,then not start
+	/*if err = m.checkLocalPartitionMatchWithMaster(); err != nil {
+		klog.Error(err)
+		return err
+	}*/
+
+	// INFO: goroutine 启动 TCP server，监听在 9021 port，被 client 调用!!!
+	if err = m.startTCPServer(); err != nil {
+		return err
+	}
+
+	m.wg.Add(1)
+
+	return nil
+}
+
 func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	if cfg == nil {
 		err = errors.New("invalid configuration")
@@ -276,55 +326,4 @@ func (m *MetaNode) Wait() {
 	if atomic.LoadUint32(&m.state) == StateRunning {
 		m.wg.Wait()
 	}
-}
-
-// Start starts up the meta node with the specified configuration.
-//  1. Start and load each meta partition from the snapshot.
-//  2. Restore raftStore fsm of each meta node range.
-//  3. Start server and accept connection from the master and clients.
-func (m *MetaNode) Start(cfg *config.Config) error {
-	var err error
-	if err = m.parseConfig(cfg); err != nil {
-		return err
-	}
-
-	// INFO: 向 master 注册 meta, POST /metaNode/add
-	m.nodeId = 1 // for debug in local
-	/*if err = m.register(); err != nil {
-		return err
-	}*/
-
-	// INFO: 启动 raft，等待 meta manager 来提交 raft log
-	if err = m.startRaftServer(); err != nil {
-		return err
-	}
-
-	// TODO: http handler 后续实现
-	/*if err = m.registerAPIHandler(); err != nil {
-		return err
-	}*/
-	// INFO: 用来处理来自 client 的请求，并把数据写到 raft log 里
-	if err = m.startMetaManager(); err != nil {
-		return err
-	}
-
-	// check local partition compare with master ,if lack,then not start
-	/*if err = m.checkLocalPartitionMatchWithMaster(); err != nil {
-		klog.Error(err)
-		return err
-	}*/
-
-	// INFO: goroutine 启动 TCP server，监听在 9021 port，被 client 调用!!!
-	if err = m.startTCPServer(); err != nil {
-		return err
-	}
-
-	m.wg.Add(1)
-
-	return nil
-}
-
-// NewServer creates a new meta node instance.
-func NewServer() *MetaNode {
-	return &MetaNode{}
 }

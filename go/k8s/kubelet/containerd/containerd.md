@@ -4,6 +4,11 @@
 代码：https://github.com/containerd/containerd
 arch: https://github.com/containerd/containerd/blob/main/design/architecture.md
 
+```shell
+cd /var/lib/containerd
+tree -L 4 .
+bbolt buckets io.containerd.snapshotter.v1.overlayfs/metadata.db
+```
 
 ## Storage
 ### Content

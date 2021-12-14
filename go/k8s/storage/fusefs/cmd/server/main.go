@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"k8s-lx1036/k8s/storage/fusefs/cmd/server/master"
+	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/config"
 
 	"k8s.io/klog/v2"
@@ -44,6 +45,7 @@ type Server interface {
 }
 
 // go run . -c ./master.json
+// go run . -c ./meta.json
 func main() {
 	flag.Parse()
 	if len(*configFile) == 0 {
@@ -62,7 +64,7 @@ func main() {
 	)
 	switch role {
 	case RoleMeta:
-		//server = meta.NewServer()
+		server = meta.NewServer()
 	case RoleMaster:
 		server = master.NewServer()
 	default:
