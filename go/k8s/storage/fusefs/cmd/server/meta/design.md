@@ -9,3 +9,6 @@ MetaNode -> start MetadataManager -> start MetaPartition
 
 
 (2) MetadataPartition
+
+# MetaPartition 作用
+

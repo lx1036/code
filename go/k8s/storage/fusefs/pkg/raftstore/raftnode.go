@@ -6,6 +6,7 @@ import (
 
 	"k8s-lx1036/k8s/storage/etcd/multiraft"
 	"k8s-lx1036/k8s/storage/raft/proto"
+	//multiraft "github.com/tiglabs/raft"
 )
 
 // INFO: 参考 https://github.com/tiglabs/raft/blob/master/test/testserver.go

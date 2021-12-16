@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -29,6 +27,20 @@ const (
 	StateStopped
 )
 
+// Configuration keys
+const (
+	cfgLocalIP           = "localIP"
+	cfgListen            = "listen"
+	cfgMetadataDir       = "metadataDir"
+	cfgRaftDir           = "raftDir"
+	cfgMasterAddrs       = "masterAddrs"
+	cfgRaftHeartbeatPort = "raftHeartbeatPort"
+	cfgRaftReplicaPort   = "raftReplicaPort"
+	cfgTotalMem          = "totalMem"
+
+	profPort = "profPort"
+)
+
 var (
 	masterHelper   util.MasterHelper
 	configTotalMem uint64
@@ -37,6 +49,8 @@ var (
 // The MetaNode manages the dentry and inode information of the meta partitions on a meta node.
 // The data consistency is ensured by Raft.
 type MetaNode struct {
+	wg sync.WaitGroup
+
 	nodeId            uint64
 	listen            string
 	metadataDir       string // root dir of the metaNode
@@ -49,7 +63,8 @@ type MetaNode struct {
 	raftReplicatePort string
 	httpStopC         chan uint8
 	state             uint32
-	wg                sync.WaitGroup
+
+	profPort string
 }
 
 func NewServer() *MetaNode {
@@ -73,20 +88,18 @@ func (m *MetaNode) Start(cfg *config.Config) error {
 	}*/
 
 	// INFO: 启动 raft，等待 meta manager 来提交 raft log
-	if err = m.startRaftServer(); err != nil {
+	if err = m.newRaft(); err != nil {
 		return err
 	}
 
-	// TODO: http handler 后续实现
-	/*if err = m.registerAPIHandler(); err != nil {
-		return err
-	}*/
+	m.startHTTPServer()
+
 	// INFO: 用来处理来自 client 的请求，并把数据写到 raft log 里
 	if err = m.startMetaManager(); err != nil {
 		return err
 	}
 
-	// check local partition compare with master ,if lack,then not start
+	// check local partition compare with master ,if lack, then not start
 	/*if err = m.checkLocalPartitionMatchWithMaster(); err != nil {
 		klog.Error(err)
 		return err
@@ -113,6 +126,10 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	m.raftDir = cfg.GetString(cfgRaftDir)
 	m.raftHeartbeatPort = cfg.GetString(cfgRaftHeartbeatPort)
 	m.raftReplicatePort = cfg.GetString(cfgRaftReplicaPort)
+	m.profPort = cfg.GetString(profPort)
+	if len(m.profPort) == 0 {
+		m.profPort = "9092"
+	}
 	configTotalMem, _ = strconv.ParseUint(cfg.GetString(cfgTotalMem), 10, 64)
 	if configTotalMem == 0 {
 		return fmt.Errorf("bad totalMem config,Recommended to be configured as 80 percent of physical machine memory")
@@ -143,19 +160,6 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	return
 }
 
-// INFO: GET masterAddrs[len(masterAddrs)-1]:9500/admin/getIp
-func getClusterInfo() (*proto.ClusterInfo, error) {
-	respBody, err := masterHelper.Request("GET", proto.AdminGetIP, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	cInfo := &proto.ClusterInfo{}
-	if err = json.Unmarshal(respBody, cInfo); err != nil {
-		return nil, err
-	}
-	return cInfo, nil
-}
-
 // INFO: 向 master 注册 meta, POST /metaNode/add
 func (m *MetaNode) register() (err error) {
 	reqParam := make(map[string]string)
@@ -173,7 +177,7 @@ func (m *MetaNode) register() (err error) {
 
 	respBody, err := masterHelper.Request("POST", proto.AddMetaNode, reqParam, nil)
 	if err != nil {
-
+		return err
 	}
 	nodeIDStr := strings.TrimSpace(string(respBody))
 	if nodeIDStr == "" {
@@ -187,72 +191,31 @@ func (m *MetaNode) register() (err error) {
 	return nil
 }
 
-// INFO: tcp 监听在 9021 port，没有走 http 协议
-func (m *MetaNode) startTCPServer() (err error) {
-	m.httpStopC = make(chan uint8)
-	ln, err := net.Listen("tcp", ":"+m.listen)
+// StartRaftServer initializes the address resolver and the raftStore server instance.
+func (m *MetaNode) newRaft() (err error) {
+	if _, err = os.Stat(m.raftDir); err != nil {
+		if err = os.MkdirAll(m.raftDir, 0755); err != nil {
+			err = fmt.Errorf("create raft server dir: %v", err)
+			return
+		}
+	}
+
+	heartbeatPort, _ := strconv.Atoi(m.raftHeartbeatPort)
+	replicaPort, _ := strconv.Atoi(m.raftReplicatePort)
+	raftConf := &raftstore.Config{
+		NodeID:            m.nodeId,
+		RaftPath:          m.raftDir,
+		IPAddr:            m.localAddr,
+		HeartbeatPort:     heartbeatPort,
+		ReplicaPort:       replicaPort,
+		NumOfLogsToRetain: 2000000,
+	}
+	m.raftStore, err = raftstore.NewRaftStore(raftConf)
 	if err != nil {
-		return
+		err = errors.New(fmt.Sprintf("new raftStore: %s", err.Error()))
 	}
-	go func(stopC chan uint8) {
-		defer ln.Close()
-		for {
-			conn, err := ln.Accept()
-			select {
-			case <-stopC:
-				return
-			default:
-			}
-			if err != nil {
-				continue
-			}
-			go m.serveConn(conn, stopC)
-		}
-	}(m.httpStopC)
-	klog.Infof("start server over...")
+
 	return
-}
-
-func (m *MetaNode) stopTCPServer() {
-	if m.httpStopC != nil {
-		defer func() {
-			if r := recover(); r != nil {
-				klog.Errorf(fmt.Sprintf("action[StopTcpServer],err:%v", r))
-			}
-		}()
-		close(m.httpStopC)
-	}
-}
-
-// INFO: 从 tcp connection 读数据
-func (m *MetaNode) serveConn(conn net.Conn, stopC chan uint8) {
-	defer conn.Close()
-	c := conn.(*net.TCPConn)
-	c.SetKeepAlive(true)
-	c.SetNoDelay(true)
-	remoteAddr := conn.RemoteAddr().String()
-	for {
-		select {
-		case <-stopC:
-			return
-		default:
-		}
-		p := &proto.Packet{}
-		if err := p.ReadFromConn(conn, proto.NoReadDeadlineTime); err != nil {
-			if err != io.EOF {
-				klog.Errorf("serve MetaNode remote[%v] %v error: %v", remoteAddr, p.GetUniqueLogId(), err)
-			}
-			return
-		}
-
-		// Start a goroutine for packet handling. Do not block connection read goroutine.
-		go func() {
-			if err := m.metadataManager.HandleMetadataOperation(conn, p, remoteAddr); err != nil {
-				klog.Errorf("serve operatorPkg: %v", err)
-				return
-			}
-		}()
-	}
 }
 
 // INFO: check meta local partition 和 master partition 数据是否一致
@@ -318,7 +281,11 @@ func (m *MetaNode) Shutdown() {
 	// shutdown node and release the resource
 	m.stopTCPServer()
 	m.stopMetaManager()
-	m.stopRaftServer()
+
+	if m.raftStore != nil {
+		m.raftStore.Stop()
+	}
+
 	m.wg.Done()
 }
 
@@ -326,4 +293,17 @@ func (m *MetaNode) Wait() {
 	if atomic.LoadUint32(&m.state) == StateRunning {
 		m.wg.Wait()
 	}
+}
+
+// INFO: GET masterAddrs[len(masterAddrs)-1]:9500/admin/getIp
+func getClusterInfo() (*proto.ClusterInfo, error) {
+	respBody, err := masterHelper.Request("GET", proto.AdminGetIP, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	cInfo := &proto.ClusterInfo{}
+	if err = json.Unmarshal(respBody, cInfo); err != nil {
+		return nil, err
+	}
+	return cInfo, nil
 }

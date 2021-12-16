@@ -1,4 +1,4 @@
-package meta
+package partition
 
 import (
 	"encoding/binary"
@@ -11,6 +11,7 @@ import (
 	"path"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/google/btree"
 )
@@ -27,16 +28,139 @@ const (
 	metadataFileTmp = ".meta"
 )
 
+const (
+	StateStandby uint32 = iota
+	StateStart
+	StateRunning
+	StateShutdown
+	StateStopped
+)
+
+const (
+	intervalToPersistData = time.Minute * 5
+)
+
 // INFO: storeMsg 包含两个 btree，这里如何持久化到磁盘是重点!!!
 type storeMsg struct {
 	command    uint32
 	applyIndex uint64
-	inodeTree  *btree.BTree
-	dentryTree *btree.BTree
+	inodeTree  *BTree
+	dentryTree *BTree
+}
+
+// INFO: 开启/关闭 定时 snapshot，且只有 leader 才会 snapshot，如果 leader change，需要关闭定时 snapshot
+func (partition *MetaPartitionFSM) startSchedule(curIndex uint64) {
+	scheduleState := StateStopped
+	timer := time.NewTimer(time.Hour * 24 * 365)
+	timer.Stop()
+
+	storeMsgFunc := func(msg *storeMsg) {
+		if err := partition.store(msg); err == nil {
+			// INFO: 已经持久化了，可以 truncate raft log
+			if partition.raftPartition != nil {
+				partition.raftPartition.Truncate(curIndex)
+			}
+			curIndex = msg.applyIndex
+		} else {
+			// INFO: retry store again
+			partition.storeChan <- msg
+		}
+
+		if _, ok := partition.IsLeader(); ok {
+			timer.Reset(intervalToPersistData)
+		}
+		scheduleState = StateStopped
+	}
+
+	go func(stopC chan bool) {
+		var messages []*storeMsg
+		readyChan := make(chan struct{}, 1)
+		for {
+			if len(messages) > 0 {
+				if scheduleState == StateStopped {
+					scheduleState = StateRunning
+					readyChan <- struct{}{}
+				}
+			}
+
+			select {
+			case <-stopC:
+				return
+			case <-timer.C:
+				if partition.applyID <= curIndex { // 开启定时 snapshot
+					timer.Reset(intervalToPersistData)
+					continue
+				}
+				partition.Put(opFSMStoreTick, nil)
+			case <-readyChan:
+				// INFO: 第一个 msg 会走 storeMsgFunc，然后后面的 msg 存储在 []messages，如果没有新的，
+				//  则 intervalToPersistData 之后，会继续下一个循环走 storeMsgFunc，这时上一个 storeMsgFunc 已经走完了，
+				//  这样可以避免并发走 store(msg *storeMsg)
+				msg := findMaxApplyIndexMsg(messages, curIndex)
+				if msg != nil {
+					go storeMsgFunc(msg)
+				}
+				messages = messages[:0]
+			case msg := <-partition.storeChan: // INFO: storeMsg channel buffer size = 5
+				switch msg.command {
+				case startStoreTick: // 开启定时 snapshot
+					timer.Reset(intervalToPersistData)
+				case stopStoreTick: // 关闭定时 snapshot
+					timer.Stop()
+				case opFSMStoreTick:
+					messages = append(messages, msg)
+				}
+			}
+		}
+	}(partition.stopC)
+}
+
+// INFO: 找出比当前 index 大的且最大的那个 storeMsg
+func findMaxApplyIndexMsg(messages []*storeMsg, index uint64) *storeMsg {
+	var maxMessage *storeMsg
+	maxApplyIndex := uint64(0)
+	for _, message := range messages {
+		if message.applyIndex <= index {
+			continue
+		}
+
+		if message.applyIndex > maxApplyIndex {
+			maxApplyIndex = message.applyIndex
+			maxMessage = message
+		}
+	}
+
+	return maxMessage
+}
+
+// INFO: save inode/dentry/apply/sign snapshot file
+func (partition *MetaPartitionFSM) store(msg *storeMsg) error {
+	// INFO: save msg into data/metanode/partition/partition_${id}/snapshot/inode
+	inodeCRC, err := partition.storeInode(msg)
+	if err != nil {
+		return err
+	}
+	// INFO: save msg into data/metanode/partition/partition_${id}/snapshot/dentry
+	dentryCRC, err := partition.storeDentry(msg)
+	if err != nil {
+		return err
+	}
+	// INFO: save msg into data/metanode/partition/partition_${id}/snapshot/apply
+	err = partition.storeApplyID(msg)
+	if err != nil {
+		return err
+	}
+	// INFO: save crc into data/metanode/partition/partition_${id}/snapshot/sign
+	if err = ioutil.WriteFile(path.Join(partition.config.RootDir, SnapshotDir, SnapshotSign),
+		[]byte(fmt.Sprintf("%d %d", inodeCRC, dentryCRC)), 0775); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // INFO: 加载 data/metanode/partition_${id}/meta 文件
-func (partition *metaPartition) loadMetadata() error {
+func (partition *MetaPartitionFSM) loadMetadata() error {
 	metaFile := path.Join(partition.config.RootDir, MetadataFile)
 	content, err := ioutil.ReadFile(metaFile)
 	if err != nil {
@@ -54,7 +178,7 @@ func (partition *metaPartition) loadMetadata() error {
 }
 
 // INFO: 加载 data/metanode/partition/partition_${id}/snapshot/inode 文件
-func (partition *metaPartition) loadInode() (err error) {
+func (partition *MetaPartitionFSM) loadInode() (err error) {
 	inodeFile := path.Join(partition.config.RootDir, SnapshotDir, InodeFile)
 	content, err := ioutil.ReadFile(inodeFile)
 	if err != nil {
@@ -66,7 +190,7 @@ func (partition *metaPartition) loadInode() (err error) {
 }
 
 // INFO: 这个函数很有参考意义，解决问题：如何持久化一个 BTree 到一个文件
-func (partition *metaPartition) storeInode(msg *storeMsg) (uint32, error) {
+func (partition *MetaPartitionFSM) storeInode(msg *storeMsg) (uint32, error) {
 	filename := path.Join(partition.config.RootDir, SnapshotDir, InodeFile)
 	inodeFile, err := os.OpenFile(filename, os.O_RDWR|os.O_TRUNC|os.O_APPEND|os.O_CREATE, 0755)
 	if err != nil {
@@ -112,12 +236,12 @@ func (partition *metaPartition) storeInode(msg *storeMsg) (uint32, error) {
 }
 
 // INFO: 加载 data/metanode/partition/partition_${id}/snapshot/dentry 文件
-func (partition *metaPartition) loadDentry() error {
+func (partition *MetaPartitionFSM) loadDentry() error {
 
 }
 
 // INFO: 迭代BTree，序列化每一个 btree.Item，然后持久化到一个文件内
-func (partition *metaPartition) storeDentry(msg *storeMsg) (uint32, error) {
+func (partition *MetaPartitionFSM) storeDentry(msg *storeMsg) (uint32, error) {
 	filename := path.Join(partition.config.RootDir, SnapshotDir, DentryFile)
 	dentryFile, err := os.OpenFile(filename, os.O_RDWR|os.O_TRUNC|os.O_APPEND|os.O_CREATE, 0755)
 	if err != nil {
@@ -162,13 +286,13 @@ func (partition *metaPartition) storeDentry(msg *storeMsg) (uint32, error) {
 	return sign.Sum32(), nil
 }
 
-func (partition *metaPartition) storeApplyID(msg *storeMsg) error {
+func (partition *MetaPartitionFSM) storeApplyID(msg *storeMsg) error {
 	filename := path.Join(partition.config.RootDir, SnapshotDir, ApplyIDFile)
 	// INFO: 注意这里使用的是 atomic.LoadUint64()，非常重要，学习下 atomic ！！！
 	return ioutil.WriteFile(filename, []byte(fmt.Sprintf("%d|%d", msg.applyIndex, atomic.LoadUint64(&partition.config.Cursor))), 0775)
 }
 
-func (partition *metaPartition) loadApplyID() error {
+func (partition *MetaPartitionFSM) loadApplyID() error {
 	filename := path.Join(partition.config.RootDir, SnapshotDir, ApplyIDFile)
 	content, err := ioutil.ReadFile(filename)
 	if err != nil {
