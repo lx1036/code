@@ -5,10 +5,12 @@ package partition
 import (
 	"encoding/json"
 	"fmt"
-	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
 	"strconv"
 	"strings"
 	"sync/atomic"
+
+	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
+	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
 
 	"github.com/tiglabs/raft"
 	raftproto "github.com/tiglabs/raft/proto"
@@ -31,6 +33,37 @@ const (
 	opFSMEvictInode
 	opFSMSetAttr
 )
+
+// INFO: 创建 raft partition，实际上每一个 partition 都有其自己的 wal path
+func (partition *MetaPartitionFSM) startRaft() error {
+	var (
+		err           error
+		heartbeatPort int
+		replicaPort   int
+		peers         []raftstore.PeerAddress
+	)
+	if heartbeatPort, replicaPort, err = partition.getRaftPort(); err != nil {
+		return err
+	}
+	for _, peer := range partition.config.Peers {
+		peers = append(peers, raftstore.PeerAddress{
+			Peer: raftproto.Peer{
+				ID: peer.ID,
+			},
+			Address:       strings.Split(peer.Addr, ":")[0],
+			HeartbeatPort: heartbeatPort,
+			ReplicaPort:   replicaPort,
+		})
+	}
+	partition.raftPartition, err = partition.config.RaftStore.CreatePartition(&raftstore.PartitionConfig{
+		ID:      partition.config.PartitionId,
+		Applied: partition.applyID,
+		Peers:   peers,
+		SM:      partition,
+	})
+
+	return err
+}
 
 func (partition *MetaPartitionFSM) Apply(command []byte, index uint64) (resp interface{}, err error) {
 	msg := &MetaItem{}

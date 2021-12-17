@@ -7,6 +7,8 @@ import (
 
 const DefaultBTreeDegree = 32
 
+// INFO: 并发安全的 btree
+
 type BTree struct {
 	sync.RWMutex
 	tree *btree.BTree
@@ -26,4 +28,11 @@ func (b *BTree) GetTree() *BTree {
 	nb := NewBtree()
 	nb.tree = t
 	return nb
+}
+
+func (b *BTree) ReplaceOrInsert(key btree.Item) {
+	b.Lock()
+	defer b.Unlock()
+
+	b.tree.ReplaceOrInsert(key)
 }

@@ -2,15 +2,10 @@ package partition
 
 import (
 	"errors"
-	"os"
-	"strings"
-	"sync/atomic"
-
 	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
-
-	raftproto "github.com/tiglabs/raft/proto"
+	"os"
 )
 
 var (
@@ -21,12 +16,13 @@ var (
 
 // MetaPartitionConfig is used to create a meta partition.
 type MetaPartitionConfig struct {
+	Peers []proto.Peer `json:"peers"` // raft peers
+
 	// Identity for raftStore group. RaftStore nodes in the same raftStore group must have the same groupID.
 	PartitionId uint64              `json:"partition_id"`
 	VolName     string              `json:"vol_name"`
 	Start       uint64              `json:"start"` // Minimal Inode ID of this range. (Required during initialization)
 	End         uint64              `json:"end"`   // Maximal Inode ID of this range. (Required during initialization)
-	Peers       []proto.Peer        `json:"peers"` // Peers information of the raftStore
 	Cursor      uint64              `json:"-"`     // Cursor ID of the inode that have been assigned
 	NodeId      uint64              `json:"-"`
 	RootDir     string              `json:"-"`
@@ -77,7 +73,7 @@ func NewMetaPartitionFSM(conf *MetaPartitionConfig) *MetaPartitionFSM {
 	}
 }
 
-// INFO: 启动各个 partition
+// Start INFO: 启动各个 partition
 func (partition *MetaPartitionFSM) Start() error {
 	if err := partition.loadFromSnapshot(); err != nil {
 		return err
@@ -106,39 +102,6 @@ func (partition *MetaPartitionFSM) loadFromSnapshot() error {
 	return partition.loadApplyID()
 }
 
-// INFO: 创建 raft partition，实际上每一个 partition 都有其自己的 wal path
-func (partition *MetaPartitionFSM) startRaft() error {
-	var (
-		err           error
-		heartbeatPort int
-		replicaPort   int
-		peers         []raftstore.PeerAddress
-	)
-	if heartbeatPort, replicaPort, err = partition.getRaftPort(); err != nil {
-		return err
-	}
-	for _, peer := range partition.config.Peers {
-		addr := strings.Split(peer.Addr, ":")[0]
-		rp := raftstore.PeerAddress{
-			Peer: raftproto.Peer{
-				ID: peer.ID,
-			},
-			Address:       addr,
-			HeartbeatPort: heartbeatPort,
-			ReplicaPort:   replicaPort,
-		}
-		peers = append(peers, rp)
-	}
-	partition.raftPartition, err = partition.config.RaftStore.CreatePartition(&raftstore.PartitionConfig{
-		ID:      partition.config.PartitionId,
-		Applied: partition.applyID,
-		Peers:   peers,
-		SM:      partition,
-	})
-
-	return err
-}
-
 func (partition *MetaPartitionFSM) Stop() {
 	panic("implement me")
 }
@@ -165,19 +128,4 @@ func (partition *MetaPartitionFSM) PersistMetadata() (err error) {
 
 func (partition *MetaPartitionFSM) DeletePartition() (err error) {
 	panic("implement me")
-}
-
-// Return a new inode ID and update the offset.
-func (partition *MetaPartitionFSM) nextInodeID() (inodeId uint64, err error) {
-	for {
-		cur := atomic.LoadUint64(&partition.config.Cursor)
-		end := partition.config.End
-		if cur >= end {
-			return 0, ErrInodeIDOutOfRange
-		}
-		newId := cur + 1
-		if atomic.CompareAndSwapUint64(&partition.config.Cursor, cur, newId) {
-			return newId, nil
-		}
-	}
 }

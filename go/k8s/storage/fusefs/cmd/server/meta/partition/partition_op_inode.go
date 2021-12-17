@@ -2,6 +2,7 @@ package partition
 
 import (
 	"encoding/json"
+	"sync/atomic"
 
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
 
@@ -79,4 +80,19 @@ func (partition *MetaPartitionFSM) EvictInode(req *proto.EvictInodeRequest, p *p
 
 func (partition *MetaPartitionFSM) SetAttr(reqData []byte, p *proto.Packet) (err error) {
 	panic("implement me")
+}
+
+// Return a new inode ID and update the offset.
+func (partition *MetaPartitionFSM) nextInodeID() (inodeId uint64, err error) {
+	for {
+		cur := atomic.LoadUint64(&partition.config.Cursor)
+		end := partition.config.End
+		if cur >= end {
+			return 0, ErrInodeIDOutOfRange
+		}
+		newId := cur + 1
+		if atomic.CompareAndSwapUint64(&partition.config.Cursor, cur, newId) {
+			return newId, nil
+		}
+	}
 }

@@ -1,10 +1,12 @@
 package partition
 
 import (
+	"bufio"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"hash/crc32"
+	"io"
 	"io/ioutil"
 	"k8s.io/klog/v2"
 	"os"
@@ -159,36 +161,6 @@ func (partition *MetaPartitionFSM) store(msg *storeMsg) error {
 	return nil
 }
 
-// INFO: 加载 data/metanode/partition_${id}/meta 文件
-func (partition *MetaPartitionFSM) loadMetadata() error {
-	metaFile := path.Join(partition.config.RootDir, MetadataFile)
-	content, err := ioutil.ReadFile(metaFile)
-	if err != nil {
-		return err
-	}
-
-	mConf := &MetaPartitionConfig{}
-	if err = json.Unmarshal(content, mConf); err != nil {
-		return err
-	}
-
-	partition.config = mConf
-	partition.config.Cursor = mConf.Start
-	return nil
-}
-
-// INFO: 加载 data/metanode/partition/partition_${id}/snapshot/inode 文件
-func (partition *MetaPartitionFSM) loadInode() (err error) {
-	inodeFile := path.Join(partition.config.RootDir, SnapshotDir, InodeFile)
-	content, err := ioutil.ReadFile(inodeFile)
-	if err != nil {
-		return err
-	}
-
-	inode := NewInode(0, 0)
-
-}
-
 // INFO: 这个函数很有参考意义，解决问题：如何持久化一个 BTree 到一个文件
 func (partition *MetaPartitionFSM) storeInode(msg *storeMsg) (uint32, error) {
 	filename := path.Join(partition.config.RootDir, SnapshotDir, InodeFile)
@@ -206,7 +178,7 @@ func (partition *MetaPartitionFSM) storeInode(msg *storeMsg) (uint32, error) {
 
 	lenBuf := make([]byte, 4)
 	sign := crc32.NewIEEE()
-	msg.inodeTree.Ascend(func(i btree.Item) bool {
+	msg.inodeTree.tree.Ascend(func(i btree.Item) bool {
 		inode := i.(*Inode)
 		data, err := inode.MarshalToJSON() // 这里使用 json 序列化形式
 		//data, err := inode.Marshal()
@@ -235,11 +207,6 @@ func (partition *MetaPartitionFSM) storeInode(msg *storeMsg) (uint32, error) {
 	return sign.Sum32(), nil
 }
 
-// INFO: 加载 data/metanode/partition/partition_${id}/snapshot/dentry 文件
-func (partition *MetaPartitionFSM) loadDentry() error {
-
-}
-
 // INFO: 迭代BTree，序列化每一个 btree.Item，然后持久化到一个文件内
 func (partition *MetaPartitionFSM) storeDentry(msg *storeMsg) (uint32, error) {
 	filename := path.Join(partition.config.RootDir, SnapshotDir, DentryFile)
@@ -257,7 +224,7 @@ func (partition *MetaPartitionFSM) storeDentry(msg *storeMsg) (uint32, error) {
 
 	lenBuf := make([]byte, 4)
 	sign := crc32.NewIEEE()
-	msg.dentryTree.Ascend(func(i btree.Item) bool {
+	msg.dentryTree.tree.Ascend(func(i btree.Item) bool {
 		inode := i.(*Dentry)
 		data, err := inode.MarshalToJSON() // 这里使用 json 序列化形式
 		//data, err := inode.Marshal()
@@ -290,6 +257,116 @@ func (partition *MetaPartitionFSM) storeApplyID(msg *storeMsg) error {
 	filename := path.Join(partition.config.RootDir, SnapshotDir, ApplyIDFile)
 	// INFO: 注意这里使用的是 atomic.LoadUint64()，非常重要，学习下 atomic ！！！
 	return ioutil.WriteFile(filename, []byte(fmt.Sprintf("%d|%d", msg.applyIndex, atomic.LoadUint64(&partition.config.Cursor))), 0775)
+}
+
+// INFO: 加载 data/metanode/partition_${id}/meta 文件
+func (partition *MetaPartitionFSM) loadMetadata() error {
+	metaFile := path.Join(partition.config.RootDir, MetadataFile)
+	content, err := ioutil.ReadFile(metaFile)
+	if err != nil {
+		return err
+	}
+
+	mConf := &MetaPartitionConfig{}
+	if err = json.Unmarshal(content, mConf); err != nil {
+		return err
+	}
+
+	partition.config = mConf
+	partition.config.Cursor = mConf.Start
+	return nil
+}
+
+// INFO: 加载 data/metanode/partition/partition_${id}/snapshot/inode 文件中每一个 inode，存入 btree
+func (partition *MetaPartitionFSM) loadInode() error {
+	inodeFile := path.Join(partition.config.RootDir, SnapshotDir, InodeFile)
+	if _, err := os.Stat(inodeFile); err != nil { // check exists
+		klog.Errorf(fmt.Sprintf("[loadInode]err:%v", err))
+		return nil
+	}
+	fp, err := os.OpenFile(inodeFile, os.O_RDONLY, 0644)
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("[loadInode] OpenFile: %s", err.Error()))
+	}
+	defer fp.Close()
+	reader := bufio.NewReaderSize(fp, 4*1024*1024)
+	inoBuf := make([]byte, 4)
+	for {
+		inoBuf = inoBuf[:4]
+		// first read length
+		_, err = io.ReadFull(reader, inoBuf)
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return fmt.Errorf(fmt.Sprintf("[loadInode] ReadHeader: %s", err.Error()))
+		}
+		length := binary.BigEndian.Uint32(inoBuf)
+
+		// next read body
+		if uint32(cap(inoBuf)) >= length {
+			inoBuf = inoBuf[:length]
+		} else {
+			inoBuf = make([]byte, length)
+		}
+		_, err = io.ReadFull(reader, inoBuf)
+		if err != nil {
+			return fmt.Errorf(fmt.Sprintf("[loadInode] ReadBody: %s", err.Error()))
+		}
+		ino := NewInode(0, 0)
+		if err = ino.Unmarshal(inoBuf); err != nil {
+			return fmt.Errorf(fmt.Sprintf("[loadInode] Unmarshal: %s", err.Error()))
+		}
+		partition.size += ino.Size
+		partition.inodeTree.ReplaceOrInsert(ino) // 写入 btree
+		if partition.config.Cursor < ino.Inode {
+			partition.config.Cursor = ino.Inode
+		}
+	}
+}
+
+// INFO: 加载 data/metanode/partition/partition_${id}/snapshot/dentry 文件
+func (partition *MetaPartitionFSM) loadDentry() error {
+	dentryFile := path.Join(partition.config.RootDir, SnapshotDir, DentryFile)
+	if _, err := os.Stat(dentryFile); err != nil { // check exists
+		klog.Errorf(fmt.Sprintf("[loadDentry]err:%v", err))
+		return nil
+	}
+	fp, err := os.OpenFile(dentryFile, os.O_RDONLY, 0644)
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("[loadDentry] OpenFile: %s", err.Error()))
+	}
+	defer fp.Close()
+	reader := bufio.NewReaderSize(fp, 4*1024*1024)
+	dentryBuf := make([]byte, 4)
+	for {
+		dentryBuf = dentryBuf[:4]
+		// first read length
+		_, err = io.ReadFull(reader, dentryBuf)
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return fmt.Errorf(fmt.Sprintf("[loadDentry] ReadHeader: %s", err.Error()))
+		}
+		length := binary.BigEndian.Uint32(dentryBuf)
+
+		// next read body
+		if uint32(cap(dentryBuf)) >= length {
+			dentryBuf = dentryBuf[:length]
+		} else {
+			dentryBuf = make([]byte, length)
+		}
+		_, err = io.ReadFull(reader, dentryBuf)
+		if err != nil {
+			return fmt.Errorf(fmt.Sprintf("[loadDentry] ReadBody: %s", err.Error()))
+		}
+		dentry := &Dentry{}
+		if err = dentry.Unmarshal(dentryBuf); err != nil {
+			return fmt.Errorf(fmt.Sprintf("[loadDentry] Unmarshal: %s", err.Error()))
+		}
+		partition.dentryTree.ReplaceOrInsert(dentry) // 写入 btree
+	}
 }
 
 func (partition *MetaPartitionFSM) loadApplyID() error {
