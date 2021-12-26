@@ -1,9 +1,10 @@
-package meta
+package partition
 
 import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -34,8 +35,8 @@ import (
 //  +-------+-----------+--------------+-----------+--------------+
 type Inode struct {
 	sync.RWMutex
-	Inode uint64 `json:"inode"` // Inode ID // 8
 
+	Inode uint64 `json:"inode"` // Inode ID // 8
 	// INFO: Marshal Value
 	Type       uint32 `json:"type"`        // 4
 	Uid        uint32 `json:"uid"`         // 4
@@ -50,6 +51,27 @@ type Inode struct {
 	Flag       int32  `json:"flag"`        // 8
 	PInode     uint64 `json:"p_inode"`     // 8
 	Reserved   uint64 `json:"reserved"`    // reserved space // 8
+}
+
+// NewInode returns a new Inode instance with specified Inode ID, name and type.
+// The AccessTime and ModifyTime will be set to the current time.
+func NewInode(inode uint64, t uint32) *Inode {
+	ts := time.Now().Unix()
+	i := &Inode{
+		Inode:      inode,
+		Type:       t,
+		Generation: 1,
+		CreateTime: ts,
+		AccessTime: ts,
+		ModifyTime: ts,
+		NLink:      1,
+	}
+
+	if os.FileMode(t).IsDir() {
+		i.NLink = 2
+	}
+
+	return i
 }
 
 func (i *Inode) Less(than btree.Item) bool {
@@ -158,23 +180,93 @@ func (i *Inode) MarshalValue() []byte {
 	return buffer.Bytes()
 }
 
-// NewInode returns a new Inode instance with specified Inode ID, name and type.
-// The AccessTime and ModifyTime will be set to the current time.
-func NewInode(inode uint64, t uint32) *Inode {
-	ts := time.Now().Unix()
-	i := &Inode{
-		Inode:      inode,
-		Type:       t,
-		Generation: 1,
-		CreateTime: ts,
-		AccessTime: ts,
-		ModifyTime: ts,
-		NLink:      1,
+func (i *Inode) Unmarshal(raw []byte) (err error) {
+	var (
+		keyLen uint32
+		valLen uint32
+	)
+	buff := bytes.NewBuffer(raw)
+	if err = binary.Read(buff, binary.BigEndian, &keyLen); err != nil {
+		return
+	}
+	keyBytes := make([]byte, keyLen)
+	if _, err = buff.Read(keyBytes); err != nil {
+		return
+	}
+	if err = i.UnmarshalKey(keyBytes); err != nil {
+		return
+	}
+	if err = binary.Read(buff, binary.BigEndian, &valLen); err != nil {
+		return
+	}
+	valBytes := make([]byte, valLen)
+	if _, err = buff.Read(valBytes); err != nil {
+		return
+	}
+	err = i.UnmarshalValue(valBytes)
+	return
+}
+
+func (i *Inode) UnmarshalKey(k []byte) (err error) {
+	i.Inode = binary.BigEndian.Uint64(k)
+	return
+}
+
+func (i *Inode) UnmarshalValue(val []byte) (err error) {
+	buff := bytes.NewBuffer(val)
+	if err = binary.Read(buff, binary.BigEndian, &i.Type); err != nil {
+		return
+	}
+	if err = binary.Read(buff, binary.BigEndian, &i.Uid); err != nil {
+		return
+	}
+	if err = binary.Read(buff, binary.BigEndian, &i.Gid); err != nil {
+		return
+	}
+	if err = binary.Read(buff, binary.BigEndian, &i.Size); err != nil {
+		return
+	}
+	if err = binary.Read(buff, binary.BigEndian, &i.Generation); err != nil {
+		return
+	}
+	if err = binary.Read(buff, binary.BigEndian, &i.CreateTime); err != nil {
+		return
+	}
+	if err = binary.Read(buff, binary.BigEndian, &i.AccessTime); err != nil {
+		return
+	}
+	if err = binary.Read(buff, binary.BigEndian, &i.ModifyTime); err != nil {
+		return
+	}
+	// read symLink
+	symSize := uint32(0)
+	if err = binary.Read(buff, binary.BigEndian, &symSize); err != nil {
+		return
+	}
+	if symSize > 0 {
+		i.LinkTarget = make([]byte, symSize)
+		if _, err = io.ReadFull(buff, i.LinkTarget); err != nil {
+			return
+		}
 	}
 
-	if os.FileMode(t).IsDir() {
-		i.NLink = 2
+	if err = binary.Read(buff, binary.BigEndian, &i.NLink); err != nil {
+		return
+	}
+	if err = binary.Read(buff, binary.BigEndian, &i.Flag); err != nil {
+		return
 	}
 
-	return i
+	if err = binary.Read(buff, binary.BigEndian, &i.PInode); err != nil {
+		return
+	}
+	if err = binary.Read(buff, binary.BigEndian, &i.Reserved); err != nil {
+		return
+	}
+
+	if buff.Len() == 0 {
+		return
+	}
+
+	return
 }

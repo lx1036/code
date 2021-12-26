@@ -91,6 +91,13 @@ type Packet struct {
 	StartT      int64
 }
 
+func NewPacket() *Packet {
+	p := new(Packet)
+	p.Magic = ProtoMagic
+	p.StartT = time.Now().UnixNano()
+	return p
+}
+
 // MarshalData marshals the packet data.
 func (p *Packet) MarshalData(v interface{}) error {
 	data, err := json.Marshal(v)
@@ -298,12 +305,13 @@ func (p *Packet) GetReqID() int64 {
 	return p.ReqID
 }
 
-// NewPacket returns a new packet.
-func NewPacket() *Packet {
-	p := new(Packet)
-	p.Magic = ProtoMagic
-	p.StartT = time.Now().UnixNano()
-	return p
+// PacketErrorWithBody sets the packet with error code whose body is filled with the given data.
+func (p *Packet) PacketErrorWithBody(code uint8, reply []byte) {
+	p.Size = uint32(len(reply))
+	p.Data = make([]byte, p.Size)
+	copy(p.Data[:p.Size], reply)
+	p.ResultCode = code
+	p.ArgLen = 0
 }
 
 var (

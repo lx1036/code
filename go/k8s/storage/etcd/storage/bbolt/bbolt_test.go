@@ -2,6 +2,7 @@ package bbolt
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -127,16 +128,63 @@ func TestBbolt(test *testing.T) {
 }
 
 func TestBuckets(test *testing.T) {
-	db, err := bolt.Open("/Users/lx1036/Code/lx1036/code/go/k8s/storage/etcd/cluster1/etcd1/member/snap/db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+	db, err := bolt.Open("my.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		klog.Fatal(err)
 	}
 	defer db.Close()
-
+	
+	db.Batch(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("key"))
+		for i := 0; i < 10; i++ {
+			key := fmt.Sprintf("abc#%d", i)
+			bucket.Put([]byte(key), []byte(key))
+		}
+		return nil
+	})
+	
+	
+	klog.Info("prefix range start")
 	db.View(func(tx *bolt.Tx) error {
+		cursor := tx.Bucket([]byte("key")).Cursor()
+		for key, value := cursor.Seek([]byte("abc")); key != nil && strings.HasPrefix(string(key), "abc"); key, value = cursor.Next() {
+			klog.Info(fmt.Sprintf("key:%s value:%s", key, value))
+		}
+		return nil
+	})
+	klog.Info("prefix range finish")
+
+	/*db.View(func(tx *bolt.Tx) error { // all buckets
 		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
 			klog.Info(string(name))
 			return nil
 		})
 	})
+	
+	db.View(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte("key")).ForEach(func(k, v []byte) error {
+			//klog.Info(fmt.Sprintf("key:%s value:%s", k, v))
+			return nil
+		})
+	})*/
+	
+	tx, _ := db.Begin(false)
+	defer func() {
+		tx.Rollback()
+	}()
+	c := tx.Bucket([]byte("key")).Cursor()
+	key, value := c.First()
+	klog.Info(fmt.Sprintf("value:%s", value))
+	for i := 0; i < 100; i++ {
+		key, value = c.Next()
+		if key == nil {
+			break
+		}
+		klog.Info(fmt.Sprintf("key:%s value:%s", key, value))
+	}
+	/*for key, value := c.Next(); key != nil; {
+		klog.Info(fmt.Sprintf("key:%s value:%s", key, value))
+	}*/
+	
+	klog.Info("finish")
 }

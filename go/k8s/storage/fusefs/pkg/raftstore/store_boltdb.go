@@ -60,7 +60,7 @@ func (store *BoltdbStore) Close() error {
 
 // NewBoltdbStore "./raft/my.db"
 func NewBoltdbStore(dbPath string) *BoltdbStore {
-	db, err := bolt.Open(dbPath, 0666, nil)
+	db, err := bolt.Open(dbPath, 0600, nil)
 	if err != nil {
 		klog.Fatalf("init boltdb failed: %v, path: %v", err, dbPath)
 	}

@@ -5,10 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"k8s-lx1036/k8s/storage/fusefs/pkg/raftstore"
+	//"k8s-lx1036/k8s/storage/fusefs/pkg/raftstore"
+	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
 
 	"github.com/tiglabs/raft"
-	raftproto "github.com/tiglabs/raft/proto"
+	"github.com/tiglabs/raft/proto"
 	"k8s.io/klog/v2"
 )
 
@@ -21,15 +22,15 @@ func (partition *MetaPartition) Apply(command []byte, index uint64) (interface{}
 	return nil, nil
 }
 
-func (partition *MetaPartition) ApplyMemberChange(confChange *raftproto.ConfChange, index uint64) (interface{}, error) {
+func (partition *MetaPartition) ApplyMemberChange(confChange *proto.ConfChange, index uint64) (interface{}, error) {
 	panic("implement me")
 }
 
-func (partition *MetaPartition) Snapshot() (raftproto.Snapshot, error) {
+func (partition *MetaPartition) Snapshot() (proto.Snapshot, error) {
 	panic("implement me")
 }
 
-func (partition *MetaPartition) ApplySnapshot(peers []raftproto.Peer, iter raftproto.SnapIterator) error {
+func (partition *MetaPartition) ApplySnapshot(peers []proto.Peer, iter proto.SnapIterator) error {
 	panic("implement me")
 }
 
@@ -51,26 +52,6 @@ func (partition *MetaPartition) Get(key interface{}) (interface{}, error) {
 
 func (partition *MetaPartition) Del(key interface{}) (interface{}, error) {
 	panic("implement me")
-}
-
-// MetaItem defines the structure of the metadata operations.
-type MetaItem struct {
-	Op uint32 `json:"op"`
-	K  []byte `json:"k"`
-	V  []byte `json:"v"`
-}
-
-const (
-	opFSMCreateInode uint32 = iota
-)
-
-// NewMetaItem returns a new MetaItem.
-func NewMetaItem(op uint32, key, value []byte) *MetaItem {
-	return &MetaItem{
-		Op: op,
-		K:  key,
-		V:  value,
-	}
 }
 
 func TestRaftPartition(test *testing.T) {
@@ -107,7 +88,7 @@ func TestRaftPartition(test *testing.T) {
 	for _, peer := range peers {
 		addr := strings.Split(peer.Addr, ":")[0]
 		peerAddress := raftstore.PeerAddress{
-			Peer: raftproto.Peer{
+			Peer: proto.Peer{
 				ID: peer.ID,
 			},
 			Address:       addr,
