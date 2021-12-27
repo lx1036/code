@@ -92,10 +92,10 @@ type Packet struct {
 }
 
 func NewPacket() *Packet {
-	p := new(Packet)
-	p.Magic = ProtoMagic
-	p.StartT = time.Now().UnixNano()
-	return p
+	return &Packet{
+		Magic:  ProtoMagic,
+		StartT: time.Now().UnixNano(),
+	}
 }
 
 // MarshalData marshals the packet data.

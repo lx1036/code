@@ -70,7 +70,7 @@ func (metadataFsm *MetadataFsm) Apply(command []byte, index uint64) (resp interf
 		klog.Errorf(fmt.Sprintf("apply fsm for cmd:%s, index:%d, err:%v", command, index, err))
 		return
 	}
-	klog.Infof(fmt.Sprintf("apply fsm for cmd:%+v, index:%d", *cmd, index))
+	klog.Infof(fmt.Sprintf("apply fsm for cmd:{Op:%d, K:%s, V:%s}, index:%d", cmd.Op, cmd.K, cmd.V, index))
 	/*cmdMap := make(map[string][]byte)
 	if cmd.Op != opSyncBatchPut {
 		cmdMap[cmd.K] = cmd.V

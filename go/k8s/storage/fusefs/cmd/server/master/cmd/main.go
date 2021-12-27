@@ -42,12 +42,8 @@ func main() {
 		},
 	}
 
-	klog.Info("adsfdafStarting the master raft cluster")
-
 	cmd.Flags().StringVar(&config, "config", "", "master config file")
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
-
-	klog.Info("aaaaStarting the master raft cluster")
 
 	if err := cmd.Execute(); err != nil {
 		panic(err)
@@ -65,8 +61,6 @@ func runCommand(configFile string) error {
 	if err != nil {
 		return err
 	}
-
-	klog.Info("fffffStarting the master raft cluster")
 
 	stopCh := genericapiserver.SetupSignalHandler()
 	server := master.NewServer(config)

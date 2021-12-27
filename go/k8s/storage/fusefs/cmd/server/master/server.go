@@ -10,7 +10,6 @@ import (
 	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
 
 	"github.com/tiglabs/raft/proto"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -22,10 +21,9 @@ const (
 	defaultInitMetaPartitionCount    = 3
 	defaultMaxInitMetaPartitionCount = 100
 
-	defaultMetaNodeReservedMem uint64 = 1 << 30
-	spaceAvailableRate                = 0.90
-	defaultNodeSetCapacity            = 18
-	retrySendSyncTaskInternal         = 3 * time.Second
+	spaceAvailableRate        = 0.90
+	defaultNodeSetCapacity    = 18
+	retrySendSyncTaskInternal = 3 * time.Second
 )
 
 // configuration keys
@@ -135,11 +133,13 @@ func NewServer(config Config) *Server {
 	for _, peer := range peers {
 		values := strings.Split(peer, ":") // 1:127.0.0.1:9500
 		id, _ := strconv.ParseUint(values[0], 10, 64)
+		port, _ := strconv.Atoi(values[2])
 		server.peers = append(server.peers, raftstore.PeerAddress{
 			Peer: proto.Peer{
 				ID: id,
 			},
 			Address:       values[1],
+			Port:          port,
 			HeartbeatPort: server.heartbeatPort,
 			ReplicaPort:   server.replicaPort,
 		})
@@ -149,9 +149,6 @@ func NewServer(config Config) *Server {
 }
 
 func (server *Server) Start() (err error) {
-
-	klog.Info("afffff the master raft cluster")
-
 	// 1. create a partition raft and statemachine
 	if server.raftStore, err = raftstore.NewRaftStore(&raftstore.Config{
 		NodeID:            server.id,
@@ -161,7 +158,7 @@ func (server *Server) Start() (err error) {
 		RaftPath:          server.walDir,
 		NumOfLogsToRetain: server.retainLogs,
 		TickInterval:      1000, // 1s
-		ElectionTick:      5,
+		ElectionTick:      5,    // [5 * 1s, 2 * 5 * 1s)
 	}); err != nil {
 		return err
 	}
@@ -169,8 +166,6 @@ func (server *Server) Start() (err error) {
 	if err != nil {
 		return err
 	}
-
-	klog.Info("afffaaaff the master raft cluster")
 
 	server.fsm = newMetadataFsm(server.boltdbStore, server.retainLogs, server.raftStore.RaftServer())
 	server.fsm.registerLeaderChangeHandler(server.handleLeaderChange)

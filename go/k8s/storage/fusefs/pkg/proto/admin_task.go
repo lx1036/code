@@ -1,5 +1,10 @@
 package proto
 
+import (
+	"fmt"
+	"time"
+)
+
 // AdminTask defines the administration task.
 type AdminTask struct {
 	ID           string
@@ -12,4 +17,14 @@ type AdminTask struct {
 	SendCount    uint8
 	Request      interface{}
 	Response     interface{}
+}
+
+func NewAdminTask(opCode uint8, opAddr string, request interface{}) (t *AdminTask) {
+	return &AdminTask{
+		ID:           fmt.Sprintf("addr[%v]_op[%v]", t.OperatorAddr, t.OpCode),
+		OpCode:       opCode,
+		OperatorAddr: opAddr,
+		CreateTime:   time.Now().Unix(),
+		Request:      request,
+	}
 }

@@ -15,6 +15,7 @@ const (
 	ParamsOwner    = "owner"
 	ParamsName     = "name"
 	ParamsCapacity = "capacity"
+	ParamsAddrKey  = "addr"
 )
 
 func (server *Server) startHTTPService() {
@@ -48,6 +49,9 @@ func (server *Server) startHTTPService() {
 		})
 	})
 
+	// metanode
+	router.NewRoute().Methods(http.MethodPost).Path("/metanode").HandlerFunc(server.addMetaNode)
+
 	// volume
 	router.NewRoute().Methods(http.MethodPost).Path("/vol").HandlerFunc(server.createVol)
 
@@ -76,6 +80,17 @@ func (server *Server) createVol(writer http.ResponseWriter, request *http.Reques
 		send(writer, http.StatusOK, data)
 		return
 	}
+}
+
+func (server *Server) addMetaNode(writer http.ResponseWriter, request *http.Request) {
+	nodeAddr := request.FormValue(ParamsAddrKey)
+	if _, err := server.cluster.addMetaNode(nodeAddr); err != nil {
+		http.Error(writer, fmt.Sprintf("add metanode %s err: %v", nodeAddr, err), http.StatusInternalServerError)
+		return
+	}
+
+	send(writer, http.StatusOK, []byte("add meta node ok"))
+	return
 }
 
 func send(writer http.ResponseWriter, code int, data []byte) {

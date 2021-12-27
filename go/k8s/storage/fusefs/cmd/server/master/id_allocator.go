@@ -36,7 +36,8 @@ const (
 )
 
 const (
-	maxVolumeIDKey = "#max_volume_id"
+	maxVolumeIDKey        = "#max_volume_id"
+	maxMetaPartitionIDKey = "#max_mp_id"
 )
 
 // IDAllocator generates and allocates ids
@@ -44,11 +45,11 @@ type IDAllocator struct {
 	volumeIDLock        sync.RWMutex
 	metaPartitionIDLock sync.RWMutex
 
-	volumeID uint64
-
+	volumeID        uint64
 	metaPartitionID uint64
-	store           *raftstore.BoltDBStore
-	partition       raftstore.Partition
+
+	store     *raftstore.BoltDBStore
+	partition raftstore.Partition
 }
 
 func NewIDAllocator(store *raftstore.BoltDBStore, partition raftstore.Partition) *IDAllocator {
@@ -66,10 +67,10 @@ func (alloc *IDAllocator) allocateVolumeID() (id uint64, err error) {
 	cmd, _ := json.Marshal(&RaftCmd{
 		Op: opAllocVolumeID,
 		K:  maxVolumeIDKey,
-		V:  []byte(strconv.Itoa(int(atomic.LoadUint64(&alloc.volumeID) + 1))),
+		V:  []byte(strconv.FormatUint(id, 10)),
 	})
 	if _, err = alloc.partition.Submit(cmd); err != nil {
-		klog.Errorf(fmt.Sprintf("action[allocateVolumeID] submit cmd %s err: %v", cmd, err))
+		klog.Errorf(fmt.Sprintf("[allocateVolumeID] submit cmd %s err: %v", cmd, err))
 		return 0, err
 	}
 
@@ -78,9 +79,29 @@ func (alloc *IDAllocator) allocateVolumeID() (id uint64, err error) {
 	return id, nil
 }
 
+func (alloc *IDAllocator) allocateMetaPartitionID() (partitionID uint64, err error) {
+	alloc.metaPartitionIDLock.Lock()
+	defer alloc.metaPartitionIDLock.Unlock()
+
+	partitionID = atomic.LoadUint64(&alloc.metaPartitionID) + 1
+	cmd, _ := json.Marshal(&RaftCmd{
+		Op: opSyncAllocMetaPartitionID,
+		K:  maxMetaPartitionIDKey,
+		V:  []byte(strconv.FormatUint(partitionID, 10)),
+	})
+	if _, err = alloc.partition.Submit(cmd); err != nil {
+		klog.Errorf(fmt.Sprintf("[allocateMetaPartitionID] submit cmd %s err: %v", cmd, err))
+		return 0, err
+	}
+
+	atomic.StoreUint64(&alloc.metaPartitionID, partitionID)
+
+	return partitionID, nil
+}
+
 func (alloc *IDAllocator) restore() {
 	alloc.restoreMaxMetaPartitionID()
-	alloc.restoreMaxCommonID()
+	alloc.restoreMaxVolumeID()
 }
 
 func (alloc *IDAllocator) restoreMaxMetaPartitionID() {
@@ -101,7 +122,7 @@ func (alloc *IDAllocator) restoreMaxMetaPartitionID() {
 }
 
 // The data node, meta node, and node set share the same ID allocator.
-func (alloc *IDAllocator) restoreMaxCommonID() {
+func (alloc *IDAllocator) restoreMaxVolumeID() {
 	value, err := alloc.store.Get([]byte(maxVolumeIDKey))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to restore maxCommonID,err:%v ", err.Error()))
