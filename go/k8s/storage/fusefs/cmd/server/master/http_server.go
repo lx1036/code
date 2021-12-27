@@ -1,144 +1,87 @@
 package master
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
+	"strconv"
 
-	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
-
+	"github.com/gorilla/mux"
 	"k8s.io/klog/v2"
 )
 
+const (
+	ParamsOwner    = "owner"
+	ParamsName     = "name"
+	ParamsCapacity = "capacity"
+)
+
 func (server *Server) startHTTPService() {
+	router := mux.NewRouter()
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if server.partition.IsRaftLeader() {
+				next.ServeHTTP(writer, request)
+				return
+			}
+
+			if len(server.leaderInfo.addr) == 0 {
+				http.Error(writer, fmt.Sprintf("no raft leader"), http.StatusBadRequest)
+				return
+			}
+
+			// proxy request to raft leader
+			reverseProxy := &httputil.ReverseProxy{
+				Director: func(request *http.Request) {
+					request.URL.Scheme = "http"
+					request.URL.Host = server.leaderInfo.addr
+				},
+				Transport:      nil,
+				FlushInterval:  0,
+				ErrorLog:       nil,
+				BufferPool:     nil,
+				ModifyResponse: nil,
+				ErrorHandler:   nil,
+			}
+			reverseProxy.ServeHTTP(writer, request)
+		})
+	})
+
+	// volume
+	router.NewRoute().Methods(http.MethodPost).Path("/vol").HandlerFunc(server.createVol)
+
 	go func() {
-		server.handleFunctions()
-		if err := http.ListenAndServe(colonSplit+server.port, nil); err != nil {
-			klog.Errorf("action[startHTTPService] failed,err[%v]", err)
-			panic(err)
+		if err := http.ListenAndServe(fmt.Sprintf("%s:%s", server.ip, server.port), router); err != nil {
+			klog.Fatal(err)
 		}
 	}()
-	return
 }
 
-func (server *Server) handleFunctions() {
-	//http.HandleFunc(proto.AdminGetIP, server.getIPAddr)
-	http.Handle(proto.AdminGetCluster, server.handlerWithInterceptor())
-	http.Handle(proto.AdminGetVolMountClient, server.handlerWithInterceptor())
-	http.Handle(proto.AdminCreateVol, server.handlerWithInterceptor())
-	http.Handle(proto.AdminGetVol, server.handlerWithInterceptor())
-	http.Handle(proto.AdminDeleteVol, server.handlerWithInterceptor())
-	http.Handle(proto.AdminUpdateVol, server.handlerWithInterceptor())
-	http.Handle(proto.AdminClusterFreeze, server.handlerWithInterceptor())
-	http.Handle(proto.AddMetaNode, server.handlerWithInterceptor())
-	http.Handle(proto.DecommissionMetaNode, server.handlerWithInterceptor())
-	http.Handle(proto.GetMetaNode, server.handlerWithInterceptor())
-	http.Handle(proto.AdminLoadMetaPartition, server.handlerWithInterceptor())
-	http.Handle(proto.AdminDecommissionMetaPartition, server.handlerWithInterceptor())
-	http.Handle(proto.AdminAddMetaReplica, server.handlerWithInterceptor())
-	http.Handle(proto.AdminDeleteMetaReplica, server.handlerWithInterceptor())
-	http.Handle(proto.ClientVol, server.handlerWithInterceptor())
-	http.Handle(proto.ClientMetaPartitions, server.handlerWithInterceptor())
-	http.Handle(proto.ClientMetaPartition, server.handlerWithInterceptor())
-	http.Handle(proto.GetMetaNodeTaskResponse, server.handlerWithInterceptor())
-	http.Handle(proto.AdminCreateMP, server.handlerWithInterceptor())
-	http.Handle(proto.ClientVolStat, server.handlerWithInterceptor())
-	http.Handle(proto.ClientVolMount, server.handlerWithInterceptor())
-	http.Handle(proto.ClientVolMountUpdate, server.handlerWithInterceptor())
-	http.Handle(proto.ClientVolUnMount, server.handlerWithInterceptor())
-	http.Handle(proto.AddRaftNode, server.handlerWithInterceptor())
-	http.Handle(proto.RemoveRaftNode, server.handlerWithInterceptor())
-	http.Handle(proto.AdminSetMetaNodeThreshold, server.handlerWithInterceptor())
-	http.Handle(proto.GetTopologyView, server.handlerWithInterceptor())
-}
+func (server *Server) createVol(writer http.ResponseWriter, request *http.Request) {
+	name := request.FormValue(ParamsName)
+	owner := request.FormValue(ParamsOwner)
+	capacityStr := request.FormValue(ParamsCapacity)
+	capacity, err := strconv.ParseUint(capacityStr, 10, 64)
+	if err != nil {
+		http.Error(writer, fmt.Sprintf("capacity params %s is wrong", capacityStr), http.StatusBadRequest)
+		return
+	}
 
-func (server *Server) handlerWithInterceptor() http.Handler {
-	return http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			if server.partition.IsRaftLeader() {
-				if server.metaReady {
-					server.ServeHTTP(w, r)
-					return
-				}
-				klog.Warningf("action[handlerWithInterceptor] leader meta has not ready")
-				http.Error(w, server.leaderInfo.addr, http.StatusBadRequest)
-				return
-			}
-			if server.leaderInfo.addr == "" {
-				klog.Errorf("action[handlerWithInterceptor] no leader,request[%v]", r.URL)
-				http.Error(w, "no leader", http.StatusBadRequest)
-				return
-			}
-
-			server.reverseProxy.ServeHTTP(w, r)
-		})
-}
-
-func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	klog.Infof("URL[%v],remoteAddr[%v]", r.URL, r.RemoteAddr)
-	switch r.URL.Path {
-	/*case proto.AdminGetCluster:
-		server.getCluster(w, r)
-	case proto.AdminGetVolMountClient:
-		server.getVolMountClient(w, r)
-	case proto.AdminCreateVol:
-		server.createVol(w, r)*/
-	case proto.AdminGetVol:
-		server.getVolSimpleInfo(w, r)
-	/*case proto.AdminDeleteVol:
-		server.markDeleteVol(w, r)
-	case proto.AdminUpdateVol:
-		server.updateVol(w, r)
-	case proto.AdminClusterFreeze:
-		server.setupAutoAllocation(w, r)
-	case proto.AddMetaNode:
-		server.addMetaNode(w, r)
-	case proto.GetMetaNode:
-		server.getMetaNode(w, r)
-	case proto.DecommissionMetaNode:
-		server.decommissionMetaNode(w, r)
-	case proto.GetMetaNodeTaskResponse:
-		server.handleMetaNodeTaskResponse(w, r)
-	case proto.ClientVol:
-		server.getVol(w, r)
-	case proto.ClientMetaPartitions:
-		server.getMetaPartitions(w, r)
-	case proto.ClientMetaPartition:
-		server.getMetaPartition(w, r)
-	case proto.ClientVolStat:
-		server.getVolStatInfo(w, r)
-	case proto.ClientVolMount:
-		server.createVolMountClient(w, r)
-	case proto.ClientVolMountUpdate:
-		server.updateVolMountClientInfo(w, r)
-	case proto.ClientVolUnMount:
-		server.deleteVolMountClient(w, r)
-	case proto.AdminLoadMetaPartition:
-		server.loadMetaPartition(w, r)
-	case proto.AdminDecommissionMetaPartition:
-		server.decommissionMetaPartition(w, r)
-	case proto.AdminCreateMP:
-		server.createMetaPartition(w, r)
-	case proto.AdminAddMetaReplica:
-		server.addMetaReplica(w, r)
-	case proto.AdminDeleteMetaReplica:
-		server.deleteMetaReplica(w, r)
-	case proto.AddRaftNode:
-		server.addRaftNode(w, r)
-	case proto.RemoveRaftNode:
-		server.removeRaftNode(w, r)
-	case proto.AdminSetMetaNodeThreshold:
-		server.setMetaNodeThreshold(w, r)
-	case proto.GetTopologyView:
-		server.getTopology(w, r)*/
-	default:
-		http.Error(w, fmt.Sprintf("unsupported url %s", r.URL.String()), http.StatusBadRequest)
+	if vol, err := server.cluster.createVol(name, owner, capacity); err != nil {
+		http.Error(writer, fmt.Sprintf("create volume %s err: %v", name, err), http.StatusInternalServerError)
+		return
+	} else {
+		data, _ := json.Marshal(vol)
+		send(writer, http.StatusOK, data)
+		return
 	}
 }
 
-func (server *Server) newReverseProxy() *httputil.ReverseProxy {
-	return &httputil.ReverseProxy{Director: func(request *http.Request) {
-		request.URL.Scheme = "http"
-		request.URL.Host = server.leaderInfo.addr
-	}}
+func send(writer http.ResponseWriter, code int, data []byte) {
+	writer.Header().Set("content-type", "application/json")
+	writer.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	writer.WriteHeader(code)
+	_, _ = writer.Write(data)
+	return
 }

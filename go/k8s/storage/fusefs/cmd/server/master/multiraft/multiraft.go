@@ -1,4 +1,4 @@
-package master
+package multiraft
 
 import (
 	"errors"

@@ -10,12 +10,9 @@ import (
 )
 
 // LeaderInfo represents the leader's information
-type LeaderInfo struct {
-	addr string //host:port
-}
 
 func (server *Server) handleLeaderChange(leader uint64) {
-	if leader == 0 {
+	/*if leader == 0 {
 		klog.Error("action[handleLeaderChange] but no leader")
 		return
 	}
@@ -38,7 +35,7 @@ func (server *Server) handleLeaderChange(leader uint64) {
 			server.clusterName, server.leaderInfo.addr))
 		//server.clearMetadata()
 		server.metaReady = false
-	}
+	}*/
 }
 
 func (server *Server) handlePeerChange(confChange *proto.ConfChange) (err error) {

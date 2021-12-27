@@ -2,10 +2,12 @@ package master
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
+	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -36,7 +38,6 @@ const (
 	defaultMetaPartitionMemUsageThreshold      float32 = 0.75    // memory usage threshold on a meta partition
 	defaultMaxMetaPartitionCountOnEachNode             = 10000
 	defaultReplicaNum                                  = 3
-	defaultRegion                                      = "us-east-2"
 )
 
 const (
@@ -49,9 +50,8 @@ const (
 	bucketAcronym         = "bucket"
 	clientAcronym         = "client"
 	maxMetaPartitionIDKey = keySeparator + "max_mp_id"
-	maxCommonIDKey        = keySeparator + "max_common_id"
 	metaNodePrefix        = keySeparator + metaNodeAcronym + keySeparator
-	volPrefix             = keySeparator + volAcronym + keySeparator
+	volPrefix             = "#vol#"
 	metaPartitionPrefix   = keySeparator + metaPartitionAcronym + keySeparator
 	clusterPrefix         = keySeparator + clusterAcronym + keySeparator
 	nodeSetPrefix         = keySeparator + nodeSetAcronym + keySeparator
@@ -59,16 +59,17 @@ const (
 	clientPrefix          = keySeparator + clientAcronym + keySeparator
 )
 
-const (
-	normal     uint8 = 0
-	markDelete uint8 = 1
-)
-
 // AddrDatabase is a map that stores the address of a given host (e.g., the leader)
 var AddrDatabase = make(map[uint64]string)
 
+type LeaderInfo struct {
+	addr string //host:port
+}
+
 // Cluster stores all the cluster-level information.
 type Cluster struct {
+	volMutex sync.RWMutex // volume mutex
+
 	Name string
 	cfg  *clusterConfig
 
@@ -88,13 +89,35 @@ type Cluster struct {
 	vols                map[string]*Volume
 	volMountClients     map[string]*MountClients
 	volStatInfo         sync.Map
-	volMutex            sync.RWMutex // volume mutex
 	volMountClientMutex sync.RWMutex // volume mount client mutex
-	createVolMutex      sync.RWMutex // create volume mutex
 
 	DisableAutoAllocate bool
 	fsm                 *MetadataFsm
-	partition           Partition
+	partition           raftstore.Partition
+}
+
+func NewCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition raftstore.Partition, cfg *clusterConfig) *Cluster {
+	return &Cluster{
+		Name:            name,
+		vols:            make(map[string]*Volume),
+		volMountClients: make(map[string]*MountClients),
+		buckets:         make(map[string]*DeleteBucketInfo),
+		leaderInfo:      leaderInfo,
+		cfg:             cfg,
+		idAlloc:         NewIDAllocator(fsm.store, partition),
+		topology:        newTopology(),
+		fsm:             fsm,
+		partition:       partition,
+	}
+}
+
+func (cluster *Cluster) start() {
+	cluster.scheduleToCheckHeartbeat()
+	//cluster.scheduleToCheckMetaPartitions()
+	//cluster.scheduleToUpdateStatInfo()
+	//cluster.scheduleToCheckVolStatus()
+	//cluster.scheduleToLoadMetaPartitions()
+	//cluster.scheduleToCheckVolMountClients()
 }
 
 func (cluster *Cluster) scheduleToCheckHeartbeat() {
@@ -111,6 +134,68 @@ func (cluster *Cluster) scheduleToCheckHeartbeat() {
 			//cluster.checkMetaNodeHeartbeat()
 		}
 	}, time.Second*defaultIntervalToCheckHeartbeat)
+}
+
+// 1. submit `createVol` to raft
+// 2. init 3 meta partition
+func (cluster *Cluster) createVol(name, owner string, capacity uint64) (*Volume, error) {
+	cluster.volMutex.Lock()
+	defer cluster.volMutex.Unlock()
+
+	if _, ok := cluster.vols[name]; ok {
+		return nil, fmt.Errorf(fmt.Sprintf("volume %s is already existed", name))
+	}
+
+	// submit `createVol` to raft
+	id, err := cluster.idAlloc.allocateVolumeID()
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("allocate partition id for vol %s err: %v", name, err))
+		return nil, err
+	}
+	vol := newVol(id, name, owner, capacity, defaultReplicaNum)
+	if err = cluster.submitAddVol(vol); err != nil {
+		klog.Errorf(fmt.Sprintf("submit add vol to raft err:%v", err))
+		return nil, err
+	}
+
+	// submit `create meta partition` to raft
+	err = vol.createMetaPartitions()
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("create meta partitions for vol %s err: %v", name, err))
+		return nil, err
+	}
+
+	cluster.vols[vol.Name] = vol
+
+	// TODO: s3 create bucket
+	return vol, nil
+}
+
+//key=#vol#volID,value=json.Marshal(vv)
+func (cluster *Cluster) submitAddVol(vol *Volume) (err error) {
+	return cluster.submitVol(opSyncAddVol, vol)
+}
+
+func (cluster *Cluster) submitUpdateVol(vol *Volume) (err error) {
+	return cluster.submitVol(opSyncUpdateVol, vol)
+}
+
+func (cluster *Cluster) submitDeleteVol(vol *Volume) (err error) {
+	return cluster.submitVol(opSyncDeleteVol, vol)
+}
+
+func (cluster *Cluster) submitVol(opType uint32, vol *Volume) (err error) {
+	cmd := new(RaftCmd)
+	cmd.Op = opType
+	cmd.K = fmt.Sprintf("%s%d", volPrefix, vol.ID)
+	cmd.V, _ = json.Marshal(newVolValue(vol))
+	return cluster.submit(cmd)
+}
+
+func (cluster *Cluster) submit(cmd *RaftCmd) error {
+	data, _ := json.Marshal(cmd)
+	_, err := cluster.partition.Submit(data)
+	return err
 }
 
 func (cluster *Cluster) masterAddr() (addr string) {
@@ -131,7 +216,7 @@ func (cluster *Cluster) addMetaNode(nodeAddr string) (uint64, error) {
 	node := cluster.topology.getAvailNodeSetForMetaNode()
 	if node == nil {
 		// create node set
-		id, err := cluster.idAlloc.allocateCommonID()
+		id, err := cluster.idAlloc.allocateVolumeID()
 		if err != nil {
 			klog.Error(err)
 			return 0, err
@@ -145,7 +230,7 @@ func (cluster *Cluster) addMetaNode(nodeAddr string) (uint64, error) {
 		cluster.topology.putNodeSet(node)
 	}
 
-	id, err := cluster.idAlloc.allocateCommonID()
+	id, err := cluster.idAlloc.allocateVolumeID()
 	if err != nil {
 		klog.Error(err)
 		return 0, err
@@ -236,11 +321,12 @@ func (cluster *Cluster) scheduleToCheckVolMountClients() {
 
 // Return all the volumes except the ones that have been marked to be deleted.
 func (cluster *Cluster) allVols() map[string]*Volume {
-	vols := make(map[string]*Volume, 0)
 	cluster.volMutex.RLock()
 	defer cluster.volMutex.RUnlock()
+
+	vols := make(map[string]*Volume, 0)
 	for name, vol := range cluster.vols {
-		if vol.Status == normal {
+		if vol.Status != MarkDeletedVol {
 			vols[name] = vol
 		}
 	}
@@ -261,15 +347,6 @@ func (cluster *Cluster) checkMetaPartitions() {
 	}
 }
 
-func (cluster *Cluster) scheduleTask() {
-	cluster.scheduleToCheckHeartbeat()
-	//cluster.scheduleToCheckMetaPartitions()
-	//cluster.scheduleToUpdateStatInfo()
-	//cluster.scheduleToCheckVolStatus()
-	//cluster.scheduleToLoadMetaPartitions()
-	//cluster.scheduleToCheckVolMountClients()
-}
-
 func (cluster *Cluster) getVolume(volName string) (*Volume, error) {
 	cluster.volMutex.RLock()
 	defer cluster.volMutex.RUnlock()
@@ -279,19 +356,4 @@ func (cluster *Cluster) getVolume(volName string) (*Volume, error) {
 	}
 
 	return vol, nil
-}
-
-func NewCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition Partition, cfg *clusterConfig) *Cluster {
-	return &Cluster{
-		Name:            name,
-		vols:            make(map[string]*Volume),
-		volMountClients: make(map[string]*MountClients),
-		buckets:         make(map[string]*DeleteBucketInfo),
-		leaderInfo:      leaderInfo,
-		cfg:             cfg,
-		idAlloc:         NewIDAllocator(fsm.store, partition),
-		topology:        newTopology(),
-		fsm:             fsm,
-		partition:       partition,
-	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
 	"strconv"
 
 	"github.com/tiglabs/raft"
@@ -23,7 +24,7 @@ type raftApplySnapshotHandler func()
 
 // MetadataFsm INFO: MetadataFsm 是一个 state machine
 type MetadataFsm struct {
-	store               *BoltdbStore
+	store               *raftstore.BoltDBStore
 	raftServer          *raft.RaftServer
 	applied             uint64
 	retainLogs          uint64
@@ -59,18 +60,18 @@ func (metadataFsm *MetadataFsm) Put(key, val []byte) error {
 
 // Del implements the interface of raft.StateMachine
 func (metadataFsm *MetadataFsm) Del(key []byte) error {
-	return metadataFsm.store.Delete(key)
+	return metadataFsm.store.Del(key)
 }
 
 // Apply implements the interface of raft.StateMachine
 func (metadataFsm *MetadataFsm) Apply(command []byte, index uint64) (resp interface{}, err error) {
 	cmd := new(RaftCmd)
 	if err = json.Unmarshal(command, cmd); err != nil {
-		klog.Errorf("action[fsmApply],unmarshal data:%v, err:%v", command, err.Error())
-		panic(err)
+		klog.Errorf(fmt.Sprintf("apply fsm for cmd:%s, index:%d, err:%v", command, index, err))
+		return
 	}
-	klog.Infof("action[fsmApply],cmd.op[%v],cmd.K[%v],cmd.V[%v]", cmd.Op, cmd.K, string(cmd.V))
-	cmdMap := make(map[string][]byte)
+	klog.Infof(fmt.Sprintf("apply fsm for cmd:%+v, index:%d", *cmd, index))
+	/*cmdMap := make(map[string][]byte)
 	if cmd.Op != opSyncBatchPut {
 		cmdMap[cmd.K] = cmd.V
 		cmdMap[applied] = []byte(strconv.FormatUint(uint64(index), 10))
@@ -101,7 +102,7 @@ func (metadataFsm *MetadataFsm) Apply(command []byte, index uint64) (resp interf
 		//if metadataFsm.applied > 0 && (metadataFsm.applied%metadataFsm.retainLogs) == 0 {
 		klog.Warningf("action[Apply],truncate raft log,retainLogs[%v],index[%v]", metadataFsm.retainLogs, metadataFsm.applied)
 		metadataFsm.raftServer.Truncate(GroupID, metadataFsm.applied)
-	}
+	}*/
 	return
 }
 
@@ -224,7 +225,7 @@ func (metadataFsm *MetadataFsm) restoreApplied() {
 }
 
 // INFO: https://github.com/tiglabs/raft/blob/master/test/memory_statemachine.go
-func newMetadataFsm(store *BoltdbStore, retainsLog uint64, raftServer *raft.RaftServer) *MetadataFsm {
+func newMetadataFsm(store *raftstore.BoltDBStore, retainsLog uint64, raftServer *raft.RaftServer) *MetadataFsm {
 	return &MetadataFsm{
 		store:      store,
 		raftServer: raftServer,
