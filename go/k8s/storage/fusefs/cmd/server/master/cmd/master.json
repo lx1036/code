@@ -3,7 +3,7 @@
   "id": 1,
   "clusterName": "fusefs",
   "ip": "127.0.0.1",
-  "port": "9500",
+  "port": 9500,
 
   "heartbeatPort": 9501,
   "replicaPort": 9502,

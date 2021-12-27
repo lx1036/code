@@ -1,10 +1,16 @@
 package master
 
 import (
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
+
+	"github.com/tiglabs/raft/proto"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -65,7 +71,7 @@ type Config struct {
 	ID          uint64 `json:"id"`
 	ClusterName string `json:"clusterName"`
 	IP          string `json:"ip"`
-	Port        string `json:"port"`
+	Port        int    `json:"port"`
 
 	// raft
 	HeartbeatPort int    `json:"heartbeatPort"`
@@ -77,6 +83,9 @@ type Config struct {
 
 	// s3
 	Endpoint string `json:"endpoint"`
+
+	// cluster
+	nodeSetCapacity int `json:"nodeSetCapacity" default:"18"`
 }
 
 // Server represents the server in a cluster
@@ -84,41 +93,65 @@ type Server struct {
 	id          uint64
 	clusterName string
 	ip          string
-	port        string
+	port        int
 
 	// raft
+	peers         []raftstore.PeerAddress
 	heartbeatPort int
 	replicaPort   int
 	walDir        string // raft log wal
 	retainLogs    uint64
 	storeDir      string // boltdb statemachine
 	fsm           *MetadataFsm
+	leaderInfo    *LeaderInfo
+	boltdbStore   *raftstore.BoltDBStore
+	raftStore     *raftstore.RaftStore
+	partition     raftstore.Partition
 
-	leaderInfo *LeaderInfo
-	config     *clusterConfig
-	cluster    *Cluster
-
-	boltdbStore *raftstore.BoltDBStore
-	raftStore   *raftstore.RaftStore
-	partition   raftstore.Partition
+	// cluster
+	//config     *clusterConfig
+	cluster         *Cluster
+	nodeSetCapacity int
 }
 
 // NewServer creates a new server
 func NewServer(config Config) *Server {
-	return &Server{
-		id:            config.ID,
-		ip:            config.IP,
-		heartbeatPort: config.HeartbeatPort,
-		replicaPort:   config.ReplicaPort,
-		walDir:        config.WalDir,
-		storeDir:      config.StoreDir,
-		retainLogs:    config.RetainLogs,
-
-		leaderInfo: &LeaderInfo{},
+	walDir, _ := filepath.Abs(config.WalDir)
+	storeDir, _ := filepath.Abs(config.StoreDir)
+	server := &Server{
+		id:              config.ID,
+		ip:              config.IP,
+		port:            config.Port,
+		heartbeatPort:   config.HeartbeatPort,
+		replicaPort:     config.ReplicaPort,
+		walDir:          walDir,
+		storeDir:        storeDir,
+		retainLogs:      config.RetainLogs,
+		nodeSetCapacity: config.nodeSetCapacity,
+		leaderInfo:      &LeaderInfo{},
 	}
+
+	peers := strings.Split(config.Peers, ",")
+	for _, peer := range peers {
+		values := strings.Split(peer, ":") // 1:127.0.0.1:9500
+		id, _ := strconv.ParseUint(values[0], 10, 64)
+		server.peers = append(server.peers, raftstore.PeerAddress{
+			Peer: proto.Peer{
+				ID: id,
+			},
+			Address:       values[1],
+			HeartbeatPort: server.heartbeatPort,
+			ReplicaPort:   server.replicaPort,
+		})
+	}
+
+	return server
 }
 
 func (server *Server) Start() (err error) {
+
+	klog.Info("afffff the master raft cluster")
+
 	// 1. create a partition raft and statemachine
 	if server.raftStore, err = raftstore.NewRaftStore(&raftstore.Config{
 		NodeID:            server.id,
@@ -127,8 +160,8 @@ func (server *Server) Start() (err error) {
 		ReplicaPort:       server.replicaPort,
 		RaftPath:          server.walDir,
 		NumOfLogsToRetain: server.retainLogs,
-		TickInterval:      1000,  // 1s
-		ElectionTick:      10000, // 10s
+		TickInterval:      1000, // 1s
+		ElectionTick:      5,
 	}); err != nil {
 		return err
 	}
@@ -136,6 +169,9 @@ func (server *Server) Start() (err error) {
 	if err != nil {
 		return err
 	}
+
+	klog.Info("afffaaaff the master raft cluster")
+
 	server.fsm = newMetadataFsm(server.boltdbStore, server.retainLogs, server.raftStore.RaftServer())
 	server.fsm.registerLeaderChangeHandler(server.handleLeaderChange)
 	server.fsm.registerPeerChangeHandler(server.handlePeerChange)
@@ -143,7 +179,7 @@ func (server *Server) Start() (err error) {
 	server.fsm.restore()
 	if server.partition, err = server.raftStore.CreatePartition(&raftstore.PartitionConfig{
 		ID:      GroupID,
-		Peers:   server.config.peers,
+		Peers:   server.peers,
 		Applied: server.fsm.applied,
 		SM:      server.fsm,
 	}); err != nil {
@@ -151,7 +187,7 @@ func (server *Server) Start() (err error) {
 	}
 
 	// 2. cluster -> partition raft
-	server.cluster = NewCluster(server.clusterName, server.leaderInfo, server.fsm, server.partition, server.config)
+	server.cluster = NewCluster(server)
 	server.cluster.start()
 	server.startHTTPService()
 

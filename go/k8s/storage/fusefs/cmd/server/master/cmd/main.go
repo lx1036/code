@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"io/ioutil"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -11,11 +12,11 @@ import (
 	"k8s-lx1036/k8s/storage/fusefs/cmd/server/master"
 
 	"github.com/spf13/cobra"
-	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 )
 
+// go run . --config=./master.json
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
@@ -27,11 +28,9 @@ func main() {
 	var config string
 
 	cmd := &cobra.Command{
-		Use:        "master",
-		Aliases:    nil,
-		SuggestFor: nil,
-		Short:      "Runs the FuseFS master server",
-		Long:       `responsible for volume creation, query and deletion, node heartbeat state detection, etc`,
+		Use:   "master",
+		Short: "Runs the FuseFS master server",
+		Long:  `responsible for volume creation, query and deletion, node heartbeat state detection, etc`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(config) == 0 {
 				panic("config is required")
@@ -43,8 +42,13 @@ func main() {
 		},
 	}
 
+	klog.Info("adsfdafStarting the master raft cluster")
+
 	cmd.Flags().StringVar(&config, "config", "", "master config file")
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
+
+	klog.Info("aaaaStarting the master raft cluster")
+
 	if err := cmd.Execute(); err != nil {
 		panic(err)
 	}
@@ -62,6 +66,8 @@ func runCommand(configFile string) error {
 		return err
 	}
 
+	klog.Info("fffffStarting the master raft cluster")
+
 	stopCh := genericapiserver.SetupSignalHandler()
 	server := master.NewServer(config)
 	err = server.Start()
@@ -69,9 +75,11 @@ func runCommand(configFile string) error {
 		return err
 	}
 
+	klog.Info("Starting the master raft cluster")
+
 	<-stopCh
 
-	klog.Info("Shutting down the etcd cluster")
+	klog.Info("Shutting down the master raft cluster")
 	server.Stop()
 	return nil
 }

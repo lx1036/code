@@ -27,7 +27,7 @@ func newMountClients() (mountClients *MountClients) {
 
 //default value
 const (
-	defaultIntervalToCheckHeartbeat      = 60
+	defaultIntervalToCheckHeartbeat      = 5
 	defaultIntervalToCheckMetaPartition  = 60
 	defaultIntervalToCheckVolMountClient = 300
 	noHeartBeatTimes                     = 3 // number of times that no heartbeat reported
@@ -71,7 +71,6 @@ type Cluster struct {
 	volMutex sync.RWMutex // volume mutex
 
 	Name string
-	cfg  *clusterConfig
 
 	buckets     map[string]*DeleteBucketInfo
 	bucketMutex sync.RWMutex
@@ -94,20 +93,24 @@ type Cluster struct {
 	DisableAutoAllocate bool
 	fsm                 *MetadataFsm
 	partition           raftstore.Partition
+	peers               []raftstore.PeerAddress
+
+	nodeSetCapacity int
 }
 
-func NewCluster(name string, leaderInfo *LeaderInfo, fsm *MetadataFsm, partition raftstore.Partition, cfg *clusterConfig) *Cluster {
+func NewCluster(server *Server) *Cluster {
 	return &Cluster{
-		Name:            name,
+		Name:            server.clusterName,
 		vols:            make(map[string]*Volume),
 		volMountClients: make(map[string]*MountClients),
 		buckets:         make(map[string]*DeleteBucketInfo),
-		leaderInfo:      leaderInfo,
-		cfg:             cfg,
-		idAlloc:         NewIDAllocator(fsm.store, partition),
+		leaderInfo:      server.leaderInfo,
+		idAlloc:         NewIDAllocator(server.fsm.store, server.partition),
 		topology:        newTopology(),
-		fsm:             fsm,
-		partition:       partition,
+		fsm:             server.fsm,
+		partition:       server.partition,
+		nodeSetCapacity: server.nodeSetCapacity,
+		peers:           server.peers,
 	}
 }
 
@@ -125,7 +128,10 @@ func (cluster *Cluster) scheduleToCheckHeartbeat() {
 		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
 			leaderID, term := cluster.partition.LeaderTerm()
 			klog.Infof(fmt.Sprintf("[scheduleToCheckHeartbeat]leaderID:%d, term:%d", leaderID, term))
-			cluster.leaderInfo.addr = AddrDatabase[leaderID]
+			if leader := cluster.getLeader(leaderID); leader != nil {
+				cluster.leaderInfo.addr = leader.Address // port
+				klog.Infof(fmt.Sprintf("[scheduleToCheckHeartbeat]leader is %s", cluster.leaderInfo.addr))
+			}
 		}
 	}, time.Second*defaultIntervalToCheckHeartbeat)
 
@@ -134,6 +140,16 @@ func (cluster *Cluster) scheduleToCheckHeartbeat() {
 			//cluster.checkMetaNodeHeartbeat()
 		}
 	}, time.Second*defaultIntervalToCheckHeartbeat)
+}
+
+func (cluster *Cluster) getLeader(leaderID uint64) *raftstore.PeerAddress {
+	for _, peer := range cluster.peers {
+		if peer.ID == leaderID {
+			return &peer
+		}
+	}
+
+	return nil
 }
 
 // 1. submit `createVol` to raft
@@ -221,7 +237,7 @@ func (cluster *Cluster) addMetaNode(nodeAddr string) (uint64, error) {
 			klog.Error(err)
 			return 0, err
 		}
-		node = newNodeSet(id, cluster.cfg.nodeSetCapacity)
+		node = newNodeSet(id, cluster.nodeSetCapacity)
 		if err = cluster.putNodeSetInfo(opSyncAddNodeSet, node); err != nil {
 			klog.Error(err)
 			return 0, nil

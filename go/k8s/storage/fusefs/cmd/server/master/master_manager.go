@@ -48,7 +48,7 @@ func (server *Server) handlePeerChange(confChange *proto.ConfChange) (err error)
 			msg = fmt.Sprintf("action[handlePeerChange] clusterID[%v] nodeAddr[%v] is invalid", server.clusterName, addr)
 			break
 		}
-		server.raftStore.AddNodeWithPort(confChange.Peer.ID, arr[0], int(server.config.heartbeatPort), int(server.config.replicaPort))
+		server.raftStore.AddNodeWithPort(confChange.Peer.ID, arr[0], int(server.heartbeatPort), int(server.replicaPort))
 		AddrDatabase[confChange.Peer.ID] = string(confChange.Context)
 		msg = fmt.Sprintf("clusterID[%v] peerID:%v,nodeAddr[%v] has been add", server.clusterName, confChange.Peer.ID, addr)
 	case proto.ConfRemoveNode:

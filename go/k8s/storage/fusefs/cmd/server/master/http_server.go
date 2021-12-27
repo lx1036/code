@@ -52,7 +52,7 @@ func (server *Server) startHTTPService() {
 	router.NewRoute().Methods(http.MethodPost).Path("/vol").HandlerFunc(server.createVol)
 
 	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf("%s:%s", server.ip, server.port), router); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", server.ip, server.port), router); err != nil {
 			klog.Fatal(err)
 		}
 	}()
