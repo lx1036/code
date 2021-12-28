@@ -1,4 +1,4 @@
-package partition
+package meta
 
 import (
 	"bufio"
@@ -28,14 +28,6 @@ const (
 	SnapshotSign    = "sign"
 	MetadataFile    = "meta"
 	metadataFileTmp = ".meta"
-)
-
-const (
-	StateStandby uint32 = iota
-	StateStart
-	StateRunning
-	StateShutdown
-	StateStopped
 )
 
 const (

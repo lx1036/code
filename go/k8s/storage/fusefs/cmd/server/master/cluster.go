@@ -320,18 +320,43 @@ func (cluster *Cluster) createVol(name, owner string, capacity uint64) (*Volume,
 		klog.Errorf(fmt.Sprintf("allocate partition id for vol %s err: %v", name, err))
 		return nil, err
 	}
+
+	var (
+		start uint64
+		end   uint64
+	)
 	vol := newVol(id, name, owner, capacity, defaultReplicaNum)
-	if err = cluster.submitVol(opSyncAddVol, vol); err != nil {
-		klog.Errorf(fmt.Sprintf("submit add vol to raft err:%v", err))
-		return nil, err
+	for index := 0; index < vol.metaPartitionCount; index++ {
+		if index != 0 {
+			start = end + 1
+		}
+
+		end = start + defaultMetaPartitionInodeIDStep
+		if index == vol.metaPartitionCount-1 {
+			end = defaultMaxMetaPartitionInodeID
+		}
+		// (1)tcp every host for create meta partition
+		if mp, err := cluster.tcpCreateMetaPartition(vol, start, end); err != nil {
+			klog.Errorf("[createMetaPartitions]vol[%v] create meta partition err[%v]", vol.Name, err)
+			break
+		} else {
+			// (2)submit `create 3 meta partitions` to raft
+			if err = cluster.submitMetaPartition(opSyncAddMetaPartition, mp); err != nil {
+				klog.Errorf("[createMetaPartitions]vol[%v] submit meta partition to raft err[%v]", vol.Name, err)
+				break
+			}
+
+			vol.addMetaPartition(mp)
+		}
+	}
+	if len(vol.MetaPartitions) != vol.metaPartitionCount {
+		return nil, fmt.Errorf("[createVol]vol %s init meta partition failed,mpCount[%v],expectCount[%v]",
+			vol.Name, len(vol.MetaPartitions), vol.metaPartitionCount)
 	}
 
-	// (1)tcp every hosts for create meta partition
-	// (2)submit `create 3 meta partitions` to raft
-	err = vol.createMetaPartitions(cluster)
-	if err != nil {
+	if err = cluster.submitVol(opSyncAddVol, vol); err != nil {
 		cluster.submitVol(opSyncDeleteVol, vol)
-		klog.Errorf(fmt.Sprintf("create meta partitions for vol %s err: %v", name, err))
+		klog.Errorf(fmt.Sprintf("submit add vol to raft err:%v", err))
 		return nil, err
 	}
 
@@ -339,6 +364,38 @@ func (cluster *Cluster) createVol(name, owner string, capacity uint64) (*Volume,
 
 	// TODO: s3 create bucket
 	return vol, nil
+}
+
+func (cluster *Cluster) tcpCreateMetaPartition(vol *Volume, start, end uint64) (mp *MetaPartition, err error) {
+	var (
+		hosts       []string
+		partitionID uint64
+		peers       []proto.Peer
+		wg          sync.WaitGroup
+	)
+	if hosts, peers, err = cluster.chooseTargetMetaHosts(nil, nil, vol.metaPartitionCount); err != nil {
+		return nil, err
+	}
+	if partitionID, err = cluster.idAlloc.allocateMetaPartitionID(); err != nil {
+		return nil, err
+	}
+	mp = newMetaPartition(partitionID, start, end, vol.metaPartitionCount, vol.Name, vol.ID, false)
+	mp.setHosts(hosts)
+	mp.setPeers(peers)
+
+	for _, host := range hosts {
+		wg.Add(1)
+		go func(host string) {
+			defer wg.Done()
+			if err = cluster.syncCreateMetaPartitionToMetaNode(host, mp); err != nil {
+				klog.Error(err)
+			}
+		}(host)
+	}
+	wg.Wait()
+
+	mp.Status = proto.ReadWrite
+	return mp, nil
 }
 
 func (cluster *Cluster) updateVol(name, owner string, capacity uint64) (*Volume, error) {

@@ -1,11 +1,10 @@
-package partition
+package meta
 
 import (
 	"errors"
 	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
-	"os"
 )
 
 var (
@@ -50,17 +49,14 @@ type MetaPartitionFSM struct {
 	size    uint64 // For partition all file size
 	applyID uint64 // Inode/Dentry max applyID, this index will be update after restoring from the dumped data.
 
-	// 每个Inode代表文件系统中的一个文件或目录
-	// 每个dentry代表一个目录项，dentry由parentId和name组成
-	dentryTree *BTree // dir entry fs.DirEntry
-	inodeTree  *BTree // index node
-
-	// raftPartition 需要多个参数一起构造
+	// raft
 	raftPartition raftstore.Partition
-	stopC         chan bool
-	storeChan     chan *storeMsg
-	state         uint32
-	delInodeFp    *os.File
+	dentryTree    *BTree // 每个dentry代表一个目录项，dentry由parentId和name组成
+	inodeTree     *BTree // index node 每个Inode代表文件系统中的一个文件或目录
+
+	stopC     chan bool
+	storeChan chan *storeMsg
+	state     uint32
 }
 
 func NewMetaPartitionFSM(conf *MetaPartitionConfig) *MetaPartitionFSM {
@@ -102,10 +98,6 @@ func (partition *MetaPartitionFSM) loadFromSnapshot() error {
 	return partition.loadApplyID()
 }
 
-func (partition *MetaPartitionFSM) Stop() {
-	panic("implement me")
-}
-
 func (partition *MetaPartitionFSM) UpdatePartition(req *proto.UpdateMetaPartitionRequest, resp *proto.UpdateMetaPartitionResponse) (err error) {
 	panic("implement me")
 }
@@ -127,5 +119,9 @@ func (partition *MetaPartitionFSM) PersistMetadata() (err error) {
 }
 
 func (partition *MetaPartitionFSM) DeletePartition() (err error) {
+	panic("implement me")
+}
+
+func (partition *MetaPartitionFSM) Stop() {
 	panic("implement me")
 }

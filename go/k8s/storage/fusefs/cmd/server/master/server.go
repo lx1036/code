@@ -95,6 +95,9 @@ type Server struct {
 	ip          string
 	port        int
 
+	cluster         *Cluster
+	nodeSetCapacity int
+
 	// raft
 	peers         []raftstore.PeerAddress
 	heartbeatPort int
@@ -107,11 +110,6 @@ type Server struct {
 	boltdbStore   *raftstore.BoltDBStore
 	raftStore     *raftstore.RaftStore
 	partition     raftstore.Partition
-
-	// cluster
-	//config     *clusterConfig
-	cluster         *Cluster
-	nodeSetCapacity int
 }
 
 // NewServer creates a new server
@@ -252,5 +250,6 @@ func (server *Server) restoreIDAlloc() {
 }
 
 func (server *Server) Stop() {
+	server.raftStore.Stop()
 	_ = server.boltdbStore.Close()
 }

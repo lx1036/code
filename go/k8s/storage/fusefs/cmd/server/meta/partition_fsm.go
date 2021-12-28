@@ -1,4 +1,4 @@
-package partition
+package meta
 
 // INFO: 是raft statemachine 实现 https://github.com/tiglabs/raft/blob/master/statemachine.go#L22-L30
 
@@ -37,20 +37,21 @@ const (
 // INFO: 创建 raft partition，实际上每一个 partition 都有其自己的 wal path
 func (partition *MetaPartitionFSM) startRaft() error {
 	var (
-		err           error
-		heartbeatPort int
-		replicaPort   int
-		peers         []raftstore.PeerAddress
+		err   error
+		peers []raftstore.PeerAddress
 	)
-	if heartbeatPort, replicaPort, err = partition.getRaftPort(); err != nil {
-		return err
-	}
+	raftConfig := partition.config.RaftStore.RaftConfig()
+	heartbeatPort, _ := strconv.Atoi(strings.Split(raftConfig.HeartbeatAddr, ":")[1])
+	replicaPort, _ := strconv.Atoi(strings.Split(raftConfig.ReplicateAddr, ":")[1])
 	for _, peer := range partition.config.Peers {
+		values := strings.Split(peer.Addr, ":") // 127.0.0.1:8500
+		port, _ := strconv.Atoi(values[1])
 		peers = append(peers, raftstore.PeerAddress{
 			Peer: raftproto.Peer{
 				ID: peer.ID,
 			},
-			Address:       strings.Split(peer.Addr, ":")[0],
+			Address:       values[0],
+			Port:          port,
 			HeartbeatPort: heartbeatPort,
 			ReplicaPort:   replicaPort,
 		})

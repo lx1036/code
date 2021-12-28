@@ -1,4 +1,4 @@
-package partition
+package meta
 
 // MetaItem defines the structure of the metadata operations.
 type MetaItem struct {

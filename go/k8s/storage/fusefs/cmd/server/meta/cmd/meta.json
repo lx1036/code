@@ -1,0 +1,14 @@
+{
+  "ip": "127.0.0.1",
+  "port": 8500,
+  "totalMem":  42949672960,
+  "masterAddrs": [
+    "127.0.0.1:9500"
+  ],
+
+  "storeDir": "./tmp/metanode/1/db",
+  "walDir": "./tmp/metanode/1/wal",
+  "raftHeartbeatPort": 8501,
+  "raftReplicaPort": 8502,
+  "retainLogs": 200
+}

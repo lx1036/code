@@ -5,10 +5,10 @@
   "ip": "127.0.0.1",
   "port": 9500,
 
+  "storeDir": "./tmp/master1/db",
+  "walDir": "./tmp/master1/wal",
   "heartbeatPort": 9501,
   "replicaPort": 9502,
-  "walDir": "./tmp/master1/wal",
-  "storeDir": "./tmp/master1/db",
   "peers": "1:127.0.0.1:9500",
   "retainLogs": 200,
 

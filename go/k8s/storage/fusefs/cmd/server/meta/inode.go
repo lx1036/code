@@ -1,4 +1,4 @@
-package partition
+package meta
 
 import (
 	"bytes"

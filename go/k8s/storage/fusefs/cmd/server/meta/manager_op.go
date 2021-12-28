@@ -10,7 +10,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func (m *metadataManager) HandleMetadataOperation(conn net.Conn, p *proto.Packet, remoteAddr string) error {
+func (m *Cluster) HandleMetadataOperation(conn net.Conn, p *proto.Packet, remoteAddr string) error {
 	var err error
 	switch p.Opcode {
 	case proto.OpCreateMetaPartition:
@@ -72,7 +72,7 @@ func (m *metadataManager) HandleMetadataOperation(conn net.Conn, p *proto.Packet
 }
 
 // Handle OpCreate inode.
-func (m *metadataManager) opCreateInode(conn net.Conn, p *proto.Packet, remoteAddr string) error {
+func (m *Cluster) opCreateInode(conn net.Conn, p *proto.Packet, remoteAddr string) error {
 	req := &proto.CreateInodeRequest{}
 
 	if err := json.Unmarshal(p.Data, req); err != nil {
