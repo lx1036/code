@@ -27,6 +27,8 @@ type MetaReplica struct {
 
 // MetaPartition defines the structure of a meta partition
 type MetaPartition struct {
+	sync.RWMutex
+
 	PartitionID uint64
 	Start       uint64
 	End         uint64
@@ -41,7 +43,6 @@ type MetaPartition struct {
 	Peers       []proto.Peer
 	MissNodes   map[string]int64
 	//LoadResponse []*proto.MetaPartitionLoadResponse
-	sync.RWMutex
 }
 
 func newMetaPartition(partitionID, start, end uint64, replicaNum int, volName string, volID uint64, isMarkDeleted bool) (mp *MetaPartition) {

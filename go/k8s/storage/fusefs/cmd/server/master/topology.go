@@ -60,7 +60,7 @@ func (t *Topology) allocNodeSetForMetaNode(excludeNodeSet *nodeSet, replicaNum u
 	defer t.nsLock.RUnlock()
 
 	nset := t.getAllNodeSet()
-	if nset == nil {
+	if nset.Len() == 0 {
 		return nil, fmt.Errorf("no node set available for creating a meta partition")
 	}
 

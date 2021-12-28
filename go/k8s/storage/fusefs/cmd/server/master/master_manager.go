@@ -59,12 +59,6 @@ func (server *Server) handlePeerChange(confChange *proto.ConfChange) (err error)
 	return
 }
 
-func (server *Server) handleApplySnapshot() {
-	server.fsm.restore()
-	server.restoreIDAlloc()
-	return
-}
-
 func (server *Server) restoreIDAlloc() {
 	server.cluster.idAlloc.restore()
 }

@@ -189,6 +189,12 @@ func (server *Server) Start() (err error) {
 	return nil
 }
 
+func (server *Server) handleApplySnapshot() {
+	server.fsm.restore()
+	server.restoreIDAlloc()
+	return
+}
+
 func (server *Server) Stop() {
 	_ = server.boltdbStore.Close()
 }

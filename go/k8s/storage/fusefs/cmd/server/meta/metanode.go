@@ -83,7 +83,7 @@ func (m *MetaNode) Start(cfg *config.Config) error {
 
 	// INFO: 向 master 注册 meta, POST /metaNode/add
 	m.nodeId = 1 // for debug in local
-	/*if err = m.register(); err != nil {
+	/*if err = m.registerToMaster(); err != nil {
 		return err
 	}*/
 
@@ -160,22 +160,22 @@ func (m *MetaNode) parseConfig(cfg *config.Config) (err error) {
 	return
 }
 
-// INFO: 向 master 注册 meta, POST /metaNode/add
-func (m *MetaNode) register() (err error) {
-	reqParam := make(map[string]string)
-	clusterInfo, err := getClusterInfo()
+// INFO: 向 master 注册 meta, POST /metaNode, @see server/master/http_server.go
+func (m *MetaNode) registerToMaster() error {
+	respBody, err := masterHelper.Request(http.MethodGet, "/cluster/info", nil, nil)
 	if err != nil {
-		klog.Errorf("[register] %s", err.Error())
 		return err
 	}
-
+	clusterInfo := &proto.ClusterInfo{}
+	_ = json.Unmarshal(respBody, clusterInfo)
 	if m.localAddr == "" {
 		m.localAddr = clusterInfo.Ip
 	}
 	m.clusterId = clusterInfo.Cluster
+	reqParam := make(map[string]string)
 	reqParam["addr"] = m.localAddr + ":" + m.listen
 
-	respBody, err := masterHelper.Request("POST", proto.AddMetaNode, reqParam, nil)
+	respBody, err = masterHelper.Request(http.MethodPost, "/metanode", reqParam, nil)
 	if err != nil {
 		return err
 	}
@@ -184,11 +184,7 @@ func (m *MetaNode) register() (err error) {
 		return fmt.Errorf("[register] master respond empty body")
 	}
 	m.nodeId, err = strconv.ParseUint(nodeIDStr, 10, 64)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // StartRaftServer initializes the address resolver and the raftStore server instance.
@@ -293,17 +289,4 @@ func (m *MetaNode) Wait() {
 	if atomic.LoadUint32(&m.state) == StateRunning {
 		m.wg.Wait()
 	}
-}
-
-// INFO: GET masterAddrs[len(masterAddrs)-1]:9500/admin/getIp
-func getClusterInfo() (*proto.ClusterInfo, error) {
-	respBody, err := masterHelper.Request("GET", proto.AdminGetIP, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	cInfo := &proto.ClusterInfo{}
-	if err = json.Unmarshal(respBody, cInfo); err != nil {
-		return nil, err
-	}
-	return cInfo, nil
 }

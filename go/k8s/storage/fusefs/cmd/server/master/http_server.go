@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strconv"
+	"strings"
+
+	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
 
 	"github.com/gorilla/mux"
 	"k8s.io/klog/v2"
@@ -38,22 +41,23 @@ func (server *Server) startHTTPService() {
 					request.URL.Scheme = "http"
 					request.URL.Host = server.leaderInfo.addr
 				},
-				Transport:      nil,
-				FlushInterval:  0,
-				ErrorLog:       nil,
-				BufferPool:     nil,
-				ModifyResponse: nil,
-				ErrorHandler:   nil,
 			}
 			reverseProxy.ServeHTTP(writer, request)
 		})
 	})
 
-	// metanode
+	// cluster
+	router.NewRoute().Methods(http.MethodGet).Path("/cluster/info").HandlerFunc(server.getClusterInfo)
+
+	// meta node
 	router.NewRoute().Methods(http.MethodPost).Path("/metanode").HandlerFunc(server.addMetaNode)
+	router.NewRoute().Methods(http.MethodGet).Path("/metanode").HandlerFunc(server.getMetaNode)
 
 	// volume
 	router.NewRoute().Methods(http.MethodPost).Path("/vol").HandlerFunc(server.createVol)
+
+	// meta partition
+	router.NewRoute().Methods(http.MethodPost).Path("/metapartition/expand").HandlerFunc(server.createMetaPartition)
 
 	go func() {
 		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", server.ip, server.port), router); err != nil {
@@ -62,6 +66,14 @@ func (server *Server) startHTTPService() {
 	}()
 }
 
+// cluster
+func (server *Server) getClusterInfo(writer http.ResponseWriter, request *http.Request) {
+	data, _ := json.Marshal(&proto.ClusterInfo{Cluster: server.cluster.Name, Ip: strings.Split(request.RemoteAddr, ":")[0]})
+	send(writer, http.StatusOK, data)
+	return
+}
+
+// volume
 func (server *Server) createVol(writer http.ResponseWriter, request *http.Request) {
 	name := request.FormValue(ParamsName)
 	owner := request.FormValue(ParamsOwner)
@@ -82,15 +94,34 @@ func (server *Server) createVol(writer http.ResponseWriter, request *http.Reques
 	}
 }
 
+// metanode
 func (server *Server) addMetaNode(writer http.ResponseWriter, request *http.Request) {
 	nodeAddr := request.FormValue(ParamsAddrKey)
-	if _, err := server.cluster.addMetaNode(nodeAddr); err != nil {
+	if metaNodeID, err := server.cluster.addMetaNode(nodeAddr); err != nil {
 		http.Error(writer, fmt.Sprintf("add metanode %s err: %v", nodeAddr, err), http.StatusInternalServerError)
 		return
+	} else {
+		send(writer, http.StatusOK, []byte(strconv.FormatUint(metaNodeID, 10)))
+		return
 	}
+}
 
-	send(writer, http.StatusOK, []byte("add meta node ok"))
-	return
+func (server *Server) getMetaNode(writer http.ResponseWriter, request *http.Request) {
+	nodeAddr := request.FormValue(ParamsAddrKey)
+	if metaNode, err := server.cluster.getMetaNode(nodeAddr); err != nil {
+		http.Error(writer, fmt.Sprintf("add metanode %s err: %v", nodeAddr, err), http.StatusInternalServerError)
+		return
+	} else {
+		metaNode.PersistenceMetaPartitions = server.cluster.getAllMetaPartitionIDByMetaNode(nodeAddr)
+		data, _ := json.Marshal(metaNode)
+		send(writer, http.StatusOK, data)
+		return
+	}
+}
+
+// meta partition
+func (server *Server) createMetaPartition(writer http.ResponseWriter, request *http.Request) {
+
 }
 
 func send(writer http.ResponseWriter, code int, data []byte) {

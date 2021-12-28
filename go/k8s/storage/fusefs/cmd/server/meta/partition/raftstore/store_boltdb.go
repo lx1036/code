@@ -98,6 +98,7 @@ func (store *BoltDBStore) BatchPut(cmdMap map[string][]byte) error {
 			err := bucket.Put([]byte(key), value)
 			if err != nil {
 				klog.Errorf(fmt.Sprintf("batch put key:%s value:%s err:%v", key, value, err))
+				return err
 			}
 		}
 		return nil

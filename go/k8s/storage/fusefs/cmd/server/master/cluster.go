@@ -54,6 +54,34 @@ type RaftCmd struct {
 	V  []byte `json:"v"`
 }
 
+func (m *RaftCmd) setOpType() {
+	keyArr := strings.Split(m.K, keySeparator)
+	if len(keyArr) < 2 {
+		klog.Warningf("action[setOpType] invalid length[%v]", keyArr)
+		return
+	}
+	switch keyArr[1] {
+	case metaNodeAcronym:
+		m.Op = opSyncAddMetaNode
+	case metaPartitionAcronym:
+		m.Op = opSyncAddMetaPartition
+	case volAcronym:
+		m.Op = opSyncAddVol
+	case clusterAcronym:
+		m.Op = opSyncPutCluster
+	case nodeSetAcronym:
+		m.Op = opSyncAddNodeSet
+	case maxMetaPartitionIDKey:
+		m.Op = opSyncAllocMetaPartitionID
+	case maxVolumeIDKey:
+		m.Op = opAllocVolumeID
+	case bucketAcronym:
+		m.Op = opSyncAddBucket
+	default:
+		klog.Warningf("action[setOpType] unknown opCode[%v]", keyArr[1])
+	}
+}
+
 // AddrDatabase is a map that stores the address of a given host (e.g., the leader)
 var AddrDatabase = make(map[uint64]string)
 
@@ -95,8 +123,9 @@ type Cluster struct {
 
 func NewCluster(server *Server) *Cluster {
 	return &Cluster{
-		Name: server.clusterName,
-		vols: make(map[string]*Volume),
+		Name:      server.clusterName,
+		vols:      make(map[string]*Volume),
+		metaNodes: make(map[string]*MetaNode),
 		//volMountClients: make(map[string]*MountClients),
 		buckets:         make(map[string]*DeleteBucketInfo),
 		leaderInfo:      server.leaderInfo,
@@ -131,7 +160,7 @@ func (cluster *Cluster) scheduleToCheckHeartbeat() {
 
 	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
 		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
-			//cluster.checkMetaNodeHeartbeat()
+			cluster.checkMetaNodeHeartbeat()
 		}
 	}, time.Second*defaultIntervalToCheckHeartbeat)
 }
@@ -144,69 +173,6 @@ func (cluster *Cluster) getLeader(leaderID uint64) *raftstore.PeerAddress {
 	}
 
 	return nil
-}
-
-// 1. submit `createVol` to raft
-// 2. init 3 meta partition
-func (cluster *Cluster) createVol(name, owner string, capacity uint64) (*Volume, error) {
-	cluster.volMutex.Lock()
-	defer cluster.volMutex.Unlock()
-
-	if _, ok := cluster.vols[name]; ok {
-		return nil, fmt.Errorf(fmt.Sprintf("volume %s is already existed", name))
-	}
-
-	// submit `createVol` to raft
-	id, err := cluster.idAlloc.allocateVolumeID()
-	if err != nil {
-		klog.Errorf(fmt.Sprintf("allocate partition id for vol %s err: %v", name, err))
-		return nil, err
-	}
-	vol := newVol(id, name, owner, capacity, defaultReplicaNum)
-	if err = cluster.submitAddVol(vol); err != nil {
-		klog.Errorf(fmt.Sprintf("submit add vol to raft err:%v", err))
-		return nil, err
-	}
-
-	// (1)tcp every hosts for create meta partition
-	// (2)submit `create 3 meta partitions` to raft
-	err = vol.createMetaPartitions(cluster)
-	if err != nil {
-		klog.Errorf(fmt.Sprintf("create meta partitions for vol %s err: %v", name, err))
-		return nil, err
-	}
-
-	cluster.vols[vol.Name] = vol
-
-	// TODO: s3 create bucket
-	return vol, nil
-}
-
-//key=#vol#volID,value=json.Marshal(vv)
-func (cluster *Cluster) submitAddVol(vol *Volume) (err error) {
-	return cluster.submitVol(opSyncAddVol, vol)
-}
-
-func (cluster *Cluster) submitUpdateVol(vol *Volume) (err error) {
-	return cluster.submitVol(opSyncUpdateVol, vol)
-}
-
-func (cluster *Cluster) submitDeleteVol(vol *Volume) (err error) {
-	return cluster.submitVol(opSyncDeleteVol, vol)
-}
-
-func (cluster *Cluster) submitVol(opType uint32, vol *Volume) (err error) {
-	cmd := new(RaftCmd)
-	cmd.Op = opType
-	cmd.K = fmt.Sprintf("%s%d", volPrefix, vol.ID)
-	cmd.V, _ = json.Marshal(newVolValue(vol))
-	return cluster.submit(cmd)
-}
-
-func (cluster *Cluster) submit(cmd *RaftCmd) error {
-	data, _ := json.Marshal(cmd)
-	_, err := cluster.partition.Submit(data)
-	return err
 }
 
 func (cluster *Cluster) masterAddr() (addr string) {
@@ -222,6 +188,19 @@ func (cluster *Cluster) checkMetaNodeHeartbeat() {
 	}
 
 	cluster.addMetaNodeTasks(tasks)
+}
+
+func (cluster *Cluster) addMetaNodeTasks(tasks []*proto.AdminTask) {
+	for _, task := range tasks {
+		if task == nil {
+			continue
+		}
+		//if node, err := cluster.metaNode(task.OperatorAddr); err != nil {
+		//	klog.Warningf(fmt.Sprintf("action[putTasks],nodeAddr:%v,taskID:%v,err:%v", task.OperatorAddr, task.ID, err))
+		//} else {
+		//	//node.Sender.AddTask(task)
+		//}
+	}
 }
 
 func (cluster *Cluster) scheduleToCheckMetaPartitions() {
@@ -315,6 +294,44 @@ func (cluster *Cluster) getVolume(volName string) (*Volume, error) {
 	return vol, nil
 }
 
+////////////////////////////HTTP///////////////////////////////////
+
+// 1. submit `createVol` to raft
+// 2. init 3 meta partition
+func (cluster *Cluster) createVol(name, owner string, capacity uint64) (*Volume, error) {
+	cluster.volMutex.Lock()
+	defer cluster.volMutex.Unlock()
+
+	if _, ok := cluster.vols[name]; ok {
+		return nil, fmt.Errorf(fmt.Sprintf("volume %s is already existed", name))
+	}
+
+	// submit `createVol` to raft
+	id, err := cluster.idAlloc.allocateVolumeID()
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("allocate partition id for vol %s err: %v", name, err))
+		return nil, err
+	}
+	vol := newVol(id, name, owner, capacity, defaultReplicaNum)
+	if err = cluster.submitAddVol(vol); err != nil {
+		klog.Errorf(fmt.Sprintf("submit add vol to raft err:%v", err))
+		return nil, err
+	}
+
+	// (1)tcp every hosts for create meta partition
+	// (2)submit `create 3 meta partitions` to raft
+	err = vol.createMetaPartitions(cluster)
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("create meta partitions for vol %s err: %v", name, err))
+		return nil, err
+	}
+
+	cluster.vols[vol.Name] = vol
+
+	// TODO: s3 create bucket
+	return vol, nil
+}
+
 func (cluster *Cluster) addMetaNode(nodeAddr string) (uint64, error) {
 	cluster.metaMutex.Lock()
 	defer cluster.metaMutex.Unlock()
@@ -360,52 +377,6 @@ func (cluster *Cluster) addMetaNode(nodeAddr string) (uint64, error) {
 	cluster.metaNodes[nodeAddr] = metaNode
 	klog.Infof(fmt.Sprintf("add meta node %s succefully", nodeAddr))
 	return metaNode.ID, nil
-}
-
-type nodeSetValue struct {
-	ID          uint64 `json:"id"`
-	Capacity    int    `json:"capacity"`
-	MetaNodeLen int    `json:"metaNodeLen"`
-}
-
-func newNodeSetValue(nset *nodeSet) *nodeSetValue {
-	return &nodeSetValue{
-		ID:          nset.ID,
-		Capacity:    nset.Capacity,
-		MetaNodeLen: nset.metaNodeLen,
-	}
-}
-
-// key=#s#
-func (cluster *Cluster) submitNodeSet(opType uint32, nset *nodeSet) error {
-	cmd := new(RaftCmd)
-	cmd.Op = opType
-	cmd.K = fmt.Sprintf("%s%s", nodeSetPrefix, strconv.FormatUint(nset.ID, 10))
-	cmd.V, _ = json.Marshal(newNodeSetValue(nset))
-	return cluster.submit(cmd)
-}
-
-type metaNodeValue struct {
-	ID        uint64
-	NodeSetID uint64
-	Addr      string
-}
-
-func newMetaNodeValue(metaNode *MetaNode) *metaNodeValue {
-	return &metaNodeValue{
-		ID:        metaNode.ID,
-		NodeSetID: metaNode.NodeSetID,
-		Addr:      metaNode.Addr,
-	}
-}
-
-// key=#metanode#
-func (cluster *Cluster) submitMetaNode(opType uint32, metaNode *MetaNode) error {
-	cmd := new(RaftCmd)
-	cmd.Op = opType
-	cmd.K = fmt.Sprintf("%s%s", metaNodePrefix, strconv.FormatUint(metaNode.ID, 10))
-	cmd.V, _ = json.Marshal(newMetaNodeValue(metaNode))
-	return cluster.submit(cmd)
 }
 
 // Choose the target hosts from the available node sets and meta nodes.
@@ -456,7 +427,7 @@ func (cluster *Cluster) syncCreateMetaPartitionToMetaNode(host string, mp *MetaP
 	task.ID = fmt.Sprintf("%v_pid[%v]", task.ID, mp.PartitionID)
 	task.PartitionID = mp.PartitionID
 
-	metaNode, err := cluster.metaNode(host)
+	metaNode, err := cluster.getMetaNode(host)
 	if err != nil {
 		return err
 	}
@@ -465,7 +436,7 @@ func (cluster *Cluster) syncCreateMetaPartitionToMetaNode(host string, mp *MetaP
 	return err
 }
 
-func (cluster *Cluster) metaNode(addr string) (*MetaNode, error) {
+func (cluster *Cluster) getMetaNode(addr string) (*MetaNode, error) {
 	value, ok := cluster.metaNodes[addr]
 	if !ok {
 		return nil, fmt.Errorf("meta node %s is not found", addr)
@@ -474,22 +445,132 @@ func (cluster *Cluster) metaNode(addr string) (*MetaNode, error) {
 	return value, nil
 }
 
-type metaPartitionValue struct {
-	PartitionID   uint64
-	Start         uint64
-	End           uint64
-	VolID         uint64
-	ReplicaNum    int
-	Status        int8
-	VolName       string
-	Hosts         string
-	Peers         []proto.Peer
-	OfflinePeerID uint64
-	IsMarkDeleted bool
+func (cluster *Cluster) getAllMetaPartitionIDByMetaNode(addr string) (partitionIDs []uint64) {
+	partitionIDs = make([]uint64, 0)
+	for _, volume := range cluster.vols {
+		for _, partition := range volume.MetaPartitions {
+			for _, host := range partition.Hosts {
+				if host == addr {
+					partitionIDs = append(partitionIDs, partition.PartitionID)
+				}
+			}
+		}
+	}
+
+	return partitionIDs
 }
 
-func newMetaPartitionValue(mp *MetaPartition) *metaPartitionValue {
-	return &metaPartitionValue{
+////////////////////////////Submit cmd to Raft///////////////////////////////////
+
+type VolStatus uint8
+
+const (
+	ReadWriteVol   VolStatus = 1
+	MarkDeletedVol VolStatus = 2
+	ReadOnlyVol    VolStatus = 3
+)
+
+const (
+	opSyncAddMetaNode         uint32 = 0x01
+	opSyncAddVol              uint32 = 0x02
+	opSyncAddMetaPartition    uint32 = 0x03
+	opSyncUpdateMetaPartition uint32 = 0x04
+	opSyncDeleteMetaNode      uint32 = 0x05
+	opSyncPutCluster          uint32 = 0x08
+	opSyncUpdateVol           uint32 = 0x09
+	opSyncDeleteVol           uint32 = 0x0A
+	opSyncDeleteMetaPartition uint32 = 0x0B
+	opSyncAddNodeSet          uint32 = 0x0C
+	opSyncUpdateNodeSet       uint32 = 0x0D
+)
+
+//key=#vol#volID,value=json.Marshal(vv)
+func (cluster *Cluster) submitAddVol(vol *Volume) (err error) {
+	return cluster.submitVol(opSyncAddVol, vol)
+}
+
+func (cluster *Cluster) submitUpdateVol(vol *Volume) (err error) {
+	return cluster.submitVol(opSyncUpdateVol, vol)
+}
+
+func (cluster *Cluster) submitDeleteVol(vol *Volume) (err error) {
+	return cluster.submitVol(opSyncDeleteVol, vol)
+}
+
+func (cluster *Cluster) submitVol(opType uint32, vol *Volume) (err error) {
+	cmd := new(RaftCmd)
+	cmd.Op = opType
+	cmd.K = fmt.Sprintf("%s%d", volPrefix, vol.ID)
+	data := struct {
+		ID     uint64    `json:"id"`
+		Name   string    `json:"name"`
+		Owner  string    `json:"owner"`
+		Status VolStatus `json:"status"`
+	}{
+		ID:     vol.ID,
+		Name:   vol.Name,
+		Owner:  vol.Owner,
+		Status: vol.Status,
+	}
+	cmd.V, _ = json.Marshal(&data)
+	return cluster.submit(cmd)
+}
+
+// key=#s#
+func (cluster *Cluster) submitNodeSet(opType uint32, nset *nodeSet) error {
+	cmd := new(RaftCmd)
+	cmd.Op = opType
+	cmd.K = fmt.Sprintf("%s%s", nodeSetPrefix, strconv.FormatUint(nset.ID, 10))
+	data := struct {
+		ID          uint64 `json:"id"`
+		Capacity    int    `json:"capacity"`
+		MetaNodeLen int    `json:"metaNodeLen"`
+	}{
+		ID:          nset.ID,
+		Capacity:    nset.Capacity,
+		MetaNodeLen: nset.metaNodeLen,
+	}
+	cmd.V, _ = json.Marshal(&data)
+	return cluster.submit(cmd)
+}
+
+// key=#metanode#
+func (cluster *Cluster) submitMetaNode(opType uint32, metaNode *MetaNode) error {
+	cmd := new(RaftCmd)
+	cmd.Op = opType
+	cmd.K = fmt.Sprintf("%s%s", metaNodePrefix, strconv.FormatUint(metaNode.ID, 10))
+	data := struct {
+		ID        uint64 `json:"id"`
+		NodeSetID uint64 `json:"nodeSetID"`
+		Addr      string `json:"addr"`
+	}{
+		ID:        metaNode.ID,
+		NodeSetID: metaNode.NodeSetID,
+		Addr:      metaNode.Addr,
+	}
+	cmd.V, _ = json.Marshal(&data)
+	return cluster.submit(cmd)
+}
+
+// #metapartition#{volID}#{partitionID}
+func (cluster *Cluster) submitMetaPartition(opType uint32, mp *MetaPartition) error {
+	cmd := new(RaftCmd)
+	cmd.Op = opType
+	cmd.K = fmt.Sprintf("%s%s#%s", metaPartitionPrefix, strconv.FormatUint(mp.volID, 10),
+		strconv.FormatUint(mp.PartitionID, 10))
+	data := &struct {
+		PartitionID   uint64
+		Start         uint64
+		End           uint64
+		VolID         uint64
+		ReplicaNum    int
+		Status        int8
+		VolName       string
+		Hosts         string
+		Peers         []proto.Peer
+		OfflinePeerID uint64
+		IsMarkDeleted bool
+	}{
 		PartitionID: mp.PartitionID,
 		Start:       mp.Start,
 		End:         mp.End,
@@ -499,16 +580,13 @@ func newMetaPartitionValue(mp *MetaPartition) *metaPartitionValue {
 		VolName:     mp.volName,
 		Hosts:       strings.Join(mp.Hosts, "_"),
 		Peers:       mp.Peers,
-		//OfflinePeerID: mp.OfflinePeerID,
-		//IsMarkDeleted: mp.IsMarkDeleted,
 	}
+	cmd.V, _ = json.Marshal(&data)
+	return cluster.submit(cmd)
 }
 
-// #metapartition#{volID}#{partitionID}
-func (cluster *Cluster) submitMetaPartition(opType uint32, mp *MetaPartition) error {
-	cmd := new(RaftCmd)
-	cmd.Op = opType
-	cmd.K = fmt.Sprintf("%s%s#%s", metaPartitionPrefix, strconv.FormatUint(mp.volID, 10), strconv.FormatUint(mp.PartitionID, 10))
-	cmd.V, _ = json.Marshal(newMetaPartitionValue(mp))
-	return cluster.submit(cmd)
+func (cluster *Cluster) submit(cmd *RaftCmd) error {
+	data, _ := json.Marshal(cmd)
+	_, err := cluster.partition.Submit(data)
+	return err
 }

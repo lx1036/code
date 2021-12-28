@@ -8,30 +8,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type VolStatus uint8
-
-const (
-	ReadWriteVol   VolStatus = 1
-	MarkDeletedVol VolStatus = 2
-	ReadOnlyVol    VolStatus = 3
-)
-
-type volValue struct {
-	ID     uint64    `json:"id"`
-	Name   string    `json:"name"`
-	Owner  string    `json:"owner"`
-	Status VolStatus `json:"status"`
-}
-
-func newVolValue(vol *Volume) (vv *volValue) {
-	return &volValue{
-		ID:     vol.ID,
-		Name:   vol.Name,
-		Owner:  vol.Owner,
-		Status: vol.Status,
-	}
-}
-
 // Volume represents a set of meta partitionMap and data partitionMap
 type Volume struct {
 	ID                 uint64
@@ -72,7 +48,7 @@ const (
 	defaultMetaPartitionInodeIDStep uint64 = 1 << 24 // 16MB
 )
 
-// 1. tcp every hosts for create meta partition
+// 1. tcp every host for create meta partition
 // 2. submit meta partition cmd to raft
 func (vol *Volume) createMetaPartitions(cluster *Cluster) (err error) {
 	var (

@@ -19,23 +19,23 @@ const (
 type MetaNode struct {
 	sync.RWMutex
 
-	ID                uint64
-	Addr              string
-	IsActive          bool
+	ID                uint64 `json:"id"`
+	Addr              string `json:"addr"`
+	IsActive          bool   `json:"isActive"`
 	Sender            *AdminTaskManager
-	RackName          string `json:"Rack"`
-	MaxMemAvailWeight uint64 `json:"MaxMemAvailWeight"`
-	Total             uint64 `json:"TotalWeight"`
-	Used              uint64 `json:"UsedWeight"`
-	Ratio             float64
-	SelectCount       uint64
-	Carry             float64
-	Threshold         float32
-	ReportTime        time.Time
+	RackName          string    `json:"rackName"`
+	MaxMemAvailWeight uint64    `json:"maxMemAvailWeight"`
+	Total             uint64    `json:"total"`
+	Used              uint64    `json:"used"`
+	Ratio             float64   `json:"ratio"`
+	SelectCount       uint64    `json:"selectCount"`
+	Carry             float64   `json:"carry"`
+	Threshold         float32   `json:"threshold"`
+	ReportTime        time.Time `json:"reportTime"`
 	//metaPartitionInfos []*proto.MetaPartitionReport
-	MetaPartitionCount        int
-	NodeSetID                 uint64
-	PersistenceMetaPartitions []uint64
+	MetaPartitionCount        int      `json:"metaPartitionCount"`
+	NodeSetID                 uint64   `json:"nodeSetID"`
+	PersistenceMetaPartitions []uint64 `json:"persistenceMetaPartitions"`
 }
 
 func newMetaNode(addr, clusterID string) *MetaNode {
