@@ -11,12 +11,12 @@ import (
 
 	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
+	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
-//default value
 const (
 	defaultIntervalToCheckHeartbeat      = 10
 	defaultIntervalToCheckMetaPartition  = 60
@@ -89,6 +89,13 @@ type LeaderInfo struct {
 	addr string //host:port
 }
 
+type nodeStatInfo struct {
+	TotalGB     uint64
+	UsedGB      uint64
+	IncreasedGB int64
+	UsedRatio   string
+}
+
 // Cluster stores all the cluster-level information.
 type Cluster struct {
 	volMutex  sync.RWMutex // volume mutex
@@ -107,10 +114,9 @@ type Cluster struct {
 
 	metaNodes        map[string]*MetaNode
 	metaNodeStatInfo *nodeStatInfo
-
-	vols map[string]*Volume
+	vols             map[string]*Volume
+	//volStatInfo      sync.Map
 	//volMountClients     map[string]*MountClients
-	volStatInfo         sync.Map
 	volMountClientMutex sync.RWMutex // volume mount client mutex
 
 	DisableAutoAllocate bool
@@ -127,21 +133,22 @@ func NewCluster(server *Server) *Cluster {
 		vols:      make(map[string]*Volume),
 		metaNodes: make(map[string]*MetaNode),
 		//volMountClients: make(map[string]*MountClients),
-		buckets:         make(map[string]*DeleteBucketInfo),
-		leaderInfo:      server.leaderInfo,
-		idAlloc:         NewIDAllocator(server.fsm.store, server.partition),
-		topology:        newTopology(),
-		fsm:             server.fsm,
-		partition:       server.partition,
-		nodeSetCapacity: server.nodeSetCapacity,
-		peers:           server.peers,
+		buckets:          make(map[string]*DeleteBucketInfo),
+		metaNodeStatInfo: new(nodeStatInfo),
+		leaderInfo:       server.leaderInfo,
+		idAlloc:          NewIDAllocator(server.fsm.store, server.partition),
+		topology:         newTopology(),
+		fsm:              server.fsm,
+		partition:        server.partition,
+		nodeSetCapacity:  server.nodeSetCapacity,
+		peers:            server.peers,
 	}
 }
 
 func (cluster *Cluster) start() {
 	cluster.scheduleToCheckHeartbeat()
-	//cluster.scheduleToCheckMetaPartitions()
-	//cluster.scheduleToUpdateStatInfo()
+	cluster.scheduleToCheckMetaPartitions()
+	cluster.scheduleToUpdateStatInfo()
 	//cluster.scheduleToCheckVolStatus()
 	//cluster.scheduleToLoadMetaPartitions()
 	//cluster.scheduleToCheckVolMountClients()
@@ -175,31 +182,11 @@ func (cluster *Cluster) getLeader(leaderID uint64) *raftstore.PeerAddress {
 	return nil
 }
 
-func (cluster *Cluster) masterAddr() (addr string) {
-	return cluster.leaderInfo.addr
-}
-
 func (cluster *Cluster) checkMetaNodeHeartbeat() {
-	tasks := make([]*proto.AdminTask, 0)
 	for _, node := range cluster.metaNodes {
 		node.checkHeartbeat()
-		task := node.createHeartbeatTask(cluster.masterAddr())
-		tasks = append(tasks, task)
-	}
-
-	cluster.addMetaNodeTasks(tasks)
-}
-
-func (cluster *Cluster) addMetaNodeTasks(tasks []*proto.AdminTask) {
-	for _, task := range tasks {
-		if task == nil {
-			continue
-		}
-		//if node, err := cluster.metaNode(task.OperatorAddr); err != nil {
-		//	klog.Warningf(fmt.Sprintf("action[putTasks],nodeAddr:%v,taskID:%v,err:%v", task.OperatorAddr, task.ID, err))
-		//} else {
-		//	//node.Sender.AddTask(task)
-		//}
+		task := node.createHeartbeatTask(cluster.leaderInfo.addr)
+		node.Sender.AddTask(task)
 	}
 }
 
@@ -211,10 +198,52 @@ func (cluster *Cluster) scheduleToCheckMetaPartitions() {
 	}, time.Second*defaultIntervalToCheckMetaPartition)
 }
 
+func (cluster *Cluster) checkMetaPartitions() {
+	/*for _, vol := range cluster.allVols() {
+		//vol.checkMetaPartitions(cluster)
+		//vol.checkSplitMetaPartition(cluster)
+		maxPartitionID := vol.maxPartitionID()
+		mps := vol.cloneMetaPartitionMap()
+		for _, mp := range mps {
+			//mp.checkStatus(cluster.Name, true, int(vol.metaPartitionCount), maxPartitionID)
+			//mp.checkLeader()
+			//mp.checkReplicaNum(cluster, vol.Name, vol.metaPartitionCount)
+			//mp.checkEnd(cluster, maxPartitionID)
+			//mp.reportMissingReplicas(cluster.Name, cluster.leaderInfo.addr, defaultMetaPartitionTimeOutSec)
+			task := mp.replicaCreationTasks(cluster.Name, vol.Name)
+			cluster.metaNodes[task.OperatorAddr].Sender.AddTask(task)
+		}
+	}*/
+}
+
 func (cluster *Cluster) scheduleToUpdateStatInfo() {
 	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
 		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
-			cluster.updateStatInfo()
+			var (
+				total uint64
+				used  uint64
+			)
+			for _, metaNode := range cluster.metaNodes {
+				total += metaNode.Total
+				used += metaNode.Used
+			}
+			useRate := float64(used) / float64(total)
+			newUsed := used / util.GB
+			cluster.metaNodeStatInfo.TotalGB = total / util.GB
+			cluster.metaNodeStatInfo.IncreasedGB = int64(newUsed) - int64(cluster.metaNodeStatInfo.UsedGB)
+			cluster.metaNodeStatInfo.UsedGB = newUsed
+			cluster.metaNodeStatInfo.UsedRatio = strconv.FormatFloat(useRate, 'f', 3, 32) // 保留3位小数并四舍五入
+
+			for name, volume := range cluster.allVols() {
+				used, total = volume.totalUsedSpace(), volume.Capacity*util.GB
+				if total <= 0 {
+					continue
+				}
+				useRate = float64(used) / float64(total)
+				cluster.vols[name].TotalGB = total / util.GB
+				cluster.vols[name].UsedGB = used / util.GB
+				cluster.vols[name].UsedRatio = strconv.FormatFloat(useRate, 'f', 3, 32)
+			}
 		}
 	}, time.Second*defaultIntervalToCheckHeartbeat)
 }
@@ -223,28 +252,9 @@ func (cluster *Cluster) scheduleToCheckVolStatus() {
 	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
 		//check vols after switching leader two minutes
 		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
-			cluster.checkDeleteBucket()
-			//for _, vol := range cluster.vols {
-			//	//vol.checkStatus(cluster)
-			//}
+
 		}
 	}, time.Second*defaultIntervalToCheckMetaPartition)
-}
-
-func (cluster *Cluster) checkDeleteBucket() {
-	for _, bucket := range cluster.buckets {
-		deleted, err := cluster.deleteListObjects(bucket.AccessKey, bucket.SecretKey, bucket.Endpoint,
-			bucket.Region, bucket.BucketName)
-		if err != nil {
-			klog.Errorf("action [checkDeleteBucket] deleteListObjects in bucket[%v] error: %v",
-				bucket.BucketName, err)
-			continue
-		}
-
-		if deleted {
-
-		}
-	}
 }
 
 func (cluster *Cluster) scheduleToCheckVolMountClients() {
@@ -270,19 +280,6 @@ func (cluster *Cluster) allVols() map[string]*Volume {
 	return vols
 }
 
-func (cluster *Cluster) checkMetaPartitions() {
-	defer func() {
-		if r := recover(); r != nil {
-			klog.Warningf("checkMetaPartitions occurred panic,err[%v]", r)
-		}
-	}()
-
-	volumes := cluster.allVols()
-	for _, vol := range volumes {
-		vol.checkMetaPartitions(cluster)
-	}
-}
-
 func (cluster *Cluster) getVolume(volName string) (*Volume, error) {
 	cluster.volMutex.RLock()
 	defer cluster.volMutex.RUnlock()
@@ -292,6 +289,17 @@ func (cluster *Cluster) getVolume(volName string) (*Volume, error) {
 	}
 
 	return vol, nil
+}
+
+func (cluster *Cluster) scheduleToLoadMetaPartitions() {
+	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
+		//check vols after switching leader two minutes
+		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
+			if cluster.vols != nil {
+				//cluster.checkLoadMetaPartitions()
+			}
+		}
+	}, time.Second*defaultIntervalToCheckMetaPartition)
 }
 
 ////////////////////////////HTTP///////////////////////////////////
@@ -313,7 +321,7 @@ func (cluster *Cluster) createVol(name, owner string, capacity uint64) (*Volume,
 		return nil, err
 	}
 	vol := newVol(id, name, owner, capacity, defaultReplicaNum)
-	if err = cluster.submitAddVol(vol); err != nil {
+	if err = cluster.submitVol(opSyncAddVol, vol); err != nil {
 		klog.Errorf(fmt.Sprintf("submit add vol to raft err:%v", err))
 		return nil, err
 	}
@@ -322,6 +330,7 @@ func (cluster *Cluster) createVol(name, owner string, capacity uint64) (*Volume,
 	// (2)submit `create 3 meta partitions` to raft
 	err = vol.createMetaPartitions(cluster)
 	if err != nil {
+		cluster.submitVol(opSyncDeleteVol, vol)
 		klog.Errorf(fmt.Sprintf("create meta partitions for vol %s err: %v", name, err))
 		return nil, err
 	}
@@ -330,6 +339,20 @@ func (cluster *Cluster) createVol(name, owner string, capacity uint64) (*Volume,
 
 	// TODO: s3 create bucket
 	return vol, nil
+}
+
+func (cluster *Cluster) updateVol(name, owner string, capacity uint64) (*Volume, error) {
+	if vol, err := cluster.getVolume(name); err != nil {
+		return nil, err
+	} else {
+		vol.Capacity = capacity // expand capacity
+		vol.Owner = owner
+		if err = cluster.submitVol(opSyncUpdateVol, vol); err != nil {
+			return nil, err
+		}
+
+		return vol, nil
+	}
 }
 
 func (cluster *Cluster) addMetaNode(nodeAddr string) (uint64, error) {
@@ -485,18 +508,6 @@ const (
 )
 
 //key=#vol#volID,value=json.Marshal(vv)
-func (cluster *Cluster) submitAddVol(vol *Volume) (err error) {
-	return cluster.submitVol(opSyncAddVol, vol)
-}
-
-func (cluster *Cluster) submitUpdateVol(vol *Volume) (err error) {
-	return cluster.submitVol(opSyncUpdateVol, vol)
-}
-
-func (cluster *Cluster) submitDeleteVol(vol *Volume) (err error) {
-	return cluster.submitVol(opSyncDeleteVol, vol)
-}
-
 func (cluster *Cluster) submitVol(opType uint32, vol *Volume) (err error) {
 	cmd := new(RaftCmd)
 	cmd.Op = opType

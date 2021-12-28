@@ -87,3 +87,7 @@ func (sender *AdminTaskManager) buildPacket(task *proto.AdminTask) (packet *prot
 	packet.Data = body
 	return packet, nil
 }
+
+func (sender *AdminTaskManager) AddTask(task *proto.AdminTask) {
+	sender.TaskMap[task.ID] = task
+}

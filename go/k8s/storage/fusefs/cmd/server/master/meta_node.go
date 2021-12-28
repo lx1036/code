@@ -67,14 +67,10 @@ func (metaNode *MetaNode) isCarryNode() (ok bool) {
 }
 
 func (metaNode *MetaNode) createHeartbeatTask(masterAddr string) *proto.AdminTask {
-	panic("not implemented")
-
-	/*request := &proto.HeartBeatRequest{
+	return proto.NewAdminTask(proto.OpMetaNodeHeartbeat, metaNode.Addr, &proto.HeartBeatRequest{
 		CurrTime:   time.Now().Unix(),
 		MasterAddr: masterAddr,
-	}
-
-	return proto.NewAdminTask(proto.OpMetaNodeHeartbeat, metaNode.Addr, request)*/
+	})
 }
 
 func (metaNode *MetaNode) checkHeartbeat() {

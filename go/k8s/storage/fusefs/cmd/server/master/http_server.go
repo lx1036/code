@@ -54,7 +54,11 @@ func (server *Server) startHTTPService() {
 	router.NewRoute().Methods(http.MethodGet).Path("/metanode").HandlerFunc(server.getMetaNode)
 
 	// volume
+	router.NewRoute().Methods(http.MethodGet).Path("/vols").HandlerFunc(server.listVols)
+	router.NewRoute().Methods(http.MethodGet).Path("/vol").HandlerFunc(server.getVol)
 	router.NewRoute().Methods(http.MethodPost).Path("/vol").HandlerFunc(server.createVol)
+	router.NewRoute().Methods(http.MethodPost).Path("/vol/expand").HandlerFunc(server.updateVol)
+	router.NewRoute().Methods(http.MethodPost).Path("/vol/shrink").HandlerFunc(server.updateVol)
 
 	// meta partition
 	router.NewRoute().Methods(http.MethodPost).Path("/metapartition/expand").HandlerFunc(server.createMetaPartition)
@@ -74,6 +78,26 @@ func (server *Server) getClusterInfo(writer http.ResponseWriter, request *http.R
 }
 
 // volume
+func (server *Server) listVols(writer http.ResponseWriter, request *http.Request) {
+	vols := server.cluster.allVols()
+	data, _ := json.Marshal(vols)
+	send(writer, http.StatusOK, data)
+	return
+}
+
+func (server *Server) getVol(writer http.ResponseWriter, request *http.Request) {
+	name := request.FormValue(ParamsName)
+	vol, err := server.cluster.getVolume(name)
+	if err != nil {
+		http.Error(writer, fmt.Sprintf("%v", err), http.StatusBadRequest)
+		return
+	}
+
+	data, _ := json.Marshal(vol)
+	send(writer, http.StatusOK, data)
+	return
+}
+
 func (server *Server) createVol(writer http.ResponseWriter, request *http.Request) {
 	name := request.FormValue(ParamsName)
 	owner := request.FormValue(ParamsOwner)
@@ -85,6 +109,27 @@ func (server *Server) createVol(writer http.ResponseWriter, request *http.Reques
 	}
 
 	if vol, err := server.cluster.createVol(name, owner, capacity); err != nil {
+		http.Error(writer, fmt.Sprintf("create volume %s err: %v", name, err), http.StatusInternalServerError)
+		return
+	} else {
+		data, _ := json.Marshal(vol)
+		send(writer, http.StatusOK, data)
+		return
+	}
+}
+
+// expand volume for fusefs csi
+func (server *Server) updateVol(writer http.ResponseWriter, request *http.Request) {
+	name := request.FormValue(ParamsName)
+	owner := request.FormValue(ParamsOwner)
+	capacityStr := request.FormValue(ParamsCapacity)
+	capacity, err := strconv.ParseUint(capacityStr, 10, 64)
+	if err != nil {
+		http.Error(writer, fmt.Sprintf("capacity params %s is wrong", capacityStr), http.StatusBadRequest)
+		return
+	}
+
+	if vol, err := server.cluster.updateVol(name, owner, capacity); err != nil {
 		http.Error(writer, fmt.Sprintf("create volume %s err: %v", name, err), http.StatusInternalServerError)
 		return
 	} else {

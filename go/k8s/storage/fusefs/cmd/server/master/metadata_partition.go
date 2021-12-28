@@ -15,33 +15,33 @@ const (
 
 // MetaReplica defines the replica of a meta partition
 type MetaReplica struct {
-	Addr       string
-	start      uint64 // lower bound of the inode id
-	end        uint64 // upper bound of the inode id
-	nodeID     uint64
-	ReportTime int64
-	Status     int8 // unavailable, readOnly, readWrite
-	IsLeader   bool
-	metaNode   *MetaNode
+	Addr       string    `json:"addr"`
+	start      uint64    `json:"start"` // lower bound of the inode id
+	end        uint64    `json:"end"`   // upper bound of the inode id
+	nodeID     uint64    `json:"nodeID"`
+	ReportTime int64     `json:"reportTime"`
+	Status     int8      `json:"status"` // unavailable, readOnly, readWrite
+	IsLeader   bool      `json:"isLeader"`
+	metaNode   *MetaNode `json:"metaNode"`
 }
 
 // MetaPartition defines the structure of a meta partition
 type MetaPartition struct {
 	sync.RWMutex
 
-	PartitionID uint64
-	Start       uint64
-	End         uint64
-	MaxInodeID  uint64
-	Size        uint64
-	Replicas    []*MetaReplica
-	ReplicaNum  int
-	Status      int8
-	volID       uint64
-	volName     string
-	Hosts       []string
-	Peers       []proto.Peer
-	MissNodes   map[string]int64
+	PartitionID uint64           `json:"partitionID"`
+	Start       uint64           `json:"start"`
+	End         uint64           `json:"end"`
+	MaxInodeID  uint64           `json:"maxInodeID"`
+	Size        uint64           `json:"size"`
+	Replicas    []*MetaReplica   `json:"replicas"`
+	ReplicaNum  int              `json:"replicaNum"`
+	Status      int8             `json:"status"`
+	volID       uint64           `json:"volID"`
+	volName     string           `json:"volName"`
+	Hosts       []string         `json:"hosts"`
+	Peers       []proto.Peer     `json:"peers"`
+	MissNodes   map[string]int64 `json:"missNodes"`
 	//LoadResponse []*proto.MetaPartitionLoadResponse
 }
 
