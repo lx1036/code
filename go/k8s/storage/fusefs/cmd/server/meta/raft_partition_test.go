@@ -109,8 +109,11 @@ func TestRaftPartition(test *testing.T) {
 		klog.Fatal(err)
 	}
 
-	metaItem := NewMetaItem(opFSMCreateInode, []byte("hello"), []byte("world"))
-	cmd, _ := json.Marshal(metaItem)
+	cmd, _ := json.Marshal(&RaftCmd{
+		Op: opFSMCreateInode,
+		K:  "hello",
+		V:  []byte("world"),
+	})
 	response, err := raftPartition.Submit(cmd)
 	if err != nil {
 		klog.Fatal(err)

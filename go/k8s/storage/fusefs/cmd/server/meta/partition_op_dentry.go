@@ -17,34 +17,34 @@ type OpDentry interface {
 	GetDentryTree() *btree.BTree
 }
 
-func (partition *MetaPartitionFSM) getDentryTree() *BTree {
+func (partition *PartitionFSM) getDentryTree() *BTree {
 	return partition.dentryTree.GetTree()
 }
 
-func (partition *MetaPartitionFSM) GetDentryTree() *btree.BTree {
+func (partition *PartitionFSM) GetDentryTree() *btree.BTree {
 	return partition.dentryTree.tree.Clone()
 }
 
-func (partition *MetaPartitionFSM) CreateDentry(req *proto.CreateDentryRequest, p *proto.Packet) (err error) {
+func (partition *PartitionFSM) CreateDentry(req *proto.CreateDentryRequest, p *proto.Packet) (err error) {
 	panic("implement me")
 }
 
-func (partition *MetaPartitionFSM) DeleteDentry(req *proto.DeleteDentryRequest, p *proto.Packet) (err error) {
+func (partition *PartitionFSM) DeleteDentry(req *proto.DeleteDentryRequest, p *proto.Packet) (err error) {
 	panic("implement me")
 }
 
-func (partition *MetaPartitionFSM) UpdateDentry(req *proto.UpdateDentryRequest, p *proto.Packet) (err error) {
+func (partition *PartitionFSM) UpdateDentry(req *proto.UpdateDentryRequest, p *proto.Packet) (err error) {
 	panic("implement me")
 }
 
-func (partition *MetaPartitionFSM) ReadDir(req *proto.ReadDirRequest, p *proto.Packet) (err error) {
+func (partition *PartitionFSM) ReadDir(req *proto.ReadDirRequest, p *proto.Packet) (err error) {
 	panic("implement me")
 }
 
-func (partition *MetaPartitionFSM) Lookup(req *proto.LookupRequest, p *proto.Packet) (err error) {
+func (partition *PartitionFSM) Lookup(req *proto.LookupRequest, p *proto.Packet) (err error) {
 	panic("implement me")
 }
 
-func (partition *MetaPartitionFSM) LookupName(req *proto.LookupNameRequest, p *proto.Packet) (err error) {
+func (partition *PartitionFSM) LookupName(req *proto.LookupNameRequest, p *proto.Packet) (err error) {
 	panic("implement me")
 }

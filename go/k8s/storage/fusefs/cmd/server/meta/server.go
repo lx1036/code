@@ -44,6 +44,12 @@ var (
 	configTotalMem uint64
 )
 
+type RaftCmd struct {
+	Op uint32 `json:"op"`
+	K  string `json:"k"`
+	V  []byte `json:"v"`
+}
+
 type Config struct {
 	IP          string   `json:"ip"`
 	Port        int      `json:"port"`
@@ -76,7 +82,7 @@ type Server struct {
 	raftHeartbeatPort int
 	raftReplicatePort int
 	retainLogs        uint64
-	raftStore         raftstore.RaftStore
+	raftStore         *raftstore.RaftStore
 }
 
 func NewServer(config Config) *Server {
@@ -121,7 +127,7 @@ func (server *Server) Start() (err error) {
 	// INFO: 用来处理来自 client 的请求，并把数据写到 raft log 里
 	server.cluster = NewCluster(MetadataManagerConfig{
 		NodeID:    server.nodeId,
-		RootDir:   server.storeDir,
+		StoreDir:  server.storeDir,
 		RaftStore: server.raftStore,
 	})
 	if err = server.cluster.Start(); err != nil {
