@@ -1,117 +1,92 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"os"
-	"os/signal"
-	"syscall"
+	"path/filepath"
+	"runtime"
+
+	"k8s-lx1036/k8s/storage/fusefs/cmd/client"
 
 	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseutil"
-	"k8s-lx1036/k8s/storage/fusefs/cmd/client"
 
+	"github.com/spf13/cobra"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 )
 
-const (
-	MaxReadAhead     = 512 * 1024
-	WriteBufPoolSize = 5 * 1024 * 1024 * 1024
-)
-
-const (
-	// Mandatory
-	MountPoint = "mountPoint"
-	VolName    = "volName"
-	Owner      = "owner"
-	MasterAddr = "masterAddr"
-	// Optional
-	LogDir             = "logDir"
-	LogLevel           = "logLevel"
-	ProfPort           = "profPort"
-	IcacheTimeout      = "icacheTimeout"
-	LookupValid        = "lookupValid"
-	AttrValid          = "attrValid"
-	ReadRate           = "readRate"
-	WriteRate          = "writeRate"
-	EnSyncWrite        = "enSyncWrite"
-	Rdonly             = "rdonly"
-	WriteCache         = "writecache"
-	KeepCache          = "keepcache"
-	FullPathName       = "FullPathName"
-	BufSize            = "bufSize"
-	MaxMultiParts      = "maxMultiParts"
-	MaxCacheInode      = "maxCacheInode"
-	ReadDirBurst       = "readDirBurst"
-	ReadDirLimit       = "readDirLimit"
-	S3ObjectNameVerify = "s3ObjectNameVerify"
-)
-
-var (
-	configFile = flag.String("c", "", "config file path")
-)
-
 // INFO: https://chubaofs.readthedocs.io/zh_CN/latest/design/client.html
-// go run . -c ./fuse_360.json
+// go run . --config=./fuse.json
 func main() {
-	klog.InitFlags(nil)
-	flag.Set("logtostderr", "true")
-	flag.Parse()
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
-	// mount config
-	if len(*configFile) == 0 {
-		klog.Fatalf(fmt.Sprintf("config file should not be empty"))
-	}
-	content, err := ioutil.ReadFile(*configFile)
-	if err != nil {
-		klog.Fatalf(fmt.Sprintf("read file err %v", err))
-	}
-	var mountOption client.MountOption
-	err = json.Unmarshal(content, &mountOption)
-	if err != nil {
-		klog.Fatalf(fmt.Sprintf("json unmarshal config file err %v", err))
+	if len(os.Getenv("GOMAXPROCS")) == 0 {
+		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
-	fuseFS, err := client.NewFuseFS(&mountOption)
-	if err != nil {
-		klog.Error(err)
-		os.Exit(1)
+	var config string
+
+	cmd := &cobra.Command{
+		Use:   "master",
+		Short: "Runs the FuseFS client",
+		Long:  `responsible for fusefs client`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(config) == 0 {
+				klog.Fatal("config is required")
+			}
+			if err := runCommand(config); err != nil {
+				return err
+			}
+			return nil
+		},
 	}
 
-	registerInterceptedSignal(fuseFS)
+	cmd.Flags().StringVar(&config, "config", "", "master config file")
+	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 
-	// mount filesystem
-	server := fuseutil.NewFileSystemServer(fuseFS)
-	mountConfig := &fuse.MountConfig{
-		FSName:                  "sunfs-" + mountOption.Volname,
-		Subtype:                 "sunfs", // `cat /proc/mounts | grep sunfs` -> xxx fuse.sunfs xxx
-		ReadOnly:                mountOption.ReadOnly,
-		DisableWritebackCaching: true,
-	}
-
-	mfs, err := fuse.Mount(mountOption.MountPoint, server, mountConfig)
-	if err != nil {
-		fuseFS.Destroy()
-		klog.Error(err)
-		os.Exit(1)
-	}
-
-	if err = mfs.Join(context.Background()); err != nil {
-		klog.Errorf("mfs Joint returns error: %v", err)
-		os.Exit(1)
+	if err := cmd.Execute(); err != nil {
+		klog.Fatal(err)
 	}
 }
 
-func registerInterceptedSignal(fuseFS *client.FuseFS) {
-	sigC := make(chan os.Signal, 1)
-	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-sigC
+func runCommand(configFile string) error {
+	configFile, _ = filepath.Abs(configFile)
+	content, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		return err
+	}
+	var config client.Config
+	err = json.Unmarshal(content, &config)
+	if err != nil {
+		return err
+	}
+
+	fuseFS, err := client.NewFuseFS(&config)
+	if err != nil {
 		fuseFS.Destroy()
-		klog.Infof("Killed due to a received signal (%v)\n", sig)
-		os.Exit(1)
-	}()
+		klog.Fatal(err)
+	}
+
+	klog.Info("Starting the fuse client")
+	mountPoint, _ := filepath.Abs(config.MountPoint)
+	mountedFileSystem, err := fuse.Mount(mountPoint, fuseutil.NewFileSystemServer(fuseFS), &fuse.MountConfig{
+		FSName:                  "fuse-" + config.Volname,
+		Subtype:                 "fuse", // `cat /proc/mounts | grep sunfs` -> xxx fuse.sunfs xxx
+		ReadOnly:                config.ReadOnly,
+		DisableWritebackCaching: true,
+	})
+	if err != nil {
+		fuseFS.Destroy()
+		klog.Fatal(err)
+	}
+	if err = mountedFileSystem.Join(genericapiserver.SetupSignalContext()); err != nil {
+		klog.Fatal(err)
+	}
+
+	return nil
 }

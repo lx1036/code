@@ -16,7 +16,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type MountOption struct {
+type Config struct {
 	MountPoint string `json:"mountPoint"`
 
 	//volname is also s3 bucket
@@ -78,6 +78,36 @@ type FuseFS struct {
 	//replicators *Ticket
 }
 
+// INFO: 不同操作对应其OP: https://k8s-lx1036/k8s/storage/fuse/blob/master/fuseutil/file_system.go#L135-L222
+
+func NewFuseFS(opt *Config) (*FuseFS, error) {
+	var err error
+	fs := new(FuseFS)
+	fs.metaClient, err = meta.NewMetaWrapper(opt.Volname, opt.Owner, opt.MasterAddr)
+	if err != nil {
+		return nil, fmt.Errorf("NewMetaWrapper failed with err %v", err)
+	}
+
+	fs.endpoint = fs.metaClient.S3Endpoint
+	fs.cluster = fs.metaClient.Cluster()
+	fs.localIP = fs.metaClient.LocalIP()
+
+	s3Config := &backend.S3Config{
+		Endpoint:         fs.metaClient.S3Endpoint, // S3Endpoint 是调用 meta cluster api 获取的，实际上数据存在 master cluster 中
+		AccessKey:        opt.AccessKey,
+		SecretKey:        opt.SecretKey,
+		DisableSSL:       true,
+		S3ForcePathStyle: true, // 必须为 true，这样 url 才是 http://S3Endpoint/bucket
+	}
+	fs.s3Backend, err = backend.NewS3Backend(opt.Volname, s3Config)
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[NewFuseFS]new s3 client err %v", err))
+		return nil, err
+	}
+
+	return fs, nil
+}
+
 // INFO: `stat ${mountOption.MountPoint}` 命令执行结果
 func (fs *FuseFS) StatFS(ctx context.Context, op *fuseops.StatFSOp) error {
 	total, used := fs.metaClient.Statfs()
@@ -136,34 +166,4 @@ func (fs *FuseFS) getS3Key(inodeID uint64) (string, error) {
 	}
 
 	return "123", nil
-}
-
-// INFO: 不同操作对应其OP: https://k8s-lx1036/k8s/storage/fuse/blob/master/fuseutil/file_system.go#L135-L222
-
-func NewFuseFS(opt *MountOption) (*FuseFS, error) {
-	var err error
-	fs := new(FuseFS)
-	fs.metaClient, err = meta.NewMetaWrapper(opt.Volname, opt.Owner, opt.MasterAddr)
-	if err != nil {
-		return nil, fmt.Errorf("NewMetaWrapper failed with err %v", err)
-	}
-
-	fs.endpoint = fs.metaClient.S3Endpoint
-	fs.cluster = fs.metaClient.Cluster()
-	fs.localIP = fs.metaClient.LocalIP()
-
-	s3Config := &backend.S3Config{
-		Endpoint:         fs.metaClient.S3Endpoint, // S3Endpoint 是调用 meta cluster api 获取的，实际上数据存在 master cluster 中
-		AccessKey:        opt.AccessKey,
-		SecretKey:        opt.SecretKey,
-		DisableSSL:       true,
-		S3ForcePathStyle: true, // 必须为 true，这样 url 才是 http://S3Endpoint/bucket
-	}
-	fs.s3Backend, err = backend.NewS3Backend(opt.Volname, s3Config)
-	if err != nil {
-		klog.Errorf(fmt.Sprintf("[NewFuseFS]new s3 client err %v", err))
-		return nil, err
-	}
-
-	return fs, nil
 }

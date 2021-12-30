@@ -3,8 +3,8 @@
   "volName": "pvc-liuxiang",
   "owner": "sunfs",
   "masterAddr": "127.0.0.1:9500",
-  "AccessKey": "123",
-  "SecretKey": "456",
+  "accessKey": "123",
+  "secretKey": "456",
   "profPort": "35903",
   "fullPathName": false,
   "bufSize": 1073741824
