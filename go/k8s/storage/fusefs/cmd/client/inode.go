@@ -146,3 +146,7 @@ func GetChildInodeEntry(child *Inode) fuseops.ChildInodeEntry {
 		EntryExpiration:      time.Now().Add(LookupValidDuration),
 	}
 }
+
+func (fs *FuseFS) ForgetInode(ctx context.Context, op *fuseops.ForgetInodeOp) error {
+	panic("implement me")
+}

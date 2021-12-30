@@ -42,6 +42,10 @@ type MetaPartition struct {
 	Hosts       []string         `json:"hosts"`
 	Peers       []proto.Peer     `json:"peers"`
 	MissNodes   map[string]int64 `json:"missNodes"`
+
+	InodeCount  uint64
+	DentryCount uint64
+
 	//LoadResponse []*proto.MetaPartitionLoadResponse
 }
 

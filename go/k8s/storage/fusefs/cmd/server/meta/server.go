@@ -90,7 +90,7 @@ func NewServer(config Config) *Server {
 		ip:           config.IP,
 		port:         config.Port,
 		masterAddrs:  config.MasterAddrs,
-		masterLeader: config.MasterAddrs[0],
+		masterLeader: config.MasterAddrs[0], // TODO: 暂时选择第一个作为 leader address
 
 		storeDir:          config.StoreDir,
 		walDir:            config.WalDir,

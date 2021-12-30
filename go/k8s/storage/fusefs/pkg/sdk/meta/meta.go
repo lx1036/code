@@ -126,7 +126,7 @@ func NewMetaWrapper(volname, owner, masterHosts string) (*MetaWrapper, error) {
 	}
 
 	// TODO: refresh
-	//go mw.refresh()
+	go mw.refresh()
 
 	return mw, nil
 }
