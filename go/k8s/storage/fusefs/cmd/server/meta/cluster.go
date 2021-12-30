@@ -165,19 +165,24 @@ func (cluster *Cluster) LoadStat() string {
 	return fmt.Sprintf("state total/loaded : %d/%d", cluster.localPartitionCount, len(cluster.partitions))
 }
 
+////////////////////////////TCP///////////////////////////////////
+
 func (cluster *Cluster) HandleMetadataOperation(conn net.Conn, p *proto.Packet, remoteAddr string) error {
 	var err error
 	switch p.Opcode {
+	// inode
+	case proto.OpMetaCreateInode:
+		err = cluster.opCreateInode(conn, p, remoteAddr)
+	case proto.OpMetaLinkInode:
+		err = cluster.opCreateInodeLink(conn, p, remoteAddr)
+	case proto.OpMetaUnlinkInode:
+		err = cluster.opUnlinkInode(conn, p, remoteAddr)
+	case proto.OpMetaBatchUnlinkInode:
+		err = cluster.opBatchUnlinkInode(conn, p, remoteAddr)
+
 	case proto.OpCreateMetaPartition:
 		err = cluster.opCreateMetaPartition(conn, p, remoteAddr)
 
-	case proto.OpMetaCreateInode:
-		err = cluster.opCreateInode(conn, p, remoteAddr)
-
-	//case proto.OpMetaLinkInode:
-	//	err = cluster.opMetaLinkInode(conn, p, remoteAddr)
-	//case proto.OpMetaUnlinkInode:
-	//	err = cluster.opMetaUnlinkInode(conn, p, remoteAddr)
 	//case proto.OpMetaInodeGet:
 	//	err = cluster.opMetaInodeGet(conn, p, remoteAddr)
 	//case proto.OpMetaEvictInode:
@@ -227,29 +232,110 @@ func (cluster *Cluster) HandleMetadataOperation(conn net.Conn, p *proto.Packet, 
 	return err
 }
 
-// Handle OpCreate inode.
 func (cluster *Cluster) opCreateInode(conn net.Conn, p *proto.Packet, remoteAddr string) error {
 	req := &proto.CreateInodeRequest{}
-
 	if err := json.Unmarshal(p.Data, req); err != nil {
-		//p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
-		cluster.respondToClient(conn, p)
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		p.WriteToConn(conn)
 		return err
 	}
+
 	partition, err := cluster.getPartition(req.PartitionID)
 	if err != nil {
-		//p.PacketErrorWithBody(proto.OpNotExistErr, []byte(err.Error()))
-		cluster.respondToClient(conn, p)
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		p.WriteToConn(conn)
 		return err
 	}
-	// TODO: 如果不是leader，可以 proxy request to leader
-	/*if !cluster.serveProxy(conn, mp, p) {
-		return err
-	}*/
+
+	// INFO: 如果不是leader，可以 proxy request to leader，然后直接返回
+	if cluster.serveProxy(conn, partition, p) {
+		return nil
+	}
+
 	err = partition.CreateInode(req, p)
-	// reply the operation result to the client through TCP
-	cluster.respondToClient(conn, p)
-	klog.Infof("%s [opCreateInode] req: %d - %v, resp: %v, body: %s", remoteAddr, p.GetReqID(), req, p.GetResultMsg(), p.Data)
+	p.WriteToConn(conn)
+	klog.Infof(fmt.Sprintf("[opCreateInode]%s req: %v, resp: %v, body: %s", remoteAddr, *req, p.GetResultMsg(), p.Data))
+
+	return err
+}
+
+func (cluster *Cluster) opCreateInodeLink(conn net.Conn, p *proto.Packet, remoteAddr string) error {
+	req := &proto.CreateInodeLinkRequest{}
+	if err := json.Unmarshal(p.Data, req); err != nil {
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		p.WriteToConn(conn)
+		return err
+	}
+
+	partition, err := cluster.getPartition(req.PartitionID)
+	if err != nil {
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		p.WriteToConn(conn)
+		return err
+	}
+
+	// INFO: 如果不是leader，可以 proxy request to leader，然后直接返回
+	if cluster.serveProxy(conn, partition, p) {
+		return nil
+	}
+
+	err = partition.CreateInodeLink(req, p)
+	p.WriteToConn(conn)
+	klog.Infof(fmt.Sprintf("[opCreateInodeLink]%s req: %v, resp: %v, body: %s", remoteAddr, *req, p.GetResultMsg(), p.Data))
+
+	return err
+}
+
+func (cluster *Cluster) opUnlinkInode(conn net.Conn, p *proto.Packet, remoteAddr string) error {
+	req := &proto.UnlinkInodeRequest{}
+	if err := json.Unmarshal(p.Data, req); err != nil {
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		p.WriteToConn(conn)
+		return err
+	}
+
+	partition, err := cluster.getPartition(req.PartitionID)
+	if err != nil {
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		p.WriteToConn(conn)
+		return err
+	}
+
+	// INFO: 如果不是leader，可以 proxy request to leader，然后直接返回
+	if cluster.serveProxy(conn, partition, p) {
+		return nil
+	}
+
+	err = partition.UnlinkInode(req, p)
+	p.WriteToConn(conn)
+	klog.Infof(fmt.Sprintf("[opUnlinkInode]%s req: %v, resp: %v, body: %s", remoteAddr, *req, p.GetResultMsg(), p.Data))
+
+	return err
+}
+
+func (cluster *Cluster) opBatchUnlinkInode(conn net.Conn, p *proto.Packet, remoteAddr string) error {
+	req := &proto.BatchUnlinkInodeRequest{}
+	if err := json.Unmarshal(p.Data, req); err != nil {
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		p.WriteToConn(conn)
+		return err
+	}
+
+	partition, err := cluster.getPartition(req.PartitionID)
+	if err != nil {
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		p.WriteToConn(conn)
+		return err
+	}
+
+	// INFO: 如果不是leader，可以 proxy request to leader，然后直接返回
+	if cluster.serveProxy(conn, partition, p) {
+		return nil
+	}
+
+	err = partition.BatchUnlinkInode(req, p)
+	p.WriteToConn(conn)
+	klog.Infof(fmt.Sprintf("[opUnlinkInode]%s req: %v, resp: %v, body: %s", remoteAddr, *req, p.GetResultMsg(), p.Data))
 
 	return err
 }
@@ -258,26 +344,32 @@ func (cluster *Cluster) opCreateMetaPartition(conn net.Conn, p *proto.Packet, re
 	return nil
 }
 
-// Reply data through tcp connection to the client.
-func (cluster *Cluster) respondToClient(conn net.Conn, p *proto.Packet) (err error) {
-	// Handle panic
-	defer func() {
-		if r := recover(); r != nil {
-			switch data := r.(type) {
-			case error:
-				err = data
-			default:
-				err = fmt.Errorf(data.(string))
-			}
-		}
-	}()
-
-	// process data and send reply though specified tcp connection.
-	err = p.WriteToConn(conn)
-	if err != nil {
-		klog.Errorf("response to client[%v], request[%s], response packet[%s]", err, p.GetOpMsg(), p.GetResultMsg())
+func (cluster *Cluster) serveProxy(conn net.Conn, partition *PartitionFSM, p *proto.Packet) bool {
+	leaderAddr, isLeader := partition.IsLeader()
+	if isLeader {
+		return false
 	}
-	return
+	if len(leaderAddr) == 0 {
+		p.PacketErrorWithBody(proto.OpErr, []byte("no leader"))
+		p.WriteToConn(conn)
+		return true
+	}
+
+	leaderConn, _ := net.Dial("tcp", leaderAddr)
+	if err := p.WriteToConn(leaderConn); err != nil {
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		p.WriteToConn(conn)
+		return true
+	}
+	if err := p.ReadFromConn(leaderConn, proto.ReadDeadlineTime); err != nil {
+		p.PacketErrorWithBody(proto.OpErr, []byte(err.Error()))
+		p.WriteToConn(conn)
+		return true
+	}
+
+	// proxy leaderConn to client conn
+	p.WriteToConn(conn)
+	return true
 }
 
 // Stop INFO: stop 每一个 partition

@@ -12,7 +12,7 @@ import (
 
 	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseutil"
-	"k8s-lx1036/k8s/storage/fusefs/cmd/client/fs"
+	"k8s-lx1036/k8s/storage/fusefs/cmd/client"
 
 	"k8s.io/klog/v2"
 )
@@ -69,13 +69,13 @@ func main() {
 	if err != nil {
 		klog.Fatalf(fmt.Sprintf("read file err %v", err))
 	}
-	var mountOption fs.MountOption
+	var mountOption client.MountOption
 	err = json.Unmarshal(content, &mountOption)
 	if err != nil {
 		klog.Fatalf(fmt.Sprintf("json unmarshal config file err %v", err))
 	}
 
-	fuseFS, err := fs.NewFuseFS(&mountOption)
+	fuseFS, err := client.NewFuseFS(&mountOption)
 	if err != nil {
 		klog.Error(err)
 		os.Exit(1)
@@ -105,7 +105,7 @@ func main() {
 	}
 }
 
-func registerInterceptedSignal(fuseFS *fs.FuseFS) {
+func registerInterceptedSignal(fuseFS *client.FuseFS) {
 	sigC := make(chan os.Signal, 1)
 	signal.Notify(sigC, syscall.SIGINT, syscall.SIGTERM)
 	go func() {

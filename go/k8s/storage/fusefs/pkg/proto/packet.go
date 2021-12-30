@@ -24,22 +24,23 @@ const (
 	ProtoMagic uint8 = 0xFF
 
 	// Operations: Client -> MetaNode.
-	OpMetaCreateInode   uint8 = 0x20
-	OpMetaUnlinkInode   uint8 = 0x21
-	OpMetaCreateDentry  uint8 = 0x22
-	OpMetaDeleteDentry  uint8 = 0x23
-	OpMetaOpen          uint8 = 0x24
-	OpMetaLookup        uint8 = 0x25
-	OpMetaReadDir       uint8 = 0x26
-	OpMetaInodeGet      uint8 = 0x27
-	OpMetaBatchInodeGet uint8 = 0x28
-	OpMetaUpdateDentry  uint8 = 0x2C
-	OpMetaTruncate      uint8 = 0x2D
-	OpMetaLinkInode     uint8 = 0x2E
-	OpMetaEvictInode    uint8 = 0x2F
-	OpMetaSetattr       uint8 = 0x30
-	OpMetaReleaseOpen   uint8 = 0x31
-	OpMetaLookupName    uint8 = 0x32
+	OpMetaCreateInode      uint8 = 0x20
+	OpMetaUnlinkInode      uint8 = 0x21
+	OpMetaBatchUnlinkInode uint8 = 0x92
+	OpMetaCreateDentry     uint8 = 0x22
+	OpMetaDeleteDentry     uint8 = 0x23
+	OpMetaOpen             uint8 = 0x24
+	OpMetaLookup           uint8 = 0x25
+	OpMetaReadDir          uint8 = 0x26
+	OpMetaInodeGet         uint8 = 0x27
+	OpMetaBatchInodeGet    uint8 = 0x28
+	OpMetaUpdateDentry     uint8 = 0x2C
+	OpMetaTruncate         uint8 = 0x2D
+	OpMetaLinkInode        uint8 = 0x2E
+	OpMetaEvictInode       uint8 = 0x2F
+	OpMetaSetattr          uint8 = 0x30
+	OpMetaReleaseOpen      uint8 = 0x31
+	OpMetaLookupName       uint8 = 0x32
 
 	//Operations: MetaNode Leader -> MetaNode Follower
 	OpMetaFreeInodesOnRaftFollower uint8 = 0x3F

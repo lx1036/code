@@ -16,7 +16,7 @@ type OpInode interface {
 	UnlinkInode(req *proto.UnlinkInodeRequest, p *proto.Packet) (err error) // delete inode
 	InodeGet(req *proto.InodeGetRequest, p *proto.Packet) (err error)
 	InodeGetBatch(req *proto.BatchInodeGetRequest, p *proto.Packet) (err error)
-	CreateInodeLink(req *proto.LinkInodeRequest, p *proto.Packet) (err error)
+	CreateInodeLink(req *proto.CreateInodeLinkRequest, p *proto.Packet) (err error)
 	EvictInode(req *proto.EvictInodeRequest, p *proto.Packet) (err error)
 	SetAttr(reqData []byte, p *proto.Packet) (err error)
 	GetInodeTree() *btree.BTree
@@ -30,6 +30,7 @@ func (partition *PartitionFSM) GetInodeTree() *btree.BTree {
 	return partition.inodeTree.tree.Clone()
 }
 
+// CreateInode submit `create inode` cmd to raft
 func (partition *PartitionFSM) CreateInode(req *proto.CreateInodeRequest, p *proto.Packet) error {
 	inoID, err := partition.nextInodeID()
 	if err != nil {
@@ -54,8 +55,59 @@ func (partition *PartitionFSM) CreateInode(req *proto.CreateInodeRequest, p *pro
 	return nil
 }
 
+type InodeResponse struct {
+	Status uint8
+	Msg    *Inode
+}
+
+func (partition *PartitionFSM) CreateInodeLink(req *proto.CreateInodeLinkRequest, p *proto.Packet) (err error) {
+	ino := NewInode(req.Inode, 0)
+	value, _ := ino.Marshal()
+	resp, err := partition.Put(opFSMCreateLinkInode, value)
+	if err != nil {
+		p.PacketErrorWithBody(proto.OpAgain, []byte(err.Error()))
+		return err
+	}
+	retMsg := resp.(*InodeResponse)
+	reply, _ := json.Marshal(retMsg)
+	p.PacketErrorWithBody(proto.OpOk, reply)
+	return nil
+}
+
 func (partition *PartitionFSM) UnlinkInode(req *proto.UnlinkInodeRequest, p *proto.Packet) (err error) {
-	panic("implement me")
+	ino := NewInode(req.Inode, 0)
+	value, _ := ino.Marshal()
+	resp, err := partition.Put(opFSMUnlinkInode, value)
+	if err != nil {
+		p.PacketErrorWithBody(proto.OpAgain, []byte(err.Error()))
+		return err
+	}
+	retMsg := resp.(*InodeResponse)
+	reply, _ := json.Marshal(retMsg)
+	p.PacketErrorWithBody(proto.OpOk, reply)
+	return nil
+}
+
+func (partition *PartitionFSM) BatchUnlinkInode(req *proto.BatchUnlinkInodeRequest, p *proto.Packet) (err error) {
+	if len(req.Inodes) == 0 {
+		return nil
+	}
+
+	var inodes InodeBatch
+	for _, id := range req.Inodes {
+		inodes = append(inodes, NewInode(id, 0))
+	}
+	value, _ := inodes.Marshal()
+	resp, err := partition.Put(opFSMUnlinkInodeBatch, value)
+	if err != nil {
+		p.PacketErrorWithBody(proto.OpAgain, []byte(err.Error()))
+		return err
+	}
+
+	retMsg := resp.([]*InodeResponse)
+	reply, _ := json.Marshal(retMsg)
+	p.PacketErrorWithBody(proto.OpOk, reply)
+	return nil
 }
 
 func (partition *PartitionFSM) InodeGet(req *proto.InodeGetRequest, p *proto.Packet) (err error) {
@@ -63,10 +115,6 @@ func (partition *PartitionFSM) InodeGet(req *proto.InodeGetRequest, p *proto.Pac
 }
 
 func (partition *PartitionFSM) InodeGetBatch(req *proto.BatchInodeGetRequest, p *proto.Packet) (err error) {
-	panic("implement me")
-}
-
-func (partition *PartitionFSM) CreateInodeLink(req *proto.LinkInodeRequest, p *proto.Packet) (err error) {
 	panic("implement me")
 }
 

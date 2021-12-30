@@ -270,3 +270,26 @@ func (i *Inode) UnmarshalValue(val []byte) (err error) {
 
 	return
 }
+
+type InodeBatch []*Inode
+
+// Marshal marshals the inodeBatch into a byte array.
+func (i InodeBatch) Marshal() ([]byte, error) {
+	buff := bytes.NewBuffer(make([]byte, 0))
+	if err := binary.Write(buff, binary.BigEndian, uint32(len(i))); err != nil {
+		return nil, err
+	}
+	for _, inode := range i {
+		bs, err := inode.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		if err = binary.Write(buff, binary.BigEndian, uint32(len(bs))); err != nil {
+			return nil, err
+		}
+		if _, err := buff.Write(bs); err != nil {
+			return nil, err
+		}
+	}
+	return buff.Bytes(), nil
+}

@@ -69,11 +69,17 @@ type BatchInodeGetRequest struct {
 	Inodes      []uint64 `json:"inos"`
 }
 
-// LinkInodeRequest defines the request to link an inode.
-type LinkInodeRequest struct {
+// CreateInodeLinkRequest defines the request to link an inode.
+type CreateInodeLinkRequest struct {
 	VolName     string `json:"vol"`
 	PartitionID uint64 `json:"pid"`
 	Inode       uint64 `json:"ino"`
+}
+
+type BatchUnlinkInodeRequest struct {
+	VolName     string   `json:"vol"`
+	PartitionID uint64   `json:"pid"`
+	Inodes      []uint64 `json:"inos"`
 }
 
 // EvictInodeRequest defines the request to evict an inode.

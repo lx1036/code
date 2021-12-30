@@ -20,6 +20,7 @@ import (
 const (
 	opFSMCreateInode uint32 = iota
 	opFSMUnlinkInode
+	opFSMUnlinkInodeBatch
 	opFSMCreateDentry
 	opFSMDeleteDentry
 	opFSMDeletePartition
@@ -141,7 +142,7 @@ func (partition *PartitionFSM) HandleLeaderChange(leader uint64) {
 // Put INFO: 提交 key-value 到 状态机，@see MetaPartitionFSM.Apply()
 func (partition *PartitionFSM) Put(key, value interface{}) (interface{}, error) {
 	raftCmd := &RaftCmd{
-		Op: opFSMCreateInode,
+		Op: key.(uint32),
 		K:  strconv.FormatUint(key.(uint64), 10),
 		V:  value.([]byte),
 	}
