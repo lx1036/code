@@ -49,7 +49,7 @@ func (fs *FuseFS) newFileHandle(inodeID uint64, flag uint32) (fuseops.HandleID, 
 
 // CreateFile INFO: 创建文件，其实是在 meta partition 中新建 inode/dentry 对象
 func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) error {
-	if fs.metaClient.isVolumeReadOnly() {
+	if fs.metaClient.IsVolumeReadOnly() {
 		return syscall.EROFS
 	}
 	if len(op.Name) >= NameMaxLen {
@@ -67,7 +67,7 @@ func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) erro
 
 	child := NewInode(inodeInfo)
 	fs.inodeCache.Put(child)
-	parent, err := fs.InodeGet(uint64(parentInodeID))
+	parent, err := fs.GetInode(parentInodeID)
 	if err == nil {
 		parent.dentryCache.Put(op.Name, inodeInfo.Inode)
 	}
@@ -101,7 +101,7 @@ func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
 	}
 
 	// read data from buffer
-	inode, err := fs.InodeGet(buf.inodeID)
+	inode, err := fs.GetInode(buf.inodeID)
 	if err != nil {
 		return err
 	}

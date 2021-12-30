@@ -2,6 +2,8 @@ package client
 
 import (
 	"container/list"
+	"context"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"os"
 	"sync"
 	"time"
@@ -19,7 +21,7 @@ var (
 )
 
 type Inode struct {
-	inodeID     uint64
+	inodeID     fuseops.InodeID
 	parentInode uint64
 	size        uint64
 	nlink       uint32
@@ -55,7 +57,7 @@ func (inode *Inode) expired() bool {
 
 func NewInode(inodeInfo *proto.InodeInfo) *Inode {
 	inode := &Inode{
-		inodeID:      inodeInfo.Inode,
+		inodeID:      fuseops.InodeID(inodeInfo.Inode),
 		parentInode:  inodeInfo.PInode,
 		size:         inodeInfo.Size,
 		nlink:        inodeInfo.Nlink,
@@ -77,20 +79,60 @@ func NewInode(inodeInfo *proto.InodeInfo) *Inode {
 	return inode
 }
 
-// INFO: 这里使用了 LRU 数据结构
+const (
+	MinInodeCacheEvictNum = 100
+)
+
+// InodeCache INFO: 这里使用了 LRU 数据结构
 type InodeCache struct {
 	sync.RWMutex
 
 	// INFO: LRU = Map + DoublyLinkedList
-	cache       map[uint64]*list.Element // map[inodeID]Element
-	lruList     *list.List               // a doubly linked list
-	maxElements int                      // 双向链表元素最大数量
+	cache   map[fuseops.InodeID]*list.Element // map[inodeID]Element
+	lruList *list.List                        // a doubly linked list
 
-	expiration time.Duration // 过期时间
-
+	maxElements int           // 双向链表元素最大数量, 默认设置 1000
+	expiration  time.Duration // 过期时间，默认设置 60min
 }
 
-// INFO: 把 inode 存入 LRU 数据结构中
+func NewInodeCache() *InodeCache {
+	inodeCache := &InodeCache{
+		maxElements: 1000,
+		expiration:  time.Minute * 60,
+
+		cache:   make(map[fuseops.InodeID]*list.Element),
+		lruList: new(list.List),
+	}
+
+	go inodeCache.start()
+
+	return inodeCache
+}
+
+func (inodeCache *InodeCache) start() {
+	wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
+		inodeCache.evict()
+	}, time.Minute*10)
+}
+
+// 检查 LRU 后 100 元素，删除其中过期的
+func (inodeCache *InodeCache) evict() {
+	inodeCache.Lock()
+	defer inodeCache.Unlock()
+
+	for i := 0; i < MinInodeCacheEvictNum; i++ {
+		element := inodeCache.lruList.Back()
+		inode := element.Value.(*Inode)
+		if !inode.expired() {
+			continue
+		}
+
+		delete(inodeCache.cache, inode.inodeID)
+		inodeCache.lruList.Remove(element)
+	}
+}
+
+// Put INFO: 把 inode 存入 LRU 数据结构中
 func (inodeCache *InodeCache) Put(inode *Inode) {
 	inodeCache.Lock()
 	defer inodeCache.Unlock()
@@ -100,18 +142,17 @@ func (inodeCache *InodeCache) Put(inode *Inode) {
 		inodeCache.lruList.Remove(old)
 		delete(inodeCache.cache, inode.inodeID)
 	}
-
-	if inodeCache.lruList.Len() >= inodeCache.maxElements {
-		inodeCache.evict(true)
-	}
-
 	inode.setExpiration(inodeCache.expiration)
 	element := inodeCache.lruList.PushFront(inode)
 	inodeCache.cache[inode.inodeID] = element
+
+	if inodeCache.lruList.Len() >= inodeCache.maxElements {
+		inodeCache.evict()
+	}
 }
 
-// INFO: 从 map 中取，这是 LRU 性能好的重要一个原因
-func (inodeCache *InodeCache) Get(inodeID uint64) *Inode {
+// Get INFO: 从 map 中取，这是 LRU 性能好的重要一个原因
+func (inodeCache *InodeCache) Get(inodeID fuseops.InodeID) *Inode {
 	inodeCache.Lock()
 	defer inodeCache.Unlock()
 
@@ -126,6 +167,29 @@ func (inodeCache *InodeCache) Get(inodeID uint64) *Inode {
 	}
 
 	return inode
+}
+
+// GetInode INFO: 从本地缓存 InodeCache 取值，如果没有调用 meta cluster api 获取并存入 InodeCache
+func (fs *FuseFS) GetInode(inodeID fuseops.InodeID) (*Inode, error) {
+	inode := fs.inodeCache.Get(inodeID)
+	if inode != nil {
+		return inode, nil
+	}
+
+	// 本地缓存里没有，从 meta cluster 中取
+	inodeInfo, err := fs.metaClient.GetInode(inodeID)
+	if err != nil {
+		return nil, err
+	}
+
+	inode = NewInode(inodeInfo)
+	fs.inodeCache.Put(inode)
+
+	return inode, nil
+}
+
+func (fs *FuseFS) ForgetInode(ctx context.Context, op *fuseops.ForgetInodeOp) error {
+	panic("implement me")
 }
 
 func GetChildInodeEntry(child *Inode) fuseops.ChildInodeEntry {
@@ -145,8 +209,4 @@ func GetChildInodeEntry(child *Inode) fuseops.ChildInodeEntry {
 		AttributesExpiration: time.Now().Add(AttrValidDuration),
 		EntryExpiration:      time.Now().Add(LookupValidDuration),
 	}
-}
-
-func (fs *FuseFS) ForgetInode(ctx context.Context, op *fuseops.ForgetInodeOp) error {
-	panic("implement me")
 }

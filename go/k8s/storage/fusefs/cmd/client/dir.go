@@ -15,7 +15,7 @@ import (
 func (fs *FuseFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
 	parentInodeID := op.Parent
 
-	inodeInfo, err := fs.metaClient.Create_ll(uint64(parentInodeID), op.Name, uint32(op.Mode.Perm()), op.Uid, op.Gid, nil)
+	inodeInfo, err := fs.metaClient.CreateInodeAndDentry(parentInodeID, op.Name, uint32(op.Mode.Perm()), op.Uid, op.Gid, nil)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("[MkDir]create inode/dentry for %d/%s err %v", uint64(parentInodeID), op.Name, err))
 		return err
@@ -23,7 +23,7 @@ func (fs *FuseFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
 
 	child := NewInode(inodeInfo)
 	fs.inodeCache.Put(child)
-	parent, err := fs.InodeGet(uint64(parentInodeID))
+	parent, err := fs.GetInode(parentInodeID)
 	if err == nil {
 		parent.dentryCache.Put(op.Name, inodeInfo.Inode)
 	}
@@ -33,25 +33,6 @@ func (fs *FuseFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
 	klog.Infof(fmt.Sprintf("[MkDir]mkdir op name %s", op.Name))
 
 	return nil
-}
-
-// INFO: 从本地缓存 InodeCache 取值，如果没有调用 meta cluster api 获取并存入 InodeCache
-func (fs *FuseFS) InodeGet(inodeID uint64) (*Inode, error) {
-	inode := fs.inodeCache.Get(inodeID)
-	if inode != nil {
-		return inode, nil
-	}
-
-	// 本地缓存里没有，从 meta cluster 中api取
-	inodeInfo, err := fs.metaClient.InodeGet_ll(inodeID)
-	if err != nil {
-		return nil, err
-	}
-
-	inode = NewInode(inodeInfo)
-	fs.inodeCache.Put(inode)
-
-	return inode, nil
 }
 
 func (fs *FuseFS) MkNode(ctx context.Context, op *fuseops.MkNodeOp) error {

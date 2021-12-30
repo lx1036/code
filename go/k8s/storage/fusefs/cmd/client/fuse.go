@@ -3,16 +3,32 @@ package client
 import (
 	"context"
 	"fmt"
+	"k8s-lx1036/k8s/storage/fusefs/cmd/client/meta"
 	"net/http"
 	"strconv"
 	"sync"
-
-	"k8s-lx1036/k8s/storage/fusefs/pkg/sdk/meta"
 
 	"golang.org/x/time/rate"
 	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
 	"k8s.io/klog/v2"
+)
+
+const (
+	DefaultPageSize        = 1 << 17 // 128KB
+	DefaultBlksize         = 1 << 20 // 1M
+	DefaultBufSize         = 5 << 30 //5GB
+	DefaultBufDirtyMax     = 6 << 20 // 6MB
+	DefaultPartBlocks      = 5
+	DefaultFlushInterval   = 5
+	DefaultFlushWait       = 30
+	DefaultMaxNameLen      = uint32(256)
+	DefaultBlkExpiration   = 10
+	DefaultReadAheadSize   = 100 << 20 // 100MB
+	DefaultReadThreshold   = 20 << 20  // 20MB
+	DefautlBufFreeTime     = 300
+	DefaultMinBufferBlocks = 15
+	DefaultMaxReleaseCount = 400
 )
 
 type Config struct {
@@ -44,14 +60,15 @@ type Config struct {
 type FuseFS struct {
 	sync.RWMutex
 
-	cluster    string
-	endpoint   string
-	localIP    string
-	volname    string
-	owner      string
+	cluster  string
+	endpoint string
+	localIP  string
+	volname  string
+	owner    string
+
 	inodeCache *InodeCache
 
-	metaClient *MetaClient
+	metaClient *meta.MetaClient
 	s3Client   *S3Client
 
 	//ic                 *InodeCache
@@ -80,8 +97,10 @@ type FuseFS struct {
 
 func NewFuseFS(opt *Config) (*FuseFS, error) {
 	var err error
-	fs := new(FuseFS)
-	fs.metaClient, err = NewMetaClient(opt.Volname, opt.Owner, opt.MasterAddr)
+	fs := &FuseFS{
+		inodeCache: NewInodeCache(),
+	}
+	fs.metaClient, err = meta.NewMetaClient(opt.Volname, opt.Owner, opt.MasterAddr)
 	if err != nil {
 		return nil, fmt.Errorf("NewMetaWrapper failed with err %v", err)
 	}
