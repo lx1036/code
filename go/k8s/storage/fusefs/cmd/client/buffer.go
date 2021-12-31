@@ -5,8 +5,6 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
-
-	"k8s-lx1036/k8s/storage/fusefs/pkg/backend"
 )
 
 // INFO: buffer 就是封装了下 s3 api 调用
@@ -17,8 +15,8 @@ type Buffer struct {
 	inodeID uint64
 	ref     int32 // 这个字段有何设计目的???
 
-	backend backend.Backend
-	fs      *FuseFS
+	//backend backend.Backend
+	fs *FuseFS
 
 	stopC   chan struct{}
 	LRUList *list.List
@@ -78,17 +76,20 @@ func (buffer *Buffer) ReadFile(offset int64, data []byte, max int64, direct bool
 }
 
 func (buffer *Buffer) readDirect(offset int64, data []byte) (int, error) {
-	rsize, err := buffer.backend.Read(buffer.key, offset, data)
+	panic("not implemented")
+	/*rsize, err := buffer.backend.Read(buffer.key, offset, data)
 	if err != nil && err != io.EOF {
 		return 0, err
 	}
 
-	return rsize, nil
+	return rsize, nil*/
 }
 
 // NewBuffer INFO: 该 Buffer 对象其实就是对 S3 数据的缓存
-func NewBuffer(inodeID uint64, backend backend.Backend, fs *FuseFS) *Buffer {
-	buffer := &Buffer{
+func NewBuffer(inodeID uint64, fs *FuseFS) *Buffer {
+	panic("not implemented")
+
+	/*buffer := &Buffer{
 		inodeID: inodeID,
 		//blockSize:     fs.blockSize,
 		//flushInterval: fs.bufFlushInterval,
@@ -98,7 +99,7 @@ func NewBuffer(inodeID uint64, backend backend.Backend, fs *FuseFS) *Buffer {
 		//dirtyList:     list.New(),
 		fs: fs,
 		//gbuf:          gbuf,
-		backend: backend,
+		backend: fs.s3Client,
 		//mergeBlock:    fs.mergeBlock,
 		//flushC:        make(chan struct{}, 1),
 		stopC: make(chan struct{}, 1),
@@ -112,5 +113,5 @@ func NewBuffer(inodeID uint64, backend backend.Backend, fs *FuseFS) *Buffer {
 	//atomic.StoreInt32(&buffer.bgStarted, 0)
 	//atomic.StoreInt32(&buffer.flushing, 0)
 
-	return buffer
+	return buffer*/
 }

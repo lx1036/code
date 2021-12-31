@@ -24,7 +24,7 @@ func (fs *FuseFS) newFileHandle(inodeID uint64, flag uint32) (fuseops.HandleID, 
 	fs.Lock()
 	defer fs.Unlock()
 
-	key, err := fs.getS3Key(inodeID)
+	/*key, err := fs.getS3Key(inodeID)
 	if err != nil {
 		return 0, err
 	}
@@ -35,7 +35,7 @@ func (fs *FuseFS) newFileHandle(inodeID uint64, flag uint32) (fuseops.HandleID, 
 		buffer.SetFilename(key)
 		fs.dataBuffers[inodeID] = buffer
 	}
-	buffer.IncRef()
+	buffer.IncRef()*/
 
 	handleID := fs.nextHandleID
 	fs.nextHandleID++
@@ -76,12 +76,12 @@ func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) erro
 	//fillChildEntry(&op.Entry, child)
 	op.Entry = GetChildInodeEntry(child)
 
-	handle, err := fs.newFileHandle(child.inodeID, 0)
+	/*handle, err := fs.newFileHandle(child.inodeID, 0)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("[CreateFile]newFileHandle err %v", err))
 		return err
 	}
-	op.Handle = handle
+	op.Handle = handle*/
 
 	klog.Infof(fmt.Sprintf("[CreateFile]create filename %s, parent inodeID %d successfully", op.Name, op.Parent))
 	return nil
@@ -91,7 +91,7 @@ func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
 	fs.Lock()
 	defer fs.Unlock()
 
-	var buf *Buffer
+	/*var buf *Buffer
 	if fileHandle, ok := fs.fileHandles[op.Handle]; ok {
 		if buf, ok = fs.dataBuffers[fileHandle.inodeID]; !ok || buf.lastError != nil {
 			return fuse.EIO
@@ -109,7 +109,7 @@ func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
 	op.BytesRead, err = buf.ReadFile(op.Offset, op.Dst[0:rNeed], fileSize, false)
 	if err != nil {
 		return err
-	}
+	}*/
 
 	return nil
 }

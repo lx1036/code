@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	RefreshMetaPartitionsInterval = time.Minute * 5
+	RefreshMetaPartitionsInterval = time.Second * 120
 
 	DefaultBTreeDegree = 32
 )
@@ -38,13 +38,38 @@ const (
 	statusConflictExtents
 )
 
+type VolStatInfo struct {
+	Name        string
+	TotalSize   uint64
+	UsedSize    uint64
+	UsedRatio   string
+	EnableToken bool
+	InodeCount  uint64
+	Status      VolStatus
+}
+type VolStatus uint8
+
+const (
+	ReadWriteVol   VolStatus = 1
+	MarkDeletedVol VolStatus = 2
+	ReadOnlyVol    VolStatus = 3
+)
+
+type JsonResponse struct {
+	Code int32  `json:"code"`
+	Msg  string `json:"msg"`
+	Data json.RawMessage
+}
+
 type MetaClient struct {
 	sync.RWMutex
 
 	volumeName   string
+	volumeID     uint64
 	masterAddrs  []string
 	masterLeader string
 	epoch        uint64
+	S3Endpoint   string
 
 	totalSize  uint64
 	usedSize   uint64
@@ -53,10 +78,9 @@ type MetaClient struct {
 
 	// Partition tree indexed by Start, in order to find a partition in which
 	// a specific inode locate.
-	inodesTree *btree.BTree
-
-	rwPartitions []*Partition
-	partitions   map[uint64]*Partition
+	partitionsTree *btree.BTree
+	rwPartitions   []*Partition
+	partitions     map[uint64]*Partition
 }
 
 func NewMetaClient(volumeName, owner, masterAddrs string) (*MetaClient, error) {
@@ -66,7 +90,18 @@ func NewMetaClient(volumeName, owner, masterAddrs string) (*MetaClient, error) {
 		masterAddrs:  addrs,
 		masterLeader: addrs[0], // TODO: 暂时选择第一个作为 leader address
 
-		inodesTree: btree.New(DefaultBTreeDegree),
+		partitionsTree: btree.New(DefaultBTreeDegree),
+		partitions:     make(map[uint64]*Partition),
+	}
+
+	if err := metaClient.getVolumeInfo(); err != nil {
+		return nil, err
+	}
+	if err := metaClient.updateVolStatInfo(); err != nil {
+		return nil, err
+	}
+	if err := metaClient.updateMetaPartitions(); err != nil {
+		return nil, err
 	}
 
 	go metaClient.start()
@@ -76,10 +111,146 @@ func NewMetaClient(volumeName, owner, masterAddrs string) (*MetaClient, error) {
 
 func (metaClient *MetaClient) start() {
 	wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
-		metaClient.updateMetaPartitions()
 		metaClient.updateVolStatInfo()
+		metaClient.updateMetaPartitions()
 		//metaClient.updateClientInfo()
 	}, RefreshMetaPartitionsInterval)
+}
+
+type SimpleVolView struct {
+	ID            uint64
+	Name          string
+	Owner         string
+	MpReplicaNum  uint8
+	Status        uint8
+	Capacity      uint64 // GB
+	MpCnt         int
+	S3Endpoint    string
+	BucketDeleted bool
+}
+
+func (metaClient *MetaClient) getVolumeInfo() error {
+	url := fmt.Sprintf("http://%s%s?name=%s", metaClient.masterLeader, "/admin/getVol", metaClient.volumeName)
+	resp, err := http.Get(url)
+	if err != nil {
+		klog.Error(fmt.Sprintf("[getVolumeInfo]%v", err))
+		return err
+	}
+	data, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		klog.Error(fmt.Sprintf("[getVolumeInfo]%v", err))
+		return err
+	}
+	var jsonResponse JsonResponse
+	if err = json.Unmarshal(data, &jsonResponse); err != nil {
+		klog.Error(fmt.Sprintf("[getVolumeInfo]%v", err))
+		return err
+	}
+	var simpleVolView SimpleVolView
+	if err = json.Unmarshal(jsonResponse.Data, &simpleVolView); err != nil {
+		klog.Error(fmt.Sprintf("[getVolumeInfo]%v", err))
+		return err
+	}
+
+	metaClient.S3Endpoint = simpleVolView.S3Endpoint
+	return nil
+}
+
+func (metaClient *MetaClient) updateVolStatInfo() error {
+	url := fmt.Sprintf("http://%s%s?name=%s", metaClient.masterLeader, "/client/volStat", metaClient.volumeName)
+	resp, err := http.Get(url)
+	data, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		klog.Error(fmt.Sprintf("[updateVolStatInfo]%v", err))
+		return err
+	}
+	var jsonResponse JsonResponse
+	if err = json.Unmarshal(data, &jsonResponse); err != nil {
+		klog.Error(fmt.Sprintf("[updateVolStatInfo]%v", err))
+		return err
+	}
+	volStatInfo := &VolStatInfo{}
+	if err = json.Unmarshal(jsonResponse.Data, volStatInfo); err != nil {
+		klog.Error(fmt.Sprintf("[updateVolStatInfo]%v", err))
+		return err
+	}
+
+	metaClient.totalSize = volStatInfo.TotalSize
+	metaClient.usedSize = volStatInfo.UsedSize
+	//metaClient.inodeCount = volStatInfo.InodeCount
+	metaClient.status = volStatInfo.Status
+
+	klog.Infof(fmt.Sprintf("[updateVolStatInfo]volName:%s, totalSize:%d, usedSize:%d, status:%d",
+		metaClient.volumeName, metaClient.totalSize, metaClient.usedSize, metaClient.status))
+	return nil
+}
+
+type Volume struct {
+	Name           string
+	Status         uint8
+	MetaPartitions []*Partition
+}
+
+// INFO: get master `/vol` api
+func (metaClient *MetaClient) updateMetaPartitions() error {
+	url := fmt.Sprintf("http://%s%s?name=%s", metaClient.masterLeader, "/client/vol", metaClient.volumeName)
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	data, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	var jsonResponse JsonResponse
+	if err = json.Unmarshal(data, &jsonResponse); err != nil {
+		klog.Error(fmt.Sprintf("[updateMetaPartitions]%v", err))
+		return err
+	}
+	volume := &Volume{}
+	if err = json.Unmarshal(jsonResponse.Data, volume); err != nil {
+		klog.Error(fmt.Sprintf("[updateMetaPartitions]%v", err))
+		return err
+	}
+
+	for _, partition := range volume.MetaPartitions {
+		metaClient.replaceOrInsert(partition)
+		if partition.Status == proto.ReadWrite {
+			metaClient.rwPartitions = append(metaClient.rwPartitions, partition)
+		}
+	}
+
+	if len(metaClient.rwPartitions) != 0 { // log
+		var partitions []Partition
+		for _, partition := range metaClient.rwPartitions {
+			partitions = append(partitions, *partition)
+		}
+		klog.Infof(fmt.Sprintf("%+v", partitions))
+	}
+
+	//metaClient.volumeName = volume.Name
+	//metaClient.volumeID = volume.ID
+	//metaClient.volumeCreateTime = volume.CreateTime
+	return nil
+}
+
+func (metaClient *MetaClient) replaceOrInsert(partition *Partition) {
+	value, ok := metaClient.partitions[partition.PartitionID]
+	if ok {
+		metaClient.deletePartitions(value)
+	}
+
+	metaClient.addPartitions(partition)
+}
+
+func (metaClient *MetaClient) deletePartitions(partition *Partition) {
+	delete(metaClient.partitions, partition.PartitionID)
+	metaClient.partitionsTree.Delete(partition)
+}
+
+func (metaClient *MetaClient) addPartitions(partition *Partition) {
+	metaClient.partitions[partition.PartitionID] = partition
+	metaClient.partitionsTree.ReplaceOrInsert(partition)
 }
 
 func (metaClient *MetaClient) IsVolumeReadOnly() bool {
@@ -112,8 +283,8 @@ func (metaClient *MetaClient) CreateInodeAndDentry(parentID fuseops.InodeID, fil
 			if err == nil && (status == statusOK || status == statusExist) {
 				return inodeInfo, nil
 			} else {
-				metaClient.unlinkInode()
-				metaClient.evictInode()
+				//metaClient.unlinkInode()
+				//metaClient.evictInode()
 				break
 			}
 		}
@@ -158,6 +329,8 @@ func (metaClient *MetaClient) GetInode(parentID fuseops.InodeID) (*proto.InodeIn
 		return nil, fmt.Errorf("[GetInode]fail to get inode")
 	}
 
+	// packet.Data:
+	// {"info":{"ino":3,"mode":0,"nlink":1,"sz":0,"uid":0,"gid":0,"gen":1,"mt":1640941698,"ct":1640941698,"at":1640941698,"tgt":null,"pino":0}}
 	resp := new(proto.InodeGetResponse)
 	err = json.Unmarshal(packet.Data, resp)
 	if err != nil {
@@ -246,6 +419,10 @@ func (metaClient *MetaClient) createDentry(partition *Partition, parentID fuseop
 	return statusOK, nil
 }
 
+func (metaClient *MetaClient) LookupName(parentInodeID, currentInodeID fuseops.InodeID) (name string, err error) {
+
+}
+
 func (metaClient *MetaClient) getRWPartitions() []*Partition {
 	if len(metaClient.rwPartitions) != 0 {
 		return metaClient.rwPartitions
@@ -265,7 +442,7 @@ func (metaClient *MetaClient) getPartitionByInode(inodeID fuseops.InodeID) *Part
 
 	var partition *Partition
 	pivot := &Partition{Start: inodeID}
-	metaClient.inodesTree.DescendLessOrEqual(pivot, func(i btree.Item) bool { // DescendLessOrEqual???
+	metaClient.partitionsTree.DescendLessOrEqual(pivot, func(i btree.Item) bool { // DescendLessOrEqual???
 		partition = i.(*Partition)
 		if inodeID > partition.End || inodeID < partition.Start {
 			partition = nil
@@ -274,46 +451,6 @@ func (metaClient *MetaClient) getPartitionByInode(inodeID fuseops.InodeID) *Part
 	})
 
 	return partition
-}
-
-type VolStatInfo struct {
-	Name        string
-	TotalSize   uint64
-	UsedSize    uint64
-	UsedRatio   string
-	EnableToken bool
-	InodeCount  uint64
-	Status      VolStatus
-}
-type VolStatus uint8
-
-const (
-	ReadWriteVol   VolStatus = 1
-	MarkDeletedVol VolStatus = 2
-	ReadOnlyVol    VolStatus = 3
-)
-
-func (metaClient *MetaClient) updateVolStatInfo() error {
-	url := fmt.Sprintf("%s?name=%s", metaClient.masterLeader, metaClient.volumeName)
-	resp, err := http.Get(url)
-	data, err := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-	if err != nil {
-		klog.Error(fmt.Sprintf("[updateVolStatInfo]%v", err))
-		return err
-	}
-
-	volStatInfo := &VolStatInfo{}
-	if err = json.Unmarshal(data, volStatInfo); err != nil {
-		klog.Error(fmt.Sprintf("[updateVolStatInfo]%v", err))
-		return err
-	}
-
-	metaClient.totalSize = volStatInfo.TotalSize
-	metaClient.usedSize = volStatInfo.UsedSize
-	metaClient.inodeCount = volStatInfo.InodeCount
-	metaClient.status = volStatInfo.Status
-	return nil
 }
 
 func (metaClient *MetaClient) Statfs() (total, used, inodeCount uint64) {

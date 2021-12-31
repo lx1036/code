@@ -16,23 +16,27 @@ var (
 	// The following two are used in the FUSE cache
 	// every time the lookup will be performed on the fly, and the result will not be cached
 	LookupValidDuration = 5 * time.Second
+
 	// the expiration duration of the attributes in the FUSE cache
 	AttrValidDuration = 30 * time.Second
 )
 
 type Inode struct {
-	inodeID     fuseops.InodeID
-	parentInode uint64
-	size        uint64
-	nlink       uint32
-	uid         uint32
-	gid         uint32
-	gen         uint64
-	createTime  int64 // time of last inode change
-	modifyTime  int64 // time of last modification
-	accessTime  int64 // time of last access
-	mode        os.FileMode
-	target      []byte
+	inodeID       fuseops.InodeID
+	parentInodeID fuseops.InodeID
+
+	size  uint64
+	nlink uint32
+	uid   uint32
+	gid   uint32
+	gen   uint64
+
+	createTime int64 // time of last inode change
+	modifyTime int64 // time of last modification
+	accessTime int64 // time of last access
+
+	mode   os.FileMode
+	target []byte
 
 	fullPathName string
 
@@ -57,19 +61,19 @@ func (inode *Inode) expired() bool {
 
 func NewInode(inodeInfo *proto.InodeInfo) *Inode {
 	inode := &Inode{
-		inodeID:      fuseops.InodeID(inodeInfo.Inode),
-		parentInode:  inodeInfo.PInode,
-		size:         inodeInfo.Size,
-		nlink:        inodeInfo.Nlink,
-		uid:          inodeInfo.Uid,
-		gid:          inodeInfo.Gid,
-		gen:          inodeInfo.Generation,
-		createTime:   inodeInfo.CreateTime,
-		modifyTime:   inodeInfo.ModifyTime,
-		accessTime:   inodeInfo.AccessTime,
-		mode:         os.FileMode(inodeInfo.Mode),
-		target:       inodeInfo.Target,
-		fullPathName: "",
+		inodeID:       fuseops.InodeID(inodeInfo.Inode),
+		parentInodeID: fuseops.InodeID(inodeInfo.PInode),
+		size:          inodeInfo.Size,
+		nlink:         inodeInfo.Nlink,
+		uid:           inodeInfo.Uid,
+		gid:           inodeInfo.Gid,
+		gen:           inodeInfo.Generation,
+		createTime:    inodeInfo.CreateTime,
+		modifyTime:    inodeInfo.ModifyTime,
+		accessTime:    inodeInfo.AccessTime,
+		mode:          os.FileMode(inodeInfo.Mode),
+		target:        inodeInfo.Target,
+		fullPathName:  "",
 	}
 
 	if proto.IsDir(inodeInfo.Mode) {
@@ -122,6 +126,9 @@ func (inodeCache *InodeCache) evict() {
 
 	for i := 0; i < MinInodeCacheEvictNum; i++ {
 		element := inodeCache.lruList.Back()
+		if element == nil {
+			return
+		}
 		inode := element.Value.(*Inode)
 		if !inode.expired() {
 			continue

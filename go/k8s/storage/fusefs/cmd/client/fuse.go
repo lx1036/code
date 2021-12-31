@@ -1,15 +1,13 @@
 package client
 
 import (
-	"context"
 	"fmt"
 	"k8s-lx1036/k8s/storage/fusefs/cmd/client/meta"
+	"k8s-lx1036/k8s/storage/fusefs/cmd/client/s3"
 	"net/http"
-	"strconv"
 	"sync"
 
 	"golang.org/x/time/rate"
-	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
 	"k8s.io/klog/v2"
 )
@@ -35,6 +33,7 @@ type Config struct {
 	MountPoint string `json:"mountPoint"`
 
 	//volname is also s3 bucket
+	Region    string `json:"region" default:"beijing"`
 	Volname   string `json:"volName"`
 	Owner     string `json:"owner"`
 	AccessKey string `json:"accessKey"`
@@ -69,7 +68,7 @@ type FuseFS struct {
 	inodeCache *InodeCache
 
 	metaClient *meta.MetaClient
-	s3Client   *S3Client
+	s3Client   *s3.S3Client
 
 	//ic                 *InodeCache
 	hc *HandleCache
@@ -88,7 +87,7 @@ type FuseFS struct {
 	nextHandleID fuseops.HandleID
 
 	//bufferPool *BufferPool
-	dataBuffers map[uint64]*Buffer // [inodeID]*Buffer
+	//dataBuffers map[uint64]*Buffer // [inodeID]*Buffer
 
 	//replicators *Ticket
 }
@@ -98,6 +97,8 @@ type FuseFS struct {
 func NewFuseFS(opt *Config) (*FuseFS, error) {
 	var err error
 	fs := &FuseFS{
+		fullPathName: opt.FullPathName,
+
 		inodeCache: NewInodeCache(),
 	}
 	fs.metaClient, err = meta.NewMetaClient(opt.Volname, opt.Owner, opt.MasterAddr)
@@ -105,12 +106,13 @@ func NewFuseFS(opt *Config) (*FuseFS, error) {
 		return nil, fmt.Errorf("NewMetaWrapper failed with err %v", err)
 	}
 
-	fs.endpoint = fs.metaClient.S3Endpoint
-	fs.cluster = fs.metaClient.Cluster()
-	fs.localIP = fs.metaClient.LocalIP()
+	//fs.endpoint = fs.metaClient.S3Endpoint
+	//fs.cluster = fs.metaClient.Cluster()
+	//fs.localIP = fs.metaClient.LocalIP()
 
-	fs.s3Client, err = NewS3Backend(opt.Volname, &S3Config{
+	fs.s3Client, err = s3.NewS3Backend(opt.Volname, &s3.S3Config{
 		Endpoint:         fs.metaClient.S3Endpoint, // S3Endpoint 是调用 meta cluster api 获取的，实际上数据存在 master cluster 中
+		Region:           "beijing",
 		AccessKey:        opt.AccessKey,
 		SecretKey:        opt.SecretKey,
 		DisableSSL:       true,

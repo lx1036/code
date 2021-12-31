@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/user"
+	"path/filepath"
+	"strconv"
 	"sync"
 
 	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
 	"k8s-lx1036/k8s/storage/fuse/fuseutil"
-	"k8s-lx1036/k8s/storage/fusefs/cmd/client/fs/fuse/utils"
-
 	"k8s.io/klog/v2"
 )
 
@@ -78,6 +79,8 @@ var (
 // INFO: 可以直接在 mac 上运行
 //  mkdir -p /tmp/fuse/memoryfs
 //  go run . --mountpoint=/tmp/fuse/memoryfs
+//  `umount globalmount` in mac
+//  `fusermount -u globalmount` in linux
 func main() {
 	flag.Parse()
 
@@ -87,7 +90,10 @@ func main() {
 	}
 
 	// filesystem server
-	server := NewMemoryFS(utils.CurrentUid(), utils.CurrentGid())
+	value, _ := user.Current()
+	uid, _ := strconv.ParseUint(value.Uid, 10, 32)
+	gid, _ := strconv.ParseUint(value.Gid, 10, 32)
+	server := NewMemoryFS(uint32(uid), uint32(gid))
 
 	cfg := &fuse.MountConfig{
 		ReadOnly: *readOnly,
@@ -98,13 +104,13 @@ func main() {
 		cfg.DebugLogger = log.New(os.Stderr, "fuse: ", 0)
 	}
 
-	mountedFileSystem, err := fuse.Mount(*mountPoint, server, cfg)
+	mountPath, _ := filepath.Abs(*mountPoint)
+	mountedFileSystem, err := fuse.Mount(mountPath, server, cfg)
 	if err != nil {
 		klog.Fatalf("Mount: %v", err)
 	}
 
-	klog.Infof(fmt.Sprintf("fuse mount point %s successfully", *mountPoint))
-	// Wait for it to be unmounted.
+	klog.Infof(fmt.Sprintf("fuse mount point %s successfully", mountPath))
 	if err = mountedFileSystem.Join(context.Background()); err != nil {
 		klog.Fatalf("Join: %v", err)
 	}

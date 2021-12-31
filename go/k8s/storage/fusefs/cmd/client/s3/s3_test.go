@@ -1,4 +1,4 @@
-package client
+package s3
 
 import (
 	"flag"

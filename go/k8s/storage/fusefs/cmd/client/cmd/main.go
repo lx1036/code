@@ -21,6 +21,10 @@ import (
 
 // INFO: https://chubaofs.readthedocs.io/zh_CN/latest/design/client.html
 // go run . --config=./fuse.json
+// df -h globalmount
+// umount globalmount
+// stat globalmount
+// debug in local: Working Directory 设置 /Users/liuxiang/Code/lx1036/code/go/k8s/storage/fusefs/cmd/client/cmd
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()

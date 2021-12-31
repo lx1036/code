@@ -1,6 +1,7 @@
 package client
 
 import (
+	"k8s-lx1036/k8s/storage/fuse/fuseops"
 	"sync"
 	"time"
 )
@@ -36,6 +37,27 @@ func (dentryCache *DentryCache) Put(name string, inodeID uint64) {
 	}
 	dentryCache.cache[name] = dentry
 	dentryCache.inodeIDCache[inodeID] = name
+}
+
+func (dentryCache *DentryCache) GetByInode(inodeID fuseops.InodeID) (string, bool) {
+	dentryCache.Lock()
+	defer dentryCache.Unlock()
+
+	if name, ok := dentryCache.inodeIDCache[uint64(inodeID)]; ok {
+		if dentry, exist := dentryCache.cache[name]; exist {
+			if dentry.expiration < time.Now().Unix() {
+				delete(dentryCache.cache, name)
+				delete(dentryCache.inodeIDCache, uint64(inodeID))
+				return "", false
+			}
+			return name, true
+		}
+
+		delete(dentryCache.inodeIDCache, uint64(inodeID))
+		return "", false
+	}
+
+	return "", false
 }
 
 // NewDentryCache returns a new dentry cache.

@@ -1,4 +1,4 @@
-package client
+package s3
 
 import (
 	"fmt"
@@ -36,6 +36,11 @@ var defaultHTTPTransport = http.Transport{
 	IdleConnTimeout:       90 * time.Second,
 	TLSHandshakeTimeout:   10 * time.Second,
 	ExpectContinueTimeout: 10 * time.Second,
+}
+
+type IOCallback interface {
+	SetError(error)
+	Run()
 }
 
 type S3Config struct {
@@ -81,7 +86,7 @@ type S3Client struct {
 
 	mergeIoVector bool
 
-	cap Capabilities
+	//cap Capabilities
 }
 
 func (s3Client *S3Client) Write(file string, offset int64, data []byte) (wsize int, err error) {
