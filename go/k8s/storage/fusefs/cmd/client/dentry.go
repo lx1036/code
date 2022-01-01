@@ -8,7 +8,7 @@ import (
 
 const (
 	// the expiration duration of the dentry in the cache (used internally)
-	DentryValidDuration = 10 * time.Second
+	DentryValidDuration = 100 * time.Second
 )
 
 // INFO: linux 中 dentry struct 包含 inodeID 信息，见 dentry_inode.png
@@ -27,6 +27,13 @@ type DentryCache struct {
 	inodeIDCache map[uint64]string
 }
 
+func NewDentryCache() *DentryCache {
+	return &DentryCache{
+		cache:        make(map[string]*Dentry),
+		inodeIDCache: make(map[uint64]string),
+	}
+}
+
 func (dentryCache *DentryCache) Put(name string, inodeID uint64) {
 	dentryCache.Lock()
 	defer dentryCache.Unlock()
@@ -37,6 +44,22 @@ func (dentryCache *DentryCache) Put(name string, inodeID uint64) {
 	}
 	dentryCache.cache[name] = dentry
 	dentryCache.inodeIDCache[inodeID] = name
+}
+
+func (dentryCache *DentryCache) Get(name string) (uint64, bool) {
+	dentryCache.Lock()
+	defer dentryCache.Unlock()
+
+	if dentry, ok := dentryCache.cache[name]; ok {
+		if dentry.expiration < time.Now().Unix() {
+			delete(dentryCache.cache, name)
+			delete(dentryCache.inodeIDCache, dentry.inodeID)
+			return 0, false
+		}
+		return dentry.inodeID, true
+	}
+
+	return 0, false
 }
 
 func (dentryCache *DentryCache) GetByInode(inodeID fuseops.InodeID) (string, bool) {
@@ -58,12 +81,4 @@ func (dentryCache *DentryCache) GetByInode(inodeID fuseops.InodeID) (string, boo
 	}
 
 	return "", false
-}
-
-// NewDentryCache returns a new dentry cache.
-func NewDentryCache() *DentryCache {
-	return &DentryCache{
-		cache:        make(map[string]*Dentry),
-		inodeIDCache: make(map[uint64]string),
-	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -21,10 +22,11 @@ import (
 
 // INFO: https://chubaofs.readthedocs.io/zh_CN/latest/design/client.html
 // go run . --config=./fuse.json
-// df -h globalmount
-// umount globalmount
-// stat globalmount
+// 检查：df -h globalmount
+// 调用 stat 接口：stat globalmount
+
 // debug in local: Working Directory 设置 /Users/liuxiang/Code/lx1036/code/go/k8s/storage/fusefs/cmd/client/cmd
+// 关闭时直接执行，进程优雅关闭：`umount globalmount`
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
@@ -34,7 +36,6 @@ func main() {
 	}
 
 	var config string
-
 	cmd := &cobra.Command{
 		Use:   "master",
 		Short: "Runs the FuseFS client",
@@ -83,6 +84,7 @@ func runCommand(configFile string) error {
 		Subtype:                 "fuse", // `cat /proc/mounts | grep sunfs` -> xxx fuse.sunfs xxx
 		ReadOnly:                config.ReadOnly,
 		DisableWritebackCaching: true,
+		DebugLogger:             log.New(os.Stderr, "fuse: ", log.LstdFlags),
 	})
 	if err != nil {
 		fuseFS.Destroy()

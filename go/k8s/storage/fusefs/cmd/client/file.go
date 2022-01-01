@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"syscall"
 
-	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
 
 	"k8s.io/klog/v2"
@@ -87,81 +86,81 @@ func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) erro
 	return nil
 }
 
-func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
-	fs.Lock()
-	defer fs.Unlock()
+//func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
+//	fs.Lock()
+//	defer fs.Unlock()
+//
+//	/*var buf *Buffer
+//	if fileHandle, ok := fs.fileHandles[op.Handle]; ok {
+//		if buf, ok = fs.dataBuffers[fileHandle.inodeID]; !ok || buf.lastError != nil {
+//			return fuse.EIO
+//		}
+//	} else {
+//		return fuse.EIO
+//	}
+//
+//	// read data from buffer
+//	inode, err := fs.GetInode(buf.inodeID)
+//	if err != nil {
+//		return err
+//	}
+//
+//	op.BytesRead, err = buf.ReadFile(op.Offset, op.Dst[0:rNeed], fileSize, false)
+//	if err != nil {
+//		return err
+//	}*/
+//
+//	return nil
+//}
 
-	/*var buf *Buffer
-	if fileHandle, ok := fs.fileHandles[op.Handle]; ok {
-		if buf, ok = fs.dataBuffers[fileHandle.inodeID]; !ok || buf.lastError != nil {
-			return fuse.EIO
-		}
-	} else {
-		return fuse.EIO
-	}
+//func (fs *FuseFS) OpenFile(ctx context.Context, op *fuseops.OpenFileOp) error {
+//	panic("implement me")
+//}
+//
+//func (fs *FuseFS) WriteFile(ctx context.Context, op *fuseops.WriteFileOp) error {
+//	panic("implement me")
+//}
+//
+//func (fs *FuseFS) SyncFile(ctx context.Context, op *fuseops.SyncFileOp) error {
+//	panic("implement me")
+//}
+//
+//func (fs *FuseFS) FlushFile(ctx context.Context, op *fuseops.FlushFileOp) error {
+//	panic("implement me")
+//}
+//
+//func (fs *FuseFS) ReleaseFileHandle(ctx context.Context, op *fuseops.ReleaseFileHandleOp) error {
+//	panic("implement me")
+//}
+//
+//func (fs *FuseFS) Rename(ctx context.Context, op *fuseops.RenameOp) error {
+//	panic("implement me")
+//}
+//
+//func (fs *FuseFS) ReadSymlink(ctx context.Context, op *fuseops.ReadSymlinkOp) error {
+//	panic("implement me")
+//}
 
-	// read data from buffer
-	inode, err := fs.GetInode(buf.inodeID)
-	if err != nil {
-		return err
-	}
-
-	op.BytesRead, err = buf.ReadFile(op.Offset, op.Dst[0:rNeed], fileSize, false)
-	if err != nil {
-		return err
-	}*/
-
-	return nil
-}
-
-func (fs *FuseFS) OpenFile(ctx context.Context, op *fuseops.OpenFileOp) error {
-	panic("implement me")
-}
-
-func (fs *FuseFS) WriteFile(ctx context.Context, op *fuseops.WriteFileOp) error {
-	panic("implement me")
-}
-
-func (fs *FuseFS) SyncFile(ctx context.Context, op *fuseops.SyncFileOp) error {
-	panic("implement me")
-}
-
-func (fs *FuseFS) FlushFile(ctx context.Context, op *fuseops.FlushFileOp) error {
-	panic("implement me")
-}
-
-func (fs *FuseFS) ReleaseFileHandle(ctx context.Context, op *fuseops.ReleaseFileHandleOp) error {
-	panic("implement me")
-}
-
-func (fs *FuseFS) Rename(ctx context.Context, op *fuseops.RenameOp) error {
-	panic("implement me")
-}
-
-func (fs *FuseFS) ReadSymlink(ctx context.Context, op *fuseops.ReadSymlinkOp) error {
-	panic("implement me")
-}
-
-func (fs *FuseFS) RemoveXattr(ctx context.Context, op *fuseops.RemoveXattrOp) error {
-	panic("implement me")
-}
-
-// Get an extended attribute.
-func (fs *FuseFS) GetXattr(ctx context.Context, op *fuseops.GetXattrOp) error {
-	return fuse.ENOSYS
-}
-
-func (fs *FuseFS) ListXattr(ctx context.Context, op *fuseops.ListXattrOp) error {
-	panic("implement me")
-}
-
-func (fs *FuseFS) SetXattr(ctx context.Context, op *fuseops.SetXattrOp) error {
-	panic("implement me")
-}
-
-func (fs *FuseFS) Fallocate(ctx context.Context, op *fuseops.FallocateOp) error {
-	panic("implement me")
-}
+//func (fs *FuseFS) RemoveXattr(ctx context.Context, op *fuseops.RemoveXattrOp) error {
+//	return fuse.ENOSYS
+//}
+//
+//// Get an extended attribute.
+//func (fs *FuseFS) GetXattr(ctx context.Context, op *fuseops.GetXattrOp) error {
+//	return fuse.ENOSYS
+//}
+//
+//func (fs *FuseFS) ListXattr(ctx context.Context, op *fuseops.ListXattrOp) error {
+//	return fuse.ENOSYS
+//}
+//
+//func (fs *FuseFS) SetXattr(ctx context.Context, op *fuseops.SetXattrOp) error {
+//	return fuse.ENOSYS
+//}
+//
+//func (fs *FuseFS) Fallocate(ctx context.Context, op *fuseops.FallocateOp) error {
+//	panic("implement me")
+//}
 
 // StatFS INFO: `stat ${MountPoint}`
 func (fs *FuseFS) StatFS(ctx context.Context, op *fuseops.StatFSOp) error {

@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"k8s-lx1036/k8s/storage/fuse/fuseutil"
 	"k8s-lx1036/k8s/storage/fusefs/cmd/client/meta"
 	"k8s-lx1036/k8s/storage/fusefs/cmd/client/s3"
 	"net/http"
@@ -58,6 +59,8 @@ type Config struct {
 
 type FuseFS struct {
 	sync.RWMutex
+
+	fuseutil.NotImplementedFileSystem
 
 	cluster  string
 	endpoint string

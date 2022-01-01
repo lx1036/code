@@ -113,6 +113,11 @@ func IsDir(mode uint32) bool {
 	return OsFileMode(mode).IsDir()
 }
 
+// IsSymlink checks if the mode is symlink.
+func IsSymlink(mode uint32) bool {
+	return OsFileMode(mode)&os.ModeSymlink != 0
+}
+
 // INFO: Dentry
 
 // Dentry defines the dentry struct.
@@ -167,6 +172,11 @@ type LookupRequest struct {
 	PartitionID uint64 `json:"pid"`
 	ParentID    uint64 `json:"pino"`
 	Name        string `json:"name"`
+}
+
+type LookupResponse struct {
+	Inode uint64 `json:"ino"`
+	Mode  uint32 `json:"mode"`
 }
 
 // LookupNameRequest defines the request for lookupName
