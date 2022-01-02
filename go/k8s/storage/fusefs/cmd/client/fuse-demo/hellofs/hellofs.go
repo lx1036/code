@@ -4,9 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"k8s-lx1036/k8s/storage/fuse"
@@ -141,21 +143,19 @@ func (fs *helloFS) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
 		return fuse.ENOENT
 	}
 
-	klog.Infof(fmt.Sprintf("ReadDirOp Inode: %+v, InodeInfo: %+v", op.Inode, info))
+	klog.Infof(fmt.Sprintf("[ReadDirOp]Inode: %+v, InodeInfo: %+v", op.Inode, info))
 
 	if !info.dir {
 		return fuse.EIO
 	}
 
 	entries := info.children
-
 	// Grab the range of interest.
 	if op.Offset > fuseops.DirOffset(len(entries)) {
 		return fuse.EIO
 	}
 
 	entries = entries[op.Offset:]
-
 	// Resume at the specified offset into the array.
 	for _, e := range entries {
 		n := fuseutil.WriteDirent(op.Dst[op.BytesRead:], e)
@@ -169,7 +169,6 @@ func (fs *helloFS) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
 	return nil
 }
 
-/*
 func (fs *helloFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
 	// Let io.ReaderAt deal with the semantics.
 	reader := strings.NewReader("Hello, world!")
@@ -184,7 +183,7 @@ func (fs *helloFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
 
 	return err
 }
-*/
+
 func (fs *helloFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
 	// Find the info for the parent.
 	parentInfo, ok := gInodeInfo[op.Parent]
@@ -214,29 +213,6 @@ func (fs *helloFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) e
 	return nil
 }
 
-func (fs *helloFS) patchAttributes(attr *fuseops.InodeAttributes) {
-	now := time.Now()
-	attr.Atime = now
-	attr.Mtime = now
-	attr.Crtime = now
-}
-
-// INFO: `stat /mnt/hellofs2`
-func (fs *helloFS) StatFS(ctx context.Context, op *fuseops.StatFSOp) error {
-	total, used := uint64(1073741824), uint64(6)
-	op.BlockSize = uint32(DefaultBlksize)
-	op.Blocks = total / uint64(DefaultBlksize)
-	op.BlocksFree = (total - used) / uint64(DefaultBlksize)
-	op.BlocksAvailable = op.BlocksFree
-	op.IoSize = 1 << 20
-	op.Inodes = 1 << 50
-	op.InodesFree = op.Inodes
-
-	klog.Infof(fmt.Sprintf("[StatFS]op %+v", *op))
-
-	return nil
-}
-
 func (fs *helloFS) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAttributesOp) error {
 	if op.OpContext.Pid == 0 {
 		// CreateFileOp should have a valid pid in context.
@@ -257,6 +233,29 @@ func (fs *helloFS) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeA
 
 	// Patch attributes.
 	fs.patchAttributes(&op.Attributes)
+
+	return nil
+}
+
+func (fs *helloFS) patchAttributes(attr *fuseops.InodeAttributes) {
+	now := time.Now()
+	attr.Atime = now
+	attr.Mtime = now
+	attr.Crtime = now
+}
+
+// INFO: `stat /mnt/hellofs2`
+func (fs *helloFS) StatFS(ctx context.Context, op *fuseops.StatFSOp) error {
+	total, used := uint64(1073741824), uint64(6)
+	op.BlockSize = uint32(DefaultBlksize)
+	op.Blocks = total / uint64(DefaultBlksize)
+	op.BlocksFree = (total - used) / uint64(DefaultBlksize)
+	op.BlocksAvailable = op.BlocksFree
+	op.IoSize = 1 << 20
+	op.Inodes = 1 << 50
+	op.InodesFree = op.Inodes
+
+	klog.Infof(fmt.Sprintf("[StatFS]op %+v", *op))
 
 	return nil
 }

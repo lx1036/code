@@ -12,6 +12,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const FuseFIle = "/dev/fuse"
+
 func findFusermount() (string, error) {
 	path, err := exec.LookPath("fusermount3")
 	if err != nil {
@@ -106,7 +108,7 @@ func fusermount(dir string, cfg *MountConfig) (*os.File, error) {
 	}
 
 	// Turn the FD into an os.File
-	return os.NewFile(uintptr(gotFds[0]), "/dev/fuse"), nil
+	return os.NewFile(uintptr(gotFds[0]), FuseFIle), nil
 }
 
 func enableFunc(flag uintptr) func(uintptr) uintptr {
@@ -144,12 +146,12 @@ func directmount(dir string, cfg *MountConfig) (*os.File, error) {
 	// We use syscall.Open + os.NewFile instead of os.OpenFile so that the file
 	// is opened in blocking mode. When opened in non-blocking mode, the Go
 	// runtime tries to use poll(2), which does not work with /dev/fuse.
-	fd, err := syscall.Open("/dev/fuse", syscall.O_RDWR, 0644)
+	fd, err := syscall.Open(FuseFIle, syscall.O_RDWR, 0644)
 	if err != nil {
 		return nil, errFallback
 	}
-	dev := os.NewFile(uintptr(fd), "/dev/fuse")
-	// As per libfuse/fusermount.c:847: https://bit.ly/2SgtWYM#L847
+	dev := os.NewFile(uintptr(fd), "fuse")
+	// @see https://github.com/libfuse/libfuse/blob/master/lib/mount.c#L425-L426
 	data := fmt.Sprintf("fd=%d,rootmode=40000,user_id=%d,group_id=%d",
 		dev.Fd(), os.Getuid(), os.Getgid())
 	// As per libfuse/fusermount.c:749: https://bit.ly/2SgtWYM#L749

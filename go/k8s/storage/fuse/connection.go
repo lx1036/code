@@ -7,14 +7,30 @@ import (
 	"log"
 	"os"
 	"path"
+	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
+	"unsafe"
 
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
 	"k8s-lx1036/k8s/storage/fuse/internal/buffer"
 	"k8s-lx1036/k8s/storage/fuse/internal/freelist"
 	"k8s-lx1036/k8s/storage/fuse/internal/fusekernel"
+)
+
+const (
+	// Errors corresponding to kernel error numbers. These may be treated specially by Connection.Reply.
+
+	EEXIST    = syscall.EEXIST
+	EINVAL    = syscall.EINVAL
+	EIO       = syscall.EIO
+	ENOATTR   = syscall.ENODATA
+	ENOENT    = syscall.ENOENT
+	ENOSYS    = syscall.ENOSYS
+	ENOTDIR   = syscall.ENOTDIR
+	ENOTEMPTY = syscall.ENOTEMPTY
 )
 
 type contextKeyType uint64
@@ -181,7 +197,7 @@ func (c *Connection) Init() error {
 // Log information for an operation with the given ID. calldepth is the depth
 // to use when recovering file:line information with runtime.Caller.
 func (c *Connection) debugLog(
-	fuseID uint64,
+	opcode uint32,
 	calldepth int,
 	format string,
 	v ...interface{}) {
@@ -203,8 +219,8 @@ func (c *Connection) debugLog(
 
 	// Format the actual message to be printed.
 	msg := fmt.Sprintf(
-		"Op 0x%08x %24s] %v",
-		fuseID,
+		"Op %s %24s] %v",
+		fusekernel.ConvertOpCodeMsg(opcode),
 		fileLine,
 		fmt.Sprintf(format, v...))
 
@@ -394,7 +410,7 @@ func (c *Connection) ReadOp() (_ context.Context, op interface{}, _ error) {
 
 		// Choose an ID for this operation for the purposes of logging, and log it.
 		if c.debugLogger != nil {
-			c.debugLog(inMsg.Header().Unique, 1, "<- %s", describeRequest(op))
+			c.debugLog(inMsg.Header().Opcode, 1, "<- %s from kernel fuse", describeRequest(op))
 		}
 
 		// Special case: handle interrupt requests inline.
@@ -464,7 +480,7 @@ func (c *Connection) Reply(ctx context.Context, opErr error) {
 	op := state.op
 	inMsg := state.inMsg
 	outMsg := state.outMsg
-	fuseID := inMsg.Header().Unique
+	//fuseID := inMsg.Header().Unique
 
 	// Make sure we destroy the messages when we're done.
 	defer c.putInMessage(inMsg)
@@ -476,9 +492,9 @@ func (c *Connection) Reply(ctx context.Context, opErr error) {
 	// Debug logging
 	if c.debugLogger != nil {
 		if opErr == nil {
-			c.debugLog(fuseID, 1, "-> OK (%s)", describeResponse(op))
+			c.debugLog(inMsg.Header().Opcode, 1, "-> OK (%s) to kernel fuse", describeResponse(op))
 		} else {
-			c.debugLog(fuseID, 1, "-> Error: %q", opErr.Error())
+			c.debugLog(inMsg.Header().Opcode, 1, "-> Error: %q to kernel fuse", opErr.Error())
 		}
 	}
 
@@ -505,4 +521,176 @@ func (c *Connection) close() error {
 	// write, but luckily we exclude the possibility of a race by requiring the
 	// user to respond to all ops first.
 	return c.dev.Close()
+}
+
+////////////////////////////////////////////////////////////////////////
+// buffer.InMessage
+////////////////////////////////////////////////////////////////////////
+
+// LOCKS_EXCLUDED(c.mu)
+func (c *Connection) getInMessage() *buffer.InMessage {
+	c.mu.Lock()
+	x := (*buffer.InMessage)(c.inMessages.Get())
+	c.mu.Unlock()
+
+	if x == nil {
+		x = new(buffer.InMessage)
+	}
+
+	return x
+}
+
+// LOCKS_EXCLUDED(c.mu)
+func (c *Connection) putInMessage(x *buffer.InMessage) {
+	c.mu.Lock()
+	c.inMessages.Put(unsafe.Pointer(x))
+	c.mu.Unlock()
+}
+
+////////////////////////////////////////////////////////////////////////
+// buffer.OutMessage
+////////////////////////////////////////////////////////////////////////
+
+// LOCKS_EXCLUDED(c.mu)
+func (c *Connection) getOutMessage() *buffer.OutMessage {
+	c.mu.Lock()
+	x := (*buffer.OutMessage)(c.outMessages.Get())
+	c.mu.Unlock()
+
+	if x == nil {
+		x = new(buffer.OutMessage)
+	}
+	x.Reset()
+
+	return x
+}
+
+// LOCKS_EXCLUDED(c.mu)
+func (c *Connection) putOutMessage(x *buffer.OutMessage) {
+	c.mu.Lock()
+	c.outMessages.Put(unsafe.Pointer(x))
+	c.mu.Unlock()
+}
+
+// Decide on the name of the given op.
+func opName(op interface{}) string {
+	// We expect all ops to be pointers.
+	t := reflect.TypeOf(op).Elem()
+
+	// Strip the "Op" from "FooOp".
+	return strings.TrimSuffix(t.Name(), "Op")
+}
+
+func describeRequest(op interface{}) (s string) {
+	v := reflect.ValueOf(op).Elem()
+
+	// We will set up a comma-separated list of components.
+	var components []string
+	addComponent := func(format string, v ...interface{}) {
+		components = append(components, fmt.Sprintf(format, v...))
+	}
+
+	// Include an inode number, if available.
+	if f := v.FieldByName("Inode"); f.IsValid() {
+		addComponent("inode %v", f.Interface())
+	}
+
+	// Include a parent inode number, if available.
+	if f := v.FieldByName("Parent"); f.IsValid() {
+		addComponent("parent %v", f.Interface())
+	}
+
+	// Include a name, if available.
+	if f := v.FieldByName("Name"); f.IsValid() {
+		addComponent("name %q", f.Interface())
+	}
+
+	if f := v.FieldByName("OpContext"); f.IsValid() {
+		if meta, ok := f.Interface().(fuseops.OpContext); ok {
+			addComponent("PID %+v", meta.Pid)
+		}
+	}
+
+	// Handle special cases.
+	switch typed := op.(type) {
+	case *interruptOp:
+		addComponent("fuseid 0x%08x", typed.FuseID)
+
+	case *unknownOp:
+		addComponent("opcode %d", typed.OpCode)
+
+	case *fuseops.SetInodeAttributesOp:
+		if typed.Size != nil {
+			addComponent("size %d", *typed.Size)
+		}
+
+		if typed.Mode != nil {
+			addComponent("mode %v", *typed.Mode)
+		}
+
+		if typed.Atime != nil {
+			addComponent("atime %v", *typed.Atime)
+		}
+
+		if typed.Mtime != nil {
+			addComponent("mtime %v", *typed.Mtime)
+		}
+
+	case *fuseops.RenameOp:
+		addComponent("old_parent %v", typed.OldParent)
+		addComponent("old_name %q", typed.OldName)
+		addComponent("new_parent %v", typed.NewParent)
+		addComponent("new_name %q", typed.NewName)
+
+	case *fuseops.ReadFileOp:
+		addComponent("handle %d", typed.Handle)
+		addComponent("offset %d", typed.Offset)
+		addComponent("%d bytes", len(typed.Dst))
+
+	case *fuseops.WriteFileOp:
+		addComponent("handle %d", typed.Handle)
+		addComponent("offset %d", typed.Offset)
+		addComponent("%d bytes", len(typed.Data))
+
+	case *fuseops.RemoveXattrOp:
+		addComponent("name %s", typed.Name)
+
+	case *fuseops.GetXattrOp:
+		addComponent("name %s", typed.Name)
+
+	case *fuseops.SetXattrOp:
+		addComponent("name %s", typed.Name)
+
+	case *fuseops.FallocateOp:
+		addComponent("offset %d", typed.Offset)
+		addComponent("length %d", typed.Length)
+		addComponent("mode %d", typed.Mode)
+	}
+
+	// Use just the name if there is no extra info.
+	if len(components) == 0 {
+		return opName(op)
+	}
+
+	// Otherwise, include the extra info.
+	return fmt.Sprintf("%s (%s)", opName(op), strings.Join(components, ", "))
+}
+
+func describeResponse(op interface{}) string {
+	v := reflect.ValueOf(op).Elem()
+
+	// We will set up a comma-separated list of components.
+	var components []string
+	addComponent := func(format string, v ...interface{}) {
+		components = append(components, fmt.Sprintf(format, v...))
+	}
+
+	// Include a resulting inode number, if available.
+	if f := v.FieldByName("Entry"); f.IsValid() {
+		if entry, ok := f.Interface().(fuseops.ChildInodeEntry); ok {
+			addComponent("inode %v", entry.Child)
+		}
+	}
+
+	return fmt.Sprintf("%s", strings.Join(components, ", "))
 }
