@@ -51,12 +51,12 @@ import (
 //	panic("implement me")
 //}
 
-//func (fs *FuseFS) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) error {
-//
-//	return nil
-//}
+func (fs *FuseFS) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) error {
+	return nil
+}
 
 func (fs *FuseFS) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
+	klog.Infof(fmt.Sprintf("[ReadDir]%+v", *op))
 	inode, err := fs.GetInode(op.Inode)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("[ReadDir]inodeID:%d, err:%v", op.Inode, err))
@@ -122,6 +122,9 @@ func (fs *FuseFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) er
 		klog.Errorf(fmt.Sprintf("[LookUpInode]inodeID:%d, err:%v", op.Parent, err))
 		return err
 	}
+	
+	klog.Infof(fmt.Sprintf("[LookUpInode]childInode:%+v", *childInode))
+	
 	op.Entry.Child = childInode.inodeID
 	op.Entry.AttributesExpiration = time.Now().Add(AttrValidDuration)
 	op.Entry.EntryExpiration = time.Now().Add(LookupValidDuration)

@@ -37,7 +37,7 @@ func main() {
 
 	var config string
 	cmd := &cobra.Command{
-		Use:   "master",
+		Use:   "client",
 		Short: "Runs the FuseFS client",
 		Long:  `responsible for fusefs client`,
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -337,7 +337,7 @@ func (metaClient *MetaClient) GetInode(parentID fuseops.InodeID) (*proto.InodeIn
 		return nil, err
 	}
 
-	klog.Infof(fmt.Sprintf("[GetInode]InodeGetResponse:%+v", *resp))
+	klog.Infof(fmt.Sprintf("[GetInode]InodeGetResponse:%+v", *resp.Info))
 	return resp.Info, nil
 }
 
