@@ -34,17 +34,6 @@ type MemoryFS struct {
 	uid uint32
 	gid uint32
 
-	// The collection of live inodes, indexed by ID. IDs of free inodes that may
-	// be re-used have nil entries. No ID less than fuseops.RootInodeID is ever
-	// used.
-	//
-	// All inodes are protected by the file system mutex.
-	//
-	// INVARIANT: For each inode in, in.CheckInvariants() does not panic.
-	// INVARIANT: len(inodes) > fuseops.RootInodeID
-	// INVARIANT: For all i < fuseops.RootInodeID, inodes[i] == nil
-	// INVARIANT: inodes[fuseops.RootInodeID] != nil
-	// INVARIANT: inodes[fuseops.RootInodeID].isDir()
 	inodes []*inode // GUARDED_BY(mu)
 
 	// A list of inode IDs within inodes available for reuse, not including the
@@ -62,44 +51,26 @@ func NewMemoryFS(uid uint32, gid uint32) fuse.Server {
 		gid:    gid,
 	}
 
-	// INFO: /tmp/fuse/memoryfs/ 目录是根目录
-	//  Set up the root inode.
-	rootAttrs := fuseops.InodeAttributes{
+	fs.inodes[fuseops.RootInodeID] = newInode(fuseops.InodeAttributes{
 		Mode: 0700 | os.ModeDir,
 		Uid:  uid,
 		Gid:  gid,
-	}
-	fs.inodes[fuseops.RootInodeID] = newInode(rootAttrs)
+	})
 
 	return fuseutil.NewFileSystemServer(fs)
 }
 
-func (fs *MemoryFS) StatFS(
-	ctx context.Context,
-	op *fuseops.StatFSOp) error {
-	return nil
-}
-
-func (fs *MemoryFS) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAttributesOp) error {
-	klog.Infof(fmt.Sprintf("[GetInodeAttributes]inodeID:%d", op.Inode))
-
-	if op.OpContext.Pid == 0 {
-		// CreateFileOp should have a valid pid in context.
-		return fuse.EINVAL
+func (fs *MemoryFS) getInodeOrDie(id fuseops.InodeID) *inode {
+	inode := fs.inodes[id]
+	if inode == nil {
+		panic(fmt.Sprintf("Unknown inode: %v", id))
 	}
 
-	fs.Lock()
-	defer fs.Unlock()
+	//klog.Infof(fmt.Sprintf("[getInodeOrDie]inodeID:%d for %+v", id, *inode))
+	return inode
+}
 
-	// 先查找当前文件
-	currentInode := fs.getInodeOrDie(op.Inode)
-	// Fill in the response.
-	op.Attributes = currentInode.attrs
-	// We don't spontaneously mutate, so the kernel can cache as long as it wants
-	// (since it also handles invalidation).
-	op.AttributesExpiration = time.Now().Add(365 * 24 * time.Hour)
-
-	klog.Infof(fmt.Sprintf("[GetInodeAttributes]inode id %d, uid: %d, gid: %d", op.Inode, op.Attributes.Uid, op.Attributes.Gid))
+func (fs *MemoryFS) StatFS(ctx context.Context, op *fuseops.StatFSOp) error {
 	return nil
 }
 
@@ -111,6 +82,8 @@ func (fs *MemoryFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) 
 
 	fs.Lock()
 	defer fs.Unlock()
+
+	klog.Infof(fmt.Sprintf("[LookUpInode]%+v", *op))
 
 	// Grab the parent directory.
 	parentInode := fs.getInodeOrDie(op.Parent)
@@ -124,7 +97,6 @@ func (fs *MemoryFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) 
 
 	// Grab the child.
 	child := fs.getInodeOrDie(childID)
-
 	// Fill in the response.
 	op.Entry.Child = childID
 	op.Entry.Attributes = child.attrs
@@ -133,7 +105,6 @@ func (fs *MemoryFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) 
 	op.Entry.AttributesExpiration = time.Now().Add(365 * 24 * time.Hour)
 	op.Entry.EntryExpiration = op.Entry.AttributesExpiration
 
-	klog.Infof(fmt.Sprintf("[LookUpInode]parent id %d, Name %s", op.Parent, op.Name))
 	return nil
 }
 
@@ -146,15 +117,13 @@ func (fs *MemoryFS) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) error {
 	fs.Lock()
 	defer fs.Unlock()
 
-	// We don't mutate spontaneosuly, so if the VFS layer has asked for an
-	// inode that doesn't exist, something screwed up earlier (a lookup, a
-	// cache invalidation, etc.).
+	klog.Infof(fmt.Sprintf("[OpenDir]%+v", *op))
+
 	currentInode := fs.getInodeOrDie(op.Inode)
 	if !currentInode.isDir() {
 		panic("Found non-dir.")
 	}
 
-	klog.Infof(fmt.Sprintf("[OpenDir]inode id: %d", op.Inode))
 	return nil
 }
 
@@ -172,124 +141,11 @@ func (fs *MemoryFS) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
 	// Serve the request.
 	op.BytesRead = currentInode.ReadDir(op.Dst, int(op.Offset))
 
-	klog.Infof(fmt.Sprintf("[ReadDir]inodeID:%d, Offset: %d, BytesRead: %d",
-		op.Inode, op.Offset, op.BytesRead))
+	klog.Infof(fmt.Sprintf("[ReadDir]inodeID:%d, handleID:%d, Offset:%d, BytesRead:%d",
+		op.Inode, op.Handle, op.Offset, op.BytesRead))
 	return nil
 }
 
-/*func (fs *MemoryFS) GetXattr(ctx context.Context, op *fuseops.GetXattrOp) error {
-	if op.OpContext.Pid == 0 {
-		// CreateFileOp should have a valid pid in context.
-		return fuse.EINVAL
-	}
-
-	fs.Lock()
-	defer fs.Unlock()
-
-	// Grab the directory.
-	currentInode := fs.getInodeOrDie(op.Inode)
-	if value, ok := currentInode.xattrs[op.Name]; ok {
-		// op.Dst 长度必须大于 value 长度, 见 GetXattrOp.Dst 字段注解
-		op.BytesRead = len(value)
-		if len(op.Dst) >= len(value) {
-			copy(op.Dst, value)
-		} else if len(op.Dst) != 0 {
-			return syscall.ERANGE
-		}
-	} else {
-		return fuse.ENOATTR
-	}
-
-	klog.Infof(fmt.Sprintf("[GetXattr]inodeID:%d, Name:%s, Dst: %s", op.Inode, op.Name, string(op.Dst)))
-	return nil
-}
-
-func (fs *MemoryFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
-	if op.OpContext.Pid == 0 {
-		// CreateFileOp should have a valid pid in context.
-		return fuse.EINVAL
-	}
-
-	fs.Lock()
-	defer fs.Unlock()
-
-	//INFO: 检查 parent 里是否已经存在该 op.Name
-	parentInode := fs.getInodeOrDie(op.Parent)
-	_, _, exists := parentInode.LookUpChild(op.Name)
-	if exists {
-		return fuse.EEXIST
-	}
-
-	// Set up attributes from the child.
-	childAttrs := fuseops.InodeAttributes{
-		Nlink: 1,
-		Mode:  op.Mode,
-		Uid:   fs.uid,
-		Gid:   fs.gid,
-	}
-	// Allocate a child.
-	childID, child := fs.allocateInode(childAttrs)
-	klog.Infof(fmt.Sprintf("[MkDir]allocateInode childID: %d", childID))
-	// Add an entry in the parent.
-	parentInode.AddChild(childID, op.Name, fuseutil.DT_Directory)
-	// Fill in the response.
-	op.Entry.Child = childID
-	op.Entry.Attributes = child.attrs
-	// We don't spontaneously mutate, so the kernel can cache as long as it wants
-	// (since it also handles invalidation).
-	op.Entry.AttributesExpiration = time.Now().Add(365 * 24 * time.Hour)
-	op.Entry.EntryExpiration = op.Entry.AttributesExpiration
-
-	klog.Infof(fmt.Sprintf("[MkDir]Parent:%d, Name:%s, Mode:%s", op.Parent, op.Name, op.Mode.String()))
-	return nil
-}
-
-func (fs *MemoryFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) error {
-	if op.OpContext.Pid == 0 {
-		// CreateFileOp should have a valid pid in context.
-		return fuse.EINVAL
-	}
-
-	fs.Lock()
-	defer fs.Unlock()
-
-	// 先查找parent文件
-	parent := fs.getInodeOrDie(op.Parent)
-	_, _, exists := parent.LookUpChild(op.Name) // op.Name 是要创建文件的 name
-	if exists {
-		return fuse.EEXIST
-	}
-
-	// Set up attributes for the child.
-	now := time.Now()
-	childAttrs := fuseops.InodeAttributes{
-		Nlink:  1,
-		Mode:   op.Mode,
-		Atime:  now,
-		Mtime:  now,
-		Ctime:  now,
-		Crtime: now,
-		Uid:    fs.uid,
-		Gid:    fs.gid,
-	}
-	// Allocate a child.
-	childID, child := fs.allocateInode(childAttrs)
-	klog.Infof(fmt.Sprintf("[CreateFile]allocateInode childID: %d", childID))
-	// Add an entry in the parent.
-	parent.AddChild(childID, op.Name, fuseutil.DT_File)
-
-	// Fill in the response entry.
-	op.Entry.Child = childID
-	op.Entry.Attributes = child.attrs
-	// We don't spontaneously mutate, so the kernel can cache as long as it wants
-	// (since it also handles invalidation).
-	op.Entry.AttributesExpiration = time.Now().Add(365 * 24 * time.Hour)
-	op.Entry.EntryExpiration = op.Entry.AttributesExpiration
-
-	klog.Infof(fmt.Sprintf("[CreateFile]create filename %s, parent inodeID %d", op.Name, op.Parent))
-	return nil
-}
-*/
 func (fs *MemoryFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
 	if op.OpContext.Pid == 0 {
 		// CreateFileOp should have a valid pid in context.
@@ -299,12 +155,12 @@ func (fs *MemoryFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error 
 	fs.Lock()
 	defer fs.Unlock()
 
-	klog.Infof(fmt.Sprintf("[ReadFile]dst length %d", len(op.Dst)))
-
 	var err error
 	currentInode := fs.getInodeOrDie(op.Inode)
 	op.BytesRead, err = currentInode.ReadAt(op.Dst, op.Offset)
 
+	klog.Infof(fmt.Sprintf("[ReadFile]inodeID:%d, handleID:%d, Offset:%d, BytesRead:%d",
+		op.Inode, op.Handle, op.Offset, op.BytesRead))
 	// Don't return EOF errors; we just indicate EOF to fuse using a short read.
 	if err == io.EOF {
 		return nil
@@ -313,23 +169,8 @@ func (fs *MemoryFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error 
 	return err
 }
 
-// Find the given inode. Panic if it doesn't exist.
-//
-// LOCKS_REQUIRED(fs.)
-func (fs *MemoryFS) getInodeOrDie(id fuseops.InodeID) *inode {
-	inode := fs.inodes[id]
-	if inode == nil {
-		panic(fmt.Sprintf("Unknown inode: %v", id))
-	}
-
-	return inode
-}
-
 // Allocate a new inode, assigning it an ID that is not in use.
-//
-// LOCKS_REQUIRED(fs.)
-func (fs *MemoryFS) allocateInode(
-	attrs fuseops.InodeAttributes) (id fuseops.InodeID, inode *inode) {
+func (fs *MemoryFS) allocateInode(attrs fuseops.InodeAttributes) (id fuseops.InodeID, inode *inode) {
 	// Create the inode.
 	inode = newInode(attrs)
 
@@ -347,15 +188,15 @@ func (fs *MemoryFS) allocateInode(
 	return id, inode
 }
 
-func (fs *MemoryFS) SetInodeAttributes(
-	ctx context.Context,
-	op *fuseops.SetInodeAttributesOp) error {
+func (fs *MemoryFS) SetInodeAttributes(ctx context.Context, op *fuseops.SetInodeAttributesOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
 
 	fs.Lock()
 	defer fs.Unlock()
+
+	klog.Infof(fmt.Sprintf("[SetInodeAttributes]%+v", *op))
 
 	var err error
 	if op.Size != nil && op.Handle == nil && *op.Size != 0 {
@@ -366,7 +207,6 @@ func (fs *MemoryFS) SetInodeAttributes(
 
 	// Grab the inode.
 	inode := fs.getInodeOrDie(op.Inode)
-
 	// Handle the request.
 	inode.SetAttributes(op.Size, op.Mode, op.Mtime)
 
@@ -380,9 +220,29 @@ func (fs *MemoryFS) SetInodeAttributes(
 	return err
 }
 
-func (fs *MemoryFS) MkDir(
-	ctx context.Context,
-	op *fuseops.MkDirOp) error {
+func (fs *MemoryFS) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAttributesOp) error {
+	if op.OpContext.Pid == 0 {
+		// CreateFileOp should have a valid pid in context.
+		return fuse.EINVAL
+	}
+
+	fs.Lock()
+	defer fs.Unlock()
+
+	klog.Infof(fmt.Sprintf("[GetInodeAttributes]%+v", *op))
+
+	// 先查找当前文件
+	currentInode := fs.getInodeOrDie(op.Inode)
+	// Fill in the response.
+	op.Attributes = currentInode.attrs
+	op.AttributesExpiration = time.Now().Add(365 * 24 * time.Hour)
+
+	return nil
+}
+
+// MkDir `mkdir abc`
+// LookUpInode -> MkDir
+func (fs *MemoryFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -390,51 +250,41 @@ func (fs *MemoryFS) MkDir(
 	fs.Lock()
 	defer fs.Unlock()
 
+	klog.Infof(fmt.Sprintf("[MkDir]%+v", *op))
+
 	// Grab the parent, which we will update shortly.
 	parent := fs.getInodeOrDie(op.Parent)
-
-	// Ensure that the name doesn't already exist, so we don't wind up with a
-	// duplicate.
+	// Ensure that the name doesn't already exist, so we don't wind up with a duplicate.
 	_, _, exists := parent.LookUpChild(op.Name)
 	if exists {
 		return fuse.EEXIST
 	}
 
-	// Set up attributes from the child.
-	childAttrs := fuseops.InodeAttributes{
+	childID, child := fs.allocateInode(fuseops.InodeAttributes{
 		Nlink: 1,
 		Mode:  op.Mode,
 		Uid:   fs.uid,
 		Gid:   fs.gid,
-	}
-
-	// Allocate a child.
-	childID, child := fs.allocateInode(childAttrs)
-
+	})
 	// Add an entry in the parent.
 	parent.AddChild(childID, op.Name, fuseutil.DT_Directory)
-
-	// Fill in the response.
 	op.Entry.Child = childID
 	op.Entry.Attributes = child.attrs
-
-	// We don't spontaneously mutate, so the kernel can cache as long as it wants
-	// (since it also handles invalidation).
 	op.Entry.AttributesExpiration = time.Now().Add(365 * 24 * time.Hour)
 	op.Entry.EntryExpiration = op.Entry.AttributesExpiration
 
 	return nil
 }
 
-func (fs *MemoryFS) MkNode(
-	ctx context.Context,
-	op *fuseops.MkNodeOp) error {
+func (fs *MemoryFS) MkNode(ctx context.Context, op *fuseops.MkNodeOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
 
 	fs.Lock()
 	defer fs.Unlock()
+
+	klog.Infof(fmt.Sprintf("[MkNode]%+v", *op))
 
 	var err error
 	op.Entry, err = fs.createFile(op.Parent, op.Name, op.Mode)
@@ -442,10 +292,7 @@ func (fs *MemoryFS) MkNode(
 }
 
 // LOCKS_REQUIRED(fs.)
-func (fs *MemoryFS) createFile(
-	parentID fuseops.InodeID,
-	name string,
-	mode os.FileMode) (fuseops.ChildInodeEntry, error) {
+func (fs *MemoryFS) createFile(parentID fuseops.InodeID, name string, mode os.FileMode) (fuseops.ChildInodeEntry, error) {
 	// Grab the parent, which we will update shortly.
 	parent := fs.getInodeOrDie(parentID)
 
@@ -488,9 +335,7 @@ func (fs *MemoryFS) createFile(
 	return entry, nil
 }
 
-func (fs *MemoryFS) CreateFile(
-	ctx context.Context,
-	op *fuseops.CreateFileOp) (err error) {
+func (fs *MemoryFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) (err error) {
 	if op.OpContext.Pid == 0 {
 		// CreateFileOp should have a valid pid in context.
 		return fuse.EINVAL
@@ -503,9 +348,7 @@ func (fs *MemoryFS) CreateFile(
 	return err
 }
 
-func (fs *MemoryFS) CreateSymlink(
-	ctx context.Context,
-	op *fuseops.CreateSymlinkOp) error {
+func (fs *MemoryFS) CreateSymlink(ctx context.Context, op *fuseops.CreateSymlinkOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -557,9 +400,7 @@ func (fs *MemoryFS) CreateSymlink(
 	return nil
 }
 
-func (fs *MemoryFS) CreateLink(
-	ctx context.Context,
-	op *fuseops.CreateLinkOp) error {
+func (fs *MemoryFS) CreateLink(ctx context.Context, op *fuseops.CreateLinkOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -600,9 +441,7 @@ func (fs *MemoryFS) CreateLink(
 	return nil
 }
 
-func (fs *MemoryFS) Rename(
-	ctx context.Context,
-	op *fuseops.RenameOp) error {
+func (fs *MemoryFS) Rename(ctx context.Context, op *fuseops.RenameOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -645,9 +484,7 @@ func (fs *MemoryFS) Rename(
 	return nil
 }
 
-func (fs *MemoryFS) RmDir(
-	ctx context.Context,
-	op *fuseops.RmDirOp) error {
+func (fs *MemoryFS) RmDir(ctx context.Context, op *fuseops.RmDirOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -681,9 +518,7 @@ func (fs *MemoryFS) RmDir(
 	return nil
 }
 
-func (fs *MemoryFS) Unlink(
-	ctx context.Context,
-	op *fuseops.UnlinkOp) error {
+func (fs *MemoryFS) Unlink(ctx context.Context, op *fuseops.UnlinkOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -712,9 +547,7 @@ func (fs *MemoryFS) Unlink(
 	return nil
 }
 
-func (fs *MemoryFS) OpenFile(
-	ctx context.Context,
-	op *fuseops.OpenFileOp) error {
+func (fs *MemoryFS) OpenFile(ctx context.Context, op *fuseops.OpenFileOp) error {
 	if op.OpContext.Pid == 0 {
 		// OpenFileOp should have a valid pid in context.
 		return fuse.EINVAL
@@ -735,9 +568,7 @@ func (fs *MemoryFS) OpenFile(
 	return nil
 }
 
-func (fs *MemoryFS) WriteFile(
-	ctx context.Context,
-	op *fuseops.WriteFileOp) error {
+func (fs *MemoryFS) WriteFile(ctx context.Context, op *fuseops.WriteFileOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -754,9 +585,7 @@ func (fs *MemoryFS) WriteFile(
 	return err
 }
 
-func (fs *MemoryFS) FlushFile(
-	ctx context.Context,
-	op *fuseops.FlushFileOp) (err error) {
+func (fs *MemoryFS) FlushFile(ctx context.Context, op *fuseops.FlushFileOp) (err error) {
 	if op.OpContext.Pid == 0 {
 		// FlushFileOp should have a valid pid in context.
 		return fuse.EINVAL
@@ -764,9 +593,7 @@ func (fs *MemoryFS) FlushFile(
 	return
 }
 
-func (fs *MemoryFS) ReadSymlink(
-	ctx context.Context,
-	op *fuseops.ReadSymlinkOp) error {
+func (fs *MemoryFS) ReadSymlink(ctx context.Context, op *fuseops.ReadSymlinkOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -783,8 +610,7 @@ func (fs *MemoryFS) ReadSymlink(
 	return nil
 }
 
-func (fs *MemoryFS) GetXattr(ctx context.Context,
-	op *fuseops.GetXattrOp) error {
+func (fs *MemoryFS) GetXattr(ctx context.Context, op *fuseops.GetXattrOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -807,8 +633,7 @@ func (fs *MemoryFS) GetXattr(ctx context.Context,
 	return nil
 }
 
-func (fs *MemoryFS) ListXattr(ctx context.Context,
-	op *fuseops.ListXattrOp) error {
+func (fs *MemoryFS) ListXattr(ctx context.Context, op *fuseops.ListXattrOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -834,8 +659,7 @@ func (fs *MemoryFS) ListXattr(ctx context.Context,
 	return nil
 }
 
-func (fs *MemoryFS) RemoveXattr(ctx context.Context,
-	op *fuseops.RemoveXattrOp) error {
+func (fs *MemoryFS) RemoveXattr(ctx context.Context, op *fuseops.RemoveXattrOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -852,8 +676,7 @@ func (fs *MemoryFS) RemoveXattr(ctx context.Context,
 	return nil
 }
 
-func (fs *MemoryFS) SetXattr(ctx context.Context,
-	op *fuseops.SetXattrOp) error {
+func (fs *MemoryFS) SetXattr(ctx context.Context, op *fuseops.SetXattrOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -881,8 +704,7 @@ func (fs *MemoryFS) SetXattr(ctx context.Context,
 	return nil
 }
 
-func (fs *MemoryFS) Fallocate(ctx context.Context,
-	op *fuseops.FallocateOp) error {
+func (fs *MemoryFS) Fallocate(ctx context.Context, op *fuseops.FallocateOp) error {
 	if op.OpContext.Pid == 0 {
 		return fuse.EINVAL
 	}
@@ -908,8 +730,7 @@ var (
 func main() {
 	flag.Parse()
 
-	// Mount the file system.
-	if *mountPoint == "" {
+	if len(*mountPoint) == 0 {
 		klog.Fatalf("You must set --mountpoint.")
 	}
 

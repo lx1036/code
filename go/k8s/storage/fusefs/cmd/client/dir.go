@@ -24,6 +24,14 @@ import (
 func (fs *FuseFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
 	klog.Infof(fmt.Sprintf("[MkDir]:%+v", *op))
 
+	parent, err := fs.GetInode(op.Parent)
+	if err != nil {
+		return err
+	}
+	if _, ok := parent.dentryCache.Get(op.Name); ok {
+		return fuse.EEXIST // Ensure that the name doesn't already exist, so we don't wind up with a duplicate.
+	}
+
 	inodeInfo, err := fs.metaClient.CreateInodeAndDentry(op.Parent, op.Name, uint32(op.Mode.Perm()), op.Uid, op.Gid, nil)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("[MkDir]create inode/dentry for %d/%s err %v", op.Parent, op.Name, err))
@@ -40,7 +48,7 @@ func (fs *FuseFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
 			Atime:  time.Unix(child.accessTime, 0),
 			Mtime:  time.Unix(child.modifyTime, 0),
 			Ctime:  time.Unix(child.createTime, 0),
-			Crtime: time.Time{},
+			Crtime: time.Unix(child.createTime, 0),
 			Uid:    child.uid,
 			Gid:    child.gid,
 		},
@@ -48,7 +56,7 @@ func (fs *FuseFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
 		EntryExpiration:      time.Now().Add(LookupValidDuration),
 	}
 	fs.inodeCache.Put(child)
-	parent, err := fs.GetInode(op.Parent)
+	parent, err = fs.GetInode(op.Parent)
 	if err == nil {
 		parent.dentryCache.Put(op.Name, inodeInfo.Inode)
 	}
@@ -180,6 +188,9 @@ func (fs *FuseFS) ReleaseDirHandle(ctx context.Context, op *fuseops.ReleaseDirHa
 }
 
 func (fs *FuseFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
 	// {Parent:1 Name:1.txt Entry:{Child:0 Generation:0 Attributes:{Size:0 Nlink:0 Mode:---------- Atime:0001-01-01 00:00:00 +0000 UTC Mtime:0001-01-01 00:00:00 +0000 UTC Ctime:0001-01-01 00:00:00 +0000 UTC Crtime:0001-01-01 00:00:00 +0000 UTC Uid:0 Gid:0} AttributesExpiration:0001-01-01 00:00:00 +0000 UTC EntryExpiration:0001-01-01 00:00:00 +0000 UTC} OpContext:{Pid:36698}}
 	klog.Infof(fmt.Sprintf("[LookUpInode]LookUpInodeOp:%+v", *op))
 
@@ -193,8 +204,7 @@ func (fs *FuseFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) er
 	if !ok {
 		inodeID, _, err = fs.metaClient.Lookup(op.Parent, op.Name)
 		if err != nil {
-			klog.Errorf(fmt.Sprintf("[LookUpInode]inodeID:%d, name:%s, err:%v", op.Parent, op.Name, err))
-			return err
+			return fuse.ENOENT
 		}
 	}
 

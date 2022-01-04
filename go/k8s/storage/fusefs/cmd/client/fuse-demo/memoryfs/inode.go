@@ -50,6 +50,18 @@ type inode struct {
 	target string
 }
 
+func newInode(attrs fuseops.InodeAttributes) *inode {
+	now := time.Now()
+	attrs.Mtime = now
+	attrs.Crtime = now
+
+	// Create the object.
+	return &inode{
+		attrs:  attrs,
+		xattrs: make(map[string][]byte),
+	}
+}
+
 // Return the index of the child within in.entries, if it exists.
 //
 // REQUIRES: in.isDir()
@@ -256,10 +268,7 @@ func (in *inode) AddChild(id fuseops.InodeID, name string, dt fuseutil.DirentTyp
 }
 
 // Update attributes from non-nil parameters.
-func (in *inode) SetAttributes(
-	size *uint64,
-	mode *os.FileMode,
-	mtime *time.Time) {
+func (in *inode) SetAttributes(size *uint64, mode *os.FileMode, mtime *time.Time) {
 	// Update the modification time.
 	in.attrs.Mtime = time.Now()
 
@@ -287,20 +296,5 @@ func (in *inode) SetAttributes(
 	// Change mtime?
 	if mtime != nil {
 		in.attrs.Mtime = *mtime
-	}
-}
-
-// Create a new inode with the supplied attributes, which need not contain
-// time-related information (the inode object will take care of that).
-func newInode(attrs fuseops.InodeAttributes) *inode {
-	// Update time info.
-	now := time.Now()
-	attrs.Mtime = now
-	attrs.Crtime = now
-
-	// Create the object.
-	return &inode{
-		attrs:  attrs,
-		xattrs: make(map[string][]byte),
 	}
 }
