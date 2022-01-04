@@ -133,7 +133,7 @@ func TestBuckets(test *testing.T) {
 		klog.Fatal(err)
 	}
 	defer db.Close()
-	
+
 	db.Batch(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("key"))
 		for i := 0; i < 10; i++ {
@@ -142,8 +142,7 @@ func TestBuckets(test *testing.T) {
 		}
 		return nil
 	})
-	
-	
+
 	klog.Info("prefix range start")
 	db.View(func(tx *bolt.Tx) error {
 		cursor := tx.Bucket([]byte("key")).Cursor()
@@ -160,14 +159,14 @@ func TestBuckets(test *testing.T) {
 			return nil
 		})
 	})
-	
+
 	db.View(func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("key")).ForEach(func(k, v []byte) error {
 			//klog.Info(fmt.Sprintf("key:%s value:%s", k, v))
 			return nil
 		})
 	})*/
-	
+
 	tx, _ := db.Begin(false)
 	defer func() {
 		tx.Rollback()
@@ -185,6 +184,6 @@ func TestBuckets(test *testing.T) {
 	/*for key, value := c.Next(); key != nil; {
 		klog.Info(fmt.Sprintf("key:%s value:%s", key, value))
 	}*/
-	
+
 	klog.Info("finish")
 }

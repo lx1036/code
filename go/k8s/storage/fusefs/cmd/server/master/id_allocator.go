@@ -7,54 +7,90 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
+
 	"k8s.io/klog/v2"
+)
+
+const (
+	opSyncAllocMetaPartitionID uint32 = 0x06
+	opAllocVolumeID            uint32 = 0x07
+	opSyncBatchPut             uint32 = 0x0E
+	opSyncAddBucket            uint32 = 0x0F
+	opSyncUpdateBucket         uint32 = 0x10
+	opSyncDeleteBucket         uint32 = 0x11
+	opSyncAddVolMountClient    uint32 = 0x12
+	opSyncUpdateVolMountClient uint32 = 0x13
+	opSyncDeleteVolMountClient uint32 = 0x14
+)
+
+const (
+	maxVolumeIDKey        = "#max_volume_id"
+	maxMetaPartitionIDKey = "#max_mp_id"
 )
 
 // IDAllocator generates and allocates ids
 type IDAllocator struct {
+	volumeIDLock        sync.RWMutex
+	metaPartitionIDLock sync.RWMutex
+
+	volumeID        uint64
 	metaPartitionID uint64
-	commonID        uint64
-	store           *BoltdbStore
-	partition       Partition
-	mpIDLock        sync.RWMutex
-	metaNodeIDLock  sync.RWMutex
+
+	store     *raftstore.BoltDBStore
+	partition raftstore.Partition
 }
 
-func (alloc *IDAllocator) allocateCommonID() (id uint64, err error) {
-	alloc.metaNodeIDLock.Lock()
-	defer alloc.metaNodeIDLock.Unlock()
-
-	var cmd []byte
-	metadata := new(RaftCmd)
-	metadata.Op = opSyncAllocCommonID
-	metadata.K = maxCommonIDKey
-	id = atomic.LoadUint64(&alloc.commonID) + 1
-	value := strconv.FormatUint(uint64(id), 10)
-	metadata.V = []byte(value)
-	cmd, err = json.Marshal(metadata)
-	if err != nil {
-		klog.Error(err)
-		return 0, err
+func NewIDAllocator(store *raftstore.BoltDBStore, partition raftstore.Partition) *IDAllocator {
+	return &IDAllocator{
+		store:     store,
+		partition: partition,
 	}
+}
 
-	// 向 raft log 提交cmd
+func (alloc *IDAllocator) allocateVolumeID() (id uint64, err error) {
+	alloc.volumeIDLock.Lock()
+	defer alloc.volumeIDLock.Unlock()
+
+	id = atomic.LoadUint64(&alloc.volumeID) + 1
+	cmd, _ := json.Marshal(&RaftCmd{
+		Op: opAllocVolumeID,
+		K:  maxVolumeIDKey,
+		V:  []byte(strconv.FormatUint(id, 10)),
+	})
 	if _, err = alloc.partition.Submit(cmd); err != nil {
-		klog.Errorf("action[allocateCommonID] Submit cmd err: %v", err)
+		klog.Errorf(fmt.Sprintf("[allocateVolumeID] submit cmd %s err: %v", cmd, err))
 		return 0, err
 	}
 
-	alloc.setCommonID(id)
+	atomic.StoreUint64(&alloc.volumeID, id)
 
 	return id, nil
 }
 
-func (alloc *IDAllocator) setCommonID(id uint64) {
-	atomic.StoreUint64(&alloc.commonID, id)
+func (alloc *IDAllocator) allocateMetaPartitionID() (partitionID uint64, err error) {
+	alloc.metaPartitionIDLock.Lock()
+	defer alloc.metaPartitionIDLock.Unlock()
+
+	partitionID = atomic.LoadUint64(&alloc.metaPartitionID) + 1
+	cmd, _ := json.Marshal(&RaftCmd{
+		Op: opSyncAllocMetaPartitionID,
+		K:  maxMetaPartitionIDKey,
+		V:  []byte(strconv.FormatUint(partitionID, 10)),
+	})
+	if _, err = alloc.partition.Submit(cmd); err != nil {
+		klog.Errorf(fmt.Sprintf("[allocateMetaPartitionID] submit cmd %s err: %v", cmd, err))
+		return 0, err
+	}
+
+	atomic.StoreUint64(&alloc.metaPartitionID, partitionID)
+
+	return partitionID, nil
 }
 
 func (alloc *IDAllocator) restore() {
 	alloc.restoreMaxMetaPartitionID()
-	alloc.restoreMaxCommonID()
+	alloc.restoreMaxVolumeID()
 }
 
 func (alloc *IDAllocator) restoreMaxMetaPartitionID() {
@@ -62,12 +98,11 @@ func (alloc *IDAllocator) restoreMaxMetaPartitionID() {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to restore maxPartitionID,err:%v ", err.Error()))
 	}
-	bytes := value
-	if len(bytes) == 0 {
+	if len(value) == 0 {
 		alloc.metaPartitionID = 0
 		return
 	}
-	maxPartitionID, err := strconv.ParseUint(string(bytes), 10, 64)
+	maxPartitionID, err := strconv.ParseUint(string(value), 10, 64)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to restore maxPartitionID,err:%v ", err.Error()))
 	}
@@ -76,27 +111,19 @@ func (alloc *IDAllocator) restoreMaxMetaPartitionID() {
 }
 
 // The data node, meta node, and node set share the same ID allocator.
-func (alloc *IDAllocator) restoreMaxCommonID() {
-	value, err := alloc.store.Get([]byte(maxCommonIDKey))
+func (alloc *IDAllocator) restoreMaxVolumeID() {
+	value, err := alloc.store.Get([]byte(maxVolumeIDKey))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to restore maxCommonID,err:%v ", err.Error()))
 	}
-	bytes := value
-	if len(bytes) == 0 {
-		alloc.commonID = 0
+	if len(value) == 0 {
+		alloc.volumeID = 0
 		return
 	}
-	maxMetaNodeID, err := strconv.ParseUint(string(bytes), 10, 64)
+	maxMetaNodeID, err := strconv.ParseUint(string(value), 10, 64)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to restore maxCommonID,err:%v ", err.Error()))
 	}
-	alloc.commonID = maxMetaNodeID
-	klog.Infof("action[restoreMaxCommonID] maxMnID[%v]", alloc.commonID)
-}
-
-func NewIDAllocator(store *BoltdbStore, partition Partition) *IDAllocator {
-	return &IDAllocator{
-		store:     store,
-		partition: partition,
-	}
+	alloc.volumeID = maxMetaNodeID
+	klog.Infof("action[restoreMaxCommonID] maxMnID[%v]", alloc.volumeID)
 }

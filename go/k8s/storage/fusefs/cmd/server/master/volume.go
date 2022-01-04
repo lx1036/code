@@ -1,60 +1,76 @@
 package master
 
 import (
-	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
 	"sync"
 )
 
-// Vol represents a set of meta partitionMap and data partitionMap
+// Volume represents a set of meta partitionMap and data partitionMap
 type Volume struct {
-	ID             uint64
-	Name           string
-	Owner          string
-	s3Endpoint     string
-	mpReplicaNum   uint8
-	Status         uint8
-	threshold      float32
-	Capacity       uint64 // GB
-	MetaPartitions map[uint64]*MetaPartition
-	mpsLock        sync.RWMutex
-	mpsCache       []byte
-	viewCache      []byte
-	bucketdeleted  bool
-	createMpMutex  sync.RWMutex
-	sync.RWMutex
+	mpsLock       sync.RWMutex
+	createMpMutex sync.RWMutex
+
+	ID                 uint64                    `json:"id"`
+	Name               string                    `json:"name"`
+	Owner              string                    `json:"owner"`
+	s3Endpoint         string                    `json:"s3Endpoint"`
+	metaPartitionCount int                       `json:"metaPartitionCount"`
+	Status             VolStatus                 `json:"status"`
+	threshold          float32                   `json:"threshold"`
+	Capacity           uint64                    `json:"capacity"` // GB
+	MetaPartitions     map[uint64]*MetaPartition `json:"metaPartitions"`
+	mpsCache           []byte                    `json:"mpsCache"`
+	viewCache          []byte                    `json:"viewCache"`
+	bucketDeleted      bool                      `json:"bucketDeleted"`
+
+	// stats
+	TotalGB   uint64 `json:"totalGB"`
+	UsedGB    uint64 `json:"usedGB"`
+	UsedRatio string `json:"usedRatio"`
 }
 
-func (vol *Volume) checkMetaPartitions(c *Cluster) {
-	var tasks []*proto.AdminTask
-	//vol.checkSplitMetaPartition(c)
-	//maxPartitionID := vol.maxPartitionID()
-	//mps := vol.cloneMetaPartitionMap()
-	//for _, mp := range mps {
-	//	mp.checkStatus(c.Name, true, int(vol.mpReplicaNum), maxPartitionID)
-	//	mp.checkLeader()
-	//	mp.checkReplicaNum(c, vol.Name, vol.mpReplicaNum)
-	//	mp.checkEnd(c, maxPartitionID)
-	//	mp.reportMissingReplicas(c.Name, c.leaderInfo.addr, defaultMetaPartitionTimeOutSec, defaultIntervalToAlarmMissingMetaPartition)
-	//	tasks = append(tasks, mp.replicaCreationTasks(c.Name, vol.Name)...)
-	//}
-	c.addMetaNodeTasks(tasks)
+func newVol(id uint64, name, owner string, capacity uint64, metaPartitionCount int) *Volume {
+	return &Volume{
+		ID:                 id,
+		Name:               name,
+		metaPartitionCount: metaPartitionCount,
+		Owner:              owner,
+		threshold:          defaultMetaPartitionMemUsageThreshold,
+		Capacity:           capacity,
+		MetaPartitions:     make(map[uint64]*MetaPartition, 0),
+		bucketDeleted:      false,
+	}
 }
 
-func newVol(id uint64, name, owner string, capacity uint64, mpReplicaNum uint8) *Volume {
-	volume := &Volume{
-		ID:             id,
-		Name:           name,
-		Owner:          owner,
-		threshold:      defaultMetaPartitionMemUsageThreshold,
-		Capacity:       capacity,
-		MetaPartitions: make(map[uint64]*MetaPartition, 0),
-		bucketdeleted:  false,
+func (vol *Volume) addMetaPartition(mp *MetaPartition) {
+	vol.MetaPartitions[mp.PartitionID] = mp
+}
+
+func (vol *Volume) maxPartitionID() (maxPartitionID uint64) {
+	for id := range vol.MetaPartitions {
+		if id > maxPartitionID {
+			maxPartitionID = id
+		}
+	}
+	return
+}
+
+func (vol *Volume) totalUsedSpace() (totalSize uint64) {
+	for _, mp := range vol.MetaPartitions {
+		totalSize += mp.Size
+	}
+	return
+}
+
+const (
+	defaultMaxMetaPartitionInodeID  uint64 = 1<<63 - 1
+	defaultMetaPartitionInodeIDStep uint64 = 1 << 24 // 16MB
+)
+
+func (vol *Volume) cloneMetaPartitionMap() map[uint64]*MetaPartition {
+	mps := make(map[uint64]*MetaPartition, 0)
+	for partitionID, mp := range vol.MetaPartitions {
+		mps[partitionID] = mp
 	}
 
-	if mpReplicaNum < defaultReplicaNum {
-		mpReplicaNum = defaultReplicaNum
-	}
-	volume.mpReplicaNum = mpReplicaNum
-
-	return volume
+	return mps
 }

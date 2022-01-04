@@ -44,6 +44,7 @@ type Config struct {
 type PeerAddress struct {
 	proto.Peer
 	Address       string
+	Port          int
 	HeartbeatPort int
 	ReplicaPort   int
 }

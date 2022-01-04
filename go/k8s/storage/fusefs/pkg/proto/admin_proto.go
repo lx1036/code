@@ -1,5 +1,7 @@
 package proto
 
+import "fmt"
+
 // api
 const (
 	// Admin APIs
@@ -84,4 +86,14 @@ type HTTPReply struct {
 	Code int32       `json:"code"`
 	Msg  string      `json:"msg"`
 	Data interface{} `json:"data"`
+}
+
+// HeartBeatRequest define the heartbeat request.
+type HeartBeatRequest struct {
+	CurrTime   int64
+	MasterAddr string
+}
+
+func (hr *HeartBeatRequest) ToString() string {
+	return fmt.Sprintf("MasterAddr[%v] CurrTime[%v]", hr.MasterAddr, hr.CurrTime)
 }

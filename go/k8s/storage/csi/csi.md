@@ -97,6 +97,7 @@ juicefs csi 的解决方案：https://mp.weixin.qq.com/s/hPupPQmCPKZpGIA4SCPBzQ
 https://github.com/kubernetes/kubernetes/pull/88569
 chubaofs-csi 使用 VolumeAttachment 解决：https://github.com/chubaofs/chubaofs-csi/pull/54
 
+
 (2)为何一些volume drivers，如NFS，或者一些FS，不需要 attach operation，CSIDriver里 `attachRequired: false`？
 ```yaml
 # csidriver 需要部署时创建，重点是 podInfoOnMount 参数，见：
@@ -115,7 +116,30 @@ spec:
 ```
 
 
-TODO:
-基于 3.0.5 打出一个 3.0.6 镜像，修改了 tini/profPort/retry call polefs api 问题？
+(3)对于 fusefs csi 创建的 pvc/pv，如果 pvc 被删除了，但是 pv 还在，怎么恢复？
+1. 先删除 pv claimRef
+2. 再新建 pvc.yaml，必须指定 volumeName
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fusefs-pvc-test
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: fusefs-storageclass
+  volumeMode: Filesystem
+  volumeName: pvc-44141bdf-a3bb-4019-bd16-e0b2770a1570 # 必须指定 pv name!!!
+```
+
+原理：https://github.com/kubernetes/kubernetes/blob/v1.23.1/pkg/controller/volume/persistentvolume/pv_controller.go#L412-L432
+
+
+
+## 面试题
 重点调查下 VolumeAttachment 资源对象是怎么被创建的完整过程？？
 为何 CSIDriver spec.attachRequired=false 就可以控制 k8s 跳过 attach/detach 操作步骤？

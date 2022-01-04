@@ -25,6 +25,7 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.2
 	github.com/denverdino/aliyungo v0.0.0-20201215054313-f635de23c5e0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
 	github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
 	github.com/docker/go-connections v0.4.0
 	github.com/eapache/channels v1.1.0
@@ -35,6 +36,7 @@ require (
 	github.com/go-logr/logr v0.4.0
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.5.0
+	github.com/go-test/deep v1.0.7
 	github.com/gogo/protobuf v1.3.2
 	github.com/gohouse/gorose/v2 v2.1.3
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
@@ -57,7 +59,7 @@ require (
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/jinzhu/gorm v1.9.11
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/jwhited/corebgp v0.2.0
+	github.com/k-sone/critbitgo v1.4.0
 	github.com/klauspost/cpuid v1.2.1
 	github.com/kubernetes-csi/csi-lib-utils v0.9.0
 	github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0
@@ -182,11 +184,9 @@ require (
 	github.com/containerd/ttrpc v1.0.2 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
-	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
 	github.com/coreos/prometheus-operator v0.38.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/docker/go-units v0.4.0 // indirect
@@ -238,7 +238,6 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/juju/ratelimit v1.0.2-0.20191002062651-f60b32039441 // indirect
-	github.com/k-sone/critbitgo v1.4.0 // indirect
 	github.com/karrick/godirwalk v1.10.12 // indirect
 	github.com/kavu/go_reuseport v1.5.0 // indirect
 	github.com/kelseyhightower/envconfig v0.0.0-20180517194557-dd1402a4d99d // indirect

@@ -123,9 +123,8 @@ func (p *partition) IsOfflinePeer() bool {
 }
 
 // IsRaftLeader returns true if this node is the leader of the raft group it belongs to.
-func (p *partition) IsRaftLeader() (isLeader bool) {
-	isLeader = p.raft != nil && p.raft.IsLeader(p.id)
-	return
+func (p *partition) IsRaftLeader() bool {
+	return p.raft != nil && p.raft.IsLeader(p.id)
 }
 
 // AppliedIndex returns the current index of the applied raft log in the raft store partition.

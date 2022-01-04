@@ -69,11 +69,17 @@ type BatchInodeGetRequest struct {
 	Inodes      []uint64 `json:"inos"`
 }
 
-// LinkInodeRequest defines the request to link an inode.
-type LinkInodeRequest struct {
+// CreateInodeLinkRequest defines the request to link an inode.
+type CreateInodeLinkRequest struct {
 	VolName     string `json:"vol"`
 	PartitionID uint64 `json:"pid"`
 	Inode       uint64 `json:"ino"`
+}
+
+type BatchUnlinkInodeRequest struct {
+	VolName     string   `json:"vol"`
+	PartitionID uint64   `json:"pid"`
+	Inodes      []uint64 `json:"inos"`
 }
 
 // EvictInodeRequest defines the request to evict an inode.
@@ -105,6 +111,11 @@ func OsFileMode(mode uint32) os.FileMode {
 
 func IsDir(mode uint32) bool {
 	return OsFileMode(mode).IsDir()
+}
+
+// IsSymlink checks if the mode is symlink.
+func IsSymlink(mode uint32) bool {
+	return OsFileMode(mode)&os.ModeSymlink != 0
 }
 
 // INFO: Dentry
@@ -161,6 +172,11 @@ type LookupRequest struct {
 	PartitionID uint64 `json:"pid"`
 	ParentID    uint64 `json:"pino"`
 	Name        string `json:"name"`
+}
+
+type LookupResponse struct {
+	Inode uint64 `json:"ino"`
+	Mode  uint32 `json:"mode"`
 }
 
 // LookupNameRequest defines the request for lookupName

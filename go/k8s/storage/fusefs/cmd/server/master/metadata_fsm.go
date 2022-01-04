@@ -3,8 +3,11 @@ package master
 import (
 	"encoding/json"
 	"fmt"
+	bolt "go.etcd.io/bbolt"
 	"io"
 	"strconv"
+
+	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
 
 	"github.com/tiglabs/raft"
 	"github.com/tiglabs/raft/proto"
@@ -23,13 +26,22 @@ type raftApplySnapshotHandler func()
 
 // MetadataFsm INFO: MetadataFsm 是一个 state machine
 type MetadataFsm struct {
-	store               *BoltdbStore
+	store               *raftstore.BoltDBStore
 	raftServer          *raft.RaftServer
 	applied             uint64
 	retainLogs          uint64
 	leaderChangeHandler raftLeaderChangeHandler
 	peerChangeHandler   raftPeerChangeHandler
 	snapshotHandler     raftApplySnapshotHandler
+}
+
+// INFO: https://github.com/tiglabs/raft/blob/master/test/memory_statemachine.go
+func newMetadataFsm(store *raftstore.BoltDBStore, retainsLog uint64, raftServer *raft.RaftServer) *MetadataFsm {
+	return &MetadataFsm{
+		store:      store,
+		raftServer: raftServer,
+		retainLogs: retainsLog,
+	}
 }
 
 // Corresponding to the LeaderChange interface in Raft library.
@@ -59,21 +71,22 @@ func (metadataFsm *MetadataFsm) Put(key, val []byte) error {
 
 // Del implements the interface of raft.StateMachine
 func (metadataFsm *MetadataFsm) Del(key []byte) error {
-	return metadataFsm.store.Delete(key)
+	return metadataFsm.store.Del(key)
 }
 
 // Apply implements the interface of raft.StateMachine
 func (metadataFsm *MetadataFsm) Apply(command []byte, index uint64) (resp interface{}, err error) {
 	cmd := new(RaftCmd)
 	if err = json.Unmarshal(command, cmd); err != nil {
-		klog.Errorf("action[fsmApply],unmarshal data:%v, err:%v", command, err.Error())
-		panic(err)
+		klog.Errorf(fmt.Sprintf("apply fsm for cmd:%s, index:%d, err:%v", command, index, err))
+		return
 	}
-	klog.Infof("action[fsmApply],cmd.op[%v],cmd.K[%v],cmd.V[%v]", cmd.Op, cmd.K, string(cmd.V))
+	klog.Infof(fmt.Sprintf("apply fsm for cmd:{Op:%d, K:%s, V:%s}, index:%d", cmd.Op, cmd.K, cmd.V, index))
+
 	cmdMap := make(map[string][]byte)
 	if cmd.Op != opSyncBatchPut {
 		cmdMap[cmd.K] = cmd.V
-		cmdMap[applied] = []byte(strconv.FormatUint(uint64(index), 10))
+		cmdMap[applied] = []byte(strconv.FormatUint(index, 10))
 	} else {
 		nestedCmdMap := make(map[string]*RaftCmd)
 		if err = json.Unmarshal(cmd.V, &nestedCmdMap); err != nil {
@@ -84,22 +97,21 @@ func (metadataFsm *MetadataFsm) Apply(command []byte, index uint64) (resp interf
 			klog.Infof("action[fsmApply],cmd.op[%v],cmd.K[%v],cmd.V[%v]", cmd.Op, cmd.K, string(cmd.V))
 			cmdMap[cmdK] = cmd.V
 		}
-		cmdMap[applied] = []byte(strconv.FormatUint(uint64(index), 10))
+		cmdMap[applied] = []byte(strconv.FormatUint(index, 10))
 	}
 	switch cmd.Op {
 	case opSyncDeleteMetaNode, opSyncDeleteVol, opSyncDeleteMetaPartition, opSyncDeleteBucket, opSyncDeleteVolMountClient:
 		if err = metadataFsm.delKeyAndPutIndex(cmd.K, cmdMap); err != nil {
-			panic(err)
+			klog.Errorf(fmt.Sprintf("apply cmd %s err:%v", cmd.V, err))
 		}
 	default:
 		if err = metadataFsm.batchPut(cmdMap); err != nil {
-			panic(err)
+			klog.Errorf(fmt.Sprintf("apply cmd %s err:%v", cmd.V, err))
 		}
 	}
 	metadataFsm.applied = index
-	if metadataFsm.applied > 0 {
-		//if metadataFsm.applied > 0 && (metadataFsm.applied%metadataFsm.retainLogs) == 0 {
-		klog.Warningf("action[Apply],truncate raft log,retainLogs[%v],index[%v]", metadataFsm.retainLogs, metadataFsm.applied)
+	if metadataFsm.applied > 0 && (metadataFsm.applied%metadataFsm.retainLogs == 0) {
+		klog.Warningf(fmt.Sprintf("truncate raft log retainLogs[%v] applied[%v]", metadataFsm.retainLogs, metadataFsm.applied))
 		metadataFsm.raftServer.Truncate(GroupID, metadataFsm.applied)
 	}
 	return
@@ -114,20 +126,61 @@ func (metadataFsm *MetadataFsm) ApplyMemberChange(confChange *proto.ConfChange, 
 	return nil, err
 }
 
+// MetadataSnapshot represents the snapshot of a meta partition
+type MetadataSnapshot struct {
+	fsm     *MetadataFsm
+	applied uint64
+
+	store  *raftstore.BoltDBStore
+	cursor *bolt.Cursor
+	tx     *bolt.Tx
+}
+
+func (ms *MetadataSnapshot) Next() ([]byte, error) {
+	var key, value []byte
+	var err error
+	if ms.tx == nil {
+		ms.tx, err = ms.store.Begin(false)
+		if err != nil {
+			return nil, err
+		}
+
+		ms.cursor = ms.tx.Bucket([]byte(raftstore.BucketName)).Cursor()
+		key, value = ms.cursor.First()
+	} else {
+		key, value = ms.cursor.Next()
+	}
+
+	if key == nil {
+		return nil, io.EOF
+	}
+
+	cmd := &RaftCmd{
+		K: string(key),
+		V: value,
+	}
+	cmd.setOpType()
+	return json.Marshal(cmd)
+}
+
+// ApplyIndex implements the Snapshot interface
+func (ms *MetadataSnapshot) ApplyIndex() uint64 {
+	return ms.applied
+}
+
+func (ms *MetadataSnapshot) Close() {
+	ms.tx.Rollback()
+}
+
 // Snapshot implements the interface of raft.StateMachine
 func (metadataFsm *MetadataFsm) Snapshot() (proto.Snapshot, error) {
-	//snapshot := metadataFsm.store.RocksDBSnapshot()
-	//iterator := metadataFsm.store.Iterator(snapshot)
-	//iterator.SeekToFirst()
 	return &MetadataSnapshot{
 		applied: metadataFsm.applied,
-		//snapshot: snapshot,
-		fsm: metadataFsm,
-		//iterator: iterator,
+		store:   metadataFsm.store,
 	}, nil
 }
 
-// ApplySnapshot implements the interface of raft.StateMachine
+// ApplySnapshot INFO: @see raft_snapshot.go snapshotReader.Next()
 func (metadataFsm *MetadataFsm) ApplySnapshot(peers []proto.Peer, iterator proto.SnapIterator) error {
 	klog.Infof(fmt.Sprintf("action[ApplySnapshot] begin,applied[%v]", metadataFsm.applied))
 	var data []byte
@@ -139,11 +192,11 @@ func (metadataFsm *MetadataFsm) ApplySnapshot(peers []proto.Peer, iterator proto
 		cmd := &RaftCmd{}
 		if err = json.Unmarshal(data, cmd); err != nil {
 			klog.Errorf("action[ApplySnapshot] failed,err:%v", err)
-			return err
+			continue
 		}
 		if err = metadataFsm.store.Put([]byte(cmd.K), cmd.V); err != nil {
 			klog.Errorf("action[ApplySnapshot] failed,err:%v", err)
-			return err
+			continue
 		}
 	}
 	if err != io.EOF {
@@ -155,7 +208,7 @@ func (metadataFsm *MetadataFsm) ApplySnapshot(peers []proto.Peer, iterator proto
 		metadataFsm.snapshotHandler()
 	}
 
-	klog.Infof(fmt.Sprintf("action[ApplySnapshot] success,applied[%v]", metadataFsm.applied))
+	klog.Infof(fmt.Sprintf("[ApplySnapshot]applied[%v] successful", metadataFsm.applied))
 	return nil
 }
 
@@ -172,13 +225,11 @@ func (metadataFsm *MetadataFsm) HandleLeaderChange(leader uint64) {
 }
 
 func (metadataFsm *MetadataFsm) delKeyAndPutIndex(key string, cmdMap map[string][]byte) (err error) {
-	//return metadataFsm.store.DeleteKeyAndPutIndex(key, cmdMap, true)
-	panic("not implemented")
+	return metadataFsm.store.DeleteKeyAndPutIndex(key, cmdMap)
 }
 
 func (metadataFsm *MetadataFsm) batchPut(cmdMap map[string][]byte) (err error) {
-	//return metadataFsm.store.BatchPut(cmdMap, true)
-	panic("not implemented")
+	return metadataFsm.store.BatchPut(cmdMap)
 }
 
 func (metadataFsm *MetadataFsm) Restore() {
@@ -221,34 +272,4 @@ func (metadataFsm *MetadataFsm) restoreApplied() {
 		panic(fmt.Sprintf("Failed to restore applied,err:%v ", err.Error()))
 	}
 	metadataFsm.applied = restoredValues
-}
-
-// INFO: https://github.com/tiglabs/raft/blob/master/test/memory_statemachine.go
-func newMetadataFsm(store *BoltdbStore, retainsLog uint64, raftServer *raft.RaftServer) *MetadataFsm {
-	return &MetadataFsm{
-		store:      store,
-		raftServer: raftServer,
-		retainLogs: retainsLog,
-	}
-}
-
-// MetadataSnapshot represents the snapshot of a meta partition
-type MetadataSnapshot struct {
-	fsm     *MetadataFsm
-	applied uint64
-	//snapshot *gorocksdb.Snapshot
-	//iterator *gorocksdb.Iterator
-}
-
-func (ms *MetadataSnapshot) Next() ([]byte, error) {
-	panic("implement me")
-}
-
-// ApplyIndex implements the Snapshot interface
-func (ms *MetadataSnapshot) ApplyIndex() uint64 {
-	return ms.applied
-}
-
-func (ms *MetadataSnapshot) Close() {
-	//ms.fsm.store.ReleaseSnapshot(ms.snapshot)
 }

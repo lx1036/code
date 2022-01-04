@@ -17,7 +17,7 @@ import (
 
 const MaxWriteSize = 1 << 16
 
-// Create a FUSE FS on the specified mount point.  The returned
+// Create a FUSE FS on the specified mount point. The returned
 // mount point is always absolute.
 func mount(mountPoint string, opts *MountConfig, ready chan<- error) (*os.File, error) {
 	fd, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
@@ -82,7 +82,7 @@ func mount(mountPoint string, opts *MountConfig, ready chan<- error) (*os.File, 
 	syscall.CloseOnExec(readFileFD)
 
 	// Turn the FD into an os.File
-	return os.NewFile(uintptr(readFileFD), "/dev/fuse"), err
+	return os.NewFile(uintptr(readFileFD), "fuse"), err
 }
 
 // get fd from file

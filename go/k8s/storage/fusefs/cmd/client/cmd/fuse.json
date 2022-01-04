@@ -1,0 +1,10 @@
+{
+  "volName": "pvc-d334e093-b028-435a-b878-cd7a988ddee3",
+  "masterAddr": "100.216.152.11:9500,100.216.152.52:9500",
+  "mountPoint": "./globalmount",
+  "bufSize": 1073741824,
+  "owner": "sunfs",
+  "accessKey": "123",
+  "secretKey": "456",
+  "fullPathName": false
+}
