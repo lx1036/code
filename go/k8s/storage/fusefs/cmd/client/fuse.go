@@ -73,7 +73,8 @@ type FuseFS struct {
 	metaClient *meta.MetaClient
 	s3Client   *s3.S3Client
 
-	dirHandleCache *DirHandleCache
+	dirHandleCache  *DirHandleCache
+	fileHandleCache *FileHandleCache
 
 	//ic                 *InodeCache
 	//readDirc           *ReadDirCache
@@ -87,7 +88,6 @@ type FuseFS struct {
 	HTTPServer         *http.Server
 
 	// INFO: FUSE file
-	fileHandles  map[fuseops.HandleID]*FileHandle
 	nextHandleID fuseops.HandleID
 
 	//bufferPool *BufferPool
@@ -103,8 +103,9 @@ func NewFuseFS(opt *Config) (*FuseFS, error) {
 	fs := &FuseFS{
 		fullPathName: opt.FullPathName,
 
-		inodeCache:     NewInodeCache(),
-		dirHandleCache: NewDirHandleCache(),
+		inodeCache:      NewInodeCache(),
+		dirHandleCache:  NewDirHandleCache(),
+		fileHandleCache: NewFileHandleCache(),
 	}
 	fs.metaClient, err = meta.NewMetaClient(opt.Volname, opt.Owner, opt.MasterAddr)
 	if err != nil {

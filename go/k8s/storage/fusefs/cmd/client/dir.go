@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseutil"
-	"strconv"
 	"sync"
 	"time"
 
@@ -106,6 +105,7 @@ func (fs *FuseFS) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) error {
 }
 
 func (fs *FuseFS) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
+	klog.Infof(fmt.Sprintf("[ReadDir]inodeID:%d, handleID:%d", op.Inode, op.Handle))
 	dirHandle := fs.dirHandleCache.Get(op.Handle)
 	if dirHandle == nil {
 		fs.dirHandleCache.Put(op.Inode, op.Handle)
@@ -244,6 +244,10 @@ func (fs *FuseFS) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAt
 	return nil
 }
 
+func (fs *FuseFS) ForgetInode(ctx context.Context, op *fuseops.ForgetInodeOp) error {
+	return nil
+}
+
 //func (fs *FuseFS) CreateLink(ctx context.Context, op *fuseops.CreateLinkOp) error {
 //	panic("implement me")
 //}
@@ -251,48 +255,6 @@ func (fs *FuseFS) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAt
 //func (fs *FuseFS) CreateSymlink(ctx context.Context, op *fuseops.CreateSymlinkOp) error {
 //	panic("implement me")
 //}
-
-// fullPathName=true, s3 key 则是 path；否则是 inodeID
-func (fs *FuseFS) getS3Key(inodeID fuseops.InodeID) (string, error) {
-	if !fs.fullPathName {
-		return strconv.FormatUint(uint64(inodeID), 10), nil
-	}
-
-	if uint64(inodeID) == proto.RootInode {
-		return "", nil
-	}
-
-	inode, err := fs.GetInode(inodeID)
-	if err != nil {
-		return "", err
-	}
-	if len(inode.fullPathName) != 0 {
-		return inode.fullPathName, nil
-	}
-
-	pInode := inode
-	currentInodeID := pInode.inodeID
-	for parentInodeID := pInode.parentInodeID; uint64(pInode.inodeID) != proto.RootInode; parentInodeID = pInode.parentInodeID {
-		pInode, err = fs.GetInode(parentInodeID)
-		if err != nil {
-			klog.Errorf(fmt.Sprintf("[getS3Key]get inodeID:%d err:%v", parentInodeID, err))
-			return "", err
-		}
-
-		name, ok := pInode.dentryCache.GetByInode(currentInodeID)
-		if !ok {
-			name, err = fs.metaClient.LookupName(parentInodeID, currentInodeID)
-			if err != nil {
-				klog.Errorf(fmt.Sprintf("[getS3Key]get inodeID:%d LookupName err:%v", parentInodeID, err))
-				return "", err
-			}
-		}
-
-		inode.fullPathName = name
-	}
-
-	return inode.fullPathName, nil
-}
 
 func ParseType(t uint32) fuseutil.DirentType {
 	if proto.IsDir(t) {

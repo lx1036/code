@@ -3,6 +3,8 @@ package client
 import (
 	"context"
 	"fmt"
+	"k8s-lx1036/k8s/storage/fuse"
+	"sync"
 
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
 
@@ -13,36 +15,73 @@ const (
 	NameMaxLen = 256
 )
 
-type FileHandle struct {
+type FileHandleCache struct {
+	sync.RWMutex
+
+	buffer map[fuseops.InodeID]*Buffer
+
 	inodeID uint64
 	flag    uint32
 }
 
-func (fs *FuseFS) newFileHandle(inodeID uint64, flag uint32) (fuseops.HandleID, error) {
-	fs.Lock()
-	defer fs.Unlock()
+func NewFileHandleCache() *FileHandleCache {
+	return &FileHandleCache{
+		buffer: make(map[fuseops.InodeID]*Buffer),
+	}
+}
 
-	/*key, err := fs.getS3Key(inodeID)
+func (fileHandleCache *FileHandleCache) Put(inodeID fuseops.InodeID, handleID fuseops.HandleID, fs *FuseFS) {
+	fileHandleCache.Lock()
+	defer fileHandleCache.Unlock()
+
+	if _, ok := fileHandleCache.buffer[inodeID]; !ok {
+		key, err := fs.getS3Key(inodeID)
+		if err != nil {
+			klog.Error(err)
+			return
+		}
+		fileHandleCache.buffer[inodeID] = NewBuffer(key, fs.s3Client)
+	}
+}
+
+func (fileHandleCache *FileHandleCache) Get(inodeID fuseops.InodeID) *Buffer {
+	return fileHandleCache.buffer[inodeID]
+}
+
+func (fs *FuseFS) OpenFile(ctx context.Context, op *fuseops.OpenFileOp) error {
+	fs.fileHandleCache.Put(op.Inode, op.Handle, fs)
+	return nil
+}
+
+func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
+	klog.Infof(fmt.Sprintf("[ReadFile]inodeID:%d, handleID:%d, Offset:%d", op.Inode, op.Handle, op.Offset))
+	fileBuffer := fs.fileHandleCache.Get(op.Inode)
+	if fileBuffer == nil {
+		fs.fileHandleCache.Put(op.Inode, op.Handle, fs)
+		fileBuffer = fs.fileHandleCache.Get(op.Inode)
+	}
+
+	inode, err := fs.GetInode(op.Inode)
 	if err != nil {
-		return 0, err
+		klog.Errorf(fmt.Sprintf("[ReadFile]inodeID:%d, handleID:%d, err:%v", op.Inode, op.Handle, err))
+		return err
+	}
+	filesize := inode.size
+	if int64(filesize) <= op.Offset {
+		op.BytesRead = 0
+		klog.Infof(fmt.Sprintf("[ReadFile]read offset:%d is large than filesize:%d", op.Offset, filesize))
+		return nil
+	}
+	bytesRead := int64(len(op.Dst))
+	if op.Offset+bytesRead > int64(filesize) {
+		bytesRead = int64(filesize) - op.Offset
+	}
+	op.BytesRead, err = fileBuffer.ReadFile(op.Offset, op.Dst[0:bytesRead], filesize, true)
+	if err != nil {
+		return fuse.EIO
 	}
 
-	buffer, ok := fs.dataBuffers[inodeID]
-	if !ok {
-		buffer = NewBuffer(inodeID, fs.s3Backend, fs)
-		buffer.SetFilename(key)
-		fs.dataBuffers[inodeID] = buffer
-	}
-	buffer.IncRef()*/
-
-	handleID := fs.nextHandleID
-	fs.nextHandleID++
-	fs.fileHandles[handleID] = &FileHandle{
-		inodeID: inodeID,
-		flag:    flag,
-	}
-
-	return handleID, nil
+	return nil
 }
 
 // CreateFile INFO: 创建文件，其实是在 meta partition 中新建 inode/dentry 对象
@@ -85,37 +124,6 @@ func (fs *FuseFS) newFileHandle(inodeID uint64, flag uint32) (fuseops.HandleID, 
 //	return nil
 //}
 
-//func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
-//	fs.Lock()
-//	defer fs.Unlock()
-//
-//	/*var buf *Buffer
-//	if fileHandle, ok := fs.fileHandles[op.Handle]; ok {
-//		if buf, ok = fs.dataBuffers[fileHandle.inodeID]; !ok || buf.lastError != nil {
-//			return fuse.EIO
-//		}
-//	} else {
-//		return fuse.EIO
-//	}
-//
-//	// read data from buffer
-//	inode, err := fs.GetInode(buf.inodeID)
-//	if err != nil {
-//		return err
-//	}
-//
-//	op.BytesRead, err = buf.ReadFile(op.Offset, op.Dst[0:rNeed], fileSize, false)
-//	if err != nil {
-//		return err
-//	}*/
-//
-//	return nil
-//}
-
-//func (fs *FuseFS) OpenFile(ctx context.Context, op *fuseops.OpenFileOp) error {
-//	panic("implement me")
-//}
-//
 //func (fs *FuseFS) WriteFile(ctx context.Context, op *fuseops.WriteFileOp) error {
 //	panic("implement me")
 //}
