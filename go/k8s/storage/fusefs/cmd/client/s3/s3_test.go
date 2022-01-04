@@ -1,4 +1,4 @@
-package backend
+package s3
 
 import (
 	"flag"

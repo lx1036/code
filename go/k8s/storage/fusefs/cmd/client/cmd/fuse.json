@@ -1,11 +1,10 @@
 {
-  "mountPoint": "./mnt",
-  "volName": "pvc-liuxiang",
+  "volName": "pvc-d334e093-b028-435a-b878-cd7a988ddee3",
+  "masterAddr": "100.216.152.11:9500,100.216.152.52:9500",
+  "mountPoint": "./globalmount",
+  "bufSize": 1073741824,
   "owner": "sunfs",
-  "masterAddr": "127.0.0.1:9500",
-  "AccessKey": "123",
-  "SecretKey": "456",
-  "profPort": "35903",
-  "fullPathName": false,
-  "bufSize": 1073741824
+  "accessKey": "123",
+  "secretKey": "456",
+  "fullPathName": false
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
+	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
 
 	"github.com/gorilla/mux"
 	"k8s.io/klog/v2"
@@ -56,6 +57,7 @@ func (server *Server) startHTTPService() {
 	// volume
 	router.NewRoute().Methods(http.MethodGet).Path("/vols").HandlerFunc(server.listVols)
 	router.NewRoute().Methods(http.MethodGet).Path("/vol").HandlerFunc(server.getVol)
+	router.NewRoute().Methods(http.MethodGet).Path("/vol/stat").HandlerFunc(server.getVolStat)
 	router.NewRoute().Methods(http.MethodPost).Path("/vol").HandlerFunc(server.createVol)
 	router.NewRoute().Methods(http.MethodPost).Path("/vol/expand").HandlerFunc(server.updateVol)
 	router.NewRoute().Methods(http.MethodPost).Path("/vol/shrink").HandlerFunc(server.updateVol)
@@ -94,6 +96,40 @@ func (server *Server) getVol(writer http.ResponseWriter, request *http.Request) 
 	}
 
 	data, _ := json.Marshal(vol)
+	send(writer, http.StatusOK, data)
+	return
+}
+
+type VolStatInfo struct {
+	Name        string
+	TotalSize   uint64
+	UsedSize    uint64
+	UsedRatio   string
+	EnableToken bool
+	InodeCount  uint64
+	Status      VolStatus
+}
+
+func (server *Server) getVolStat(writer http.ResponseWriter, request *http.Request) {
+	name := request.FormValue(ParamsName)
+	vol, err := server.cluster.getVolume(name)
+	if err != nil {
+		http.Error(writer, fmt.Sprintf("%v", err), http.StatusBadRequest)
+		return
+	}
+
+	volStatInfo := &VolStatInfo{
+		Name:       vol.Name,
+		TotalSize:  vol.Capacity * util.GB,
+		UsedSize:   vol.totalUsedSpace(),
+		UsedRatio:  vol.UsedRatio,
+		InodeCount: 0,
+		Status:     vol.Status,
+	}
+	for _, metaPartition := range vol.MetaPartitions {
+		volStatInfo.InodeCount += metaPartition.InodeCount
+	}
+	data, _ := json.Marshal(volStatInfo)
 	send(writer, http.StatusOK, data)
 	return
 }

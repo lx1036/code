@@ -6,30 +6,15 @@ import (
 	"fmt"
 	"log"
 	"os"
-
+	"path/filepath"
+	"time"
+	
 	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
 	"k8s-lx1036/k8s/storage/fuse/fuseutil"
-
+	
 	"k8s.io/klog/v2"
 )
-
-// NewHelloFS INFO: Create a file system with a fixed structure that looks like this:
-//
-//     hello
-//     dir/
-//         world
-//
-// Each file contains the string "Hello, world!".
-func NewHelloFS() (fuse.Server, error) {
-	fs := &helloFS{}
-
-	return fuseutil.NewFileSystemServer(fs), nil
-}
-
-type helloFS struct {
-	fuseutil.NotImplementedFileSystem
-}
 
 const (
 	rootInode fuseops.InodeID = fuseops.RootInodeID + iota
@@ -118,14 +103,143 @@ var gInodeInfo = map[fuseops.InodeID]inodeInfo{
 	},
 }
 
-func findChildInode(name string, children []fuseutil.Dirent) (fuseops.InodeID, error) {
-	for _, e := range children {
-		if e.Name == name {
-			return e.Inode, nil
-		}
+type helloFS struct {
+	fuseutil.NotImplementedFileSystem
+}
+
+// NewHelloFS INFO: Create a file system with a fixed structure that looks like this:
+//
+//     hello
+//     dir/
+//         world
+//
+// Each file contains the string "Hello, world!".
+func NewHelloFS() (fuse.Server, error) {
+	fs := &helloFS{}
+
+	return fuseutil.NewFileSystemServer(fs), nil
+}
+
+//func (fs *helloFS) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) error {
+//	info, ok := gInodeInfo[op.Inode]
+//	if !ok {
+//		return fuse.ENOENT
+//	}
+//
+//	if !info.attributes.Mode.IsDir() {
+//		return fmt.Errorf(fmt.Sprintf("[OpenDir]inodeID:%d is not dir", op.Inode))
+//	}
+//
+//	return nil
+//}
+
+// ReadDir INFO: `ll /tmp/fuse/hellofs` read dir
+//func (fs *helloFS) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
+//	// Find the info for this inode.
+//	info, ok := gInodeInfo[op.Inode]
+//	if !ok {
+//		return fuse.ENOENT
+//	}
+//
+//	klog.Infof(fmt.Sprintf("[ReadDirOp]Inode: %+v, InodeInfo: %+v", op.Inode, info))
+//
+//	if !info.dir {
+//		return fuse.EIO
+//	}
+//
+//	entries := info.children
+//	// Grab the range of interest.
+//	if op.Offset > fuseops.DirOffset(len(entries)) {
+//		return fuse.EIO
+//	}
+//
+//	entries = entries[op.Offset:]
+//	// Resume at the specified offset into the array.
+//	for _, e := range entries {
+//		n := fuseutil.WriteDirent(op.Dst[op.BytesRead:], e)
+//		if n == 0 {
+//			break
+//		}
+//
+//		op.BytesRead += n
+//	}
+//
+//	return nil
+//}
+//
+//func (fs *helloFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
+//	// Let io.ReaderAt deal with the semantics.
+//	reader := strings.NewReader("Hello, world!")
+//
+//	var err error
+//	op.BytesRead, err = reader.ReadAt(op.Dst, op.Offset)
+//
+//	// Special case: FUSE doesn't expect us to return io.EOF.
+//	if err == io.EOF {
+//		return nil
+//	}
+//
+//	return err
+//}
+//
+//func (fs *helloFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
+//	// Find the info for the parent.
+//	parentInfo, ok := gInodeInfo[op.Parent]
+//	if !ok {
+//		return fuse.ENOENT
+//	}
+//
+//	// Find the child within the parent.
+//	var childInode fuseops.InodeID
+//	found := false
+//	for _, child := range parentInfo.children {
+//		if child.Name == op.Name {
+//			childInode = child.Inode
+//			found = true
+//			break
+//		}
+//	}
+//	if !found {
+//		return fuse.ENOENT
+//	}
+//
+//	op.Entry.Child = childInode
+//	op.Entry.Attributes = gInodeInfo[childInode].attributes
+//	fs.patchAttributes(&op.Entry.Attributes)
+//
+//	klog.Infof(fmt.Sprintf("[LookUpInode]inodeID:%d", op.Parent))
+//	return nil
+//}
+
+func (fs *helloFS) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAttributesOp) error {
+	if op.OpContext.Pid == 0 {
+		// CreateFileOp should have a valid pid in context.
+		return fuse.EINVAL
 	}
 
-	return 0, fuse.ENOENT
+	klog.Infof(fmt.Sprintf("[GetInodeAttributes]inodeID:%d", op.Inode))
+
+	// Find the info for this inode.
+	info, ok := gInodeInfo[op.Inode]
+	if !ok {
+		return fuse.ENOENT
+	}
+
+	// Copy over its attributes.
+	op.Attributes = info.attributes
+	op.AttributesExpiration = time.Now().Add(365 * 24 * time.Hour)
+
+	// Patch attributes.
+	fs.patchAttributes(&op.Attributes)
+
+	return nil
+}
+
+func (fs *helloFS) patchAttributes(attr *fuseops.InodeAttributes) {
+	now := time.Now()
+	attr.Atime = now
+	attr.Mtime = now
+	attr.Crtime = now
 }
 
 // INFO: `stat /mnt/hellofs2`
@@ -145,9 +259,7 @@ func (fs *helloFS) StatFS(ctx context.Context, op *fuseops.StatFSOp) error {
 }
 
 var (
-	fMountPoint = flag.String("mountpoint", "", "Path to mount point.")
-	fReadOnly   = flag.Bool("read_only", false, "Mount in read-only mode.")
-	fDebug      = flag.Bool("debug", false, "Enable debug logging.")
+	mountPoint = flag.String("mountpoint", "", "Path to mount point.")
 )
 
 /*
@@ -172,32 +284,28 @@ INFO:
 func main() {
 	flag.Parse()
 
-	// filesystem server
+	if len(*mountPoint) == 0 {
+		klog.Fatalf("You must set --mountpoint.")
+	}
+
+	//server, err := NewHelloFS()
 	server, err := NewHelloFS()
 	if err != nil {
 		klog.Fatalf("makeFS: %v", err)
 	}
-
-	// Mount the file system.
-	if *fMountPoint == "" {
-		klog.Fatalf("You must set --mountpoint.")
-	}
-
-	cfg := &fuse.MountConfig{
-		ReadOnly: *fReadOnly,
-		FSName:   "hellofs",
-		Subtype:  "hellofs_subtype",
-	}
-	if *fDebug {
-		cfg.DebugLogger = log.New(os.Stderr, "fuse: ", 0)
-	}
-
-	mountedFileSystem, err := fuse.Mount(*fMountPoint, server, cfg)
+	mountPath, _ := filepath.Abs(*mountPoint)
+	mountedFileSystem, err := fuse.Mount(mountPath, server, &fuse.MountConfig{
+		FSName:                  "hellofs",
+		Subtype:                 "hellofs_subtype",
+		ReadOnly:                false,
+		DisableWritebackCaching: true,
+		DebugLogger:             log.New(os.Stderr, "fuse: ", log.LstdFlags),
+	})
 	if err != nil {
 		klog.Fatalf("Mount: %v", err)
 	}
 
-	klog.Infof(fmt.Sprintf("fuse mount point %s successfully", *fMountPoint))
+	klog.Infof(fmt.Sprintf("fuse mount point %s successfully", mountPath))
 	// Wait for it to be unmounted.
 	if err = mountedFileSystem.Join(context.Background()); err != nil {
 		klog.Fatalf("Join: %v", err)

@@ -2,6 +2,7 @@ package meta
 
 import (
 	"encoding/json"
+	"net"
 	"strings"
 	"testing"
 
@@ -120,4 +121,11 @@ func TestRaftPartition(test *testing.T) {
 	}
 
 	klog.Info(response)
+}
+
+func TestNetDial(test *testing.T) {
+	_, err := net.Dial("tcp", "127.0.0.1:8581")
+	if err != nil {
+		klog.Error(err) // "dial tcp 127.0.0.1:8581: connect: connection refused"
+	}
 }

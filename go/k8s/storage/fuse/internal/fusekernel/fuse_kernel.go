@@ -394,6 +394,86 @@ const (
 	OpExchange   = 63
 )
 
+func ConvertOpCodeMsg(opcode uint32) string {
+	switch opcode {
+	case OpLookup:
+		return "OpLookup"
+	case OpForget:
+		return "OpForget"
+	case OpGetattr:
+		return "OpGetattr"
+	case OpSetattr:
+		return "OpSetattr"
+	case OpReadlink:
+		return "OpReadlink"
+	case OpSymlink:
+		return "OpSymlink"
+	case OpMknod:
+		return "OpMknod"
+	case OpMkdir:
+		return "OpMkdir"
+	case OpUnlink:
+		return "OpUnlink"
+	case OpRmdir:
+		return "OpRmdir"
+	case OpRename:
+		return "OpRename"
+	case OpLink:
+		return "OpLink"
+	case OpOpen:
+		return "OpOpen"
+	case OpRead:
+		return "OpRead"
+	case OpWrite:
+		return "OpWrite"
+	case OpStatfs:
+		return "OpStatfs"
+	case OpRelease:
+		return "OpRelease"
+	case OpFsync:
+		return "OpFsync"
+	case OpSetxattr:
+		return "OpSetxattr"
+	case OpGetxattr:
+		return "OpGetxattr"
+	case OpListxattr:
+		return "OpListxattr"
+	case OpRemovexattr:
+		return "OpRemovexattr"
+	case OpFlush:
+		return "OpFlush"
+	case OpInit:
+		return "OpInit"
+	case OpOpendir:
+		return "OpOpendir"
+	case OpReaddir:
+		return "OpReaddir"
+	case OpReleasedir:
+		return "OpReleasedir"
+	case OpFsyncdir:
+		return "OpFsyncdir"
+	case OpGetlk:
+		return "OpGetlk"
+	case OpSetlk:
+		return "OpSetlk"
+	case OpSetlkw:
+		return "OpSetlkw"
+	case OpAccess:
+		return "OpAccess"
+	case OpCreate:
+		return "OpCreate"
+	case OpInterrupt:
+		return "OpInterrupt"
+	case OpDestroy:
+		return "OpDestroy"
+	case OpFallocate:
+		return "OpFallocate"
+
+	default:
+		return "unknown opcode"
+	}
+}
+
 type EntryOut struct {
 	Nodeid         uint64 // Inode ID
 	Generation     uint64 // Inode generation

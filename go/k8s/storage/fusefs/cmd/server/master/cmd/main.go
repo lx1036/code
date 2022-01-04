@@ -33,7 +33,7 @@ func main() {
 		Long:  `responsible for volume creation, query and deletion, node heartbeat state detection, etc`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(config) == 0 {
-				panic("config is required")
+				klog.Fatal("config is required")
 			}
 			if err := runCommand(config); err != nil {
 				return err
@@ -46,7 +46,7 @@ func main() {
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 
 	if err := cmd.Execute(); err != nil {
-		panic(err)
+		klog.Fatal(err)
 	}
 }
 

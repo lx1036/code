@@ -1,4 +1,4 @@
-package backend
+package s3
 
 import (
 	"fmt"
@@ -38,6 +38,11 @@ var defaultHTTPTransport = http.Transport{
 	ExpectContinueTimeout: 10 * time.Second,
 }
 
+type IOCallback interface {
+	SetError(error)
+	Run()
+}
+
 type S3Config struct {
 	// Common Backend Config
 	Region              string
@@ -65,7 +70,7 @@ type MultipartCommitInput struct {
 	Offset     int64
 }
 
-type S3Backend struct {
+type S3Client struct {
 	*s3.S3
 
 	bucket string
@@ -81,79 +86,79 @@ type S3Backend struct {
 
 	mergeIoVector bool
 
-	cap Capabilities
+	//cap Capabilities
 }
 
-func (s3Backend *S3Backend) Write(file string, offset int64, data []byte) (wsize int, err error) {
+func (s3Client *S3Client) Write(file string, offset int64, data []byte) (wsize int, err error) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) WriteStream(file string, offset int64, length int64, reader io.ReadSeeker) (wsize int, err error) {
+func (s3Client *S3Client) WriteStream(file string, offset int64, length int64, reader io.ReadSeeker) (wsize int, err error) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) ReadStream(file string, offset int64, length int64, writer io.Writer) (rsize int, err error) {
+func (s3Client *S3Client) ReadStream(file string, offset int64, length int64, writer io.Writer) (rsize int, err error) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) WriteStreamWithCallBack(file string, offset int64, length int64, reader io.ReadSeeker, cb IOCallback) {
+func (s3Client *S3Client) WriteStreamWithCallBack(file string, offset int64, length int64, reader io.ReadSeeker, cb IOCallback) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) ReadStreamWithCallBack(file string, offset int64, length int64, writer io.Writer, cb IOCallback) {
+func (s3Client *S3Client) ReadStreamWithCallBack(file string, offset int64, length int64, writer io.Writer, cb IOCallback) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) WriteV(file string, vec *IOVector, reader io.ReadSeeker) (wsize int, err error) {
+func (s3Client *S3Client) WriteV(file string, vec *IOVector, reader io.ReadSeeker) (wsize int, err error) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) ReadV(file string, vec *IOVector, writer io.Writer) (rsize int, err error) {
+func (s3Client *S3Client) ReadV(file string, vec *IOVector, writer io.Writer) (rsize int, err error) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) Truncate(file string, offset int64) (err error) {
+func (s3Client *S3Client) Truncate(file string, offset int64) (err error) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) Fallocate(file string, op int, off int64, len int64) (err error) {
+func (s3Client *S3Client) Fallocate(file string, op int, off int64, len int64) (err error) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) Flush(file string) (err error) {
+func (s3Client *S3Client) Flush(file string) (err error) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) Rename(src string, dst string, dir bool) (err error) {
+func (s3Client *S3Client) Rename(src string, dst string, dir bool) (err error) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) Delete(file string) (err error) {
+func (s3Client *S3Client) Delete(file string) (err error) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) Deletes(files []string) (err error) {
+func (s3Client *S3Client) Deletes(files []string) (err error) {
 	panic("implement me")
 }
 
-func (s3Backend *S3Backend) SupportCallBack() bool {
+func (s3Client *S3Client) SupportCallBack() bool {
 	panic("implement me")
 }
 
 // INFO: 从 file 文件读取数据写到 data
 //  aws s3api get-object --key=2 --bucket pvc-f73f7c99-0b5c-40ee-b57c-acdebcebed34 --endpoint-url ${endpoint-url} --range bytes=1-100 2.txt
 //  => "asdfadfasdfasdfasdf"
-func (s3Backend *S3Backend) Read(file string, offset int64, data []byte) (int, error) {
+func (s3Client *S3Client) Read(file string, offset int64, data []byte) (int, error) {
 	rNeed := len(data)
 	end := offset + int64(rNeed) - 1
 	bytes := fmt.Sprintf("bytes=%v-%v", offset, end)
 	input := &s3.GetObjectInput{
-		Bucket: aws.String(s3Backend.bucket),
+		Bucket: aws.String(s3Client.bucket),
 		Key:    aws.String(file),
 	}
 	input.Range = &bytes
 	klog.Infof(fmt.Sprintf("[Read]send input %s to s3", input.String()))
-	reader, err := s3Backend.getObject(input)
+	reader, err := s3Client.getObject(input)
 	if err != nil {
 		return 0, err
 	}
@@ -169,9 +174,9 @@ func (s3Backend *S3Backend) Read(file string, offset int64, data []byte) (int, e
 	return n, nil
 }
 
-func (s3Backend *S3Backend) getObject(input *s3.GetObjectInput) (io.ReadCloser, error) {
-	req, resp := s3Backend.GetObjectRequest(input)
-	req.HTTPRequest.Header.Add("User-Agent", s3Backend.agent)
+func (s3Client *S3Client) getObject(input *s3.GetObjectInput) (io.ReadCloser, error) {
+	req, resp := s3Client.GetObjectRequest(input)
+	req.HTTPRequest.Header.Add("User-Agent", s3Client.agent)
 	err := req.Send()
 	if err != nil {
 		return nil, mapAwsError(err)
@@ -180,12 +185,12 @@ func (s3Backend *S3Backend) getObject(input *s3.GetObjectInput) (io.ReadCloser, 
 	return resp.Body, nil
 }
 
-func (s3Backend *S3Backend) AuthBucket() error {
+func (s3Client *S3Client) AuthBucket() error {
 	input := &s3.HeadBucketInput{
-		Bucket: aws.String(s3Backend.bucket),
+		Bucket: aws.String(s3Client.bucket),
 	}
 
-	bucketOutput, err := s3Backend.HeadBucket(input)
+	bucketOutput, err := s3Client.HeadBucket(input)
 	if err != nil {
 		return err
 	}
@@ -195,7 +200,7 @@ func (s3Backend *S3Backend) AuthBucket() error {
 	return nil
 }
 
-func NewS3Backend(bucket string, cfg *S3Config) (*S3Backend, error) {
+func NewS3Backend(bucket string, cfg *S3Config) (*S3Client, error) {
 	credential := credentials.NewStaticCredentials(cfg.AccessKey, cfg.SecretKey, "")
 	awsConfig := (&aws.Config{
 		Region:           &cfg.Region,
@@ -207,7 +212,7 @@ func NewS3Backend(bucket string, cfg *S3Config) (*S3Backend, error) {
 		Transport: &defaultHTTPTransport,
 		Timeout:   cfg.HTTPTimeout,
 	})
-	s3Backend := &S3Backend{
+	s3Backend := &S3Client{
 		bucket:      bucket,
 		awsConfig:   awsConfig,
 		minPartSize: DefaultMinPartSize,
