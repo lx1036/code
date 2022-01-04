@@ -4,9 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"k8s-lx1036/k8s/storage/fuse"
@@ -104,7 +107,11 @@ var gInodeInfo = map[fuseops.InodeID]inodeInfo{
 }
 
 type helloFS struct {
+	sync.Mutex
+
 	fuseutil.NotImplementedFileSystem
+
+	fooContents []byte
 }
 
 // NewHelloFS INFO: Create a file system with a fixed structure that looks like this:
@@ -118,6 +125,40 @@ func NewHelloFS() (fuse.Server, error) {
 	fs := &helloFS{}
 
 	return fuseutil.NewFileSystemServer(fs), nil
+}
+
+func (fs *helloFS) WriteFile(ctx context.Context, op *fuseops.WriteFileOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
+	klog.Infof(fmt.Sprintf("[WriteFile]inodeID:%d, handleID:%d, offset:%d", op.Inode, op.Handle, op.Offset))
+	// Ensure that the contents slice is long enough.
+	newLen := int(op.Offset) + len(op.Data)
+	if len(fs.fooContents) < newLen {
+		padding := make([]byte, newLen-len(fs.fooContents))
+		fs.fooContents = append(fs.fooContents, padding...)
+	}
+
+	// Copy in the data.
+	n := copy(fs.fooContents[op.Offset:], op.Data)
+	if n != len(op.Data) {
+		panic(fmt.Sprintf("Unexpected short copy: %v", n))
+	}
+
+	return nil
+}
+
+func (fs *helloFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
+	reader := strings.NewReader(string(fs.fooContents))
+	var err error
+	op.BytesRead, err = reader.ReadAt(op.Dst, op.Offset)
+
+	// Special case: FUSE doesn't expect us to return io.EOF.
+	if err == io.EOF {
+		return nil
+	}
+
+	return err
 }
 
 func (fs *helloFS) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) error {

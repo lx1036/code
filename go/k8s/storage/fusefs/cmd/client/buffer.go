@@ -32,6 +32,40 @@ type Buffer struct {
 	lastError error
 }
 
+// NewBuffer INFO: 该 Buffer 对象其实就是对 S3 数据的缓存
+func NewBuffer(key string, backend Backend) *Buffer {
+	return &Buffer{
+		backend: backend,
+		key:     key,
+	}
+
+	/*buffer := &Buffer{
+		inodeID: inodeID,
+		//blockSize:     fs.blockSize,
+		//flushInterval: fs.bufFlushInterval,
+		//blocks:        make(map[int64]*list.Element, 0),
+		LRUList: list.New(),
+		//dirtyBlocks:   make(map[int64]*list.Element, 0),
+		//dirtyList:     list.New(),
+		fs: fs,
+		//gbuf:          gbuf,
+		backend: fs.s3Client,
+		//mergeBlock:    fs.mergeBlock,
+		//flushC:        make(chan struct{}, 1),
+		stopC: make(chan struct{}, 1),
+	}
+
+	//buffer.bgFlushWait = DefaultFlushWait
+	//atomic.StoreInt64(&buffer.nextReadOffset, 0)
+	//atomic.StoreInt64(&buffer.seqReadAmount, 0)
+	//atomic.StoreInt64(&buffer.nextReadAheadOffset, 0)
+	//atomic.StoreInt64(&buffer.dirtyAmount, 0)
+	//atomic.StoreInt32(&buffer.bgStarted, 0)
+	//atomic.StoreInt32(&buffer.flushing, 0)
+
+	return buffer*/
+}
+
 // SetFilename INFO: @see FuseFS::newFileHandle() 里设置的 key，其实就是文件的 inodeID
 func (buffer *Buffer) SetFilename(filename string) {
 	buffer.key = filename
@@ -56,6 +90,8 @@ func (buffer *Buffer) ReadFile(offset int64, data []byte, filesize uint64, direc
 			return 0, err
 		}
 	}
+
+	// TODO: read data from buffer
 
 	/*nNeed := len(data)
 	aOffset := buffer.alignOffset(offset)
@@ -89,38 +125,8 @@ func (buffer *Buffer) readDirect(offset int64, data []byte) (int, error) {
 	return bytesRead, nil
 }
 
-// NewBuffer INFO: 该 Buffer 对象其实就是对 S3 数据的缓存
-func NewBuffer(key string, backend Backend) *Buffer {
-	return &Buffer{
-		backend: backend,
-		key:     key,
-	}
+func (buffer *Buffer) FlushFile() {
 
-	/*buffer := &Buffer{
-		inodeID: inodeID,
-		//blockSize:     fs.blockSize,
-		//flushInterval: fs.bufFlushInterval,
-		//blocks:        make(map[int64]*list.Element, 0),
-		LRUList: list.New(),
-		//dirtyBlocks:   make(map[int64]*list.Element, 0),
-		//dirtyList:     list.New(),
-		fs: fs,
-		//gbuf:          gbuf,
-		backend: fs.s3Client,
-		//mergeBlock:    fs.mergeBlock,
-		//flushC:        make(chan struct{}, 1),
-		stopC: make(chan struct{}, 1),
-	}
-
-	//buffer.bgFlushWait = DefaultFlushWait
-	//atomic.StoreInt64(&buffer.nextReadOffset, 0)
-	//atomic.StoreInt64(&buffer.seqReadAmount, 0)
-	//atomic.StoreInt64(&buffer.nextReadAheadOffset, 0)
-	//atomic.StoreInt64(&buffer.dirtyAmount, 0)
-	//atomic.StoreInt32(&buffer.bgStarted, 0)
-	//atomic.StoreInt32(&buffer.flushing, 0)
-
-	return buffer*/
 }
 
 // fullPathName=true, s3 key 则是 path；否则是 inodeID

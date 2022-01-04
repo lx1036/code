@@ -265,7 +265,7 @@ func (metaClient *MetaClient) CreateInodeAndDentry(parentID fuseops.InodeID, fil
 		return nil, fmt.Errorf(fmt.Sprintf("[CreateInodeAndDentry]fail to get parent partition id:%+v", parentID))
 	}
 	if len(parentPartition.LeaderAddr) == 0 {
-		return nil, fmt.Errorf(fmt.Sprintf("partitionID %d has no leader address", parentPartition.PartitionID))
+		return nil, fmt.Errorf(fmt.Sprintf("[CreateInodeAndDentry]partitionID %d has no leader address", parentPartition.PartitionID))
 	}
 
 	rwPartitions := metaClient.getRWPartitions()
@@ -274,14 +274,16 @@ func (metaClient *MetaClient) CreateInodeAndDentry(parentID fuseops.InodeID, fil
 	for i := 0; i < length; i++ {
 		rwPartition := rwPartitions[(int(epoch)+i)%length] // ???
 		if len(rwPartition.LeaderAddr) == 0 {
-			klog.Infof(fmt.Sprintf("partitionID %d has no leader address", rwPartition.PartitionID))
+			klog.Infof(fmt.Sprintf("[CreateInodeAndDentry]partitionID %d has no leader address", rwPartition.PartitionID))
 			continue
 		}
 		status, inodeInfo, err := metaClient.createInode(rwPartition, mode, uid, gid, target)
 		if err == nil && status == statusOK {
+			klog.Infof(fmt.Sprintf("[CreateInodeAndDentry]create inode:%d for filename:%s succefully", inodeInfo.Inode, filename))
 			// create dentry
 			status, err = metaClient.createDentry(parentPartition, parentID, filename, inodeInfo.Inode, mode)
 			if err == nil && (status == statusOK || status == statusExist) {
+				klog.Infof(fmt.Sprintf("[CreateInodeAndDentry]create dentry for filename:%s succefully", filename))
 				return inodeInfo, nil
 			} else {
 				//metaClient.unlinkInode()
@@ -291,7 +293,7 @@ func (metaClient *MetaClient) CreateInodeAndDentry(parentID fuseops.InodeID, fil
 		}
 	}
 
-	return nil, fmt.Errorf("fail to create inode/dentry for parentID:%d, filename:%s", parentID, filename)
+	return nil, fmt.Errorf("[CreateInodeAndDentry]fail to create inode/dentry for parentID:%d, filename:%s", parentID, filename)
 }
 
 func (metaClient *MetaClient) GetInode(inodeID fuseops.InodeID) (*proto.InodeInfo, error) {
@@ -467,7 +469,7 @@ func (metaClient *MetaClient) lookup(partition *Partition, parentID fuseops.Inod
 		return
 	}
 	if packet.ResultCode != proto.OpOk {
-		return 0, 0, 0, fmt.Errorf("[Lookup]fail to get inode")
+		return 0, 0, 0, fmt.Errorf("[Lookup]fail to get inode for file/dir name:%s", name)
 	}
 
 	resp := new(proto.LookupResponse)

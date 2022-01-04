@@ -20,35 +20,48 @@ import (
 
 */
 
-// MkDir Create a directory inode as a child of an existing directory inode.
-// The kernel sends this in response to a mkdir(2) call.
-//func (fs *FuseFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
-//	parentInodeID := op.Parent
-//
-//	inodeInfo, err := fs.metaClient.CreateInodeAndDentry(parentInodeID, op.Name, uint32(op.Mode.Perm()), op.Uid, op.Gid, nil)
-//	if err != nil {
-//		klog.Errorf(fmt.Sprintf("[MkDir]create inode/dentry for %d/%s err %v", uint64(parentInodeID), op.Name, err))
-//		return err
-//	}
-//
-//	child := NewInode(inodeInfo)
-//	fs.inodeCache.Put(child)
-//	parent, err := fs.GetInode(parentInodeID)
-//	if err == nil {
-//		parent.dentryCache.Put(op.Name, inodeInfo.Inode)
-//	}
-//
-//	op.Entry = GetChildInodeEntry(child)
-//
-//	klog.Infof(fmt.Sprintf("[MkDir]mkdir op name %s", op.Name))
-//
-//	return nil
-//}
-//
-//func (fs *FuseFS) MkNode(ctx context.Context, op *fuseops.MkNodeOp) error {
-//	klog.Warningf("MkNode is not support!")
-//	return fuse.ENOSYS
-//}
+// MkDir `mkdir globalmount/1`
+func (fs *FuseFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
+	klog.Infof(fmt.Sprintf("[MkDir]:%+v", *op))
+
+	inodeInfo, err := fs.metaClient.CreateInodeAndDentry(op.Parent, op.Name, uint32(op.Mode.Perm()), op.Uid, op.Gid, nil)
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[MkDir]create inode/dentry for %d/%s err %v", op.Parent, op.Name, err))
+		return err
+	}
+
+	child := NewInode(inodeInfo)
+	op.Entry = fuseops.ChildInodeEntry{
+		Child: child.inodeID,
+		Attributes: fuseops.InodeAttributes{
+			Size:   child.size,
+			Nlink:  child.nlink,
+			Mode:   child.mode,
+			Atime:  time.Unix(child.accessTime, 0),
+			Mtime:  time.Unix(child.modifyTime, 0),
+			Ctime:  time.Unix(child.createTime, 0),
+			Crtime: time.Time{},
+			Uid:    child.uid,
+			Gid:    child.gid,
+		},
+		AttributesExpiration: time.Now().Add(AttrValidDuration),
+		EntryExpiration:      time.Now().Add(LookupValidDuration),
+	}
+	fs.inodeCache.Put(child)
+	parent, err := fs.GetInode(op.Parent)
+	if err == nil {
+		parent.dentryCache.Put(op.Name, inodeInfo.Inode)
+	}
+
+	klog.Infof(fmt.Sprintf("[MkDir]mkdir op name %s", op.Name))
+
+	return nil
+}
+
+func (fs *FuseFS) MkNode(ctx context.Context, op *fuseops.MkNodeOp) error {
+	klog.Warningf("MkNode is not support!")
+	return fuse.ENOSYS
+}
 
 //func (fs *FuseFS) RmDir(ctx context.Context, op *fuseops.RmDirOp) error {
 //	panic("implement me")
@@ -180,33 +193,35 @@ func (fs *FuseFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) er
 	if !ok {
 		inodeID, _, err = fs.metaClient.Lookup(op.Parent, op.Name)
 		if err != nil {
-			klog.Errorf(fmt.Sprintf("[LookUpInode]inodeID:%d, err:%v", op.Parent, err))
+			klog.Errorf(fmt.Sprintf("[LookUpInode]inodeID:%d, name:%s, err:%v", op.Parent, op.Name, err))
 			return err
 		}
 	}
 
-	childInode, err := fs.GetInode(fuseops.InodeID(inodeID))
+	child, err := fs.GetInode(fuseops.InodeID(inodeID))
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("[LookUpInode]inodeID:%d, err:%v", op.Parent, err))
 		return err
 	}
 
 	// {inodeID:16777218 parentInodeID:1 size:6 nlink:1 uid:0 gid:0 gen:1 createTime:1639994505 modifyTime:1639994505 accessTime:1639994505 mode:420 target:[] fullPathName: expiration:1641274151526565000 dentryCache:<nil>}
-	klog.Infof(fmt.Sprintf("[LookUpInode]childInode:%+v", *childInode))
+	klog.Infof(fmt.Sprintf("[LookUpInode]childInode:%+v", *child))
 
-	op.Entry.Child = childInode.inodeID
-	op.Entry.AttributesExpiration = time.Now().Add(AttrValidDuration)
-	op.Entry.EntryExpiration = time.Now().Add(LookupValidDuration)
-	op.Entry.Attributes = fuseops.InodeAttributes{
-		Size:   childInode.size,
-		Nlink:  childInode.nlink,
-		Mode:   childInode.mode,
-		Atime:  time.Unix(childInode.accessTime, 0),
-		Mtime:  time.Unix(childInode.modifyTime, 0),
-		Ctime:  time.Unix(childInode.createTime, 0),
-		Crtime: time.Unix(childInode.createTime, 0),
-		Uid:    childInode.uid,
-		Gid:    childInode.gid,
+	op.Entry = fuseops.ChildInodeEntry{
+		Child: child.inodeID,
+		Attributes: fuseops.InodeAttributes{
+			Size:   child.size,
+			Nlink:  child.nlink,
+			Mode:   child.mode,
+			Atime:  time.Unix(child.accessTime, 0),
+			Mtime:  time.Unix(child.modifyTime, 0),
+			Ctime:  time.Unix(child.createTime, 0),
+			Crtime: time.Time{},
+			Uid:    child.uid,
+			Gid:    child.gid,
+		},
+		AttributesExpiration: time.Now().Add(AttrValidDuration),
+		EntryExpiration:      time.Now().Add(LookupValidDuration),
 	}
 	parentInode, err = fs.GetInode(op.Parent)
 	if err != nil {
@@ -214,8 +229,8 @@ func (fs *FuseFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) er
 		return err
 	}
 
-	parentInode.dentryCache.Put(op.Name, uint64(childInode.inodeID))
-	klog.Infof(fmt.Sprintf("[LookUpInode]inodeID:%d, name:%s", childInode.inodeID, op.Name))
+	parentInode.dentryCache.Put(op.Name, uint64(child.inodeID))
+	klog.Infof(fmt.Sprintf("[LookUpInode]inodeID:%d, name:%s", child.inodeID, op.Name))
 	return nil
 }
 
