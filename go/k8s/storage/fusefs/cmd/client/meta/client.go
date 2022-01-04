@@ -294,22 +294,22 @@ func (metaClient *MetaClient) CreateInodeAndDentry(parentID fuseops.InodeID, fil
 	return nil, fmt.Errorf("fail to create inode/dentry for parentID:%d, filename:%s", parentID, filename)
 }
 
-func (metaClient *MetaClient) GetInode(parentID fuseops.InodeID) (*proto.InodeInfo, error) {
-	parentPartition := metaClient.getPartitionByInode(parentID)
+func (metaClient *MetaClient) GetInode(inodeID fuseops.InodeID) (*proto.InodeInfo, error) {
+	parentPartition := metaClient.getPartitionByInode(inodeID)
 	if parentPartition == nil {
-		return nil, fmt.Errorf(fmt.Sprintf("[GetInode]fail to get parent partition id:%+v", parentID))
+		return nil, fmt.Errorf(fmt.Sprintf("[GetInode]fail to get parent partition id:%+v", inodeID))
 	}
 	if len(parentPartition.LeaderAddr) == 0 {
 		return nil, fmt.Errorf(fmt.Sprintf("[GetInode]partitionID %d has no leader address", parentPartition.PartitionID))
 	}
 
 	packet := proto.NewPacketReqID()
-	packet.Opcode = proto.OpMetaCreateInode
+	packet.Opcode = proto.OpMetaInodeGet
 	packet.PartitionID = parentPartition.PartitionID
 	err := packet.MarshalData(&proto.InodeGetRequest{
 		VolName:     metaClient.volumeName,
 		PartitionID: parentPartition.PartitionID,
-		Inode:       uint64(parentID),
+		Inode:       uint64(inodeID),
 	})
 	if err != nil {
 		return nil, err
@@ -330,13 +330,13 @@ func (metaClient *MetaClient) GetInode(parentID fuseops.InodeID) (*proto.InodeIn
 		return nil, fmt.Errorf("[GetInode]fail to get inode")
 	}
 
-	// packet.Data: {"info":{"ino":9,"mode":0,"nlink":1,"sz":0,"uid":0,"gid":0,"gen":1,"mt":1641040155,"ct":1641040155,"at":1641040155,"tgt":null,"pino":0}}
 	resp := new(proto.InodeGetResponse)
 	err = json.Unmarshal(packet.Data, resp)
 	if err != nil {
 		return nil, err
 	}
 
+	// {Inode:1 Mode:2147484159 Nlink:3 Size:0 Uid:0 Gid:0 Generation:1 ModifyTime:1639993844 CreateTime:1639993844 AccessTime:1639993844 Target:[] PInode:0}
 	klog.Infof(fmt.Sprintf("[GetInode]InodeGetResponse:%+v", *resp.Info))
 	return resp.Info, nil
 }

@@ -1,14 +1,13 @@
 package client
 
 import (
-	"context"
 	"fmt"
 	"k8s-lx1036/k8s/storage/fuse/fuseutil"
 	"k8s-lx1036/k8s/storage/fusefs/cmd/client/meta"
 	"k8s-lx1036/k8s/storage/fusefs/cmd/client/s3"
 	"net/http"
 	"sync"
-	
+
 	"golang.org/x/time/rate"
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
 	"k8s.io/klog/v2"
@@ -74,8 +73,9 @@ type FuseFS struct {
 	metaClient *meta.MetaClient
 	s3Client   *s3.S3Client
 
+	dirHandleCache *DirHandleCache
+
 	//ic                 *InodeCache
-	hc *HandleCache
 	//readDirc           *ReadDirCache
 	readDirLimiter *rate.Limiter
 	//orphan             *OrphanInodeList
@@ -103,7 +103,8 @@ func NewFuseFS(opt *Config) (*FuseFS, error) {
 	fs := &FuseFS{
 		fullPathName: opt.FullPathName,
 
-		inodeCache: NewInodeCache(),
+		inodeCache:     NewInodeCache(),
+		dirHandleCache: NewDirHandleCache(),
 	}
 	fs.metaClient, err = meta.NewMetaClient(opt.Volname, opt.Owner, opt.MasterAddr)
 	if err != nil {
@@ -132,8 +133,4 @@ func NewFuseFS(opt *Config) (*FuseFS, error) {
 
 func (fs *FuseFS) Destroy() {
 	//fs.mw.UnMountClient()
-}
-
-func (fs *FuseFS) ForgetInode(ctx context.Context, op *fuseops.ForgetInodeOp) error {
-	return nil
 }

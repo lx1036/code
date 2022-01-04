@@ -195,7 +195,6 @@ func (fs *FuseFS) GetInode(inodeID fuseops.InodeID) (*Inode, error) {
 	return inode, nil
 }
 
-
 func GetChildInodeEntry(child *Inode) fuseops.ChildInodeEntry {
 	return fuseops.ChildInodeEntry{
 		Child: fuseops.InodeID(child.inodeID),

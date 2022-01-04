@@ -3,8 +3,10 @@ package client
 import (
 	"context"
 	"fmt"
+	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseutil"
 	"strconv"
+	"sync"
 	"time"
 
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
@@ -12,6 +14,12 @@ import (
 
 	"k8s.io/klog/v2"
 )
+
+/*
+`ls globalmount` 必须的方法: OpenDir()/ReadDir()/LookUpInode()/GetInodeAttributes()
+
+
+*/
 
 // MkDir Create a directory inode as a child of an existing directory inode.
 // The kernel sends this in response to a mkdir(2) call.
@@ -51,57 +59,117 @@ import (
 //	panic("implement me")
 //}
 
+type DirHandleCache struct {
+	sync.RWMutex
+
+	handles map[fuseops.HandleID]*DirHandle
+}
+type DirHandle struct {
+	sync.RWMutex
+
+	inodeID fuseops.InodeID
+	entries []proto.Dentry
+}
+
+func NewDirHandleCache() *DirHandleCache {
+	return &DirHandleCache{
+		handles: make(map[fuseops.HandleID]*DirHandle),
+	}
+}
+
+func (dirHandleCache *DirHandleCache) Put(inodeID fuseops.InodeID, handleID fuseops.HandleID) {
+	dirHandleCache.Lock()
+	defer dirHandleCache.Unlock()
+	dirHandleCache.handles[handleID] = &DirHandle{
+		inodeID: inodeID,
+	}
+}
+
+func (dirHandleCache *DirHandleCache) Release(handleID fuseops.HandleID) *DirHandle {
+	dirHandleCache.Lock()
+	defer dirHandleCache.Unlock()
+	if dirHandle, ok := dirHandleCache.handles[handleID]; ok {
+		delete(dirHandleCache.handles, handleID)
+		return dirHandle
+	}
+
+	return nil
+}
+
+func (dirHandleCache *DirHandleCache) Get(handleID fuseops.HandleID) *DirHandle {
+	return dirHandleCache.handles[handleID]
+}
+
 func (fs *FuseFS) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) error {
+	fs.dirHandleCache.Put(op.Inode, op.Handle)
 	return nil
 }
 
 func (fs *FuseFS) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
-	klog.Infof(fmt.Sprintf("[ReadDir]%+v", *op))
+	dirHandle := fs.dirHandleCache.Get(op.Handle)
+	if dirHandle == nil {
+		fs.dirHandleCache.Put(op.Inode, op.Handle)
+		dirHandle = fs.dirHandleCache.Get(op.Handle)
+	}
+
+	dirHandle.Lock()
+	defer dirHandle.Unlock()
+	if op.Offset == 0 || len(dirHandle.entries) == 0 {
+		children, err := fs.metaClient.ReadDir(op.Inode)
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("[ReadDir]%+v", err))
+			return err
+		}
+		dirHandle.entries = children
+	}
+	if int(op.Offset) > len(dirHandle.entries) {
+		klog.Errorf(fmt.Sprintf("[ReadDir]op.Offset %d > dirHandle.entries %d", op.Offset, dirHandle.entries))
+		return fuse.EIO
+	}
+
+	klog.Infof(fmt.Sprintf("[ReadDir]children dirs: %+v, op.Inode:%d", dirHandle.entries, op.Inode))
+
 	inode, err := fs.GetInode(op.Inode)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("[ReadDir]inodeID:%d, err:%v", op.Inode, err))
 		return err
 	}
 
-	klog.Infof(fmt.Sprintf("[ReadDir]inode:%+v", *inode))
-
-	children, err := fs.metaClient.ReadDir(op.Inode)
-	if err != nil {
-		klog.Errorf(fmt.Sprintf("[ReadDir]inodeID:%d, err:%v", op.Inode, err))
-		return err
-	}
-
-	for i := int(op.Offset); i < len(children); i++ {
-		child := children[i]
+	entries := dirHandle.entries[op.Offset:]
+	for i, entry := range entries {
 		n := fuseutil.WriteDirent(op.Dst[op.BytesRead:], fuseutil.Dirent{
-			Offset: fuseops.DirOffset(i) + 1,
-			Inode:  fuseops.InodeID(child.Inode),
-			Name:   child.Name,
-			Type:   ParseType(child.Type),
+			Offset: fuseops.DirOffset(i + 1),
+			Inode:  fuseops.InodeID(entry.Inode),
+			Name:   entry.Name,
+			Type:   ParseType(entry.Type),
 		})
 		if n == 0 {
 			break
 		}
+
 		op.BytesRead += n
+
+		inode.dentryCache.Put(entry.Name, entry.Inode)
 	}
 
-	klog.Infof(fmt.Sprintf("[ReadDir]%+v", *op))
 	return nil
 }
 
-//func (fs *FuseFS) ReleaseDirHandle(ctx context.Context, op *fuseops.ReleaseDirHandleOp) error {
-//	panic("implement me")
-//}
-//
-//func (fs *FuseFS) CreateLink(ctx context.Context, op *fuseops.CreateLinkOp) error {
-//	panic("implement me")
-//}
-//
-//func (fs *FuseFS) CreateSymlink(ctx context.Context, op *fuseops.CreateSymlinkOp) error {
-//	panic("implement me")
-//}
+func (fs *FuseFS) ReleaseDirHandle(ctx context.Context, op *fuseops.ReleaseDirHandleOp) error {
+	dirHandle := fs.dirHandleCache.Release(op.Handle)
+	if dirHandle != nil {
+		klog.Infof(fmt.Sprintf("[ReleaseDirHandle]inodeID:%d, handleID:%d", dirHandle.inodeID, op.Handle))
+	} else {
+		klog.Warningf(fmt.Sprintf("[ReleaseDirHandle]handleID:%d", op.Handle))
+	}
+
+	return nil
+}
 
 func (fs *FuseFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
+	// {Parent:1 Name:1.txt Entry:{Child:0 Generation:0 Attributes:{Size:0 Nlink:0 Mode:---------- Atime:0001-01-01 00:00:00 +0000 UTC Mtime:0001-01-01 00:00:00 +0000 UTC Ctime:0001-01-01 00:00:00 +0000 UTC Crtime:0001-01-01 00:00:00 +0000 UTC Uid:0 Gid:0} AttributesExpiration:0001-01-01 00:00:00 +0000 UTC EntryExpiration:0001-01-01 00:00:00 +0000 UTC} OpContext:{Pid:36698}}
+	klog.Infof(fmt.Sprintf("[LookUpInode]LookUpInodeOp:%+v", *op))
+
 	parentInode, err := fs.GetInode(op.Parent)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("[LookUpInode]inodeID:%d, err:%v", op.Parent, err))
@@ -122,9 +190,10 @@ func (fs *FuseFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) er
 		klog.Errorf(fmt.Sprintf("[LookUpInode]inodeID:%d, err:%v", op.Parent, err))
 		return err
 	}
-	
+
+	// {inodeID:16777218 parentInodeID:1 size:6 nlink:1 uid:0 gid:0 gen:1 createTime:1639994505 modifyTime:1639994505 accessTime:1639994505 mode:420 target:[] fullPathName: expiration:1641274151526565000 dentryCache:<nil>}
 	klog.Infof(fmt.Sprintf("[LookUpInode]childInode:%+v", *childInode))
-	
+
 	op.Entry.Child = childInode.inodeID
 	op.Entry.AttributesExpiration = time.Now().Add(AttrValidDuration)
 	op.Entry.EntryExpiration = time.Now().Add(LookupValidDuration)
@@ -174,6 +243,14 @@ func (fs *FuseFS) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAt
 	klog.Infof(fmt.Sprintf("[GetInodeAttributes]inodeID:%d, attr:%s", op.Inode, op.Attributes.DebugString()))
 	return nil
 }
+
+//func (fs *FuseFS) CreateLink(ctx context.Context, op *fuseops.CreateLinkOp) error {
+//	panic("implement me")
+//}
+//
+//func (fs *FuseFS) CreateSymlink(ctx context.Context, op *fuseops.CreateSymlinkOp) error {
+//	panic("implement me")
+//}
 
 // fullPathName=true, s3 key 则是 path；否则是 inodeID
 func (fs *FuseFS) getS3Key(inodeID fuseops.InodeID) (string, error) {
