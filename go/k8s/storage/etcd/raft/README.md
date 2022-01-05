@@ -1,5 +1,7 @@
 
 # Raft
+算法论文简略版本：https://raft.github.io/raft.pdf
+
 raft 共识算法主要分为三个问题：
 * leader election: 集群中需要选出有且只有一个 leader
 * log replication: leader 会把 log entry 发给每一个 follower，并且 follower 会提交 log entry 到状态机(mvcc boltdb)，不断紧追 leader 进度
@@ -8,3 +10,10 @@ raft 共识算法主要分为三个问题：
 raft 模块包括：共识模块，log memory/wal storage 模块。状态机是 mvcc boltdb 模块。见 ![raft arch](./raft-arch.png)
 
 ## 成员变更(raft conf change)
+
+
+
+## Trouble shoot
+(1) raft协议，leader在commit了一条日志后，立刻挂了，那其他节点如何处理这条日志？
+https://www.zhihu.com/question/357207584
+

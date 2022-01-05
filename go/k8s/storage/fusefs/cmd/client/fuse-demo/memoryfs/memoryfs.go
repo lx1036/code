@@ -21,6 +21,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
+/*
+INFO: 优雅关闭进程 `fusermount -u /mnt/hellofs`，hellofs 进程会自动关闭
+*/
+
 // INFO: Create a file system that stores data and metadata in memory.
 //  The supplied UID/GID pair will own the root inode. This file system does no
 //  permissions checking, and should therefore be mounted with the default_permissions option.

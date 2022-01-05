@@ -5,7 +5,6 @@ go 1.17
 // 只需要 go get github.com/osrg/gobgp@v2.32.0 就会生成: github.com/osrg/gobgp v0.0.0-20211001064702-91b91278600d
 
 require (
-	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05
 	bou.ke/monkey v1.0.2
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/BurntSushi/toml v0.4.1
@@ -50,7 +49,6 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/hanwen/go-fuse/v2 v2.1.1-0.20210611132105-24a1dfe6b4f8
 	github.com/hashicorp/go-msgpack v0.5.5
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/raft v1.3.1
