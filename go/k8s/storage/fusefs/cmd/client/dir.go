@@ -285,6 +285,10 @@ func (fs *FuseFS) GetInodeAttributes(ctx context.Context, op *fuseops.GetInodeAt
 	return nil
 }
 
+func (fs *FuseFS) SetInodeAttributes(ctx context.Context, op *fuseops.SetInodeAttributesOp) error {
+	return nil
+}
+
 func (fs *FuseFS) ForgetInode(ctx context.Context, op *fuseops.ForgetInodeOp) error {
 	return nil
 }

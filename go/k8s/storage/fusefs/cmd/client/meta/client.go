@@ -556,6 +556,49 @@ func (metaClient *MetaClient) ReadDir(inodeID fuseops.InodeID) ([]proto.Dentry, 
 	return resp.Children, nil
 }
 
+func (metaClient *MetaClient) SetAttr(inodeID fuseops.InodeID, valid, mode, uid, gid uint32, size, pino uint64) error {
+	partition := metaClient.getPartitionByInode(inodeID)
+	if partition == nil {
+		return fmt.Errorf(fmt.Sprintf("[ReadDir]fail to get partition for inodeID:%+v", inodeID))
+	}
+	if len(partition.LeaderAddr) == 0 {
+		return fmt.Errorf(fmt.Sprintf("[ReadDir]partitionID %d has no leader address", partition.PartitionID))
+	}
+
+	packet := proto.NewPacketReqID()
+	packet.Opcode = proto.OpMetaSetattr
+	//packet.PartitionID = partition.PartitionID
+	if err := packet.MarshalData(&proto.SetAttrRequest{
+		VolName:     metaClient.volumeName,
+		PartitionID: partition.PartitionID,
+		Inode:       uint64(inodeID),
+		Mode:        mode,
+		Uid:         uid,
+		Gid:         gid,
+		Size:        size,
+		Pino:        pino,
+		Valid:       valid,
+	}); err != nil {
+		return err
+	}
+	conn, err := net.Dial("tcp", partition.LeaderAddr)
+	if err != nil {
+		return err
+	}
+	err = packet.WriteToConn(conn)
+	if err != nil {
+		return err
+	}
+	if err = packet.ReadFromConn(conn, proto.ReadDeadlineTime); err != nil {
+		return err
+	}
+	if packet.ResultCode != proto.OpOk {
+		return fmt.Errorf("[ReadDir]fail to get inode")
+	}
+
+	return nil
+}
+
 func (metaClient *MetaClient) Statfs() (total, used, inodeCount uint64) {
 	return metaClient.totalSize, metaClient.usedSize, metaClient.inodeCount
 }

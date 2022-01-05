@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"io"
 	"strconv"
 	"strings"
 
@@ -135,4 +136,39 @@ func (r *Range) Sub(rg *Range) (*Range, bool) {
 			return tmp, true
 		}
 	}
+}
+
+type LimitedReadSeeker struct {
+	R io.ReadSeeker
+	N int64
+	O int64
+}
+
+func NewLimitReadSeeker(r io.ReadSeeker, n int64) *LimitedReadSeeker {
+	return &LimitedReadSeeker{
+		R: r,
+		N: n,
+		O: n,
+	}
+}
+
+func (l *LimitedReadSeeker) Read(data []byte) (n int, err error) {
+	if l.N <= 0 {
+		return 0, io.EOF
+	}
+	if int64(len(data)) > l.N {
+		data = data[0:l.N]
+	}
+	n, err = l.R.Read(data)
+	l.N -= int64(n)
+	return
+}
+
+func (l *LimitedReadSeeker) Seek(offset int64, whence int) (int64, error) {
+	sOffset, err := l.R.Seek(offset, whence)
+	if err != nil {
+		return 0, err
+	}
+	l.N = l.O - sOffset
+	return sOffset, nil
 }

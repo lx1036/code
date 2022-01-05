@@ -125,6 +125,24 @@ func (buffer *Buffer) readDirect(offset int64, data []byte) (int, error) {
 	return bytesRead, nil
 }
 
+func (buffer *Buffer) WriteFile(offset int64, data []byte, direct bool) (bytesWrite int, err error) {
+
+	if direct {
+		bytesWrite, err = buffer.writeDirect(offset, data)
+		if err != nil {
+			return 0, err
+		}
+
+		return
+	}
+
+	return
+}
+
+func (buffer *Buffer) writeDirect(offset int64, data []byte) (bytesWrite int, err error) {
+	return buffer.backend.Write(buffer.key, offset, data)
+}
+
 func (buffer *Buffer) FlushFile() {
 
 }

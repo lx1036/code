@@ -186,3 +186,24 @@ type LookupNameRequest struct {
 	ParentID    uint64 `json:"pino"`
 	ID          uint64 `json:"id"`
 }
+
+// SetAttrRequest defines the request to set attribute.
+type SetAttrRequest struct {
+	VolName     string `json:"vol"`
+	PartitionID uint64 `json:"pid"`
+	Inode       uint64 `json:"ino"`
+	Mode        uint32 `json:"mode"`
+	Uid         uint32 `json:"uid"`
+	Gid         uint32 `json:"gid"`
+	Size        uint64 `json:"size"`
+	Pino        uint64 `json:"pino"`
+	Valid       uint32 `json:"valid"`
+}
+
+const (
+	AttrMode uint32 = 1 << iota
+	AttrUid
+	AttrGid
+	AttrSize
+	AttrPino
+)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"k8s-lx1036/k8s/storage/fuse"
+	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
 	"sync"
 	"syscall"
 	"time"
@@ -145,14 +146,58 @@ func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) erro
 	return nil
 }
 
-//func (fs *FuseFS) WriteFile(ctx context.Context, op *fuseops.WriteFileOp) error {
-//	panic("implement me")
-//}
-//
-//func (fs *FuseFS) SyncFile(ctx context.Context, op *fuseops.SyncFileOp) error {
-//	panic("implement me")
-//}
-//
+func (fs *FuseFS) WriteFile(ctx context.Context, op *fuseops.WriteFileOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
+	if fs.metaClient.IsVolumeReadOnly() {
+		return syscall.EROFS
+	}
+
+	klog.Infof(fmt.Sprintf("[WriteFile]inodeID:%d, handleID:%d, Offset:%d", op.Inode, op.Handle, op.Offset))
+	fileBuffer := fs.fileHandleCache.Get(op.Inode)
+	if fileBuffer == nil {
+		fs.fileHandleCache.Put(op.Inode, op.Handle, fs)
+		fileBuffer = fs.fileHandleCache.Get(op.Inode)
+	}
+
+	total, used, _ := fs.metaClient.Statfs()
+	used += uint64(len(op.Data))
+	if used > total {
+		return fuse.ENOSPC // no space
+	}
+
+	bytesWrite, err := fileBuffer.WriteFile(op.Offset, op.Data, true)
+	if err != nil {
+		return fuse.EIO
+	}
+
+	fs.SetFileSize(op.Inode, uint64(op.Offset)+uint64(bytesWrite), false)
+
+	return nil
+}
+
+func (fs *FuseFS) SetFileSize(inodeID fuseops.InodeID, size uint64, truncate bool) {
+	inode, err := fs.GetInode(inodeID)
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[SetFileSize]fail to set inodeID:%d err:%v", inodeID, err))
+		return
+	}
+
+	if !truncate && inode.size > size {
+		return
+	}
+	inode.size = size
+	err = fs.metaClient.SetAttr(inodeID, proto.AttrSize, uint32(inode.mode), inode.uid, inode.gid, inode.size, 0)
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[SetFileSize]fail to set inodeID:%d err:%v", inodeID, err))
+		return
+	}
+}
+
+func (fs *FuseFS) SyncFile(ctx context.Context, op *fuseops.SyncFileOp) error {
+	panic("implement me")
+}
 
 func (fs *FuseFS) FlushFile(ctx context.Context, op *fuseops.FlushFileOp) error {
 	fs.Lock()
