@@ -108,7 +108,7 @@ func fusermount(dir string, cfg *MountConfig) (*os.File, error) {
 	}
 
 	// Turn the FD into an os.File
-	return os.NewFile(uintptr(gotFds[0]), FuseFIle), nil
+	return os.NewFile(uintptr(gotFds[0]), "fuse"), nil
 }
 
 func enableFunc(flag uintptr) func(uintptr) uintptr {

@@ -6,6 +6,8 @@ import (
 	"k8s-lx1036/k8s/storage/fusefs/cmd/client/meta"
 	"k8s-lx1036/k8s/storage/fusefs/cmd/client/s3"
 	"net/http"
+	"os/user"
+	"strconv"
 	"sync"
 
 	"golang.org/x/time/rate"
@@ -50,6 +52,8 @@ type Config struct {
 	ReadOnly bool `json:"readOnly"`
 
 	FullPathName bool `json:"fullPathName"`
+
+	Debug bool `json:"debug" default:"false"`
 }
 
 // INFO: inode operations
@@ -67,6 +71,8 @@ type FuseFS struct {
 	localIP  string
 	volname  string
 	owner    string
+	uid      uint32
+	gid      uint32
 
 	inodeCache *InodeCache
 
@@ -100,8 +106,13 @@ type FuseFS struct {
 
 func NewFuseFS(opt *Config) (*FuseFS, error) {
 	var err error
+	value, _ := user.Current()
+	uid, _ := strconv.ParseUint(value.Uid, 10, 32)
+	gid, _ := strconv.ParseUint(value.Gid, 10, 32)
 	fs := &FuseFS{
 		fullPathName: opt.FullPathName,
+		uid:          uint32(uid),
+		gid:          uint32(gid),
 
 		inodeCache:      NewInodeCache(),
 		dirHandleCache:  NewDirHandleCache(),

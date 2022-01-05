@@ -741,9 +741,10 @@ func main() {
 	server := NewMemoryFS(uint32(uid), uint32(gid))
 
 	cfg := &fuse.MountConfig{
-		ReadOnly: *readOnly,
-		FSName:   "memoryfs",
-		Subtype:  "fuse",
+		ReadOnly:   *readOnly,
+		FSName:     "memoryfs",
+		Subtype:    "fuse",
+		VolumeName: "memoryfs", // OS X only
 	}
 	if *debug {
 		cfg.DebugLogger = log.New(os.Stderr, "fuse: ", 0)

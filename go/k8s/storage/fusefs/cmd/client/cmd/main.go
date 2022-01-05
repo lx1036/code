@@ -79,13 +79,16 @@ func runCommand(configFile string) error {
 
 	klog.Info("Starting the fuse client")
 	mountPoint, _ := filepath.Abs(config.MountPoint)
-	mountedFileSystem, err := fuse.Mount(mountPoint, fuseutil.NewFileSystemServer(fuseFS), &fuse.MountConfig{
+	mountConfig := &fuse.MountConfig{
 		FSName:                  "fuse-" + config.Volname,
 		Subtype:                 "fuse", // `cat /proc/mounts | grep sunfs` -> xxx fuse.sunfs xxx
 		ReadOnly:                config.ReadOnly,
 		DisableWritebackCaching: true,
-		DebugLogger:             log.New(os.Stderr, "fuse: ", log.LstdFlags),
-	})
+	}
+	if config.Debug {
+		mountConfig.DebugLogger = log.New(os.Stderr, "fuse: ", log.LstdFlags)
+	}
+	mountedFileSystem, err := fuse.Mount(mountPoint, fuseutil.NewFileSystemServer(fuseFS), mountConfig)
 	if err != nil {
 		fuseFS.Destroy()
 		klog.Fatal(err)

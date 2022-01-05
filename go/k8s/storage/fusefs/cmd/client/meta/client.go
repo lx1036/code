@@ -339,7 +339,7 @@ func (metaClient *MetaClient) GetInode(inodeID fuseops.InodeID) (*proto.InodeInf
 	}
 
 	// {Inode:1 Mode:2147484159 Nlink:3 Size:0 Uid:0 Gid:0 Generation:1 ModifyTime:1639993844 CreateTime:1639993844 AccessTime:1639993844 Target:[] PInode:0}
-	klog.Infof(fmt.Sprintf("[GetInode]InodeGetResponse:%+v", *resp.Info))
+	klog.Infof(fmt.Sprintf("[GetInode]InodeGetResponse:%+v", *(resp.Info)))
 	return resp.Info, nil
 }
 

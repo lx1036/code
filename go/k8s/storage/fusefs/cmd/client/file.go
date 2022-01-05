@@ -55,12 +55,18 @@ func (fileHandleCache *FileHandleCache) Release(handleID fuseops.HandleID) {
 }
 
 func (fs *FuseFS) OpenFile(ctx context.Context, op *fuseops.OpenFileOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
 	fs.fileHandleCache.Put(op.Inode, op.Handle, fs)
 	return nil
 }
 
 // ReadFile `cat globalmount/1.txt`
 func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
 	klog.Infof(fmt.Sprintf("[ReadFile]inodeID:%d, handleID:%d, Offset:%d", op.Inode, op.Handle, op.Offset))
 	fileBuffer := fs.fileHandleCache.Get(op.Inode)
 	if fileBuffer == nil {
@@ -93,6 +99,9 @@ func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
 
 // CreateFile INFO: 创建文件，其实是在 meta partition 中新建 inode/dentry 对象, `touch globalmount/2.txt`
 func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
 	if fs.metaClient.IsVolumeReadOnly() {
 		return syscall.EROFS
 	}
@@ -102,7 +111,7 @@ func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) erro
 
 	// 在 meta partition 中写 inode 和 dentry 数据
 	inodeInfo, err := fs.metaClient.CreateInodeAndDentry(op.Parent, op.Name,
-		uint32(op.Mode.Perm()), op.Uid, op.Gid, nil)
+		uint32(op.Mode.Perm()), fs.uid, fs.gid, nil)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("[CreateFile]create inode/dentry for %d/%s err %v", op.Parent, op.Name, err))
 		return err
@@ -146,6 +155,9 @@ func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) erro
 //
 
 func (fs *FuseFS) FlushFile(ctx context.Context, op *fuseops.FlushFileOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
 	fileBuffer := fs.fileHandleCache.Get(op.Inode)
 	if fileBuffer == nil {
 		fs.fileHandleCache.Put(op.Inode, op.Handle, fs)
@@ -158,6 +170,9 @@ func (fs *FuseFS) FlushFile(ctx context.Context, op *fuseops.FlushFileOp) error 
 }
 
 func (fs *FuseFS) ReleaseFileHandle(ctx context.Context, op *fuseops.ReleaseFileHandleOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
 	fs.fileHandleCache.Release(op.Handle)
 
 	return nil

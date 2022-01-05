@@ -277,10 +277,7 @@ func (c *MountConfig) toOptionsString() string {
 // Mount attempts to mount a file system on the given directory, using the
 // supplied Server to serve connection requests. It blocks until the file
 // system is successfully mounted.
-func Mount(
-	dir string,
-	server Server,
-	config *MountConfig) (*MountedFileSystem, error) {
+func Mount(dir string, server Server, config *MountConfig) (*MountedFileSystem, error) {
 	// Sanity check: make sure the mount point exists and is a directory. This
 	// saves us from some confusing errors later on OS X.
 	fi, err := os.Stat(dir)
