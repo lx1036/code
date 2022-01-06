@@ -17,7 +17,11 @@ var (
 	join    = flag.Bool("join", false, "join an existing cluster")
 )
 
-// INFO: go run . --id 1 --cluster http://127.0.0.1:12379 --port 12380
+// go run . --id 1 --cluster http://127.0.0.1:12379 --port 12380
+
+// go run . --id 1 --cluster http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379 --port 12380
+// go run . --id 2 --cluster http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379 --port 22380
+// go run . --id 3 --cluster http://127.0.0.1:12379,http://127.0.0.1:22379,http://127.0.0.1:32379 --port 32380
 func main() {
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
@@ -29,10 +33,10 @@ func main() {
 	defer close(confChangeC)
 
 	var kvStore *raft.KVStore
-	getSnapshot := func() ([]byte, error) {
+	getSnapshotDataFromStore := func() ([]byte, error) {
 		return kvStore.GetSnapshot()
 	}
-	commitC, errorC, snapshotterReady := raft.NewRaftNode(*id, strings.Split(*cluster, ","), *join, getSnapshot, proposeC, confChangeC)
+	commitC, errorC, snapshotterReady := raft.NewRaftNode(*id, strings.Split(*cluster, ","), *join, getSnapshotDataFromStore, proposeC, confChangeC)
 
 	kvStore = raft.NewKVStore(<-snapshotterReady, proposeC, commitC, errorC)
 

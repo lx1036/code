@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -28,22 +29,54 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed on PUT", http.StatusBadRequest)
 			return
 		}
-
 		klog.Infof(fmt.Sprintf("Put key:%s value:%s", key, string(v)))
 		h.store.Propose(key, string(v))
-
 		// Optimistic-- no waiting for ack from raft. Value is not yet
 		// committed so a subsequent GET on the key may return old value
 		w.WriteHeader(http.StatusNoContent)
+
 	case http.MethodGet:
 		if v, ok := h.store.Lookup(key); ok {
 			w.Write([]byte(v))
 		} else {
 			http.Error(w, "Failed to GET", http.StatusNotFound)
 		}
+
+	// curl -L http://127.0.0.1:12380/4 -XPOST -d http://127.0.0.1:42379
 	case http.MethodPost:
+		url, err := io.ReadAll(r.Body)
+		if err != nil {
+			klog.Errorf("Failed to read on POST (%v)\n", err)
+			http.Error(w, "Failed on POST", http.StatusBadRequest)
+			return
+		}
+		nodeId, err := strconv.ParseUint(key[1:], 0, 64)
+		if err != nil {
+			klog.Errorf("Failed to convert ID for conf change (%v)\n", err)
+			http.Error(w, "Failed on POST", http.StatusBadRequest)
+			return
+		}
+		cc := raftpb.ConfChange{
+			Type:    raftpb.ConfChangeAddNode,
+			NodeID:  nodeId,
+			Context: url,
+		}
+		h.confChangeC <- cc
+		w.WriteHeader(http.StatusNoContent)
 
 	case http.MethodDelete:
+		nodeId, err := strconv.ParseUint(key[1:], 0, 64)
+		if err != nil {
+			klog.Infof("Failed to convert ID for conf change (%v)\n", err)
+			http.Error(w, "Failed on DELETE", http.StatusBadRequest)
+			return
+		}
+		cc := raftpb.ConfChange{
+			Type:   raftpb.ConfChangeRemoveNode,
+			NodeID: nodeId,
+		}
+		h.confChangeC <- cc
+		w.WriteHeader(http.StatusNoContent)
 
 	default:
 		w.Header().Set("Allow", "PUT")
@@ -52,7 +85,6 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Allow", "DELETE")
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
-
 }
 
 // ServeHttpKVAPI starts a key-value server with a GET/PUT API and listens.
