@@ -2,11 +2,8 @@ package main
 
 import (
 	"flag"
-	"strings"
+	"k8s-lx1036/k8s/storage/etcd/raftexample/pkg/raft"
 
-	raft "k8s-lx1036/k8s/storage/etcd/raftexample/pkg"
-
-	"go.etcd.io/etcd/raft/v3/raftpb"
 	"k8s.io/klog/v2"
 )
 
@@ -27,6 +24,14 @@ func main() {
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 
+	stopC := make(chan struct{})
+	server := raft.NewServer()
+	server.Start(*id, *cluster, *port)
+
+	<-stopC
+
+	/*store := raft.NewKVStore(r)
+
 	proposeC := make(chan string)
 	defer close(proposeC)
 	confChangeC := make(chan raftpb.ConfChange)
@@ -41,5 +46,5 @@ func main() {
 	kvStore = raft.NewKVStore(<-snapshotterReady, proposeC, commitC, errorC)
 
 	// the key-value http handler will propose updates to raft
-	raft.ServeHttpKVAPI(kvStore, *port, confChangeC, errorC)
+	raft.ServeHttpKVAPI(kvStore, *port, confChangeC, errorC)*/
 }

@@ -22,6 +22,7 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	switch r.Method {
+	// curl -L http://127.0.0.1:12380/hello -XPUT -d world
 	case http.MethodPut:
 		v, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -35,6 +36,7 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// committed so a subsequent GET on the key may return old value
 		w.WriteHeader(http.StatusNoContent)
 
+	// curl -L http://127.0.0.1:12380/hello -XGET
 	case http.MethodGet:
 		if v, ok := h.store.Lookup(key); ok {
 			w.Write([]byte(v))
@@ -64,6 +66,8 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.confChangeC <- cc
 		w.WriteHeader(http.StatusNoContent)
 
+	// curl -L http://127.0.0.1:12380/2 -XDELETE -d http://127.0.0.1:22379
+	// curl -L http://127.0.0.1:12380/3 -XDELETE -d http://127.0.0.1:32379
 	case http.MethodDelete:
 		nodeId, err := strconv.ParseUint(key[1:], 0, 64)
 		if err != nil {

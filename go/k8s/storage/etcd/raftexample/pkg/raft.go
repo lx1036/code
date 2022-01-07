@@ -74,8 +74,8 @@ func NewRaftNode(id int, peers []string, join bool, getSnapshotDataFromStore fun
 		errorC:                   errorC,
 		peers:                    peers,
 		join:                     join,
-		waldir:                   fmt.Sprintf("raft/wal-%d", id),
-		snapdir:                  fmt.Sprintf("raft/snap-%d", id),
+		waldir:                   fmt.Sprintf("data/wal-%d", id),
+		snapdir:                  fmt.Sprintf("data/snap-%d", id),
 		getSnapshotDataFromStore: getSnapshotDataFromStore,
 		snapCount:                defaultSnapshotCount,
 		stopc:                    make(chan struct{}),
@@ -141,7 +141,7 @@ func (r *raftNode) startRaft() {
 	}
 	r.raftStorage.SetHardState(st)
 	// append to storage so raft starts at the right place in log
-	r.raftStorage.Append(ents)
+	r.raftStorage.Append(ents) // INFO: wal 是 log entry 持久化存储，开始启动节点后，replay 到 memoryStorage 里
 
 	r.snapshotterReady <- r.snapshotter
 
@@ -152,8 +152,8 @@ func (r *raftNode) startRaft() {
 	}
 	c := &raft.Config{
 		ID:                        uint64(r.id),
-		ElectionTick:              50,
-		HeartbeatTick:             5,
+		ElectionTick:              10,
+		HeartbeatTick:             1,
 		Storage:                   r.raftStorage,
 		MaxSizePerMsg:             1024 * 1024,
 		MaxInflightMsgs:           256,
