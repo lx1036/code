@@ -23,4 +23,6 @@ follower 不是 learner 且没有 pending snapshot for apply，才会成为 cand
 
 (3) follower 会在什么情况下成为 candidate?
 
+(4) etcd/raft 有没有持久化 appliedIndex?
 
+(5) etcd/raft leaderTransfer 如何实现的？

@@ -153,7 +153,7 @@ func (r *RaftNode) start(rh *raftReadyHandler) {
 		ElectionTick:              10,
 		HeartbeatTick:             1,
 		Storage:                   r.raftStorage,
-		MaxSizePerMsg:             1024 * 1024,
+		MaxSizePerMsg:             1024 * 1024, // max byte size of each append message, 1MB
 		MaxInflightMsgs:           256,
 		MaxUncommittedEntriesSize: 1 << 30,
 	}

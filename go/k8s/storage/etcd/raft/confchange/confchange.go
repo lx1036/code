@@ -19,8 +19,8 @@ type Changer struct {
 	LastIndex uint64
 }
 
-func (changer Changer) Simple(ccs ...pb.ConfChangeSingle) (tracker.Config, tracker.ProgressMap, error) {
-	cfg, prs, err := changer.checkAndCopy()
+func (c Changer) Simple(ccs ...pb.ConfChangeSingle) (tracker.Config, tracker.ProgressMap, error) {
+	cfg, prs, err := c.checkAndCopy()
 	if err != nil {
 		return tracker.Config{}, nil, err
 	}
@@ -29,10 +29,10 @@ func (changer Changer) Simple(ccs ...pb.ConfChangeSingle) (tracker.Config, track
 		return tracker.Config{}, nil, err
 	}
 
-	if err := changer.apply(&cfg, prs, ccs...); err != nil {
+	if err := c.apply(&cfg, prs, ccs...); err != nil {
 		return tracker.Config{}, nil, err
 	}
-	if n := symdiff(incoming(changer.Tracker.Voters), incoming(cfg.Voters)); n > 1 {
+	if n := symdiff(incoming(c.Tracker.Voters), incoming(cfg.Voters)); n > 1 {
 		return tracker.Config{}, nil, errors.New("more than one voter changed without entering joint config")
 	}
 
@@ -177,11 +177,11 @@ func (c Changer) initProgress(cfg *tracker.Config, prs tracker.ProgressMap, id u
 // checkAndCopy copies the tracker's config and progress map (deeply enough for
 // the purposes of the Changer) and returns those copies. It returns an error
 // if checkInvariants does.
-func (changer Changer) checkAndCopy() (tracker.Config, tracker.ProgressMap, error) {
-	cfg := changer.Tracker.Config.Clone()
+func (c Changer) checkAndCopy() (tracker.Config, tracker.ProgressMap, error) {
+	cfg := c.Tracker.Config.Clone()
 	prs := tracker.ProgressMap{}
 
-	for id, pr := range changer.Tracker.Progress {
+	for id, pr := range c.Tracker.Progress {
 		// A shallow copy is enough because we only mutate the Learner field.
 		ppr := *pr
 		prs[id] = &ppr

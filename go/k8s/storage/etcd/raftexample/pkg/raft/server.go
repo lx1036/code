@@ -8,9 +8,12 @@ import (
 
 type Server struct {
 	id    uint64
-	lead  uint64 // must use atomic operations to access; keep 64-bit aligned.
 	peers []string
 	port  int
+
+	// raft info
+	lead           uint64 // must use atomic operations to access; keep 64-bit aligned.
+	committedIndex uint64 // must use atomic operations to access; keep 64-bit aligned.
 
 	cluster *Cluster
 
@@ -28,10 +31,10 @@ func (server *Server) Start(id int, cluster string, port int) {
 		updateLeadership: func(newLeader bool) {
 		},
 		updateCommittedIndex: func(ci uint64) {
-			/*committedIndex := server.getCommittedIndex()
+			committedIndex := server.getCommittedIndex()
 			if ci > committedIndex {
 				server.setCommittedIndex(ci)
-			}*/
+			}
 		},
 	}
 	peers := strings.Split(cluster, ",")
@@ -73,4 +76,12 @@ func (server *Server) Lead() uint64 {
 
 func (server *Server) ID() uint64 {
 	return server.id
+}
+
+func (server *Server) setCommittedIndex(committedIndex uint64) {
+	atomic.StoreUint64(&server.committedIndex, committedIndex)
+}
+
+func (server *Server) getCommittedIndex() uint64 {
+	return atomic.LoadUint64(&server.committedIndex)
 }
