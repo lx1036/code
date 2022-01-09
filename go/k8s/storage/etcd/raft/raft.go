@@ -483,6 +483,8 @@ func (r *raft) stepFollower(message pb.Message) error {
 		message.To = r.lead
 		r.send(message)
 
+	case pb.MsgSnap:
+
 	// INFO: Follower 的线性一致性读处理逻辑
 	case pb.MsgReadIndex:
 		if r.lead == None {

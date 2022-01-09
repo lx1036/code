@@ -89,6 +89,8 @@ type raftReadyHandler struct {
 	updateCommittedIndex func(uint64)
 }
 
+// Apply Snapshot (if any) and CommittedEntries to the state machine. If any committed Entry has Type EntryConfChange, call Node.ApplyConfChange() to apply it to the node.
+
 func (r *RaftNode) start(rh *raftReadyHandler) {
 	// INFO: (1) replay wal from snapshot
 	if !fileutil.Exist(r.snapdir) {
