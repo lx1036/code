@@ -51,7 +51,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-msgpack v0.5.5
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/hashicorp/raft v1.3.1
+	github.com/hashicorp/raft v1.3.3
 	github.com/jacobsa/oglematchers v0.0.0-20150720000706-141901ea67cd
 	github.com/jacobsa/syncutil v0.0.0-20180201203307-228ac8e5a6c3
 	github.com/jessevdk/go-flags v1.5.0

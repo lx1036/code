@@ -1,7 +1,3 @@
-// INFO: 参考文档 https://github.com/vision9527/raft-demo/blob/election-1/README.md
-//  https://github.com/talkgo/night/blob/master/content/night/104-2020-09-13-hashicorp-raft.md
-//  https://talkgo.org/t/topic/882
-
 package main
 
 import (
@@ -14,12 +10,16 @@ import (
 	"strings"
 	"time"
 
-	"k8s-lx1036/k8s/storage/raft/boltdb"
+	boltdb "k8s-lx1036/k8s/storage/raft/hashicorp/bolt-store"
 
 	"github.com/hashicorp/raft"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/klog/v2"
 )
+
+// INFO: 参考文档 https://github.com/vision9527/raft-demo/blob/election-1/README.md
+//  https://github.com/talkgo/night/blob/master/content/night/104-2020-09-13-hashicorp-raft.md
+//  https://talkgo.org/t/topic/882
 
 var (
 	httpAddr    string
@@ -75,12 +75,13 @@ func (h *HttpServer) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	value := h.fsm.Data[key]
+	value := h.fsm.kvstore.Get(key)
 	fmt.Fprintf(w, value)
 	return
 }
 
 // INFO: https://github.com/vision9527/raft-demo/blob/master/README.md
+//  (1) leader election
 
 // go run . --http_addr=127.0.0.1:7001 --raft_addr=127.0.0.1:7000 --raft_id=1 --raft_cluster=1/127.0.0.1:7000,2/127.0.0.1:8000,3/127.0.0.1:9000
 // go run . --http_addr=127.0.0.1:8001 --raft_addr=127.0.0.1:8000 --raft_id=2 --raft_cluster=1/127.0.0.1:7000,2/127.0.0.1:8000,3/127.0.0.1:9000
@@ -95,14 +96,24 @@ func main() {
 	flag.Parse()
 
 	raftDir := "raft/raft_" + raftId
-	os.MkdirAll(raftDir, 0700)
+	raftDir = filepath.Clean(raftDir)
+	if _, err := os.Stat(raftDir); err != nil {
+		if os.IsNotExist(err) {
+			os.MkdirAll(raftDir, 0700)
+		} else {
+			klog.Fatalf(fmt.Sprintf("%s is err:%v", raftDir, err))
+		}
+	}
 
 	// INFO: (1)初始化 raft 对象
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(raftId)
-	// config.HeartbeatTimeout = 1000 * time.Millisecond
-	// config.ElectionTimeout = 1000 * time.Millisecond
-	// config.CommitTimeout = 1000 * time.Millisecond
+	config.HeartbeatTimeout = 1000 * time.Millisecond
+	config.ElectionTimeout = config.HeartbeatTimeout * 10 // electionTimeout=heartbeatTimeout * 10
+	config.BatchApplyCh = true
+	config.Logger = NewLogger()
+	config.SnapshotThreshold = 5               // 有 5 个 log entry 就可以触发 snapshot
+	config.SnapshotInterval = time.Second * 60 // 每60s 检查是否达到 snapshot threshold
 	addr, err := net.ResolveTCPAddr("tcp", raftAddr)
 	if err != nil {
 		klog.Fatal(err)
@@ -123,45 +134,49 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	fsm := new(Fsm)
-	fsm.Data = map[string]string{}
-	rf, err := raft.NewRaft(config, fsm, logStore, stableStore, snapshots, transport)
+	fsm := &Fsm{
+		kvstore: NewKVStore(),
+	}
+	r, err := raft.NewRaft(config, fsm, logStore, stableStore, snapshots, transport)
 	if err != nil {
 		klog.Fatal(err)
 	}
 
 	// INFO: (2)start raft cluster
-	servers := rf.GetConfiguration().Configuration().Servers
-	if len(servers) > 0 {
-		return
-	}
-	peerArray := strings.Split(raftCluster, ",")
-	if len(peerArray) == 0 {
-		return
-	}
 	var configuration raft.Configuration
-	for _, peerInfo := range peerArray {
-		peer := strings.Split(peerInfo, "/")
-		id := peer[0]
-		addr := peer[1]
-		server := raft.Server{
-			ID:      raft.ServerID(id),
-			Address: raft.ServerAddress(addr),
+	servers := r.GetConfiguration().Configuration().Servers
+	if len(servers) > 0 {
+		configuration.Servers = servers
+	} else {
+		peerArray := strings.Split(raftCluster, ",")
+		if len(peerArray) == 0 {
+			return
 		}
-		configuration.Servers = append(configuration.Servers, server)
+		for _, peerInfo := range peerArray {
+			peer := strings.Split(peerInfo, "/")
+			id := peer[0]
+			addr := peer[1]
+			server := raft.Server{
+				ID:      raft.ServerID(id),
+				Address: raft.ServerAddress(addr),
+			}
+			configuration.Servers = append(configuration.Servers, server)
+		}
 	}
-	rf.BootstrapCluster(configuration)
+
+	r.BootstrapCluster(configuration)
+	klog.Infof(fmt.Sprintf("raft is started"))
 
 	// 监听leader变化
 	go func() {
-		for leader := range rf.LeaderCh() {
+		for leader := range r.LeaderCh() {
 			isLeader = leader
 		}
 	}()
 
 	// 启动http server
 	httpServer := &HttpServer{
-		raft: rf,
+		raft: r,
 		fsm:  fsm,
 	}
 
@@ -173,7 +188,7 @@ func main() {
 	stopCh := genericapiserver.SetupSignalHandler()
 	<-stopCh
 
-	err = rf.Shutdown().Error()
+	err = r.Shutdown().Error()
 	if err != nil {
 		klog.Error(err)
 	}

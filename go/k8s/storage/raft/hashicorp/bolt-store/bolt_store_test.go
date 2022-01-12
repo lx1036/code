@@ -1,6 +1,7 @@
-package boltdb
+package bolt_store
 
 import (
+	"io/fs"
 	"io/ioutil"
 	"k8s.io/klog/v2"
 	"os"
@@ -134,7 +135,7 @@ func TestNewBoltStore(t *testing.T) {
 	}
 
 	// Ensure our tables were created
-	db, err := bolt.Open(fh.Name(), dbFileMode, nil)
+	db, err := bolt.Open(fh.Name(), fs.ModePerm, nil)
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
