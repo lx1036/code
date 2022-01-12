@@ -114,6 +114,7 @@ func main() {
 	config.Logger = NewLogger()
 	config.SnapshotThreshold = 5               // 有 5 个 log entry 就可以触发 snapshot
 	config.SnapshotInterval = time.Second * 60 // 每60s 检查是否达到 snapshot threshold
+	config.TrailingLogs = 1000
 	addr, err := net.ResolveTCPAddr("tcp", raftAddr)
 	if err != nil {
 		klog.Fatal(err)
@@ -126,18 +127,14 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	logStore, err := boltdb.NewBoltStore(filepath.Join(raftDir, "raft-log.db"))
-	if err != nil {
-		klog.Fatal(err)
-	}
-	stableStore, err := boltdb.NewBoltStore(filepath.Join(raftDir, "raft-stable.db"))
+	store, err := boltdb.NewBoltStore(filepath.Join(raftDir, "raft-log.db"))
 	if err != nil {
 		klog.Fatal(err)
 	}
 	fsm := &Fsm{
 		kvstore: NewKVStore(),
 	}
-	r, err := raft.NewRaft(config, fsm, logStore, stableStore, snapshots, transport)
+	r, err := raft.NewRaft(config, fsm, store, store, snapshots, transport)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -163,7 +160,6 @@ func main() {
 			configuration.Servers = append(configuration.Servers, server)
 		}
 	}
-
 	r.BootstrapCluster(configuration)
 	klog.Infof(fmt.Sprintf("raft is started"))
 

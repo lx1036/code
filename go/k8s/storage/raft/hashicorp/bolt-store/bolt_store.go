@@ -1,11 +1,10 @@
 package bolt_store
 
 import (
-	"bytes"
-	"encoding/binary"
+	"encoding/json"
 	"errors"
-	"github.com/hashicorp/go-msgpack/codec"
 	"io/fs"
+	"strconv"
 
 	"github.com/hashicorp/raft"
 	bolt "go.etcd.io/bbolt"
@@ -106,12 +105,12 @@ func (b *BoltStore) StoreLog(log *raft.Log) error {
 func (b *BoltStore) StoreLogs(logs []*raft.Log) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
 		for _, log := range logs {
-			key := uint64ToBytes(log.Index)
-			val, err := encodeMsgPack(log)
+			key := []byte(strconv.FormatUint(log.Index, 10))
+			val, err := json.Marshal(log)
 			if err != nil {
 				return err
 			}
-			if err := tx.Bucket(dbLogs).Put(key, val.Bytes()); err != nil {
+			if err := tx.Bucket(dbLogs).Put(key, val); err != nil {
 				return err
 			}
 		}
@@ -123,7 +122,7 @@ func (b *BoltStore) StoreLogs(logs []*raft.Log) error {
 // GetLog is used to retrieve a log from bbolt at a given index.
 func (b *BoltStore) GetLog(idx uint64, log *raft.Log) error {
 	return b.db.View(func(tx *bolt.Tx) error {
-		val := tx.Bucket(dbLogs).Get(uint64ToBytes(idx))
+		val := tx.Bucket(dbLogs).Get([]byte(strconv.FormatUint(idx, 10)))
 		if val == nil {
 			// INFO: raft.ErrLogNotFound 会触发 snapshot，表示 follower log entry 离 leader too far behind
 			//  所以需要 leader 发送 snapshot 给 follower
@@ -131,7 +130,7 @@ func (b *BoltStore) GetLog(idx uint64, log *raft.Log) error {
 			return raft.ErrLogNotFound
 		}
 
-		return decodeMsgPack(val, log)
+		return json.Unmarshal(val, log)
 	})
 }
 
@@ -146,7 +145,7 @@ func (b *BoltStore) FirstIndex() (uint64, error) {
 	if firstIndex == nil {
 		return 0, nil
 	} else {
-		return bytesToUint64(firstIndex), nil
+		return strconv.ParseUint(string(firstIndex), 10, 64)
 	}
 }
 
@@ -162,17 +161,18 @@ func (b *BoltStore) LastIndex() (uint64, error) {
 		// INFO: @see https://github.com/hashicorp/raft/blob/v1.3.3/api.go#L486-L490
 		return 0, nil
 	} else {
-		return bytesToUint64(lastIndex), nil
+		return strconv.ParseUint(string(lastIndex), 10, 64)
 	}
 }
 
 // DeleteRange INFO: compact logs in [min, max) after snapshot @see https://github.com/hashicorp/raft/blob/v1.3.3/snapshot.go#L243-L246
 func (b *BoltStore) DeleteRange(min, max uint64) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
-		minKey := uint64ToBytes(min)
+		minKey := []byte(strconv.FormatUint(min, 10))
 		cur := tx.Bucket(dbLogs).Cursor()
 		for k, _ := cur.Seek(minKey); k != nil; k, _ = cur.Next() {
-			if bytesToUint64(k) > max {
+			key, _ := strconv.ParseUint(string(k), 10, 64)
+			if key > max {
 				break
 			}
 
@@ -204,7 +204,7 @@ func (b *BoltStore) Get(key []byte) ([]byte, error) {
 		if value == nil {
 			// INFO: @see https://github.com/hashicorp/raft/blob/v1.3.3/raft.go#L1502-L1512
 			//  @see https://github.com/hashicorp/raft/blob/v1.3.3/api.go#L480-L484
-			return raft.ErrLogNotFound
+			return ErrKeyNotFound
 		}
 		return nil
 	})
@@ -213,7 +213,7 @@ func (b *BoltStore) Get(key []byte) ([]byte, error) {
 }
 
 func (b *BoltStore) SetUint64(key []byte, val uint64) error {
-	return b.Set(key, uint64ToBytes(val))
+	return b.Set(key, []byte(strconv.FormatUint(val, 10)))
 }
 
 func (b *BoltStore) GetUint64(key []byte) (uint64, error) {
@@ -221,36 +221,8 @@ func (b *BoltStore) GetUint64(key []byte) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return bytesToUint64(val), nil
+
+	return strconv.ParseUint(string(val), 10, 64)
 }
 
 /////////////////////////StableStore interface////////////////////////////////////////
-
-// Encode writes an encoded object to a new bytes buffer
-func encodeMsgPack(in interface{}) (*bytes.Buffer, error) {
-	buf := bytes.NewBuffer(nil)
-	hd := codec.MsgpackHandle{}
-	enc := codec.NewEncoder(buf, &hd)
-	err := enc.Encode(in)
-	return buf, err
-}
-
-// Decode reverses the encode operation on a byte slice input
-func decodeMsgPack(buf []byte, out interface{}) error {
-	r := bytes.NewBuffer(buf)
-	hd := codec.MsgpackHandle{}
-	dec := codec.NewDecoder(r, &hd)
-	return dec.Decode(out)
-}
-
-// Converts bytes to an integer
-func bytesToUint64(b []byte) uint64 {
-	return binary.BigEndian.Uint64(b)
-}
-
-// Converts a uint to a byte slice
-func uint64ToBytes(u uint64) []byte {
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, u)
-	return buf
-}

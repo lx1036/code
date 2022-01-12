@@ -1,11 +1,14 @@
 package bolt_store
 
 import (
+	"encoding/binary"
+	"encoding/json"
 	"io/fs"
 	"io/ioutil"
 	"k8s.io/klog/v2"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -349,4 +352,35 @@ func TestBoltStoreDeleteRange(t *testing.T) {
 	if err := store.GetLog(2, new(raft.Log)); err != raft.ErrLogNotFound {
 		t.Fatalf("should have deleted log2")
 	}
+}
+
+func TestRaftLogJsonMarshal(test *testing.T) {
+	log := &raft.Log{
+		Index:      1,
+		Term:       1,
+		Type:       raft.LogCommand,
+		Data:       []byte("data"),
+		Extensions: []byte("Extensions"),
+		AppendedAt: time.Now(),
+	}
+	value, _ := json.Marshal(log)
+	// {"Index":1,"Term":1,"Type":0,"Data":"ZGF0YQ==","Extensions":"RXh0ZW5zaW9ucw==","AppendedAt":"2022-01-13T01:46:03.19639+08:00"}
+	klog.Info(string(value))
+
+	type Person struct {
+		Name []byte `json:"name"`
+		City string
+	}
+	person := &Person{Name: []byte("name"), City: "beijing"}
+	value, _ = json.Marshal(person)
+	klog.Info(string(value)) // {"name":"bmFtZQ==","City":"beijing"}
+
+	buf := make([]byte, 8)
+	index := uint64(1)
+	binary.BigEndian.PutUint64(buf, index)
+	klog.Info(string(buf), buf)                       // 空值, [0 0 0 0 0 0 0 1]
+	klog.Info(binary.BigEndian.Uint64(buf), len(buf)) // 1 8
+
+	term, _ := strconv.ParseUint("1", 10, 64)
+	klog.Info(term)
 }
