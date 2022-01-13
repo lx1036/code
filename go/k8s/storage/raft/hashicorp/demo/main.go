@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -111,10 +112,10 @@ func main() {
 	config.HeartbeatTimeout = 1000 * time.Millisecond
 	config.ElectionTimeout = config.HeartbeatTimeout * 10 // electionTimeout=heartbeatTimeout * 10
 	config.BatchApplyCh = true
-	config.Logger = NewLogger()
+	//config.Logger = NewLogger()
 	config.SnapshotThreshold = 5               // 有 5 个 log entry 就可以触发 snapshot
-	config.SnapshotInterval = time.Second * 60 // 每60s 检查是否达到 snapshot threshold
-	config.TrailingLogs = 1000
+	config.SnapshotInterval = time.Second * 60 // 每 [60s, 120) 检查是否达到 snapshot threshold
+	config.TrailingLogs = 3
 	addr, err := net.ResolveTCPAddr("tcp", raftAddr)
 	if err != nil {
 		klog.Fatal(err)
@@ -180,6 +181,8 @@ func main() {
 	http.HandleFunc("/get", httpServer.Get)
 	go http.ListenAndServe(httpAddr, nil)
 
+	dumpData()
+
 	// stop channel closed on SIGTERM and SIGINT
 	stopCh := genericapiserver.SetupSignalHandler()
 	<-stopCh
@@ -188,4 +191,21 @@ func main() {
 	if err != nil {
 		klog.Error(err)
 	}
+}
+
+func dumpData() {
+	go func() {
+		time.Sleep(time.Second * 30)
+		if isLeader {
+			for i := 1; i <= 10; i++ {
+				resp, err := http.Get(fmt.Sprintf("http://%s/set?key=hello%d&value=world%d", httpAddr, i, i))
+				if err != nil {
+					klog.Error(err)
+					return
+				}
+				data, _ := io.ReadAll(resp.Body)
+				klog.Info(string(data))
+			}
+		}
+	}()
 }

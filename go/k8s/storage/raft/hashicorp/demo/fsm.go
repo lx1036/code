@@ -40,17 +40,16 @@ func (f *Fsm) Snapshot() (raft.FSMSnapshot, error) {
 // Restore is used to restore an FSM from a snapshot. It is not called
 // concurrently with any other command. The FSM must discard all previous
 // state.
-func (f *Fsm) Restore(closer io.ReadCloser) error {
+func (f *Fsm) Restore(reader io.ReadCloser) error {
 	f.Lock()
 	defer f.Unlock()
-	
-	var data []byte
-	_, err := closer.Read(data)
+
+	dst, err := io.ReadAll(reader)
 	if err != nil {
 		return err
 	}
 
-	return f.kvstore.Restore(data)
+	return f.kvstore.Restore(dst)
 }
 
 type KVStore struct {
@@ -83,6 +82,8 @@ func (store *KVStore) Restore(data []byte) error {
 	store.Lock()
 	defer store.Unlock()
 
+	// {"hello":"world","hello1":"world1","hello2":"world2","hello3":"world3","hello4":"world4"}
+	klog.Info(string(data))
 	kvdata := make(map[string]string)
 	err := json.Unmarshal(data, &kvdata)
 	if err != nil {
