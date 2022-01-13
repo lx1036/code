@@ -27,7 +27,6 @@ func (f *Fsm) Apply(log *raft.Log) interface{} {
 		key := data[1]
 		value := data[2]
 		f.kvstore.Set(key, value)
-		//f.Data[key] = value
 	}
 	f.Unlock()
 
@@ -38,7 +37,13 @@ func (f *Fsm) Snapshot() (raft.FSMSnapshot, error) {
 	return f.kvstore, nil
 }
 
+// Restore is used to restore an FSM from a snapshot. It is not called
+// concurrently with any other command. The FSM must discard all previous
+// state.
 func (f *Fsm) Restore(closer io.ReadCloser) error {
+	f.Lock()
+	defer f.Unlock()
+	
 	var data []byte
 	_, err := closer.Read(data)
 	if err != nil {
