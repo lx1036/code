@@ -3,11 +3,14 @@ package bolt_store
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"k8s.io/klog/v2"
+	"math/big"
 	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -376,11 +379,24 @@ func TestRaftLogJsonMarshal(test *testing.T) {
 	klog.Info(string(value)) // {"name":"bmFtZQ==","City":"beijing"}
 
 	buf := make([]byte, 8)
-	index := uint64(1)
+	index := uint64(11)
+	klog.Infof(fmt.Sprintf("%08d", index)) // 00000011 , 需要的
+	b := &big.Int{}
+	b.SetUint64(index)
+	klog.Info(string(b.Bytes()))
 	binary.BigEndian.PutUint64(buf, index)
 	klog.Info(string(buf), buf)                       // 空值, [0 0 0 0 0 0 0 1]
 	klog.Info(binary.BigEndian.Uint64(buf), len(buf)) // 1 8
 
-	term, _ := strconv.ParseUint("1", 10, 64)
+	term, _ := strconv.ParseUint("00000011", 10, 64)
 	klog.Info(term)
+
+	key := []byte(strconv.FormatUint(11, 10))
+	klog.Info(string(key)) // 11
+
+	keys := []string{"10", "3", "2"}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+	klog.Info(keys) // [0002 0003 0010]
 }

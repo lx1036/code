@@ -115,7 +115,7 @@ func main() {
 	//config.Logger = NewLogger()
 	config.SnapshotThreshold = 5               // 有 5 个 log entry 就可以触发 snapshot
 	config.SnapshotInterval = time.Second * 60 // 每 [60s, 120) 检查是否达到 snapshot threshold
-	config.TrailingLogs = 3
+	config.TrailingLogs = 3                    // compact logs 之后，距离 snapshotIndex，还可以有 TrailingLogs 个 logs
 	addr, err := net.ResolveTCPAddr("tcp", raftAddr)
 	if err != nil {
 		klog.Fatal(err)

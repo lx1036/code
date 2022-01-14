@@ -3,6 +3,7 @@ package bolt_store
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"strconv"
 
@@ -105,7 +106,7 @@ func (b *BoltStore) StoreLog(log *raft.Log) error {
 func (b *BoltStore) StoreLogs(logs []*raft.Log) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
 		for _, log := range logs {
-			key := []byte(strconv.FormatUint(log.Index, 10))
+			key := []byte(fmt.Sprintf("%08d", log.Index))
 			val, err := json.Marshal(log)
 			if err != nil {
 				return err
@@ -122,7 +123,7 @@ func (b *BoltStore) StoreLogs(logs []*raft.Log) error {
 // GetLog is used to retrieve a log from bbolt at a given index.
 func (b *BoltStore) GetLog(idx uint64, log *raft.Log) error {
 	return b.db.View(func(tx *bolt.Tx) error {
-		val := tx.Bucket(dbLogs).Get([]byte(strconv.FormatUint(idx, 10)))
+		val := tx.Bucket(dbLogs).Get([]byte(fmt.Sprintf("%08d", idx)))
 		if val == nil {
 			// INFO: raft.ErrLogNotFound 会触发 snapshot，表示 follower log entry 离 leader too far behind
 			//  所以需要 leader 发送 snapshot 给 follower
@@ -168,10 +169,10 @@ func (b *BoltStore) LastIndex() (uint64, error) {
 // DeleteRange INFO: compact logs in [min, max) after snapshot @see https://github.com/hashicorp/raft/blob/v1.3.3/snapshot.go#L243-L246
 func (b *BoltStore) DeleteRange(min, max uint64) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
-		minKey := []byte(strconv.FormatUint(min, 10))
+		minKey := fmt.Sprintf("%08d", min)
 		cur := tx.Bucket(dbLogs).Cursor()
-		for k, _ := cur.Seek(minKey); k != nil; k, _ = cur.Next() {
-			key, _ := strconv.ParseUint(string(k), 10, 64)
+		for k, _ := cur.Seek([]byte(minKey)); k != nil; k, _ = cur.Next() {
+			key, _ := strconv.ParseUint(string(k), 10, 64) // 00000011 -> 11
 			if key > max {
 				break
 			}
