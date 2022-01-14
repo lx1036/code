@@ -109,7 +109,7 @@ func main() {
 	// INFO: (1)初始化 raft 对象
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(raftId)
-	config.HeartbeatTimeout = 1000 * time.Millisecond
+	config.HeartbeatTimeout = 1000 * time.Millisecond     // 心跳过期时间是1s，每 100ms 一次心跳 @see https://github.com/hashicorp/raft/blob/v1.3.3/replication.go#L389-L394
 	config.ElectionTimeout = config.HeartbeatTimeout * 10 // electionTimeout=heartbeatTimeout * 10
 	config.BatchApplyCh = true
 	//config.Logger = NewLogger()
