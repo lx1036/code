@@ -1,13 +1,16 @@
 package bolt_store
 
 import (
+	crand "crypto/rand"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"k8s.io/klog/v2"
+	"math"
 	"math/big"
+	"math/rand"
 	"os"
 	"reflect"
 	"sort"
@@ -399,4 +402,29 @@ func TestRaftLogJsonMarshal(test *testing.T) {
 		return keys[i] < keys[j]
 	})
 	klog.Info(keys) // [0002 0003 0010]
+
+	type Future map[string]string
+	var future Future
+	if _, ok := future["a"]; !ok {
+		klog.Info("not found")
+	}
+
+	minVal := time.Second * 60
+	extra := time.Duration(rand.Int63()) % minVal
+	klog.Info(extra.String())
+}
+
+func init() {
+	// Ensure we use a high-entropy seed for the pseudo-random generator
+	rand.Seed(newSeed())
+}
+
+// returns an int64 from a crypto random source
+// can be used to seed a source for a math/rand.
+func newSeed() int64 {
+	r, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		panic(fmt.Errorf("failed to read random bytes: %v", err))
+	}
+	return r.Int64()
 }

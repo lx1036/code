@@ -166,7 +166,7 @@ func (b *BoltStore) LastIndex() (uint64, error) {
 	}
 }
 
-// DeleteRange INFO: compact logs in [min, max) after snapshot @see https://github.com/hashicorp/raft/blob/v1.3.3/snapshot.go#L243-L246
+// DeleteRange INFO: compact logs in [min, max] after snapshot @see https://github.com/hashicorp/raft/blob/v1.3.3/snapshot.go#L243-L246
 func (b *BoltStore) DeleteRange(min, max uint64) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
 		minKey := fmt.Sprintf("%08d", min)

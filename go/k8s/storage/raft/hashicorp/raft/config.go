@@ -140,6 +140,48 @@ func (c *Configuration) Clone() (copy Configuration) {
 	return
 }
 
+// checkConfiguration tests a cluster membership configuration for common
+// errors.
+func checkConfiguration(configuration Configuration) error {
+	idSet := make(map[ServerID]bool)
+	addressSet := make(map[ServerAddress]bool)
+	var voters int
+	for _, server := range configuration.Servers {
+		if server.ID == "" {
+			return fmt.Errorf("empty ID in configuration: %v", configuration)
+		}
+		if server.Address == "" {
+			return fmt.Errorf("empty address in configuration: %v", server)
+		}
+		if idSet[server.ID] {
+			return fmt.Errorf("found duplicate ID in configuration: %v", server.ID)
+		}
+		idSet[server.ID] = true
+		if addressSet[server.Address] {
+			return fmt.Errorf("found duplicate address in configuration: %v", server.Address)
+		}
+		addressSet[server.Address] = true
+		if server.Suffrage == Voter {
+			voters++
+		}
+	}
+	if voters == 0 {
+		return fmt.Errorf("need at least one voter in configuration: %v", configuration)
+	}
+	return nil
+}
+
+// hasVote returns true if the server identified by 'id' is a Voter in the
+// provided Configuration.
+func hasVote(configuration Configuration, id ServerID) bool {
+	for _, server := range configuration.Servers {
+		if server.ID == id {
+			return server.Suffrage == Voter
+		}
+	}
+	return false
+}
+
 // configurations is state tracked on every server about its Configurations.
 // Note that, per Diego's dissertation, there can be at most one uncommitted
 // configuration at a time (the next configuration may not be created until the
