@@ -135,6 +135,10 @@ type Config struct {
 	// 9.6. This prevents disruption when a node that has been partitioned away
 	// rejoins the cluster.
 	PreVote bool
+
+	// DisableProposalForwarding set to true means that followers will drop
+	// proposals, rather than forwarding them to the leader.
+	DisableProposalForwarding bool
 }
 
 func (c *Config) validate() error {
@@ -217,9 +221,9 @@ type raft struct {
 	// value.
 	pendingConfIndex uint64
 
-	// leadTransferee is id of the leader transfer target when its value is not zero.
-	// Follow the procedure defined in raft thesis 3.10.
-	leadTransferee uint64
+	// INFO: @see raft 3.10, 可以人工指定 raft leader, leadTransferID 为 target node id, 这个 feature 很重要!!!
+	leadTransferID uint64
+
 	// Follower 转发 propose 开关
 	disableProposalForwarding bool
 	// randomizedElectionTimeout is a random number between
@@ -253,7 +257,7 @@ func newRaft(config *Config) *raft {
 		panic(err.Error())
 	}
 
-	raftlog := newLogWithSize(config.Storage, config.MaxCommittedSizePerReady)
+	raftlog := newRaftLogWithSize(config.Storage, config.MaxCommittedSizePerReady)
 	hardState, confState, err := config.Storage.InitialState()
 	if err != nil {
 		panic(err)
@@ -266,17 +270,17 @@ func newRaft(config *Config) *raft {
 		raftLog:            raftlog,
 		maxMsgSize:         config.MaxSizePerMsg,
 		maxUncommittedSize: config.MaxUncommittedEntriesSize,
-		electionTimeout:    config.ElectionTick,
-		heartbeatTimeout:   config.HeartbeatTick,
+		electionTimeout:    config.ElectionTick,  // 10
+		heartbeatTimeout:   config.HeartbeatTick, // 1
 
-		checkQuorum: config.CheckQuorum,
-		preVote:     config.PreVote,
+		checkQuorum: config.CheckQuorum, // false
+		preVote:     config.PreVote,     // false
 
 		progress: tracker.MakeProgressTracker(config.MaxInflightMsgs),
 
 		readOnly: newReadOnly(config.ReadOnlyOption),
 
-		//disableProposalForwarding: c.DisableProposalForwarding,
+		disableProposalForwarding: config.DisableProposalForwarding,
 	}
 
 	cfg, progress, err := confchange.Restore(confchange.Changer{
@@ -394,8 +398,8 @@ func (r *raft) switchToConfig(cfg tracker.Config, progress tracker.ProgressMap) 
 		})
 	}
 
-	// If the leadTransferee was removed or demoted, abort the leadership transfer.
-	if _, ok := r.progress.Config.Voters.IDs()[r.leadTransferee]; !ok && r.leadTransferee != 0 {
+	// If the leadTransferID was removed or demoted, abort the leadership transfer.
+	if _, ok := r.progress.Config.Voters.IDs()[r.leadTransferID]; !ok && r.leadTransferID != 0 {
 		r.abortLeaderTransfer()
 	}
 
@@ -479,6 +483,8 @@ func (r *raft) stepFollower(message pb.Message) error {
 		message.To = r.lead
 		r.send(message)
 
+	case pb.MsgSnap:
+
 	// INFO: Follower 的线性一致性读处理逻辑
 	case pb.MsgReadIndex:
 		if r.lead == None {
@@ -498,6 +504,21 @@ func (r *raft) stepFollower(message pb.Message) error {
 			Index:      message.Index,
 			RequestCtx: message.Entries[0].Data,
 		})
+
+	case pb.MsgTransferLeader:
+		if r.lead == None {
+			klog.Infof("%x no leader at term %d; dropping leader transfer msg", r.id, r.Term)
+			return nil
+		}
+		message.To = r.lead
+		r.send(message)
+
+	case pb.MsgTimeoutNow:
+		klog.Infof("%x [term %d] received MsgTimeoutNow from %x and starts an election to get leadership.", r.id, r.Term, message.From)
+		// Leadership transfers never use pre-vote even if r.preVote is true; we
+		// know we are not recovering from a partition so there is no need for the
+		// extra round trip.
+		r.hup(campaignTransfer)
 	}
 
 	return nil
@@ -510,6 +531,8 @@ func (r *raft) stepCandidate(message pb.Message) error {
 	switch message.Type {
 	case pb.MsgHeartbeat:
 
+	case pb.MsgTimeoutNow:
+		klog.Infof("%x [term %d state %v] ignored MsgTimeoutNow from %x", r.id, r.Term, r.state, message.From)
 	}
 
 	return nil
@@ -551,8 +574,8 @@ func (r *raft) stepLeader(message pb.Message) error {
 		if r.progress.Progress[r.id] == nil {
 			return ErrProposalDropped
 		}
-		if r.leadTransferee != None {
-			klog.Errorf(fmt.Sprintf("%x [term %d] transfer leadership to %x is in progress; dropping proposal", r.id, r.Term, r.leadTransferee))
+		if r.leadTransferID != None { // @see raft 3.10: The prior leader stops accepting new client requests.
+			klog.Errorf(fmt.Sprintf("%x [term %d] transfer leadership to %x is in progress; dropping proposal", r.id, r.Term, r.leadTransferID))
 			return ErrProposalDropped
 		}
 
@@ -605,6 +628,40 @@ func (r *raft) stepLeader(message pb.Message) error {
 	if pr == nil {
 		klog.Errorf("%x no progress available for %x", r.id, message.From)
 		return nil
+	}
+
+	switch message.Type {
+	case pb.MsgTransferLeader: // @see raft 3.10 Leadership transfer extension
+		if pr.IsLearner {
+			klog.Infof("%x is learner. Ignored transferring leadership", r.id)
+			return nil
+		}
+		leadTransferee := message.From
+		lastLeadTransferee := r.leadTransferID
+		if lastLeadTransferee != None {
+			if lastLeadTransferee == leadTransferee {
+				klog.Infof("%x [term %d] transfer leadership to %x is in progress, ignores request to same node %x",
+					r.id, r.Term, leadTransferee, leadTransferee)
+				return nil
+			}
+			r.abortLeaderTransfer()
+			klog.Infof("%x [term %d] abort previous transferring leadership to %x", r.id, r.Term, lastLeadTransferee)
+		}
+		if leadTransferee == r.id {
+			klog.Infof("%x is already leader. Ignored transferring leadership to self", r.id)
+			return nil
+		}
+		// Transfer leadership to third party.
+		klog.Infof("%x [term %d] starts to transfer leadership to %x", r.id, r.Term, leadTransferee)
+		// Transfer leadership should be finished in one electionTimeout, so reset r.electionElapsed.
+		r.electionElapsed = 0
+		r.leadTransferID = leadTransferee
+		if pr.Match == r.raftLog.lastIndex() {
+			r.sendTimeoutNow(leadTransferee) // @see raft 3.10: The prior leader sends a TimeoutNow request to the target server.
+			klog.Infof("%x sends MsgTimeoutNow to %x immediately as %x already has up-to-date log", r.id, leadTransferee, leadTransferee)
+		} else {
+			r.sendAppend(leadTransferee)
+		}
 	}
 
 	return nil
@@ -677,6 +734,10 @@ func (r *raft) sendHeartbeat(to uint64, ctx []byte) {
 	r.send(m)
 }
 
+func (r *raft) sendTimeoutNow(to uint64) {
+	r.send(pb.Message{To: to, Type: pb.MsgTimeoutNow})
+}
+
 // INFO: leader 把 append log 发送给 follower, r.progress 会记录进度
 //  Follower的日志同步进度维护在Progress对象中
 func (r *raft) bcastAppend() {
@@ -742,23 +803,28 @@ func (r *raft) maybeSendAppend(to uint64, sendIfEmpty bool) bool {
 }
 
 func (r *raft) abortLeaderTransfer() {
-	r.leadTransferee = None
-}
-
-// Raft 为了优化选票被瓜分导致选举失败的问题，引入了随机数，每个节点等待发起选举的时间点不一致，优雅的解决了潜在的竞选活锁，同时易于理解
-func (r *raft) resetRandomizedElectionTimeout() {
-	r.randomizedElectionTimeout = r.electionTimeout + globalRand.Intn(r.electionTimeout)
+	r.leadTransferID = None
 }
 
 // tickElection INFO: r.electionTimeout 过期之后，Follower/Candidate 发起选举
 func (r *raft) tickElection() {
 	r.electionElapsed++
-	if r.promotable() && r.pastElectionTimeout() {
+	if r.promotable() && r.pastElectionTimeout() { // 如果 election timeout，candidate 还没成为 leader
 		r.electionElapsed = 0
 		if err := r.Step(pb.Message{From: r.id, Type: pb.MsgHup}); err != nil {
 			klog.Errorf("error occurred during election: %v", err)
 		}
 	}
+}
+
+func (r *raft) pastElectionTimeout() bool {
+	return r.electionElapsed >= r.randomizedElectionTimeout
+}
+
+// INFO: Raft 为了优化选票被瓜分导致选举失败的问题，引入了随机数，每个节点等待发起选举的时间点不一致，优雅的解决了潜在的竞选活锁，同时易于理解
+//  @see raft 3.4 论文中介绍，使用 random election timeout 来防止多个 follower 一起成为 candidate
+func (r *raft) resetRandomizedElectionTimeout() {
+	r.randomizedElectionTimeout = r.electionTimeout + globalRand.Intn(r.electionTimeout) // [10, 20]
 }
 
 // INFO: 在 r.heartbeatTimeout 之后, leader 发 MsgBeat 给 Follower/PreCandidate/Candidate
@@ -965,13 +1031,6 @@ func numOfPendingConf(ents []pb.Entry) int {
 		}
 	}
 	return n
-}
-
-// pastElectionTimeout returns true iff r.electionElapsed is greater
-// than or equal to the randomized election timeout in
-// [electiontimeout, 2 * electiontimeout - 1].
-func (r *raft) pastElectionTimeout() bool {
-	return r.electionElapsed >= r.randomizedElectionTimeout
 }
 
 // INFO: state machine 是否可以 promoted to be leader

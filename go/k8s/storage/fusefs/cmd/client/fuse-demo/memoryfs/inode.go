@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"time"
 
+	"k8s-lx1036/k8s/storage/fuse"
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
 	"k8s-lx1036/k8s/storage/fuse/fuseutil"
 )
@@ -41,6 +43,23 @@ type inode struct {
 
 	// extended attributes and values
 	xattrs map[string][]byte
+
+	// For symlinks, the target of the symlink.
+	//
+	// INVARIANT: If !isSymlink(), len(target) == 0
+	target string
+}
+
+func newInode(attrs fuseops.InodeAttributes) *inode {
+	now := time.Now()
+	attrs.Mtime = now
+	attrs.Crtime = now
+
+	// Create the object.
+	return &inode{
+		attrs:  attrs,
+		xattrs: make(map[string][]byte),
+	}
 }
 
 // Return the index of the child within in.entries, if it exists.
@@ -59,6 +78,84 @@ func (in *inode) findChild(name string) (i int, ok bool) {
 	}
 
 	return 0, false
+}
+
+// Remove an entry for a child.
+//
+// REQUIRES: in.isDir()
+// REQUIRES: An entry for the given name exists.
+func (in *inode) RemoveChild(name string) {
+	// Update the modification time.
+	in.attrs.Mtime = time.Now()
+
+	// Find the entry.
+	i, ok := in.findChild(name)
+	if !ok {
+		panic(fmt.Sprintf("Unknown child: %s", name))
+	}
+
+	// Mark it as unused.
+	in.entries[i] = fuseutil.Dirent{
+		Type:   fuseutil.DT_Unknown,
+		Offset: fuseops.DirOffset(i + 1),
+	}
+}
+
+// Return the number of children of the directory.
+//
+// REQUIRES: in.isDir()
+func (in *inode) Len() int {
+	var n int
+	for _, e := range in.entries {
+		if e.Type != fuseutil.DT_Unknown {
+			n++
+		}
+	}
+
+	return n
+}
+
+// Write to the file's contents. See documentation for ioutil.WriterAt.
+//
+// REQUIRES: in.isFile()
+func (in *inode) WriteAt(p []byte, off int64) (int, error) {
+	if !in.isFile() {
+		panic("WriteAt called on non-file.")
+	}
+
+	// Update the modification time.
+	in.attrs.Mtime = time.Now()
+
+	// Ensure that the contents slice is long enough.
+	newLen := int(off) + len(p)
+	if len(in.contents) < newLen {
+		padding := make([]byte, newLen-len(in.contents))
+		in.contents = append(in.contents, padding...)
+		in.attrs.Size = uint64(newLen)
+	}
+
+	// Copy in the data.
+	n := copy(in.contents[off:], p)
+
+	// Sanity check.
+	if n != len(p) {
+		panic(fmt.Sprintf("Unexpected short copy: %v", n))
+	}
+
+	return n, nil
+}
+
+func (in *inode) Fallocate(mode uint32, offset uint64, length uint64) error {
+	if mode != 0 {
+		return fuse.ENOSYS
+	}
+	newSize := int(offset + length)
+	if newSize > len(in.contents) {
+		padding := make([]byte, newSize-len(in.contents))
+		in.contents = append(in.contents, padding...)
+		in.attrs.Size = offset + length
+	}
+	return nil
 }
 
 func (in *inode) isDir() bool {
@@ -170,17 +267,34 @@ func (in *inode) AddChild(id fuseops.InodeID, name string, dt fuseutil.DirentTyp
 	in.entries = append(in.entries, e)
 }
 
-// Create a new inode with the supplied attributes, which need not contain
-// time-related information (the inode object will take care of that).
-func newInode(attrs fuseops.InodeAttributes) *inode {
-	// Update time info.
-	now := time.Now()
-	attrs.Mtime = now
-	attrs.Crtime = now
+// Update attributes from non-nil parameters.
+func (in *inode) SetAttributes(size *uint64, mode *os.FileMode, mtime *time.Time) {
+	// Update the modification time.
+	in.attrs.Mtime = time.Now()
 
-	// Create the object.
-	return &inode{
-		attrs:  attrs,
-		xattrs: make(map[string][]byte),
+	// Truncate?
+	if size != nil {
+		intSize := int(*size)
+
+		// Update contents.
+		if intSize <= len(in.contents) {
+			in.contents = in.contents[:intSize]
+		} else {
+			padding := make([]byte, intSize-len(in.contents))
+			in.contents = append(in.contents, padding...)
+		}
+
+		// Update attributes.
+		in.attrs.Size = *size
+	}
+
+	// Change mode?
+	if mode != nil {
+		in.attrs.Mode = *mode
+	}
+
+	// Change mtime?
+	if mtime != nil {
+		in.attrs.Mtime = *mtime
 	}
 }

@@ -15,10 +15,10 @@ import (
 var (
 	// The following two are used in the FUSE cache
 	// every time the lookup will be performed on the fly, and the result will not be cached
-	LookupValidDuration = 5 * time.Second
+	LookupValidDuration = 300 * time.Second
 
 	// the expiration duration of the attributes in the FUSE cache
-	AttrValidDuration = 30 * time.Second
+	AttrValidDuration = 300 * time.Second
 )
 
 type Inode struct {
@@ -194,7 +194,6 @@ func (fs *FuseFS) GetInode(inodeID fuseops.InodeID) (*Inode, error) {
 
 	return inode, nil
 }
-
 
 func GetChildInodeEntry(child *Inode) fuseops.ChildInodeEntry {
 	return fuseops.ChildInodeEntry{

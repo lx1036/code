@@ -62,7 +62,7 @@ func (s *KVStore) GetSnapshot() ([]byte, error) {
 	return json.Marshal(s.kvStore)
 }
 
-// 往proposeC channel里写key-value，生产者
+// Propose 往 proposeC channel里写key-value，生产者
 func (s *KVStore) Propose(k string, v string) {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(kv{k, v}); err != nil {
@@ -72,7 +72,6 @@ func (s *KVStore) Propose(k string, v string) {
 	s.proposeC <- buf.String()
 }
 
-//
 func (s *KVStore) Lookup(key string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

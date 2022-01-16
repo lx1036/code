@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -21,7 +22,7 @@ import (
 )
 
 const (
-	DefaultMinPartSize = 5 << 20
+	DefaultMinPartSize = 5 << 20 // 5MB
 	DefaultMaxParts    = 60
 )
 
@@ -89,12 +90,86 @@ type S3Client struct {
 	//cap Capabilities
 }
 
-func (s3Client *S3Client) Write(file string, offset int64, data []byte) (wsize int, err error) {
-	panic("implement me")
+func NewS3Backend(bucket string, cfg *S3Config) (*S3Client, error) {
+	credential := credentials.NewStaticCredentials(cfg.AccessKey, cfg.SecretKey, "")
+	awsConfig := (&aws.Config{
+		Region:           &cfg.Region,
+		Endpoint:         &cfg.Endpoint,
+		DisableSSL:       &cfg.DisableSSL,
+		S3ForcePathStyle: &cfg.S3ForcePathStyle,
+		Credentials:      credential,
+	}).WithHTTPClient(&http.Client{
+		Transport: &defaultHTTPTransport,
+		Timeout:   cfg.HTTPTimeout,
+	})
+	s3Backend := &S3Client{
+		bucket:      bucket,
+		awsConfig:   awsConfig,
+		minPartSize: DefaultMinPartSize,
+		maxParts:    DefaultMaxParts,
+		uploads:     make(map[string]*MultipartCommitInput),
+	}
+	s3Backend.mergeIoVector = cfg.MergeIOVector
+	s3Backend.agent = fmt.Sprintf("fuseFS/%v", cfg.Version)
+
+	// create new session
+	var err error
+	s3Backend.session, err = session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	})
+	if err != nil {
+		return nil, err
+	}
+	s3Backend.S3 = s3.New(s3Backend.session, s3Backend.awsConfig)
+	err = s3Backend.AuthBucket()
+	if err != nil {
+		klog.Infof(fmt.Sprintf("[NewS3Backend]auth bucket %s failed with err %v", s3Backend.bucket, err))
+		return nil, err
+	}
+
+	//s3Backend.replicators = util.Ticket{Total: 128}.Init()
+
+	return s3Backend, nil
 }
 
-func (s3Client *S3Client) WriteStream(file string, offset int64, length int64, reader io.ReadSeeker) (wsize int, err error) {
-	panic("implement me")
+func (s3Client *S3Client) Write(file string, offset int64, data []byte) (bytesWrite int, err error) {
+	bytesWrite = len(data)
+	reader := bytes.NewReader(data)
+	_, err = s3Client.WriteStream(file, offset, int64(bytesWrite), reader)
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[Write]write failed, bucket(%s) key(%s) err: %v", s3Client.bucket, file, err))
+	}
+	return
+}
+
+func (s3Client *S3Client) WriteStream(file string, offset int64, length int64, reader io.ReadSeeker) (int, error) {
+	// upload part?
+	if int(length) >= s3Client.minPartSize {
+		err := s3Client.UploadNewPart(file, offset, length, reader, nil)
+		if err != nil {
+			klog.Errorf("[WriteStream]write failed, bucket(%s) key(%s) err: %v", s3Client.bucket, file, err)
+			return 0, err
+		}
+		return int(length), nil
+	}
+
+	// TODO: s3Client.uploads
+
+	body := NewLimitReadSeeker(reader, length)
+	_, err := s3Client.PutObject(&s3.PutObjectInput{
+		Bucket: aws.String(s3Client.bucket),
+		Key:    aws.String(file),
+		Body:   body,
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return int(length), nil
+}
+
+func (s3Client *S3Client) UploadNewPart(file string, offset, length int64, reader io.ReadSeeker, cb IOCallback) error {
+	return nil
 }
 
 func (s3Client *S3Client) ReadStream(file string, offset int64, length int64, writer io.Writer) (rsize int, err error) {
@@ -175,14 +250,21 @@ func (s3Client *S3Client) Read(file string, offset int64, data []byte) (int, err
 }
 
 func (s3Client *S3Client) getObject(input *s3.GetObjectInput) (io.ReadCloser, error) {
-	req, resp := s3Client.GetObjectRequest(input)
+	response, err := s3Client.GetObject(input)
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Body, nil
+
+	/*req, resp := s3Client.GetObjectRequest(input)
 	req.HTTPRequest.Header.Add("User-Agent", s3Client.agent)
 	err := req.Send()
 	if err != nil {
 		return nil, mapAwsError(err)
 	}
 
-	return resp.Body, nil
+	return resp.Body, nil*/
 }
 
 func (s3Client *S3Client) AuthBucket() error {
@@ -198,48 +280,6 @@ func (s3Client *S3Client) AuthBucket() error {
 	klog.Infof(fmt.Sprintf("[AuthBucket]bucketOutput %s", bucketOutput.String()))
 
 	return nil
-}
-
-func NewS3Backend(bucket string, cfg *S3Config) (*S3Client, error) {
-	credential := credentials.NewStaticCredentials(cfg.AccessKey, cfg.SecretKey, "")
-	awsConfig := (&aws.Config{
-		Region:           &cfg.Region,
-		Endpoint:         &cfg.Endpoint,
-		DisableSSL:       &cfg.DisableSSL,
-		S3ForcePathStyle: &cfg.S3ForcePathStyle,
-		Credentials:      credential,
-	}).WithHTTPClient(&http.Client{
-		Transport: &defaultHTTPTransport,
-		Timeout:   cfg.HTTPTimeout,
-	})
-	s3Backend := &S3Client{
-		bucket:      bucket,
-		awsConfig:   awsConfig,
-		minPartSize: DefaultMinPartSize,
-		maxParts:    DefaultMaxParts,
-		uploads:     make(map[string]*MultipartCommitInput),
-	}
-	s3Backend.mergeIoVector = cfg.MergeIOVector
-	s3Backend.agent = fmt.Sprintf("fuseFS/%v", cfg.Version)
-
-	// create new session
-	var err error
-	s3Backend.session, err = session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	})
-	if err != nil {
-		return nil, err
-	}
-	s3Backend.S3 = s3.New(s3Backend.session, s3Backend.awsConfig)
-	err = s3Backend.AuthBucket()
-	if err != nil {
-		klog.Infof(fmt.Sprintf("[NewS3Backend]auth bucket %s failed with err %v", s3Backend.bucket, err))
-		return nil, err
-	}
-
-	//s3Backend.replicators = util.Ticket{Total: 128}.Init()
-
-	return s3Backend, nil
 }
 
 func mapAwsError(err error) error {

@@ -31,6 +31,7 @@ const (
 	ENOSYS    = syscall.ENOSYS
 	ENOTDIR   = syscall.ENOTDIR
 	ENOTEMPTY = syscall.ENOTEMPTY
+	ENOSPC    = syscall.ENOSPC
 )
 
 type contextKeyType uint64

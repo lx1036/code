@@ -165,10 +165,9 @@ type msgWithResult struct {
 type node struct {
 	raft       *raft
 	prevSoftSt *SoftState
-	prevHardSt pb.HardState
+	prevHardSt pb.HardState // 需要持久化的 raft state
 
-	tickChan chan struct{}
-
+	tickChan       chan struct{}
 	proposeChan    chan msgWithResult
 	confChangeChan chan pb.ConfChangeV2
 	confStateChan  chan pb.ConfState
@@ -498,6 +497,15 @@ func (n *node) stepWithWaitOption(ctx context.Context, message pb.Message, wait 
 	}
 
 	return nil
+}
+
+func (n *node) TransferLeadership(ctx context.Context, lead, transferee uint64) {
+	select {
+	// manually set 'from' and 'to', so that leader can voluntarily transfer its leadership
+	case n.receiveChan <- pb.Message{Type: pb.MsgTransferLeader, From: transferee, To: lead}:
+	case <-n.doneChan:
+	case <-ctx.Done():
+	}
 }
 
 func (n *node) Advance() {

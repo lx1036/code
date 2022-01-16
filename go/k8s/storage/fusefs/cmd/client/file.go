@@ -3,7 +3,11 @@ package client
 import (
 	"context"
 	"fmt"
+	"k8s-lx1036/k8s/storage/fuse"
+	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
+	"sync"
 	"syscall"
+	"time"
 
 	"k8s-lx1036/k8s/storage/fuse/fuseops"
 
@@ -14,40 +18,91 @@ const (
 	NameMaxLen = 256
 )
 
-type FileHandle struct {
+type FileHandleCache struct {
+	sync.RWMutex
+
+	buffer map[fuseops.InodeID]*Buffer
+
 	inodeID uint64
 	flag    uint32
 }
 
-func (fs *FuseFS) newFileHandle(inodeID uint64, flag uint32) (fuseops.HandleID, error) {
+func NewFileHandleCache() *FileHandleCache {
+	return &FileHandleCache{
+		buffer: make(map[fuseops.InodeID]*Buffer),
+	}
+}
+
+func (fileHandleCache *FileHandleCache) Put(inodeID fuseops.InodeID, handleID fuseops.HandleID, fs *FuseFS) {
+	fileHandleCache.Lock()
+	defer fileHandleCache.Unlock()
+
+	if _, ok := fileHandleCache.buffer[inodeID]; !ok {
+		key, err := fs.getS3Key(inodeID)
+		if err != nil {
+			klog.Error(err)
+			return
+		}
+		fileHandleCache.buffer[inodeID] = NewBuffer(key, fs.s3Client)
+	}
+}
+
+func (fileHandleCache *FileHandleCache) Get(inodeID fuseops.InodeID) *Buffer {
+	return fileHandleCache.buffer[inodeID]
+}
+
+func (fileHandleCache *FileHandleCache) Release(handleID fuseops.HandleID) {
+
+}
+
+func (fs *FuseFS) OpenFile(ctx context.Context, op *fuseops.OpenFileOp) error {
 	fs.Lock()
 	defer fs.Unlock()
 
-	/*key, err := fs.getS3Key(inodeID)
-	if err != nil {
-		return 0, err
-	}
-
-	buffer, ok := fs.dataBuffers[inodeID]
-	if !ok {
-		buffer = NewBuffer(inodeID, fs.s3Backend, fs)
-		buffer.SetFilename(key)
-		fs.dataBuffers[inodeID] = buffer
-	}
-	buffer.IncRef()*/
-
-	handleID := fs.nextHandleID
-	fs.nextHandleID++
-	fs.fileHandles[handleID] = &FileHandle{
-		inodeID: inodeID,
-		flag:    flag,
-	}
-
-	return handleID, nil
+	fs.fileHandleCache.Put(op.Inode, op.Handle, fs)
+	return nil
 }
 
-// CreateFile INFO: 创建文件，其实是在 meta partition 中新建 inode/dentry 对象
+// ReadFile `cat globalmount/1.txt`
+func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
+	klog.Infof(fmt.Sprintf("[ReadFile]inodeID:%d, handleID:%d, Offset:%d", op.Inode, op.Handle, op.Offset))
+	fileBuffer := fs.fileHandleCache.Get(op.Inode)
+	if fileBuffer == nil {
+		fs.fileHandleCache.Put(op.Inode, op.Handle, fs)
+		fileBuffer = fs.fileHandleCache.Get(op.Inode)
+	}
+
+	inode, err := fs.GetInode(op.Inode)
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[ReadFile]inodeID:%d, handleID:%d, err:%v", op.Inode, op.Handle, err))
+		return err
+	}
+	filesize := inode.size
+	if int64(filesize) <= op.Offset {
+		op.BytesRead = 0
+		klog.Infof(fmt.Sprintf("[ReadFile]read offset:%d is large than filesize:%d", op.Offset, filesize))
+		return nil
+	}
+	bytesRead := int64(len(op.Dst))
+	if op.Offset+bytesRead > int64(filesize) {
+		bytesRead = int64(filesize) - op.Offset
+	}
+	op.BytesRead, err = fileBuffer.ReadFile(op.Offset, op.Dst[0:bytesRead], filesize, true)
+	if err != nil {
+		return fuse.EIO
+	}
+
+	return nil
+}
+
+// CreateFile INFO: 创建文件，其实是在 meta partition 中新建 inode/dentry 对象, `touch globalmount/2.txt`
 func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
 	if fs.metaClient.IsVolumeReadOnly() {
 		return syscall.EROFS
 	}
@@ -56,82 +111,118 @@ func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) erro
 	}
 
 	// 在 meta partition 中写 inode 和 dentry 数据
-	parentInodeID := op.Parent
 	inodeInfo, err := fs.metaClient.CreateInodeAndDentry(op.Parent, op.Name,
-		uint32(op.Mode.Perm()), op.Uid, op.Gid, nil)
+		uint32(op.Mode.Perm()), fs.uid, fs.gid, nil)
 	if err != nil {
-		klog.Errorf(fmt.Sprintf("[CreateFile]create inode/dentry for %d/%s err %v", uint64(parentInodeID), op.Name, err))
+		klog.Errorf(fmt.Sprintf("[CreateFile]create inode/dentry for %d/%s err %v", op.Parent, op.Name, err))
 		return err
 	}
 
 	child := NewInode(inodeInfo)
+	op.Entry = fuseops.ChildInodeEntry{
+		Child: child.inodeID,
+		Attributes: fuseops.InodeAttributes{
+			Size:   child.size,
+			Nlink:  child.nlink,
+			Mode:   child.mode,
+			Atime:  time.Unix(child.accessTime, 0),
+			Mtime:  time.Unix(child.modifyTime, 0),
+			Ctime:  time.Unix(child.createTime, 0),
+			Crtime: time.Time{},
+			Uid:    child.uid,
+			Gid:    child.gid,
+		},
+		AttributesExpiration: time.Now().Add(AttrValidDuration),
+		EntryExpiration:      time.Now().Add(LookupValidDuration),
+	}
 	fs.inodeCache.Put(child)
-	parent, err := fs.GetInode(parentInodeID)
+	fs.fileHandleCache.Put(child.inodeID, op.Handle, fs)
+	parent, err := fs.GetInode(op.Parent)
 	if err == nil {
 		parent.dentryCache.Put(op.Name, inodeInfo.Inode)
 	}
 
-	// INFO: 需要填写 child entry，这里注意用的指针 &op.Entry，这样可以直接修改 op.Entry 属性值
-	//fillChildEntry(&op.Entry, child)
-	op.Entry = GetChildInodeEntry(child)
-
-	/*handle, err := fs.newFileHandle(child.inodeID, 0)
-	if err != nil {
-		klog.Errorf(fmt.Sprintf("[CreateFile]newFileHandle err %v", err))
-		return err
-	}
-	op.Handle = handle*/
-
-	klog.Infof(fmt.Sprintf("[CreateFile]create filename %s, parent inodeID %d successfully", op.Name, op.Parent))
+	klog.Infof(fmt.Sprintf("[CreateFile]create filename:%s, parentInodeID:%d, handleID:%d successfully", op.Name, op.Parent, op.Handle))
 	return nil
 }
 
-//func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
-//	fs.Lock()
-//	defer fs.Unlock()
-//
-//	/*var buf *Buffer
-//	if fileHandle, ok := fs.fileHandles[op.Handle]; ok {
-//		if buf, ok = fs.dataBuffers[fileHandle.inodeID]; !ok || buf.lastError != nil {
-//			return fuse.EIO
-//		}
-//	} else {
-//		return fuse.EIO
-//	}
-//
-//	// read data from buffer
-//	inode, err := fs.GetInode(buf.inodeID)
-//	if err != nil {
-//		return err
-//	}
-//
-//	op.BytesRead, err = buf.ReadFile(op.Offset, op.Dst[0:rNeed], fileSize, false)
-//	if err != nil {
-//		return err
-//	}*/
-//
-//	return nil
-//}
+func (fs *FuseFS) WriteFile(ctx context.Context, op *fuseops.WriteFileOp) error {
+	fs.Lock()
+	defer fs.Unlock()
 
-//func (fs *FuseFS) OpenFile(ctx context.Context, op *fuseops.OpenFileOp) error {
-//	panic("implement me")
-//}
-//
-//func (fs *FuseFS) WriteFile(ctx context.Context, op *fuseops.WriteFileOp) error {
-//	panic("implement me")
-//}
-//
-//func (fs *FuseFS) SyncFile(ctx context.Context, op *fuseops.SyncFileOp) error {
-//	panic("implement me")
-//}
-//
-//func (fs *FuseFS) FlushFile(ctx context.Context, op *fuseops.FlushFileOp) error {
-//	panic("implement me")
-//}
-//
-//func (fs *FuseFS) ReleaseFileHandle(ctx context.Context, op *fuseops.ReleaseFileHandleOp) error {
-//	panic("implement me")
-//}
+	if fs.metaClient.IsVolumeReadOnly() {
+		return syscall.EROFS
+	}
+
+	klog.Infof(fmt.Sprintf("[WriteFile]inodeID:%d, handleID:%d, Offset:%d", op.Inode, op.Handle, op.Offset))
+	fileBuffer := fs.fileHandleCache.Get(op.Inode)
+	if fileBuffer == nil {
+		fs.fileHandleCache.Put(op.Inode, op.Handle, fs)
+		fileBuffer = fs.fileHandleCache.Get(op.Inode)
+	}
+
+	total, used, _ := fs.metaClient.Statfs()
+	used += uint64(len(op.Data))
+	if used > total {
+		return fuse.ENOSPC // no space
+	}
+
+	bytesWrite, err := fileBuffer.WriteFile(op.Offset, op.Data, true)
+	if err != nil {
+		return fuse.EIO
+	}
+
+	fs.SetFileSize(op.Inode, uint64(op.Offset)+uint64(bytesWrite), false)
+
+	return nil
+}
+
+func (fs *FuseFS) SetFileSize(inodeID fuseops.InodeID, size uint64, truncate bool) {
+	inode, err := fs.GetInode(inodeID)
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[SetFileSize]fail to set inodeID:%d err:%v", inodeID, err))
+		return
+	}
+
+	if !truncate && inode.size > size {
+		return
+	}
+	inode.size = size
+	err = fs.metaClient.SetAttr(inodeID, proto.AttrSize, uint32(inode.mode), inode.uid, inode.gid, inode.size, 0)
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("[SetFileSize]fail to set inodeID:%d err:%v", inodeID, err))
+		return
+	}
+}
+
+func (fs *FuseFS) SyncFile(ctx context.Context, op *fuseops.SyncFileOp) error {
+	panic("implement me")
+}
+
+func (fs *FuseFS) FlushFile(ctx context.Context, op *fuseops.FlushFileOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
+	fileBuffer := fs.fileHandleCache.Get(op.Inode)
+	if fileBuffer == nil {
+		fs.fileHandleCache.Put(op.Inode, op.Handle, fs)
+		fileBuffer = fs.fileHandleCache.Get(op.Inode)
+	}
+
+	fileBuffer.FlushFile()
+
+	return nil
+}
+
+func (fs *FuseFS) ReleaseFileHandle(ctx context.Context, op *fuseops.ReleaseFileHandleOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
+	fs.fileHandleCache.Release(op.Handle)
+
+	return nil
+}
+
 //
 //func (fs *FuseFS) Rename(ctx context.Context, op *fuseops.RenameOp) error {
 //	panic("implement me")

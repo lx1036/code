@@ -15,7 +15,7 @@ import (
 //  参考下 https://github.com/jacobsa/fuse/blob/master/mount_darwin.go#L85-L107 监听在 /dev/macfusexxx 文件上
 //  **[基于Fuse的用户态文件系统性能优化几点建议](https://zhuanlan.zhihu.com/p/68085075)**
 
-const MaxWriteSize = 1 << 16
+const MaxWriteSize = 1 << 16 // 64 KB
 
 // Create a FUSE FS on the specified mount point. The returned
 // mount point is always absolute.
@@ -25,9 +25,9 @@ func mount(mountPoint string, opts *MountConfig, ready chan<- error) (*os.File, 
 		return nil, os.NewSyscallError("socketpair", err.(syscall.Errno))
 	}
 	// Wrap the sockets into os.File objects that we will pass off to fusermount.
-	writeFile := os.NewFile(uintptr(fd[0]), "fusermount-child-writes")
+	writeFile := os.NewFile(uintptr(fd[0]), "fusermount-writes")
 	defer writeFile.Close()
-	readFile := os.NewFile(uintptr(fd[1]), "fusermount-parent-reads")
+	readFile := os.NewFile(uintptr(fd[1]), "fusermount-reads")
 	defer readFile.Close()
 
 	bin, err := findFusermount()
@@ -91,8 +91,7 @@ func getConnection(local *os.File) (int, error) {
 	control := make([]byte, 4*256)
 
 	// n, oobn, recvflags, from, errno  - todo: error checking.
-	_, oobn, _, _,
-		err := syscall.Recvmsg(int(local.Fd()), data[:], control[:], 0)
+	_, oobn, _, _, err := syscall.Recvmsg(int(local.Fd()), data[:], control[:], 0)
 	if err != nil {
 		return 0, err
 	}

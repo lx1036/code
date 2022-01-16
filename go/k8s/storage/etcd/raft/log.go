@@ -24,14 +24,14 @@ type raftLog struct {
 
 	// maxNextEntsSize is the maximum number aggregate byte size of the messages
 	// returned from calls to nextEnts.
-	maxNextEntsSize uint64
+	maxNextEntsSize uint64 // 1MB
 }
 
 func newLog(storage Storage) *raftLog {
-	return newLogWithSize(storage, noLimit)
+	return newRaftLogWithSize(storage, noLimit)
 }
 
-func newLogWithSize(storage Storage, maxNextEntsSize uint64) *raftLog {
+func newRaftLogWithSize(storage Storage, maxNextEntsSize uint64) *raftLog {
 	if storage == nil {
 		klog.Fatalf("storage must not be nil")
 	}
