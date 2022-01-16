@@ -259,7 +259,7 @@ func TestRestore(test *testing.T) {
 		},
 	}
 	storage := newTestMemoryStorage(withPeers(1, 2), withLearners(4))
-	r := newTestRaft(1, 5, 1, storage)
+	r := newTestRaft(1, 10, 1, storage)
 	if !r.restore(snapshot) {
 		test.Fatal("restore fail, want succeed")
 	}

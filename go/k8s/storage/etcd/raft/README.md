@@ -17,3 +17,12 @@ raft 模块包括：共识模块，log memory/wal storage 模块。状态机是 
 (1) raft协议，leader在commit了一条日志后，立刻挂了，那其他节点如何处理这条日志？
 https://www.zhihu.com/question/357207584
 
+(2) raft cluster, 突然发生了 leader election 选举出一个新 leader，突然选举的原因是什么？以及选举的详细过程？
+
+follower 不是 learner 且没有 pending snapshot for apply，才会成为 candidate。
+
+(3) follower 会在什么情况下成为 candidate?
+
+(4) etcd/raft 有没有持久化 appliedIndex?
+
+(5) etcd/raft leaderTransfer 如何实现的？

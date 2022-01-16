@@ -1,10 +1,20 @@
-package boltdb
+package bolt_store
 
 import (
+	crand "crypto/rand"
+	"encoding/binary"
+	"encoding/json"
+	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"k8s.io/klog/v2"
+	"math"
+	"math/big"
+	"math/rand"
 	"os"
 	"reflect"
+	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -134,7 +144,7 @@ func TestNewBoltStore(t *testing.T) {
 	}
 
 	// Ensure our tables were created
-	db, err := bolt.Open(fh.Name(), dbFileMode, nil)
+	db, err := bolt.Open(fh.Name(), fs.ModePerm, nil)
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
@@ -348,4 +358,73 @@ func TestBoltStoreDeleteRange(t *testing.T) {
 	if err := store.GetLog(2, new(raft.Log)); err != raft.ErrLogNotFound {
 		t.Fatalf("should have deleted log2")
 	}
+}
+
+func TestRaftLogJsonMarshal(test *testing.T) {
+	log := &raft.Log{
+		Index:      1,
+		Term:       1,
+		Type:       raft.LogCommand,
+		Data:       []byte("data"),
+		Extensions: []byte("Extensions"),
+		AppendedAt: time.Now(),
+	}
+	value, _ := json.Marshal(log)
+	// {"Index":1,"Term":1,"Type":0,"Data":"ZGF0YQ==","Extensions":"RXh0ZW5zaW9ucw==","AppendedAt":"2022-01-13T01:46:03.19639+08:00"}
+	klog.Info(string(value))
+
+	type Person struct {
+		Name []byte `json:"name"`
+		City string
+	}
+	person := &Person{Name: []byte("name"), City: "beijing"}
+	value, _ = json.Marshal(person)
+	klog.Info(string(value)) // {"name":"bmFtZQ==","City":"beijing"}
+
+	buf := make([]byte, 8)
+	index := uint64(11)
+	klog.Infof(fmt.Sprintf("%08d", index)) // 00000011 , 需要的
+	b := &big.Int{}
+	b.SetUint64(index)
+	klog.Info(string(b.Bytes()))
+	binary.BigEndian.PutUint64(buf, index)
+	klog.Info(string(buf), buf)                       // 空值, [0 0 0 0 0 0 0 1]
+	klog.Info(binary.BigEndian.Uint64(buf), len(buf)) // 1 8
+
+	term, _ := strconv.ParseUint("00000011", 10, 64)
+	klog.Info(term)
+
+	key := []byte(strconv.FormatUint(11, 10))
+	klog.Info(string(key)) // 11
+
+	keys := []string{"10", "3", "2"}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+	klog.Info(keys) // [0002 0003 0010]
+
+	type Future map[string]string
+	var future Future
+	if _, ok := future["a"]; !ok {
+		klog.Info("not found")
+	}
+
+	minVal := time.Second * 60
+	extra := time.Duration(rand.Int63()) % minVal
+	klog.Info(extra.String())
+}
+
+func init() {
+	// Ensure we use a high-entropy seed for the pseudo-random generator
+	rand.Seed(newSeed())
+}
+
+// returns an int64 from a crypto random source
+// can be used to seed a source for a math/rand.
+func newSeed() int64 {
+	r, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		panic(fmt.Errorf("failed to read random bytes: %v", err))
+	}
+	return r.Int64()
 }

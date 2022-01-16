@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
@@ -187,6 +188,7 @@ func (server *Server) serveConn(conn net.Conn) {
 	defer conn.Close()
 	c := conn.(*net.TCPConn)
 	c.SetKeepAlive(true)
+	c.SetKeepAlivePeriod(time.Minute * 3)
 	remoteAddr := conn.RemoteAddr().String()
 	for {
 		p := &proto.Packet{}
