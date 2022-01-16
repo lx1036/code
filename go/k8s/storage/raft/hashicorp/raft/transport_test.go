@@ -29,25 +29,29 @@ func TestRpcCodec(test *testing.T) {
 				return
 			}
 
+			klog.Info("listener.Accept()")
+
 			go func() {
 				defer conn.Close()
-				r := bufio.NewReaderSize(conn, connReceiveBufferSize)
+				reader := bufio.NewReaderSize(conn, connReceiveBufferSize)
 				writer := bufio.NewWriter(conn)
-				dec := codec.NewDecoder(r, &codec.MsgpackHandle{})
+				dec := codec.NewDecoder(reader, &codec.MsgpackHandle{})
 				enc := codec.NewEncoder(writer, &codec.MsgpackHandle{})
 				for {
-					rpcType, err := r.ReadByte()
+					rpcType, err := reader.ReadByte()
 					if err != nil {
 						klog.Error(err)
 						return
 					}
-					if rpcType != rpcRequestVote {
-						klog.Errorf(fmt.Sprintf("rpc type is not rpcRequestVote"))
-						return
-					}
 					var req RequestVoteRequest
-					if err = dec.Decode(&req); err != nil {
-						klog.Error(err)
+					switch rpcType {
+					case rpcRequestVote:
+						if err = dec.Decode(&req); err != nil {
+							klog.Error(err)
+							return
+						}
+					default:
+						klog.Errorf(fmt.Sprintf("rpc type is unknown"))
 						return
 					}
 
@@ -81,7 +85,7 @@ func TestRpcCodec(test *testing.T) {
 	}()
 
 	go func() {
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 3)
 
 		var err error
 		conn, err := net.Dial("tcp", bindAddr)

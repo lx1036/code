@@ -1,8 +1,14 @@
 package raft
 
 import (
+	"errors"
 	"fmt"
 	"time"
+)
+
+var (
+	// ErrLogNotFound indicates a given log entry is not available.
+	ErrLogNotFound = errors.New("log not found")
 )
 
 // LogType describes various types of log entries.

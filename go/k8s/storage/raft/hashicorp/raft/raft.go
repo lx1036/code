@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"bytes"
 	"container/list"
 	"errors"
 	"fmt"
@@ -335,6 +336,9 @@ func (r *Raft) runFollower() {
 				}
 			}
 
+		case rpc := <-r.rpcCh:
+			r.processRPC(rpc)
+
 		case <-r.shutdownCh:
 			return
 		}
@@ -416,6 +420,9 @@ func (r *Raft) runCandidate() {
 			// which will kick us back into runCandidate
 			klog.Warningf("Election timeout reached, restarting election")
 			return
+
+		case rpc := <-r.rpcCh:
+			r.processRPC(rpc)
 
 		case <-r.shutdownCh:
 			return
@@ -518,7 +525,12 @@ func (r *Raft) persistVote(term uint64, candidate []byte) error {
 // runLeader runs the FSM for a leader. Do the setup here and drop into
 // the leaderLoop for the hot loop.
 func (r *Raft) runLeader() {
-
+	for r.getState() == Leader {
+		select {
+		case rpc := <-r.rpcCh:
+			r.processRPC(rpc)
+		}
+	}
 }
 
 func (r *Raft) config() Config {
@@ -615,6 +627,109 @@ func (r *Raft) processHeartbeat(rpc RPC) {
 		klog.Error(fmt.Sprintf("expected heartbeat, got command: %+v", rpc.Command))
 		rpc.Respond(nil, fmt.Errorf("unexpected command"))
 	}
+}
+
+// processRPC is called to handle an incoming RPC request. This must only be
+// called from the main thread.
+func (r *Raft) processRPC(rpc RPC) {
+	switch cmd := rpc.Command.(type) {
+	case *AppendEntriesRequest:
+		r.appendEntries(rpc, cmd)
+	case *RequestVoteRequest:
+		r.requestVote(rpc, cmd)
+	case *InstallSnapshotRequest:
+		r.installSnapshot(rpc, cmd)
+	case *TimeoutNowRequest:
+		r.timeoutNow(rpc, cmd)
+	default:
+		klog.Error(fmt.Sprintf("got unexpected command: %+v", rpc.Command))
+		rpc.Respond(nil, fmt.Errorf("unexpected command"))
+	}
+}
+
+/*candidate 之后，获取 grant vote 必要条件：
+* 如果已经有 leader 且 leader != candidate，则 reject vote；
+* 如果 term 小于 follower term，则 reject term；
+* 同 term 时不能给不同 candidate 投票多次，但是可以给同一个 candidate 投票多次，否则 reject term；
+* 如果 follower lastLogTerm > candidate lastLogTerm，则 reject term；
+* 如果 follower lastLogTerm == candidate lastLogTerm，但是 follower lastLogIndex == candidate lastLogIndex 则 reject vote；
+ */
+func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
+	resp := &RequestVoteResponse{
+		Term:    r.getCurrentTerm(),
+		Granted: false,
+	}
+	var rpcErr error
+	defer func() {
+		rpc.Respond(resp, rpcErr)
+	}()
+
+	// Check if we have an existing leader [who's not the candidate] and also
+	// check the LeadershipTransfer flag is set. Usually votes are rejected if
+	// there is a known leader. But if the leader initiated a leadership transfer,
+	// vote!
+	candidate := r.transport.DecodePeer(req.Candidate)
+	if leader := r.Leader(); leader != "" && leader != candidate && !req.LeadershipTransfer {
+		klog.Warningf(fmt.Sprintf("rejecting vote request since we have a leader:%s from candidate:%s", leader, candidate))
+		return
+	}
+
+	// Ignore an older term
+	if req.Term < r.getCurrentTerm() {
+		return
+	}
+
+	// Increase the term if we see a newer one
+	if req.Term > r.getCurrentTerm() {
+		// Ensure transition to follower
+		klog.Warningf("lost leadership because received a requestVote with a newer term")
+		r.setState(Follower)
+		r.setCurrentTerm(req.Term)
+		resp.Term = req.Term
+	}
+
+	// Check if we've voted in this election before
+	lastVoteTerm, err := r.stable.GetUint64(keyLastVoteTerm)
+	if err != nil && err.Error() != "not found" {
+		klog.Errorf(fmt.Sprintf("failed to get last vote term err:%v", err))
+		return
+	}
+	lastVoteCandBytes, err := r.stable.Get(keyLastVoteCand)
+	if err != nil && err.Error() != "not found" {
+		klog.Errorf(fmt.Sprintf("failed to get last vote candidate err:%v", err))
+		return
+	}
+	if lastVoteTerm == req.Term && lastVoteCandBytes != nil {
+		klog.Infof(fmt.Sprintf("duplicate requestVote at term:%d", req.Term))
+		if bytes.Compare(lastVoteCandBytes, req.Candidate) == 0 {
+			klog.Warningf(fmt.Sprintf("duplicate requestVote from candidate:%s at term:%d", candidate, req.Term))
+			resp.Granted = true
+		}
+		return
+	}
+
+	// Reject if their term is older
+	lastIdx, lastTerm := r.getLastEntry()
+	if lastTerm > req.LastLogTerm {
+		klog.Warningf(fmt.Sprintf("rejecting vote request since our lastTerm:%d is greater than candidate:%s term:%d",
+			lastTerm, candidate, req.LastLogTerm))
+		return
+	}
+	if lastTerm == req.LastLogTerm && lastIdx > req.LastLogIndex {
+		klog.Warningf(fmt.Sprintf("rejecting vote request since our lastIndex:%d is greater than candidate:%s lastIndex:%d",
+			lastIdx, candidate, req.LastLogIndex))
+		return
+	}
+
+	// Persist a vote for safety
+	if err = r.persistVote(req.Term, req.Candidate); err != nil {
+		klog.Errorf(fmt.Sprintf("failed to persist vote err:%v", err))
+		return
+	}
+
+	resp.Granted = true
+	r.setLastContact()
+	return
 }
 
 // appendEntries is invoked when we get an append entries RPC call. This must
@@ -859,4 +974,24 @@ func (r *Raft) LastContact() time.Time {
 	last := r.lastContact
 	r.lastContactLock.RUnlock()
 	return last
+}
+
+// installSnapshot is invoked when we get a InstallSnapshot RPC call.
+// We must be in the follower state for this, since it means we are
+// too far behind a leader for log replay. This must only be called
+// from the main thread.
+func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
+
+}
+
+// timeoutNow is what happens when a server receives a TimeoutNowRequest.
+func (r *Raft) timeoutNow(rpc RPC, req *TimeoutNowRequest) {
+
+}
+
+// RegisterObserver registers a new observer.
+func (r *Raft) RegisterObserver(observer *Observer) {
+	r.observersLock.Lock()
+	defer r.observersLock.Unlock()
+	r.observers[observer.id] = observer
 }

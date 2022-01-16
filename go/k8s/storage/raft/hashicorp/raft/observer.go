@@ -1,5 +1,7 @@
 package raft
 
+import "sync/atomic"
+
 // LeaderObservation is used for the data when leadership changes.
 type LeaderObservation struct {
 	Leader ServerAddress
@@ -48,4 +50,24 @@ type Observer struct {
 
 	// id is the ID of this observer in the Raft map.
 	id uint64
+}
+
+// nextObserverId is used to provide a unique ID for each observer to aid in
+// deregistration.
+var nextObserverID uint64
+
+// NewObserver creates a new observer that can be registered
+// to make observations on a Raft instance. Observations
+// will be sent on the given channel if they satisfy the
+// given filter.
+//
+// If blocking is true, the observer will block when it can't
+// send on the channel, otherwise it may discard events.
+func NewObserver(channel chan Observation, blocking bool, filter FilterFn) *Observer {
+	return &Observer{
+		channel:  channel,
+		blocking: blocking,
+		filter:   filter,
+		id:       atomic.AddUint64(&nextObserverID, 1),
+	}
 }

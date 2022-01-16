@@ -2,6 +2,7 @@ package raft
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -157,6 +158,11 @@ type NetworkTransport struct {
 
 	consumeCh chan RPC
 
+	// streamCtx is used to cancel existing connection handlers.
+	streamCtx     context.Context
+	streamCancel  context.CancelFunc
+	streamCtxLock sync.RWMutex
+
 	shutdown   bool
 	shutdownCh chan struct{}
 }
@@ -174,7 +180,6 @@ func (n *netConn) Release() error {
 }
 
 func NewNetworkTransport(bindAddr string, maxPool int, timeout time.Duration) (*NetworkTransport, error) {
-
 	listener, err := net.Listen("tcp", bindAddr)
 	if err != nil {
 		return nil, err
@@ -193,9 +198,26 @@ func NewNetworkTransport(bindAddr string, maxPool int, timeout time.Duration) (*
 		shutdownCh: make(chan struct{}),
 	}
 
+	// Create the connection context and then start our listener.
+	transport.setupStreamContext()
 	go transport.listen()
 
 	return transport, nil
+}
+
+// setupStreamContext is used to create a new stream context. This should be
+// called with the stream lock held.
+func (transport *NetworkTransport) setupStreamContext() {
+	ctx, cancel := context.WithCancel(context.Background())
+	transport.streamCtx = ctx
+	transport.streamCancel = cancel
+}
+
+// getStreamContext is used retrieve the current stream context.
+func (transport *NetworkTransport) getStreamContext() context.Context {
+	transport.streamCtxLock.RLock()
+	defer transport.streamCtxLock.RUnlock()
+	return transport.streamCtx
 }
 
 // Consumer implements the Transport interface.
@@ -229,7 +251,8 @@ func (transport *NetworkTransport) listen() {
 			}
 		}
 
-		go transport.handleConn(conn)
+		loopDelay = 0
+		go transport.handleConn(transport.getStreamContext(), conn)
 	}
 }
 
@@ -243,7 +266,10 @@ const (
 	connSendBufferSize = 256 * 1024 // 256KB
 )
 
-func (transport *NetworkTransport) handleConn(conn net.Conn) {
+// handleConn is used to handle an inbound connection for its lifespan. The
+// handler will exit when the passed context is cancelled or the connection is
+// closed.
+func (transport *NetworkTransport) handleConn(connCtx context.Context, conn net.Conn) {
 	defer conn.Close()
 	r := bufio.NewReaderSize(conn, connReceiveBufferSize)
 	w := bufio.NewWriter(conn)
@@ -251,6 +277,13 @@ func (transport *NetworkTransport) handleConn(conn net.Conn) {
 	enc := codec.NewEncoder(w, &codec.MsgpackHandle{})
 
 	for {
+		select {
+		case <-connCtx.Done():
+			klog.Infof("stream layer is closed")
+			return
+		default:
+		}
+
 		if err := transport.handleCommand(r, dec, enc); err != nil {
 			if err != io.EOF {
 				klog.Errorf(fmt.Sprintf("failed to decode incoming command err:%v", err))
@@ -273,7 +306,6 @@ const (
 
 // handleCommand is used to decode and dispatch a single command.
 func (transport *NetworkTransport) handleCommand(r *bufio.Reader, dec *codec.Decoder, enc *codec.Encoder) error {
-
 	// Get the rpc type
 	rpcType, err := r.ReadByte()
 	if err != nil {
@@ -298,16 +330,30 @@ func (transport *NetworkTransport) handleCommand(r *bufio.Reader, dec *codec.Dec
 		return fmt.Errorf("unknown rpc type %d", rpcType)
 	}
 
-	// Dispatch the RPC
+	// Dispatch the RPC to handle the request -> response
 	select {
 	case transport.consumeCh <- rpc:
 	case <-transport.shutdownCh:
 		return ErrTransportShutdown
 	}
 
+	// Wait for response
 	select {
 	case resp := <-respCh:
-		klog.Info(resp)
+		// Send the error first
+		respErr := ""
+		if resp.Error != nil {
+			respErr = resp.Error.Error()
+		}
+		if err := enc.Encode(respErr); err != nil {
+			return err
+		}
+
+		// Send the response
+		if err := enc.Encode(resp.Response); err != nil {
+			return err
+		}
+
 	case <-transport.shutdownCh:
 		return ErrTransportShutdown
 	}
@@ -427,5 +473,23 @@ func sendRPC(conn *netConn, rpcType uint8, request interface{}) error {
 // decodeResponse is used to decode an RPC response and reports whether
 // the connection can be reused.
 func decodeResponse(conn *netConn, resp interface{}) (bool, error) {
+	// INFO: @see handleCommand()
+	// Decode the error if any
+	var rpcError string
+	if err := conn.dec.Decode(&rpcError); err != nil {
+		conn.Release()
+		return false, err
+	}
+
+	// Decode the response
+	if err := conn.dec.Decode(resp); err != nil {
+		conn.Release()
+		return false, err
+	}
+
+	// Format an error if any
+	if rpcError != "" {
+		return true, fmt.Errorf(rpcError)
+	}
 	return true, nil
 }

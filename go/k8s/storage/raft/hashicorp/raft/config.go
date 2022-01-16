@@ -288,6 +288,20 @@ func ValidateConfig(config *Config) error {
 	return nil
 }
 
+func DefaultConfig() *Config {
+	return &Config{
+		HeartbeatTimeout:   1000 * time.Millisecond,
+		ElectionTimeout:    1000 * time.Millisecond,
+		CommitTimeout:      50 * time.Millisecond,
+		MaxAppendEntries:   64,
+		ShutdownOnRemove:   true,
+		TrailingLogs:       10240,
+		SnapshotInterval:   120 * time.Second,
+		SnapshotThreshold:  8192,
+		LeaderLeaseTimeout: 500 * time.Millisecond,
+	}
+}
+
 // EncodeConfiguration serializes a Configuration using MsgPack, or panics on
 // errors.
 func EncodeConfiguration(configuration Configuration) []byte {
