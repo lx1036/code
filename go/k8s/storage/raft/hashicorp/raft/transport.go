@@ -164,7 +164,7 @@ type NetworkTransport struct {
 type netConn struct {
 	target ServerAddress
 	conn   net.Conn
-	w      *bufio.Writer
+	writer *bufio.Writer
 	dec    *codec.Decoder
 	enc    *codec.Encoder
 }
@@ -307,7 +307,7 @@ func (transport *NetworkTransport) handleCommand(r *bufio.Reader, dec *codec.Dec
 
 	select {
 	case resp := <-respCh:
-
+		klog.Info(resp)
 	case <-transport.shutdownCh:
 		return ErrTransportShutdown
 	}
@@ -362,10 +362,10 @@ func (transport *NetworkTransport) getConn(target ServerAddress) (*netConn, erro
 		target: target,
 		conn:   conn,
 		dec:    codec.NewDecoder(bufio.NewReader(conn), &codec.MsgpackHandle{}),
-		w:      bufio.NewWriterSize(conn, connSendBufferSize),
+		writer: bufio.NewWriterSize(conn, connSendBufferSize),
 	}
 
-	netConn.enc = codec.NewEncoder(netConn.w, &codec.MsgpackHandle{})
+	netConn.enc = codec.NewEncoder(netConn.writer, &codec.MsgpackHandle{})
 
 	return netConn, nil
 }
@@ -405,7 +405,7 @@ func (transport *NetworkTransport) addConn(conn *netConn) {
 // sendRPC is used to encode and send the RPC.
 func sendRPC(conn *netConn, rpcType uint8, request interface{}) error {
 	// Write the request type
-	if err := conn.w.WriteByte(rpcType); err != nil {
+	if err := conn.writer.WriteByte(rpcType); err != nil {
 		conn.Release()
 		return err
 	}
@@ -417,9 +417,15 @@ func sendRPC(conn *netConn, rpcType uint8, request interface{}) error {
 	}
 
 	// Flush
-	if err := conn.w.Flush(); err != nil {
+	if err := conn.writer.Flush(); err != nil {
 		conn.Release()
 		return err
 	}
 	return nil
+}
+
+// decodeResponse is used to decode an RPC response and reports whether
+// the connection can be reused.
+func decodeResponse(conn *netConn, resp interface{}) (bool, error) {
+	return true, nil
 }
