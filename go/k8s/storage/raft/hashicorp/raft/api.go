@@ -13,6 +13,14 @@ var (
 
 	// ErrEnqueueTimeout is returned when a command fails due to a timeout.
 	ErrEnqueueTimeout = errors.New("timed out enqueuing operation")
+
+	// ErrLeadershipTransferInProgress is returned when the leader is rejecting
+	// client requests because it is attempting to transfer leadership.
+	ErrLeadershipTransferInProgress = errors.New("leadership transfer in progress")
+
+	// ErrNotLeader is returned when an operation can't be completed on a
+	// follower or candidate node.
+	ErrNotLeader = errors.New("node is not the leader")
 )
 
 // Apply is used to apply a command to the FSM in a highly consistent

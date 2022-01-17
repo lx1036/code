@@ -1,6 +1,9 @@
 package raft
 
-import "sync"
+import (
+	"sort"
+	"sync"
+)
 
 // Commitment is used to advance the leader's commit index. The leader and
 // replication goroutines report in newly written entries with Match(), and
@@ -40,3 +43,45 @@ func newCommitment(commitCh chan struct{}, configuration Configuration, startInd
 		startIndex:   startIndex,
 	}
 }
+
+// Match is called once a server completes writing entries to disk: either the
+// leader has written the new entry or a follower has replied to an
+// AppendEntries RPC. The given server's disk agrees with this server's log up
+// through the given index.
+func (c *commitment) match(id ServerID, matchIndex uint64) {
+	c.Lock()
+	defer c.Unlock()
+
+	if prev, ok := c.matchIndexes[id]; ok && matchIndex > prev {
+		c.matchIndexes[id] = matchIndex
+		c.recalculate()
+	}
+}
+
+// Internal helper to calculate new commitIndex from matchIndexes.
+// Must be called with lock held.
+func (c *commitment) recalculate() {
+	if len(c.matchIndexes) == 0 {
+		return
+	}
+
+	matched := make([]uint64, 0, len(c.matchIndexes))
+	for _, idx := range c.matchIndexes {
+		matched = append(matched, idx)
+	}
+	sort.Sort(uint64Slice(matched))
+	quorumMatchIndex := matched[(len(matched)-1)/2] // TODO: 查找论文计算 commit index
+	if quorumMatchIndex > c.commitIndex && quorumMatchIndex >= c.startIndex {
+		c.commitIndex = quorumMatchIndex
+		select {
+		case c.commitCh <- struct{}{}: // @see runLeader()::<-r.leaderState.commitCh
+		default:
+		}
+	}
+}
+
+type uint64Slice []uint64
+
+func (p uint64Slice) Len() int           { return len(p) }
+func (p uint64Slice) Less(i, j int) bool { return p[i] < p[j] }
+func (p uint64Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }

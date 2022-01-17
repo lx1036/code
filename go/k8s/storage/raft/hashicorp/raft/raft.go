@@ -520,17 +520,98 @@ func (r *Raft) persistVote(term uint64, candidate []byte) error {
 func (r *Raft) runLeader() {
 	klog.Infof(fmt.Sprintf("%s/%s entering leader state in term:%d for leader:%s", r.localID, r.localAddr, r.getCurrentTerm(), r.Leader()))
 
-	// setup leader state. This is only supposed to be accessed within the
-	// leaderloop.
+	// setup leader state. This is only supposed to be accessed within the leaderloop.
 	r.setupLeaderState()
 
 	// Start a replication routine for each peer
 	r.startReplication()
 
+	// stepDown is used to track if there is an inflight log that
+	// would cause us to lose leadership (specifically a RemovePeer of
+	// ourselves). If this is the case, we must not allow any logs to
+	// be processed in parallel, otherwise we are basing commit on
+	// only a single peer (ourself) and replicating to an undefined set
+	// of peers.
+	stepDown := false
+
 	for r.getState() == Leader {
 		select {
 		case rpc := <-r.rpcCh:
 			r.processRPC(rpc)
+
+		case newLog := <-r.applyCh:
+			if r.getLeadershipTransferInProgress() {
+				klog.Warningf(ErrLeadershipTransferInProgress.Error())
+				newLog.respond(ErrLeadershipTransferInProgress)
+				continue
+			}
+
+			// Group commit, gather all the ready commits
+			ready := []*logFuture{newLog}
+		GroupCommitLoop:
+			for i := 0; i < r.config().MaxAppendEntries; i++ {
+				select {
+				case log := <-r.applyCh:
+					ready = append(ready, log)
+				default:
+					break GroupCommitLoop
+				}
+			}
+
+			// Dispatch the logs
+			if stepDown {
+				// we're in the process of stepping down as leader, don't process anything new
+				for i := range ready {
+					ready[i].respond(ErrNotLeader)
+				}
+			} else {
+				r.dispatchLogs(ready)
+			}
+
+		case <-r.leaderState.commitCh:
+
+		case <-r.shutdownCh:
+			return
+		}
+	}
+}
+
+// dispatchLog is called on the leader to push a log to disk, mark it
+// as inflight and begin replication of it.
+func (r *Raft) dispatchLogs(applyLogs []*logFuture) {
+	now := time.Now()
+	term := r.getCurrentTerm()
+	lastIndex := r.getLastIndex()
+	logs := make([]*Log, len(applyLogs))
+	for idx, applyLog := range applyLogs {
+		applyLog.dispatch = now
+		lastIndex++
+		applyLog.log.Index = lastIndex
+		applyLog.log.Term = term
+		applyLog.log.AppendedAt = now
+		logs[idx] = &applyLog.log
+		r.leaderState.inflight.PushBack(applyLog)
+	}
+
+	// push logs to disk(boltdb)
+	if err := r.logs.StoreLogs(logs); err != nil {
+		klog.Errorf(fmt.Sprintf("failed to store logs to disk err:%v", err))
+		for _, applyLog := range applyLogs {
+			applyLog.respond(err)
+		}
+		r.setState(Follower)
+		return
+	}
+
+	r.leaderState.commitment.match(r.localID, lastIndex)
+	// Update the last log since it's on disk now
+	r.setLastLog(lastIndex, term)
+
+	// Notify the replicators of the new log
+	for _, replication := range r.leaderState.replState {
+		select {
+		case replication.triggerCh <- struct{}{}:
+		default:
 		}
 	}
 }
@@ -544,6 +625,18 @@ func (r *Raft) setupLeaderState() {
 	r.leaderState.replState = make(map[ServerID]*followerReplication)
 	r.leaderState.notify = make(map[*verifyFuture]struct{})
 	r.leaderState.stepDown = make(chan struct{}, 1)
+}
+
+func (r *Raft) setLeadershipTransferInProgress(v bool) {
+	if v {
+		atomic.StoreInt32(&r.leaderState.leadershipTransferInProgress, 1)
+	} else {
+		atomic.StoreInt32(&r.leaderState.leadershipTransferInProgress, 0)
+	}
+}
+
+func (r *Raft) getLeadershipTransferInProgress() bool {
+	return atomic.LoadInt32(&r.leaderState.leadershipTransferInProgress) == 1
 }
 
 // startReplication will set up state and start asynchronous replication to

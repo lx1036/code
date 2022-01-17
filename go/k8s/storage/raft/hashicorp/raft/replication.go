@@ -108,21 +108,20 @@ func (s *followerReplication) notifyAll(leader bool) {
 	}
 }
 
-// replicate is a long running routine that replicates log entries to a single
-// follower.
-func (r *Raft) replicate(s *followerReplication) {
+// replicate is a long running routine that replicates log entries to a single follower.
+func (r *Raft) replicate(follower *followerReplication) {
 	// Start an async heartbeat routing
 	stopHeartbeat := make(chan struct{})
 	defer close(stopHeartbeat)
-	go r.heartbeat(s, stopHeartbeat)
+	go r.heartbeat(follower, stopHeartbeat)
 
 	//RPC:
 	shouldStop := false
 	for !shouldStop {
 		select {
-		case <-s.triggerCh:
+		case <-follower.triggerCh:
 			lastLogIdx, _ := r.getLastLog()
-			shouldStop = r.replicateTo(s, lastLogIdx)
+			shouldStop = r.replicateTo(follower, lastLogIdx)
 		}
 	}
 
@@ -178,6 +177,6 @@ func (r *Raft) heartbeat(replication *followerReplication, stopCh chan struct{})
 // replicateTo is a helper to replicate(), used to replicate the logs up to a
 // given last index.
 // If the follower log is behind, we take care to bring them up to date.
-func (r *Raft) replicateTo(s *followerReplication, lastIndex uint64) (shouldStop bool) {
+func (r *Raft) replicateTo(follower *followerReplication, lastIndex uint64) (shouldStop bool) {
 	return false
 }
