@@ -164,3 +164,17 @@ type leadershipTransferFuture struct {
 	ID      *ServerID
 	Address *ServerAddress
 }
+
+type shutdownFuture struct {
+	raft *Raft
+}
+
+func (s *shutdownFuture) Error() error {
+	if s.raft == nil {
+		return nil
+	}
+	if closeable, ok := s.raft.transport.(WithClose); ok {
+		closeable.Close()
+	}
+	return nil
+}

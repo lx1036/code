@@ -2,6 +2,9 @@ package raft
 
 import (
 	"io"
+	"sync"
+
+	"github.com/hashicorp/go-msgpack/codec"
 )
 
 // FSM provides an interface that can be implemented by
@@ -45,3 +48,54 @@ type FSMSnapshot interface {
 func (r *Raft) runFSM() {
 
 }
+
+// MockFSM is an implementation of the FSM interface, and just stores
+// the logs sequentially.
+type MockFSM struct {
+	sync.Mutex
+	logs           [][]byte
+	configurations []Configuration
+}
+
+func (m *MockFSM) Apply(log *Log) interface{} {
+	m.Lock()
+	defer m.Unlock()
+	m.logs = append(m.logs, log.Data)
+	return len(m.logs)
+}
+
+func (m *MockFSM) Snapshot() (FSMSnapshot, error) {
+	m.Lock()
+	defer m.Unlock()
+	return &MockSnapshot{m.logs, len(m.logs)}, nil
+}
+
+func (m *MockFSM) Restore(reader io.ReadCloser) error {
+	m.Lock()
+	defer m.Unlock()
+
+	defer reader.Close()
+	hd := codec.MsgpackHandle{}
+	dec := codec.NewDecoder(reader, &hd)
+
+	m.logs = nil
+	return dec.Decode(&m.logs)
+}
+
+type MockSnapshot struct {
+	logs     [][]byte
+	maxIndex int
+}
+
+func (m *MockSnapshot) Persist(sink SnapshotSink) error {
+	hd := codec.MsgpackHandle{}
+	enc := codec.NewEncoder(sink, &hd)
+	if err := enc.Encode(m.logs[:m.maxIndex]); err != nil {
+		sink.Cancel()
+		return err
+	}
+	sink.Close()
+	return nil
+}
+
+func (m *MockSnapshot) Release() {}

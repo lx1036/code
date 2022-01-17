@@ -81,6 +81,18 @@ type Transport interface {
 	TimeoutNow(id ServerID, target ServerAddress, args *TimeoutNowRequest, resp *TimeoutNowResponse) error
 }
 
+// WithClose is an interface that a transport may provide which
+// allows a transport to be shut down cleanly when a Raft instance
+// shuts down.
+//
+// It is defined separately from Transport as unfortunately it wasn't in the
+// original interface specification.
+type WithClose interface {
+	// Close permanently closes a transport, stopping
+	// any associated goroutines and freeing other resources.
+	Close() error
+}
+
 // AppendPipeline is used for pipelining AppendEntries requests. It is used
 // to increase the replication throughput by masking latency and better
 // utilizing bandwidth.
@@ -163,8 +175,9 @@ type NetworkTransport struct {
 	streamCancel  context.CancelFunc
 	streamCtxLock sync.RWMutex
 
-	shutdown   bool
-	shutdownCh chan struct{}
+	shutdownLock sync.Mutex
+	shutdown     bool
+	shutdownCh   chan struct{}
 }
 
 type netConn struct {
@@ -281,6 +294,8 @@ func (transport *NetworkTransport) handleConn(connCtx context.Context, conn net.
 		case <-connCtx.Done():
 			klog.Infof("stream layer is closed")
 			return
+		case <-transport.shutdownCh:
+			return
 		default:
 		}
 
@@ -383,7 +398,7 @@ func (transport *NetworkTransport) genericRPC(id ServerID, target ServerAddress,
 		return err
 	}
 
-	// Decode the response
+	// Wait for and Decode the response
 	canReturn, err := decodeResponse(conn, resp)
 	if canReturn {
 		transport.addConn(conn)
@@ -446,6 +461,17 @@ func (transport *NetworkTransport) addConn(conn *netConn) {
 	} else {
 		conn.Release()
 	}
+}
+
+func (transport *NetworkTransport) Close() error {
+	transport.shutdownLock.Lock()
+	defer transport.shutdownLock.Unlock()
+
+	if !transport.shutdown {
+		close(transport.shutdownCh)
+		transport.shutdown = true
+	}
+	return nil
 }
 
 // sendRPC is used to encode and send the RPC.

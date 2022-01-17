@@ -412,6 +412,17 @@ func TestRaftLogJsonMarshal(test *testing.T) {
 	minVal := time.Second * 60
 	extra := time.Duration(rand.Int63()) % minVal
 	klog.Info(extra.String())
+
+	shutshownCh := make(chan struct{})
+	go func() {
+		time.Sleep(time.Second * 3)
+		close(shutshownCh) // close channel 会触发 <-shutdown
+	}()
+	select {
+	case <-shutshownCh:
+		klog.Info("shutdown")
+		return
+	}
 }
 
 func init() {

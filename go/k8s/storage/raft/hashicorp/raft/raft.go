@@ -328,7 +328,7 @@ func (r *Raft) runFollower() {
 				klog.Warningf("not part of stable configuration, aborting election")
 			} else {
 				if hasVote(r.configurations.latest, r.localID) {
-					klog.Warningf(fmt.Sprintf("heartbeat timeout reached, starting election lastLeader:%s", lastLeader))
+					klog.Warningf(fmt.Sprintf("%s/%s heartbeat timeout reached, starting election lastLeader:%s", r.localID, r.localAddr, lastLeader))
 					r.setState(Candidate)
 					return
 				} else {
@@ -374,7 +374,7 @@ type voteResult struct {
 
 // runCandidate runs the FSM for a candidate.
 func (r *Raft) runCandidate() {
-	klog.Infof(fmt.Sprintf("%s/%s entering candidate state in term:%d", r.localID, r.localAddr, r.getCurrentTerm()+1))
+	klog.Infof(fmt.Sprintf("%s/%s entering candidate state in term:%d for leader:%s", r.localID, r.localAddr, r.getCurrentTerm()+1, r.Leader()))
 
 	// Start vote for local and peers, and set a timeout
 	voteCh := r.startElection()
@@ -525,6 +525,8 @@ func (r *Raft) persistVote(term uint64, candidate []byte) error {
 // runLeader runs the FSM for a leader. Do the setup here and drop into
 // the leaderLoop for the hot loop.
 func (r *Raft) runLeader() {
+	klog.Infof(fmt.Sprintf("%s/%s entering leader state in term:%d for leader:%s", r.localID, r.localAddr, r.getCurrentTerm(), r.Leader()))
+
 	for r.getState() == Leader {
 		select {
 		case rpc := <-r.rpcCh:
@@ -541,7 +543,7 @@ func (r *Raft) setState(state RaftState) {
 	oldState := r.raftState.getState()
 	r.raftState.setState(state)
 	if oldState != state {
-		klog.Infof(fmt.Sprintf("swich raft state from %s to %s", oldState, state))
+		klog.Infof(fmt.Sprintf("swich raft state from %s to %s for %s/%s", oldState, state, r.localID, r.localAddr))
 	}
 }
 
@@ -682,7 +684,7 @@ func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
 	// Increase the term if we see a newer one
 	if req.Term > r.getCurrentTerm() {
 		// Ensure transition to follower
-		klog.Warningf("lost leadership because received a requestVote with a newer term")
+		klog.Warningf(fmt.Sprintf("%s/%s lost leadership because received a requestVote with a newer term", r.localID, r.localAddr))
 		r.setState(Follower)
 		r.setCurrentTerm(req.Term)
 		resp.Term = req.Term
@@ -994,4 +996,22 @@ func (r *Raft) RegisterObserver(observer *Observer) {
 	r.observersLock.Lock()
 	defer r.observersLock.Unlock()
 	r.observers[observer.id] = observer
+}
+
+// Shutdown is used to stop the Raft background routines.
+// This is not a graceful operation. Provides a future that
+// can be used to block until all background routines have exited.
+func (r *Raft) Shutdown() Future {
+	r.shutdownLock.Lock()
+	defer r.shutdownLock.Unlock()
+
+	if !r.shutdown {
+		close(r.shutdownCh)
+		r.shutdown = true
+		r.setState(Shutdown)
+		return &shutdownFuture{r}
+	}
+
+	// avoid closing transport twice
+	return &shutdownFuture{nil}
 }
