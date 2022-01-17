@@ -1,6 +1,56 @@
 package raft
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+	"time"
+)
+
+var (
+	ErrRaftShutdown = errors.New("raft is already shutdown")
+
+	ErrCantBootstrap = errors.New("bootstrap only works on new clusters")
+
+	// ErrEnqueueTimeout is returned when a command fails due to a timeout.
+	ErrEnqueueTimeout = errors.New("timed out enqueuing operation")
+)
+
+// Apply is used to apply a command to the FSM in a highly consistent
+// manner. This returns a future that can be used to wait on the application.
+// An optional timeout can be provided to limit the amount of time we wait
+// for the command to be started. This must be run on the leader or it
+// will fail.
+func (r *Raft) Apply(cmd []byte, timeout time.Duration) ApplyFuture {
+	return r.ApplyLog(Log{Data: cmd}, timeout)
+}
+
+// ApplyLog performs Apply but takes in a Log directly. The only values
+// currently taken from the submitted Log are Data and Extensions.
+func (r *Raft) ApplyLog(log Log, timeout time.Duration) ApplyFuture {
+	var timer <-chan time.Time
+	if timeout > 0 {
+		timer = time.After(timeout)
+	}
+
+	// Create a log future, no index or term yet
+	f := &logFuture{
+		log: Log{
+			Type:       LogCommand,
+			Data:       log.Data,
+			Extensions: log.Extensions,
+		},
+	}
+	f.init()
+
+	select {
+	case <-timer:
+		return errorFuture{ErrEnqueueTimeout}
+	case <-r.shutdownCh:
+		return errorFuture{ErrRaftShutdown}
+	case r.applyCh <- f:
+		return f
+	}
+}
 
 // BootstrapCluster initializes a server's storage with the given cluster
 // configuration. This should only be called at the beginning of time for the

@@ -23,6 +23,14 @@ type errorFuture struct {
 	err error
 }
 
+func (e errorFuture) Index() uint64 {
+	return 0
+}
+
+func (e errorFuture) Response() interface{} {
+	return nil
+}
+
 func (e errorFuture) Error() error {
 	return e.err
 }
@@ -79,12 +87,42 @@ type logFuture struct {
 	dispatch time.Time
 }
 
+func (l logFuture) Index() uint64 {
+	return l.log.Index
+}
+
+func (l logFuture) Response() interface{} {
+	return l.response
+}
+
 // There are several types of requests that cause a configuration entry to
 // be appended to the log. These are encoded here for leaderLoop() to process.
 // This is internal to a single server.
 type configurationChangeFuture struct {
 	logFuture
 	req configurationChangeRequest
+}
+
+// IndexFuture is used for future actions that can result in a raft log entry
+// being created.
+type IndexFuture interface {
+	Future
+
+	// Index holds the index of the newly applied log entry.
+	// This must not be called until after the Error method has returned.
+	Index() uint64
+}
+
+// ApplyFuture is used for Apply and can return the FSM response.
+type ApplyFuture interface {
+	IndexFuture
+
+	// Response returns the FSM response as returned by the FSM.Apply method. This
+	// must not be called until after the Error method has returned.
+	// Note that if FSM.Apply returns an error, it will be returned by Response,
+	// and not by the Error method, so it is always important to check Response
+	// for errors from the FSM.
+	Response() interface{}
 }
 
 // verifyFuture is used to verify the current node is still
@@ -95,6 +133,29 @@ type verifyFuture struct {
 	quorumSize int
 	votes      int
 	voteLock   sync.Mutex
+}
+
+// vote is used to respond to a verifyFuture.
+// This may block when responding on the notifyCh.
+func (v *verifyFuture) vote(leader bool) {
+	v.voteLock.Lock()
+	defer v.voteLock.Unlock()
+
+	// Guard against having notified already
+	if v.notifyCh == nil {
+		return
+	}
+
+	if leader {
+		v.votes++
+		if v.votes >= v.quorumSize {
+			v.notifyCh <- v
+			v.notifyCh = nil
+		}
+	} else {
+		v.notifyCh <- v
+		v.notifyCh = nil
+	}
 }
 
 // configurationsFuture is used to retrieve the current configurations. This is

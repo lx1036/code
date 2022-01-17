@@ -1,10 +1,30 @@
 package raft
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+	"time"
+)
 
 // LeaderObservation is used for the data when leadership changes.
 type LeaderObservation struct {
 	Leader ServerAddress
+}
+
+// PeerObservation is sent to observers when peers change.
+type PeerObservation struct {
+	Removed bool
+	Peer    Server
+}
+
+// FailedHeartbeatObservation is sent when a node fails to heartbeat with the leader
+type FailedHeartbeatObservation struct {
+	PeerID      ServerID
+	LastContact time.Time
+}
+
+// ResumedHeartbeatObservation is sent when a node resumes to heartbeat with the leader following failures
+type ResumedHeartbeatObservation struct {
+	PeerID ServerID
 }
 
 // observe sends an observation to every observer.

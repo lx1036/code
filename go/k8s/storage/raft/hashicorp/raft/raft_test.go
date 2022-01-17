@@ -18,4 +18,14 @@ func TestRaftStartStop(test *testing.T) {
 	// wait for leader election
 	time.Sleep(time.Second * 10)
 	cluster.Close()
+
+	raft := cluster.rafts[0]
+	// Everything should fail now
+	if f := raft.Apply(nil, 0); f.Error() != ErrRaftShutdown {
+		test.Fatalf("should be shutdown: %v", f.Error())
+	}
+	// Should be idempotent
+	if f := raft.Shutdown(); f.Error() != nil {
+		test.Fatalf("shutdown should be idempotent")
+	}
 }

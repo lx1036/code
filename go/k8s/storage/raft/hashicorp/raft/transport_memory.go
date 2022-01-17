@@ -40,7 +40,15 @@ func (transport *MemoryTransport) AppendEntriesPipeline(id ServerID, target Serv
 }
 
 func (transport *MemoryTransport) AppendEntries(id ServerID, target ServerAddress, request *AppendEntriesRequest, resp *AppendEntriesResponse) error {
-	panic("implement me")
+	rpcResp, err := transport.sendRPC(target, request, nil, transport.timeout)
+	if err != nil {
+		return err
+	}
+
+	// Copy the result back
+	out := rpcResp.Response.(*AppendEntriesResponse)
+	*resp = *out
+	return nil
 }
 
 func (transport *MemoryTransport) RequestVote(id ServerID, target ServerAddress, request *RequestVoteRequest, resp *RequestVoteResponse) error {

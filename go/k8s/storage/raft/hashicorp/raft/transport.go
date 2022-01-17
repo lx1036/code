@@ -381,6 +381,10 @@ func (transport *NetworkTransport) RequestVote(id ServerID, target ServerAddress
 	return transport.genericRPC(id, target, rpcRequestVote, request, resp)
 }
 
+func (transport *NetworkTransport) AppendEntries(id ServerID, target ServerAddress, request *RequestVoteRequest, resp *RequestVoteResponse) error {
+	return transport.genericRPC(id, target, rpcAppendEntries, request, resp)
+}
+
 // genericRPC handles a simple request/response RPC.
 func (transport *NetworkTransport) genericRPC(id ServerID, target ServerAddress, rpcType uint8, request interface{}, resp interface{}) error {
 	conn, err := transport.getConn(target)
@@ -461,6 +465,16 @@ func (transport *NetworkTransport) addConn(conn *netConn) {
 	} else {
 		conn.Release()
 	}
+}
+
+// EncodePeer implements the Transport interface.
+func (transport *NetworkTransport) EncodePeer(id ServerID, address ServerAddress) []byte {
+	return []byte(address)
+}
+
+// DecodePeer implements the Transport interface.
+func (transport *NetworkTransport) DecodePeer(buf []byte) ServerAddress {
+	return ServerAddress(buf)
 }
 
 func (transport *NetworkTransport) Close() error {

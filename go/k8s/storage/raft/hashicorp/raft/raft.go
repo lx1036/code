@@ -3,7 +3,6 @@ package raft
 import (
 	"bytes"
 	"container/list"
-	"errors"
 	"fmt"
 	"k8s.io/klog/v2"
 	"sync"
@@ -17,21 +16,15 @@ var (
 	keyLastVoteCand = []byte("LastVoteCand")
 )
 
-var (
-	ErrRaftShutdown = errors.New("raft is already shutdown")
-
-	ErrCantBootstrap = errors.New("bootstrap only works on new clusters")
-)
-
 // leaderState is state that is used while we are a leader.
 type leaderState struct {
 	leadershipTransferInProgress int32 // indicates that a leadership transfer is in progress.
 	commitCh                     chan struct{}
-	//commitment                   *commitment
-	inflight *list.List // list of logFuture in log index order
-	//replState                    map[ServerID]*followerReplication
-	//notify                       map[*verifyFuture]struct{}
-	stepDown chan struct{}
+	commitment                   *commitment
+	inflight                     *list.List // list of logFuture in log index order
+	replState                    map[ServerID]*followerReplication
+	notify                       map[*verifyFuture]struct{}
+	stepDown                     chan struct{}
 }
 
 // Raft implements a Raft node.
@@ -404,8 +397,8 @@ func (r *Raft) runCandidate() {
 			// Check if the vote is granted
 			if vote.Granted {
 				grantedVotes++
-				klog.Infof(fmt.Sprintf("vote granted from %s/%s at term:%d and votes is %d/%d now",
-					vote.voterID, vote.voterAddress, vote.Term, grantedVotes, r.totalVoteSize()))
+				klog.Infof(fmt.Sprintf("vote granted from %s/%s to %s/%s at term:%d and votes is %d/%d now",
+					vote.voterID, vote.voterAddress, r.localID, r.localAddr, vote.Term, grantedVotes, r.totalVoteSize()))
 			}
 			// Check if we've become the leader
 			if grantedVotes >= votesNeeded {
@@ -527,11 +520,102 @@ func (r *Raft) persistVote(term uint64, candidate []byte) error {
 func (r *Raft) runLeader() {
 	klog.Infof(fmt.Sprintf("%s/%s entering leader state in term:%d for leader:%s", r.localID, r.localAddr, r.getCurrentTerm(), r.Leader()))
 
+	// setup leader state. This is only supposed to be accessed within the
+	// leaderloop.
+	r.setupLeaderState()
+
+	// Start a replication routine for each peer
+	r.startReplication()
+
 	for r.getState() == Leader {
 		select {
 		case rpc := <-r.rpcCh:
 			r.processRPC(rpc)
 		}
+	}
+}
+
+func (r *Raft) setupLeaderState() {
+	r.leaderState.commitCh = make(chan struct{}, 1)
+	r.leaderState.commitment = newCommitment(r.leaderState.commitCh,
+		r.configurations.latest,
+		r.getLastIndex()+1 /* first index that may be committed in this term */)
+	r.leaderState.inflight = list.New()
+	r.leaderState.replState = make(map[ServerID]*followerReplication)
+	r.leaderState.notify = make(map[*verifyFuture]struct{})
+	r.leaderState.stepDown = make(chan struct{}, 1)
+}
+
+// startReplication will set up state and start asynchronous replication to
+// new peers, and stop replication to removed peers. Before removing a peer,
+// it'll instruct the replication routines to try to replicate to the current
+// index. This must only be called from the main thread.
+func (r *Raft) startReplication() {
+	inConfig := make(map[ServerID]bool, len(r.configurations.latest.Servers))
+	lastIdx := r.getLastIndex()
+
+	// Start replication goroutines that need starting
+	for _, server := range r.configurations.latest.Servers {
+		if server.ID == r.localID {
+			continue
+		}
+
+		inConfig[server.ID] = true
+
+		replication, ok := r.leaderState.replState[server.ID]
+		if !ok {
+			klog.Infof(fmt.Sprintf("leader:%s/%s start a new follower replication for follower:%s/%s",
+				r.localID, r.localAddr, server.ID, server.Address))
+
+			replication = &followerReplication{
+				currentTerm:         r.getCurrentTerm(),
+				nextIndex:           lastIdx + 1,
+				peer:                server,
+				commitment:          r.leaderState.commitment,
+				stepDown:            r.leaderState.stepDown,
+				lastContact:         time.Now(),
+				stopCh:              make(chan uint64, 1),
+				triggerCh:           make(chan struct{}, 1), // buffer channel
+				triggerDeferErrorCh: make(chan *deferError, 1),
+				notify:              make(map[*verifyFuture]struct{}),
+				notifyCh:            make(chan struct{}, 1),
+			}
+			r.leaderState.replState[server.ID] = replication
+			go r.replicate(replication)
+
+			select {
+			case replication.triggerCh <- struct{}{}:
+			default:
+			}
+
+			r.observe(PeerObservation{Peer: server, Removed: false})
+		} else {
+			replication.peerLock.RLock()
+			peer := replication.peer
+			replication.peerLock.RUnlock()
+			if peer.Address != server.Address {
+				klog.Infof(fmt.Sprintf("live change the peer address for %s/%s", server.ID, server.Address))
+				replication.peerLock.Lock()
+				peer.Address = server.Address
+				replication.peerLock.Unlock()
+			}
+		}
+	}
+
+	// Stop replication goroutines that need stopping
+	// Before removing a peer, it'll instruct the replication routines to try to replicate to the current index.
+	for serverID, repl := range r.leaderState.replState {
+		if inConfig[serverID] {
+			continue
+		}
+
+		// Replicate up to lastIdx and stop
+		klog.Infof(fmt.Sprintf("removed peer:%s/%s from leader:%s/%s peers, and stopping replication until up to lastIndex:%d",
+			repl.peer.ID, repl.peer.Address, r.localID, r.localAddr, lastIdx))
+		repl.stopCh <- lastIdx
+		close(repl.stopCh)
+		delete(r.leaderState.replState, serverID)
+		r.observe(PeerObservation{Peer: repl.peer, Removed: true})
 	}
 }
 
@@ -543,7 +627,7 @@ func (r *Raft) setState(state RaftState) {
 	oldState := r.raftState.getState()
 	r.raftState.setState(state)
 	if oldState != state {
-		klog.Infof(fmt.Sprintf("swich raft state from %s to %s for %s/%s", oldState, state, r.localID, r.localAddr))
+		klog.Infof(fmt.Sprintf("switch raft state from %s to %s for %s/%s", oldState, state, r.localID, r.localAddr))
 	}
 }
 
@@ -684,7 +768,8 @@ func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
 	// Increase the term if we see a newer one
 	if req.Term > r.getCurrentTerm() {
 		// Ensure transition to follower
-		klog.Warningf(fmt.Sprintf("%s/%s lost leadership because received a requestVote with a newer term", r.localID, r.localAddr))
+		klog.Warningf(fmt.Sprintf("%s/%s received a requestVote from %s with a newer term:%d",
+			r.localID, r.localAddr, candidate, req.Term))
 		r.setState(Follower)
 		r.setCurrentTerm(req.Term)
 		resp.Term = req.Term
