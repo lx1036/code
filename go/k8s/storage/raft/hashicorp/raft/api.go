@@ -52,6 +52,10 @@ func (r *Raft) ApplyLog(log Log, timeout time.Duration) ApplyFuture {
 	}
 }
 
+func (r *Raft) State() RaftState {
+	return r.getState()
+}
+
 // BootstrapCluster initializes a server's storage with the given cluster
 // configuration. This should only be called at the beginning of time for the
 // cluster with an identical configuration listing all Voter servers. There is

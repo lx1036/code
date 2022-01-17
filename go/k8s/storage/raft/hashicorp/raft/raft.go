@@ -314,8 +314,8 @@ func (r *Raft) runFollower() {
 			// Heartbeat failed! Transition to the candidate state
 			lastLeader := r.Leader()
 			r.setLeader("")
-			if r.configurations.latestIndex == 0 { // INFO: 如果 BootstrapCluster 慢于 heartbeatTimeout，提示warning
-				klog.Warningf("no known peers, aborting election")
+			if r.configurations.latestIndex == 0 { // INFO: 如果没有 BootstrapCluster 或者 BootstrapCluster 慢于 heartbeatTimeout，提示warning
+				klog.Warningf("no known peers because of not BootstrapCluster, aborting election")
 			} else if r.configurations.latestIndex == r.configurations.committedIndex &&
 				!hasVote(r.configurations.latest, r.localID) {
 				klog.Warningf("not part of stable configuration, aborting election")

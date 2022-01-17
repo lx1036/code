@@ -1,11 +1,13 @@
 package raft
 
 import (
+	"context"
 	"fmt"
 	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // LoopbackTransport is an interface that provides a loopback transport suitable for testing
@@ -32,12 +34,16 @@ type ClusterConfig struct {
 }
 
 type Cluster struct {
+	conf *Config
+
 	raftDirs   []string
 	rafts      []*Raft
 	stores     []*MemoryStore
 	fsms       []FSM
 	snapshots  []*FileSnapshotStore
 	transports []LoopbackTransport
+
+	longstopTimeout time.Duration
 
 	observationCh chan Observation
 }
@@ -48,7 +54,9 @@ func NewCluster(config *ClusterConfig) *Cluster {
 	}
 
 	cluster := &Cluster{
-		observationCh: make(chan Observation, 1024),
+		conf:            config.Conf,
+		longstopTimeout: 5 * time.Second,
+		observationCh:   make(chan Observation, 1024),
 	}
 
 	var configuration Configuration
@@ -88,6 +96,7 @@ func NewCluster(config *ClusterConfig) *Cluster {
 			}
 		}
 		fsm := &MockFSM{}
+		cluster.fsms = append(cluster.fsms, fsm)
 		raft, err := NewRaft(peerConf, fsm, store, store, snapStore, cluster.transports[i])
 		if err != nil {
 			klog.Fatalf(fmt.Sprintf("NewRaft failed: %v", err))
@@ -103,6 +112,89 @@ func NewCluster(config *ClusterConfig) *Cluster {
 	return cluster
 }
 
+// EnsureLeader checks that ALL the nodes think the leader is the given expected leader
+func (cluster *Cluster) EnsureLeader(expect ServerAddress) {
+	if len(expect) == 0 {
+		klog.Fatal("no leader")
+	}
+
+	fail := false
+	for _, r := range cluster.rafts {
+		leader := r.Leader()
+		if leader != expect {
+			if len(leader) == 0 {
+				leader = "[none]"
+			}
+			klog.Errorf(fmt.Sprintf("expected leader:%s got:%s", expect, leader))
+			fail = true
+		}
+	}
+	if fail {
+		klog.Fatalf("at least one peer has the wrong notion of leader")
+	}
+}
+
+// Leader waits for the cluster to elect a leader and stay in a stable state.
+func (cluster *Cluster) Leader() *Raft {
+	leaders := cluster.GetInState(Leader)
+	if len(leaders) != 1 {
+		klog.Fatalf(fmt.Sprintf("expected one leader: %v", leaders))
+	}
+	return leaders[0]
+}
+
+// Followers waits for the cluster to have N-1 followers and stay in a stable
+// state.
+func (cluster *Cluster) Followers() []*Raft {
+	expFollowers := len(cluster.rafts) - 1
+	followers := cluster.GetInState(Follower)
+	if len(followers) != expFollowers {
+		klog.Fatalf(fmt.Sprintf("timeout waiting for %d followers (followers are %v)", expFollowers, followers))
+	}
+	return followers
+}
+
+// GetInState polls the state of the cluster and attempts to identify when it has
+// settled into the given state.
+func (cluster *Cluster) GetInState(s RaftState) []*Raft {
+	timeout := cluster.conf.HeartbeatTimeout
+	if timeout < cluster.conf.ElectionTimeout {
+		timeout = cluster.conf.ElectionTimeout
+	}
+	timeout = 2*timeout + cluster.conf.CommitTimeout
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for {
+		inState, highestTerm := cluster.pollState(s)
+		if highestTerm == 0 {
+			timer.Reset(cluster.longstopTimeout)
+		} else {
+			timer.Reset(timeout)
+		}
+
+		select {
+		case <-timer.C:
+			return inState
+		}
+	}
+}
+
+func (cluster *Cluster) pollState(s RaftState) ([]*Raft, uint64) {
+	var highestTerm uint64
+	in := make([]*Raft, 0, 1)
+	for _, r := range cluster.rafts {
+		if r.State() == s {
+			in = append(in, r)
+		}
+		term := r.getCurrentTerm()
+		if term > highestTerm {
+			highestTerm = term
+		}
+	}
+	return in, highestTerm
+}
+
 func (cluster *Cluster) FullyConnect() {
 	klog.Infof("fully connecting")
 	for i, t1 := range cluster.transports {
@@ -113,6 +205,61 @@ func (cluster *Cluster) FullyConnect() {
 			}
 		}
 	}
+}
+
+// WaitForReplication blocks until every FSM in the cluster has the given
+// length, or the long sanity check timeout expires.
+func (cluster *Cluster) WaitForReplication(fsmLength int) {
+	limitCh := time.After(cluster.longstopTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), cluster.conf.CommitTimeout)
+	defer cancel()
+
+CHECK:
+	for {
+		select {
+		case <-limitCh:
+			klog.Fatalf("timeout waiting for replication")
+
+		case <-cluster.WaitEventChan(ctx, nil):
+			for _, fsmRaw := range cluster.fsms {
+				fsm := getMockFSM(fsmRaw)
+				fsm.Lock()
+				num := len(fsm.logs)
+				fsm.Unlock()
+				if num != fsmLength {
+					continue CHECK
+				}
+			}
+			return
+		}
+	}
+}
+
+func getMockFSM(fsm FSM) *MockFSM {
+	switch f := fsm.(type) {
+	case *MockFSM:
+		return f
+	default:
+		return nil
+	}
+}
+
+func (cluster *Cluster) WaitEventChan(ctx context.Context, filter FilterFn) <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		defer close(ch)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case o, ok := <-cluster.observationCh:
+				if !ok || filter == nil || filter(&o) {
+					return
+				}
+			}
+		}
+	}()
+	return ch
 }
 
 // Close shuts down the cluster and cleans up.
