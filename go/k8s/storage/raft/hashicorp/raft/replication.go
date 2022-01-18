@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"k8s.io/klog/v2"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -177,6 +178,95 @@ func (r *Raft) heartbeat(replication *followerReplication, stopCh chan struct{})
 // replicateTo is a helper to replicate(), used to replicate the logs up to a
 // given last index.
 // If the follower log is behind, we take care to bring them up to date.
-func (r *Raft) replicateTo(follower *followerReplication, lastIndex uint64) (shouldStop bool) {
-	return false
+func (r *Raft) replicateTo(replication *followerReplication, lastIndex uint64) (shouldStop bool) {
+	var peer Server
+	var req AppendEntriesRequest
+	var resp AppendEntriesResponse
+
+Start:
+	// Prevent an excessive retry rate on errors
+	if replication.failures > 0 {
+		select {
+		case <-time.After(backoff(failureWait, replication.failures, maxFailureScale)):
+		case <-r.shutdownCh:
+		}
+	}
+
+	replication.peerLock.RLock()
+	peer = replication.peer
+	replication.peerLock.RUnlock()
+
+	// Setup the request
+	if err := r.setupAppendEntries(replication, &req, atomic.LoadUint64(&replication.nextIndex), lastIndex); err == ErrLogNotFound {
+		goto SendSnap
+	} else if err != nil {
+		return
+	}
+
+	// Make the RPC call
+	start = time.Now()
+	if err := r.transport.AppendEntries(peer.ID, peer.Address, &req, &resp); err != nil {
+		klog.Errorf(fmt.Sprintf("failed to appendEntries to peer:%s/%s err:%v", peer.ID, peer.Address, err))
+		replication.failures++
+		return
+	}
+
+	// Check for a newer term, stop running
+	if resp.Term > req.Term {
+		r.handleStaleTerm(replication)
+		return true
+	}
+
+	// Update the last contact
+	replication.setLastContact()
+
+	// Update s based on success
+	if resp.Success {
+		// Update our replication state
+		updateLastAppended(replication, &req)
+
+		// Clear any failures, allow pipelining
+		replication.failures = 0
+		replication.allowPipeline = true
+	} else {
+		atomic.StoreUint64(&replication.nextIndex, max(min(replication.nextIndex-1, resp.LastLog+1), 1))
+		if resp.NoRetryBackoff {
+			replication.failures = 0
+		} else {
+			replication.failures++
+		}
+		klog.Warningf(fmt.Sprintf("appendEntries rejected, sending older logs to peer:%s/%s nextIndex:%d",
+			peer.ID, peer.Address, atomic.LoadUint64(&replication.nextIndex)))
+	}
+
+CheckMore:
+	// Poll the stop channel here in case we are looping and have been asked
+	// to stop, or have stepped down as leader. Even for the best effort case
+	// where we are asked to replicate to a given index and then shutdown,
+	// it's better to not loop in here to send lots of entries to a straggler
+	// that's leaving the cluster anyways.
+	select {
+	case <-replication.stopCh:
+		return true
+	default:
+	}
+
+	// Check if there are more logs to replicate
+	if atomic.LoadUint64(&replication.nextIndex) <= lastIndex {
+		goto Start
+	}
+	return
+
+	// SEND_SNAP is used when we fail to get a log, usually because the follower
+	// is too far behind, and we must ship a snapshot down instead
+SendSnap:
+	if stop, err := r.sendLatestSnapshot(replication); stop {
+		return true
+	} else if err != nil {
+		klog.Errorf(fmt.Sprintf("failed to send snapshot to peer:%s/%s err:%v", peer.ID, peer.Address, err))
+		return
+	}
+
+	// Check if there is more to replicate
+	goto CheckMore
 }
