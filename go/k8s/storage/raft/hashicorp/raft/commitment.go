@@ -70,14 +70,24 @@ func (c *commitment) recalculate() {
 		matched = append(matched, idx)
 	}
 	sort.Sort(uint64Slice(matched))
-	quorumMatchIndex := matched[(len(matched)-1)/2] // TODO: 查找论文计算 commit index
+
+	// TODO: 查找论文计算 commit index, 只要一半peers ack，该index就是commit index
+	quorumMatchIndex := matched[(len(matched)-1)/2]
 	if quorumMatchIndex > c.commitIndex && quorumMatchIndex >= c.startIndex {
 		c.commitIndex = quorumMatchIndex
 		select {
-		case c.commitCh <- struct{}{}: // @see runLeader()::<-r.leaderState.commitCh
+		// INFO: @see runLeader()::<-r.leaderState.commitCh, leader apply logs from lastAppliedIndex to commitIndex
+		case c.commitCh <- struct{}{}:
 		default:
 		}
 	}
+}
+
+// Called by leader after commitCh is notified
+func (c *commitment) getCommitIndex() uint64 {
+	c.Lock()
+	defer c.Unlock()
+	return c.commitIndex
 }
 
 type uint64Slice []uint64

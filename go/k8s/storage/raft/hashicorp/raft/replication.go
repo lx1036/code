@@ -204,7 +204,6 @@ Start:
 	}
 
 	// Make the RPC call
-	start = time.Now()
 	if err := r.transport.AppendEntries(peer.ID, peer.Address, &req, &resp); err != nil {
 		klog.Errorf(fmt.Sprintf("failed to appendEntries to peer:%s/%s err:%v", peer.ID, peer.Address, err))
 		replication.failures++
@@ -269,4 +268,94 @@ SendSnap:
 
 	// Check if there is more to replicate
 	goto CheckMore
+}
+
+// setupAppendEntries is used to setup an append entries request.
+func (r *Raft) setupAppendEntries(s *followerReplication, req *AppendEntriesRequest, nextIndex, lastIndex uint64) error {
+	req.Term = s.currentTerm
+	req.Leader = r.transport.EncodePeer(r.localID, r.localAddr)
+	req.LeaderCommitIndex = r.getCommitIndex()
+	if err := r.setPreviousLog(req, nextIndex); err != nil {
+		return err
+	}
+	if err := r.setNewLogs(req, nextIndex, lastIndex); err != nil {
+		return err
+	}
+	return nil
+}
+
+// setPreviousLog is used to setup the PrevLogEntry and PrevLogTerm for an
+// AppendEntriesRequest given the next index to replicate.
+func (r *Raft) setPreviousLog(req *AppendEntriesRequest, nextIndex uint64) error {
+	// Guard for the first index, since there is no 0 log entry
+	// Guard against the previous index being a snapshot as well
+	lastSnapIdx, lastSnapTerm := r.getLastSnapshot()
+	if nextIndex == 1 {
+		req.PrevLogEntry = 0
+		req.PrevLogTerm = 0
+	} else if (nextIndex - 1) == lastSnapIdx {
+		req.PrevLogEntry = lastSnapIdx
+		req.PrevLogTerm = lastSnapTerm
+	} else {
+		var l Log
+		if err := r.logs.GetLog(nextIndex-1, &l); err != nil {
+			klog.Errorf(fmt.Sprintf("failed to get log index:%d err:%v", nextIndex-1, err))
+			return err
+		}
+
+		// Set the previous index and term (0 if nextIndex is 1)
+		req.PrevLogEntry = l.Index
+		req.PrevLogTerm = l.Term
+	}
+	return nil
+}
+
+// setNewLogs is used to setup the logs which should be appended for a request.
+func (r *Raft) setNewLogs(req *AppendEntriesRequest, nextIndex, lastIndex uint64) error {
+	// Append up to MaxAppendEntries or up to the lastIndex. we need to use a
+	// consistent value for maxAppendEntries in the lines below in case it ever
+	// becomes reloadable.
+	maxAppendEntries := r.config().MaxAppendEntries
+	req.Entries = make([]*Log, 0, maxAppendEntries)
+	maxIndex := min(nextIndex+uint64(maxAppendEntries)-1, lastIndex)
+	for i := nextIndex; i <= maxIndex; i++ {
+		oldLog := new(Log)
+		if err := r.logs.GetLog(i, oldLog); err != nil {
+			klog.Errorf(fmt.Sprintf("failed to get log index:%d err:%v", i, err))
+			return err
+		}
+		req.Entries = append(req.Entries, oldLog)
+	}
+	return nil
+}
+
+// handleStaleTerm is used when a follower indicates that we have a stale term.
+func (r *Raft) handleStaleTerm(replication *followerReplication) {
+	klog.Errorf(fmt.Sprintf("peer:%s/%s has newer term, stopping replication", replication.peer.ID, replication.peer.Address))
+	replication.notifyAll(false) // No longer leader
+	select {
+	case replication.stepDown <- struct{}{}:
+	default:
+	}
+}
+
+// sendLatestSnapshot is used to send the latest snapshot we have
+// down to our follower.
+func (r *Raft) sendLatestSnapshot(replication *followerReplication) (bool, error) {
+	return true, nil
+}
+
+// updateLastAppended is used to update follower replication state after a
+// successful AppendEntries RPC.
+// TODO: This isn't used during InstallSnapshot, but the code there is similar.
+func updateLastAppended(s *followerReplication, req *AppendEntriesRequest) {
+	// Mark any inflight logs as committed
+	if logs := req.Entries; len(logs) > 0 {
+		last := logs[len(logs)-1]
+		atomic.StoreUint64(&s.nextIndex, last.Index+1)
+		s.commitment.match(s.peer.ID, last.Index)
+	}
+
+	// Notify still leader
+	s.notifyAll(true)
 }

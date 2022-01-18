@@ -568,7 +568,60 @@ func (r *Raft) runLeader() {
 				r.dispatchLogs(ready)
 			}
 
+		// leader commit logs and apply to fsm
 		case <-r.leaderState.commitCh:
+			// Process the newly committed entries
+			oldCommitIndex := r.getCommitIndex()
+			commitIndex := r.leaderState.commitment.getCommitIndex()
+			r.setCommitIndex(commitIndex)
+
+			// New configration has been committed, set it as the committed value.
+			if r.configurations.latestIndex > oldCommitIndex &&
+				r.configurations.latestIndex <= commitIndex {
+				r.setCommittedConfiguration(r.configurations.latest, r.configurations.latestIndex)
+				if !hasVote(r.configurations.committed, r.localID) {
+					stepDown = true
+				}
+			}
+
+			// Pull all inflight logs that are committed off the queue.
+			var groupReady []*list.Element
+			var groupFutures = make(map[uint64]*logFuture)
+			var lastIdxInGroup uint64
+			for e := r.leaderState.inflight.Front(); e != nil; e = e.Next() {
+				commitLog := e.Value.(*logFuture)
+				idx := commitLog.log.Index
+				if idx > commitIndex {
+					// Don't go past the committed index
+					break
+				}
+
+				groupReady = append(groupReady, e)
+				groupFutures[idx] = commitLog
+				lastIdxInGroup = idx
+			}
+			// Process the group
+			if len(groupReady) != 0 {
+				r.applyLogsToFSM(lastIdxInGroup, groupFutures)
+
+				for _, e := range groupReady {
+					r.leaderState.inflight.Remove(e)
+				}
+			}
+
+			if stepDown { // leader 降级
+				if r.config().ShutdownOnRemove {
+					klog.Info("removed ourself, shutting down")
+					r.Shutdown()
+				} else {
+					klog.Info("removed ourself, transitioning to follower")
+					r.setState(Follower)
+				}
+			}
+
+		// INFO: @see handleStaleTerm()
+		case <-r.leaderState.stepDown:
+			r.setState(Follower)
 
 		case <-r.shutdownCh:
 			return
@@ -912,8 +965,7 @@ func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
 	return
 }
 
-// appendEntries is invoked when we get an append entries RPC call. This must
-// only be called from the main thread.
+// appendEntries is invoked when we get AppendEntriesRPC call.
 func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 	resp := &AppendEntriesResponse{
 		Term:           r.getCurrentTerm(),
@@ -956,7 +1008,8 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 		} else {
 			var prevLog Log
 			if err := r.logs.GetLog(cmd.PrevLogEntry, &prevLog); err != nil {
-				klog.Warningf(fmt.Sprintf("failed to get previous log previousLogIndex:%d lastLogIndex:%d error:%v", cmd.PrevLogEntry, lastIdx, err))
+				klog.Warningf(fmt.Sprintf("failed to get previous log previousLogIndex:%d lastLogIndex:%d error:%v",
+					cmd.PrevLogEntry, lastIdx, err))
 				resp.NoRetryBackoff = true
 				return
 			}
@@ -1030,7 +1083,7 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 		if r.configurations.latestIndex <= idx {
 			r.setCommittedConfiguration(r.configurations.latest, r.configurations.latestIndex)
 		}
-		r.processLogs(idx, nil)
+		r.applyLogsToFSM(idx, nil)
 	}
 
 	// Everything went well, set success
@@ -1046,14 +1099,14 @@ type commitTuple struct {
 	future *logFuture
 }
 
-// processLogs is used to apply all the committed entries that haven't been
+// applyLogsToFSM is used to apply all the committed entries that haven't been
 // applied up to the given index limit.
 // This can be called from both leaders and followers.
 // Followers call this from AppendEntries, for n entries at a time, and always
 // pass futures=nil.
 // Leaders call this when entries are committed. They pass the futures from any
 // inflight logs.
-func (r *Raft) processLogs(index uint64, futures map[uint64]*logFuture) {
+func (r *Raft) applyLogsToFSM(index uint64, futures map[uint64]*logFuture) {
 	// Reject logs we've applied already
 	lastApplied := r.getLastApplied()
 	if index <= lastApplied {
