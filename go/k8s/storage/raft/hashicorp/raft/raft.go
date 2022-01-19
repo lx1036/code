@@ -833,10 +833,63 @@ func (r *Raft) setLatestConfiguration(c Configuration, i uint64) {
 	r.latestConfiguration.Store(c.Clone())
 }
 
+// GetConfiguration returns the latest configuration. This may not yet be
+// committed. The main loop can access this directly.
+func (r *Raft) GetConfiguration() ConfigurationFuture {
+	configReq := &configurationsFuture{}
+	configReq.init()
+	configReq.configurations = configurations{latest: r.getLatestConfiguration()}
+	configReq.respond(nil)
+	return configReq
+}
+
 // restoreSnapshot attempts to restore the latest snapshots, and fails if none
 // of them can be restored. This is called at initialization time, and is
 // completely unsafe to call at any other time.
 func (r *Raft) restoreSnapshot() error {
+	snapshots, err := r.snapshots.List()
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("failed to list snapshots err:%v", err))
+		return err
+	}
+
+	// Try to load in order of newest to oldest
+	for _, snapshot := range snapshots {
+		if !r.config().NoSnapshotRestoreOnStart {
+			_, source, err := r.snapshots.Open(snapshot.ID)
+			if err != nil {
+				klog.Errorf(fmt.Sprintf("failed to open snapshot id:%s err:%v", snapshot.ID, err))
+				continue
+			}
+
+			if err := r.fsm.Restore(source); err != nil {
+				source.Close()
+				klog.Errorf(fmt.Sprintf("failed to restore snapshot id:%s err:%v", snapshot.ID, err))
+				continue
+			}
+
+			source.Close()
+			klog.Infof(fmt.Sprintf("restored from snapshot id:%s", snapshot.ID))
+		}
+
+		// Update the lastApplied so we don't replay old logs
+		r.setLastApplied(snapshot.Index)
+
+		// Update the last stable snapshot info
+		r.setLastSnapshot(snapshot.Index, snapshot.Term)
+
+		// Update the configuration
+		r.setCommittedConfiguration(snapshot.Configuration, snapshot.ConfigurationIndex)
+		r.setLatestConfiguration(snapshot.Configuration, snapshot.ConfigurationIndex)
+
+		// Success!
+		return nil
+	}
+
+	// If we had snapshots and failed to load them, its an error
+	if len(snapshots) > 0 {
+		return fmt.Errorf("failed to load any existing snapshots")
+	}
 	return nil
 }
 
@@ -1008,8 +1061,8 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 		} else {
 			var prevLog Log
 			if err := r.logs.GetLog(cmd.PrevLogEntry, &prevLog); err != nil {
-				klog.Warningf(fmt.Sprintf("failed to get previous log previousLogIndex:%d lastLogIndex:%d error:%v",
-					cmd.PrevLogEntry, lastIdx, err))
+				klog.Warningf(fmt.Sprintf("failed to get previous log from %s/%s previousLogIndex:%d lastLogIndex:%d error:%v",
+					r.localID, r.localAddr, cmd.PrevLogEntry, lastIdx, err))
 				resp.NoRetryBackoff = true
 				return
 			}

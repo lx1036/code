@@ -107,6 +107,13 @@ func (r *raftState) getLastEntry() (uint64, uint64) {
 	return r.lastSnapshotIndex, r.lastSnapshotTerm
 }
 
+func (r *raftState) setLastSnapshot(index, term uint64) {
+	r.lastLock.Lock()
+	r.lastSnapshotIndex = index
+	r.lastSnapshotTerm = term
+	r.lastLock.Unlock()
+}
+
 func (r *raftState) getLastSnapshot() (index, term uint64) {
 	r.lastLock.Lock()
 	index = r.lastSnapshotIndex
