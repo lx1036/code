@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"k8s.io/klog/v2"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -223,5 +224,50 @@ func TestRecoverRaftCluster(test *testing.T) {
 			cluster.EnsurePeersSame()
 		})
 	}
+}
 
+func TestRaftApplyConcurrently(test *testing.T) {
+	cluster := NewCluster(&ClusterConfig{
+		Peers: []string{
+			"1/127.0.0.1:7000",
+			"2/127.0.0.1:8000",
+			"3/127.0.0.1:9000",
+		},
+		Bootstrap: true,
+	})
+	defer cluster.Close()
+
+	time.Sleep(time.Second * 3)
+	leader := cluster.Leader()
+
+	nums := 100
+	var group sync.WaitGroup
+	group.Add(nums)
+	applyF := func(i int) {
+		defer group.Done()
+		future := leader.Apply([]byte(fmt.Sprintf("test%d", i)), 0)
+		if err := future.Error(); err != nil {
+			klog.Fatalf(fmt.Sprintf("[ERR] err: %v", err))
+		}
+	}
+	// Concurrently apply
+	for i := 0; i < nums; i++ {
+		go applyF(i)
+	}
+
+	// Wait to finish
+	doneCh := make(chan struct{})
+	go func() {
+		group.Wait()
+		close(doneCh)
+	}()
+	select {
+	case <-doneCh:
+	case <-time.After(time.Second * 5):
+		klog.Fatalf("timeout")
+	}
+
+	cluster.EnsureLeader(cluster.Leader().localAddr)
+	cluster.EnsureFSMSame()
+	cluster.EnsurePeersSame()
 }

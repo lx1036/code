@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt"
 	"io"
 	"sync"
 
@@ -46,7 +47,31 @@ type FSMSnapshot interface {
 // to the FSM. This is done async of other logs since we don't want
 // the FSM to block our internal operations.
 func (r *Raft) runFSM() {
+	commitBatch := func(reqs []*commitTuple) {
 
+	}
+
+	restore := func(req *restoreFuture) {
+
+	}
+
+	for {
+		select {
+		case ptr := <-r.fsmMutateCh:
+			switch req := ptr.(type) {
+			case []*commitTuple:
+				commitBatch(req)
+
+			case *restoreFuture:
+				restore(req)
+
+			default:
+				panic(fmt.Errorf("bad type passed to fsmMutateCh: %#v", ptr))
+			}
+		case <-r.shutdownCh:
+			return
+		}
+	}
 }
 
 // MockFSM is an implementation of the FSM interface, and just stores

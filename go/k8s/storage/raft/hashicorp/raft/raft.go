@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"fmt"
 	"k8s.io/klog/v2"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1043,6 +1044,17 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 
 	var rpcErr error
 	defer func() {
+		switch c := rpc.Command.(type) {
+		case *AppendEntriesRequest:
+			if len(cmd.Entries) > 0 {
+				var msg []string
+				for _, entry := range cmd.Entries {
+					msg = append(msg, fmt.Sprintf("%d:%s", entry.Index, string(entry.Data)))
+				}
+				klog.Infof(fmt.Sprintf("[appendEntries]leader is %s, msg is %s", c.Leader, strings.Join(msg, " ")))
+			}
+		}
+
 		rpc.Respond(resp, rpcErr)
 	}()
 

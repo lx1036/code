@@ -227,6 +227,13 @@ type userRestoreFuture struct {
 	reader io.Reader
 }
 
+// restoreFuture is used for requesting an FSM to perform a
+// snapshot restore. Used internally only.
+type restoreFuture struct {
+	deferError
+	ID string
+}
+
 // leadershipTransferFuture is used to track the progress of a leadership
 // transfer internally.
 type leadershipTransferFuture struct {

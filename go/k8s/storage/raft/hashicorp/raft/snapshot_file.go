@@ -12,6 +12,7 @@ import (
 	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -237,7 +238,7 @@ type FileSnapshotSink struct {
 func (store *FileSnapshotStore) Create(index, term uint64, configuration Configuration, configurationIndex uint64) (SnapshotSink, error) {
 	// Create a new path
 	name := snapshotName(term, index)
-	path := filepath.Join(store.path, name+tmpSuffix)
+	path := filepath.Join(store.path, name+tmpSuffix) // snapshots/2-12-1642129446715.tmp
 	klog.Infof(fmt.Sprintf("creating new snapshot path:%s", path))
 
 	// Make the directory
@@ -337,7 +338,7 @@ func (s *FileSnapshotSink) ID() string {
 	return s.meta.ID
 }
 
-// Close persist snapshot file and meta file
+// Close persist snapshot file and meta file, is used to indicate a successful end.
 func (s *FileSnapshotSink) Close() error {
 	if s.closed {
 		return nil
@@ -361,16 +362,102 @@ func (s *FileSnapshotSink) Close() error {
 	}
 
 	// Move the directory into place
-	newPath := strings.TrimSuffix(s.dir, tmpSuffix)
+	newPath := strings.TrimSuffix(s.dir, tmpSuffix) // snapshots/2-12-1642129446715.tmp -> snapshots/2-12-1642129446715
 	if err := os.Rename(s.dir, newPath); err != nil {
 		klog.Errorf(fmt.Sprintf("failed to move snapshot into place err:%v", err))
 		return err
 	}
 
+	if !s.noSync && runtime.GOOS != "windows" { // skipping fsync for directory entry edits on Windows, only needed for *nix style file systems
+		parentFH, err := os.Open(s.parentDir)
+		defer parentFH.Close()
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("failed to open snapshot parent directory path:%s err:%v", s.parentDir, err))
+			return err
+		}
+
+		if err = parentFH.Sync(); err != nil {
+			klog.Errorf(fmt.Sprintf("failed syncing parent directory path:%s err:%v", s.parentDir, err))
+			return err
+		}
+	}
+
+	// Reap any old snapshots
+	if err := s.store.ReapSnapshots(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
+// ReapSnapshots reaps any snapshots beyond the retain count.
+func (store *FileSnapshotStore) ReapSnapshots() error {
+	snapshots, err := store.getSnapshots()
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("failed to get snapshots err:%v", err))
+		return err
+	}
+
+	for i := store.retain; i < len(snapshots); i++ {
+		path := filepath.Join(store.path, snapshots[i].ID)
+		klog.Infof(fmt.Sprintf("reaping snapshot path:%s", path))
+		if err := os.RemoveAll(path); err != nil {
+			klog.Errorf(fmt.Sprintf("failed to reap snapshot path:%s err:%v", path, err))
+			return err
+		}
+	}
+	return nil
+}
+
+// Cancel is used to indicate an unsuccessful end.
 func (s *FileSnapshotSink) Cancel() error {
-	panic("implement me")
+	// Make sure close is idempotent
+	if s.closed {
+		return nil
+	}
+	s.closed = true
+
+	// Close the open handles
+	if err := s.finalize(); err != nil {
+		klog.Errorf(fmt.Sprintf("failed to finalize snapshot err:%v", err))
+		return err
+	}
+
+	// Attempt to remove all artifacts
+	return os.RemoveAll(s.dir)
+}
+
+// finalize is used to close all of our resources.
+func (s *FileSnapshotSink) finalize() error {
+	// Flush any remaining data
+	if err := s.buffered.Flush(); err != nil {
+		return err
+	}
+
+	// Sync to force fsync to disk
+	if !s.noSync {
+		if err := s.stateFile.Sync(); err != nil {
+			return err
+		}
+	}
+
+	// Get the file size
+	stat, statErr := s.stateFile.Stat()
+
+	// Close the file
+	if err := s.stateFile.Close(); err != nil {
+		return err
+	}
+
+	// Set the file size, check after we close
+	if statErr != nil {
+		return statErr
+	}
+	s.meta.Size = stat.Size()
+
+	// Set the CRC
+	s.meta.CRC = s.stateHash.Sum(nil)
+	return nil
 }
 
 // snapshotName generates a name for the snapshot.

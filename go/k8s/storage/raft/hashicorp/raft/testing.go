@@ -134,6 +134,8 @@ func (cluster *Cluster) EnsureLeader(expect ServerAddress) {
 	if fail {
 		klog.Fatalf("at least one peer has the wrong notion of leader")
 	}
+
+	klog.Infof(fmt.Sprintf("expected %s is leader", string(expect)))
 }
 
 func (cluster *Cluster) EnsureFSMSame() {
@@ -194,6 +196,9 @@ CHECK:
 	}
 
 	first.Unlock()
+	for _, log := range first.logs {
+		klog.Infof(fmt.Sprintf("log in fsm is %s", string(log)))
+	}
 	return
 
 WAIT:
