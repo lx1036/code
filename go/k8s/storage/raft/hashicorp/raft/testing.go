@@ -154,7 +154,7 @@ CHECK:
 		if len(first.logs) != len(fsm.logs) {
 			fsm.Unlock()
 			if time.Now().After(limit) {
-				klog.Fatalf(fmt.Sprintf("FSM log length mismatch: %d %d",
+				klog.Fatalf(fmt.Sprintf("FSM log length mismatch: first:%d other:%d",
 					len(first.logs), len(fsm.logs)))
 			} else {
 				goto WAIT

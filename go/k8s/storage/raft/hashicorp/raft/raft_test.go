@@ -271,3 +271,49 @@ func TestRaftApplyConcurrently(test *testing.T) {
 	cluster.EnsureFSMSame()
 	cluster.EnsurePeersSame()
 }
+
+func TestRaftAutoSnapshot(test *testing.T) {
+	config := DefaultConfig()
+	config.TrailingLogs = 10
+	config.SnapshotThreshold = 50
+	config.SnapshotInterval = time.Second * 1
+	cluster := NewCluster(&ClusterConfig{
+		Conf: config,
+		Peers: []string{
+			"1/127.0.0.1:7000",
+			//"2/127.0.0.1:8000",
+			//"3/127.0.0.1:9000",
+		},
+		Bootstrap: true,
+	})
+	defer cluster.Close()
+
+	time.Sleep(time.Second * 3)
+
+	leader := cluster.Leader()
+	var future Future
+	for i := 0; i < 100; i++ {
+		future = leader.Apply([]byte(fmt.Sprintf("test%d", i)), 0)
+	}
+
+	// Wait for the last future to apply
+	if err := future.Error(); err != nil {
+		test.Fatalf("err: %v", err)
+	}
+
+	// Wait for a snapshot to happen
+	time.Sleep(time.Second * 10)
+
+	// Check for snapshot
+	if snaps, _ := leader.snapshots.List(); len(snaps) == 0 {
+		test.Fatalf("should have a snapshot")
+	} else {
+		for _, snap := range snaps {
+			klog.Infof(fmt.Sprintf("snapshot meta data:%+v", *snap))
+		}
+	}
+}
+
+func TestRaftUserSnapshot(test *testing.T) {
+
+}

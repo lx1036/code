@@ -23,6 +23,10 @@ var (
 	// ErrNotLeader is returned when an operation can't be completed on a
 	// follower or candidate node.
 	ErrNotLeader = errors.New("node is not the leader")
+
+	// ErrNothingNewToSnapshot is returned when trying to create a snapshot
+	// but there's nothing new commited to the FSM since we started.
+	ErrNothingNewToSnapshot = errors.New("nothing new to snapshot")
 )
 
 // Apply is used to apply a command to the FSM in a highly consistent
