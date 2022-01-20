@@ -833,6 +833,20 @@ func (r *Raft) setLatestConfiguration(c Configuration, i uint64) {
 	r.latestConfiguration.Store(c.Clone())
 }
 
+// getLatestConfiguration reads the configuration from a copy of the main
+// configuration, which means it can be accessed independently from the main
+// loop.
+func (r *Raft) getLatestConfiguration() Configuration {
+	// this switch catches the case where this is called without having set
+	// a configuration previously.
+	switch c := r.latestConfiguration.Load().(type) {
+	case Configuration:
+		return c
+	default:
+		return Configuration{}
+	}
+}
+
 // GetConfiguration returns the latest configuration. This may not yet be
 // committed. The main loop can access this directly.
 func (r *Raft) GetConfiguration() ConfigurationFuture {

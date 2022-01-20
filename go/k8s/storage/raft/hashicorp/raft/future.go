@@ -158,6 +158,16 @@ func (v *verifyFuture) vote(leader bool) {
 	}
 }
 
+// ConfigurationFuture is used for GetConfiguration and can return the
+// latest configuration in use by Raft.
+type ConfigurationFuture interface {
+	IndexFuture
+
+	// Configuration contains the latest configuration. This must
+	// not be called until after the Error method has returned.
+	Configuration() Configuration
+}
+
 // configurationsFuture is used to retrieve the current configurations. This is
 // used to allow safe access to this information outside of the main thread.
 type configurationsFuture struct {

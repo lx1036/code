@@ -233,7 +233,7 @@ func RecoverCluster(conf *Config, fsm FSM, logs LogStore, stable StableStore,
 	if err != nil {
 		return fmt.Errorf("failed to snapshot FSM: %v", err)
 	}
-	sink, err := snaps.Create(lastIndex, lastTerm, configuration, 1, trans)
+	sink, err := snaps.Create(lastIndex, lastTerm, configuration, 1)
 	if err != nil {
 		return fmt.Errorf("failed to create snapshot: %v", err)
 	}

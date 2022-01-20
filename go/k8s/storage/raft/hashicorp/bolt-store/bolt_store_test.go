@@ -1,6 +1,7 @@
 package bolt_store
 
 import (
+	"bufio"
 	crand "crypto/rand"
 	"encoding/binary"
 	"encoding/json"
@@ -12,6 +13,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
@@ -423,6 +425,33 @@ func TestRaftLogJsonMarshal(test *testing.T) {
 		klog.Info("shutdown")
 		return
 	}
+}
+
+func TestFileReader(test *testing.T) {
+	filename, _ := filepath.Abs("./file.json")
+	klog.Info(filename)
+	f, err := os.Open(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			f, _ = os.Create(filename) // os.Create()
+		} else {
+			klog.Fatal(err)
+		}
+	}
+	_, _ = f.Write([]byte("test"))
+	//f.Sync()
+	f.Close()
+	defer os.Remove(filename)
+
+	f2, err := os.Open(filename)
+	r := bufio.NewReader(f2)
+	defer f2.Close() // 如果没有 defer，文件流已经关闭，不能继续 reader
+	data, err := ioutil.ReadAll(r)
+	if err != nil {
+		klog.Fatal(err)
+	}
+
+	klog.Info(string(data)) // "test"
 }
 
 func init() {

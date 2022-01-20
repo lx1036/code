@@ -30,8 +30,7 @@ type SnapshotStore interface {
 	// Create is used to begin a snapshot at a given index and term, and with
 	// the given committed configuration. The version parameter controls
 	// which snapshot version to create.
-	Create(index, term uint64, configuration Configuration,
-		configurationIndex uint64, trans Transport) (SnapshotSink, error)
+	Create(index, term uint64, configuration Configuration, configurationIndex uint64) (SnapshotSink, error)
 
 	// List is used to list the available snapshots in the store.
 	// It should return then in descending order, with the highest index first.
