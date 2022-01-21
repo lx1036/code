@@ -168,7 +168,9 @@ type NetworkTransport struct {
 	timeout      time.Duration
 	TimeoutScale int
 
-	consumeCh chan RPC
+	consumeCh       chan RPC
+	heartbeatFn     func(RPC)
+	heartbeatFnLock sync.Mutex
 
 	// streamCtx is used to cancel existing connection handlers.
 	streamCtx     context.Context
@@ -333,6 +335,7 @@ func (transport *NetworkTransport) handleCommand(r *bufio.Reader, dec *codec.Dec
 		RespChan: respCh,
 	}
 
+	isHeartbeat := false
 	switch rpcType {
 	case rpcRequestVote:
 		var req RequestVoteRequest
@@ -341,8 +344,31 @@ func (transport *NetworkTransport) handleCommand(r *bufio.Reader, dec *codec.Dec
 		}
 		rpc.Command = &req
 
+	case rpcAppendEntries:
+		var req AppendEntriesRequest
+		if err := dec.Decode(&req); err != nil {
+			return err
+		}
+		rpc.Command = &req
+
+		// Check if this is a heartbeat
+		if isHeartbeatRequest(req) {
+			isHeartbeat = true
+		}
+
 	default:
 		return fmt.Errorf("unknown rpc type %d", rpcType)
+	}
+
+	// INFO: Check for heartbeat fast-path, skip Dispatch the RPC to consumerCh
+	if isHeartbeat {
+		transport.heartbeatFnLock.Lock()
+		fn := transport.heartbeatFn
+		transport.heartbeatFnLock.Unlock()
+		if fn != nil {
+			fn(rpc)
+			goto RESP
+		}
 	}
 
 	// Dispatch the RPC to handle the request -> response
@@ -353,6 +379,7 @@ func (transport *NetworkTransport) handleCommand(r *bufio.Reader, dec *codec.Dec
 	}
 
 	// Wait for response
+RESP:
 	select {
 	case resp := <-respCh:
 		// Send the error first
@@ -374,6 +401,15 @@ func (transport *NetworkTransport) handleCommand(r *bufio.Reader, dec *codec.Dec
 	}
 
 	return nil
+}
+
+// SetHeartbeatHandler is used to setup a heartbeat handler
+// as a fast-pass. This is to avoid head-of-line blocking from
+// disk IO.
+func (transport *NetworkTransport) SetHeartbeatHandler(cb func(rpc RPC)) {
+	transport.heartbeatFnLock.Lock()
+	defer transport.heartbeatFnLock.Unlock()
+	transport.heartbeatFn = cb
 }
 
 // RequestVote implements the Transport interface.
@@ -532,4 +568,11 @@ func decodeResponse(conn *netConn, resp interface{}) (bool, error) {
 		return true, fmt.Errorf(rpcError)
 	}
 	return true, nil
+}
+
+// INFO: 判断 AppendEntriesRequest 是 heartbeat，而不是 log request
+func isHeartbeatRequest(req AppendEntriesRequest) bool {
+	return req.Term != 0 && req.Leader != nil &&
+		req.PrevLogEntry == 0 && req.PrevLogTerm == 0 &&
+		len(req.Entries) == 0 && req.LeaderCommitIndex == 0
 }

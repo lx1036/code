@@ -230,6 +230,9 @@ func NewRaft(conf *Config, fsm FSM, logs LogStore, stable StableStore, snaps Sna
 	// Setup a heartbeat fast-path to avoid head-of-line
 	// blocking where possible. It MUST be safe for this
 	// to be called concurrently with a blocking RPC.
+	// INFO: @see https://github.com/hashicorp/raft/blob/v1.3.3/net_transport.go#L580-L598 L629-L638
+	//  性能提升：这里可以快速处理 heartbeat 信息，不需要再放入 <-r.rpcCh 再去处理，免得阻塞，因为心跳是每100ms一次，特别多。
+	//  这个优化还是可以的！！！
 	transport.SetHeartbeatHandler(r.processHeartbeat)
 
 	if conf.skipStartup {
@@ -299,13 +302,13 @@ func (r *Raft) runFollower() {
 		case b := <-r.bootstrapCh:
 			b.respond(r.liveBootstrap(b.configuration))
 
-		case <-heartbeatTimer: // 每 [1s, 2s] 一次心跳检查是否要心跳
+		case <-heartbeatTimer: // 每 [1s, 2s] 一次心跳检查是否有心跳
 			// Restart the heartbeat timer
 			heartbeatTimeout := r.config().HeartbeatTimeout
 			heartbeatTimer = randomTimeout(heartbeatTimeout) // [1s, 2s]
 
-			// INFO: 性能提高: 这里使用 lastContact，如果是正常的 log replicate，也会修改 lastContact，这样在 heartbeatTimeout 内不需要再去心跳检查
-			//  本来担心网络抖动会导致几次心跳没成功，会发起 leader election；但是每 HeartbeatTimeout / 10 leader 发起一次心跳，如果
+			// INFO: 提高safety: 这里使用 lastContact，如果是正常的 log replicate，也会修改 lastContact
+			//  本来担心网络抖动会导致几次心跳没成功，会发起 leader election，但是每 HeartbeatTimeout / 10 leader 发起一次心跳，如果
 			//  10次心跳都没成功，就必然 ElectionTimeout，则可以发起选举, @see https://github.com/hashicorp/raft/blob/v1.3.3/replication.go#L389-L394
 			lastContact := r.LastContact()
 			if time.Now().Sub(lastContact) < heartbeatTimeout {
@@ -1029,6 +1032,7 @@ func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
 	}
 
 	resp.Granted = true
+	// raft paper: "For example, you might reasonably reset a peer’s election timer whenever you receive an AppendEntries or RequestVote RPC."
 	r.setLastContact()
 	return
 }
@@ -1167,6 +1171,7 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 
 	// Everything went well, set success
 	resp.Success = true
+	// raft paper: "For example, you might reasonably reset a peer’s election timer whenever you receive an AppendEntries or RequestVote RPC."
 	r.setLastContact()
 	return
 }
