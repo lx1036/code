@@ -392,6 +392,8 @@ func (r *Raft) runCandidate() {
 		case vote := <-voteCh:
 			// Check if the term is greater than ours, bail
 			if vote.Term > r.getCurrentTerm() { // INFO: @see raft paper 3.4
+				// @see https://thesquareplanet.com/blog/students-guide-to-raft/
+				// "If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower"
 				klog.Warningf("newer term discovered, fallback to follower")
 				r.setState(Follower)
 				r.setCurrentTerm(vote.Term)
@@ -413,6 +415,10 @@ func (r *Raft) runCandidate() {
 			}
 
 		case <-electionTimer:
+			// INFO: @see https://thesquareplanet.com/blog/students-guide-to-raft/
+			//  Follow Figure 2’s directions as to when you should start an election. In particular, note that if you are
+			//  a candidate (i.e., you are currently running an election), but the election timer fires, you should start another election.
+			//  This is important to avoid the system stalling due to delayed or dropped RPCs.
 			// Election failed! Restart the election. We simply return,
 			// which will kick us back into runCandidate
 			klog.Warningf("Election timeout reached, restarting election")
@@ -1079,20 +1085,23 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 	// Save the current leader
 	r.setLeader(r.transport.DecodePeer(cmd.Leader))
 
-	// INFO: 对于 heartbeat AppendEntriesRequest, PrevLogEntry、Entries、LeaderCommitIndex 都是 0
+	// INFO: 对于 heartbeat AppendEntriesRequest, PrevLogIndex、Entries、LeaderCommitIndex 都是 0
 	//  @see https://github.com/hashicorp/raft/blob/v1.3.3/net_transport.go#L587-L592
 
 	// Verify the last log entry, 为何验证 previousLog
-	if cmd.PrevLogEntry > 0 {
+	// @see https://thesquareplanet.com/blog/students-guide-to-raft/
+	// If you get an AppendEntries RPC with a prevLogIndex that points beyond the end of your log, you should handle it
+	// the same as if you did have that entry but the term did not match (i.e., reply false).
+	if cmd.PrevLogIndex > 0 {
 		lastIdx, lastTerm := r.getLastEntry()
 		var prevLogTerm uint64
-		if cmd.PrevLogEntry == lastIdx {
+		if cmd.PrevLogIndex == lastIdx {
 			prevLogTerm = lastTerm
 		} else {
 			var prevLog Log
-			if err := r.logs.GetLog(cmd.PrevLogEntry, &prevLog); err != nil {
+			if err := r.logs.GetLog(cmd.PrevLogIndex, &prevLog); err != nil {
 				klog.Warningf(fmt.Sprintf("failed to get previous log from %s/%s previousLogIndex:%d lastLogIndex:%d error:%v",
-					r.localID, r.localAddr, cmd.PrevLogEntry, lastIdx, err))
+					r.localID, r.localAddr, cmd.PrevLogIndex, lastIdx, err))
 				resp.NoRetryBackoff = true
 				return
 			}

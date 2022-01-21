@@ -44,6 +44,8 @@ func newCommitment(commitCh chan struct{}, configuration Configuration, startInd
 	}
 }
 
+// INFO: 这里每一个 follower replication 已经发送 success=true，每一次都要重新计算下 commitIndex，当一半以上多数 follower replication
+//  发送成功，commitIndex 就是中间的那个数 quorumMatchIndex
 // Match is called once a server completes writing entries to disk: either the
 // leader has written the new entry or a follower has replied to an
 // AppendEntries RPC. The given server's disk agrees with this server's log up

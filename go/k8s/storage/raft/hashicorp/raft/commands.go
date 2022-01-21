@@ -8,7 +8,7 @@ type AppendEntriesRequest struct {
 	Leader []byte
 
 	// Provide the previous entries for integrity checking
-	PrevLogEntry uint64
+	PrevLogIndex uint64
 	PrevLogTerm  uint64
 
 	// New entries to commit

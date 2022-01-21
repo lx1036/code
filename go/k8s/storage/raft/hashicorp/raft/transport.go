@@ -573,6 +573,6 @@ func decodeResponse(conn *netConn, resp interface{}) (bool, error) {
 // INFO: 判断 AppendEntriesRequest 是 heartbeat，而不是 log request
 func isHeartbeatRequest(req AppendEntriesRequest) bool {
 	return req.Term != 0 && req.Leader != nil &&
-		req.PrevLogEntry == 0 && req.PrevLogTerm == 0 &&
+		req.PrevLogIndex == 0 && req.PrevLogTerm == 0 &&
 		len(req.Entries) == 0 && req.LeaderCommitIndex == 0
 }
