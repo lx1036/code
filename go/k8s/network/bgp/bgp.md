@@ -2,11 +2,15 @@
 # BGP
 BGP使用 TCP 作为传输协议，使用端口 179 建立连接，允许基于策略的路由，可以使用路由策略在目标的多个路径之间选择，并控制路由信息的再分配。
 
+BGP 基于路径矢量(Path Vector)的算法,即每个路由条目更新通过一个AS时, 将其穿越的AS号码记录下来, 通过避免路径属性中出现相同的AS号码来避免环路的策略。
+
 概念名词：
 * ROA: Route Origin Authorization
 * BMP: BGP Monitoring Protocol, provides a convenient interface for obtaining route views
 * VRF: virtual routing and forwarding(Configuring a VRF to Provide BGP VPN Services)
 * FIB: Forwarding Information Based
+* CIDR: Classless Inter-Domain Routing 无类域间路由
+* AS: Autonomous System 自治系统
 
 ## GoBGP
 ```shell
