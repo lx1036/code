@@ -8,7 +8,7 @@ BGP 基于路径矢量(Path Vector)的算法,即每个路由条目更新通过�
 * ROA: Route Origin Authorization
 * BMP: BGP Monitoring Protocol, provides a convenient interface for obtaining route views
 * VRF: virtual routing and forwarding(Configuring a VRF to Provide BGP VPN Services)
-* FIB: Forwarding Information Based
+* FIB: Forwarding Information Based 每个路由器本身有一个路由信息数据库(RIB Routing Information Based)，然后会根据本地算法来构建转发数据库(FIB)
 * CIDR: Classless Inter-Domain Routing 无类域间路由
 * AS: Autonomous System 自治系统
 
