@@ -130,3 +130,5 @@ https://github.com/kubeovn/kube-ovn/wiki/BGP-%E6%94%AF%E6%8C%81
 **[bgp-route-server](https://datatracker.ietf.org/doc/html/rfc7947)**
 
 **[bgp-route-reflection](https://datatracker.ietf.org/doc/html/rfc4456)**
+
+**[在FB闯祸的BGP协议简介(BGP 最佳文档!!!)](https://mp.weixin.qq.com/s/XXi03wNMTjejZJpN6YPQ9g)**
