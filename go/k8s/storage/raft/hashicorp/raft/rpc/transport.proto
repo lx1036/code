@@ -59,6 +59,5 @@ message RequestVoteRequest {
 
 message RequestVoteResponse {
   uint64 term = 2;
-  bytes peers = 3;
-  bool granted = 4;
+  bool granted = 3;
 }

@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	keyCurrentTerm  = []byte("CurrentTerm")
-	keyLastVoteTerm = []byte("LastVoteTerm")
-	keyLastVoteCand = []byte("LastVoteCand")
+	keyCurrentTerm       = []byte("CurrentTerm")
+	keyLastVoteTerm      = []byte("LastVoteTerm")
+	keyLastVoteCandidate = []byte("LastVoteCandidate")
 )
 
 // leaderState is state that is used while we are a leader.
@@ -519,7 +519,7 @@ func (r *Raft) persistVote(term uint64, candidate []byte) error {
 	if err := r.stable.SetUint64(keyLastVoteTerm, term); err != nil {
 		return err
 	}
-	if err := r.stable.Set(keyLastVoteCand, candidate); err != nil {
+	if err := r.stable.Set(keyLastVoteCandidate, candidate); err != nil {
 		return err
 	}
 	return nil
@@ -1004,7 +1004,7 @@ func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
 		klog.Errorf(fmt.Sprintf("failed to get last vote term err:%v", err))
 		return
 	}
-	lastVoteCandBytes, err := r.stable.Get(keyLastVoteCand)
+	lastVoteCandBytes, err := r.stable.Get(keyLastVoteCandidate)
 	if err != nil && err.Error() != "not found" {
 		klog.Errorf(fmt.Sprintf("failed to get last vote candidate err:%v", err))
 		return

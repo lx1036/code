@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"net"
 	"sync"
@@ -25,6 +26,8 @@ type grpcServer struct {
 	heartbeatFn     func(RPC)
 
 	consumerCh chan RPC
+
+	pb.UnimplementedTransportServer
 
 	shutdownCh chan struct{}
 }
@@ -70,19 +73,30 @@ func (server *grpcServer) AppendEntriesPipeline(server2 pb.Transport_AppendEntri
 }
 
 func (server *grpcServer) AppendEntries(ctx context.Context, request *pb.AppendEntriesRequest) (*pb.AppendEntriesResponse, error) {
-	server.handleCommand(decodeAppendEntriesRequest(request), nil)
+	response, err := server.handleCommand(decodeAppendEntriesRequest(request), nil)
+	if err != nil {
+		return nil, err
+	}
 
+	return encodeAppendEntriesResponse(response.(*AppendEntriesResponse)), nil
 }
 
 func (server *grpcServer) RequestVote(ctx context.Context, request *pb.RequestVoteRequest) (*pb.RequestVoteResponse, error) {
-	panic("implement me")
+	response, err := server.handleCommand(decodeRequestVoteRequest(request), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return encodeRequestVoteResponse(response.(*RequestVoteResponse)), nil
 }
 
 type GrpcTransport struct {
-	localAddr   string
-	dialOptions []grpc.DialOption
-	listener    *net.TCPListener
-	grpcServer  *grpc.Server
+	localAddr    string
+	dialOptions  []grpc.DialOption
+	listener     *net.TCPListener
+	grpcServer   *grpc.Server
+	connPool     map[ServerAddress]*grpcNetConn
+	connPoolLock sync.Mutex
 
 	consumerCh chan RPC
 
@@ -110,10 +124,13 @@ func NewGrpcTransport(localAddr string, dialOptions []grpc.DialOption) (*GrpcTra
 
 	transport.server = &grpcServer{
 		consumerCh: transport.consumerCh,
+		shutdownCh: transport.shutdownCh,
 	}
 
 	pb.RegisterTransportServer(transport.grpcServer, transport.server)
 	go transport.listen()
+
+	return transport, nil
 }
 
 func (transport *GrpcTransport) listen() {
@@ -126,7 +143,7 @@ func (transport *GrpcTransport) listen() {
 }
 
 func (transport *GrpcTransport) Consumer() <-chan RPC {
-
+	return transport.consumerCh
 }
 
 func (transport *GrpcTransport) AppendEntries(id ServerID, target ServerAddress, request *AppendEntriesRequest,
@@ -150,20 +167,19 @@ func (transport *GrpcTransport) AppendEntries(id ServerID, target ServerAddress,
 	return nil
 }
 
-func (transport *GrpcTransport) genericRPC(target ServerAddress) error {
-
-}
-
 func (transport *GrpcTransport) getConn(target ServerAddress) (*grpcNetConn, error) {
+	transport.connPoolLock.Lock()
+	defer transport.connPoolLock.Unlock()
+
 	// Check for a pooled conn
-	if conn := transport.getPooledConn(target); conn != nil {
+	if conn, ok := transport.connPool[target]; ok && conn != nil {
 		return conn, nil
 	}
 
 	// Dial a new connection
 	clientConn, err := grpc.Dial(string(target), transport.dialOptions...)
 	if err != nil {
-
+		return nil, err
 	}
 
 	conn := &grpcNetConn{
@@ -172,6 +188,13 @@ func (transport *GrpcTransport) getConn(target ServerAddress) (*grpcNetConn, err
 	}
 
 	return conn, nil
+}
+
+func (transport *GrpcTransport) addConn(target ServerAddress, conn *grpcNetConn) {
+	transport.connPoolLock.Lock()
+	defer transport.connPoolLock.Unlock()
+
+	transport.connPool[target] = conn
 }
 
 func encodeAppendEntriesRequest(request *AppendEntriesRequest) *pb.AppendEntriesRequest {
@@ -186,7 +209,73 @@ func encodeAppendEntriesRequest(request *AppendEntriesRequest) *pb.AppendEntries
 }
 
 func encodeLogs(logs []*Log) []*pb.Log {
+	l := make([]*pb.Log, len(logs))
+	for _, log := range logs {
+		l = append(l, encodeLog(log))
+	}
 
+	return l
+}
+
+func encodeLog(log *Log) *pb.Log {
+	return &pb.Log{
+		Index:      log.Index,
+		Term:       log.Term,
+		Type:       encodeLogType(log.Type),
+		Data:       log.Data,
+		Extensions: log.Extensions,
+		AppendedAt: timestamppb.New(log.AppendedAt),
+	}
+}
+
+func encodeLogType(s LogType) pb.Log_LogType {
+	switch s {
+	case LogCommand:
+		return pb.Log_LOG_COMMAND
+	case LogNoop:
+		return pb.Log_LOG_NOOP
+	case LogBarrier:
+		return pb.Log_LOG_BARRIER
+	case LogConfiguration:
+		return pb.Log_LOG_CONFIGURATION
+	default:
+		panic("invalid LogType")
+	}
+}
+
+func decodeLogs(logs []*pb.Log) []*Log {
+	l := make([]*Log, len(logs))
+	for _, log := range logs {
+		l = append(l, decodeLog(log))
+	}
+
+	return l
+}
+
+func decodeLog(log *pb.Log) *Log {
+	return &Log{
+		Index:      log.Index,
+		Term:       log.Term,
+		Type:       decodeLogType(log.Type),
+		Data:       log.Data,
+		Extensions: log.Extensions,
+		AppendedAt: log.AppendedAt.AsTime(),
+	}
+}
+
+func decodeLogType(m pb.Log_LogType) LogType {
+	switch m {
+	case pb.Log_LOG_COMMAND:
+		return LogCommand
+	case pb.Log_LOG_NOOP:
+		return LogNoop
+	case pb.Log_LOG_BARRIER:
+		return LogBarrier
+	case pb.Log_LOG_CONFIGURATION:
+		return LogConfiguration
+	default:
+		panic("invalid LogType")
+	}
 }
 
 func decodeAppendEntriesRequest(request *pb.AppendEntriesRequest) *AppendEntriesRequest {
@@ -200,6 +289,28 @@ func decodeAppendEntriesRequest(request *pb.AppendEntriesRequest) *AppendEntries
 	}
 }
 
-func decodeLogs(logs []*pb.Log) []*Log {
+func encodeAppendEntriesResponse(response *AppendEntriesResponse) *pb.AppendEntriesResponse {
+	return &pb.AppendEntriesResponse{
+		Term:           response.Term,
+		LastLog:        response.LastLog,
+		Success:        response.Success,
+		NoRetryBackoff: response.NoRetryBackoff,
+	}
+}
 
+func decodeRequestVoteRequest(request *pb.RequestVoteRequest) *RequestVoteRequest {
+	return &RequestVoteRequest{
+		Term:               request.Term,
+		Candidate:          request.Candidate,
+		LastLogIndex:       request.LastLogIndex,
+		LastLogTerm:        request.LastLogTerm,
+		LeadershipTransfer: request.LeadershipTransfer,
+	}
+}
+
+func encodeRequestVoteResponse(response *RequestVoteResponse) *pb.RequestVoteResponse {
+	return &pb.RequestVoteResponse{
+		Term:    response.Term,
+		Granted: response.Granted,
+	}
 }
