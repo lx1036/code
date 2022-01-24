@@ -68,3 +68,15 @@ func min(a, b uint64) uint64 {
 	}
 	return b
 }
+
+// backoff is used to compute an exponential backoff
+// duration. Base time is scaled by the current round,
+// up to some maximum scale factor.
+func backoff(base time.Duration, round, limit uint64) time.Duration {
+	power := min(round, limit)
+	for power >= 2 {
+		base *= 2
+		power--
+	}
+	return base
+}
