@@ -100,9 +100,10 @@ func TestRpcCodec(test *testing.T) {
 			}
 		}()
 
-		dec := codec.NewDecoder(bufio.NewReader(conn), &codec.MsgpackHandle{})
+		reader := bufio.NewReaderSize(conn, connReceiveBufferSize)
 		writer := bufio.NewWriterSize(conn, connSendBufferSize)
 		enc := codec.NewEncoder(writer, &codec.MsgpackHandle{})
+		dec := codec.NewDecoder(reader, &codec.MsgpackHandle{})
 
 		// Send the request
 		if err = writer.WriteByte(rpcRequestVote); err != nil {
