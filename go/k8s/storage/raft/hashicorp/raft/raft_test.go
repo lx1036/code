@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"k8s.io/klog/v2"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -128,6 +129,7 @@ func TestRecoverRaftCluster(test *testing.T) {
 
 	for _, fixture := range fixtures {
 		test.Run(fixture.description, func(t *testing.T) {
+			var err error
 			config := DefaultConfig()
 			config.TrailingLogs = 10
 			config.SnapshotThreshold = uint64(snapshotThreshold)
@@ -142,16 +144,17 @@ func TestRecoverRaftCluster(test *testing.T) {
 			})
 			defer cluster.Close()
 
+			time.Sleep(time.Second * 3)
+
 			leader := cluster.Leader()
 			for i := 0; i < fixture.appliedIndex; i++ {
 				if err := leader.Apply([]byte(fmt.Sprintf("test:%d", i)), 0).Error(); err != nil {
 					klog.Fatalf(fmt.Sprintf("propose/apply log err:%v", err))
 				}
 			}
-
 			// Snap the configuration.
 			future := leader.GetConfiguration()
-			if err := future.Error(); err != nil {
+			if err = future.Error(); err != nil {
 				t.Fatalf("[ERR] get configuration err: %v", err)
 			}
 			configuration := future.Configuration()
@@ -162,7 +165,155 @@ func TestRecoverRaftCluster(test *testing.T) {
 				}
 			}
 
+			// Recover the cluster. We need to replace the transport and we
+			// replace the FSM so no state can carry over.
+			for i, r := range cluster.rafts {
+				var before []*SnapshotMeta
+				before, err = r.snapshots.List()
+				if err != nil {
+					t.Fatalf("snapshot list err: %v", err)
+				}
+				cfg := r.config()
+				if err = RecoverCluster(&cfg, &MockFSM{}, r.logs, r.stable,
+					r.snapshots, r.transport, configuration); err != nil {
+					t.Fatalf("recover err: %v", err)
+				}
+
+				// Make sure the recovery looks right.
+				var after []*SnapshotMeta
+				after, err = r.snapshots.List()
+				if err != nil {
+					t.Fatalf("snapshot list err: %v", err)
+				}
+				if len(after) != len(before)+1 {
+					t.Fatalf("expected a new snapshot, %d vs. %d", len(before), len(after))
+				}
+				var first uint64
+				first, err = r.logs.FirstIndex()
+				if err != nil {
+					t.Fatalf("first log index err: %v", err)
+				}
+				var last uint64
+				last, err = r.logs.LastIndex()
+				if err != nil {
+					t.Fatalf("last log index err: %v", err)
+				}
+				if first != 0 || last != 0 {
+					t.Fatalf("expected empty logs, got %d/%d", first, last)
+				}
+
+				// Fire up the recovered Raft instance. We have to patch
+				// up the cluster state manually since this is an unusual
+				// operation.
+				trans := NewMemoryTransport(r.localAddr)
+				var r2 *Raft
+				r2, err = NewRaft(&cfg, &MockFSM{}, r.logs, r.stable, r.snapshots, trans)
+				if err != nil {
+					t.Fatalf("new raft err: %v", err)
+				}
+				cluster.rafts[i] = r2
+				cluster.transports[i] = r2.transport.(*MemoryTransport)
+				cluster.fsms[i] = r2.fsm.(*MockFSM)
+			}
+			cluster.FullyConnect()
+			time.Sleep(time.Second * 3)
+
+			// Let things settle and make sure we recovered.
+			cluster.EnsureLeader(cluster.Leader().localAddr)
+			cluster.EnsureFSMSame()
+			cluster.EnsurePeersSame()
 		})
 	}
+}
+
+func TestRaftApplyConcurrently(test *testing.T) {
+	cluster := NewCluster(&ClusterConfig{
+		Peers: []string{
+			"1/127.0.0.1:7000",
+			"2/127.0.0.1:8000",
+			"3/127.0.0.1:9000",
+		},
+		Bootstrap: true,
+	})
+	defer cluster.Close()
+
+	time.Sleep(time.Second * 3)
+	leader := cluster.Leader()
+
+	nums := 100
+	var group sync.WaitGroup
+	group.Add(nums)
+	applyF := func(i int) {
+		defer group.Done()
+		future := leader.Apply([]byte(fmt.Sprintf("test%d", i)), 0)
+		if err := future.Error(); err != nil {
+			klog.Fatalf(fmt.Sprintf("[ERR] err: %v", err))
+		}
+	}
+	// Concurrently apply
+	for i := 0; i < nums; i++ {
+		go applyF(i)
+	}
+
+	// Wait to finish
+	doneCh := make(chan struct{})
+	go func() {
+		group.Wait()
+		close(doneCh)
+	}()
+	select {
+	case <-doneCh:
+	case <-time.After(time.Second * 5):
+		klog.Fatalf("timeout")
+	}
+
+	cluster.EnsureLeader(cluster.Leader().localAddr)
+	cluster.EnsureFSMSame()
+	cluster.EnsurePeersSame()
+}
+
+func TestRaftAutoSnapshot(test *testing.T) {
+	config := DefaultConfig()
+	config.TrailingLogs = 10
+	config.SnapshotThreshold = 50
+	config.SnapshotInterval = time.Second * 1
+	cluster := NewCluster(&ClusterConfig{
+		Conf: config,
+		Peers: []string{
+			"1/127.0.0.1:7000",
+			//"2/127.0.0.1:8000",
+			//"3/127.0.0.1:9000",
+		},
+		Bootstrap: true,
+	})
+	defer cluster.Close()
+
+	time.Sleep(time.Second * 3)
+
+	leader := cluster.Leader()
+	var future Future
+	for i := 0; i < 100; i++ {
+		future = leader.Apply([]byte(fmt.Sprintf("test%d", i)), 0)
+	}
+
+	// Wait for the last future to apply
+	if err := future.Error(); err != nil {
+		test.Fatalf("err: %v", err)
+	}
+
+	// Wait for a snapshot to happen
+	time.Sleep(time.Second * 10)
+
+	// Check for snapshot
+	if snaps, _ := leader.snapshots.List(); len(snaps) == 0 {
+		test.Fatalf("should have a snapshot")
+	} else {
+		for _, snap := range snaps {
+			klog.Infof(fmt.Sprintf("snapshot meta data:%+v", *snap))
+		}
+	}
+}
+
+func TestRaftUserSnapshot(test *testing.T) {
 
 }

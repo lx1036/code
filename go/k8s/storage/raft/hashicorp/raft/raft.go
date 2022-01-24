@@ -5,15 +5,16 @@ import (
 	"container/list"
 	"fmt"
 	"k8s.io/klog/v2"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
 var (
-	keyCurrentTerm  = []byte("CurrentTerm")
-	keyLastVoteTerm = []byte("LastVoteTerm")
-	keyLastVoteCand = []byte("LastVoteCand")
+	keyCurrentTerm       = []byte("CurrentTerm")
+	keyLastVoteTerm      = []byte("LastVoteTerm")
+	keyLastVoteCandidate = []byte("LastVoteCandidate")
 )
 
 // leaderState is state that is used while we are a leader.
@@ -229,6 +230,9 @@ func NewRaft(conf *Config, fsm FSM, logs LogStore, stable StableStore, snaps Sna
 	// Setup a heartbeat fast-path to avoid head-of-line
 	// blocking where possible. It MUST be safe for this
 	// to be called concurrently with a blocking RPC.
+	// INFO: @see https://github.com/hashicorp/raft/blob/v1.3.3/net_transport.go#L580-L598 L629-L638
+	//  性能提升：这里可以快速处理 heartbeat 信息，不需要再放入 <-r.rpcCh 再去处理，免得阻塞，因为心跳是每100ms一次，特别多。
+	//  这个优化还是可以的！！！
 	transport.SetHeartbeatHandler(r.processHeartbeat)
 
 	if conf.skipStartup {
@@ -298,13 +302,13 @@ func (r *Raft) runFollower() {
 		case b := <-r.bootstrapCh:
 			b.respond(r.liveBootstrap(b.configuration))
 
-		case <-heartbeatTimer: // 每 [1s, 2s] 一次心跳检查是否要心跳
+		case <-heartbeatTimer: // 每 [1s, 2s] 一次心跳检查是否有心跳
 			// Restart the heartbeat timer
 			heartbeatTimeout := r.config().HeartbeatTimeout
 			heartbeatTimer = randomTimeout(heartbeatTimeout) // [1s, 2s]
 
-			// INFO: 性能提高: 这里使用 lastContact，如果是正常的 log replicate，也会修改 lastContact，这样在 heartbeatTimeout 内不需要再去心跳检查
-			//  本来担心网络抖动会导致几次心跳没成功，会发起 leader election；但是每 HeartbeatTimeout / 10 leader 发起一次心跳，如果
+			// INFO: 提高safety: 这里使用 lastContact，如果是正常的 log replicate，也会修改 lastContact
+			//  本来担心网络抖动会导致几次心跳没成功，会发起 leader election，但是每 HeartbeatTimeout / 10 leader 发起一次心跳，如果
 			//  10次心跳都没成功，就必然 ElectionTimeout，则可以发起选举, @see https://github.com/hashicorp/raft/blob/v1.3.3/replication.go#L389-L394
 			lastContact := r.LastContact()
 			if time.Now().Sub(lastContact) < heartbeatTimeout {
@@ -388,6 +392,8 @@ func (r *Raft) runCandidate() {
 		case vote := <-voteCh:
 			// Check if the term is greater than ours, bail
 			if vote.Term > r.getCurrentTerm() { // INFO: @see raft paper 3.4
+				// @see https://thesquareplanet.com/blog/students-guide-to-raft/
+				// "If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower"
 				klog.Warningf("newer term discovered, fallback to follower")
 				r.setState(Follower)
 				r.setCurrentTerm(vote.Term)
@@ -409,6 +415,10 @@ func (r *Raft) runCandidate() {
 			}
 
 		case <-electionTimer:
+			// INFO: @see https://thesquareplanet.com/blog/students-guide-to-raft/
+			//  Follow Figure 2’s directions as to when you should start an election. In particular, note that if you are
+			//  a candidate (i.e., you are currently running an election), but the election timer fires, you should start another election.
+			//  This is important to avoid the system stalling due to delayed or dropped RPCs.
 			// Election failed! Restart the election. We simply return,
 			// which will kick us back into runCandidate
 			klog.Warningf("Election timeout reached, restarting election")
@@ -509,7 +519,7 @@ func (r *Raft) persistVote(term uint64, candidate []byte) error {
 	if err := r.stable.SetUint64(keyLastVoteTerm, term); err != nil {
 		return err
 	}
-	if err := r.stable.Set(keyLastVoteCand, candidate); err != nil {
+	if err := r.stable.Set(keyLastVoteCandidate, candidate); err != nil {
 		return err
 	}
 	return nil
@@ -833,6 +843,20 @@ func (r *Raft) setLatestConfiguration(c Configuration, i uint64) {
 	r.latestConfiguration.Store(c.Clone())
 }
 
+// getLatestConfiguration reads the configuration from a copy of the main
+// configuration, which means it can be accessed independently from the main
+// loop.
+func (r *Raft) getLatestConfiguration() Configuration {
+	// this switch catches the case where this is called without having set
+	// a configuration previously.
+	switch c := r.latestConfiguration.Load().(type) {
+	case Configuration:
+		return c
+	default:
+		return Configuration{}
+	}
+}
+
 // GetConfiguration returns the latest configuration. This may not yet be
 // committed. The main loop can access this directly.
 func (r *Raft) GetConfiguration() ConfigurationFuture {
@@ -980,7 +1004,7 @@ func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
 		klog.Errorf(fmt.Sprintf("failed to get last vote term err:%v", err))
 		return
 	}
-	lastVoteCandBytes, err := r.stable.Get(keyLastVoteCand)
+	lastVoteCandBytes, err := r.stable.Get(keyLastVoteCandidate)
 	if err != nil && err.Error() != "not found" {
 		klog.Errorf(fmt.Sprintf("failed to get last vote candidate err:%v", err))
 		return
@@ -1014,6 +1038,7 @@ func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
 	}
 
 	resp.Granted = true
+	// raft paper: "For example, you might reasonably reset a peer’s election timer whenever you receive an AppendEntries or RequestVote RPC."
 	r.setLastContact()
 	return
 }
@@ -1029,6 +1054,17 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 
 	var rpcErr error
 	defer func() {
+		switch c := rpc.Command.(type) {
+		case *AppendEntriesRequest:
+			if len(cmd.Entries) > 0 {
+				var msg []string
+				for _, entry := range cmd.Entries {
+					msg = append(msg, fmt.Sprintf("%d:%s", entry.Index, string(entry.Data)))
+				}
+				klog.Infof(fmt.Sprintf("[appendEntries]leader is %s, msg is %s", c.Leader, strings.Join(msg, " ")))
+			}
+		}
+
 		rpc.Respond(resp, rpcErr)
 	}()
 
@@ -1049,20 +1085,23 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 	// Save the current leader
 	r.setLeader(r.transport.DecodePeer(cmd.Leader))
 
-	// INFO: 对于 heartbeat AppendEntriesRequest, PrevLogEntry、Entries、LeaderCommitIndex 都是 0
+	// INFO: 对于 heartbeat AppendEntriesRequest, PrevLogIndex、Entries、LeaderCommitIndex 都是 0
 	//  @see https://github.com/hashicorp/raft/blob/v1.3.3/net_transport.go#L587-L592
 
 	// Verify the last log entry, 为何验证 previousLog
-	if cmd.PrevLogEntry > 0 {
+	// @see https://thesquareplanet.com/blog/students-guide-to-raft/
+	// If you get an AppendEntries RPC with a prevLogIndex that points beyond the end of your log, you should handle it
+	// the same as if you did have that entry but the term did not match (i.e., reply false).
+	if cmd.PrevLogIndex > 0 {
 		lastIdx, lastTerm := r.getLastEntry()
 		var prevLogTerm uint64
-		if cmd.PrevLogEntry == lastIdx {
+		if cmd.PrevLogIndex == lastIdx {
 			prevLogTerm = lastTerm
 		} else {
 			var prevLog Log
-			if err := r.logs.GetLog(cmd.PrevLogEntry, &prevLog); err != nil {
+			if err := r.logs.GetLog(cmd.PrevLogIndex, &prevLog); err != nil {
 				klog.Warningf(fmt.Sprintf("failed to get previous log from %s/%s previousLogIndex:%d lastLogIndex:%d error:%v",
-					r.localID, r.localAddr, cmd.PrevLogEntry, lastIdx, err))
+					r.localID, r.localAddr, cmd.PrevLogIndex, lastIdx, err))
 				resp.NoRetryBackoff = true
 				return
 			}
@@ -1141,6 +1180,7 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 
 	// Everything went well, set success
 	resp.Success = true
+	// raft paper: "For example, you might reasonably reset a peer’s election timer whenever you receive an AppendEntries or RequestVote RPC."
 	r.setLastContact()
 	return
 }

@@ -1,7 +1,9 @@
 package raft
 
 import (
+	"fmt"
 	"io"
+	"k8s.io/klog/v2"
 )
 
 // SnapshotMeta is for metadata of a snapshot.
@@ -30,8 +32,7 @@ type SnapshotStore interface {
 	// Create is used to begin a snapshot at a given index and term, and with
 	// the given committed configuration. The version parameter controls
 	// which snapshot version to create.
-	Create(index, term uint64, configuration Configuration,
-		configurationIndex uint64, trans Transport) (SnapshotSink, error)
+	Create(index, term uint64, configuration Configuration, configurationIndex uint64) (SnapshotSink, error)
 
 	// List is used to list the available snapshots in the store.
 	// It should return then in descending order, with the highest index first.
@@ -54,5 +55,170 @@ type SnapshotSink interface {
 // new snapshots of the FSM. It runs in parallel to the FSM and
 // main goroutines, so that snapshots do not block normal operation.
 func (r *Raft) runSnapshots() {
+	for {
+		select {
+		case <-randomTimeout(r.config().SnapshotInterval): // [1s, 2s]
+			// Check if we should snapshot
+			if !r.shouldSnapshot() {
+				continue
+			}
 
+			// Trigger a snapshot
+			if _, err := r.takeSnapshot(); err != nil {
+				klog.Errorf(fmt.Sprintf("failed to take snapshot err:%v", err))
+			}
+
+		case future := <-r.userSnapshotCh:
+			// User-triggered, run immediately
+			id, err := r.takeSnapshot()
+			if err != nil {
+				klog.Errorf(fmt.Sprintf("failed to take snapshot err:%v", err))
+			} else {
+				future.opener = func() (*SnapshotMeta, io.ReadCloser, error) {
+					return r.snapshots.Open(id)
+				}
+			}
+			future.respond(err)
+
+		case <-r.shutdownCh:
+			return
+		}
+	}
+}
+
+// shouldSnapshot checks if we meet the conditions to take
+// a new snapshot.
+func (r *Raft) shouldSnapshot() bool {
+	// Check the last snapshot index
+	lastSnap, _ := r.getLastSnapshot()
+
+	// Check the last log index
+	lastIdx, err := r.logs.LastIndex()
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("failed to get last log index err:%v", err))
+		return false
+	}
+
+	// Compare the delta to the threshold
+	delta := lastIdx - lastSnap
+	return delta >= r.config().SnapshotThreshold
+}
+
+// takeSnapshot is used to take a new snapshot. This must only be called from
+// the snapshot thread, never the main thread. This returns the ID of the new
+// snapshot, along with an error.
+func (r *Raft) takeSnapshot() (string, error) {
+	// Create a request for the FSM to perform a snapshot.
+	snapReq := &reqSnapshotFuture{}
+	snapReq.init()
+
+	// Wait for dispatch or shutdown.
+	select {
+	case r.fsmSnapshotCh <- snapReq:
+	case <-r.shutdownCh:
+		return "", ErrRaftShutdown
+	}
+	// INFO: Wait until we get a response, 这里是 block，值得借鉴
+	if err := snapReq.Error(); err != nil {
+		if err != ErrNothingNewToSnapshot {
+			err = fmt.Errorf("failed to start snapshot: %v", err)
+		}
+		return "", err
+	}
+
+	defer snapReq.snapshot.Release()
+
+	// Make a request for the configurations and extract the committed info.
+	// We have to use the future here to safely get this information since
+	// it is owned by the main thread.
+	configReq := &configurationsFuture{}
+	configReq.ShutdownCh = r.shutdownCh
+	configReq.init()
+	select {
+	case r.configurationsCh <- configReq:
+	case <-r.shutdownCh:
+		return "", ErrRaftShutdown
+	}
+	if err := configReq.Error(); err != nil {
+		return "", err
+	}
+	committed := configReq.configurations.committed
+	committedIndex := configReq.configurations.committedIndex
+
+	// We don't support snapshots while there's a config change outstanding
+	// since the snapshot doesn't have a means to represent this state. This
+	// is a little weird because we need the FSM to apply an index that's
+	// past the configuration change, even though the FSM itself doesn't see
+	// the configuration changes. It should be ok in practice with normal
+	// application traffic flowing through the FSM. If there's none of that
+	// then it's not crucial that we snapshot, since there's not much going
+	// on Raft-wise.
+	if snapReq.index < committedIndex {
+		return "", fmt.Errorf("cannot take snapshot now, wait until the configuration entry at %v has been applied (have applied %v)",
+			committedIndex, snapReq.index)
+	}
+
+	// Create a new snapshot.
+	klog.Infof(fmt.Sprintf("starting snapshot up to index:%d", snapReq.index))
+	sink, err := r.snapshots.Create(snapReq.index, snapReq.term, committed, committedIndex)
+	if err != nil {
+		return "", fmt.Errorf("failed to create snapshot: %v", err)
+	}
+	// Try to persist the snapshot.
+	if err := snapReq.snapshot.Persist(sink); err != nil {
+		sink.Cancel()
+		return "", fmt.Errorf("failed to persist snapshot: %v", err)
+	}
+	// Close and check for error.
+	if err := sink.Close(); err != nil {
+		return "", fmt.Errorf("failed to close snapshot: %v", err)
+	}
+
+	// Update the last stable snapshot info.
+	r.setLastSnapshot(snapReq.index, snapReq.term)
+
+	// Compact the logs.
+	if err := r.compactLogs(snapReq.index); err != nil {
+		return "", err
+	}
+
+	klog.Infof(fmt.Sprintf("snapshot complete up to index:%d", snapReq.index))
+	return sink.ID(), nil
+}
+
+// compactLogs takes the last inclusive index of a snapshot
+// and trims the logs that are no longer needed.
+func (r *Raft) compactLogs(snapIdx uint64) error {
+	// Determine log ranges to compact
+	minLog, err := r.logs.FirstIndex()
+	if err != nil {
+		return fmt.Errorf("failed to get first log index: %v", err)
+	}
+
+	// Check if we have enough logs to truncate
+	lastLogIdx, _ := r.getLastLog()
+	// Use a consistent value for trailingLogs for the duration of this method
+	// call to avoid surprising behaviour.
+	trailingLogs := r.config().TrailingLogs
+	if (lastLogIdx - minLog) <= trailingLogs { // TODO: 这里 hashicorp/raft 貌似有个 bug
+		return nil
+	}
+
+	// Truncate up to the end of the snapshot, or `TrailingLogs`
+	// back from the head, which ever is further back. This ensures
+	// at least `TrailingLogs` entries, but does not allow logs
+	// after the snapshot to be removed.
+	maxLog := min(snapIdx, lastLogIdx-trailingLogs)
+	if minLog > maxLog {
+		klog.Info("no logs to truncate")
+		return nil
+	}
+
+	klog.Infof(fmt.Sprintf("compacting logs from %d to %d", minLog, maxLog))
+
+	// Compact the logs
+	if err := r.logs.DeleteRange(minLog, maxLog); err != nil {
+		return fmt.Errorf("log compaction failed: %v", err)
+	}
+	return nil
 }

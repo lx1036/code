@@ -21,7 +21,7 @@ type MemoryTransport struct {
 func NewMemoryTransport(addr ServerAddress) *MemoryTransport {
 	return &MemoryTransport{
 		localAddr:  addr,
-		timeout:    500 * time.Microsecond,
+		timeout:    1 * time.Second,
 		peers:      make(map[ServerAddress]*MemoryTransport),
 		consumerCh: make(chan RPC, 16),
 	}

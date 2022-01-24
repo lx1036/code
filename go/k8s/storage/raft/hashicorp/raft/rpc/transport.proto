@@ -1,0 +1,63 @@
+
+
+
+
+syntax = "proto3";
+
+option go_package = "./;rpc";
+import "google/protobuf/timestamp.proto";
+
+
+service Transport {
+  rpc AppendEntriesPipeline(stream AppendEntriesRequest) returns (stream AppendEntriesResponse) {}
+
+  // AppendEntries performs a single append entries request / response.
+  rpc AppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse) {}
+
+  // RequestVote is the command used by a candidate to ask a Raft peer for a vote in an election.
+  rpc RequestVote(RequestVoteRequest) returns (RequestVoteResponse) {}
+}
+
+message Log {
+  enum LogType {
+    LOG_COMMAND = 0;
+    LOG_NOOP = 1;
+    LOG_BARRIER = 2;
+    LOG_CONFIGURATION = 3;
+  }
+  uint64 index = 1;
+  uint64 term = 2;
+  LogType type = 3;
+  bytes data = 4;
+  bytes extensions = 5;
+  google.protobuf.Timestamp appended_at = 6;
+}
+
+message AppendEntriesRequest {
+  uint64 term = 2;
+  bytes leader = 3;
+  uint64 prev_log_index = 4;
+  uint64 prev_log_term = 5;
+  repeated Log entries = 6;
+  uint64 leader_commit_index = 7;
+}
+
+message AppendEntriesResponse {
+  uint64 term = 2;
+  uint64 last_log = 3;
+  bool success = 4;
+  bool no_retry_backoff = 5;
+}
+
+message RequestVoteRequest {
+  uint64 term = 2;
+  bytes candidate = 3;
+  uint64 last_log_index = 4;
+  uint64 last_log_term = 5;
+  bool leadership_transfer = 6;
+}
+
+message RequestVoteResponse {
+  uint64 term = 2;
+  bool granted = 3;
+}

@@ -23,6 +23,10 @@ var (
 	// ErrNotLeader is returned when an operation can't be completed on a
 	// follower or candidate node.
 	ErrNotLeader = errors.New("node is not the leader")
+
+	// ErrNothingNewToSnapshot is returned when trying to create a snapshot
+	// but there's nothing new commited to the FSM since we started.
+	ErrNothingNewToSnapshot = errors.New("nothing new to snapshot")
 )
 
 // Apply is used to apply a command to the FSM in a highly consistent
@@ -233,7 +237,7 @@ func RecoverCluster(conf *Config, fsm FSM, logs LogStore, stable StableStore,
 	if err != nil {
 		return fmt.Errorf("failed to snapshot FSM: %v", err)
 	}
-	sink, err := snaps.Create(lastIndex, lastTerm, configuration, 1, trans)
+	sink, err := snaps.Create(lastIndex, lastTerm, configuration, 1)
 	if err != nil {
 		return fmt.Errorf("failed to create snapshot: %v", err)
 	}

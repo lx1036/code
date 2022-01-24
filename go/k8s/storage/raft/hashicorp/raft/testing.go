@@ -1,11 +1,13 @@
 package raft
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -132,6 +134,116 @@ func (cluster *Cluster) EnsureLeader(expect ServerAddress) {
 	if fail {
 		klog.Fatalf("at least one peer has the wrong notion of leader")
 	}
+
+	klog.Infof(fmt.Sprintf("expected %s is leader", string(expect)))
+}
+
+func (cluster *Cluster) EnsureFSMSame() {
+	limit := time.Now().Add(cluster.longstopTimeout)
+	first := getMockFSM(cluster.fsms[0])
+
+CHECK:
+	first.Lock()
+	for i, fsmRaw := range cluster.fsms {
+		fsm := getMockFSM(fsmRaw)
+		if i == 0 {
+			continue
+		}
+		fsm.Lock()
+
+		if len(first.logs) != len(fsm.logs) {
+			fsm.Unlock()
+			if time.Now().After(limit) {
+				klog.Fatalf(fmt.Sprintf("FSM log length mismatch: first:%d other:%d",
+					len(first.logs), len(fsm.logs)))
+			} else {
+				goto WAIT
+			}
+		}
+
+		for idx := 0; idx < len(first.logs); idx++ {
+			if bytes.Compare(first.logs[idx], fsm.logs[idx]) != 0 {
+				fsm.Unlock()
+				if time.Now().After(limit) {
+					klog.Fatalf(fmt.Sprintf("FSM log mismatch at index %d", idx))
+				} else {
+					goto WAIT
+				}
+			}
+		}
+		if len(first.configurations) != len(fsm.configurations) {
+			fsm.Unlock()
+			if time.Now().After(limit) {
+				klog.Fatalf(fmt.Sprintf("FSM configuration length mismatch: %d %d",
+					len(first.logs), len(fsm.logs)))
+			} else {
+				goto WAIT
+			}
+		}
+
+		for idx := 0; idx < len(first.configurations); idx++ {
+			if !reflect.DeepEqual(first.configurations[idx], fsm.configurations[idx]) {
+				fsm.Unlock()
+				if time.Now().After(limit) {
+					klog.Fatalf(fmt.Sprintf("FSM configuration mismatch at index %d: %v, %v",
+						idx, first.configurations[idx], fsm.configurations[idx]))
+				} else {
+					goto WAIT
+				}
+			}
+		}
+		fsm.Unlock()
+	}
+
+	first.Unlock()
+	for _, log := range first.logs {
+		klog.Infof(fmt.Sprintf("log in fsm is %s", string(log)))
+	}
+	return
+
+WAIT:
+	first.Unlock()
+	cluster.WaitEvent(nil, cluster.conf.CommitTimeout)
+	goto CHECK
+}
+
+// getConfiguration returns the configuration of the given Raft instance, or
+// fails the test if there's an error
+func (cluster *Cluster) getConfiguration(r *Raft) Configuration {
+	future := r.GetConfiguration()
+	if err := future.Error(); err != nil {
+		klog.Fatalf(fmt.Sprintf("failed to get configuration: %v", err))
+		return Configuration{}
+	}
+
+	return future.Configuration()
+}
+
+// EnsurePeersSame makes sure all the rafts have the same set of peers.
+func (cluster *Cluster) EnsurePeersSame() {
+	limit := time.Now().Add(cluster.longstopTimeout)
+	peerSet := cluster.getConfiguration(cluster.rafts[0])
+
+CHECK:
+	for i, raft := range cluster.rafts {
+		if i == 0 {
+			continue
+		}
+
+		otherSet := cluster.getConfiguration(raft)
+		if !reflect.DeepEqual(peerSet, otherSet) {
+			if time.Now().After(limit) {
+				klog.Fatalf(fmt.Sprintf("peer mismatch: %+v %+v", peerSet, otherSet))
+			} else {
+				goto WAIT
+			}
+		}
+	}
+	return
+
+WAIT:
+	cluster.WaitEvent(nil, cluster.conf.CommitTimeout)
+	goto CHECK
 }
 
 // Leader waits for the cluster to elect a leader and stay in a stable state.
@@ -241,6 +353,19 @@ func getMockFSM(fsm FSM) *MockFSM {
 		return f
 	default:
 		return nil
+	}
+}
+
+// WaitEvent waits until an observation is made, a timeout occurs, or a test
+// failure is signaled. It is possible to set a filter to look for specific
+// observations. Setting timeout to 0 means that it will wait forever until a
+// non-filtered observation is made or a test failure is signaled.
+func (cluster *Cluster) WaitEvent(filter FilterFn, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	eventCh := cluster.WaitEventChan(ctx, filter)
+	select {
+	case <-eventCh:
 	}
 }
 

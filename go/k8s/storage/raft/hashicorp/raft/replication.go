@@ -121,7 +121,9 @@ func (r *Raft) replicate(follower *followerReplication) {
 	for !shouldStop {
 		select {
 		case <-follower.triggerCh:
-			lastLogIdx, _ := r.getLastLog()
+			lastLogIdx, lastLogTerm := r.getLastLog()
+			klog.Infof(fmt.Sprintf("ready to replicate logs from %s/%s to follower %s/%s until from lastCommitIndex:%d to commitIndex:%d at term:%d",
+				r.localID, r.localAddr, follower.peer.ID, follower.peer.Address, follower.commitment.commitIndex, lastLogIdx, lastLogTerm))
 			shouldStop = r.replicateTo(follower, lastLogIdx)
 		}
 	}
@@ -205,7 +207,8 @@ Start:
 
 	// Make the RPC call
 	if err := r.transport.AppendEntries(peer.ID, peer.Address, &req, &resp); err != nil {
-		klog.Errorf(fmt.Sprintf("failed to appendEntries to peer:%s/%s err:%v", peer.ID, peer.Address, err))
+		klog.Errorf(fmt.Sprintf("failed to appendEntries from %s/%s to peer:%s/%s err:%v",
+			r.localID, r.localAddr, peer.ID, peer.Address, err))
 		replication.failures++
 		return
 	}
@@ -284,17 +287,17 @@ func (r *Raft) setupAppendEntries(s *followerReplication, req *AppendEntriesRequ
 	return nil
 }
 
-// setPreviousLog is used to setup the PrevLogEntry and PrevLogTerm for an
+// setPreviousLog is used to setup the PrevLogIndex and PrevLogTerm for an
 // AppendEntriesRequest given the next index to replicate.
 func (r *Raft) setPreviousLog(req *AppendEntriesRequest, nextIndex uint64) error {
 	// Guard for the first index, since there is no 0 log entry
 	// Guard against the previous index being a snapshot as well
 	lastSnapIdx, lastSnapTerm := r.getLastSnapshot()
 	if nextIndex == 1 {
-		req.PrevLogEntry = 0
+		req.PrevLogIndex = 0
 		req.PrevLogTerm = 0
 	} else if (nextIndex - 1) == lastSnapIdx {
-		req.PrevLogEntry = lastSnapIdx
+		req.PrevLogIndex = lastSnapIdx
 		req.PrevLogTerm = lastSnapTerm
 	} else {
 		var l Log
@@ -304,7 +307,7 @@ func (r *Raft) setPreviousLog(req *AppendEntriesRequest, nextIndex uint64) error
 		}
 
 		// Set the previous index and term (0 if nextIndex is 1)
-		req.PrevLogEntry = l.Index
+		req.PrevLogIndex = l.Index
 		req.PrevLogTerm = l.Term
 	}
 	return nil
