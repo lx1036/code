@@ -2,6 +2,7 @@ package raft
 
 import (
 	"io"
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 )
 
 // RPCResponse captures both a response and a potential error.
@@ -37,14 +38,14 @@ type Transport interface {
 	AppendEntriesPipeline(id ServerID, target ServerAddress) (AppendPipeline, error)
 
 	// AppendEntries sends the appropriate RPC to the target node.
-	AppendEntries(id ServerID, target ServerAddress, args *AppendEntriesRequest, resp *AppendEntriesResponse) error
+	AppendEntries(id ServerID, target ServerAddress, args *pb.AppendEntriesRequest, resp *pb.AppendEntriesResponse) error
 
 	// RequestVote sends the appropriate RPC to the target node.
-	RequestVote(id ServerID, target ServerAddress, args *RequestVoteRequest, resp *RequestVoteResponse) error
+	RequestVote(id ServerID, target ServerAddress, args *pb.RequestVoteRequest, resp *pb.RequestVoteResponse) error
 
 	// InstallSnapshot is used to push a snapshot down to a follower. The data is read from
 	// the ReadCloser and streamed to the client.
-	InstallSnapshot(id ServerID, target ServerAddress, args *InstallSnapshotRequest, resp *InstallSnapshotResponse, data io.Reader) error
+	InstallSnapshot(id ServerID, target ServerAddress, args *pb.InstallSnapshotRequest, resp *pb.InstallSnapshotResponse, data io.Reader) error
 
 	// EncodePeer is used to serialize a peer's address.
 	EncodePeer(id ServerID, addr ServerAddress) []byte
@@ -59,5 +60,5 @@ type Transport interface {
 	SetHeartbeatHandler(cb func(rpc RPC))
 
 	// TimeoutNow is used to start a leadership transfer to the target node.
-	TimeoutNow(id ServerID, target ServerAddress, args *TimeoutNowRequest, resp *TimeoutNowResponse) error
+	TimeoutNow(id ServerID, target ServerAddress, args *pb.TimeoutNowRequest, resp *pb.TimeoutNowResponse) error
 }

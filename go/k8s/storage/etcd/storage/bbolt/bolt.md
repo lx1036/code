@@ -9,6 +9,11 @@ boltdb 是一个 key-value 存储系统，麻雀虽小五脏俱全，最大好�
 read-write transaction 会锁文件。
 read-only transaction 没有锁文件，性能好。
 
+## boltdb cli
+```shell
+go get github.com/br0xen/boltbrowser/...
+go get go.etcd.io/bbolt/... # 安装bbolt命令，bolt cli客户端
+```
 
 ### meta page
 

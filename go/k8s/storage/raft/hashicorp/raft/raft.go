@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"fmt"
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"k8s.io/klog/v2"
 	"strings"
 	"sync"
@@ -462,7 +463,7 @@ func (r *Raft) startElection() <-chan *voteResult {
 
 	// Construct the request
 	lastIdx, lastTerm := r.getLastEntry()
-	req := &RequestVoteRequest{
+	req := &pb.RequestVoteRequest{
 		Term:               r.getCurrentTerm(),
 		Candidate:          r.transport.EncodePeer(r.localID, r.localAddr),
 		LastLogIndex:       lastIdx,
@@ -944,7 +945,7 @@ func (r *Raft) processRPC(rpc RPC) {
 	switch cmd := rpc.Command.(type) {
 	case *AppendEntriesRequest:
 		r.appendEntries(rpc, cmd)
-	case *RequestVoteRequest:
+	case *pb.RequestVoteRequest:
 		r.requestVote(rpc, cmd)
 	case *InstallSnapshotRequest:
 		r.installSnapshot(rpc, cmd)
@@ -963,7 +964,7 @@ func (r *Raft) processRPC(rpc RPC) {
 * 如果 follower lastLogTerm > candidate lastLogTerm，则 reject term；
 * 如果 follower lastLogTerm == candidate lastLogTerm，但是 follower lastLogIndex == candidate lastLogIndex 则 reject vote；
  */
-func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
+func (r *Raft) requestVote(rpc RPC, req *pb.RequestVoteRequest) {
 	resp := &RequestVoteResponse{
 		Term:    r.getCurrentTerm(),
 		Granted: false,

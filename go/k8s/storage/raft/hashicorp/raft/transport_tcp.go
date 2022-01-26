@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
+
 	"github.com/hashicorp/go-msgpack/codec"
 	"k8s.io/klog/v2"
 )
@@ -280,7 +282,7 @@ func (transport *TCPTransport) handleCommand(r *bufio.Reader, dec *codec.Decoder
 	isHeartbeat := false
 	switch rpcType {
 	case rpcRequestVote:
-		var req RequestVoteRequest
+		var req pb.RequestVoteRequest
 		if err := dec.Decode(&req); err != nil {
 			return err
 		}
@@ -355,7 +357,7 @@ func (transport *TCPTransport) SetHeartbeatHandler(cb func(rpc RPC)) {
 }
 
 // RequestVote implements the Transport interface.
-func (transport *TCPTransport) RequestVote(id ServerID, target ServerAddress, request *RequestVoteRequest, resp *RequestVoteResponse) error {
+func (transport *TCPTransport) RequestVote(id ServerID, target ServerAddress, request *pb.RequestVoteRequest, resp *RequestVoteResponse) error {
 	return transport.genericRPC(id, target, rpcRequestVote, request, resp)
 }
 

@@ -60,6 +60,9 @@ containerd 架构由36个 plugins 实现:
 * (23) containers/io.containerd.grpc.v1，
 
 
+## kubelet cri grpc 调用 containerd 创建 pod 时，具体细节是什么，只限于容器运行时内容？
+**[一起学containerd(六)创建pod,从sandbox开始](https://zhuanlan.zhihu.com/p/431406216)**
+
 
 
 ## 参考文献
