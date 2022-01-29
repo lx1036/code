@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"fmt"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"k8s.io/klog/v2"
 	"strings"
@@ -154,7 +155,7 @@ func NewRaft(conf *Config, fsm FSM, logs LogStore, stable StableStore, snaps Sna
 	}
 
 	// Get the last log entry.
-	var lastLog Log
+	var lastLog pb.Log
 	if lastIndex > 0 {
 		if err = logs.GetLog(lastIndex, &lastLog); err != nil {
 			return nil, fmt.Errorf("failed to get last log at index %d: %v", lastIndex, err)
@@ -215,7 +216,7 @@ func NewRaft(conf *Config, fsm FSM, logs LogStore, stable StableStore, snaps Sna
 	// Scan through the log for any configuration change entries in [snapshotIndex + 1, lastLogIndex]
 	snapshotIndex, _ := r.getLastSnapshot()
 	for index := snapshotIndex + 1; index <= lastLog.Index; index++ {
-		var entry Log
+		var entry pb.Log
 		if err := r.logs.GetLog(index, &entry); err != nil {
 			klog.Error(fmt.Sprintf("failed to get log for index:%d err:%v", index, err))
 			panic(err)
@@ -355,7 +356,7 @@ func (r *Raft) liveBootstrap(configuration Configuration) error {
 	}
 
 	// Make the configuration live.
-	var entry Log
+	var entry pb.Log
 	if err := r.logs.GetLog(1, &entry); err != nil {
 		panic(err)
 	}
@@ -365,7 +366,7 @@ func (r *Raft) liveBootstrap(configuration Configuration) error {
 }
 
 type voteResult struct {
-	RequestVoteResponse
+	pb.RequestVoteResponse
 	voterID      ServerID
 	voterAddress ServerAddress
 }
@@ -499,7 +500,7 @@ func (r *Raft) startElection() <-chan *voteResult {
 				}
 				// Include our own vote
 				respCh <- &voteResult{
-					RequestVoteResponse: RequestVoteResponse{
+					RequestVoteResponse: pb.RequestVoteResponse{
 						Term:    req.Term,
 						Granted: true,
 					},
@@ -646,13 +647,13 @@ func (r *Raft) dispatchLogs(applyLogs []*logFuture) {
 	now := time.Now()
 	term := r.getCurrentTerm()
 	lastIndex := r.getLastIndex()
-	logs := make([]*Log, len(applyLogs))
+	logs := make([]*pb.Log, len(applyLogs))
 	for idx, applyLog := range applyLogs {
 		applyLog.dispatch = now
 		lastIndex++
 		applyLog.log.Index = lastIndex
 		applyLog.log.Term = term
-		applyLog.log.AppendedAt = now
+		applyLog.log.AppendedAt = timestamppb.New(now)
 		logs[idx] = &applyLog.log
 		r.leaderState.inflight.PushBack(applyLog)
 	}
@@ -821,9 +822,9 @@ func (r *Raft) Leader() ServerAddress {
 // processConfigurationLogEntry takes a log entry and updates the latest
 // configuration if the entry results in a new configuration. This must only be
 // called from the main thread, or from NewRaft() before any threads have begun.
-func (r *Raft) processConfigurationLogEntry(entry *Log) error {
+func (r *Raft) processConfigurationLogEntry(entry *pb.Log) error {
 	switch entry.Type {
-	case LogConfiguration:
+	case pb.LogType_CONFIGURATION:
 		r.setCommittedConfiguration(r.configurations.latest, r.configurations.latestIndex)
 		r.setLatestConfiguration(DecodeConfiguration(entry.Data), entry.Index)
 	}
@@ -931,7 +932,7 @@ func (r *Raft) processHeartbeat(rpc RPC) {
 
 	// Ensure we are only handling a heartbeat
 	switch cmd := rpc.Command.(type) {
-	case *AppendEntriesRequest:
+	case *pb.AppendEntriesRequest:
 		r.appendEntries(rpc, cmd)
 	default:
 		klog.Error(fmt.Sprintf("expected heartbeat, got command: %+v", rpc.Command))
@@ -943,13 +944,13 @@ func (r *Raft) processHeartbeat(rpc RPC) {
 // called from the main thread.
 func (r *Raft) processRPC(rpc RPC) {
 	switch cmd := rpc.Command.(type) {
-	case *AppendEntriesRequest:
+	case *pb.AppendEntriesRequest:
 		r.appendEntries(rpc, cmd)
 	case *pb.RequestVoteRequest:
 		r.requestVote(rpc, cmd)
-	case *InstallSnapshotRequest:
+	case *pb.InstallSnapshotRequest:
 		r.installSnapshot(rpc, cmd)
-	case *TimeoutNowRequest:
+	case *pb.TimeoutNowRequest:
 		r.timeoutNow(rpc, cmd)
 	default:
 		klog.Error(fmt.Sprintf("got unexpected command: %+v", rpc.Command))
@@ -965,7 +966,7 @@ func (r *Raft) processRPC(rpc RPC) {
 * 如果 follower lastLogTerm == candidate lastLogTerm，但是 follower lastLogIndex == candidate lastLogIndex 则 reject vote；
  */
 func (r *Raft) requestVote(rpc RPC, req *pb.RequestVoteRequest) {
-	resp := &RequestVoteResponse{
+	resp := &pb.RequestVoteResponse{
 		Term:    r.getCurrentTerm(),
 		Granted: false,
 	}
@@ -1045,8 +1046,8 @@ func (r *Raft) requestVote(rpc RPC, req *pb.RequestVoteRequest) {
 }
 
 // appendEntries is invoked when we get AppendEntriesRPC call.
-func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
-	resp := &AppendEntriesResponse{
+func (r *Raft) appendEntries(rpc RPC, cmd *pb.AppendEntriesRequest) {
+	resp := &pb.AppendEntriesResponse{
 		Term:           r.getCurrentTerm(),
 		LastLog:        r.getLastIndex(),
 		Success:        false,
@@ -1056,7 +1057,7 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 	var rpcErr error
 	defer func() {
 		switch c := rpc.Command.(type) {
-		case *AppendEntriesRequest:
+		case *pb.AppendEntriesRequest:
 			if len(cmd.Entries) > 0 {
 				var msg []string
 				for _, entry := range cmd.Entries {
@@ -1099,7 +1100,7 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 		if cmd.PrevLogIndex == lastIdx {
 			prevLogTerm = lastTerm
 		} else {
-			var prevLog Log
+			var prevLog pb.Log
 			if err := r.logs.GetLog(cmd.PrevLogIndex, &prevLog); err != nil {
 				klog.Warningf(fmt.Sprintf("failed to get previous log from %s/%s previousLogIndex:%d lastLogIndex:%d error:%v",
 					r.localID, r.localAddr, cmd.PrevLogIndex, lastIdx, err))
@@ -1120,13 +1121,13 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 	if len(cmd.Entries) > 0 {
 		// Delete any conflicting entries, skip any duplicates
 		lastLogIdx, _ := r.getLastLog()
-		var newEntries []*Log
+		var newEntries []*pb.Log
 		for i, entry := range cmd.Entries {
 			if entry.Index > lastLogIdx {
 				newEntries = cmd.Entries[i:]
 				break
 			}
-			var storeEntry Log
+			var storeEntry pb.Log
 			if err := r.logs.GetLog(entry.Index, &storeEntry); err != nil {
 				klog.Warningf(fmt.Sprintf("failed to get log entry index:%d err:%v", entry.Index, err))
 				return
@@ -1189,7 +1190,7 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 // commitTuple is used to send an index that was committed,
 // with an optional associated future that should be invoked.
 type commitTuple struct {
-	log    *Log
+	log    *pb.Log
 	future *logFuture
 }
 
@@ -1232,7 +1233,7 @@ func (r *Raft) applyLogsToFSM(index uint64, futures map[uint64]*logFuture) {
 		if futureOk {
 			preparedLog = r.prepareLog(&future.log, future)
 		} else {
-			l := new(Log)
+			l := new(pb.Log)
 			if err := r.logs.GetLog(idx, l); err != nil {
 				klog.Errorf(fmt.Sprintf("failed to get log index:%d error:%v", idx, err))
 				panic(err)
@@ -1268,16 +1269,16 @@ func (r *Raft) applyLogsToFSM(index uint64, futures map[uint64]*logFuture) {
 }
 
 // processLog is invoked to process the application of a single committed log entry.
-func (r *Raft) prepareLog(l *Log, future *logFuture) *commitTuple {
+func (r *Raft) prepareLog(l *pb.Log, future *logFuture) *commitTuple {
 	switch l.Type {
-	case LogBarrier:
+	case pb.LogType_BARRIER:
 		// Barrier is handled by the FSM
 		fallthrough // 使用fallthrough强制执行后面的case代码, default 不会执行
 
-	case LogCommand, LogConfiguration:
+	case pb.LogType_COMMAND, pb.LogType_CONFIGURATION:
 		return &commitTuple{l, future}
 
-	case LogNoop:
+	case pb.LogType_NOOP:
 		// Ignore the no-op
 
 	default:
@@ -1307,12 +1308,12 @@ func (r *Raft) LastContact() time.Time {
 // We must be in the follower state for this, since it means we are
 // too far behind a leader for log replay. This must only be called
 // from the main thread.
-func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
+func (r *Raft) installSnapshot(rpc RPC, req *pb.InstallSnapshotRequest) {
 
 }
 
 // timeoutNow is what happens when a server receives a TimeoutNowRequest.
-func (r *Raft) timeoutNow(rpc RPC, req *TimeoutNowRequest) {
+func (r *Raft) timeoutNow(rpc RPC, req *pb.TimeoutNowRequest) {
 
 }
 

@@ -43,7 +43,7 @@ type WithClose interface {
 type AppendPipeline interface {
 	// AppendEntries is used to add another request to the pipeline.
 	// The send may block which is an effective form of back-pressure.
-	AppendEntries(args *AppendEntriesRequest, resp *AppendEntriesResponse) (AppendFuture, error)
+	AppendEntries(args *pb.AppendEntriesRequest, resp *pb.AppendEntriesResponse) (AppendFuture, error)
 
 	// Consumer returns a channel that can be used to consume
 	// response futures when they are ready.
@@ -63,12 +63,12 @@ type AppendFuture interface {
 
 	// Request holds the parameters of the AppendEntries call.
 	// It is always OK to call this method.
-	Request() *AppendEntriesRequest
+	Request() *pb.AppendEntriesRequest
 
 	// Response holds the results of the AppendEntries call.
 	// This method must only be called after the Error
 	// method returns, and will only be valid on success.
-	Response() *AppendEntriesResponse
+	Response() *pb.AppendEntriesResponse
 }
 
 // StreamLayer is used with the TCPTransport to provide
@@ -289,7 +289,7 @@ func (transport *TCPTransport) handleCommand(r *bufio.Reader, dec *codec.Decoder
 		rpc.Command = &req
 
 	case rpcAppendEntries:
-		var req AppendEntriesRequest
+		var req pb.AppendEntriesRequest
 		if err := dec.Decode(&req); err != nil {
 			return err
 		}
@@ -357,11 +357,11 @@ func (transport *TCPTransport) SetHeartbeatHandler(cb func(rpc RPC)) {
 }
 
 // RequestVote implements the Transport interface.
-func (transport *TCPTransport) RequestVote(id ServerID, target ServerAddress, request *pb.RequestVoteRequest, resp *RequestVoteResponse) error {
+func (transport *TCPTransport) RequestVote(id ServerID, target ServerAddress, request *pb.RequestVoteRequest, resp *pb.RequestVoteResponse) error {
 	return transport.genericRPC(id, target, rpcRequestVote, request, resp)
 }
 
-func (transport *TCPTransport) AppendEntries(id ServerID, target ServerAddress, request *AppendEntriesRequest, resp *AppendEntriesResponse) error {
+func (transport *TCPTransport) AppendEntries(id ServerID, target ServerAddress, request *pb.AppendEntriesRequest, resp *pb.AppendEntriesResponse) error {
 	return transport.genericRPC(id, target, rpcAppendEntries, request, resp)
 }
 
@@ -515,7 +515,7 @@ func decodeResponse(conn *netConn, resp interface{}) (bool, error) {
 }
 
 // INFO: 判断 AppendEntriesRequest 是 heartbeat，而不是 log request
-func isHeartbeatRequest(req *AppendEntriesRequest) bool {
+func isHeartbeatRequest(req *pb.AppendEntriesRequest) bool {
 	return req.Term != 0 && req.Leader != nil &&
 		req.PrevLogIndex == 0 && req.PrevLogTerm == 0 &&
 		len(req.Entries) == 0 && req.LeaderCommitIndex == 0

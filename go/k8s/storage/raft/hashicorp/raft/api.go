@@ -3,6 +3,7 @@ package raft
 import (
 	"errors"
 	"fmt"
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -35,12 +36,12 @@ var (
 // for the command to be started. This must be run on the leader or it
 // will fail.
 func (r *Raft) Apply(cmd []byte, timeout time.Duration) ApplyFuture {
-	return r.ApplyLog(Log{Data: cmd}, timeout)
+	return r.ApplyLog(&pb.Log{Data: cmd}, timeout)
 }
 
 // ApplyLog performs Apply but takes in a Log directly. The only values
 // currently taken from the submitted Log are Data and Extensions.
-func (r *Raft) ApplyLog(log Log, timeout time.Duration) ApplyFuture {
+func (r *Raft) ApplyLog(log *pb.Log, timeout time.Duration) ApplyFuture {
 	var timer <-chan time.Time
 	if timeout > 0 {
 		timer = time.After(timeout)
@@ -48,8 +49,8 @@ func (r *Raft) ApplyLog(log Log, timeout time.Duration) ApplyFuture {
 
 	// Create a log future, no index or term yet
 	f := &logFuture{
-		log: Log{
-			Type:       LogCommand,
+		log: pb.Log{
+			Type:       pb.LogType_COMMAND,
 			Data:       log.Data,
 			Extensions: log.Extensions,
 		},
@@ -107,10 +108,10 @@ func BootstrapCluster(conf *Config, logs LogStore, stable StableStore, snaps Sna
 		return fmt.Errorf("failed to save current term: %v", err)
 	}
 	// Append configuration entry to log.
-	entry := &Log{
+	entry := &pb.Log{
 		Index: 1,
 		Term:  1,
-		Type:  LogConfiguration,
+		Type:  pb.LogType_CONFIGURATION,
 		Data:  EncodeConfiguration(configuration),
 	}
 	if err := logs.StoreLog(entry); err != nil {
@@ -216,11 +217,11 @@ func RecoverCluster(conf *Config, fsm FSM, logs LogStore, stable StableStore,
 		return fmt.Errorf("failed to find last log: %v", err)
 	}
 	for index := snapshotIndex + 1; index <= lastLogIndex; index++ {
-		var entry Log
+		var entry pb.Log
 		if err = logs.GetLog(index, &entry); err != nil {
 			return fmt.Errorf("failed to get log at index %d: %v", index, err)
 		}
-		if entry.Type == LogCommand {
+		if entry.Type == pb.LogType_COMMAND {
 			_ = fsm.Apply(&entry)
 		}
 

@@ -2,6 +2,7 @@ package raft
 
 import (
 	"errors"
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"sync"
 )
 
@@ -11,7 +12,7 @@ import (
 type MemoryStore struct {
 	sync.RWMutex
 
-	logs  map[uint64]*Log
+	logs  map[uint64]*pb.Log
 	kv    map[string][]byte
 	kvInt map[string]uint64
 
@@ -21,7 +22,7 @@ type MemoryStore struct {
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		logs:  make(map[uint64]*Log),
+		logs:  make(map[uint64]*pb.Log),
 		kv:    make(map[string][]byte),
 		kvInt: make(map[string]uint64),
 	}
@@ -42,24 +43,32 @@ func (store *MemoryStore) LastIndex() (uint64, error) {
 }
 
 // GetLog implements the LogStore interface.
-func (store *MemoryStore) GetLog(index uint64, log *Log) error {
+func (store *MemoryStore) GetLog(index uint64, log *pb.Log) error {
 	store.RLock()
 	defer store.RUnlock()
 	l, ok := store.logs[index]
 	if !ok {
 		return ErrLogNotFound
 	}
-	*log = *l
+
+	log = &pb.Log{
+		Index:      l.Index,
+		Term:       l.Term,
+		Type:       l.Type,
+		Data:       l.Data,
+		Extensions: l.Extensions,
+		AppendedAt: l.AppendedAt,
+	}
 	return nil
 }
 
 // StoreLog implements the LogStore interface.
-func (store *MemoryStore) StoreLog(log *Log) error {
-	return store.StoreLogs([]*Log{log})
+func (store *MemoryStore) StoreLog(log *pb.Log) error {
+	return store.StoreLogs([]*pb.Log{log})
 }
 
 // StoreLogs implements the LogStore interface.
-func (store *MemoryStore) StoreLogs(logs []*Log) error {
+func (store *MemoryStore) StoreLogs(logs []*pb.Log) error {
 	store.Lock()
 	defer store.Unlock()
 	for _, l := range logs {

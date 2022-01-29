@@ -2,6 +2,7 @@ package raft
 
 import (
 	"io"
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"sync"
 	"time"
 )
@@ -82,16 +83,16 @@ func (d *deferError) respond(err error) {
 // the log is considered committed.
 type logFuture struct {
 	deferError
-	log      Log
+	log      pb.Log
 	response interface{}
 	dispatch time.Time
 }
 
-func (l logFuture) Index() uint64 {
+func (l *logFuture) Index() uint64 {
 	return l.log.Index
 }
 
-func (l logFuture) Response() interface{} {
+func (l *logFuture) Response() interface{} {
 	return l.response
 }
 

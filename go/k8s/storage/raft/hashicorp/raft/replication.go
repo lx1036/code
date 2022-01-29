@@ -2,6 +2,7 @@ package raft
 
 import (
 	"fmt"
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"k8s.io/klog/v2"
 	"sync"
 	"sync/atomic"
@@ -135,11 +136,11 @@ func (r *Raft) replicate(follower *followerReplication) {
 // since that routine could potentially be blocked on disk IO.
 func (r *Raft) heartbeat(replication *followerReplication, stopCh chan struct{}) {
 	var failures uint64
-	req := AppendEntriesRequest{
+	req := pb.AppendEntriesRequest{
 		Term:   replication.currentTerm,
 		Leader: r.transport.EncodePeer(r.localID, r.localAddr),
 	}
-	var resp AppendEntriesResponse
+	var resp pb.AppendEntriesResponse
 	for {
 		// Wait for the next heartbeat interval or forced notify
 		select {
@@ -182,8 +183,8 @@ func (r *Raft) heartbeat(replication *followerReplication, stopCh chan struct{})
 // If the follower log is behind, we take care to bring them up to date.
 func (r *Raft) replicateTo(replication *followerReplication, lastIndex uint64) (shouldStop bool) {
 	var peer Server
-	var req AppendEntriesRequest
-	var resp AppendEntriesResponse
+	var req pb.AppendEntriesRequest
+	var resp pb.AppendEntriesResponse
 
 Start:
 	// Prevent an excessive retry rate on errors
@@ -274,7 +275,7 @@ SendSnap:
 }
 
 // setupAppendEntries is used to setup an append entries request.
-func (r *Raft) setupAppendEntries(s *followerReplication, req *AppendEntriesRequest, nextIndex, lastIndex uint64) error {
+func (r *Raft) setupAppendEntries(s *followerReplication, req *pb.AppendEntriesRequest, nextIndex, lastIndex uint64) error {
 	req.Term = s.currentTerm
 	req.Leader = r.transport.EncodePeer(r.localID, r.localAddr)
 	req.LeaderCommitIndex = r.getCommitIndex()
@@ -289,7 +290,7 @@ func (r *Raft) setupAppendEntries(s *followerReplication, req *AppendEntriesRequ
 
 // setPreviousLog is used to setup the PrevLogIndex and PrevLogTerm for an
 // AppendEntriesRequest given the next index to replicate.
-func (r *Raft) setPreviousLog(req *AppendEntriesRequest, nextIndex uint64) error {
+func (r *Raft) setPreviousLog(req *pb.AppendEntriesRequest, nextIndex uint64) error {
 	// Guard for the first index, since there is no 0 log entry
 	// Guard against the previous index being a snapshot as well
 	lastSnapIdx, lastSnapTerm := r.getLastSnapshot()
@@ -300,7 +301,7 @@ func (r *Raft) setPreviousLog(req *AppendEntriesRequest, nextIndex uint64) error
 		req.PrevLogIndex = lastSnapIdx
 		req.PrevLogTerm = lastSnapTerm
 	} else {
-		var l Log
+		var l pb.Log
 		if err := r.logs.GetLog(nextIndex-1, &l); err != nil {
 			klog.Errorf(fmt.Sprintf("failed to get log index:%d err:%v", nextIndex-1, err))
 			return err
@@ -314,15 +315,15 @@ func (r *Raft) setPreviousLog(req *AppendEntriesRequest, nextIndex uint64) error
 }
 
 // setNewLogs is used to setup the logs which should be appended for a request.
-func (r *Raft) setNewLogs(req *AppendEntriesRequest, nextIndex, lastIndex uint64) error {
+func (r *Raft) setNewLogs(req *pb.AppendEntriesRequest, nextIndex, lastIndex uint64) error {
 	// Append up to MaxAppendEntries or up to the lastIndex. we need to use a
 	// consistent value for maxAppendEntries in the lines below in case it ever
 	// becomes reloadable.
 	maxAppendEntries := r.config().MaxAppendEntries
-	req.Entries = make([]*Log, 0, maxAppendEntries)
+	req.Entries = make([]*pb.Log, 0, maxAppendEntries)
 	maxIndex := min(nextIndex+uint64(maxAppendEntries)-1, lastIndex)
 	for i := nextIndex; i <= maxIndex; i++ {
-		oldLog := new(Log)
+		oldLog := new(pb.Log)
 		if err := r.logs.GetLog(i, oldLog); err != nil {
 			klog.Errorf(fmt.Sprintf("failed to get log index:%d err:%v", i, err))
 			return err
@@ -351,7 +352,7 @@ func (r *Raft) sendLatestSnapshot(replication *followerReplication) (bool, error
 // updateLastAppended is used to update follower replication state after a
 // successful AppendEntries RPC.
 // TODO: This isn't used during InstallSnapshot, but the code there is similar.
-func updateLastAppended(s *followerReplication, req *AppendEntriesRequest) {
+func updateLastAppended(s *followerReplication, req *pb.AppendEntriesRequest) {
 	// Mark any inflight logs as committed
 	if logs := req.Entries; len(logs) > 0 {
 		last := logs[len(logs)-1]
