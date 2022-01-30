@@ -7,7 +7,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"k8s.io/klog/v2"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -55,15 +54,12 @@ type Raft struct {
 	confReloadMu sync.Mutex
 	// Used to request the leader to make configuration changes.
 	configurationChangeCh chan *configurationChangeFuture
-	// Tracks the latest configuration and latest committed configuration from
-	// the log/snapshot.
+	// INFO: 所有 logs 中已经 committed 的 pb.LogType_CONFIGURATION log
+	//  Tracks the latest configuration and latest committed configuration from the log/snapshot.
 	configurations configurations
 	// Holds a copy of the latest configuration which can be read
 	// independent of main loop.
 	latestConfiguration atomic.Value
-	// configurationsCh is used to get the configuration data safely from
-	// outside of the main thread.
-	configurationsCh chan *configurationsFuture
 	// conf stores the current configuration to use. This is the most recent one
 	// provided. All reads of config values should use the config() helper method
 	// to read this safely.
@@ -82,15 +78,17 @@ type Raft struct {
 	// take a user snapshot on the leader, otherwise we might restore the
 	// snapshot and apply old logs to it that were in the pipe.
 	fsmMutateCh chan interface{}
-	// snapshots is used to store and retrieve snapshots
-	snapshots SnapshotStore
+	// snapshotStore is used to store and retrieve snapshotStore
+	snapshotStore SnapshotStore
 	// fsmSnapshotCh is used to trigger a new snapshot being taken
 	fsmSnapshotCh chan *reqSnapshotFuture
-	// userSnapshotCh is used for user-triggered snapshots
+	// userSnapshotCh is used for user-triggered snapshotStore
 	userSnapshotCh chan *userSnapshotFuture
 	// userRestoreCh is used for user-triggered restores of external
-	// snapshots
+	// snapshotStore
 	userRestoreCh chan *userRestoreFuture
+	// @see takeSnapshot()
+	configurationsCh chan *configurationsFuture
 
 	// lastContact is the last time we had contact from the
 	// leader node. This can be used to gauge staleness.
@@ -134,7 +132,7 @@ type Raft struct {
 
 // NewRaft is used to construct a new Raft node. It takes a configuration, as well
 // as implementations of various interfaces that are required. If we have any
-// old state, such as snapshots, logs, peers, etc, all those will be restored
+// old state, such as snapshotStore, logs, peers, etc, all those will be restored
 // when creating the Raft node.
 func NewRaft(conf *Config, fsm FSM, logs LogStore, stable StableStore, snaps SnapshotStore, transport Transport) (*Raft, error) {
 	// Validate the configuration.
@@ -177,16 +175,16 @@ func NewRaft(conf *Config, fsm FSM, logs LogStore, stable StableStore, snaps Sna
 		localAddr:             localAddr,
 		configurationChangeCh: make(chan *configurationChangeFuture),
 		configurations:        configurations{},
-		configurationsCh:      make(chan *configurationsFuture, 8),
 		leaderCh:              make(chan bool, 1),
 
-		applyCh:        applyCh,
-		fsm:            fsm,
-		fsmMutateCh:    make(chan interface{}, 128),
-		fsmSnapshotCh:  make(chan *reqSnapshotFuture),
-		snapshots:      snaps,
-		userSnapshotCh: make(chan *userSnapshotFuture),
-		userRestoreCh:  make(chan *userRestoreFuture),
+		applyCh:          applyCh,
+		fsm:              fsm,
+		fsmMutateCh:      make(chan interface{}, 128),
+		fsmSnapshotCh:    make(chan *reqSnapshotFuture),
+		snapshotStore:    snaps,
+		userSnapshotCh:   make(chan *userSnapshotFuture),
+		userRestoreCh:    make(chan *userRestoreFuture),
+		configurationsCh: make(chan *configurationsFuture, 8), // 8 ???
 
 		logs:   logs,
 		stable: stable,
@@ -304,6 +302,10 @@ func (r *Raft) runFollower() {
 		case b := <-r.bootstrapCh:
 			b.respond(r.liveBootstrap(b.configuration))
 
+		case c := <-r.configurationsCh:
+			c.configurations = r.configurations.Clone()
+			c.respond(nil)
+
 		case <-heartbeatTimer: // 每 [1s, 2s] 一次心跳检查是否有心跳
 			// Restart the heartbeat timer
 			heartbeatTimeout := r.config().HeartbeatTimeout
@@ -338,6 +340,9 @@ func (r *Raft) runFollower() {
 		case rpc := <-r.rpcCh:
 			r.processRPC(rpc)
 
+		case restore := <-r.userRestoreCh:
+			restore.respond(ErrNotLeader)
+
 		case <-r.shutdownCh:
 			return
 		}
@@ -350,7 +355,7 @@ func (r *Raft) runFollower() {
 func (r *Raft) liveBootstrap(configuration Configuration) error {
 	// Use the pre-init API to make the static updates.
 	cfg := r.config()
-	err := BootstrapCluster(&cfg, r.logs, r.stable, r.snapshots, configuration)
+	err := BootstrapCluster(&cfg, r.logs, r.stable, r.snapshotStore, configuration)
 	if err != nil {
 		return err
 	}
@@ -391,6 +396,10 @@ func (r *Raft) runCandidate() {
 	klog.Infof(fmt.Sprintf("need %d votes at least", votesNeeded))
 	for r.getState() == Candidate {
 		select {
+		case c := <-r.configurationsCh:
+			c.configurations = r.configurations.Clone()
+			c.respond(nil)
+
 		case vote := <-voteCh:
 			// Check if the term is greater than ours, bail
 			if vote.Term > r.getCurrentTerm() { // INFO: @see raft paper 3.4
@@ -428,6 +437,9 @@ func (r *Raft) runCandidate() {
 
 		case rpc := <-r.rpcCh:
 			r.processRPC(rpc)
+
+		case restore := <-r.userRestoreCh:
+			restore.respond(ErrNotLeader)
 
 		case <-r.shutdownCh:
 			return
@@ -548,6 +560,15 @@ func (r *Raft) runLeader() {
 
 	for r.getState() == Leader {
 		select {
+		case c := <-r.configurationsCh:
+			if r.getLeadershipTransferInProgress() {
+				klog.Warningf(ErrLeadershipTransferInProgress.Error())
+				c.respond(ErrLeadershipTransferInProgress)
+				continue
+			}
+			c.configurations = r.configurations.Clone()
+			c.respond(nil)
+
 		case rpc := <-r.rpcCh:
 			r.processRPC(rpc)
 
@@ -587,7 +608,7 @@ func (r *Raft) runLeader() {
 			commitIndex := r.leaderState.commitment.getCommitIndex()
 			r.setCommitIndex(commitIndex)
 
-			// New configration has been committed, set it as the committed value.
+			// New configuration has been committed, set it as the committed value.
 			if r.configurations.latestIndex > oldCommitIndex &&
 				r.configurations.latestIndex <= commitIndex {
 				r.setCommittedConfiguration(r.configurations.latest, r.configurations.latestIndex)
@@ -631,6 +652,15 @@ func (r *Raft) runLeader() {
 				}
 			}
 
+		case restore := <-r.userRestoreCh:
+			if r.getLeadershipTransferInProgress() {
+				klog.Warningf(ErrLeadershipTransferInProgress.Error())
+				restore.respond(ErrLeadershipTransferInProgress)
+				continue
+			}
+			err := r.restoreUserSnapshot(restore.meta, restore.reader)
+			restore.respond(err)
+
 		// INFO: @see handleStaleTerm()
 		case <-r.leaderState.stepDown:
 			r.setState(Follower)
@@ -649,8 +679,8 @@ func (r *Raft) dispatchLogs(applyLogs []*logFuture) {
 	lastIndex := r.getLastIndex()
 	logs := make([]*pb.Log, len(applyLogs))
 	for idx, applyLog := range applyLogs {
-		applyLog.dispatch = now
 		lastIndex++
+		applyLog.dispatch = now
 		applyLog.log.Index = lastIndex
 		applyLog.log.Term = term
 		applyLog.log.AppendedAt = timestamppb.New(now)
@@ -869,20 +899,20 @@ func (r *Raft) GetConfiguration() ConfigurationFuture {
 	return configReq
 }
 
-// restoreSnapshot attempts to restore the latest snapshots, and fails if none
+// restoreSnapshot attempts to restore the latest snapshotStore, and fails if none
 // of them can be restored. This is called at initialization time, and is
 // completely unsafe to call at any other time.
 func (r *Raft) restoreSnapshot() error {
-	snapshots, err := r.snapshots.List()
+	snapshots, err := r.snapshotStore.List()
 	if err != nil {
-		klog.Errorf(fmt.Sprintf("failed to list snapshots err:%v", err))
+		klog.Errorf(fmt.Sprintf("failed to list snapshotStore err:%v", err))
 		return err
 	}
 
 	// Try to load in order of newest to oldest
 	for _, snapshot := range snapshots {
 		if !r.config().NoSnapshotRestoreOnStart {
-			_, source, err := r.snapshots.Open(snapshot.ID)
+			_, source, err := r.snapshotStore.Open(snapshot.ID)
 			if err != nil {
 				klog.Errorf(fmt.Sprintf("failed to open snapshot id:%s err:%v", snapshot.ID, err))
 				continue
@@ -912,9 +942,9 @@ func (r *Raft) restoreSnapshot() error {
 		return nil
 	}
 
-	// If we had snapshots and failed to load them, its an error
+	// If we had snapshotStore and failed to load them, its an error
 	if len(snapshots) > 0 {
-		return fmt.Errorf("failed to load any existing snapshots")
+		return fmt.Errorf("failed to load any existing snapshotStore")
 	}
 	return nil
 }
@@ -1056,17 +1086,6 @@ func (r *Raft) appendEntries(rpc RPC, cmd *pb.AppendEntriesRequest) {
 
 	var rpcErr error
 	defer func() {
-		switch c := rpc.Command.(type) {
-		case *pb.AppendEntriesRequest:
-			if len(cmd.Entries) > 0 {
-				var msg []string
-				for _, entry := range cmd.Entries {
-					msg = append(msg, fmt.Sprintf("%d:%s", entry.Index, string(entry.Data)))
-				}
-				klog.Infof(fmt.Sprintf("[appendEntries]leader is %s, msg is %s", c.Leader, strings.Join(msg, " ")))
-			}
-		}
-
 		rpc.Respond(resp, rpcErr)
 	}()
 

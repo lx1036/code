@@ -51,7 +51,7 @@ func (store *MemoryStore) GetLog(index uint64, log *pb.Log) error {
 		return ErrLogNotFound
 	}
 
-	log = &pb.Log{
+	*log = pb.Log{
 		Index:      l.Index,
 		Term:       l.Term,
 		Type:       l.Type,

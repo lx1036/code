@@ -175,7 +175,7 @@ func (r *Raft) runFSM() {
 
 	restore := func(req *restoreFuture) {
 		// Open the snapshot
-		meta, source, err := r.snapshots.Open(req.ID)
+		meta, source, err := r.snapshotStore.Open(req.ID)
 		if err != nil {
 			req.respond(fmt.Errorf("failed to open snapshot %v: %v", req.ID, err))
 			return

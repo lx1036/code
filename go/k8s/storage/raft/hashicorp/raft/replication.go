@@ -14,7 +14,7 @@ const (
 	failureWait     = 10 * time.Millisecond
 )
 
-// followerReplication is in charge of sending snapshots and log entries from
+// followerReplication is in charge of sending snapshotStore and log entries from
 // this leader during this particular term to a remote follower.
 type followerReplication struct {
 	// currentTerm and nextIndex must be kept at the top of the struct so

@@ -47,7 +47,7 @@ func (transport *MemoryTransport) AppendEntries(id ServerID, target ServerAddres
 	}
 
 	out := rpcResp.Response.(*pb.AppendEntriesResponse)
-	resp = &pb.AppendEntriesResponse{
+	*resp = pb.AppendEntriesResponse{
 		Term:           out.Term,
 		LastLog:        out.LastLog,
 		Success:        out.Success,
@@ -63,7 +63,7 @@ func (transport *MemoryTransport) RequestVote(id ServerID, target ServerAddress,
 	}
 
 	out := rpcResp.Response.(*pb.RequestVoteResponse)
-	resp = &pb.RequestVoteResponse{
+	*resp = pb.RequestVoteResponse{
 		Term:    out.Term,
 		Granted: out.Granted,
 	}

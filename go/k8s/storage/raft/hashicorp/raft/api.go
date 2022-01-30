@@ -3,8 +3,10 @@ package raft
 import (
 	"errors"
 	"fmt"
-	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
+	"io"
 	"time"
+
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 
 	"k8s.io/klog/v2"
 )
@@ -28,6 +30,10 @@ var (
 	// ErrNothingNewToSnapshot is returned when trying to create a snapshot
 	// but there's nothing new commited to the FSM since we started.
 	ErrNothingNewToSnapshot = errors.New("nothing new to snapshot")
+
+	// ErrAbortedByRestore is returned when a leader fails to commit a log
+	// entry because it's been superseded by a user snapshot restore.
+	ErrAbortedByRestore = errors.New("snapshot restored while committing log")
 )
 
 // Apply is used to apply a command to the FSM in a highly consistent
@@ -64,6 +70,64 @@ func (r *Raft) ApplyLog(log *pb.Log, timeout time.Duration) ApplyFuture {
 		return errorFuture{ErrRaftShutdown}
 	case r.applyCh <- f:
 		return f
+	}
+}
+
+// Restore is used to manually force Raft to consume an external snapshot, such
+// as if restoring from a backup. We will use the current Raft configuration,
+// not the one from the snapshot, so that we can restore into a new cluster. We
+// will also use the higher of the index of the snapshot, or the current index,
+// and then add 1 to that, so we force a new state with a hole in the Raft log,
+// so that the snapshot will be sent to followers and used for any new joiners.
+// This can only be run on the leader, and blocks until the restore is complete
+// or an error occurs.
+//
+// WARNING! This operation has the leader take on the state of the snapshot and
+// then sets itself up so that it replicates that to its followers though the
+// install snapshot process. This involves a potentially dangerous period where
+// the leader commits ahead of its followers, so should only be used for disaster
+// recovery into a fresh cluster, and should not be used in normal operations.
+func (r *Raft) Restore(meta *SnapshotMeta, reader io.Reader, timeout time.Duration) error {
+	var timer <-chan time.Time
+	if timeout > 0 {
+		timer = time.After(timeout)
+	}
+
+	// Perform the restore.
+	restore := &userRestoreFuture{
+		meta:   meta,
+		reader: reader,
+	}
+	restore.init()
+	select {
+	case <-timer:
+		return ErrEnqueueTimeout
+	case <-r.shutdownCh:
+		return ErrRaftShutdown
+	case r.userRestoreCh <- restore:
+		// If the restore is ingested then wait for it to complete.
+		if err := restore.Error(); err != nil {
+			return err
+		}
+	}
+
+	// Apply a no-op log entry. Waiting for this allows us to wait until the
+	// followers have gotten the restore and replicated at least this new
+	// entry, which shows that we've also faulted and installed the
+	// snapshot with the contents of the restore.
+	noop := &logFuture{
+		log: pb.Log{
+			Type: pb.LogType_NOOP,
+		},
+	}
+	noop.init()
+	select {
+	case <-timer:
+		return ErrEnqueueTimeout
+	case <-r.shutdownCh:
+		return ErrRaftShutdown
+	case r.applyCh <- noop:
+		return noop.Error()
 	}
 }
 
@@ -170,14 +234,14 @@ func RecoverCluster(conf *Config, fsm FSM, logs LogStore, stable StableStore,
 		return fmt.Errorf("refused to recover cluster with no initial state, this is probably an operator error")
 	}
 
-	// Attempt to restore any snapshots we find, newest to oldest.
+	// Attempt to restore any snapshotStore we find, newest to oldest.
 	var (
 		snapshotIndex uint64
 		snapshotTerm  uint64
 	)
 	snapshots, err := snaps.List()
 	if err != nil {
-		klog.Errorf(fmt.Sprintf("failed to list snapshots err:%v", err))
+		klog.Errorf(fmt.Sprintf("failed to list snapshotStore err:%v", err))
 		return err
 	}
 	// Try to load in order of newest to oldest
@@ -204,7 +268,7 @@ func RecoverCluster(conf *Config, fsm FSM, logs LogStore, stable StableStore,
 		break
 	}
 	if len(snapshots) > 0 && (snapshotIndex == 0 || snapshotTerm == 0) {
-		return fmt.Errorf("failed to restore any of the available snapshots")
+		return fmt.Errorf("failed to restore any of the available snapshotStore")
 	}
 
 	// The snapshot information is the best known end point for the data
@@ -261,7 +325,7 @@ func RecoverCluster(conf *Config, fsm FSM, logs LogStore, stable StableStore,
 }
 
 // HasExistingState returns true if the server has any existing state (logs,
-// knowledge of a current term, or any snapshots).
+// knowledge of a current term, or any snapshotStore).
 func HasExistingState(logs LogStore, stable StableStore, snaps SnapshotStore) (bool, error) {
 	// Make sure we don't have a current term.
 	currentTerm, err := stable.GetUint64(keyCurrentTerm)
@@ -284,10 +348,10 @@ func HasExistingState(logs LogStore, stable StableStore, snaps SnapshotStore) (b
 		return true, nil
 	}
 
-	// Make sure we have no snapshots
+	// Make sure we have no snapshotStore
 	snapshots, err := snaps.List()
 	if err != nil {
-		return false, fmt.Errorf("failed to list snapshots: %v", err)
+		return false, fmt.Errorf("failed to list snapshotStore: %v", err)
 	}
 	if len(snapshots) > 0 {
 		return true, nil
