@@ -2,8 +2,11 @@ package client
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 
 	"k8s-lx1036/k8s/kubelet/containerd/containerd/pkg/images"
+	"k8s-lx1036/k8s/kubelet/containerd/containerd/pkg/images/remotes/docker"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -13,6 +16,21 @@ import (
 // RemoteContext is used to configure object resolutions and transfers with
 // remote content stores and image providers.
 type RemoteContext struct {
+	// Resolver is used to resolve names to objects, fetchers, and pushers.
+	// If no resolver is provided, defaults to Docker registry resolver.
+	Resolver *docker.Resolver
+
+	// Unpack is done after an image is pulled to extract into a snapshotter.
+	// It is done simultaneously for schema 2 images when they are pulled.
+	Unpack bool
+}
+
+func defaultRemoteContext() *RemoteContext {
+	return &RemoteContext{
+		Resolver: docker.NewResolver(docker.ResolverOptions{
+			Client: http.DefaultClient,
+		}),
+	}
 }
 
 // RemoteOpt allows the caller to set distribution options for a remote
@@ -55,7 +73,26 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 	}
 
 	if pullCtx.Unpack {
-
+		// unpacker only supports schema 2 image, for schema 1 this is noop.
+		u, err := c.newUnpacker(ctx, pullCtx)
+		if err != nil {
+			return nil, fmt.Errorf("create unpacker: %w", err)
+		}
+		unpackWrapper, unpackEg = u.handlerWrapper(ctx, pullCtx, &unpacks)
+		defer func() {
+			if err := unpackEg.Wait(); err != nil {
+				if retErr == nil {
+					retErr = fmt.Errorf("unpack: %w", err)
+				}
+			}
+		}()
+		wrapper := pullCtx.HandlerWrapper
+		pullCtx.HandlerWrapper = func(h images.Handler) images.Handler {
+			if wrapper == nil {
+				return unpackWrapper(h)
+			}
+			return unpackWrapper(wrapper(h))
+		}
 	}
 
 	img, err := c.fetch(ctx, pullCtx, ref, 1)
@@ -95,5 +132,15 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 }
 
 func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, limit int) (images.Image, error) {
+
+	name, desc, err := rCtx.Resolver.Resolve(ctx, ref)
+	if err != nil {
+		return images.Image{}, fmt.Errorf("failed to resolve reference %q: %w", ref, err)
+	}
+
+	fetcher, err := rCtx.Resolver.Fetcher(ctx, name)
+	if err != nil {
+		return images.Image{}, fmt.Errorf("failed to get fetcher for %q: %w", name, err)
+	}
 
 }
