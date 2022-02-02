@@ -16,8 +16,33 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+var (
+	// ErrInvalidAuthorization is used when credentials are passed to a server but
+	// those credentials are rejected.
+	ErrInvalidAuthorization = errors.New("authorization failed")
+
+	// MaxManifestSize represents the largest size accepted from a registry
+	// during resolution. Larger manifests may be accepted using a
+	// resolution method other than the registry.
+	//
+	// NOTE: The max supported layers by some runtimes is 128 and individual
+	// layers will not contribute more than 256 bytes, making a
+	// reasonable limit for a large image manifests of 32K bytes.
+	// 4M bytes represents a much larger upper bound for images which may
+	// contain large annotations or be non-images. A proper manifest
+	// design puts large metadata in subobjects, as is consistent the
+	// intent of the manifest design.
+	MaxManifestSize int64 = 4 * 1048 * 1048
+)
+
 // ResolverOptions are used to configured a new Docker register resolver
 type ResolverOptions struct {
+	// Hosts returns registry host configurations for a namespace.
+	Hosts RegistryHosts
+
+	// Client is the http client to used when making registry requests
+	// Deprecated: use Hosts
+	Client *http.Client
 }
 
 type Resolver struct {
