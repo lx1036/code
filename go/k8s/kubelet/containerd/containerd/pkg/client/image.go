@@ -91,7 +91,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (*Imag
 			return nil, fmt.Errorf("create unpacker: %w", err)
 		}
 
-		pullCtx.HandlerWrapper = func(i images.Handler) images.Handler {
+		pullCtx.HandlerWrapper = func(f images.Handler) images.Handler {
 			var (
 				lock   sync.Mutex
 				layers = map[digest.Digest][]ocispec.Descriptor{}
@@ -188,6 +188,8 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		return images.Image{}, fmt.Errorf("failed to get fetcher for %q: %w", name, err)
 	}
 
+	// "application/vnd.docker.distribution.manifest.v2+json"
+
 	// Get all the children for a descriptor
 	childrenHandler := images.ChildrenHandler(store)
 	// Set any children labels for that content
@@ -205,17 +207,6 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		childrenHandler = images.LimitManifests(childrenHandler, rCtx.PlatformMatcher, limit)
 	}
 
-	// set isConvertible to true if there is application/octet-stream media type
-	convertibleHandler := images.HandlerFunc(
-		func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-			if desc.MediaType == docker.LegacyConfigMediaType {
-				isConvertible = true
-			}
-
-			return []ocispec.Descriptor{}, nil
-		},
-	)
-
 	appendDistSrcLabelHandler, err := docker.AppendDistributionSourceLabel(store, ref)
 	if err != nil {
 		return images.Image{}, err
@@ -223,16 +214,11 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 
 	handlers := append(rCtx.BaseHandlers,
 		remotes.FetchHandler(store, fetcher),
-		convertibleHandler,
 		childrenHandler,
 		appendDistSrcLabelHandler,
 	)
 
-	handler = images.Handlers(handlers...)
-
-	converterFunc = func(ctx context.Context, desc ocispec.Descriptor) (ocispec.Descriptor, error) {
-		return docker.ConvertManifest(ctx, store, desc)
-	}
+	handler := images.Handlers(handlers...)
 
 	if rCtx.HandlerWrapper != nil {
 		handler = rCtx.HandlerWrapper(handler)
@@ -244,12 +230,6 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 
 	if err := images.Dispatch(ctx, handler, limiter, desc); err != nil {
 		return images.Image{}, err
-	}
-
-	if isConvertible {
-		if desc, err = converterFunc(ctx, desc); err != nil {
-			return images.Image{}, err
-		}
 	}
 
 	return images.Image{
