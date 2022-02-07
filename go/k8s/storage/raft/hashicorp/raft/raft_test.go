@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"bytes"
 	"fmt"
 	"k8s.io/klog/v2"
 	"strings"
@@ -101,7 +102,7 @@ func TestRecoverRaftClusterNoState(test *testing.T) {
 		},
 	}
 	err := RecoverCluster(&config, &MockFSM{}, r.logs, r.stable,
-		r.snapshots, r.transport, configuration)
+		r.snapshotStore, r.transport, configuration)
 	if err == nil || !strings.Contains(err.Error(), "no initial state") {
 		test.Fatalf("should have failed for no initial state: %v", err)
 	}
@@ -169,19 +170,19 @@ func TestRecoverRaftCluster(test *testing.T) {
 			// replace the FSM so no state can carry over.
 			for i, r := range cluster.rafts {
 				var before []*SnapshotMeta
-				before, err = r.snapshots.List()
+				before, err = r.snapshotStore.List()
 				if err != nil {
 					t.Fatalf("snapshot list err: %v", err)
 				}
 				cfg := r.config()
 				if err = RecoverCluster(&cfg, &MockFSM{}, r.logs, r.stable,
-					r.snapshots, r.transport, configuration); err != nil {
+					r.snapshotStore, r.transport, configuration); err != nil {
 					t.Fatalf("recover err: %v", err)
 				}
 
 				// Make sure the recovery looks right.
 				var after []*SnapshotMeta
-				after, err = r.snapshots.List()
+				after, err = r.snapshotStore.List()
 				if err != nil {
 					t.Fatalf("snapshot list err: %v", err)
 				}
@@ -207,7 +208,7 @@ func TestRecoverRaftCluster(test *testing.T) {
 				// operation.
 				trans := NewMemoryTransport(r.localAddr)
 				var r2 *Raft
-				r2, err = NewRaft(&cfg, &MockFSM{}, r.logs, r.stable, r.snapshots, trans)
+				r2, err = NewRaft(&cfg, &MockFSM{}, r.logs, r.stable, r.snapshotStore, trans)
 				if err != nil {
 					t.Fatalf("new raft err: %v", err)
 				}
@@ -238,27 +239,23 @@ func TestRaftApplyConcurrently(test *testing.T) {
 	defer cluster.Close()
 
 	time.Sleep(time.Second * 3)
-	leader := cluster.Leader()
 
+	leader := cluster.Leader()
 	nums := 100
 	var group sync.WaitGroup
 	group.Add(nums)
 	applyF := func(i int) {
 		defer group.Done()
-		future := leader.Apply([]byte(fmt.Sprintf("test%d", i)), 0)
-		if err := future.Error(); err != nil {
+		if err := leader.Apply([]byte(fmt.Sprintf("test%d", i)), 0).Error(); err != nil {
 			klog.Fatalf(fmt.Sprintf("[ERR] err: %v", err))
 		}
 	}
-	// Concurrently apply
-	for i := 0; i < nums; i++ {
+	for i := 0; i < nums; i++ { // Concurrently apply
 		go applyF(i)
 	}
-
-	// Wait to finish
 	doneCh := make(chan struct{})
 	go func() {
-		group.Wait()
+		group.Wait() // Wait to finish
 		close(doneCh)
 	}()
 	select {
@@ -295,7 +292,6 @@ func TestRaftAutoSnapshot(test *testing.T) {
 	for i := 0; i < 100; i++ {
 		future = leader.Apply([]byte(fmt.Sprintf("test%d", i)), 0)
 	}
-
 	// Wait for the last future to apply
 	if err := future.Error(); err != nil {
 		test.Fatalf("err: %v", err)
@@ -305,7 +301,7 @@ func TestRaftAutoSnapshot(test *testing.T) {
 	time.Sleep(time.Second * 10)
 
 	// Check for snapshot
-	if snaps, _ := leader.snapshots.List(); len(snaps) == 0 {
+	if snaps, _ := leader.snapshotStore.List(); len(snaps) == 0 {
 		test.Fatalf("should have a snapshot")
 	} else {
 		for _, snap := range snaps {
@@ -315,5 +311,179 @@ func TestRaftAutoSnapshot(test *testing.T) {
 }
 
 func TestRaftUserSnapshot(test *testing.T) {
+	config := DefaultConfig()
+	config.TrailingLogs = 10
+	config.SnapshotThreshold = 50
+	config.SnapshotInterval = time.Second * 1
+	cluster := NewCluster(&ClusterConfig{
+		Conf: config,
+		Peers: []string{
+			"1/127.0.0.1:7000",
+		},
+		Bootstrap: true,
+	})
+	defer cluster.Close()
 
+	time.Sleep(time.Second * 3)
+
+	leader := cluster.Leader()
+	if err := leader.Snapshot().Error(); err != ErrNothingNewToSnapshot {
+		test.Fatalf("Request for Snapshot failed: %v", err)
+	}
+
+	klog.Infof(fmt.Sprintf("apply cmd into leader..."))
+	var future Future
+	for i := 0; i < 100; i++ {
+		future = leader.Apply([]byte(fmt.Sprintf("test%d", i)), 0)
+	}
+	// Wait for the last future to apply
+	if err := future.Error(); err != nil {
+		test.Fatalf("err: %v", err)
+	}
+
+	klog.Infof(fmt.Sprintf("manually trigger user snapshot..."))
+	if err := leader.Snapshot().Error(); err != nil {
+		test.Fatalf("Request for Snapshot failed: %v", err)
+	}
+
+	// Check for snapshot
+	if snaps, _ := leader.snapshotStore.List(); len(snaps) == 0 {
+		test.Fatalf("should have a snapshot")
+	} else {
+		for _, snap := range snaps {
+			klog.Infof(fmt.Sprintf("snapshot meta data:%+v", *snap))
+		}
+	}
+}
+
+func TestRaftSnapshotAndRestore(test *testing.T) {
+	fixtures := []struct {
+		description string
+		offset      int
+	}{
+		{
+			description: "0",
+			offset:      0,
+		},
+		{
+			description: "1",
+			offset:      1,
+		},
+		{
+			description: "2",
+			offset:      2,
+		},
+
+		// Snapshots from the future
+		{
+			description: "100",
+			offset:      100,
+		},
+		{
+			description: "1000",
+			offset:      1000,
+		},
+		{
+			description: "10000",
+			offset:      10000,
+		},
+	}
+	for _, fixture := range fixtures {
+		test.Run(fixture.description, func(t *testing.T) {
+			config := DefaultConfig()
+			config.TrailingLogs = 10
+			config.SnapshotThreshold = 50
+			config.SnapshotInterval = time.Second * 1
+			cluster := NewCluster(&ClusterConfig{
+				Conf: config,
+				Peers: []string{
+					"1/127.0.0.1:7000",
+					"2/127.0.0.1:8000",
+					"3/127.0.0.1:9000",
+				},
+				Bootstrap: true,
+			})
+			defer cluster.Close()
+
+			time.Sleep(time.Second * 3)
+
+			leader := cluster.Leader()
+			if err := leader.Snapshot().Error(); err != ErrNothingNewToSnapshot {
+				test.Fatalf("Request for Snapshot failed: %v", err)
+			}
+
+			klog.Infof(fmt.Sprintf("apply cmd into leader..."))
+			var future Future
+			for i := 0; i < 100; i++ {
+				future = leader.Apply([]byte(fmt.Sprintf("test%d", i)), 0)
+			}
+			// Wait for the last future to apply
+			if err := future.Error(); err != nil {
+				test.Fatalf("err: %v", err)
+			}
+
+			klog.Infof(fmt.Sprintf("manually trigger user snapshot..."))
+			snapshot := leader.Snapshot()
+			if err := snapshot.Error(); err != nil {
+				test.Fatalf("Request for Snapshot failed: %v", err)
+			}
+
+			// Commit some more things.
+			for i := 10; i < 20; i++ {
+				future = leader.Apply([]byte(fmt.Sprintf("test %d", i)), 0)
+			}
+			if err := future.Error(); err != nil {
+				test.Fatalf("Error Apply new log entries: %v", err)
+			}
+
+			// Restore the snapshot, fix the index with the offset.
+			preIndex := leader.getLastIndex()
+			meta, reader, err := snapshot.Open()
+			meta.Index += uint64(fixture.offset)
+			if err != nil {
+				test.Fatalf("Snapshot open failed: %v", err)
+			}
+			defer reader.Close()
+			if err := leader.Restore(meta, reader, 5*time.Second); err != nil {
+				test.Fatalf("Restore failed: %v", err)
+			}
+			// Make sure the index was updated correctly. We add 2 because we burn
+			// an index to create a hole, and then we apply a no-op after the
+			// restore.
+			var expected uint64
+			if meta.Index < preIndex {
+				expected = preIndex + 2
+			} else {
+				expected = meta.Index + 2
+			}
+			lastIndex := leader.getLastIndex()
+			if lastIndex != expected {
+				test.Fatalf("Index was not updated correctly: %d vs. %d", lastIndex, expected)
+			}
+
+			// Ensure all the logs are the same and that we have everything that was
+			// part of the original snapshot, and that the contents after were
+			// reverted.
+			cluster.EnsureFSMSame()
+			fsm := getMockFSM(cluster.fsms[0])
+			fsm.Lock()
+			if len(fsm.logs) != 10 {
+				test.Fatalf("Log length bad: %d", len(fsm.logs))
+			}
+			for i, entry := range fsm.logs {
+				if bytes.Compare(entry, []byte(fmt.Sprintf("test %d", i))) != 0 {
+					test.Fatalf("Log entry bad: %v", entry)
+				}
+			}
+			fsm.Unlock()
+			// Commit some more things.
+			for i := 20; i < 30; i++ {
+				future = leader.Apply([]byte(fmt.Sprintf("test %d", i)), 0)
+			}
+			if err := future.Error(); err != nil {
+				test.Fatalf("Error Apply new log entries: %v", err)
+			}
+			cluster.EnsureFSMSame()
+		})
+	}
 }

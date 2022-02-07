@@ -23,6 +23,10 @@ type TransportClient interface {
 	AppendEntries(ctx context.Context, in *AppendEntriesRequest, opts ...grpc.CallOption) (*AppendEntriesResponse, error)
 	// RequestVote is the command used by a candidate to ask a Raft peer for a vote in an election.
 	RequestVote(ctx context.Context, in *RequestVoteRequest, opts ...grpc.CallOption) (*RequestVoteResponse, error)
+	// TimeoutNow is used to start a leadership transfer to the target node.
+	TimeoutNow(ctx context.Context, in *TimeoutNowRequest, opts ...grpc.CallOption) (*TimeoutNowResponse, error)
+	// InstallSnapshot is the command sent to a Raft peer to bootstrap its log (and state machine) from a snapshot on another peer.
+	InstallSnapshot(ctx context.Context, opts ...grpc.CallOption) (Transport_InstallSnapshotClient, error)
 }
 
 type transportClient struct {
@@ -82,6 +86,49 @@ func (c *transportClient) RequestVote(ctx context.Context, in *RequestVoteReques
 	return out, nil
 }
 
+func (c *transportClient) TimeoutNow(ctx context.Context, in *TimeoutNowRequest, opts ...grpc.CallOption) (*TimeoutNowResponse, error) {
+	out := new(TimeoutNowResponse)
+	err := c.cc.Invoke(ctx, "/Transport/TimeoutNow", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *transportClient) InstallSnapshot(ctx context.Context, opts ...grpc.CallOption) (Transport_InstallSnapshotClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Transport_ServiceDesc.Streams[1], "/Transport/InstallSnapshot", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &transportInstallSnapshotClient{stream}
+	return x, nil
+}
+
+type Transport_InstallSnapshotClient interface {
+	Send(*InstallSnapshotRequest) error
+	CloseAndRecv() (*InstallSnapshotResponse, error)
+	grpc.ClientStream
+}
+
+type transportInstallSnapshotClient struct {
+	grpc.ClientStream
+}
+
+func (x *transportInstallSnapshotClient) Send(m *InstallSnapshotRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *transportInstallSnapshotClient) CloseAndRecv() (*InstallSnapshotResponse, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	m := new(InstallSnapshotResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // TransportServer is the server API for Transport service.
 // All implementations must embed UnimplementedTransportServer
 // for forward compatibility
@@ -91,6 +138,10 @@ type TransportServer interface {
 	AppendEntries(context.Context, *AppendEntriesRequest) (*AppendEntriesResponse, error)
 	// RequestVote is the command used by a candidate to ask a Raft peer for a vote in an election.
 	RequestVote(context.Context, *RequestVoteRequest) (*RequestVoteResponse, error)
+	// TimeoutNow is used to start a leadership transfer to the target node.
+	TimeoutNow(context.Context, *TimeoutNowRequest) (*TimeoutNowResponse, error)
+	// InstallSnapshot is the command sent to a Raft peer to bootstrap its log (and state machine) from a snapshot on another peer.
+	InstallSnapshot(Transport_InstallSnapshotServer) error
 	mustEmbedUnimplementedTransportServer()
 }
 
@@ -106,6 +157,12 @@ func (UnimplementedTransportServer) AppendEntries(context.Context, *AppendEntrie
 }
 func (UnimplementedTransportServer) RequestVote(context.Context, *RequestVoteRequest) (*RequestVoteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequestVote not implemented")
+}
+func (UnimplementedTransportServer) TimeoutNow(context.Context, *TimeoutNowRequest) (*TimeoutNowResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TimeoutNow not implemented")
+}
+func (UnimplementedTransportServer) InstallSnapshot(Transport_InstallSnapshotServer) error {
+	return status.Errorf(codes.Unimplemented, "method InstallSnapshot not implemented")
 }
 func (UnimplementedTransportServer) mustEmbedUnimplementedTransportServer() {}
 
@@ -182,6 +239,50 @@ func _Transport_RequestVote_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Transport_TimeoutNow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TimeoutNowRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TransportServer).TimeoutNow(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/Transport/TimeoutNow",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TransportServer).TimeoutNow(ctx, req.(*TimeoutNowRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Transport_InstallSnapshot_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(TransportServer).InstallSnapshot(&transportInstallSnapshotServer{stream})
+}
+
+type Transport_InstallSnapshotServer interface {
+	SendAndClose(*InstallSnapshotResponse) error
+	Recv() (*InstallSnapshotRequest, error)
+	grpc.ServerStream
+}
+
+type transportInstallSnapshotServer struct {
+	grpc.ServerStream
+}
+
+func (x *transportInstallSnapshotServer) SendAndClose(m *InstallSnapshotResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *transportInstallSnapshotServer) Recv() (*InstallSnapshotRequest, error) {
+	m := new(InstallSnapshotRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // Transport_ServiceDesc is the grpc.ServiceDesc for Transport service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -197,12 +298,21 @@ var Transport_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "RequestVote",
 			Handler:    _Transport_RequestVote_Handler,
 		},
+		{
+			MethodName: "TimeoutNow",
+			Handler:    _Transport_TimeoutNow_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "AppendEntriesPipeline",
 			Handler:       _Transport_AppendEntriesPipeline_Handler,
 			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "InstallSnapshot",
+			Handler:       _Transport_InstallSnapshot_Handler,
 			ClientStreams: true,
 		},
 	},

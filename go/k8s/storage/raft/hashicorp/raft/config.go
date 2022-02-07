@@ -190,7 +190,7 @@ func hasVote(configuration Configuration, id ServerID) bool {
 // One downside to storing just two configurations is that if you try to take a
 // snapshot when your state machine hasn't yet applied the committedIndex, we
 // have no record of the configuration that would logically fit into that
-// snapshot. We disallow snapshots in that case now. An alternative approach,
+// snapshot. We disallow snapshotStore in that case now. An alternative approach,
 // which LogCabin uses, is to track every configuration change in the
 // log.
 type configurations struct {
@@ -204,6 +204,15 @@ type configurations struct {
 	latest Configuration
 	// latestIndex is the log index where 'latest' was written.
 	latestIndex uint64
+}
+
+func (c *configurations) Clone() configurations {
+	return configurations{
+		committed:      c.committed.Clone(),
+		committedIndex: c.committedIndex,
+		latest:         c.latest.Clone(),
+		latestIndex:    c.latestIndex,
+	}
 }
 
 // ConfigurationChangeCommand is the different ways to change the cluster

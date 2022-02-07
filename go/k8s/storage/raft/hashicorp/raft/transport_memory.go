@@ -3,6 +3,7 @@ package raft
 import (
 	"fmt"
 	"io"
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"sync"
 	"time"
 )
@@ -39,35 +40,41 @@ func (transport *MemoryTransport) AppendEntriesPipeline(id ServerID, target Serv
 	panic("implement me")
 }
 
-func (transport *MemoryTransport) AppendEntries(id ServerID, target ServerAddress, request *AppendEntriesRequest, resp *AppendEntriesResponse) error {
+func (transport *MemoryTransport) AppendEntries(id ServerID, target ServerAddress, request *pb.AppendEntriesRequest, resp *pb.AppendEntriesResponse) error {
 	rpcResp, err := transport.sendRPC(target, request, nil, transport.timeout)
 	if err != nil {
 		return err
 	}
 
-	// Copy the result back
-	out := rpcResp.Response.(*AppendEntriesResponse)
-	*resp = *out
+	out := rpcResp.Response.(*pb.AppendEntriesResponse)
+	*resp = pb.AppendEntriesResponse{
+		Term:           out.Term,
+		LastLog:        out.LastLog,
+		Success:        out.Success,
+		NoRetryBackoff: out.NoRetryBackoff,
+	}
 	return nil
 }
 
-func (transport *MemoryTransport) RequestVote(id ServerID, target ServerAddress, request *RequestVoteRequest, resp *RequestVoteResponse) error {
+func (transport *MemoryTransport) RequestVote(id ServerID, target ServerAddress, request *pb.RequestVoteRequest, resp *pb.RequestVoteResponse) error {
 	rpcResp, err := transport.sendRPC(target, request, nil, transport.timeout)
 	if err != nil {
 		return err
 	}
 
-	// Copy the result back
-	out := rpcResp.Response.(*RequestVoteResponse)
-	*resp = *out
+	out := rpcResp.Response.(*pb.RequestVoteResponse)
+	*resp = pb.RequestVoteResponse{
+		Term:    out.Term,
+		Granted: out.Granted,
+	}
 	return nil
 }
 
-func (transport *MemoryTransport) InstallSnapshot(id ServerID, target ServerAddress, request *InstallSnapshotRequest, resp *InstallSnapshotResponse, data io.Reader) error {
+func (transport *MemoryTransport) InstallSnapshot(id ServerID, target ServerAddress, request *pb.InstallSnapshotRequest, resp *pb.InstallSnapshotResponse, data io.Reader) error {
 	panic("implement me")
 }
 
-func (transport *MemoryTransport) TimeoutNow(id ServerID, target ServerAddress, request *TimeoutNowRequest, resp *TimeoutNowResponse) error {
+func (transport *MemoryTransport) TimeoutNow(id ServerID, target ServerAddress, request *pb.TimeoutNowRequest, resp *pb.TimeoutNowResponse) error {
 	panic("implement me")
 }
 

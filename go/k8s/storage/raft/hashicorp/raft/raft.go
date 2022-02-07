@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"container/list"
 	"fmt"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"k8s.io/klog/v2"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -54,15 +54,12 @@ type Raft struct {
 	confReloadMu sync.Mutex
 	// Used to request the leader to make configuration changes.
 	configurationChangeCh chan *configurationChangeFuture
-	// Tracks the latest configuration and latest committed configuration from
-	// the log/snapshot.
+	// INFO: 所有 logs 中已经 committed 的 pb.LogType_CONFIGURATION log
+	//  Tracks the latest configuration and latest committed configuration from the log/snapshot.
 	configurations configurations
 	// Holds a copy of the latest configuration which can be read
 	// independent of main loop.
 	latestConfiguration atomic.Value
-	// configurationsCh is used to get the configuration data safely from
-	// outside of the main thread.
-	configurationsCh chan *configurationsFuture
 	// conf stores the current configuration to use. This is the most recent one
 	// provided. All reads of config values should use the config() helper method
 	// to read this safely.
@@ -81,15 +78,17 @@ type Raft struct {
 	// take a user snapshot on the leader, otherwise we might restore the
 	// snapshot and apply old logs to it that were in the pipe.
 	fsmMutateCh chan interface{}
-	// snapshots is used to store and retrieve snapshots
-	snapshots SnapshotStore
+	// snapshotStore is used to store and retrieve snapshotStore
+	snapshotStore SnapshotStore
 	// fsmSnapshotCh is used to trigger a new snapshot being taken
 	fsmSnapshotCh chan *reqSnapshotFuture
-	// userSnapshotCh is used for user-triggered snapshots
+	// userSnapshotCh is used for user-triggered snapshotStore
 	userSnapshotCh chan *userSnapshotFuture
 	// userRestoreCh is used for user-triggered restores of external
-	// snapshots
+	// snapshotStore
 	userRestoreCh chan *userRestoreFuture
+	// @see takeSnapshot()
+	configurationsCh chan *configurationsFuture
 
 	// lastContact is the last time we had contact from the
 	// leader node. This can be used to gauge staleness.
@@ -133,7 +132,7 @@ type Raft struct {
 
 // NewRaft is used to construct a new Raft node. It takes a configuration, as well
 // as implementations of various interfaces that are required. If we have any
-// old state, such as snapshots, logs, peers, etc, all those will be restored
+// old state, such as snapshotStore, logs, peers, etc, all those will be restored
 // when creating the Raft node.
 func NewRaft(conf *Config, fsm FSM, logs LogStore, stable StableStore, snaps SnapshotStore, transport Transport) (*Raft, error) {
 	// Validate the configuration.
@@ -154,7 +153,7 @@ func NewRaft(conf *Config, fsm FSM, logs LogStore, stable StableStore, snaps Sna
 	}
 
 	// Get the last log entry.
-	var lastLog Log
+	var lastLog pb.Log
 	if lastIndex > 0 {
 		if err = logs.GetLog(lastIndex, &lastLog); err != nil {
 			return nil, fmt.Errorf("failed to get last log at index %d: %v", lastIndex, err)
@@ -176,16 +175,16 @@ func NewRaft(conf *Config, fsm FSM, logs LogStore, stable StableStore, snaps Sna
 		localAddr:             localAddr,
 		configurationChangeCh: make(chan *configurationChangeFuture),
 		configurations:        configurations{},
-		configurationsCh:      make(chan *configurationsFuture, 8),
 		leaderCh:              make(chan bool, 1),
 
-		applyCh:        applyCh,
-		fsm:            fsm,
-		fsmMutateCh:    make(chan interface{}, 128),
-		fsmSnapshotCh:  make(chan *reqSnapshotFuture),
-		snapshots:      snaps,
-		userSnapshotCh: make(chan *userSnapshotFuture),
-		userRestoreCh:  make(chan *userRestoreFuture),
+		applyCh:          applyCh,
+		fsm:              fsm,
+		fsmMutateCh:      make(chan interface{}, 128),
+		fsmSnapshotCh:    make(chan *reqSnapshotFuture),
+		snapshotStore:    snaps,
+		userSnapshotCh:   make(chan *userSnapshotFuture),
+		userRestoreCh:    make(chan *userRestoreFuture),
+		configurationsCh: make(chan *configurationsFuture, 8), // 8 ???
 
 		logs:   logs,
 		stable: stable,
@@ -215,7 +214,7 @@ func NewRaft(conf *Config, fsm FSM, logs LogStore, stable StableStore, snaps Sna
 	// Scan through the log for any configuration change entries in [snapshotIndex + 1, lastLogIndex]
 	snapshotIndex, _ := r.getLastSnapshot()
 	for index := snapshotIndex + 1; index <= lastLog.Index; index++ {
-		var entry Log
+		var entry pb.Log
 		if err := r.logs.GetLog(index, &entry); err != nil {
 			klog.Error(fmt.Sprintf("failed to get log for index:%d err:%v", index, err))
 			panic(err)
@@ -303,6 +302,10 @@ func (r *Raft) runFollower() {
 		case b := <-r.bootstrapCh:
 			b.respond(r.liveBootstrap(b.configuration))
 
+		case c := <-r.configurationsCh:
+			c.configurations = r.configurations.Clone()
+			c.respond(nil)
+
 		case <-heartbeatTimer: // 每 [1s, 2s] 一次心跳检查是否有心跳
 			// Restart the heartbeat timer
 			heartbeatTimeout := r.config().HeartbeatTimeout
@@ -337,6 +340,9 @@ func (r *Raft) runFollower() {
 		case rpc := <-r.rpcCh:
 			r.processRPC(rpc)
 
+		case restore := <-r.userRestoreCh:
+			restore.respond(ErrNotLeader)
+
 		case <-r.shutdownCh:
 			return
 		}
@@ -349,13 +355,13 @@ func (r *Raft) runFollower() {
 func (r *Raft) liveBootstrap(configuration Configuration) error {
 	// Use the pre-init API to make the static updates.
 	cfg := r.config()
-	err := BootstrapCluster(&cfg, r.logs, r.stable, r.snapshots, configuration)
+	err := BootstrapCluster(&cfg, r.logs, r.stable, r.snapshotStore, configuration)
 	if err != nil {
 		return err
 	}
 
 	// Make the configuration live.
-	var entry Log
+	var entry pb.Log
 	if err := r.logs.GetLog(1, &entry); err != nil {
 		panic(err)
 	}
@@ -365,7 +371,7 @@ func (r *Raft) liveBootstrap(configuration Configuration) error {
 }
 
 type voteResult struct {
-	RequestVoteResponse
+	pb.RequestVoteResponse
 	voterID      ServerID
 	voterAddress ServerAddress
 }
@@ -390,6 +396,10 @@ func (r *Raft) runCandidate() {
 	klog.Infof(fmt.Sprintf("need %d votes at least", votesNeeded))
 	for r.getState() == Candidate {
 		select {
+		case c := <-r.configurationsCh:
+			c.configurations = r.configurations.Clone()
+			c.respond(nil)
+
 		case vote := <-voteCh:
 			// Check if the term is greater than ours, bail
 			if vote.Term > r.getCurrentTerm() { // INFO: @see raft paper 3.4
@@ -427,6 +437,9 @@ func (r *Raft) runCandidate() {
 
 		case rpc := <-r.rpcCh:
 			r.processRPC(rpc)
+
+		case restore := <-r.userRestoreCh:
+			restore.respond(ErrNotLeader)
 
 		case <-r.shutdownCh:
 			return
@@ -499,7 +512,7 @@ func (r *Raft) startElection() <-chan *voteResult {
 				}
 				// Include our own vote
 				respCh <- &voteResult{
-					RequestVoteResponse: RequestVoteResponse{
+					RequestVoteResponse: pb.RequestVoteResponse{
 						Term:    req.Term,
 						Granted: true,
 					},
@@ -547,6 +560,15 @@ func (r *Raft) runLeader() {
 
 	for r.getState() == Leader {
 		select {
+		case c := <-r.configurationsCh:
+			if r.getLeadershipTransferInProgress() {
+				klog.Warningf(ErrLeadershipTransferInProgress.Error())
+				c.respond(ErrLeadershipTransferInProgress)
+				continue
+			}
+			c.configurations = r.configurations.Clone()
+			c.respond(nil)
+
 		case rpc := <-r.rpcCh:
 			r.processRPC(rpc)
 
@@ -586,7 +608,7 @@ func (r *Raft) runLeader() {
 			commitIndex := r.leaderState.commitment.getCommitIndex()
 			r.setCommitIndex(commitIndex)
 
-			// New configration has been committed, set it as the committed value.
+			// New configuration has been committed, set it as the committed value.
 			if r.configurations.latestIndex > oldCommitIndex &&
 				r.configurations.latestIndex <= commitIndex {
 				r.setCommittedConfiguration(r.configurations.latest, r.configurations.latestIndex)
@@ -630,6 +652,15 @@ func (r *Raft) runLeader() {
 				}
 			}
 
+		case restore := <-r.userRestoreCh:
+			if r.getLeadershipTransferInProgress() {
+				klog.Warningf(ErrLeadershipTransferInProgress.Error())
+				restore.respond(ErrLeadershipTransferInProgress)
+				continue
+			}
+			err := r.restoreUserSnapshot(restore.meta, restore.reader)
+			restore.respond(err)
+
 		// INFO: @see handleStaleTerm()
 		case <-r.leaderState.stepDown:
 			r.setState(Follower)
@@ -646,13 +677,13 @@ func (r *Raft) dispatchLogs(applyLogs []*logFuture) {
 	now := time.Now()
 	term := r.getCurrentTerm()
 	lastIndex := r.getLastIndex()
-	logs := make([]*Log, len(applyLogs))
+	logs := make([]*pb.Log, len(applyLogs))
 	for idx, applyLog := range applyLogs {
-		applyLog.dispatch = now
 		lastIndex++
+		applyLog.dispatch = now
 		applyLog.log.Index = lastIndex
 		applyLog.log.Term = term
-		applyLog.log.AppendedAt = now
+		applyLog.log.AppendedAt = timestamppb.New(now)
 		logs[idx] = &applyLog.log
 		r.leaderState.inflight.PushBack(applyLog)
 	}
@@ -821,9 +852,9 @@ func (r *Raft) Leader() ServerAddress {
 // processConfigurationLogEntry takes a log entry and updates the latest
 // configuration if the entry results in a new configuration. This must only be
 // called from the main thread, or from NewRaft() before any threads have begun.
-func (r *Raft) processConfigurationLogEntry(entry *Log) error {
+func (r *Raft) processConfigurationLogEntry(entry *pb.Log) error {
 	switch entry.Type {
-	case LogConfiguration:
+	case pb.LogType_CONFIGURATION:
 		r.setCommittedConfiguration(r.configurations.latest, r.configurations.latestIndex)
 		r.setLatestConfiguration(DecodeConfiguration(entry.Data), entry.Index)
 	}
@@ -868,20 +899,20 @@ func (r *Raft) GetConfiguration() ConfigurationFuture {
 	return configReq
 }
 
-// restoreSnapshot attempts to restore the latest snapshots, and fails if none
+// restoreSnapshot attempts to restore the latest snapshotStore, and fails if none
 // of them can be restored. This is called at initialization time, and is
 // completely unsafe to call at any other time.
 func (r *Raft) restoreSnapshot() error {
-	snapshots, err := r.snapshots.List()
+	snapshots, err := r.snapshotStore.List()
 	if err != nil {
-		klog.Errorf(fmt.Sprintf("failed to list snapshots err:%v", err))
+		klog.Errorf(fmt.Sprintf("failed to list snapshotStore err:%v", err))
 		return err
 	}
 
 	// Try to load in order of newest to oldest
 	for _, snapshot := range snapshots {
 		if !r.config().NoSnapshotRestoreOnStart {
-			_, source, err := r.snapshots.Open(snapshot.ID)
+			_, source, err := r.snapshotStore.Open(snapshot.ID)
 			if err != nil {
 				klog.Errorf(fmt.Sprintf("failed to open snapshot id:%s err:%v", snapshot.ID, err))
 				continue
@@ -911,9 +942,9 @@ func (r *Raft) restoreSnapshot() error {
 		return nil
 	}
 
-	// If we had snapshots and failed to load them, its an error
+	// If we had snapshotStore and failed to load them, its an error
 	if len(snapshots) > 0 {
-		return fmt.Errorf("failed to load any existing snapshots")
+		return fmt.Errorf("failed to load any existing snapshotStore")
 	}
 	return nil
 }
@@ -931,7 +962,7 @@ func (r *Raft) processHeartbeat(rpc RPC) {
 
 	// Ensure we are only handling a heartbeat
 	switch cmd := rpc.Command.(type) {
-	case *AppendEntriesRequest:
+	case *pb.AppendEntriesRequest:
 		r.appendEntries(rpc, cmd)
 	default:
 		klog.Error(fmt.Sprintf("expected heartbeat, got command: %+v", rpc.Command))
@@ -943,13 +974,13 @@ func (r *Raft) processHeartbeat(rpc RPC) {
 // called from the main thread.
 func (r *Raft) processRPC(rpc RPC) {
 	switch cmd := rpc.Command.(type) {
-	case *AppendEntriesRequest:
+	case *pb.AppendEntriesRequest:
 		r.appendEntries(rpc, cmd)
 	case *pb.RequestVoteRequest:
 		r.requestVote(rpc, cmd)
-	case *InstallSnapshotRequest:
+	case *pb.InstallSnapshotRequest:
 		r.installSnapshot(rpc, cmd)
-	case *TimeoutNowRequest:
+	case *pb.TimeoutNowRequest:
 		r.timeoutNow(rpc, cmd)
 	default:
 		klog.Error(fmt.Sprintf("got unexpected command: %+v", rpc.Command))
@@ -965,7 +996,7 @@ func (r *Raft) processRPC(rpc RPC) {
 * 如果 follower lastLogTerm == candidate lastLogTerm，但是 follower lastLogIndex == candidate lastLogIndex 则 reject vote；
  */
 func (r *Raft) requestVote(rpc RPC, req *pb.RequestVoteRequest) {
-	resp := &RequestVoteResponse{
+	resp := &pb.RequestVoteResponse{
 		Term:    r.getCurrentTerm(),
 		Granted: false,
 	}
@@ -1045,8 +1076,8 @@ func (r *Raft) requestVote(rpc RPC, req *pb.RequestVoteRequest) {
 }
 
 // appendEntries is invoked when we get AppendEntriesRPC call.
-func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
-	resp := &AppendEntriesResponse{
+func (r *Raft) appendEntries(rpc RPC, cmd *pb.AppendEntriesRequest) {
+	resp := &pb.AppendEntriesResponse{
 		Term:           r.getCurrentTerm(),
 		LastLog:        r.getLastIndex(),
 		Success:        false,
@@ -1055,17 +1086,6 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 
 	var rpcErr error
 	defer func() {
-		switch c := rpc.Command.(type) {
-		case *AppendEntriesRequest:
-			if len(cmd.Entries) > 0 {
-				var msg []string
-				for _, entry := range cmd.Entries {
-					msg = append(msg, fmt.Sprintf("%d:%s", entry.Index, string(entry.Data)))
-				}
-				klog.Infof(fmt.Sprintf("[appendEntries]leader is %s, msg is %s", c.Leader, strings.Join(msg, " ")))
-			}
-		}
-
 		rpc.Respond(resp, rpcErr)
 	}()
 
@@ -1099,7 +1119,7 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 		if cmd.PrevLogIndex == lastIdx {
 			prevLogTerm = lastTerm
 		} else {
-			var prevLog Log
+			var prevLog pb.Log
 			if err := r.logs.GetLog(cmd.PrevLogIndex, &prevLog); err != nil {
 				klog.Warningf(fmt.Sprintf("failed to get previous log from %s/%s previousLogIndex:%d lastLogIndex:%d error:%v",
 					r.localID, r.localAddr, cmd.PrevLogIndex, lastIdx, err))
@@ -1120,13 +1140,13 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 	if len(cmd.Entries) > 0 {
 		// Delete any conflicting entries, skip any duplicates
 		lastLogIdx, _ := r.getLastLog()
-		var newEntries []*Log
+		var newEntries []*pb.Log
 		for i, entry := range cmd.Entries {
 			if entry.Index > lastLogIdx {
 				newEntries = cmd.Entries[i:]
 				break
 			}
-			var storeEntry Log
+			var storeEntry pb.Log
 			if err := r.logs.GetLog(entry.Index, &storeEntry); err != nil {
 				klog.Warningf(fmt.Sprintf("failed to get log entry index:%d err:%v", entry.Index, err))
 				return
@@ -1189,7 +1209,7 @@ func (r *Raft) appendEntries(rpc RPC, cmd *AppendEntriesRequest) {
 // commitTuple is used to send an index that was committed,
 // with an optional associated future that should be invoked.
 type commitTuple struct {
-	log    *Log
+	log    *pb.Log
 	future *logFuture
 }
 
@@ -1232,7 +1252,7 @@ func (r *Raft) applyLogsToFSM(index uint64, futures map[uint64]*logFuture) {
 		if futureOk {
 			preparedLog = r.prepareLog(&future.log, future)
 		} else {
-			l := new(Log)
+			l := new(pb.Log)
 			if err := r.logs.GetLog(idx, l); err != nil {
 				klog.Errorf(fmt.Sprintf("failed to get log index:%d error:%v", idx, err))
 				panic(err)
@@ -1268,16 +1288,16 @@ func (r *Raft) applyLogsToFSM(index uint64, futures map[uint64]*logFuture) {
 }
 
 // processLog is invoked to process the application of a single committed log entry.
-func (r *Raft) prepareLog(l *Log, future *logFuture) *commitTuple {
+func (r *Raft) prepareLog(l *pb.Log, future *logFuture) *commitTuple {
 	switch l.Type {
-	case LogBarrier:
+	case pb.LogType_BARRIER:
 		// Barrier is handled by the FSM
 		fallthrough // 使用fallthrough强制执行后面的case代码, default 不会执行
 
-	case LogCommand, LogConfiguration:
+	case pb.LogType_COMMAND, pb.LogType_CONFIGURATION:
 		return &commitTuple{l, future}
 
-	case LogNoop:
+	case pb.LogType_NOOP:
 		// Ignore the no-op
 
 	default:
@@ -1307,12 +1327,12 @@ func (r *Raft) LastContact() time.Time {
 // We must be in the follower state for this, since it means we are
 // too far behind a leader for log replay. This must only be called
 // from the main thread.
-func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
+func (r *Raft) installSnapshot(rpc RPC, req *pb.InstallSnapshotRequest) {
 
 }
 
 // timeoutNow is what happens when a server receives a TimeoutNowRequest.
-func (r *Raft) timeoutNow(rpc RPC, req *TimeoutNowRequest) {
+func (r *Raft) timeoutNow(rpc RPC, req *pb.TimeoutNowRequest) {
 
 }
 
