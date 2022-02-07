@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"net"
 	"sync"
@@ -41,7 +40,7 @@ func (server *grpcServer) handleCommand(command interface{}, data io.Reader) (in
 	}
 
 	// INFO: Check for heartbeat fast-path, skip Dispatch the RPC to consumerCh
-	if value, ok := command.(*AppendEntriesRequest); ok && isHeartbeatRequest(value) {
+	if value, ok := command.(*pb.AppendEntriesRequest); ok && isHeartbeatRequest(value) {
 		server.heartbeatFnLock.Lock()
 		fn := server.heartbeatFn
 		server.heartbeatFnLock.Unlock()
@@ -73,21 +72,21 @@ func (server *grpcServer) AppendEntriesPipeline(server2 pb.Transport_AppendEntri
 }
 
 func (server *grpcServer) AppendEntries(ctx context.Context, request *pb.AppendEntriesRequest) (*pb.AppendEntriesResponse, error) {
-	response, err := server.handleCommand(decodeAppendEntriesRequest(request), nil)
+	response, err := server.handleCommand(request, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return encodeAppendEntriesResponse(response.(*AppendEntriesResponse)), nil
+	return response.(*pb.AppendEntriesResponse), nil
 }
 
 func (server *grpcServer) RequestVote(ctx context.Context, request *pb.RequestVoteRequest) (*pb.RequestVoteResponse, error) {
-	response, err := server.handleCommand(decodeRequestVoteRequest(request), nil)
+	response, err := server.handleCommand(request, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return encodeRequestVoteResponse(response.(*RequestVoteResponse)), nil
+	return response.(*pb.RequestVoteResponse), nil
 }
 
 type GrpcTransport struct {
@@ -146,24 +145,21 @@ func (transport *GrpcTransport) Consumer() <-chan RPC {
 	return transport.consumerCh
 }
 
-func (transport *GrpcTransport) AppendEntries(id ServerID, target ServerAddress, request *AppendEntriesRequest,
-	resp *AppendEntriesResponse) error {
-
+func (transport *GrpcTransport) AppendEntries(id ServerID, target ServerAddress, request *pb.AppendEntriesRequest,
+	resp *pb.AppendEntriesResponse) error {
 	conn, err := transport.getConn(target)
 	if err != nil {
 		return err
 	}
 
 	// Send the RPC
-	response, err := conn.client.AppendEntries(context.TODO(), encodeAppendEntriesRequest(request))
-
-	*resp = AppendEntriesResponse{
+	response, err := conn.client.AppendEntries(context.TODO(), request)
+	resp = &pb.AppendEntriesResponse{
 		Term:           response.Term,
 		LastLog:        response.LastLog,
 		Success:        response.Success,
 		NoRetryBackoff: response.NoRetryBackoff,
 	}
-
 	return nil
 }
 
@@ -195,122 +191,4 @@ func (transport *GrpcTransport) addConn(target ServerAddress, conn *grpcNetConn)
 	defer transport.connPoolLock.Unlock()
 
 	transport.connPool[target] = conn
-}
-
-func encodeAppendEntriesRequest(request *AppendEntriesRequest) *pb.AppendEntriesRequest {
-	return &pb.AppendEntriesRequest{
-		Term:              request.Term,
-		Leader:            request.Leader,
-		PrevLogIndex:      request.PrevLogIndex,
-		PrevLogTerm:       request.PrevLogTerm,
-		Entries:           encodeLogs(request.Entries),
-		LeaderCommitIndex: request.LeaderCommitIndex,
-	}
-}
-
-func encodeLogs(logs []*Log) []*pb.Log {
-	l := make([]*pb.Log, len(logs))
-	for _, log := range logs {
-		l = append(l, encodeLog(log))
-	}
-
-	return l
-}
-
-func encodeLog(log *Log) *pb.Log {
-	return &pb.Log{
-		Index:      log.Index,
-		Term:       log.Term,
-		Type:       encodeLogType(log.Type),
-		Data:       log.Data,
-		Extensions: log.Extensions,
-		AppendedAt: timestamppb.New(log.AppendedAt),
-	}
-}
-
-func encodeLogType(s LogType) pb.Log_LogType {
-	switch s {
-	case LogCommand:
-		return pb.Log_LOG_COMMAND
-	case LogNoop:
-		return pb.Log_LOG_NOOP
-	case LogBarrier:
-		return pb.Log_LOG_BARRIER
-	case LogConfiguration:
-		return pb.Log_LOG_CONFIGURATION
-	default:
-		panic("invalid LogType")
-	}
-}
-
-func decodeLogs(logs []*pb.Log) []*Log {
-	l := make([]*Log, len(logs))
-	for _, log := range logs {
-		l = append(l, decodeLog(log))
-	}
-
-	return l
-}
-
-func decodeLog(log *pb.Log) *Log {
-	return &Log{
-		Index:      log.Index,
-		Term:       log.Term,
-		Type:       decodeLogType(log.Type),
-		Data:       log.Data,
-		Extensions: log.Extensions,
-		AppendedAt: log.AppendedAt.AsTime(),
-	}
-}
-
-func decodeLogType(m pb.Log_LogType) LogType {
-	switch m {
-	case pb.Log_LOG_COMMAND:
-		return LogCommand
-	case pb.Log_LOG_NOOP:
-		return LogNoop
-	case pb.Log_LOG_BARRIER:
-		return LogBarrier
-	case pb.Log_LOG_CONFIGURATION:
-		return LogConfiguration
-	default:
-		panic("invalid LogType")
-	}
-}
-
-func decodeAppendEntriesRequest(request *pb.AppendEntriesRequest) *AppendEntriesRequest {
-	return &AppendEntriesRequest{
-		Term:              request.Term,
-		Leader:            request.Leader,
-		PrevLogIndex:      request.PrevLogIndex,
-		PrevLogTerm:       request.PrevLogTerm,
-		Entries:           decodeLogs(request.Entries),
-		LeaderCommitIndex: request.LeaderCommitIndex,
-	}
-}
-
-func encodeAppendEntriesResponse(response *AppendEntriesResponse) *pb.AppendEntriesResponse {
-	return &pb.AppendEntriesResponse{
-		Term:           response.Term,
-		LastLog:        response.LastLog,
-		Success:        response.Success,
-		NoRetryBackoff: response.NoRetryBackoff,
-	}
-}
-
-func decodeRequestVoteRequest(request *pb.RequestVoteRequest) *RequestVoteRequest {
-	return &RequestVoteRequest{
-		Term:               request.Term,
-		Candidate:          request.Candidate,
-		LastLogIndex:       request.LastLogIndex,
-		LastLogTerm:        request.LastLogTerm,
-		LeadershipTransfer: request.LeadershipTransfer,
-	}
-}
-
-func encodeRequestVoteResponse(response *RequestVoteResponse) *pb.RequestVoteResponse {
-	return &pb.RequestVoteResponse{
-		Term:    response.Term,
-		Granted: response.Granted,
-	}
 }

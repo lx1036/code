@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"net"
 	"testing"
 	"time"
@@ -43,7 +44,7 @@ func TestRpcCodec(test *testing.T) {
 						klog.Error(err)
 						return
 					}
-					var req RequestVoteRequest
+					var req pb.RequestVoteRequest
 					switch rpcType {
 					case rpcRequestVote:
 						if err = dec.Decode(&req); err != nil {
@@ -57,7 +58,7 @@ func TestRpcCodec(test *testing.T) {
 
 					klog.Infof(fmt.Sprintf("accept request from rpc client, request:%+v", req))
 
-					resp := &RequestVoteResponse{
+					resp := &pb.RequestVoteResponse{
 						Term:    req.Term,
 						Granted: false,
 					}
@@ -100,15 +101,16 @@ func TestRpcCodec(test *testing.T) {
 			}
 		}()
 
-		dec := codec.NewDecoder(bufio.NewReader(conn), &codec.MsgpackHandle{})
+		reader := bufio.NewReaderSize(conn, connReceiveBufferSize)
 		writer := bufio.NewWriterSize(conn, connSendBufferSize)
 		enc := codec.NewEncoder(writer, &codec.MsgpackHandle{})
+		dec := codec.NewDecoder(reader, &codec.MsgpackHandle{})
 
 		// Send the request
 		if err = writer.WriteByte(rpcRequestVote); err != nil {
 			return
 		}
-		req := &RequestVoteRequest{
+		req := &pb.RequestVoteRequest{
 			Term:         1,
 			LastLogIndex: 11,
 			LastLogTerm:  1,
@@ -123,7 +125,7 @@ func TestRpcCodec(test *testing.T) {
 		klog.Infof(fmt.Sprintf("send the request to rpc server, request:%+v", *req))
 
 		// Decode the response
-		var resp RequestVoteResponse
+		var resp pb.RequestVoteResponse
 		if err = dec.Decode(&resp); err != nil {
 			return
 		}

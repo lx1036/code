@@ -3,6 +3,7 @@ package raft
 import (
 	"fmt"
 	"io"
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"sync"
 
 	"github.com/hashicorp/go-msgpack/codec"
@@ -15,7 +16,7 @@ type FSM interface {
 	// It returns a value which will be made available in the
 	// ApplyFuture returned by Raft.Apply method if that
 	// method was called on the same Raft node as the FSM.
-	Apply(*Log) interface{}
+	Apply(*pb.Log) interface{}
 
 	// Snapshot is used to support log compaction. This call should
 	// return an FSMSnapshot which can be used to save a point-in-time
@@ -46,7 +47,7 @@ type BatchingFSM interface {
 	// should correlate to the log at the same index of the input. The returned
 	// values will be made available in the ApplyFuture returned by Raft.Apply
 	// method if that method was called on the same Raft node as the FSM.
-	ApplyBatch([]*Log) []interface{}
+	ApplyBatch([]*pb.Log) []interface{}
 
 	FSM
 }
@@ -99,10 +100,10 @@ func (r *Raft) runFSM() {
 		}()
 
 		switch req.log.Type {
-		case LogCommand:
+		case pb.LogType_COMMAND:
 			resp = r.fsm.Apply(req.log)
 
-		case LogConfiguration:
+		case pb.LogType_CONFIGURATION:
 			if !configStoreEnabled {
 				// Return early to avoid incrementing the index and term for
 				// an unimplemented operation.
@@ -126,16 +127,16 @@ func (r *Raft) runFSM() {
 
 		// Only send LogCommand and LogConfiguration log types. LogBarrier types
 		// will not be sent to the FSM.
-		shouldSend := func(l *Log) bool {
+		shouldSend := func(l *pb.Log) bool {
 			switch l.Type {
-			case LogCommand, LogConfiguration:
+			case pb.LogType_COMMAND, pb.LogType_CONFIGURATION:
 				return true
 			}
 			return false
 		}
 
 		var lastBatchIndex, lastBatchTerm uint64
-		sendLogs := make([]*Log, 0, len(reqs))
+		sendLogs := make([]*pb.Log, 0, len(reqs))
 		for _, req := range reqs {
 			if shouldSend(req.log) {
 				sendLogs = append(sendLogs, req.log)
@@ -174,7 +175,7 @@ func (r *Raft) runFSM() {
 
 	restore := func(req *restoreFuture) {
 		// Open the snapshot
-		meta, source, err := r.snapshots.Open(req.ID)
+		meta, source, err := r.snapshotStore.Open(req.ID)
 		if err != nil {
 			req.respond(fmt.Errorf("failed to open snapshot %v: %v", req.ID, err))
 			return
@@ -238,7 +239,7 @@ type MockFSM struct {
 	configurations []Configuration
 }
 
-func (m *MockFSM) ApplyBatch(logs []*Log) []interface{} {
+func (m *MockFSM) ApplyBatch(logs []*pb.Log) []interface{} {
 	m.Lock()
 	defer m.Unlock()
 
@@ -251,7 +252,7 @@ func (m *MockFSM) ApplyBatch(logs []*Log) []interface{} {
 	return index
 }
 
-func (m *MockFSM) Apply(log *Log) interface{} {
+func (m *MockFSM) Apply(log *pb.Log) interface{} {
 	m.Lock()
 	defer m.Unlock()
 	m.logs = append(m.logs, log.Data)

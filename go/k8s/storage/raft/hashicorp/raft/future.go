@@ -1,7 +1,9 @@
 package raft
 
 import (
+	"fmt"
 	"io"
+	pb "k8s-lx1036/k8s/storage/raft/hashicorp/raft/rpc"
 	"sync"
 	"time"
 )
@@ -82,16 +84,16 @@ func (d *deferError) respond(err error) {
 // the log is considered committed.
 type logFuture struct {
 	deferError
-	log      Log
+	log      pb.Log
 	response interface{}
 	dispatch time.Time
 }
 
-func (l logFuture) Index() uint64 {
+func (l *logFuture) Index() uint64 {
 	return l.log.Index
 }
 
-func (l logFuture) Response() interface{} {
+func (l *logFuture) Response() interface{} {
 	return l.response
 }
 
@@ -194,6 +196,16 @@ type bootstrapFuture struct {
 	configuration Configuration
 }
 
+// SnapshotFuture is used for waiting on a user-triggered snapshot to complete.
+type SnapshotFuture interface {
+	Future
+
+	// Open is a function you can call to access the underlying snapshot and
+	// its metadata. This must not be called until after the Error method
+	// has returned.
+	Open() (*SnapshotMeta, io.ReadCloser, error)
+}
+
 // reqSnapshotFuture is used for requesting a snapshot start.
 // It is only used internally.
 type reqSnapshotFuture struct {
@@ -213,6 +225,19 @@ type userSnapshotFuture struct {
 	// opener is a function used to open the snapshot. This is filled in
 	// once the future returns with no error.
 	opener func() (*SnapshotMeta, io.ReadCloser, error)
+}
+
+// Open is a function you can call to access the underlying snapshot and its metadata.
+func (u *userSnapshotFuture) Open() (*SnapshotMeta, io.ReadCloser, error) {
+	if u.opener == nil {
+		return nil, nil, fmt.Errorf("no snapshot available")
+	}
+	// Invalidate the opener so it can't get called multiple times,
+	// which isn't generally safe.
+	defer func() {
+		u.opener = nil
+	}()
+	return u.opener()
 }
 
 // userRestoreFuture is used for waiting on a user-triggered restore of an

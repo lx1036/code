@@ -27,7 +27,7 @@ const (
 )
 
 // FileSnapshotStore implements the SnapshotStore interface and allows
-// snapshots to be made on the local disk.
+// snapshotStore to be made on the local disk.
 type FileSnapshotStore struct {
 	path   string
 	retain int
@@ -39,7 +39,7 @@ type FileSnapshotStore struct {
 
 // NewFileSnapshotStore creates a new FileSnapshotStore based
 // on a base directory. The `retain` parameter controls how many
-// snapshots are retained. Must be at least 1.
+// snapshotStore are retained. Must be at least 1.
 func NewFileSnapshotStore(base string, retain int) (*FileSnapshotStore, error) {
 	// Ensure our path exists
 	path := filepath.Join(base, snapPath)
@@ -56,7 +56,7 @@ func NewFileSnapshotStore(base string, retain int) (*FileSnapshotStore, error) {
 func (store *FileSnapshotStore) List() ([]*SnapshotMeta, error) {
 	snapshots, err := store.getSnapshots()
 	if err != nil {
-		klog.Errorf(fmt.Sprintf("failed to get snapshots error:%v", err))
+		klog.Errorf(fmt.Sprintf("failed to get snapshotStore error:%v", err))
 		return nil, err
 	}
 
@@ -70,9 +70,9 @@ func (store *FileSnapshotStore) List() ([]*SnapshotMeta, error) {
 	return snapMeta, nil
 }
 
-// getSnapshots returns all the known snapshots.
+// getSnapshots returns all the known snapshotStore.
 func (store *FileSnapshotStore) getSnapshots() ([]*fileSnapshotMeta, error) {
-	// Get the eligible snapshots
+	// Get the eligible snapshotStore
 	snapshots, err := ioutil.ReadDir(store.path)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("failed to scan snapshot directory err:%v", err))
@@ -86,7 +86,7 @@ func (store *FileSnapshotStore) getSnapshots() ([]*fileSnapshotMeta, error) {
 			continue
 		}
 
-		// Ignore any temporary snapshots
+		// Ignore any temporary snapshotStore
 		dirName := snap.Name()
 		if strings.HasSuffix(dirName, tmpSuffix) {
 			klog.Warningf(fmt.Sprintf("found temporary snapshot name:%s", dirName))
@@ -139,6 +139,7 @@ type bufferedFile struct {
 	fh *os.File
 }
 
+// Read data into p
 func (b *bufferedFile) Read(p []byte) (n int, err error) {
 	return b.bh.Read(p)
 }
@@ -238,8 +239,8 @@ type FileSnapshotSink struct {
 func (store *FileSnapshotStore) Create(index, term uint64, configuration Configuration, configurationIndex uint64) (SnapshotSink, error) {
 	// Create a new path
 	name := snapshotName(term, index)
-	path := filepath.Join(store.path, name+tmpSuffix) // snapshots/2-12-1642129446715.tmp
-	klog.Infof(fmt.Sprintf("creating new snapshot path:%s", path))
+	path := filepath.Join(store.path, name+tmpSuffix) // snapshotStore/2-12-1642129446715.tmp
+	klog.Infof(fmt.Sprintf("creating new snapshot from lastSnapshotIndex:%d term:%d at path:%s", index, term, path))
 
 	// Make the directory
 	if err := os.MkdirAll(path, 0755); err != nil {
@@ -362,7 +363,7 @@ func (s *FileSnapshotSink) Close() error {
 	}
 
 	// Move the directory into place
-	newPath := strings.TrimSuffix(s.dir, tmpSuffix) // snapshots/2-12-1642129446715.tmp -> snapshots/2-12-1642129446715
+	newPath := strings.TrimSuffix(s.dir, tmpSuffix) // snapshotStore/2-12-1642129446715.tmp -> snapshotStore/2-12-1642129446715
 	if err := os.Rename(s.dir, newPath); err != nil {
 		klog.Errorf(fmt.Sprintf("failed to move snapshot into place err:%v", err))
 		return err
@@ -382,7 +383,7 @@ func (s *FileSnapshotSink) Close() error {
 		}
 	}
 
-	// Reap any old snapshots
+	// Reap any old snapshotStore
 	if err := s.store.ReapSnapshots(); err != nil {
 		return err
 	}
@@ -390,11 +391,11 @@ func (s *FileSnapshotSink) Close() error {
 	return nil
 }
 
-// ReapSnapshots reaps any snapshots beyond the retain count.
+// ReapSnapshots reaps any snapshotStore beyond the retain count.
 func (store *FileSnapshotStore) ReapSnapshots() error {
 	snapshots, err := store.getSnapshots()
 	if err != nil {
-		klog.Errorf(fmt.Sprintf("failed to get snapshots err:%v", err))
+		klog.Errorf(fmt.Sprintf("failed to get snapshotStore err:%v", err))
 		return err
 	}
 

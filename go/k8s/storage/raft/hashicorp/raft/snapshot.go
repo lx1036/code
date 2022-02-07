@@ -16,7 +16,7 @@ type SnapshotMeta struct {
 	Term  uint64
 
 	// Configuration and ConfigurationIndex are present in version 1
-	// snapshots and later.
+	// snapshotStore and later.
 	Configuration      Configuration
 	ConfigurationIndex uint64
 
@@ -26,7 +26,7 @@ type SnapshotMeta struct {
 
 // SnapshotStore interface is used to allow for flexible implementations
 // of snapshot storage and retrieval. For example, a client could implement
-// a shared state store such as S3, allowing new nodes to restore snapshots
+// a shared state store such as S3, allowing new nodes to restore snapshotStore
 // without streaming from the leader.
 type SnapshotStore interface {
 	// Create is used to begin a snapshot at a given index and term, and with
@@ -34,7 +34,7 @@ type SnapshotStore interface {
 	// which snapshot version to create.
 	Create(index, term uint64, configuration Configuration, configurationIndex uint64) (SnapshotSink, error)
 
-	// List is used to list the available snapshots in the store.
+	// List is used to list the available snapshotStore in the store.
 	// It should return then in descending order, with the highest index first.
 	List() ([]*SnapshotMeta, error)
 
@@ -52,8 +52,8 @@ type SnapshotSink interface {
 }
 
 // runSnapshots is a long running goroutine used to manage taking
-// new snapshots of the FSM. It runs in parallel to the FSM and
-// main goroutines, so that snapshots do not block normal operation.
+// new snapshotStore of the FSM. It runs in parallel to the FSM and
+// main goroutines, so that snapshotStore do not block normal operation.
 func (r *Raft) runSnapshots() {
 	for {
 		select {
@@ -75,7 +75,7 @@ func (r *Raft) runSnapshots() {
 				klog.Errorf(fmt.Sprintf("failed to take snapshot err:%v", err))
 			} else {
 				future.opener = func() (*SnapshotMeta, io.ReadCloser, error) {
-					return r.snapshots.Open(id)
+					return r.snapshotStore.Open(id)
 				}
 			}
 			future.respond(err)
@@ -125,12 +125,10 @@ func (r *Raft) takeSnapshot() (string, error) {
 		}
 		return "", err
 	}
-
 	defer snapReq.snapshot.Release()
 
-	// Make a request for the configurations and extract the committed info.
-	// We have to use the future here to safely get this information since
-	// it is owned by the main thread.
+	// INFO: 从 main thread 获取最新 configurations.(committed|committedIndex)，
+	//  主要目的是获取 committedIndex 开始到之前做 snapshot
 	configReq := &configurationsFuture{}
 	configReq.ShutdownCh = r.shutdownCh
 	configReq.init()
@@ -145,7 +143,7 @@ func (r *Raft) takeSnapshot() (string, error) {
 	committed := configReq.configurations.committed
 	committedIndex := configReq.configurations.committedIndex
 
-	// We don't support snapshots while there's a config change outstanding
+	// We don't support snapshotStore while there's a config change outstanding
 	// since the snapshot doesn't have a means to represent this state. This
 	// is a little weird because we need the FSM to apply an index that's
 	// past the configuration change, even though the FSM itself doesn't see
@@ -158,9 +156,10 @@ func (r *Raft) takeSnapshot() (string, error) {
 			committedIndex, snapReq.index)
 	}
 
-	// Create a new snapshot.
-	klog.Infof(fmt.Sprintf("starting snapshot up to index:%d", snapReq.index))
-	sink, err := r.snapshots.Create(snapReq.index, snapReq.term, committed, committedIndex)
+	// INFO: 所有 logs 中已经 committed 的 pb.LogType_CONFIGURATION log
+	klog.Infof(fmt.Sprintf("starting snapshot up to index:%d, the committed configurationIndex is %d in all logs",
+		snapReq.index, committedIndex))
+	sink, err := r.snapshotStore.Create(snapReq.index, snapReq.term, committed, committedIndex)
 	if err != nil {
 		return "", fmt.Errorf("failed to create snapshot: %v", err)
 	}
@@ -184,6 +183,21 @@ func (r *Raft) takeSnapshot() (string, error) {
 
 	klog.Infof(fmt.Sprintf("snapshot complete up to index:%d", snapReq.index))
 	return sink.ID(), nil
+}
+
+// Snapshot is used to manually force Raft to take a snapshot. Returns a future
+// that can be used to block until complete, and that contains a function that
+// can be used to open the snapshot.
+func (r *Raft) Snapshot() SnapshotFuture {
+	future := &userSnapshotFuture{}
+	future.init()
+	select {
+	case r.userSnapshotCh <- future:
+		return future
+	case <-r.shutdownCh:
+		future.respond(ErrRaftShutdown)
+		return future
+	}
 }
 
 // compactLogs takes the last inclusive index of a snapshot
@@ -214,11 +228,101 @@ func (r *Raft) compactLogs(snapIdx uint64) error {
 		return nil
 	}
 
-	klog.Infof(fmt.Sprintf("compacting logs from %d to %d", minLog, maxLog))
+	klog.Infof(fmt.Sprintf("compacting logs from %d to %d, trailing %d logs until to lastLogIdx:%d",
+		minLog, maxLog, trailingLogs, lastLogIdx))
 
 	// Compact the logs
 	if err := r.logs.DeleteRange(minLog, maxLog); err != nil {
 		return fmt.Errorf("log compaction failed: %v", err)
 	}
+	return nil
+}
+
+// restoreUserSnapshot is used to manually consume an external snapshot, such
+// as if restoring from a backup. We will use the current Raft configuration,
+// not the one from the snapshot, so that we can restore into a new cluster. We
+// will also use the higher of the index of the snapshot, or the current index,
+// and then add 1 to that, so we force a new state with a hole in the Raft log,
+// so that the snapshot will be sent to followers and used for any new joiners.
+// This can only be run on the leader, and returns a future that can be used to
+// block until complete.
+func (r *Raft) restoreUserSnapshot(meta *SnapshotMeta, reader io.Reader) error {
+	// We don't support snapshots while there's a config change
+	// outstanding since the snapshot doesn't have a means to
+	// represent this state.
+	committedIndex := r.configurations.committedIndex
+	latestIndex := r.configurations.latestIndex
+	if committedIndex != latestIndex {
+		return fmt.Errorf("cannot restore snapshot now, wait until the configuration entry at %v has been applied (have applied %v)",
+			latestIndex, committedIndex)
+	}
+
+	// Cancel any inflight requests.
+	for {
+		e := r.leaderState.inflight.Front()
+		if e == nil {
+			break
+		}
+		e.Value.(*logFuture).respond(ErrAbortedByRestore)
+		r.leaderState.inflight.Remove(e)
+	}
+
+	// We will overwrite the snapshot metadata with the current term,
+	// an index that's greater than the current index, or the last
+	// index in the snapshot. It's important that we leave a hole in
+	// the index so we know there's nothing in the Raft log there and
+	// replication will fault and send the snapshot.
+	term := r.getCurrentTerm()
+	lastIndex := r.getLastIndex()
+	if meta.Index > lastIndex {
+		lastIndex = meta.Index
+	}
+	lastIndex++
+
+	// Dump the snapshot. Note that we use the latest configuration,
+	// not the one that came with the snapshot.
+	sink, err := r.snapshotStore.Create(lastIndex, term,
+		r.configurations.latest, r.configurations.latestIndex)
+	if err != nil {
+		return fmt.Errorf("failed to create snapshot: %v", err)
+	}
+	n, err := io.Copy(sink, reader)
+	if err != nil {
+		sink.Cancel()
+		return fmt.Errorf("failed to write snapshot: %v", err)
+	}
+	if n != meta.Size {
+		sink.Cancel()
+		return fmt.Errorf("failed to write snapshot, size didn't match (%d != %d)", n, meta.Size)
+	}
+	if err := sink.Close(); err != nil {
+		return fmt.Errorf("failed to close snapshot: %v", err)
+	}
+	klog.Infof(fmt.Sprintf("copied to local snapshot %d bytes", n))
+
+	// Restore the snapshot into the FSM. If this fails we are in a
+	// bad state so we panic to take ourselves out.
+	restore := &restoreFuture{ID: sink.ID()}
+	restore.ShutdownCh = r.shutdownCh
+	restore.init()
+	select {
+	case r.fsmMutateCh <- restore:
+	case <-r.shutdownCh:
+		return ErrRaftShutdown
+	}
+	if err := restore.Error(); err != nil {
+		panic(fmt.Errorf("failed to restore snapshot: %v", err))
+	}
+
+	// We set the last log so it looks like we've stored the empty
+	// index we burned. The last applied is set because we made the
+	// FSM take the snapshot state, and we store the last snapshot
+	// in the stable store since we created a snapshot as part of
+	// this process.
+	r.setLastLog(lastIndex, term)
+	r.setLastApplied(lastIndex)
+	r.setLastSnapshot(lastIndex, term)
+
+	klog.Infof(fmt.Sprintf("restored user snapshot from index:%d", latestIndex))
 	return nil
 }
