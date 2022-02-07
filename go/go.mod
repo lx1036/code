@@ -77,6 +77,8 @@ require (
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.15.0
+	github.com/opencontainers/go-digest v1.0.0
+	github.com/opencontainers/image-spec v1.0.1
 	github.com/opencontainers/runc v1.0.0-rc93
 	github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 	github.com/operator-framework/operator-sdk v0.17.1
@@ -268,8 +270,6 @@ require (
 	github.com/mrunalp/fileutils v0.5.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
-	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/selinux v1.8.0 // indirect
 	github.com/pelletier/go-toml v1.9.3 // indirect
 	github.com/pierrec/lz4 v2.0.5+incompatible // indirect
