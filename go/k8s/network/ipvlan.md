@@ -56,3 +56,4 @@ https://docs.cilium.io/en/stable/operations/upgrade/#deprecated-options
 **[Docker: Use IPvlan networks](https://docs.docker.com/network/ipvlan/)**
 **[Docker: Use macvlan networks](https://docs.docker.com/network/macvlan/)**
 **[书籍：Kubernetes 网络权威指南 1.8-1.9 小节]**
+**[Terway IPVlan in Cilium](https://github.com/cilium/cilium/pull/10251)**
