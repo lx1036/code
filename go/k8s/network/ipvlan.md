@@ -16,6 +16,31 @@ ipvlan 有两种不同的模式：L2 和 L3。
 
 ### L2 模式
 
+```shell
+ip netns add ns0
+ip netns add ns1
+
+ip link add link eth0 ipvl0 type ipvlan mode l2
+ip link add link eth0 ipvl1 type ipvlan mode l2
+
+ip link set dev ipvl0 netns ns0
+ip link set dev ipvl1 netns ns1
+
+# For ns0
+ip netns exec ns0 bash
+ip link set dev ipvl0 up
+ip link set dev lo up
+ip -4 addr add 127.0.0.1 dev lo
+ip -4 addr add $IPADDR dev ipvl0
+ip -4 route add default via $ROUTER dev ipvl0
+# For ns1
+ip netns exec ns1 bash
+ip link set dev ipvl1 up
+ip link set dev lo up
+ip -4 addr add 127.0.0.1 dev lo
+ip -4 addr add $IPADDR dev ipvl1
+ip -4 route add default via $ROUTER dev ipvl1
+```
 
 ### L3 模式
 
@@ -29,7 +54,7 @@ sudo ip link add ipv2 link eth0 type ipvlan mode l3
 # 移动网卡到对应的 ns
 sudo ip link set ipv1 netns net1
 sudo ip link set ipv2 netns net2
-sudo ip netns exec net1 ip link set ipv1 up
+sudo ip netns exec net1 ip link set ipv1 up # ip netns exec net1 bash
 sudo ip netns exec net2 ip link set ipv2 up
 # 配置 ip 地址和默认路由
 sudo ip netns exec net1 ip addr add 10.0.1.10/24 dev ipv1
