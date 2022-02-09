@@ -21,6 +21,7 @@ metadata:
   namespace: kube-system
 data:
 
+  # @see https://docs.cilium.io/en/stable/gettingstarted/k8s-install-external-etcd
   # Identity allocation mode selects how identities are shared between cilium
   # nodes by setting how they are stored. The options are "crd" or "kvstore".
   # - "crd" stores identities in kubernetes as CRDs (custom resource definition).
@@ -151,6 +152,16 @@ data:
   enable-endpoint-routes: 'true' # "Use per endpoint routes instead of routing via cilium_host"
 
   node-port-mode: "dsr"
+
+  # If you want metrics enabled in cilium-operator, set the port for
+  # which the Cilium Operator will have their metrics exposed.
+  # NOTE that this will open the port on the nodes where Cilium operator pod
+  # is scheduled.
+  operator-prometheus-serve-addr: ":6942"
+  enable-metrics: "true"
+
+  # @see https://docs.cilium.io/en/stable/concepts/kubernetes/ciliumendpointslice/
+  enable-cilium-endpoint-slice: "true"
 ---
 # Source: cilium/charts/agent/templates/clusterrole.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -217,13 +228,23 @@ rules:
     resources:
       - ciliumnetworkpolicies
       - ciliumnetworkpolicies/status
+      - ciliumnetworkpolicies/finalizers
       - ciliumclusterwidenetworkpolicies
       - ciliumclusterwidenetworkpolicies/status
+      - ciliumclusterwidenetworkpolicies/finalizers
       - ciliumendpoints
       - ciliumendpoints/status
+      - ciliumendpoints/finalizers
       - ciliumnodes
       - ciliumnodes/status
+      - ciliumnodes/finalizers
       - ciliumidentities
+      - ciliumendpointslices
+      - ciliumidentities/status
+      - ciliumidentities/finalizers
+      - ciliumlocalredirectpolicies
+      - ciliumlocalredirectpolicies/status
+      - ciliumlocalredirectpolicies/finalizers
     verbs:
       - '*'
 ---
@@ -265,6 +286,13 @@ rules:
       - list
       - watch
   - apiGroups:
+      - ""
+    resources:
+      # to perform LB IP allocation for BGP
+      - services/status
+    verbs:
+      - update
+  - apiGroups:
       - cilium.io
     resources:
       - ciliumnetworkpolicies
@@ -287,6 +315,22 @@ rules:
       - get
       - list
       - watch
+      - create
+      - update
+  # For cilium-operator running in HA mode.
+  #
+  # Cilium operator running in HA mode requires the use of ResourceLock for Leader Election
+  # between multiple running instances.
+  # The preferred way of doing this is to use LeasesResourceLock as edits to Leases are less
+  # common and fewer objects in the cluster watch "all Leases".
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - update
 ---
 # Source: cilium/charts/agent/templates/clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -430,7 +474,7 @@ spec:
               key: custom-cni-conf
               name: cilium-config
               optional: true
-        image: "quay.io/cilium/cilium:v1.10.1"
+        image: "quay.io/cilium/cilium:v1.11.1"
         imagePullPolicy: IfNotPresent
         lifecycle:
           postStart:
@@ -493,7 +537,7 @@ spec:
               key: wait-bpf-mount
               name: cilium-config
               optional: true
-        image: "quay.io/cilium/cilium:v1.10.1"
+        image: "quay.io/cilium/cilium:v1.11.1"
         imagePullPolicy: IfNotPresent
         name: clean-cilium-state
         securityContext:
@@ -629,7 +673,7 @@ spec:
               key: AWS_DEFAULT_REGION
               name: cilium-aws
               optional: true
-        image: "quay.io/cilium/operator:v1.10.1"
+        image: "quay.io/cilium/operator:v1.11.1"
         imagePullPolicy: IfNotPresent
         name: cilium-operator
         livenessProbe:
