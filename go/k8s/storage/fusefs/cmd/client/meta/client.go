@@ -58,7 +58,7 @@ const (
 type JsonResponse struct {
 	Code int32  `json:"code"`
 	Msg  string `json:"msg"`
-	Data json.RawMessage
+	Data json.RawMessage `json:"data"`
 }
 
 type MetaClient struct {
@@ -317,6 +317,8 @@ func (metaClient *MetaClient) GetInode(inodeID fuseops.InodeID) (*proto.InodeInf
 		return nil, err
 	}
 
+	// TODO: packet TCP 这块可以使用 grpc pb 来标准化
+	
 	conn, err := net.Dial("tcp", parentPartition.LeaderAddr)
 	if err != nil {
 		return nil, err
