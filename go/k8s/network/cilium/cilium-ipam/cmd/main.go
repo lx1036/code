@@ -7,7 +7,6 @@ import (
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/ippool"
 
 	ciliumClientSet "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned"
-	"github.com/cilium/ipam"
 	"github.com/projectcalico/calico/libcalico-go/lib/options"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"

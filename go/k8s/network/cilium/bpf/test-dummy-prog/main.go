@@ -1,10 +1,7 @@
-
 //go:build linux
 // +build linux
 
-
 package main
-
 
 import (
 	"fmt"
@@ -89,7 +86,7 @@ func (t ProgType) String() string {
 	case ProgTypeSkReusePort:
 		return "Socket SO_REUSEPORT"
 	}
-	
+
 	return "Unknown"
 }
 
@@ -116,7 +113,7 @@ const (
 	BPF_BTF_LOAD            = 18
 	BPF_BTF_GET_FD_BY_ID    = 19
 	BPF_TASK_FD_QUERY       = 20
-	
+
 	// BPF syscall attach types
 	BPF_CGROUP_INET_INGRESS      = 0
 	BPF_CGROUP_INET_EGRESS       = 1
@@ -143,24 +140,24 @@ const (
 	BPF_CGROUP_INET6_GETPEERNAME = 30
 	BPF_CGROUP_INET4_GETSOCKNAME = 31
 	BPF_CGROUP_INET6_GETSOCKNAME = 32
-	
+
 	// Flags for BPF_MAP_UPDATE_ELEM. Must match values from linux/bpf.h
 	BPF_ANY     = 0
 	BPF_NOEXIST = 1
 	BPF_EXIST   = 2
-	
+
 	// Flags for BPF_MAP_CREATE. Must match values from linux/bpf.h
 	BPF_F_NO_PREALLOC   = 1 << 0
 	BPF_F_NO_COMMON_LRU = 1 << 1
 	BPF_F_NUMA_NODE     = 1 << 2
-	
+
 	// Flags for BPF_PROG_QUERY
 	BPF_F_QUERY_EFFECTVE = 1 << 0
-	
+
 	// Flags for accessing BPF object
 	BPF_F_RDONLY = 1 << 3
 	BPF_F_WRONLY = 1 << 4
-	
+
 	// Flag for stack_map, store build_id+offset instead of pointer
 	BPF_F_STACK_BUILD_ID = 1 << 5
 )
@@ -251,20 +248,20 @@ func TestDummyProg(progType ProgType, attachType uint32) error {
 		ret, _, errno := unix.Syscall(unix.SYS_BPF, BPF_PROG_ATTACH,
 			uintptr(unsafe.Pointer(&bpfAttr)),
 			unsafe.Sizeof(bpfAttr))
-		
+
 		if int(ret) < 0 && errno != unix.EBADF {
 			klog.Infof(fmt.Sprintf("err: %s", errno.Error())) // err: invalid argument
-			
+
 			return errno
 		}
 		return nil
 	}
-	
+
 	klog.Infof(fmt.Sprintf("err: %s", errno.Error()))
-	
+
 	runtime.KeepAlive(&insns)
 	runtime.KeepAlive(&license)
 	runtime.KeepAlive(&bpfAttr)
-	
+
 	return errno
 }
