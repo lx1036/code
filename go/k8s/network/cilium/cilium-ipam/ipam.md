@@ -65,3 +65,7 @@ spec:
     - 20.216.255.0/24
 
 ```
+
+
+# 参考文献
+**[腾讯云自定义 Cilium IPAM](https://mp.weixin.qq.com/s/l0kGo4Fb9NTfLgjQrt88pg)**

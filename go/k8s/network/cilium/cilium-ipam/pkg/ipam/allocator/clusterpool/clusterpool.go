@@ -54,7 +54,7 @@ func (a *AllocatorOperator) Start(ctx context.Context, updater ipam.CiliumNodeGe
 	return nodeManager, nil
 }
 
-func newCIDRSets(isV6 bool, strCIDRs []string, maskSize int) ([]podcidr.CIDRAllocator, error) {
+func NewCIDRSets(isV6 bool, strCIDRs []string, maskSize int) ([]podcidr.CIDRAllocator, error) {
 	cidrAllocators := make([]podcidr.CIDRAllocator, 0, len(strCIDRs))
 	for _, strCIDR := range strCIDRs {
 		addr, cidr, err := net.ParseCIDR(strCIDR)

@@ -3,10 +3,15 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/cilium/cilium/pkg/ipam/allocator/podcidr"
+	"github.com/cilium/cilium/pkg/revert"
+	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/ipam/allocator/clusterpool"
 
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/ippool"
 
+	ciliumv2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	ciliumClientSet "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned"
+	"github.com/cilium/ipam/cidrset"
 	"github.com/projectcalico/calico/libcalico-go/lib/options"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -43,8 +48,25 @@ func main() {
 
 	for _, node := range nodeList.Items {
 		cidrs := ippool.DetermineEnabledIPPoolCIDRs(node, *ippoolList)
+		cidrAllocators, err := clusterpool.NewCIDRSets(false, cidrs, 27)
+		if err != nil {
+			klog.Fatal(err)
+		}
+
+		_, v4CIDR, err := allocateFirstFreeCIDR(cidrAllocators)
+
 	}
 
+	// create CiliumNode
+	cn := &ciliumv2.CiliumNode{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+		},
+		Spec: ciliumv2.NodeSpec{},
+	}
 	ciliumClient := ciliumClientSet.NewForConfigOrDie(restConfig)
-	ciliumClient.CiliumV2().CiliumNodes().Create()
+	_, err = ciliumClient.CiliumV2().CiliumNodes().Create(context.TODO(), cn, metav1.CreateOptions{})
+	if err != nil {
+		klog.Fatal(err)
+	}
 }
