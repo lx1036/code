@@ -20,13 +20,13 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// INFO: https://chubaofs.readthedocs.io/zh_CN/latest/design/client.html
+// INFO: https://cubefs.readthedocs.io/zh_CN/latest/design/client.html
 // go run . --config=./fuse.json
 // 检查：df -h globalmount
 // 调用 stat 接口：stat globalmount
 
 // debug in local: Working Directory 设置 /Users/liuxiang/Code/lx1036/code/go/k8s/storage/fusefs/cmd/client/cmd
-// 关闭时直接执行，进程优雅关闭：`umount globalmount`
+// 关闭时直接执行，进程优雅关闭：`umount globalmount` 或者 `fusermount -u globalmount`
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()

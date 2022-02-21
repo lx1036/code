@@ -11,7 +11,6 @@ import (
 	taskpb "github.com/containerd/containerd/api/services/tasks/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -46,7 +45,7 @@ func New(address string) (*Client, error) {
 	}
 	clientOps := []grpc.DialOption{
 		grpc.WithBlock(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		//grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithConnectParams(connParams),
 		//grpc.WithContextDialer(dialer.ContextDialer),

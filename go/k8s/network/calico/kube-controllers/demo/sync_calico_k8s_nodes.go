@@ -3,16 +3,16 @@ package main
 import (
 	"context"
 	"flag"
-	apisv3 "github.com/projectcalico/libcalico-go/lib/apis/v3"
-	"github.com/projectcalico/libcalico-go/lib/errors"
-	"github.com/projectcalico/libcalico-go/lib/options"
+	apisv3 "github.com/projectcalico/calico/libcalico-go/lib/apis/v3"
+	"github.com/projectcalico/calico/libcalico-go/lib/errors"
+	"github.com/projectcalico/calico/libcalico-go/lib/options"
 	"os"
 	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/projectcalico/libcalico-go/lib/apiconfig"
-	//client "github.com/projectcalico/libcalico-go/lib/clientv3"
+	"github.com/projectcalico/calico/libcalico-go/lib/apiconfig"
+	//client "github.com/projectcalico/calico/libcalico-go/lib/clientv3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
