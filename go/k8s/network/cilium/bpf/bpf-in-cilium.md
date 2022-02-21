@@ -136,5 +136,7 @@ yum install -y bpftool
 
 **[Cilium：BPF 和 XDP 参考指南](http://arthurchiao.art/blog/cilium-bpf-xdp-reference-guide-zh/)**
 
+**[cilium && cgroup ebpf](https://speakerdeck.com/rueian/cilium-and-cgroup-ebpf)**
+
 ## 常见缩写
 ELF: executable and linkable format

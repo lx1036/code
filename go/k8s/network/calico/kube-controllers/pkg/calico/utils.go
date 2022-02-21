@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"net"
 
-	"github.com/projectcalico/libcalico-go/lib/backend/model"
+	"github.com/projectcalico/calico/libcalico-go/lib/backend/model"
 )
 
 func OrdinalToIP(b *model.AllocationBlock, ord int) net.IP {
