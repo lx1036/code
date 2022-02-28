@@ -1,5 +1,10 @@
 
 # ARP in Cilium
+```shell
+# 抓包arp协议
+tcpdump -i eth0 -nnee arp and host 20.206.230.25
+tcpdump -i eth0 -nnee arp
+```
 解决的问题：
 
 
