@@ -6,7 +6,7 @@ import (
 	"math"
 	"net"
 
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/config"
+	"k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/config"
 )
 
 // poolFor returns the pool that owns the requested IP, or "" if none.

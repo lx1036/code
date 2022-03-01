@@ -2,13 +2,13 @@ package speaker
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/k8s/types"
+	"k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/k8s/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"net"
 
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/bgp"
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/config"
+	"k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/bgp"
+	"k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/config"
 )
 
 // A Protocol can advertise an IP address.

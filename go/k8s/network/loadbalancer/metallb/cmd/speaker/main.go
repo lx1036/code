@@ -3,12 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/k8s/types"
+	"k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/k8s/types"
 	"os"
 	"path/filepath"
 
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/config"
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/speaker"
+	"k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/config"
+	"k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/speaker"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

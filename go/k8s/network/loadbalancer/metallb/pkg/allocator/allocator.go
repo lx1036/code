@@ -7,7 +7,7 @@ import (
 	"net"
 	"strings"
 
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/config"
+	"k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/config"
 )
 
 // An Allocator tracks IP address pools and allocates addresses from them.

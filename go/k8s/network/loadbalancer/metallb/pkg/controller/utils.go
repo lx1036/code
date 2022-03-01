@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/allocator"
+	"k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/allocator"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )

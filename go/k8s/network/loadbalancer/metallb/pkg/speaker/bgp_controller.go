@@ -2,8 +2,8 @@ package speaker
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/bgp"
-	"k8s-lx1036/k8s/network/cilium/metallb/pkg/config"
+	"k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/bgp"
+	"k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
