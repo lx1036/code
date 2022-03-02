@@ -1,21 +1,21 @@
 
 
 # Kube-Router
-Kube-Router CNI: https://github.com/cloudnativelabs/kube-router
+Kube-Router CNI: https://github.com/cloudnativelabs/kube-router https://kube-router.io/
 
-## BGP
+## Features
+(1) IPVS/LVS Service Proxy
+(2) Pod/ServiceIP Networking with BGP: gobgp BGP 包来宣告 pod cidr 和 ServiceIP/ExternalIP service
+(3) Network Policy: ipsets with iptables 来实现的
+
+### IPVS/LVS Service Proxy
+kube-router 使用 IPVS 直接做 NodePort/ClusterIP service，这样岂不是不需要 kube-proxy？
+@see demo: https://asciinema.org/a/120312 
+
+
+### Pod/ServiceIP Networking with BGP
 kube-router 使用 gobgp 包来实现 BGP 宣告路由，并且支持宣告 ClusterIP/ExternalIP 给交换机。这个功能很重要!!!
-
-## IPAM
-kube-router 没有自己的 IPAM 来管理各个 node 的 pod subnet，而是使用了 kube-controller-manager IPAM 分配给各个 node 的 pod subnet。这个很重要!!!
-
-## Troubleshot
-(1) kube-router 有没有自己的 IPAM 来管理 service ip from service cidr 的分配？
-
-
-
-
-# 笔记
+IPAM: kube-router 没有自己的 IPAM 来管理各个 node 的 pod subnet，而是使用了 kube-controller-manager IPAM 分配给各个 node 的 pod subnet。这个很重要!!!
 
 (1) 获取 node 上的 pod cidr
 ```shell
@@ -41,6 +41,21 @@ kubectl get nodes -o json | jq '.items[] | .spec'
 #}
 
 ```
+
+
+### Network Policy
+kube-router 使用 iptables 来实现 NetworkPolicy。
+
+
+
+
+## Troubleshot
+(1) kube-router 有没有自己的 IPAM 来管理 service ip from service cidr 的分配？
+
+
+
+
+# 笔记
 
 (2) bridge-nf
 https://feisky.gitbooks.io/sdn/content/linux/params.html#bridge-nf
