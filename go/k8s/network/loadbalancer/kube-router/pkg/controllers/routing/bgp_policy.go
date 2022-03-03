@@ -6,7 +6,7 @@ import (
 	"k8s-lx1036/k8s/network/loadbalancer/kube-router/pkg/utils"
 	"k8s.io/apimachinery/pkg/labels"
 	"reflect"
-	
+
 	gobgpapi "github.com/osrg/gobgp/api"
 	"k8s.io/klog/v2"
 )
@@ -19,42 +19,42 @@ func (controller *NetworkRoutingController) AddPolicies() error {
 	if err != nil {
 		klog.Errorf("Failed to add `podcidrdefinedset` defined set: %s", err)
 	}
-	
+
 	err = controller.syncServiceVIPsDefinedSet()
 	if err != nil {
 		klog.Errorf("Failed to add `servicevipsdefinedset` defined set: %s", err)
 	}
-	
+
 	err = controller.syncDefaultRouteDefinedSet()
 	if err != nil {
 		klog.Errorf("Failed to add `defaultroutedefinedset` defined set: %s", err)
 	}
-	
+
 	iBGPPeerCIDRs, err := controller.addiBGPPeersDefinedSet()
 	if err != nil {
 		klog.Errorf("Failed to add `iBGPpeerset` defined set: %s", err)
 	}
-	
+
 	externalBGPPeerCIDRs, err := controller.addExternalBGPPeersDefinedSet()
 	if err != nil {
 		klog.Errorf("Failed to add `externalpeerset` defined set: %s", err)
 	}
-	
+
 	err = controller.addAllBGPPeersDefinedSet(iBGPPeerCIDRs, externalBGPPeerCIDRs)
 	if err != nil {
 		klog.Errorf("Failed to add `allpeerset` defined set: %s", err)
 	}
-	
+
 	err = controller.addExportPolicies()
 	if err != nil {
 		return err
 	}
-	
+
 	err = controller.addImportPolicies()
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -71,13 +71,13 @@ func (controller *NetworkRoutingController) syncPodCidrDefinedSet() error {
 	if err != nil {
 		return err
 	}
-	
+
 	if currentDefinedSet == nil {
 		_, mask, err := controller.splitPodCidr()
 		if err != nil {
 			return err
 		}
-		
+
 		return controller.bgpServer.AddDefinedSet(context.TODO(), &gobgpapi.AddDefinedSetRequest{
 			DefinedSet: &gobgpapi.DefinedSet{
 				DefinedType: gobgpapi.DefinedType_PREFIX,
@@ -92,7 +92,7 @@ func (controller *NetworkRoutingController) syncPodCidrDefinedSet() error {
 			},
 		})
 	}
-	
+
 	return nil
 }
 
@@ -109,7 +109,7 @@ func (controller *NetworkRoutingController) syncServiceVIPsDefinedSet() error {
 	if err != nil {
 		return err
 	}
-	
+
 	advIPPrefixList := make([]*gobgpapi.Prefix, 0)
 	advIps, _, _ := controller.getAllVIPs()
 	for _, ip := range advIps {
@@ -129,11 +129,11 @@ func (controller *NetworkRoutingController) syncServiceVIPsDefinedSet() error {
 			},
 		})
 	}
-	
+
 	if reflect.DeepEqual(advIPPrefixList, currentDefinedSet.Prefixes) {
 		return nil
 	}
-	
+
 	// sync DefinedSet
 	toAdd := make([]*gobgpapi.Prefix, 0)
 	toDelete := make([]*gobgpapi.Prefix, 0)
@@ -182,7 +182,7 @@ func (controller *NetworkRoutingController) syncServiceVIPsDefinedSet() error {
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -200,7 +200,7 @@ func (controller *NetworkRoutingController) syncDefaultRouteDefinedSet() error {
 	if err != nil {
 		return err
 	}
-	
+
 	if currentDefinedSet == nil {
 		cidrLen := 0
 		return controller.bgpServer.AddDefinedSet(context.Background(), &gobgpapi.AddDefinedSetRequest{
@@ -217,7 +217,7 @@ func (controller *NetworkRoutingController) syncDefaultRouteDefinedSet() error {
 			},
 		})
 	}
-	
+
 	return nil
 }
 
@@ -226,7 +226,7 @@ func (controller *NetworkRoutingController) addiBGPPeersDefinedSet() ([]string, 
 	if !controller.enableIBGP {
 		return iBGPPeerCIDRs, nil
 	}
-	
+
 	definedsetName := "iBGPpeerset"
 	// Get the current list of the nodes from the local cache
 	nodes, err := controller.nodeLister.List(labels.Everything())
@@ -241,7 +241,7 @@ func (controller *NetworkRoutingController) addiBGPPeersDefinedSet() ([]string, 
 		}
 		iBGPPeerCIDRs = append(iBGPPeerCIDRs, fmt.Sprintf("%s/32", nodeIP.String()))
 	}
-	
+
 	var currentDefinedSet *gobgpapi.DefinedSet
 	err = controller.bgpServer.ListDefinedSet(context.Background(),
 		&gobgpapi.ListDefinedSetRequest{
@@ -265,7 +265,7 @@ func (controller *NetworkRoutingController) addiBGPPeersDefinedSet() ([]string, 
 		})
 		return iBGPPeerCIDRs, err
 	}
-	
+
 	if reflect.DeepEqual(iBGPPeerCIDRs, currentDefinedSet.List) {
 		return iBGPPeerCIDRs, nil
 	}
@@ -315,7 +315,7 @@ func (controller *NetworkRoutingController) addiBGPPeersDefinedSet() ([]string, 
 	if err != nil {
 		return iBGPPeerCIDRs, err
 	}
-	
+
 	return iBGPPeerCIDRs, nil
 }
 
@@ -333,7 +333,7 @@ func (controller *NetworkRoutingController) addExternalBGPPeersDefinedSet() ([]s
 	if err != nil {
 		return externalBGPPeerCIDRs, err
 	}
-	
+
 	if len(controller.globalPeerRouters) > 0 {
 		for _, peer := range controller.globalPeerRouters {
 			externalBgpPeers = append(externalBgpPeers, peer.Conf.NeighborAddress)
@@ -345,7 +345,7 @@ func (controller *NetworkRoutingController) addExternalBGPPeersDefinedSet() ([]s
 	for _, peer := range externalBgpPeers {
 		externalBGPPeerCIDRs = append(externalBGPPeerCIDRs, peer+"/32")
 	}
-	
+
 	if currentDefinedSet == nil {
 		err = controller.bgpServer.AddDefinedSet(context.Background(), &gobgpapi.AddDefinedSetRequest{
 			DefinedSet: &gobgpapi.DefinedSet{
@@ -356,7 +356,7 @@ func (controller *NetworkRoutingController) addExternalBGPPeersDefinedSet() ([]s
 		})
 		return externalBGPPeerCIDRs, err
 	}
-	
+
 	return externalBGPPeerCIDRs, nil
 }
 
@@ -381,7 +381,7 @@ func (controller *NetworkRoutingController) addAllBGPPeersDefinedSet(iBGPPeerCID
 		}
 		return controller.bgpServer.AddDefinedSet(context.Background(), &gobgpapi.AddDefinedSetRequest{DefinedSet: allPeerNS})
 	}
-	
+
 	toAdd := make([]string, 0)
 	toDelete := make([]string, 0)
 	for _, peer := range allBgpPeers {
@@ -447,7 +447,7 @@ func (controller *NetworkRoutingController) addExportPolicies() error {
 	const policyName = "kube_router_export"
 	statements := make([]*gobgpapi.Statement, 0)
 	var bgpActions gobgpapi.Actions
-	
+
 	if controller.enableIBGP {
 		actions := gobgpapi.Actions{
 			RouteAction: gobgpapi.RouteAction_ACCEPT,
@@ -471,13 +471,13 @@ func (controller *NetworkRoutingController) addExportPolicies() error {
 				Actions: &actions,
 			})
 	}
-	
+
 	if len(controller.globalPeerRouters) > 0 {
 		bgpActions.RouteAction = gobgpapi.RouteAction_ACCEPT
 		if controller.overrideNextHop {
 			bgpActions.Nexthop = &gobgpapi.NexthopAction{Self: true}
 		}
-		
+
 		// set BGP communities for the routes advertised to peers for VIPs
 		if len(controller.nodeCommunities) > 0 {
 			bgpActions.Community = &gobgpapi.CommunityAction{
@@ -485,7 +485,7 @@ func (controller *NetworkRoutingController) addExportPolicies() error {
 				Communities: controller.nodeCommunities,
 			}
 		}
-		
+
 		// statement to represent the export policy to permit advertising cluster IP's
 		// only to the global BGP peer or node specific BGP peer
 		statements = append(statements, &gobgpapi.Statement{
@@ -501,7 +501,7 @@ func (controller *NetworkRoutingController) addExportPolicies() error {
 			},
 			Actions: &bgpActions,
 		})
-		
+
 		if controller.advertisePodCidr {
 			actions := gobgpapi.Actions{
 				RouteAction: gobgpapi.RouteAction_ACCEPT,
@@ -531,7 +531,7 @@ func (controller *NetworkRoutingController) addExportPolicies() error {
 			})
 		}
 	}
-	
+
 	definition := gobgpapi.Policy{
 		Name:       policyName,
 		Statements: statements,
@@ -551,7 +551,7 @@ func (controller *NetworkRoutingController) addExportPolicies() error {
 			return fmt.Errorf(fmt.Sprintf("Failed to add policy: %v", err))
 		}
 	}
-	
+
 	policyAssignmentExists := false
 	err = controller.bgpServer.ListPolicyAssignment(context.Background(), &gobgpapi.ListPolicyAssignmentRequest{
 		Name:      "global",
@@ -578,6 +578,6 @@ func (controller *NetworkRoutingController) addExportPolicies() error {
 			return fmt.Errorf(fmt.Sprintf("Failed to add policy assignment: %v", err))
 		}
 	}
-	
+
 	return nil
 }

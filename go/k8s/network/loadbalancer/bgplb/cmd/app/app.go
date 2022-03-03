@@ -3,14 +3,14 @@ package app
 import (
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/cmd/app/options"
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/controller"
-	
+
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 )
 
 func NewBGPLBCommand(stopCh <-chan struct{}) *cobra.Command {
 	opts := options.NewOptions()
-	
+
 	cmd := &cobra.Command{
 		Short: "Launch bgplb",
 		Long:  "Launch bgplb",
@@ -22,7 +22,7 @@ func NewBGPLBCommand(stopCh <-chan struct{}) *cobra.Command {
 		},
 	}
 	opts.Flags(cmd)
-	
+
 	return cmd
 }
 
@@ -36,9 +36,9 @@ func runCommand(option *options.Options, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	
+
 	<-stopCh
-	
+
 	// INFO: 这里做了queue清理工作，可以借鉴下，不过不是很重要
 	klog.Info("Shutting down the etcd cluster")
 	bgpLBController.Stop()

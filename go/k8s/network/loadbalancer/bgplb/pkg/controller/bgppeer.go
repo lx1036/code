@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
-	
+
 	v1 "k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/apis/bgplb.k9s.io/v1"
-	
+
 	gobgpapi "github.com/osrg/gobgp/api"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -15,19 +15,19 @@ import (
 func (controller *BgpLBController) onBGPPeerAdd(obj interface{}) {
 	peer := obj.(*v1.BgpPeer)
 	klog.Infof("bgpPeer %s/%s was added, enqueuing it for submission", peer.Namespace, peer.Name)
-	
+
 	//filter peer with nodeSelector
 	if peer.Spec.NodeSelector != nil {
-	
+
 	}
-	
+
 	clone := peer.DeepCopy()
 	bgpPeer, err := convertToBgpPeer(clone)
 	if err != nil {
 		klog.Error(err)
 		return
 	}
-	
+
 	err = controller.bgpServer.AddPeer(context.Background(), &gobgpapi.AddPeerRequest{
 		Peer: bgpPeer,
 	})
@@ -55,7 +55,7 @@ func (controller *BgpLBController) onBGPPeerDelete(obj interface{}) {
 			return
 		}
 	}
-	
+
 	if peer != nil {
 		clone := peer.DeepCopy()
 		bgpPeer, err := convertToBgpPeer(clone)
@@ -63,7 +63,7 @@ func (controller *BgpLBController) onBGPPeerDelete(obj interface{}) {
 			klog.Error(err)
 			return
 		}
-		
+
 		err = controller.bgpServer.DeletePeer(context.TODO(), &gobgpapi.DeletePeerRequest{
 			Address:   bgpPeer.Conf.NeighborAddress,
 			Interface: bgpPeer.Conf.NeighborInterface,
@@ -86,7 +86,7 @@ func defaultFamily(ip net.IP) *v1.Family {
 			Safi: "SAFI_UNICAST",
 		}
 	}
-	
+
 	return family
 }
 
@@ -109,11 +109,11 @@ func convertToBgpPeer(peer *v1.BgpPeer) (*gobgpapi.Peer, error) {
 			},
 		})
 	}
-	
+
 	bgpPeer, err := peer.Spec.ConvertToGoBgpPeer()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return bgpPeer, nil
 }

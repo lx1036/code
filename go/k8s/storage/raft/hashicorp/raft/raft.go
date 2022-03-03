@@ -18,6 +18,10 @@ var (
 	keyLastVoteCandidate = []byte("LastVoteCandidate")
 )
 
+const (
+	minCheckInterval = 10 * time.Millisecond
+)
+
 // leaderState is state that is used while we are a leader.
 type leaderState struct {
 	leadershipTransferInProgress int32 // indicates that a leadership transfer is in progress.
@@ -558,6 +562,10 @@ func (r *Raft) runLeader() {
 	// of peers.
 	stepDown := false
 
+	// This is only used for the first lease check, we reload lease below
+	// based on the current config value.
+	lease := time.After(r.config().LeaderLeaseTimeout)
+
 	for r.getState() == Leader {
 		select {
 		case c := <-r.configurationsCh:
@@ -664,6 +672,18 @@ func (r *Raft) runLeader() {
 		// INFO: @see handleStaleTerm()
 		case <-r.leaderState.stepDown:
 			r.setState(Follower)
+
+		case <-lease: // INFO: leader 定时检查所有 Follower 的 LastContact，看看是否达到法定票数
+			// Check if we've exceeded the lease, potentially stepping down
+			maxDiff := r.checkLeaderLease()
+			// Next check interval should adjust for the last node we've
+			// contacted, without going negative
+			checkInterval := r.config().LeaderLeaseTimeout - maxDiff
+			if checkInterval < minCheckInterval {
+				checkInterval = minCheckInterval
+			}
+			// Renew the lease timer
+			lease = time.After(checkInterval)
 
 		case <-r.shutdownCh:
 			return
@@ -805,6 +825,51 @@ func (r *Raft) startReplication() {
 		delete(r.leaderState.replState, serverID)
 		r.observe(PeerObservation{Peer: repl.peer, Removed: true})
 	}
+}
+
+// checkLeaderLease is used to check if we can contact a quorum of nodes
+// within the last leader lease interval. If not, we need to step down,
+// as we may have lost connectivity. Returns the maximum duration without
+// contact. This must only be called from the main thread.
+// INFO: 注意返回时间是所有Follower中Max(now-LastContact)
+func (r *Raft) checkLeaderLease() time.Duration {
+	// Track contacted nodes, we can always contact ourself
+	contacted := 0
+	now := time.Now()
+	// Store lease timeout for this one check invocation as we need to refer to it
+	// in the loop and would be confusing if it ever becomes reloadable and
+	// changes between iterations below.
+	leaseTimeout := r.config().LeaderLeaseTimeout
+	var maxDiff time.Duration
+	for _, server := range r.configurations.latest.Servers {
+		if server.Suffrage == Voter {
+			if server.ID == r.localID {
+				contacted++
+				continue
+			}
+			f := r.leaderState.replState[server.ID]
+			diff := now.Sub(f.LastContact())
+			if diff <= leaseTimeout {
+				contacted++
+				if diff > maxDiff {
+					maxDiff = diff
+				}
+			} else {
+				klog.Warningf(fmt.Sprintf("failed to contact server:%s/%s, and interval is %dms",
+					server.ID, server.Address, diff.Milliseconds()))
+			}
+		}
+	}
+
+	// Verify we can contact a quorum
+	quorum := r.quorumSize()
+	if contacted < quorum {
+		klog.Warningf(fmt.Sprintf("failed to contact quorum of nodes for server:%s/%s, stepping down from leader to follower",
+			r.localID, r.localAddr))
+		r.setState(Follower)
+	}
+
+	return maxDiff
 }
 
 func (r *Raft) config() Config {
