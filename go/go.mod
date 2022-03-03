@@ -56,7 +56,7 @@ require (
 	github.com/hashicorp/go-hclog v1.0.0
 	github.com/hashicorp/go-msgpack v0.5.5
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/hashicorp/raft v1.3.3
+	github.com/hashicorp/raft v1.3.6
 	github.com/jacobsa/oglematchers v0.0.0-20150720000706-141901ea67cd
 	github.com/jacobsa/syncutil v0.0.0-20180201203307-228ac8e5a6c3
 	github.com/jessevdk/go-flags v1.5.0
@@ -160,7 +160,6 @@ require (
 )
 
 require (
-	github.com/containerd/go-cni v1.1.3 // indirect
 	github.com/go-kit/kit v0.12.0 // indirect
 	github.com/go-kit/log v0.2.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
