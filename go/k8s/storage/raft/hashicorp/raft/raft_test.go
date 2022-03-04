@@ -542,7 +542,7 @@ LOOP:
 
 	// Verify no further contact
 	last := follower.LastContact()
-	time.Sleep(cluster.propagateTimeout)
+	time.Sleep(time.Second * 3)
 
 	// Check that last contact has not changed
 	if last != follower.LastContact() {

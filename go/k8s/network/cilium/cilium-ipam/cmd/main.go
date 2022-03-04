@@ -3,16 +3,12 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/cilium/cilium/pkg/ipam/allocator/podcidr"
-	"github.com/cilium/cilium/pkg/revert"
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/ipam/allocator/clusterpool"
-
+	
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/ippool"
-
+	
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	ciliumClientSet "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned"
-	"github.com/cilium/ipam/cidrset"
-	"github.com/projectcalico/calico/libcalico-go/lib/options"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -25,7 +21,7 @@ func main() {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
 	)
 	flag.Parse()
-
+	
 	restConfig, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		klog.Fatal(err)
@@ -34,29 +30,29 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-
+	
 	nodeList, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		klog.Fatal(err)
 	}
-
+	
 	_, calicoClient := ippool.CreateCalicoClient(*kubeconfig)
 	ippoolList, err := calicoClient.IPPools().List(context.TODO(), options.ListOptions{})
 	if err != nil {
 		klog.Fatal(err)
 	}
-
+	
 	for _, node := range nodeList.Items {
 		cidrs := ippool.DetermineEnabledIPPoolCIDRs(node, *ippoolList)
 		cidrAllocators, err := clusterpool.NewCIDRSets(false, cidrs, 27)
 		if err != nil {
 			klog.Fatal(err)
 		}
-
+		
 		_, v4CIDR, err := allocateFirstFreeCIDR(cidrAllocators)
-
+		
 	}
-
+	
 	// create CiliumNode
 	cn := &ciliumv2.CiliumNode{
 		ObjectMeta: metav1.ObjectMeta{
