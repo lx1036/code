@@ -487,3 +487,73 @@ func TestRaftSnapshotAndRestore(test *testing.T) {
 		})
 	}
 }
+
+func TestCheckLeaderLease(test *testing.T) {
+	cluster := NewCluster(&ClusterConfig{
+		Peers: []string{
+			"1/127.0.0.1:7000",
+			"2/127.0.0.1:8000",
+		},
+		Bootstrap: true,
+	})
+	defer cluster.Close()
+
+	time.Sleep(time.Second * 3)
+
+	leader := cluster.Leader()
+	// Wait until we have a follower
+	limit := time.Now().Add(cluster.longstopTimeout)
+	var followers []*Raft
+	for time.Now().Before(limit) && len(followers) != 1 {
+		cluster.WaitEvent(nil, cluster.conf.CommitTimeout)
+		followers = cluster.GetInState(Follower)
+	}
+	if len(followers) != 1 {
+		test.Fatalf("expected a followers: %v", followers)
+	}
+
+	// Disconnect the follower now
+	follower := followers[0]
+	cluster.Disconnect(follower.localAddr)
+
+	// Watch the leaderCh
+	timeout := time.After(cluster.conf.LeaderLeaseTimeout * 2)
+LOOP:
+	for {
+		select {
+		case v := <-leader.LeaderCh():
+			if !v {
+				break LOOP
+			}
+		case <-timeout:
+			test.Fatalf("timeout stepping down as leader")
+		}
+	}
+
+	// Ensure the last contact of the leader is non-zero
+	if leader.LastContact().IsZero() {
+		test.Fatalf("expected non-zero contact time")
+	}
+
+	// Should be no leaders
+	if len(cluster.GetInState(Leader)) != 0 {
+		test.Fatalf("expected step down")
+	}
+
+	// Verify no further contact
+	last := follower.LastContact()
+	time.Sleep(time.Second * 3)
+
+	// Check that last contact has not changed
+	if last != follower.LastContact() {
+		test.Fatalf("unexpected further contact")
+	}
+
+	// Ensure both have cleared their leader
+	if l := leader.Leader(); l != "" {
+		test.Fatalf("bad: %v", l)
+	}
+	if l := follower.Leader(); l != "" {
+		test.Fatalf("bad: %v", l)
+	}
+}

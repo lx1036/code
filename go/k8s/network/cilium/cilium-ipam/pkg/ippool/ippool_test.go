@@ -3,9 +3,8 @@ package ippool
 import (
 	"context"
 	"fmt"
-	"testing"
-
 	"github.com/projectcalico/calico/libcalico-go/lib/options"
+	"testing"
 
 	"k8s.io/klog/v2"
 )

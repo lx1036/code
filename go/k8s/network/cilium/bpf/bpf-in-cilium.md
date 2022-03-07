@@ -37,7 +37,7 @@ http://arthurchiao.art/blog/understanding-ebpf-datapath-in-cilium-zh/ :
 在 `/var/run/cilium/state/${CiliumEndpointID}/` 目录中包含 `lxc_config.h` 和 `bpf_lxc.o`二进制文件(源码是 `bpf_lxc.c`)，`bpf_lxc.c` 
 包含了 `from-container` 和 `to-container` tc eBPF 程序:
 ```shell
-yum update -y && yum update iproute2 -y
+yum update -y && yum update iproute2 net-tools -y
 
 # (1)给宿主机默认网卡 eth0 挂载 tc eBPF 程序
 tc filter show dev eth0 ingress
