@@ -56,7 +56,7 @@ require (
 	github.com/hashicorp/go-hclog v1.0.0
 	github.com/hashicorp/go-msgpack v0.5.5
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/hashicorp/raft v1.3.3
+	github.com/hashicorp/raft v1.3.6
 	github.com/jacobsa/oglematchers v0.0.0-20150720000706-141901ea67cd
 	github.com/jacobsa/syncutil v0.0.0-20180201203307-228ac8e5a6c3
 	github.com/jessevdk/go-flags v1.5.0
@@ -70,7 +70,7 @@ require (
 	github.com/kylelemons/godebug v1.1.0
 	github.com/labstack/gommon v0.3.0
 	github.com/libp2p/go-reuseport v0.1.0
-	github.com/lni/dragonboat/v3 v3.3.1
+	github.com/lni/dragonboat/v3 v3.3.5
 	github.com/lni/goutils v1.3.0
 	github.com/mattbaird/jsonpatch v0.0.0-20200820163806-098863c1fc24
 	github.com/mholt/certmagic v0.8.3
@@ -123,7 +123,7 @@ require (
 	golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211103184734-ae416a5f93c7
+	golang.org/x/sys v0.0.0-20220111092808-5a964db01320
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
@@ -160,7 +160,6 @@ require (
 )
 
 require (
-	github.com/containerd/go-cni v1.1.3 // indirect
 	github.com/go-kit/kit v0.12.0 // indirect
 	github.com/go-kit/log v0.2.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
@@ -174,12 +173,6 @@ require (
 require (
 	cloud.google.com/go v0.93.3 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
-	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
-	github.com/Azure/go-autorest/autorest v0.11.22 // indirect
-	github.com/Azure/go-autorest/autorest/adal v0.9.17 // indirect
-	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
-	github.com/Azure/go-autorest/logger v0.2.1 // indirect
-	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/Microsoft/hcsshim v0.8.21 // indirect
@@ -206,7 +199,7 @@ require (
 	github.com/cncf/xds/go v0.0.0-20211011173535-cb28da3451f1 // indirect
 	github.com/cockroachdb/errors v1.7.5 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20190617123548-eb05cc24525f // indirect
-	github.com/cockroachdb/pebble v0.0.0-20201228155439-c3ef93f9a9ed // indirect
+	github.com/cockroachdb/pebble v0.0.0-20210331181633-27fc006b8bfb // indirect
 	github.com/cockroachdb/redact v1.0.6 // indirect
 	github.com/cockroachdb/sentry-go v0.6.1-cockroachdb.2 // indirect
 	github.com/containerd/console v1.0.2 // indirect
@@ -216,7 +209,6 @@ require (
 	github.com/containerd/typeurl v1.0.2 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
-	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
 	github.com/coreos/prometheus-operator v0.38.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -257,7 +249,6 @@ require (
 	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/gohouse/gocar v0.0.2 // indirect
 	github.com/gohouse/t v0.0.5 // indirect
-	github.com/golang-jwt/jwt/v4 v4.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -356,7 +347,6 @@ require (
 	github.com/valyala/fasttemplate v1.0.1 // indirect
 	github.com/valyala/histogram v1.0.1 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
-	go.etcd.io/etcd v0.5.0-alpha.5.0.20201125193152-8a03d2e9614b // indirect
 	go.etcd.io/etcd/client/v2 v2.305.0 // indirect
 	go.mongodb.org/mongo-driver v1.7.4 // indirect
 	go.opencensus.io v0.23.0 // indirect
@@ -381,7 +371,6 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.7 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
-	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20211027115401-c9b1ec1aa6d8 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.0.1 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa // indirect
@@ -401,7 +390,7 @@ replace (
 	github.com/hanwen/go-fuse/v2 v2.1.1-0.20210611132105-24a1dfe6b4f8 => github.com/juicedata/go-fuse/v2 v2.1.1-0.20210629082323-0ec79f5f0a45
 	github.com/optiopay/kafka => github.com/cilium/kafka v0.0.0-20180809090225-01ce283b732b
 	go.universe.tf/metallb => github.com/cilium/metallb v0.1.1-0.20210831235406-48667b93284d
-	google.golang.org/grpc => google.golang.org/grpc v1.29.1
+	google.golang.org/grpc => google.golang.org/grpc v1.43.0
 	gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.2.2
 	k8s.io/api => k8s.io/api v0.22.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.22.1

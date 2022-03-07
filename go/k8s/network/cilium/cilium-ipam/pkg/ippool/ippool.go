@@ -2,13 +2,12 @@ package ippool
 
 import (
 	"fmt"
+	"github.com/projectcalico/calico/libcalico-go/lib/apiconfig"
+	"github.com/projectcalico/calico/libcalico-go/lib/selector"
+	client "k8s.io/client-go/kubernetes"
 	"os"
 
 	apiv3 "github.com/projectcalico/api/pkg/apis/projectcalico/v3"
-	"github.com/projectcalico/calico/libcalico-go/lib/apiconfig"
-	client "github.com/projectcalico/calico/libcalico-go/lib/clientv3"
-	"github.com/projectcalico/calico/libcalico-go/lib/net"
-	"github.com/projectcalico/calico/libcalico-go/lib/selector"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"

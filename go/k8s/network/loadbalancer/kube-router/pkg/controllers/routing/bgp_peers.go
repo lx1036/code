@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	
+
 	"k8s-lx1036/k8s/network/loadbalancer/kube-router/pkg/metrics"
 	"k8s-lx1036/k8s/network/loadbalancer/kube-router/pkg/utils"
-	
+
 	gobgpapi "github.com/osrg/gobgp/api"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -20,7 +20,7 @@ func (controller *NetworkRoutingController) onNodeAdd(node *corev1.Node) error {
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("New node received, but we were unable to add it as we were couldn't find its node IP: %v", err))
 	}
-	
+
 	klog.Infof("Received node %s added update from watch API so peer with new node", nodeIP)
 	return controller.handleNodeUpdate(node)
 }
@@ -38,7 +38,7 @@ func (controller *NetworkRoutingController) onNodeDelete(node *corev1.Node) erro
 	} else {
 		klog.Infof("Received node (IP unavailable) removed update from watch API, so remove node from peer")
 	}
-	
+
 	return controller.handleNodeUpdate(node)
 }
 
@@ -46,17 +46,17 @@ func (controller *NetworkRoutingController) handleNodeUpdate(node *corev1.Node) 
 	if !controller.bgpServerStarted {
 		return nil
 	}
-	
+
 	// update export policies so that NeighborSet gets updated with new set of nodes
 	err := controller.AddPolicies()
 	if err != nil {
 		klog.Errorf("Error adding BGP policies: %s", err.Error())
 	}
-	
+
 	if controller.bgpEnableInternal {
 		controller.syncInternalPeers()
 	}
-	
+
 	return nil
 }
 
@@ -72,7 +72,7 @@ func (controller *NetworkRoutingController) isPeerEstablished(peerIP string) (bo
 	if err != nil {
 		return false, fmt.Errorf("unable to list peers to see if tunnel & routes need to be removed: %v", err)
 	}
-	
+
 	return peerConnected, nil
 }
 
@@ -83,22 +83,22 @@ func (controller *NetworkRoutingController) isPeerEstablished(peerIP string) (bo
 func (controller *NetworkRoutingController) syncFullMeshIBGPPeers() {
 	controller.mu.Lock()
 	defer controller.mu.Unlock()
-	
+
 	start := time.Now()
 	defer func() {
 		endTime := time.Since(start)
 		metrics.ControllerBGPInternalPeersSyncTime.Observe(endTime.Seconds())
 		klog.Infof("Syncing BGP peers for the node took %v", endTime)
 	}()
-	
+
 	nodes, err := controller.nodeLister.List(labels.Everything())
 	if err != nil {
 		klog.Infof(fmt.Sprintf("[syncIBGPPeers]list nodes err:%v", err))
 		return
 	}
-	
+
 	metrics.ControllerBPGPeers.Set(float64(len(nodes)))
-	
+
 	// establish peer and add Pod CIDRs with current set of nodes
 	for _, node := range nodes {
 		nodeIP, err := utils.GetNodeIP(node)
@@ -106,12 +106,12 @@ func (controller *NetworkRoutingController) syncFullMeshIBGPPeers() {
 			klog.Errorf("Failed to find a node IP and therefore cannot sync internal BGP Peer: %v", err)
 			continue
 		}
-		
+
 		// skip self
 		if nodeIP.String() == controller.nodeIP.String() {
 			continue
 		}
-		
+
 		controller.activeNodes[nodeIP.String()] = true
 		peer := &gobgpapi.Peer{
 			Conf: &gobgpapi.PeerConf{
@@ -129,7 +129,7 @@ func (controller *NetworkRoutingController) syncFullMeshIBGPPeers() {
 				DeferralTime:    uint32(controller.bgpGracefulRestartDeferralTime.Seconds()),
 				LocalRestarting: true,
 			}
-			
+
 			peer.AfiSafis = []*gobgpapi.AfiSafi{
 				{
 					Config: &gobgpapi.AfiSafiConfig{
@@ -157,7 +157,7 @@ func (controller *NetworkRoutingController) syncFullMeshIBGPPeers() {
 				},
 			}
 		}
-		
+
 		// we are rr-server peer with other rr-client with reflection enabled
 		if controller.bgpRRServer {
 			if _, ok := node.ObjectMeta.Annotations[rrClientAnnotation]; ok {
@@ -168,7 +168,7 @@ func (controller *NetworkRoutingController) syncFullMeshIBGPPeers() {
 				}
 			}
 		}
-		
+
 		// TODO: check if a node is already added as neighbor in a better way than add and catch error
 		if err := controller.bgpServer.AddPeer(context.Background(), &gobgpapi.AddPeerRequest{
 			Peer: peer,

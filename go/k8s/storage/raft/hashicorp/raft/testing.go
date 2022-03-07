@@ -319,6 +319,18 @@ func (cluster *Cluster) FullyConnect() {
 	}
 }
 
+// Disconnect disconnects all transports from the given address.
+func (cluster *Cluster) Disconnect(addr ServerAddress) {
+	klog.Infof(fmt.Sprintf("disconnecting %s", addr))
+	for _, t := range cluster.transports {
+		if t.LocalAddr() == addr {
+			t.DisconnectAll()
+		} else {
+			t.Disconnect(addr)
+		}
+	}
+}
+
 // WaitForReplication blocks until every FSM in the cluster has the given
 // length, or the long sanity check timeout expires.
 func (cluster *Cluster) WaitForReplication(fsmLength int) {

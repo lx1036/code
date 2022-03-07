@@ -88,11 +88,21 @@ func (transport *MemoryTransport) Connect(peer ServerAddress, t Transport) {
 }
 
 func (transport *MemoryTransport) Disconnect(peer ServerAddress) {
-	panic("implement me")
+	transport.Lock()
+	defer transport.Unlock()
+	delete(transport.peers, peer)
 }
 
 func (transport *MemoryTransport) DisconnectAll() {
-	panic("implement me")
+	transport.Lock()
+	defer transport.Unlock()
+	transport.peers = make(map[ServerAddress]*MemoryTransport)
+
+	// Handle pipelines
+	/*for _, pipeline := range transport.pipelines {
+		pipeline.Close()
+	}
+	transport.pipelines = nil*/
 }
 
 func (transport *MemoryTransport) sendRPC(target ServerAddress, request interface{}, reader io.Reader, timeout time.Duration) (rpcResp RPCResponse, err error) {
