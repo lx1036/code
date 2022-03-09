@@ -28,21 +28,18 @@ func (controller *NetworkRoutingController) startBgpServer() error {
 		return fmt.Errorf(fmt.Sprintf("failed to start BGP server due to:%v", err))
 	}
 
-	go controller.watchBgpUpdates()
+	//go controller.watchBgpUpdates() // full mesh
 
-	if len(controller.globalPeerRouters) != 0 {
-		err := connectToExternalBGPPeers(controller.bgpServer, controller.globalPeerRouters, controller.bgpGracefulRestart,
-			controller.bgpGracefulRestartDeferralTime, controller.bgpGracefulRestartTime, controller.peerMultihopTTL)
-		if err != nil {
-			err2 := controller.bgpServer.StopBgp(context.Background(), &gobgpapi.StopBgpRequest{})
-			if err2 != nil {
-				klog.Errorf("Failed to stop bgpServer: %s", err2)
-			}
-
-			return fmt.Errorf("failed to peer with Global Peer Router(s): %s", err)
+	// add router peer
+	err := connectToExternalBGPPeers(controller.bgpServer, controller.globalPeerRouters, controller.bgpGracefulRestart,
+		controller.bgpGracefulRestartDeferralTime, controller.bgpGracefulRestartTime, controller.peerMultihopTTL)
+	if err != nil {
+		err2 := controller.bgpServer.StopBgp(context.Background(), &gobgpapi.StopBgpRequest{})
+		if err2 != nil {
+			klog.Errorf("Failed to stop bgpServer: %s", err2)
 		}
-	} else {
-		klog.Infof("No Global Peer Routers configured. Peering skipped.")
+
+		return fmt.Errorf("failed to peer with Global Peer Router(s): %s", err)
 	}
 
 	return nil
@@ -96,6 +93,11 @@ func connectToExternalBGPPeers(server *gobgp.BgpServer, peerNeighbors []*gobgpap
 							Enabled: true,
 						},
 					},
+					AddPaths: &gobgpapi.AddPaths{
+						Config: &gobgpapi.AddPathsConfig{
+							SendMax: 10,
+						},
+					},
 				},
 				{
 					Config: &gobgpapi.AfiSafiConfig{
@@ -105,6 +107,11 @@ func connectToExternalBGPPeers(server *gobgp.BgpServer, peerNeighbors []*gobgpap
 					MpGracefulRestart: &gobgpapi.MpGracefulRestart{
 						Config: &gobgpapi.MpGracefulRestartConfig{
 							Enabled: true,
+						},
+					},
+					AddPaths: &gobgpapi.AddPaths{
+						Config: &gobgpapi.AddPathsConfig{
+							SendMax: 10,
 						},
 					},
 				},

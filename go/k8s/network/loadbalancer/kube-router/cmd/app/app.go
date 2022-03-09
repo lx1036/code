@@ -2,12 +2,15 @@ package app
 
 import (
 	"fmt"
+	"time"
+
 	"k8s-lx1036/k8s/network/loadbalancer/kube-router/cmd/app/options"
 	"k8s-lx1036/k8s/network/loadbalancer/kube-router/pkg/controllers/routing"
 	"k8s-lx1036/k8s/network/loadbalancer/kube-router/pkg/utils"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
 
@@ -39,7 +42,26 @@ func runCommand(option *options.Options, stopCh <-chan struct{}) error {
 		return err
 	}
 
-	controller, err := routing.NewNetworkRoutingController(option)
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+	svcInformer := informerFactory.Core().V1().Services().Informer()
+	epInformer := informerFactory.Core().V1().Endpoints().Informer()
+	//podInformer := informerFactory.Core().V1().Pods().Informer()
+	//nodeInformer := informerFactory.Core().V1().Nodes().Informer()
+	//nsInformer := informerFactory.Core().V1().Namespaces().Informer()
+	//npInformer := informerFactory.Networking().V1().NetworkPolicies().Informer()
+	informerFactory.Start(stopCh)
+	syncCh := make(chan struct{})
+	go func() {
+		informerFactory.WaitForCacheSync(stopCh)
+		close(syncCh)
+	}()
+	select {
+	case <-time.After(time.Second * 10):
+		return fmt.Errorf("cache sync timeout")
+	case <-syncCh:
+	}
+
+	controller, err := routing.NewNetworkRoutingController(option, clientSet, svcInformer, epInformer)
 	if err != nil {
 		return err
 	}
@@ -55,6 +77,6 @@ func runCommand(option *options.Options, stopCh <-chan struct{}) error {
 
 	// INFO: 这里做了queue清理工作，可以借鉴下，不过不是很重要
 	klog.Info("Shutting down the etcd cluster")
-	controller.Stop()
+	//controller.Stop()
 	return nil
 }

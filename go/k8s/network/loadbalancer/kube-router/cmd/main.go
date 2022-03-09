@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"runtime"
 
@@ -10,6 +11,7 @@ import (
 	"k8s.io/component-base/logs"
 )
 
+//
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
@@ -23,5 +25,4 @@ func main() {
 	if err := cmd.Execute(); err != nil {
 		panic(err)
 	}
-
 }

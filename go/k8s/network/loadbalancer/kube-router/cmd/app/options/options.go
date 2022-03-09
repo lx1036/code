@@ -3,10 +3,12 @@ package options
 import (
 	"github.com/spf13/cobra"
 	apiv1 "k8s.io/api/core/v1"
+	"time"
 )
 
 const (
-	DefaultBGPPort = 1790 // 本地测试使用 1790，不要用默认的 179
+	DefaultBGPPort     = 1790 // 本地测试使用 1790，不要用默认的 179
+	DefaultBgpHoldTime = 90 * time.Second
 )
 
 type Options struct {
@@ -26,7 +28,14 @@ type Options struct {
 	AdvertiseLoadBalancerIP bool
 	AdvertisePodCidr        bool
 
-	BGPPort uint32
+	PeerRouterAddr                 string
+	BGPPort                        uint32
+	BGPGracefulRestart             bool
+	BGPGracefulRestartDeferralTime time.Duration
+	BGPGracefulRestartTime         time.Duration
+	BGPHoldTime                    time.Duration
+	PeerRouterPort                 uint32
+	OverrideNextHop                bool
 }
 
 func (o *Options) Flags(cmd *cobra.Command) {
@@ -51,10 +60,25 @@ func (o *Options) Flags(cmd *cobra.Command) {
 		"Add LoadbBalancer IP of service status as set by the LB provider to the RIB so that it gets advertised to the BGP peers.")
 	flags.BoolVar(&o.AdvertisePodCidr, "advertise-pod-cidr", true,
 		"Add Node's POD cidr to the RIB so that it gets advertised to the BGP peers.")
+
 	flags.Uint32Var(&o.BGPPort, "bgp-port", DefaultBGPPort,
 		"The port open for incoming BGP connections and to use for connecting with other BGP peers.")
+	flags.StringVar(&o.PeerRouterAddr, "peer-router-addr", "127.0.0.1", "peer router addr")
+	flags.Uint32Var(&o.PeerRouterPort, "peer-router-port", DefaultBGPPort, "peer router port")
+	flags.BoolVar(&o.BGPGracefulRestart, "bgp-graceful-restart", true,
+		"Enables the BGP Graceful Restart capability so that routes are preserved on unexpected restarts")
+	flags.DurationVar(&o.BGPHoldTime, "bgp-holdtime", DefaultBgpHoldTime,
+		"This parameter is mainly used to modify the holdtime declared to BGP peer. When Kube-router goes down "+
+			"abnormally, the local saving time of BGP route will be affected. "+
+			"Holdtime must be in the range 3s to 18h12m16s.")
+	flags.BoolVar(&o.OverrideNextHop, "override-nexthop", false, "Override the next-hop in bgp "+
+		"routes sent to peers with the local ip.")
 }
 
 func NewOptions() *Options {
-	return &Options{}
+	return &Options{
+		BGPGracefulRestartDeferralTime: 360 * time.Second,
+		BGPGracefulRestartTime:         90 * time.Second,
+		BGPHoldTime:                    90 * time.Second,
+	}
 }

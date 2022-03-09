@@ -57,12 +57,12 @@ func (controller *NetworkRoutingController) injectRoute(path *gobgpapi.Path) err
 		if !controller.enableOverlays {
 			return false
 		}
-		if controller.overlayType == "full" {
+		/*if controller.overlayType == "full" {
 			return true
 		}
 		if controller.overlayType == "subnet" && !sameSubnet {
 			return true
-		}
+		}*/
 		return false
 	}
 

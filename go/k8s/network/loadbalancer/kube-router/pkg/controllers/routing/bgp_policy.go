@@ -3,8 +3,6 @@ package routing
 import (
 	"context"
 	"fmt"
-	"k8s-lx1036/k8s/network/loadbalancer/kube-router/pkg/utils"
-	"k8s.io/apimachinery/pkg/labels"
 	"reflect"
 
 	gobgpapi "github.com/osrg/gobgp/api"
@@ -15,24 +13,19 @@ import (
 
 // AddPolicies adds BGP import and export policies
 func (controller *NetworkRoutingController) AddPolicies() error {
-	err := controller.syncPodCidrDefinedSet()
+	err := controller.addPodCidrDefinedSet()
 	if err != nil {
 		klog.Errorf("Failed to add `podcidrdefinedset` defined set: %s", err)
 	}
 
-	err = controller.syncServiceVIPsDefinedSet()
+	err = controller.addServiceVIPsDefinedSet()
 	if err != nil {
 		klog.Errorf("Failed to add `servicevipsdefinedset` defined set: %s", err)
 	}
 
-	err = controller.syncDefaultRouteDefinedSet()
+	err = controller.addDefaultRouteDefinedSet()
 	if err != nil {
 		klog.Errorf("Failed to add `defaultroutedefinedset` defined set: %s", err)
-	}
-
-	iBGPPeerCIDRs, err := controller.addiBGPPeersDefinedSet()
-	if err != nil {
-		klog.Errorf("Failed to add `iBGPpeerset` defined set: %s", err)
 	}
 
 	externalBGPPeerCIDRs, err := controller.addExternalBGPPeersDefinedSet()
@@ -40,7 +33,7 @@ func (controller *NetworkRoutingController) AddPolicies() error {
 		klog.Errorf("Failed to add `externalpeerset` defined set: %s", err)
 	}
 
-	err = controller.addAllBGPPeersDefinedSet(iBGPPeerCIDRs, externalBGPPeerCIDRs)
+	err = controller.addAllBGPPeersDefinedSet(externalBGPPeerCIDRs)
 	if err != nil {
 		klog.Errorf("Failed to add `allpeerset` defined set: %s", err)
 	}
@@ -59,7 +52,7 @@ func (controller *NetworkRoutingController) AddPolicies() error {
 }
 
 // create a defined set to represent just the pod CIDR associated with the node
-func (controller *NetworkRoutingController) syncPodCidrDefinedSet() error {
+func (controller *NetworkRoutingController) addPodCidrDefinedSet() error {
 	var currentDefinedSet *gobgpapi.DefinedSet
 	definedsetName := "podcidrdefinedset"
 	err := controller.bgpServer.ListDefinedSet(context.TODO(), &gobgpapi.ListDefinedSetRequest{
@@ -97,7 +90,7 @@ func (controller *NetworkRoutingController) syncPodCidrDefinedSet() error {
 }
 
 // create a defined set to represent all the advertisable IP associated with the services
-func (controller *NetworkRoutingController) syncServiceVIPsDefinedSet() error {
+func (controller *NetworkRoutingController) addServiceVIPsDefinedSet() error {
 	var currentDefinedSet *gobgpapi.DefinedSet
 	definedsetName := "servicevipsdefinedset"
 	err := controller.bgpServer.ListDefinedSet(context.Background(), &gobgpapi.ListDefinedSetRequest{
@@ -111,7 +104,7 @@ func (controller *NetworkRoutingController) syncServiceVIPsDefinedSet() error {
 	}
 
 	advIPPrefixList := make([]*gobgpapi.Prefix, 0)
-	advIps, _, _ := controller.getAllVIPs()
+	advIps, _, _ := controller.getAllActiveVIPs()
 	for _, ip := range advIps {
 		advIPPrefixList = append(advIPPrefixList,
 			&gobgpapi.Prefix{
@@ -187,7 +180,7 @@ func (controller *NetworkRoutingController) syncServiceVIPsDefinedSet() error {
 }
 
 // create a defined set to represent just the host default route
-func (controller *NetworkRoutingController) syncDefaultRouteDefinedSet() error {
+func (controller *NetworkRoutingController) addDefaultRouteDefinedSet() error {
 	var currentDefinedSet *gobgpapi.DefinedSet
 	definedsetName := "defaultroutedefinedset"
 	err := controller.bgpServer.ListDefinedSet(context.Background(),
@@ -219,104 +212,6 @@ func (controller *NetworkRoutingController) syncDefaultRouteDefinedSet() error {
 	}
 
 	return nil
-}
-
-func (controller *NetworkRoutingController) addiBGPPeersDefinedSet() ([]string, error) {
-	iBGPPeerCIDRs := make([]string, 0)
-	if !controller.enableIBGP {
-		return iBGPPeerCIDRs, nil
-	}
-
-	definedsetName := "iBGPpeerset"
-	// Get the current list of the nodes from the local cache
-	nodes, err := controller.nodeLister.List(labels.Everything())
-	if err != nil {
-		return nil, err
-	}
-	for _, node := range nodes {
-		nodeIP, err := utils.GetNodeIP(node)
-		if err != nil {
-			klog.Errorf("Failed to find a node IP and therefore cannot add internal BGP Peer: %v", err)
-			continue
-		}
-		iBGPPeerCIDRs = append(iBGPPeerCIDRs, fmt.Sprintf("%s/32", nodeIP.String()))
-	}
-
-	var currentDefinedSet *gobgpapi.DefinedSet
-	err = controller.bgpServer.ListDefinedSet(context.Background(),
-		&gobgpapi.ListDefinedSetRequest{
-			DefinedType: gobgpapi.DefinedType_NEIGHBOR,
-			Name:        definedsetName,
-		},
-		func(ds *gobgpapi.DefinedSet) {
-			currentDefinedSet = ds
-		})
-	if err != nil {
-		return iBGPPeerCIDRs, err
-	}
-	if currentDefinedSet == nil {
-		iBGPPeerNS := &gobgpapi.DefinedSet{
-			DefinedType: gobgpapi.DefinedType_NEIGHBOR,
-			Name:        definedsetName,
-			List:        iBGPPeerCIDRs,
-		}
-		err = controller.bgpServer.AddDefinedSet(context.Background(), &gobgpapi.AddDefinedSetRequest{
-			DefinedSet: iBGPPeerNS,
-		})
-		return iBGPPeerCIDRs, err
-	}
-
-	if reflect.DeepEqual(iBGPPeerCIDRs, currentDefinedSet.List) {
-		return iBGPPeerCIDRs, nil
-	}
-	toAdd := make([]string, 0)
-	toDelete := make([]string, 0)
-	for _, prefix := range iBGPPeerCIDRs {
-		add := true
-		for _, currentPrefix := range currentDefinedSet.List {
-			if prefix == currentPrefix {
-				add = false
-			}
-		}
-		if add {
-			toAdd = append(toAdd, prefix)
-		}
-	}
-	for _, currentPrefix := range currentDefinedSet.List {
-		shouldDelete := true
-		for _, prefix := range iBGPPeerCIDRs {
-			if currentPrefix == prefix {
-				shouldDelete = false
-			}
-		}
-		if shouldDelete {
-			toDelete = append(toDelete, currentPrefix)
-		}
-	}
-	err = controller.bgpServer.AddDefinedSet(context.Background(), &gobgpapi.AddDefinedSetRequest{
-		DefinedSet: &gobgpapi.DefinedSet{
-			DefinedType: gobgpapi.DefinedType_NEIGHBOR,
-			Name:        definedsetName,
-			List:        toAdd,
-		},
-	})
-	if err != nil {
-		return iBGPPeerCIDRs, err
-	}
-	err = controller.bgpServer.DeleteDefinedSet(context.Background(),
-		&gobgpapi.DeleteDefinedSetRequest{
-			DefinedSet: &gobgpapi.DefinedSet{
-				DefinedType: gobgpapi.DefinedType_NEIGHBOR,
-				Name:        definedsetName,
-				List:        toDelete,
-			},
-			All: false,
-		})
-	if err != nil {
-		return iBGPPeerCIDRs, err
-	}
-
-	return iBGPPeerCIDRs, nil
 }
 
 func (controller *NetworkRoutingController) addExternalBGPPeersDefinedSet() ([]string, error) {
@@ -361,7 +256,7 @@ func (controller *NetworkRoutingController) addExternalBGPPeersDefinedSet() ([]s
 }
 
 // a slice of all peers is used as a match condition for reject statement of servicevipsdefinedset import policy
-func (controller *NetworkRoutingController) addAllBGPPeersDefinedSet(iBGPPeerCIDRs, externalBGPPeerCIDRs []string) error {
+func (controller *NetworkRoutingController) addAllBGPPeersDefinedSet(externalBGPPeerCIDRs []string) error {
 	var currentDefinedSet *gobgpapi.DefinedSet
 	definedsetName := "allpeerset"
 	err := controller.bgpServer.ListDefinedSet(context.Background(),
@@ -372,19 +267,18 @@ func (controller *NetworkRoutingController) addAllBGPPeersDefinedSet(iBGPPeerCID
 	if err != nil {
 		return err
 	}
-	allBgpPeers := append(externalBGPPeerCIDRs, iBGPPeerCIDRs...)
 	if currentDefinedSet == nil {
 		allPeerNS := &gobgpapi.DefinedSet{
 			DefinedType: gobgpapi.DefinedType_NEIGHBOR,
 			Name:        definedsetName,
-			List:        allBgpPeers,
+			List:        externalBGPPeerCIDRs,
 		}
 		return controller.bgpServer.AddDefinedSet(context.Background(), &gobgpapi.AddDefinedSetRequest{DefinedSet: allPeerNS})
 	}
 
 	toAdd := make([]string, 0)
 	toDelete := make([]string, 0)
-	for _, peer := range allBgpPeers {
+	for _, peer := range externalBGPPeerCIDRs {
 		add := true
 		for _, currentPeer := range currentDefinedSet.List {
 			if peer == currentPeer {
@@ -397,7 +291,7 @@ func (controller *NetworkRoutingController) addAllBGPPeersDefinedSet(iBGPPeerCID
 	}
 	for _, currentPeer := range currentDefinedSet.List {
 		shouldDelete := true
-		for _, peer := range allBgpPeers {
+		for _, peer := range externalBGPPeerCIDRs {
 			if peer == currentPeer {
 				shouldDelete = false
 			}
@@ -447,30 +341,6 @@ func (controller *NetworkRoutingController) addExportPolicies() error {
 	const policyName = "kube_router_export"
 	statements := make([]*gobgpapi.Statement, 0)
 	var bgpActions gobgpapi.Actions
-
-	if controller.enableIBGP {
-		actions := gobgpapi.Actions{
-			RouteAction: gobgpapi.RouteAction_ACCEPT,
-		}
-		if controller.overrideNextHop {
-			actions.Nexthop = &gobgpapi.NexthopAction{Self: true}
-		}
-		// statement to represent the export policy to permit advertising node's pod CIDR
-		statements = append(statements,
-			&gobgpapi.Statement{
-				Conditions: &gobgpapi.Conditions{
-					PrefixSet: &gobgpapi.MatchSet{
-						MatchType: gobgpapi.MatchType_ANY,
-						Name:      "podcidrdefinedset",
-					},
-					NeighborSet: &gobgpapi.MatchSet{
-						MatchType: gobgpapi.MatchType_ANY,
-						Name:      "iBGPpeerset",
-					},
-				},
-				Actions: &actions,
-			})
-	}
 
 	if len(controller.globalPeerRouters) > 0 {
 		bgpActions.RouteAction = gobgpapi.RouteAction_ACCEPT
@@ -532,7 +402,7 @@ func (controller *NetworkRoutingController) addExportPolicies() error {
 		}
 	}
 
-	definition := gobgpapi.Policy{
+	policy := gobgpapi.Policy{
 		Name:       policyName,
 		Statements: statements,
 	}
@@ -546,7 +416,7 @@ func (controller *NetworkRoutingController) addExportPolicies() error {
 		return fmt.Errorf(fmt.Sprintf("Failed to verify if kube-router BGP export policy exists: %v", err))
 	}
 	if !policyAlreadyExists {
-		err = controller.bgpServer.AddPolicy(context.Background(), &gobgpapi.AddPolicyRequest{Policy: &definition})
+		err = controller.bgpServer.AddPolicy(context.Background(), &gobgpapi.AddPolicyRequest{Policy: &policy})
 		if err != nil {
 			return fmt.Errorf(fmt.Sprintf("Failed to add policy: %v", err))
 		}
@@ -571,11 +441,94 @@ func (controller *NetworkRoutingController) addExportPolicies() error {
 			&gobgpapi.AddPolicyAssignmentRequest{Assignment: &gobgpapi.PolicyAssignment{
 				Name:          "global",
 				Direction:     gobgpapi.PolicyDirection_EXPORT,
-				Policies:      []*gobgpapi.Policy{&definition},
+				Policies:      []*gobgpapi.Policy{&policy},
 				DefaultAction: gobgpapi.RouteAction_REJECT,
 			}})
 		if err != nil {
 			return fmt.Errorf(fmt.Sprintf("Failed to add policy assignment: %v", err))
+		}
+	}
+
+	return nil
+}
+
+// BGP import policies are added so that the following conditions are met:
+// - do not import Service VIPs advertised from any peers, instead each kube-router originates and injects
+//   Service VIPs into local rib.
+func (controller *NetworkRoutingController) addImportPolicies() error {
+	statements := make([]*gobgpapi.Statement, 0)
+	actions := gobgpapi.Actions{
+		RouteAction: gobgpapi.RouteAction_REJECT,
+	}
+	statements = append(statements, &gobgpapi.Statement{
+		Conditions: &gobgpapi.Conditions{
+			PrefixSet: &gobgpapi.MatchSet{
+				MatchType: gobgpapi.MatchType_ANY,
+				Name:      "servicevipsdefinedset",
+			},
+			NeighborSet: &gobgpapi.MatchSet{
+				MatchType: gobgpapi.MatchType_ANY,
+				Name:      "allpeerset",
+			},
+		},
+		Actions: &actions,
+	}, &gobgpapi.Statement{
+		Conditions: &gobgpapi.Conditions{
+			PrefixSet: &gobgpapi.MatchSet{
+				MatchType: gobgpapi.MatchType_ANY,
+				Name:      "defaultroutedefinedset",
+			},
+			NeighborSet: &gobgpapi.MatchSet{
+				MatchType: gobgpapi.MatchType_ANY,
+				Name:      "allpeerset",
+			},
+		},
+		Actions: &actions,
+	})
+	policyAlreadyExists := false
+	err := controller.bgpServer.ListPolicy(context.Background(), &gobgpapi.ListPolicyRequest{}, func(existingPolicy *gobgpapi.Policy) {
+		if existingPolicy.Name == "kube_router_import" {
+			policyAlreadyExists = true
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("Failed to verify if kube-router BGP import policy exists: " + err.Error())
+	}
+	policy := gobgpapi.Policy{
+		Name:       "kube_router_import",
+		Statements: statements,
+	}
+	if !policyAlreadyExists {
+		err = controller.bgpServer.AddPolicy(context.Background(), &gobgpapi.AddPolicyRequest{Policy: &policy})
+		if err != nil {
+			return fmt.Errorf("Failed to add policy: " + err.Error())
+		}
+	}
+
+	policyAssignmentExists := false
+	err = controller.bgpServer.ListPolicyAssignment(context.Background(),
+		&gobgpapi.ListPolicyAssignmentRequest{Name: "global", Direction: gobgpapi.PolicyDirection_IMPORT},
+		func(existingPolicyAssignment *gobgpapi.PolicyAssignment) {
+			for _, p := range existingPolicyAssignment.Policies {
+				if p.Name == "kube_router_import" {
+					policyAssignmentExists = true
+				}
+			}
+		})
+	if err != nil {
+		return fmt.Errorf("Failed to verify if kube-router BGP import policy assignment exists: " + err.Error())
+	}
+	if !policyAssignmentExists {
+		policyAssignment := gobgpapi.PolicyAssignment{
+			Name:          "global",
+			Direction:     gobgpapi.PolicyDirection_IMPORT,
+			Policies:      []*gobgpapi.Policy{&policy},
+			DefaultAction: gobgpapi.RouteAction_ACCEPT,
+		}
+		err = controller.bgpServer.AddPolicyAssignment(context.Background(),
+			&gobgpapi.AddPolicyAssignmentRequest{Assignment: &policyAssignment})
+		if err != nil {
+			return fmt.Errorf("Failed to add policy assignment: " + err.Error())
 		}
 	}
 
