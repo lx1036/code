@@ -11,19 +11,19 @@ import (
 
 type Controller struct {
 	Name string
-	
+
 	MaxConcurrentReconciles int
-	
+
 	Do reconcile.Reconciler
-	
+
 	MakeQueue func() workqueue.RateLimitingInterface
-	
+
 	Queue workqueue.RateLimitingInterface
-	
+
 	mu sync.Mutex
-	
+
 	//Log logr.Logger
-	
+
 	SetFields func(i interface{}) error
 }
 

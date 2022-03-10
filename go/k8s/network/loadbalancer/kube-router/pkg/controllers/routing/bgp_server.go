@@ -46,21 +46,25 @@ func (controller *NetworkRoutingController) startBgpServer() error {
 }
 
 func (controller *NetworkRoutingController) watchBgpUpdates() {
-	err := controller.bgpServer.MonitorTable(context.Background(), &gobgpapi.MonitorTableRequest{
-		TableType: gobgpapi.TableType_GLOBAL,
-		Family: &gobgpapi.Family{
-			Afi:  gobgpapi.Family_AFI_IP,
-			Safi: gobgpapi.Family_SAFI_UNICAST,
-		},
-	}, func(path *gobgpapi.Path) {
-		metrics.ControllerBGPAdvertisementsReceived.Inc()
+	err := controller.bgpServer.WatchEvent(context.Background(), &gobgpapi.WatchEventRequest{
+		Table: &gobgpapi.WatchEventRequest_Table{
+			Filters: []*gobgpapi.WatchEventRequest_Table_Filter{
+				{
+					Type: gobgpapi.WatchEventRequest_Table_Filter_BEST,
+				},
+			},
+		}}, func(response *gobgpapi.WatchEventResponse) {
+		t := response.GetTable()
+		for _, path := range t.GetPaths() {
+			metrics.ControllerBGPAdvertisementsReceived.Inc()
 
-		if path.NeighborIp == "<nil>" {
-			return
-		}
-		klog.Infof("Processing bgp route advertisement from peer: %s", path.NeighborIp)
-		if err := controller.injectRoute(path); err != nil {
-			klog.Errorf(fmt.Sprintf("Failed to inject routes due to: %v", err))
+			if path.NeighborIp == "<nil>" {
+				return
+			}
+			klog.Infof("Processing bgp route advertisement from peer: %s", path.NeighborIp)
+			if err := controller.injectRoute(path); err != nil {
+				klog.Errorf(fmt.Sprintf("Failed to inject routes due to: %v", err))
+			}
 		}
 	})
 	if err != nil {
