@@ -18,7 +18,7 @@ package server
 import (
 	"context"
 	"fmt"
-	api "github.com/osrg/gobgp/api"
+	api "github.com/osrg/gobgp/v3/api"
 	"k8s.io/klog/v2"
 	"net"
 	"time"

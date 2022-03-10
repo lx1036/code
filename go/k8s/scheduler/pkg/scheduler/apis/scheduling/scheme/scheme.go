@@ -2,7 +2,7 @@ package scheme
 
 import (
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/scheduling/config"
-	configv1beta1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/scheduling/config/v1beta1"
+	configv1 "k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/scheduling/config/v1"
 	"k8s-lx1036/k8s/scheduler/pkg/scheduler/apis/scheduling/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,5 +27,5 @@ func init() {
 func AddToScheme(scheme *runtime.Scheme) {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(config.AddToScheme(scheme))
-	utilruntime.Must(configv1beta1.AddToScheme(scheme))
+	utilruntime.Must(configv1.AddToScheme(scheme))
 }

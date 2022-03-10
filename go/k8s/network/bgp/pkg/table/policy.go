@@ -27,7 +27,7 @@ import (
 	"sync"
 
 	"github.com/k-sone/critbitgo"
-	api "github.com/osrg/gobgp/api"
+	api "github.com/osrg/gobgp/v3/api"
 	log "github.com/sirupsen/logrus"
 	"k8s-lx1036/k8s/network/bgp/pkg/config"
 	"k8s-lx1036/k8s/network/bgp/pkg/packet/bgp"

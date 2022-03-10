@@ -4,7 +4,7 @@ import (
 	"context"
 	goruntime "runtime"
 	"time"
-
+	
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -12,8 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	kubeletapis "k8s.io/kubelet/pkg/apis"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
@@ -27,20 +27,20 @@ func (kl *Kubelet) registerWithAPIServer() {
 		return
 	}
 	step := 100 * time.Millisecond
-
+	
 	for {
 		time.Sleep(step)
 		step = step * 2
 		if step >= 7*time.Second {
 			step = 7 * time.Second
 		}
-
+		
 		node, err := kl.initialNode(context.TODO())
 		if err != nil {
 			klog.Errorf("Unable to construct v1.Node object for kubelet: %v", err)
 			continue
 		}
-
+		
 		klog.Infof("Attempting to register node %s", node.Name)
 		registered := kl.tryRegisterWithAPIServer(node)
 		if registered {
@@ -68,7 +68,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 			Unschedulable: !kl.registerSchedulable,
 		},
 	}
-
+	
 	nodeTaints := make([]v1.Taint, 0)
 	unschedulableTaint := v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
@@ -83,7 +83,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 	if len(nodeTaints) > 0 {
 		node.Spec.Taints = nodeTaints
 	}
-
+	
 	// Initially, set NodeNetworkUnavailable to true.
 	node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
 		Type:               v1.NodeNetworkUnavailable,
@@ -92,9 +92,9 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		Message:            "Node created without a route",
 		LastTransitionTime: metav1.NewTime(kl.clock.Now()),
 	})
-
+	
 	kl.setNodeStatus(node)
-
+	
 	return node, nil
 }
 
@@ -115,12 +115,12 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	if err == nil {
 		return true
 	}
-
+	
 	if !apierrors.IsAlreadyExists(err) {
 		klog.Errorf("Unable to register node %q with API server: %v", kl.nodeName, err)
 		return false
 	}
-
+	
 	existingNode, err := kl.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(kl.nodeName), metav1.GetOptions{})
 	if err != nil {
 		klog.Errorf("Unable to register node %q with API server: error getting existing node: %v", kl.nodeName, err)
@@ -130,10 +130,10 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		klog.Errorf("Unable to register node %q with API server: no node instance returned", kl.nodeName)
 		return false
 	}
-
+	
 	originalNode := existingNode.DeepCopy()
 	klog.Infof("Node %s was previously registered", kl.nodeName)
-
+	
 	// 2. node 之前注册过，reconcile 下 volumes.kubernetes.io/controller-managed-attach-detach annotation
 	requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(node, existingNode)
 	requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
@@ -145,7 +145,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 			return false
 		}
 	}
-
+	
 	return true
 }
 
@@ -155,11 +155,11 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 		existingCMAAnnotation    = existingNode.Annotations[volutil.ControllerManagedAttachAnnotation]
 		newCMAAnnotation, newSet = node.Annotations[volutil.ControllerManagedAttachAnnotation]
 	)
-
+	
 	if newCMAAnnotation == existingCMAAnnotation {
 		return false
 	}
-
+	
 	if !newSet {
 		klog.Info("Controller attach-detach setting changed to false; updating existing Node")
 		delete(existingNode.Annotations, volutil.ControllerManagedAttachAnnotation)
@@ -170,7 +170,7 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 		}
 		existingNode.Annotations[volutil.ControllerManagedAttachAnnotation] = newCMAAnnotation
 	}
-
+	
 	return true
 }
 
@@ -190,7 +190,7 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		kubeletapis.LabelOS,
 		kubeletapis.LabelArch,
 	}
-
+	
 	needsUpdate := false
 	if existingNode.Labels == nil {
 		existingNode.Labels = make(map[string]string)
@@ -200,17 +200,17 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		if _, hasInitialValue := initialNode.Labels[label]; !hasInitialValue {
 			continue
 		}
-
+		
 		if existingNode.Labels[label] != initialNode.Labels[label] {
 			existingNode.Labels[label] = initialNode.Labels[label]
 			needsUpdate = true
 		}
-
+		
 		if existingNode.Labels[label] == "" {
 			delete(existingNode.Labels, label)
 		}
 	}
-
+	
 	return needsUpdate
 }
 
@@ -226,7 +226,7 @@ func updateDefaultResources(initialNode, existingNode *v1.Node) bool {
 			existingNode.Status.Capacity = make(map[v1.ResourceName]resource.Quantity)
 		}
 	}
-
+	
 	if existingNode.Status.Allocatable == nil {
 		if initialNode.Status.Allocatable != nil {
 			existingNode.Status.Allocatable = initialNode.Status.Allocatable.DeepCopy()
@@ -259,37 +259,37 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node) bool {
 	requiresUpdate := updateDefaultResources(initialNode, existingNode)
 	supportedHugePageResources := sets.String{}
-
+	
 	for resourceName := range initialNode.Status.Capacity {
 		if !v1helper.IsHugePageResourceName(resourceName) {
 			continue
 		}
 		supportedHugePageResources.Insert(string(resourceName))
-
+		
 		initialCapacity := initialNode.Status.Capacity[resourceName]
 		initialAllocatable := initialNode.Status.Allocatable[resourceName]
-
+		
 		capacity, resourceIsSupported := existingNode.Status.Capacity[resourceName]
 		allocatable := existingNode.Status.Allocatable[resourceName]
-
+		
 		// existingNode hugepage capacity < initialNode hugepage capacity
 		if !resourceIsSupported || capacity.Cmp(initialCapacity) != 0 {
 			existingNode.Status.Capacity[resourceName] = initialCapacity.DeepCopy()
 			requiresUpdate = true
 		}
-
+		
 		// Add or update allocatable if it the size was previously unsupported or has changed
 		if !resourceIsSupported || allocatable.Cmp(initialAllocatable) != 0 {
 			existingNode.Status.Allocatable[resourceName] = initialAllocatable.DeepCopy()
 			requiresUpdate = true
 		}
 	}
-
+	
 	for resourceName := range existingNode.Status.Capacity {
 		if !v1helper.IsHugePageResourceName(resourceName) {
 			continue
 		}
-
+		
 		// If huge page size no longer is supported, we remove it from the node
 		if !supportedHugePageResources.Has(string(resourceName)) {
 			delete(existingNode.Status.Capacity, resourceName)
@@ -298,6 +298,6 @@ func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node)
 			requiresUpdate = true
 		}
 	}
-
+	
 	return requiresUpdate
 }

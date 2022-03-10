@@ -5,9 +5,9 @@ import (
 	goruntime "runtime"
 	"testing"
 	"time"
-
+	
 	"github.com/stretchr/testify/assert"
-
+	
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
@@ -29,7 +29,7 @@ func addNotImplatedReaction(kubeClient *fake.Clientset) {
 	if kubeClient == nil {
 		return
 	}
-
+	
 	kubeClient.AddReactor("*", "*", notImplemented)
 }
 
@@ -37,7 +37,7 @@ func addNotImplatedReaction(kubeClient *fake.Clientset) {
 func TestRegisterWithApiServer(test *testing.T) {
 	testKubelet := newTestKubelet(test, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-
+	
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
@@ -67,9 +67,9 @@ func TestRegisterWithApiServer(test *testing.T) {
 		}
 		return notImplemented(action)
 	})
-
+	
 	addNotImplatedReaction(kubeClient)
-
+	
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -78,7 +78,7 @@ func TestRegisterWithApiServer(test *testing.T) {
 		MemoryCapacity: 1024,
 	}
 	kubelet.setCachedMachineInfo(machineInfo)
-
+	
 	done := make(chan struct{})
 	go func() {
 		kubelet.registerWithAPIServer()
@@ -106,7 +106,7 @@ func TestUpdateNewNodeStatus(test *testing.T) {
 			nodeStatusMaxImages: -1,
 		},
 	}
-
+	
 	for _, fixture := range fixtures {
 		test.Run(fixture.desc, func(t *testing.T) {
 			numTestImages := int(fixture.nodeStatusMaxImages) + 1
@@ -114,7 +114,7 @@ func TestUpdateNewNodeStatus(test *testing.T) {
 				numTestImages = 5
 			}
 			inputImageList, expectedImageList := generateTestingImageLists(numTestImages, int(fixture.nodeStatusMaxImages))
-
+			
 			testKubelet := newTestKubeletWithImageList(
 				t, inputImageList, false /* controllerAttachDetachEnabled */, true /*initFakeVolumePlugin*/)
 			defer testKubelet.Cleanup()
@@ -134,8 +134,8 @@ func TestUpdateNewNodeStatus(test *testing.T) {
 					v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 				},
 			}
-
+			
 		})
 	}
-
+	
 }

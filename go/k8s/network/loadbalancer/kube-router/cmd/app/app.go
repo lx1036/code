@@ -61,11 +61,11 @@ func runCommand(option *options.Options, stopCh <-chan struct{}) error {
 	case <-syncCh:
 	}
 
+	klog.Info("starting run server...")
 	controller, err := routing.NewNetworkRoutingController(option, clientSet, svcInformer, epInformer)
 	if err != nil {
 		return err
 	}
-	klog.Info("starting run server...")
 	go controller.Run(stopCh) // INFO: 注意这里是异步
 
 	controller.CondMutex.L.Lock()

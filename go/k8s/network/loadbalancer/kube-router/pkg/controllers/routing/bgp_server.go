@@ -7,8 +7,8 @@ import (
 
 	"k8s-lx1036/k8s/network/loadbalancer/kube-router/pkg/metrics"
 
-	gobgpapi "github.com/osrg/gobgp/api"
-	gobgp "github.com/osrg/gobgp/pkg/server"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
+	gobgp "github.com/osrg/gobgp/v3/pkg/server"
 	"k8s.io/klog/v2"
 )
 
@@ -19,7 +19,7 @@ func (controller *NetworkRoutingController) startBgpServer() error {
 
 	nodeAsnNumber := controller.defaultNodeAsnNumber
 	global := &gobgpapi.Global{
-		As:              nodeAsnNumber,
+		Asn:             nodeAsnNumber,
 		RouterId:        controller.routerID,
 		ListenAddresses: controller.localAddressList,
 		ListenPort:      int32(controller.bgpPort),
@@ -46,7 +46,13 @@ func (controller *NetworkRoutingController) startBgpServer() error {
 }
 
 func (controller *NetworkRoutingController) watchBgpUpdates() {
-	pathWatch := func(path *gobgpapi.Path) {
+	err := controller.bgpServer.MonitorTable(context.Background(), &gobgpapi.MonitorTableRequest{
+		TableType: gobgpapi.TableType_GLOBAL,
+		Family: &gobgpapi.Family{
+			Afi:  gobgpapi.Family_AFI_IP,
+			Safi: gobgpapi.Family_SAFI_UNICAST,
+		},
+	}, func(path *gobgpapi.Path) {
 		metrics.ControllerBGPAdvertisementsReceived.Inc()
 
 		if path.NeighborIp == "<nil>" {
@@ -56,15 +62,7 @@ func (controller *NetworkRoutingController) watchBgpUpdates() {
 		if err := controller.injectRoute(path); err != nil {
 			klog.Errorf(fmt.Sprintf("Failed to inject routes due to: %v", err))
 		}
-	}
-
-	err := controller.bgpServer.MonitorTable(context.Background(), &gobgpapi.MonitorTableRequest{
-		TableType: gobgpapi.TableType_GLOBAL,
-		Family: &gobgpapi.Family{
-			Afi:  gobgpapi.Family_AFI_IP,
-			Safi: gobgpapi.Family_SAFI_UNICAST,
-		},
-	}, pathWatch)
+	})
 	if err != nil {
 		klog.Errorf("failed to register monitor global routing table callback due to : " + err.Error())
 	}
@@ -129,7 +127,7 @@ func connectToExternalBGPPeers(server *gobgp.BgpServer, peerNeighbors []*gobgpap
 		}
 
 		klog.Infof("Successfully configured %s in ASN %v as BGP peer to the node",
-			neighbor.Conf.NeighborAddress, neighbor.Conf.PeerAs)
+			neighbor.Conf.NeighborAddress, neighbor.Conf.PeerAsn)
 	}
 
 	return nil

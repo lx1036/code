@@ -25,7 +25,6 @@ import (
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"

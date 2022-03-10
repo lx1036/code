@@ -5,10 +5,9 @@ import (
 	"k8s-lx1036/k8s/kubelet/pkg/lifecycle"
 
 	v1 "k8s.io/api/core/v1"
-	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // Manager manages all the Device Plugins running on a node.

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	api "github.com/osrg/gobgp/api"
+	api "github.com/osrg/gobgp/v3/api"
 	"github.com/spf13/viper"
 	"k8s-lx1036/k8s/network/bgp/pkg/config"
 

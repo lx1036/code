@@ -3,7 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
-	gobgpapi "github.com/osrg/gobgp/api"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
 	v1 "k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/apis/bgplb.k9s.io/v1"
 	"k8s.io/client-go/tools/cache"
 	"net"
@@ -14,7 +14,7 @@ import (
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/client/informers/externalversions"
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/utils"
 
-	gobgp "github.com/osrg/gobgp/pkg/server"
+	gobgp "github.com/osrg/gobgp/v3/pkg/server"
 	"google.golang.org/grpc"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"

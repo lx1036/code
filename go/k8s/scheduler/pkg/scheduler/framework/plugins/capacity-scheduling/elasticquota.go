@@ -2,7 +2,6 @@ package capacity_scheduling
 
 import (
 	//framework "k8s-lx1036/k8s/scheduler/pkg/scheduler/framework"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"

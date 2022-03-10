@@ -12,8 +12,8 @@ import (
 	"k8s-lx1036/k8s/network/loadbalancer/kube-router/cmd/app/options"
 	"k8s-lx1036/k8s/network/loadbalancer/kube-router/pkg/utils"
 
-	gobgpapi "github.com/osrg/gobgp/api"
-	gobgp "github.com/osrg/gobgp/pkg/server"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
+	gobgp "github.com/osrg/gobgp/v3/pkg/server"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -131,7 +131,7 @@ func NewNetworkRoutingController(
 	controller.globalPeerRouters = append(controller.globalPeerRouters, &gobgpapi.Peer{
 		Conf: &gobgpapi.PeerConf{
 			NeighborAddress: option.PeerRouterAddr,
-			PeerAs:          65100,
+			PeerAsn:         65100,
 		},
 		Timers: &gobgpapi.Timers{Config: &gobgpapi.TimersConfig{HoldTime: uint64(option.BGPHoldTime)}},
 		Transport: &gobgpapi.Transport{

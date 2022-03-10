@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/ptypes"
-	gobgpapi "github.com/osrg/gobgp/api"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
 	"github.com/vishvananda/netlink"
 )
 

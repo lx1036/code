@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	gobgpapi "github.com/osrg/gobgp/api"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog/v2"
 )

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	gobgpapi "github.com/osrg/gobgp/api"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
 	"k8s.io/klog/v2"
 )
 

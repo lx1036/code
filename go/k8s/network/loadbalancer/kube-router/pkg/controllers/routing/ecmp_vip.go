@@ -7,8 +7,8 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/any"
-	gobgpapi "github.com/osrg/gobgp/api"
-	bgppacket "github.com/osrg/gobgp/pkg/packet/bgp"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
+	bgppacket "github.com/osrg/gobgp/v3/pkg/packet/bgp"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	gobgpapi "github.com/osrg/gobgp/api"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
 )
 
 func (controller *NetworkRoutingController) isPeerEstablished(peerIP string) (bool, error) {
