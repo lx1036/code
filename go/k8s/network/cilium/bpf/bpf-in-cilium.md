@@ -2,6 +2,12 @@
 
 
 # eBPF
+安装辅助工具:
+```shell
+yum update -y && yum update -y iproute2 net-tools centos-release-scl llvm-toolset-7 bpftool && scl enable llvm-toolset-7 'bash' && clang --version && llc --version
+```
+
+
 eBPF go 包：https://github.com/cilium/ebpf
 examples: https://github.com/cilium/ebpf/blob/master/examples/README.md
 
