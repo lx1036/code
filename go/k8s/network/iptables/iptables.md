@@ -8,7 +8,7 @@
 **[iptables k8s go client](https://github.com/kubernetes/kubernetes/blob/master/pkg/util/iptables/iptables.go)**
 
 # iptables
-
+**[官网](https://linux.die.net/man/8/iptables)**
 ![iptables 工作流程图](./img/tables_traverse.jpg)
 ![iptables 思维导图](./img/iptables_mindmap.jpg)
 
@@ -27,6 +27,8 @@ netfilter: Linux 内核中实现包过滤防火墙的内部结构，属于`内�
 iptables -L -n # 默认是 filter 表
 # 可以指定表
 iptables -t nat -L -n
+iptables -t filter --list-rules
+iptables -t filter -S
 ```
 
 (2)iptables 4种规则表、5种链结构

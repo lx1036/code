@@ -265,17 +265,17 @@ func (controller *NetworkPolicyController) syncNetworkPolicyChains(networkPolici
 			switch policyType {
 			case networking.PolicyTypeIngress:
 				// create a ipset for all destination pod ip's matched by the policy spec PodSelector
-				targetDestPodIPSetName := policyDstPodIPSetName(policy.namespace, policy.name)
-				controller.RefreshIPSet(targetDestPodIPSetName, ipset.TypeHashIP, currentPodIPs)
-				err = controller.processIngressRules(policy, targetDestPodIPSetName, activePolicyIPSets)
+				targetDstPodIPSetName := policyDstPodIPSetName(policy.namespace, policy.name)
+				controller.refreshIPSet(targetDstPodIPSetName, ipset.TypeHashIP, currentPodIPs)
+				err = controller.processIngressRules(policy, targetDstPodIPSetName, activePolicyIPSets)
 				if err != nil {
 					return nil, nil, err
 				}
-				activePolicyIPSets[targetDestPodIPSetName] = true
+				activePolicyIPSets[targetDstPodIPSetName] = true
 			case networking.PolicyTypeEgress:
 				// create a ipset for all source pod ip's matched by the policy spec PodSelector
 				targetSourcePodIPSetName := policySrcPodIPSetName(policy.namespace, policy.name)
-				controller.RefreshIPSet(targetSourcePodIPSetName, ipset.TypeHashIP, currentPodIPs)
+				controller.refreshIPSet(targetSourcePodIPSetName, ipset.TypeHashIP, currentPodIPs)
 				err = controller.processEgressRules(policy, targetSourcePodIPSetName, activePolicyIPSets)
 				if err != nil {
 					return nil, nil, err
@@ -293,7 +293,7 @@ func (controller *NetworkPolicyController) syncNetworkPolicyChains(networkPolici
 	return activePolicyChains, activePolicyIPSets, nil
 }
 
-func (controller *NetworkPolicyController) processIngressRules(policy networkPolicyInfo, targetDestPodIPSetName string, activePolicyIPSets map[string]bool) error {
+func (controller *NetworkPolicyController) processIngressRules(policy networkPolicyInfo, targetDstPodIPSetName string, activePolicyIPSets map[string]bool) error {
 	// From network policy spec: "If field 'Ingress' is empty then this NetworkPolicy does not allow any traffic "
 	// so no whitelist rules to be added to the network policy
 	if policy.ingressRules == nil {
@@ -301,19 +301,19 @@ func (controller *NetworkPolicyController) processIngressRules(policy networkPol
 	}
 
 	policyChainName := networkPolicyChainName(policy.namespace, policy.name)
-	// ingress
 	for id, rule := range policy.ingressRules {
+		comment := fmt.Sprintf("rule to ACCEPT traffic from source pods to dest pods selected by policy name %s namespace %s", policy.name, policy.namespace)
+
 		if len(rule.srcPods) != 0 {
 			// Create policy based ipset with source pod IPs
 			srcPodIPSetName := policyIndexedSrcPodIPSetName(policy.namespace, policy.name, id)
 			activePolicyIPSets[srcPodIPSetName] = true
-			controller.RefreshIPSet(srcPodIPSetName, ipset.TypeHashIP, getIPsFromPods(rule.srcPods))
+			controller.refreshIPSet(srcPodIPSetName, ipset.TypeHashIP, getIPsFromPods(rule.srcPods))
 
 			// If the ingress policy contains port declarations, we need to make sure that we match on pod IP and port
 			if len(rule.ports) != 0 {
 				for _, port := range rule.ports {
-					comment := fmt.Sprintf("rule to ACCEPT traffic from source pods to dest pods selected by policy name %s namespace %s", policy.name, policy.namespace)
-					controller.appendIPTableRules(policyChainName, comment, srcPodIPSetName, targetDestPodIPSetName, port.protocol, port.port, port.endport)
+					controller.appendIPTableRules(policyChainName, comment, srcPodIPSetName, targetDstPodIPSetName, port.protocol, port.port, port.endport)
 				}
 			}
 
@@ -323,8 +323,7 @@ func (controller *NetworkPolicyController) processIngressRules(policy networkPol
 				for portIdx, eps := range rule.namedPorts {
 					namedPortIPSetName := policyIndexedIngressNamedPortIPSetName(policy.namespace, policy.name, id, portIdx)
 					activePolicyIPSets[namedPortIPSetName] = true
-					controller.RefreshIPSet(namedPortIPSetName, ipset.TypeHashIP, eps.ips)
-					comment := fmt.Sprintf("rule to ACCEPT traffic from source pods to dest pods selected by policy name %s namespace %s", policy.name, policy.namespace)
+					controller.refreshIPSet(namedPortIPSetName, ipset.TypeHashIP, eps.ips)
 					controller.appendIPTableRules(policyChainName, comment, srcPodIPSetName, namedPortIPSetName, eps.protocol, eps.port, eps.endport)
 				}
 			}
@@ -333,26 +332,24 @@ func (controller *NetworkPolicyController) processIngressRules(policy networkPol
 			if len(rule.ports) == 0 && len(rule.namedPorts) == 0 {
 				// case where no 'ports' details specified in the ingress rule but 'from' details specified
 				// so match on specified source and destination ip with all port and protocol
-				comment := fmt.Sprintf("rule to ACCEPT traffic from source pods to dest pods selected by policy name %s namespace %s", policy.name, policy.namespace)
-				controller.appendIPTableRules(policyChainName, comment, srcPodIPSetName, targetDestPodIPSetName, "", "", "")
+				controller.appendIPTableRules(policyChainName, comment, srcPodIPSetName, targetDstPodIPSetName, "", "", "")
 			}
 		}
 
-		comment := fmt.Sprintf("rule to ACCEPT traffic from all sources to dest pods selected by policy name %s namespace %s", policy.name, policy.namespace)
 		if rule.matchAllSource && !rule.matchAllPorts {
 			for _, port := range rule.ports {
-				controller.appendIPTableRules(policyChainName, comment, "", targetDestPodIPSetName, port.protocol, port.port, port.endport)
+				controller.appendIPTableRules(policyChainName, comment, "", targetDstPodIPSetName, port.protocol, port.port, port.endport)
 			}
 			for portIdx, eps := range rule.namedPorts {
 				namedPortIPSetName := policyIndexedIngressNamedPortIPSetName(policy.namespace, policy.name, id, portIdx)
 				activePolicyIPSets[namedPortIPSetName] = true
-				controller.RefreshIPSet(namedPortIPSetName, ipset.TypeHashIP, eps.ips)
+				controller.refreshIPSet(namedPortIPSetName, ipset.TypeHashIP, eps.ips)
 				controller.appendIPTableRules(policyChainName, comment, "", namedPortIPSetName, eps.protocol, eps.port, eps.endport)
 			}
 		}
 
 		if rule.matchAllSource && rule.matchAllPorts {
-			controller.appendIPTableRules(policyChainName, comment, "", targetDestPodIPSetName, "", "", "")
+			controller.appendIPTableRules(policyChainName, comment, "", targetDstPodIPSetName, "", "", "")
 		}
 
 		comment = fmt.Sprintf("rule to ACCEPT traffic from specified ipBlocks to dest pods selected by policy name %s namespace %s", policy.name, policy.namespace)
@@ -361,15 +358,15 @@ func (controller *NetworkPolicyController) processIngressRules(policy networkPol
 			activePolicyIPSets[srcIPBlockIPSetName] = true
 			controller.ipsetCmdHandler.RefreshSet(srcIPBlockIPSetName, rule.srcIPBlocks, ipset.TypeHashNet)
 			if rule.matchAllPorts {
-				controller.appendIPTableRules(policyChainName, comment, srcIPBlockIPSetName, targetDestPodIPSetName, "", "", "")
+				controller.appendIPTableRules(policyChainName, comment, srcIPBlockIPSetName, targetDstPodIPSetName, "", "", "")
 			} else {
 				for _, port := range rule.ports {
-					controller.appendIPTableRules(policyChainName, comment, srcIPBlockIPSetName, targetDestPodIPSetName, port.protocol, port.port, port.endport)
+					controller.appendIPTableRules(policyChainName, comment, srcIPBlockIPSetName, targetDstPodIPSetName, port.protocol, port.port, port.endport)
 				}
 				for portIdx, eps := range rule.namedPorts {
 					namedPortIPSetName := policyIndexedIngressNamedPortIPSetName(policy.namespace, policy.name, id, portIdx)
 					activePolicyIPSets[namedPortIPSetName] = true
-					controller.RefreshIPSet(namedPortIPSetName, ipset.TypeHashNet, eps.ips)
+					controller.refreshIPSet(namedPortIPSetName, ipset.TypeHashNet, eps.ips)
 					controller.appendIPTableRules(policyChainName, comment, srcIPBlockIPSetName, namedPortIPSetName, eps.protocol, eps.port, eps.endport)
 				}
 			}
@@ -379,7 +376,78 @@ func (controller *NetworkPolicyController) processIngressRules(policy networkPol
 	return nil
 }
 
-func (controller *NetworkPolicyController) RefreshIPSet(ipsetName, setType string, ips []string) {
+func (controller *NetworkPolicyController) processEgressRules(policy networkPolicyInfo, targetSrcPodIPSetName string, activePolicyIPSets map[string]bool) error {
+	if policy.egressRules == nil {
+		return nil
+	}
+
+	policyChainName := networkPolicyChainName(policy.namespace, policy.name)
+	for id, rule := range policy.egressRules {
+		comment := fmt.Sprintf("rule to ACCEPT traffic from source pods to dest pods selected by policy name %s namespace %s", policy.name, policy.namespace)
+
+		if len(rule.dstPods) != 0 {
+			dstPodIPSetName := policyIndexedDstPodIPSetName(policy.namespace, policy.name, id)
+			activePolicyIPSets[dstPodIPSetName] = true
+			controller.refreshIPSet(dstPodIPSetName, ipset.TypeHashIP, getIPsFromPods(rule.dstPods))
+
+			// If the egress policy contains port declarations, we need to make sure that we match on pod IP and port
+			if len(rule.ports) != 0 {
+				for _, port := range rule.ports {
+					controller.appendIPTableRules(policyChainName, comment, targetSrcPodIPSetName, dstPodIPSetName, port.protocol, port.port, port.endport)
+				}
+			}
+
+			// If the ingress policy contains named port declarations, we need to make sure that we match on pod IP and
+			// the resolved port number
+			if len(rule.namedPorts) != 0 {
+				for portIdx, eps := range rule.namedPorts {
+					namedPortIPSetName := policyIndexedEgressNamedPortIPSetName(policy.namespace, policy.name, id, portIdx)
+					activePolicyIPSets[namedPortIPSetName] = true
+					controller.refreshIPSet(namedPortIPSetName, ipset.TypeHashIP, eps.ips)
+					controller.appendIPTableRules(policyChainName, comment, targetSrcPodIPSetName, namedPortIPSetName, eps.protocol, eps.port, eps.endport)
+				}
+			}
+
+			// If the ingress policy contains no ports at all create the policy based only on IP
+			if len(rule.ports) == 0 && len(rule.namedPorts) == 0 {
+				// case where no 'ports' details specified in the ingress rule but 'from' details specified
+				// so match on specified source and destination ip with all port and protocol
+				controller.appendIPTableRules(policyChainName, comment, targetSrcPodIPSetName, dstPodIPSetName, "", "", "")
+			}
+		}
+
+		if rule.matchAllDestinations && !rule.matchAllPorts {
+			for _, port := range rule.ports {
+				controller.appendIPTableRules(policyChainName, comment, targetSrcPodIPSetName, "", port.protocol, port.port, port.endport)
+			}
+			for _, eps := range rule.namedPorts {
+				controller.appendIPTableRules(policyChainName, comment, targetSrcPodIPSetName, "", eps.protocol, eps.port, eps.endport)
+			}
+		}
+
+		if rule.matchAllDestinations && rule.matchAllPorts {
+			controller.appendIPTableRules(policyChainName, comment, targetSrcPodIPSetName, "", "", "", "")
+		}
+
+		comment = fmt.Sprintf("rule to ACCEPT traffic from source pods to specified ipBlocks selected by policy name %s namespace %s", policy.name, policy.namespace)
+		if len(rule.dstIPBlocks) != 0 {
+			dstIPBlockIPSetName := policyIndexedDstIPBlockIPSetName(policy.namespace, policy.name, id)
+			activePolicyIPSets[dstIPBlockIPSetName] = true
+			controller.ipsetCmdHandler.RefreshSet(dstIPBlockIPSetName, rule.dstIPBlocks, ipset.TypeHashNet)
+			if rule.matchAllPorts {
+				controller.appendIPTableRules(policyChainName, comment, targetSrcPodIPSetName, dstIPBlockIPSetName, "", "", "")
+			} else {
+				for _, port := range rule.ports {
+					controller.appendIPTableRules(policyChainName, comment, targetSrcPodIPSetName, dstIPBlockIPSetName, port.protocol, port.port, port.endport)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (controller *NetworkPolicyController) refreshIPSet(ipsetName, setType string, ips []string) {
 	setEntries := make([][]string, 0)
 	for _, ip := range ips {
 		setEntries = append(setEntries, []string{ip, ipset.OptionTimeout, "0"})
@@ -388,6 +456,7 @@ func (controller *NetworkPolicyController) RefreshIPSet(ipsetName, setType strin
 	controller.ipsetCmdHandler.RefreshSet(ipsetName, setEntries, setType)
 }
 
+// https://linux.die.net/man/8/iptables --set
 // `iptables -A {chain} -m comment --comment {comment} -m set --match-set {match-set} src -m set --match-set {match-set} dst -p {protocol} -dport {port} -j MARK --set-xmark 0x10000/0x10000`
 // `iptables -A {chain} -m comment --comment {comment} -m set --match-set {match-set} src -m set --match-set {match-set} dst -p {protocol} -dport {port} -m mark --mark 0x10000/0x10000 -j RETURN`
 func (controller *NetworkPolicyController) appendIPTableRules(policyChainName, comment, srcIPSetName, dstIPSetName,

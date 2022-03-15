@@ -13,40 +13,54 @@ const (
 )
 
 func networkPolicyChainName(namespace, policyName string) string {
-	hash := sha256.Sum256([]byte(namespace + policyName))
-	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	return kubeNetworkPolicyChainPrefix + encoded[:16]
+	data := namespace + policyName
+	return encode(kubeNetworkPolicyChainPrefix, data)
 }
 
 func policyDstPodIPSetName(namespace, policyName string) string {
-	hash := sha256.Sum256([]byte(namespace + policyName))
-	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	return kubeDestinationIPSetPrefix + encoded[:16]
+	data := namespace + policyName
+	return encode(kubeDestinationIPSetPrefix, data)
 }
 
 func policySrcPodIPSetName(namespace, policyName string) string {
-	hash := sha256.Sum256([]byte(namespace + policyName))
-	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	return kubeSourceIPSetPrefix + encoded[:16]
+	data := namespace + policyName
+	return encode(kubeSourceIPSetPrefix, data)
 }
 
 func policyIndexedSrcPodIPSetName(namespace, policyName string, ingressRuleNo int) string {
-	hash := sha256.Sum256([]byte(namespace + policyName + "ingressrule" + strconv.Itoa(ingressRuleNo) + "pod"))
-	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	return kubeSourceIPSetPrefix + encoded[:16]
+	data := namespace + policyName + "ingressrule" + strconv.Itoa(ingressRuleNo) + "pod"
+	return encode(kubeSourceIPSetPrefix, data)
+}
+
+func policyIndexedDstPodIPSetName(namespace, policyName string, egressRuleNo int) string {
+	data := namespace + policyName + "egressrule" + strconv.Itoa(egressRuleNo) + "pod"
+	return encode(kubeDestinationIPSetPrefix, data)
 }
 
 func policyIndexedIngressNamedPortIPSetName(namespace, policyName string, ingressRuleNo, namedPortNo int) string {
-	hash := sha256.Sum256([]byte(namespace + policyName + "ingressrule" + strconv.Itoa(ingressRuleNo) +
-		strconv.Itoa(namedPortNo) + "namedport"))
-	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	return kubeDestinationIPSetPrefix + encoded[:16]
+	data := namespace + policyName + "ingressrule" + strconv.Itoa(ingressRuleNo) + strconv.Itoa(namedPortNo) + "namedport"
+	return encode(kubeDestinationIPSetPrefix, data)
+}
+
+func policyIndexedEgressNamedPortIPSetName(namespace, policyName string, egressRuleNo, namedPortNo int) string {
+	data := namespace + policyName + "egressrule" + strconv.Itoa(egressRuleNo) + strconv.Itoa(namedPortNo) + "namedport"
+	return encode(kubeDestinationIPSetPrefix, data)
 }
 
 func policyIndexedSourceIPBlockIPSetName(namespace, policyName string, ingressRuleNo int) string {
-	hash := sha256.Sum256([]byte(namespace + policyName + "ingressrule" + strconv.Itoa(ingressRuleNo) + "ipblock"))
+	data := namespace + policyName + "ingressrule" + strconv.Itoa(ingressRuleNo) + "ipblock"
+	return encode(kubeSourceIPSetPrefix, data)
+}
+
+func policyIndexedDstIPBlockIPSetName(namespace, policyName string, egressRuleNo int) string {
+	data := namespace + policyName + "egressrule" + strconv.Itoa(egressRuleNo) + "ipblock"
+	return encode(kubeDestinationIPSetPrefix, data)
+}
+
+func encode(prefix, data string) string {
+	hash := sha256.Sum256([]byte(data))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	return kubeSourceIPSetPrefix + encoded[:16]
+	return prefix + encoded[:16]
 }
 
 func getIPsFromPods(pods []podInfo) []string {

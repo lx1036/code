@@ -33,6 +33,8 @@ var (
 	}
 )
 
+// iptables -t filter --list-rules
+
 type NetworkPolicyController struct {
 	ipsetMutex *sync.Mutex
 
@@ -40,6 +42,7 @@ type NetworkPolicyController struct {
 	podLister           cache.Indexer
 	namespaceLister     cache.Indexer
 
+	// RETURN means stop traversing this chain and resume at the next rule in the previous (calling) chain.
 	iptablesCmdHandler iptables.Interface
 	ipsetCmdHandler    *ipset.IPSet
 
@@ -273,5 +276,35 @@ func (controller *NetworkPolicyController) syncPolicy() {
 		klog.Errorf("Failed to cleanup stale ipsets: %v", err.Error())
 		return
 	}
+
+}
+
+func (controller *NetworkPolicyController) ensureExplicitAccept() {
+	// for the traffic to/from the local pod's let network policy controller be
+	// authoritative entity to ACCEPT the traffic if it complies to network policies
+	for _, customChain := range defaultChains {
+		args := []string{"-m", "comment", "--comment", "rule to explicitly ACCEPT traffic that comply to network policies",
+			"-m", "mark", "--mark", "0x20000/0x20000", "-j", "ACCEPT"}
+
+		controller.filterTableRules = AppendUnique(controller.filterTableRules, string(customChain), args)
+	}
+}
+
+func AppendUnique(buffer bytes.Buffer, chain string, rule []string) bytes.Buffer {
+	var desiredBuffer bytes.Buffer
+	rules := strings.Split(strings.TrimSpace(buffer.String()), "\n")
+	for _, foundRule := range rules {
+		if strings.Contains(foundRule, chain) && strings.Contains(foundRule, strings.Join(rule, " ")) {
+			continue
+		}
+		desiredBuffer.WriteString(foundRule + "\n")
+	}
+	ruleStr := strings.Join(append([]string{"-A", chain}, rule...), " ")
+	desiredBuffer.WriteString(ruleStr + "\n")
+	return desiredBuffer
+}
+
+func (controller *NetworkPolicyController) cleanupStaleRules(activePolicyChains, activePodFwChains map[string]bool,
+	deleteDefaultChains bool) error {
 
 }

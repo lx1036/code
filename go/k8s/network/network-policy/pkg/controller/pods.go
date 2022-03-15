@@ -11,6 +11,10 @@ func (controller *NetworkPolicyController) ListPodsByNamespaceAndLabels(namespac
 	return listerv1.NewPodLister(controller.podLister).Pods(namespace).List(podSelector)
 }
 
+func (controller *NetworkPolicyController) syncPodFirewallChains(networkPoliciesInfo []networkPolicyInfo) map[string]bool {
+
+}
+
 func isNetworkPolicyPod(pod *corev1.Pod) bool {
 	return len(pod.Status.PodIP) != 0 && !pod.Spec.HostNetwork && pod.Status.Phase == corev1.PodRunning
 }
