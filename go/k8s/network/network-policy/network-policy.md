@@ -3,6 +3,9 @@
 @see https://github.com/cloudnativelabs/kube-router/blob/master/docs/how-it-works.md#pod-ingress-firewall
 使用 iptables, ipset and conntrack 技术实现 Network Policy。并挂载在 filter table。
 
+```shell
+yum install -y conntrack
+```
 
 
 (1)Terway + Cilium
