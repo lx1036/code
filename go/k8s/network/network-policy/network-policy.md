@@ -29,7 +29,7 @@ spec:
   ingress:
   - from:
     - podSelector: {}
-  podSelector: {}
+  podSelector: {} # target pods, labels.Everything()
   policyTypes:
     - Ingress
 ```
@@ -83,6 +83,12 @@ spec:
   - to:
     - ipBlock:
         cidr: 14.215.0.0/16
+#    - namespaceSelector:
+#        matchLabels:
+#          app: bar
+#    - podSelector:
+#        matchLabels:
+#          app: bar2    
     ports:
     - protocol: TCP
       port: 5978
@@ -102,6 +108,12 @@ metadata:
 spec:
   ingress:
   - from:
+#    - namespaceSelector:
+#        matchLabels:
+#          app: bar
+#    - podSelector:
+#        matchLabels:
+#          app: bar2
     - ipBlock:
         cidr: 14.215.0.0/16
     ports:

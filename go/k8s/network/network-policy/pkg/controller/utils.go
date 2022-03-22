@@ -10,6 +10,7 @@ const (
 	kubeNetworkPolicyChainPrefix = "KUBE-NWPLCY-"
 	kubeDestinationIPSetPrefix   = "KUBE-DST-"
 	kubeSourceIPSetPrefix        = "KUBE-SRC-"
+	kubePodFirewallChainPrefix   = "KUBE-POD-FW-"
 )
 
 func networkPolicyChainName(namespace, policyName string) string {
@@ -55,6 +56,11 @@ func policyIndexedSourceIPBlockIPSetName(namespace, policyName string, ingressRu
 func policyIndexedDstIPBlockIPSetName(namespace, policyName string, egressRuleNo int) string {
 	data := namespace + policyName + "egressrule" + strconv.Itoa(egressRuleNo) + "ipblock"
 	return encode(kubeDestinationIPSetPrefix, data)
+}
+
+func podFirewallChainName(namespace, policyName string) string {
+	data := namespace + policyName
+	return encode(kubePodFirewallChainPrefix, data)
 }
 
 func encode(prefix, data string) string {

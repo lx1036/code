@@ -10,6 +10,7 @@ import (
 	listerv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	"strconv"
 	"strings"
 )
 
@@ -28,7 +29,6 @@ type networkPolicyInfo struct {
 	// whitelist egress rules from the network policy spec
 	egressRules []egressRule
 
-	// policy type "ingress" or "egress" or "both" as defined by PolicyType in the spec
 	policyTypes []networking.PolicyType
 }
 
@@ -89,7 +89,7 @@ func (controller *NetworkPolicyController) buildNetworkPoliciesInfo() ([]network
 					namespace: pod.ObjectMeta.Namespace,
 					labels:    pod.ObjectMeta.Labels,
 				}
-				controller.grabNamedPortFromPod(pod, &namedPort2IngressEps)
+				//controller.grabNamedPortFromPod(pod, &namedPort2IngressEps) // TODO: skip named port
 			}
 		}
 
@@ -133,7 +133,7 @@ func (controller *NetworkPolicyController) buildNetworkPolicyIngressRule(network
 			rule.matchAllPorts = true
 		} else {
 			rule.matchAllPorts = false
-			rule.ports, rule.namedPorts = controller.processNetworkPolicyPorts(ingress.Ports, namedPort2IngressEps)
+			rule.ports, rule.namedPorts = controller.processNetworkPolicyPorts(ingress.Ports)
 		}
 
 		ingressRules = append(ingressRules, rule)
@@ -158,7 +158,7 @@ func (controller *NetworkPolicyController) buildNetworkPolicyEgressRule(networkP
 					if !isNetworkPolicyPod(pod) {
 						continue
 					}
-					controller.grabNamedPortFromPod(pod, &namedPort2EgressEps)
+					//controller.grabNamedPortFromPod(pod, &namedPort2EgressEps) // TODO: skip named port
 				}
 			}
 		} else {
@@ -176,7 +176,7 @@ func (controller *NetworkPolicyController) buildNetworkPolicyEgressRule(networkP
 							labels:    pod.ObjectMeta.Labels,
 						})
 
-						controller.grabNamedPortFromPod(pod, &namedPort2EgressEps)
+						//controller.grabNamedPortFromPod(pod, &namedPort2EgressEps) // TODO: skip named port
 					}
 				}
 
@@ -188,7 +188,7 @@ func (controller *NetworkPolicyController) buildNetworkPolicyEgressRule(networkP
 			rule.matchAllPorts = true
 		} else {
 			rule.matchAllPorts = false
-			rule.ports, rule.namedPorts = controller.processNetworkPolicyPorts(egress.Ports, namedPort2EgressEps)
+			rule.ports, rule.namedPorts = controller.processNetworkPolicyPorts(egress.Ports)
 		}
 
 		egressRules = append(egressRules, rule)
@@ -227,8 +227,29 @@ func (controller *NetworkPolicyController) listPodsByNetworkPolicyPeer(peer netw
 	return matchingPods, err
 }
 
-func (controller *NetworkPolicyController) processNetworkPolicyPorts(npPorts []networking.NetworkPolicyPort, namedPort2eps namedPort2eps) (numericPorts []protocolAndPort, namedPorts []endPoints) {
+func (controller *NetworkPolicyController) processNetworkPolicyPorts(ports []networking.NetworkPolicyPort) (numericPorts []protocolAndPort, namedPorts []endPoints) {
+	for _, port := range ports {
+		var protocol string
+		if port.Protocol != nil {
+			protocol = string(*port.Protocol)
+		}
+		if port.Port == nil {
+			numericPorts = append(numericPorts, protocolAndPort{port: "", protocol: protocol})
+		} else if port.Port.Type == intstr.Int {
+			var portProto protocolAndPort
+			if port.EndPort != nil {
+				if *port.EndPort >= port.Port.IntVal {
+					portProto.endport = strconv.Itoa(int(*port.EndPort))
+				}
+			}
+			portProto.protocol, portProto.port = protocol, port.Port.String()
+			numericPorts = append(numericPorts, portProto)
+		} else {
+			// TODO: skip named port
+		}
+	}
 
+	return
 }
 
 // Configure iptables rules representing each network policy. All pod's matched by
@@ -265,7 +286,7 @@ func (controller *NetworkPolicyController) syncNetworkPolicyChains(networkPolici
 			switch policyType {
 			case networking.PolicyTypeIngress:
 				// create a ipset for all destination pod ip's matched by the policy spec PodSelector
-				targetDstPodIPSetName := policyDstPodIPSetName(policy.namespace, policy.name)
+				targetDstPodIPSetName := policyDstPodIPSetName(policy.namespace, policy.name) // target pod ipset name
 				controller.refreshIPSet(targetDstPodIPSetName, ipset.TypeHashIP, currentPodIPs)
 				err = controller.processIngressRules(policy, targetDstPodIPSetName, activePolicyIPSets)
 				if err != nil {
@@ -274,13 +295,13 @@ func (controller *NetworkPolicyController) syncNetworkPolicyChains(networkPolici
 				activePolicyIPSets[targetDstPodIPSetName] = true
 			case networking.PolicyTypeEgress:
 				// create a ipset for all source pod ip's matched by the policy spec PodSelector
-				targetSourcePodIPSetName := policySrcPodIPSetName(policy.namespace, policy.name)
-				controller.refreshIPSet(targetSourcePodIPSetName, ipset.TypeHashIP, currentPodIPs)
-				err = controller.processEgressRules(policy, targetSourcePodIPSetName, activePolicyIPSets)
+				targetSrcPodIPSetName := policySrcPodIPSetName(policy.namespace, policy.name)
+				controller.refreshIPSet(targetSrcPodIPSetName, ipset.TypeHashIP, currentPodIPs)
+				err = controller.processEgressRules(policy, targetSrcPodIPSetName, activePolicyIPSets)
 				if err != nil {
 					return nil, nil, err
 				}
-				activePolicyIPSets[targetSourcePodIPSetName] = true
+				activePolicyIPSets[targetSrcPodIPSetName] = true
 			}
 		}
 	}
@@ -293,6 +314,30 @@ func (controller *NetworkPolicyController) syncNetworkPolicyChains(networkPolici
 	return activePolicyChains, activePolicyIPSets, nil
 }
 
+/*
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-network-policy
+  namespace: foo
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          app: bar
+    - podSelector:
+        matchLabels:
+          app: bar2
+    - ipBlock:
+        cidr: 14.215.0.0/16
+    ports:
+    - protocol: TCP
+      port: 5978
+  podSelector: {}
+  policyTypes:
+    - Ingress
+*/
 func (controller *NetworkPolicyController) processIngressRules(policy networkPolicyInfo, targetDstPodIPSetName string, activePolicyIPSets map[string]bool) error {
 	// From network policy spec: "If field 'Ingress' is empty then this NetworkPolicy does not allow any traffic "
 	// so no whitelist rules to be added to the network policy
@@ -376,6 +421,30 @@ func (controller *NetworkPolicyController) processIngressRules(policy networkPol
 	return nil
 }
 
+/*
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-network-policy
+  namespace: foo
+spec:
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 14.215.0.0/16
+    - namespaceSelector:
+        matchLabels:
+          app: bar
+    - podSelector:
+        matchLabels:
+          app: bar2
+    ports:
+    - protocol: TCP
+      port: 5978
+  podSelector: {}
+  policyTypes:
+    - Egress
+*/
 func (controller *NetworkPolicyController) processEgressRules(policy networkPolicyInfo, targetSrcPodIPSetName string, activePolicyIPSets map[string]bool) error {
 	if policy.egressRules == nil {
 		return nil
@@ -457,8 +526,9 @@ func (controller *NetworkPolicyController) refreshIPSet(ipsetName, setType strin
 }
 
 // https://linux.die.net/man/8/iptables --set
-// `iptables -A {chain} -m comment --comment {comment} -m set --match-set {match-set} src -m set --match-set {match-set} dst -p {protocol} -dport {port} -j MARK --set-xmark 0x10000/0x10000`
-// `iptables -A {chain} -m comment --comment {comment} -m set --match-set {match-set} src -m set --match-set {match-set} dst -p {protocol} -dport {port} -m mark --mark 0x10000/0x10000 -j RETURN`
+// CONNMARK: --set-mark mark[/mask] "Set connection mark. If a mask is specified then only those bits set in the mask is modified."
+// `iptables -A {chain} -m comment --comment {comment} -m set --match-set {srcIPSetName} src -m set --match-set {dstIPSetName} dst -p {protocol} --dport {port} -j MARK --set-xmark 0x10000/0x10000`
+// `iptables -A {chain} -m comment --comment {comment} -m set --match-set {srcIPSetName} src -m set --match-set {dstIPSetName} dst -p {protocol} --dport {port} -m mark --mark 0x10000/0x10000 -j RETURN`
 func (controller *NetworkPolicyController) appendIPTableRules(policyChainName, comment, srcIPSetName, dstIPSetName,
 	protocol, dPort, endPort string) {
 	args := make([]string, 0)
@@ -483,9 +553,9 @@ func (controller *NetworkPolicyController) appendIPTableRules(policyChainName, c
 		}
 	}
 
-	markArgs := append(args, "-j", "MARK", "--set-xmark", "0x10000/0x10000", "\n")
+	markArgs := append(args, "-j", "MARK", "--set-xmark", ConntrackMark, "\n")
 	controller.filterTableRules.WriteString(strings.Join(markArgs, " "))
-	args = append(args, "-m", "mark", "--mark", "0x10000/0x10000", "-j", "RETURN", "\n")
+	args = append(args, "-m", "mark", "--mark", ConntrackMark, "-j", "RETURN", "\n")
 	controller.filterTableRules.WriteString(strings.Join(args, " "))
 }
 

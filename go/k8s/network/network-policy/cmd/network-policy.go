@@ -5,17 +5,11 @@ import (
 	"os"
 	"runtime"
 
-	"k8s-lx1036/k8s/network/loadbalancer/bgplb/cmd/app"
-	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/apis/bgplb.k9s.io/v1"
+	"k8s-lx1036/k8s/network/network-policy/cmd/app"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/component-base/logs"
 )
-
-func init() {
-	_ = v1.AddToScheme(scheme.Scheme)
-}
 
 func main() {
 	logs.InitLogs()
@@ -25,7 +19,7 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
-	cmd := app.NewBGPLBCommand(genericapiserver.SetupSignalHandler())
+	cmd := app.NewNetworkPolicyCommand(genericapiserver.SetupSignalHandler())
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
 		panic(err)
