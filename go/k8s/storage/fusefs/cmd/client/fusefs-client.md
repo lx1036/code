@@ -5,7 +5,15 @@ Linux 文件系统为每个文件分配两个数据结构：inode 和 dentry。
 
 该 fusefs-client 可以直接本地与 polefs meta/master 组件一起使用。
 
-
+```shell
+# 当前 ./globalmount 目录下只有一个 hello 文件 
+# `ll` 命令触发的 fuse 接口函数
+OpenDir (inode 1, PID 34787) -> ReadDir (inode 1, PID 34787) -> 
+LookUpInode (parent 1, name "hello", PID 34787) -> ReadDir (inode 1, PID 34787) ->
+ReadDir (inode 1, PID 34787) -> ReadDir (inode 1, PID 34787) -> 
+GetInodeAttributes (inode 1, PID 34787) -> ReleaseDirHandle(PID 34787) -> 
+LookUpInode(parent 1, name "hello", PID 34787) -> LookUpInode (parent 1, name "hello", PID 34787)
+```
 
 
 ### Fuse 内核模块

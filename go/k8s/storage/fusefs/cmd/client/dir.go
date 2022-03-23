@@ -15,12 +15,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-/*
-`ls globalmount` 必须的方法: OpenDir()/ReadDir()/LookUpInode()/GetInodeAttributes()
-
-
-*/
-
 // MkDir `mkdir globalmount/1`
 func (fs *FuseFS) MkDir(ctx context.Context, op *fuseops.MkDirOp) error {
 	fs.Lock()
@@ -101,17 +95,23 @@ func NewDirHandleCache() *DirHandleCache {
 	}
 }
 
-func (dirHandleCache *DirHandleCache) Put(inodeID fuseops.InodeID, handleID fuseops.HandleID) {
+// Assign INFO: 在 dir 整个生命周期内(OpenDir -> ReleaseDirHandle)，为该 HandleID 分配一个 *DirHandle 对象
+func (dirHandleCache *DirHandleCache) Assign(inodeID fuseops.InodeID, handleID fuseops.HandleID) {
 	dirHandleCache.Lock()
 	defer dirHandleCache.Unlock()
-	dirHandleCache.handles[handleID] = &DirHandle{
-		inodeID: inodeID,
+
+	if _, ok := dirHandleCache.handles[handleID]; !ok {
+		dirHandleCache.handles[handleID] = &DirHandle{
+			inodeID: inodeID,
+			entries: make([]proto.Dentry, 0),
+		}
 	}
 }
 
 func (dirHandleCache *DirHandleCache) Release(handleID fuseops.HandleID) *DirHandle {
 	dirHandleCache.Lock()
 	defer dirHandleCache.Unlock()
+
 	if dirHandle, ok := dirHandleCache.handles[handleID]; ok {
 		delete(dirHandleCache.handles, handleID)
 		return dirHandle
@@ -124,27 +124,43 @@ func (dirHandleCache *DirHandleCache) Get(handleID fuseops.HandleID) *DirHandle 
 	return dirHandleCache.handles[handleID]
 }
 
+/*
+# 当前 ./globalmount 目录下只有一个 hello 文件
+# `ll` 命令触发的 fuse 接口函数
+OpenDir (inode 1, PID 34787) -> ReadDir (inode 1, PID 34787) ->
+LookUpInode (parent 1, name "hello", PID 34787) -> ReadDir (inode 1, PID 34787) ->
+ReadDir (inode 1, PID 34787) -> ReadDir (inode 1, PID 34787) ->
+GetInodeAttributes (inode 1, PID 34787) -> ReleaseDirHandle(PID 34787) ->
+LookUpInode(parent 1, name "hello", PID 34787) -> LookUpInode (parent 1, name "hello", PID 34787)
+*/
+
+// OpenDir INFO: 响应用户态的 open()
 func (fs *FuseFS) OpenDir(ctx context.Context, op *fuseops.OpenDirOp) error {
 	fs.Lock()
 	defer fs.Unlock()
 
-	fs.dirHandleCache.Put(op.Inode, op.Handle)
+	// op.Handle 在整个生命周期(OpenDir -> ReleaseDirHandle) 内，该 HandleID 是唯一有效的
+
+	fs.dirHandleCache.Assign(op.Inode, op.Handle)
 	return nil
 }
 
+// ReleaseDirHandle INFO: 响应用户态的 close(), all file descriptors are closed 后，调用该方法，且该 HandleID 不会哎后续 op 里出现
+func (fs *FuseFS) ReleaseDirHandle(ctx context.Context, op *fuseops.ReleaseDirHandleOp) error {
+	fs.Lock()
+	defer fs.Unlock()
+
+	_ = fs.dirHandleCache.Release(op.Handle)
+	return nil
+}
+
+// ReadDir INFO: `ll ./dir` Read entries from a directory previously opened with OpenDir.
 func (fs *FuseFS) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
 	fs.Lock()
 	defer fs.Unlock()
 
 	klog.Infof(fmt.Sprintf("[ReadDir]inodeID:%d, handleID:%d", op.Inode, op.Handle))
 	dirHandle := fs.dirHandleCache.Get(op.Handle)
-	if dirHandle == nil {
-		fs.dirHandleCache.Put(op.Inode, op.Handle)
-		dirHandle = fs.dirHandleCache.Get(op.Handle)
-	}
-
-	dirHandle.Lock()
-	defer dirHandle.Unlock()
 	if op.Offset == 0 || len(dirHandle.entries) == 0 {
 		children, err := fs.metaClient.ReadDir(op.Inode)
 		if err != nil {
@@ -181,20 +197,6 @@ func (fs *FuseFS) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
 		op.BytesRead += n
 
 		inode.dentryCache.Put(entry.Name, entry.Inode)
-	}
-
-	return nil
-}
-
-func (fs *FuseFS) ReleaseDirHandle(ctx context.Context, op *fuseops.ReleaseDirHandleOp) error {
-	fs.Lock()
-	defer fs.Unlock()
-
-	dirHandle := fs.dirHandleCache.Release(op.Handle)
-	if dirHandle != nil {
-		klog.Infof(fmt.Sprintf("[ReleaseDirHandle]inodeID:%d, handleID:%d", dirHandle.inodeID, op.Handle))
-	} else {
-		klog.Warningf(fmt.Sprintf("[ReleaseDirHandle]handleID:%d", op.Handle))
 	}
 
 	return nil

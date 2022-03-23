@@ -74,6 +74,8 @@ func (partition *Partition) Less(than btree.Item) bool {
 	return partition.Start < than.(*Partition).Start
 }
 
+// TODO: packet TCP 这块可以使用 grpc pb 来标准化
+
 type MetaClient struct {
 	sync.RWMutex
 
@@ -387,8 +389,6 @@ func (metaClient *MetaClient) GetInode(inodeID fuseops.InodeID) (*proto.InodeInf
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: packet TCP 这块可以使用 grpc pb 来标准化
 
 	conn, err := net.Dial("tcp", parentPartition.LeaderAddr)
 	if err != nil {
