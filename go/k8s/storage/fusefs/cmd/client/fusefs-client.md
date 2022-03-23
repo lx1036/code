@@ -1,6 +1,12 @@
 
 
-## FUSE(Filesystem in Userspace)
+# FUSE(Filesystem in Userspace)
+Linux 文件系统为每个文件分配两个数据结构：inode 和 dentry。
+
+该 fusefs-client 可以直接本地与 polefs meta/master 组件一起使用。
+
+
+
 
 ### Fuse 内核模块
 linux fuse: https://github.com/torvalds/linux/blob/master/fs/fuse

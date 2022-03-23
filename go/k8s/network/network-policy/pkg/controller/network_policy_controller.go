@@ -17,9 +17,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-	
+
 	"k8s-lx1036/k8s/network/network-policy/pkg/ipset"
-	
+
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/utils/exec"
@@ -30,7 +30,7 @@ const (
 	kubeForwardChainName   = "KUBE-ROUTER-FORWARD"
 	kubeOutputChainName    = "KUBE-ROUTER-OUTPUT"
 	kubeDefaultNetpolChain = "KUBE-NWPLCY-DEFAULT"
-	
+
 	ConntrackMark = "0x10000/0x10000"
 )
 
@@ -46,23 +46,23 @@ var (
 
 type NetworkPolicyController struct {
 	ipsetMutex *sync.Mutex
-	
+
 	networkPolicyLister cache.Indexer
 	podLister           cache.Indexer
 	namespaceLister     cache.Indexer
-	
+
 	// RETURN means stop traversing this chain and resume at the next rule in the previous (calling) chain.
 	iptablesCmdHandler iptables.Interface
 	ipsetCmdHandler    *ipset.IPSet
-	
+
 	serviceClusterIPRange   net.IPNet
 	serviceExternalIPRanges []net.IPNet
 	serviceNodePortRange    string
-	
+
 	filterTableRules bytes.Buffer // 不需要实例化
 	syncPeriod       time.Duration
 	nodeIP           net.IP
-	
+
 	stopCh chan struct{}
 }
 
@@ -79,15 +79,15 @@ func NewNetworkPolicyController(
 	}
 	controller := &NetworkPolicyController{
 		ipsetMutex: ipsetMutex,
-		
+
 		iptablesCmdHandler: iptables.New(exec.New(), iptables.ProtocolIPv4),
 		ipsetCmdHandler:    ipsetCmdHandler,
-		
+
 		networkPolicyLister: networkPolicyInformer.GetIndexer(),
 		podLister:           podInformer.GetIndexer(),
 		namespaceLister:     namespaceInformer.GetIndexer(),
 	}
-	
+
 	nodeName := os.Getenv("NODE_NAME")
 	if nodeName != "" {
 		node, err := clientset.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
@@ -102,7 +102,7 @@ func NewNetworkPolicyController(
 	} else {
 		return nil, fmt.Errorf("NODE_NAME env is empty")
 	}
-	
+
 	networkPolicyInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			controller.syncPolicy()
@@ -127,7 +127,7 @@ func NewNetworkPolicyController(
 			controller.syncPolicy()
 		},
 	})
-	
+
 	namespaceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ns := obj.(*corev1.Namespace)
@@ -155,14 +155,14 @@ func NewNetworkPolicyController(
 					return
 				}
 			}
-			
+
 			if ns.Labels == nil {
 				return
 			}
 			controller.syncPolicy()
 		},
 	})
-	
+
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*corev1.Pod)
@@ -194,7 +194,7 @@ func NewNetworkPolicyController(
 			controller.syncPolicy()
 		},
 	})
-	
+
 	return controller, nil
 }
 
@@ -214,7 +214,7 @@ func (controller *NetworkPolicyController) ensureDefaultNetworkPolicyChain() {
 				kubeDefaultNetpolChain, err.Error())
 		}
 	}
-	
+
 	// `iptables -t filter -A KUBE-NWPLCY-DEFAULT -j MARK -m comment --comment "rule to mark traffic matching a network policy" --set-xmark 0x10000/0x10000`
 	markArgs := []string{"-j", "MARK", "-m", "comment", "--comment", "rule to mark traffic matching a network policy", "--set-xmark", "0x10000/0x10000"}
 	_, err = controller.iptablesCmdHandler.EnsureRule(iptables.Append, iptables.TableFilter, kubeDefaultNetpolChain, markArgs...)
@@ -233,7 +233,7 @@ func (controller *NetworkPolicyController) ensureTopLevelChains() {
 	const whitelistTCPNodePortsPosition = "2"
 	const whitelistUDPNodePortsPosition = "3"
 	const externalIPPositionAdditive = 4
-	
+
 	addUUIDForRuleSpec := func(chain iptables.Chain, ruleSpec *[]string) (string, error) {
 		hash := sha256.Sum256([]byte(fmt.Sprintf("%s%s", chain, strings.Join(*ruleSpec, ""))))
 		encoded := base32.StdEncoding.EncodeToString(hash[:])[:16] // hash rule
@@ -246,19 +246,19 @@ func (controller *NetworkPolicyController) ensureTopLevelChains() {
 		return "", fmt.Errorf("could not find a comment in the ruleSpec string given: %s",
 			strings.Join(*ruleSpec, " "))
 	}
-	
+
 	for builtinChain, customChain := range defaultChains {
 		_, err := controller.iptablesCmdHandler.EnsureChain(iptables.TableFilter, customChain)
 		if err != nil {
 			klog.Fatalf("failed to run iptables command to create %s chain due to %s", customChain, err.Error())
 		}
-		
+
 		args := []string{"-m", "comment", "--comment", "kube-router netpol", "-j", string(customChain)}
 		_, err = addUUIDForRuleSpec(builtinChain, &args)
 		if err != nil {
 			klog.Fatalf("Failed to get uuid for rule: %s", err.Error())
 		}
-		
+
 		// iptables -t filter -I INPUT -m comment --comment "kube-router netpol-xxx" -j KUBE-ROUTER-INPUT
 		// iptables -t filter -I FORWARD -m comment --comment "kube-router netpol-xxx" -j KUBE-ROUTER-FORWARD
 		// iptables -t filter -I OUTPUT -m comment --comment "kube-router netpol-xxx" -j KUBE-ROUTER-OUTPUT
@@ -268,7 +268,7 @@ func (controller *NetworkPolicyController) ensureTopLevelChains() {
 			return
 		}
 	}
-	
+
 	// iptables -t filter -I KUBE-ROUTER-INPUT 1 -m comment --comment "allow traffic to cluster IP" -d "10.20.30.0/24" -j RETURN
 	whitelistServiceVipsArgs := []string{serviceVIPPosition, "-m", "comment", "--comment", "allow traffic to cluster IP", "-d",
 		controller.serviceClusterIPRange.String(), "-j", "RETURN"}
@@ -281,7 +281,7 @@ func (controller *NetworkPolicyController) ensureTopLevelChains() {
 		klog.Fatalf("Failed to run iptables command to insert in %s chain %s", kubeInputChainName, err.Error())
 		return
 	}
-	
+
 	// iptables -t filter -I KUBE-ROUTER-INPUT 2 -p tcp -m comment --comment "allow LOCAL UDP traffic to node ports-xxx" -m addrtype --dst-type LOCAL -m multiport --dports "30000-32767" -j RETURN
 	whitelistTCPNodeportsArgs := []string{whitelistTCPNodePortsPosition, "-p", "tcp", "-m", "comment", "--comment",
 		"allow LOCAL TCP traffic to node ports", "-m", "addrtype", "--dst-type", "LOCAL",
@@ -295,7 +295,7 @@ func (controller *NetworkPolicyController) ensureTopLevelChains() {
 		klog.Fatalf("Failed to run iptables command to insert in %s chain %s", kubeInputChainName, err.Error())
 		return
 	}
-	
+
 	// iptables -t filter -I KUBE-ROUTER-INPUT 3 -p udp -m comment --comment "allow LOCAL UDP traffic to node ports-xxx" -m addrtype --dst-type LOCAL -m multiport --dports "30000-32767" -j RETURN
 	whitelistUDPNodeportsArgs := []string{whitelistUDPNodePortsPosition, "-p", "udp", "-m", "comment", "--comment",
 		"allow LOCAL UDP traffic to node ports", "-m", "addrtype", "--dst-type", "LOCAL",
@@ -309,7 +309,7 @@ func (controller *NetworkPolicyController) ensureTopLevelChains() {
 		klog.Fatalf("Failed to run iptables command to insert in %s chain %s", kubeInputChainName, err.Error())
 		return
 	}
-	
+
 	// iptables -t filter -I KUBE-ROUTER-INPUT 4 -m comment --comment "allow traffic to external IP range:10.20.30.0/24-xxx" -d 10.20.30.0/24 -j RETURN
 	for externalIPIndex, externalIPRange := range controller.serviceExternalIPRanges {
 		position := fmt.Sprintf("%d", externalIPIndex+externalIPPositionAdditive)
@@ -331,13 +331,13 @@ func (controller *NetworkPolicyController) ensureTopLevelChains() {
 func (controller *NetworkPolicyController) Run() {
 	t := time.NewTicker(controller.syncPeriod)
 	defer t.Stop()
-	
+
 	// setup kube-router specific top level custom chains (KUBE-ROUTER-INPUT, KUBE-ROUTER-FORWARD, KUBE-ROUTER-OUTPUT)
 	controller.ensureTopLevelChains()
-	
+
 	// setup default network policy chain that is applied to traffic from/to the pods that does not match any network policy
 	controller.ensureDefaultNetworkPolicyChain()
-	
+
 	for {
 		select {
 		case <-controller.stopCh:
@@ -346,25 +346,25 @@ func (controller *NetworkPolicyController) Run() {
 			controller.syncPolicy()
 		}
 	}
-	
+
 }
 
 // Sync synchronizes iptables to desired state of network policies
 func (controller *NetworkPolicyController) syncPolicy() {
-	
+
 	// setup kube-router specific top level custom chains (KUBE-ROUTER-INPUT, KUBE-ROUTER-FORWARD, KUBE-ROUTER-OUTPUT)
 	controller.ensureTopLevelChains()
-	
+
 	// setup default network policy chain that is applied to traffic from/to the pods that does not match any network policy
 	controller.ensureDefaultNetworkPolicyChain()
-	
+
 	controller.filterTableRules.Reset()
 	err := controller.iptablesCmdHandler.SaveInto(iptables.TableFilter, &controller.filterTableRules)
 	if err != nil {
 		klog.Errorf("Aborting sync. Failed to run iptables-save: %v" + err.Error())
 		return
 	}
-	
+
 	networkPoliciesInfo, err := controller.buildNetworkPoliciesInfo()
 	if err != nil {
 		klog.Errorf("Aborting sync. Failed to build network policies: %v", err.Error())
@@ -384,7 +384,7 @@ func (controller *NetworkPolicyController) syncPolicy() {
 		klog.Errorf("Aborting sync. Failed to cleanup stale iptables rules: %v", err.Error())
 		return
 	}
-	
+
 	err = controller.iptablesCmdHandler.Restore(iptables.TableFilter, controller.filterTableRules.Bytes(),
 		iptables.FlushTables, iptables.NoRestoreCounters)
 	if err != nil {
@@ -392,7 +392,7 @@ func (controller *NetworkPolicyController) syncPolicy() {
 			err.Error(), controller.filterTableRules.String())
 		return
 	}
-	
+
 	err = controller.cleanupStaleIPSets(activePolicyIPSets)
 	if err != nil {
 		klog.Errorf("Failed to cleanup stale ipsets: %v", err.Error())
@@ -406,7 +406,7 @@ func (controller *NetworkPolicyController) ensureExplicitAccept() {
 	for _, customChain := range defaultChains {
 		args := []string{"-m", "comment", "--comment", "rule to explicitly ACCEPT traffic that comply to network policies",
 			"-m", "mark", "--mark", "0x20000/0x20000", "-j", "ACCEPT"}
-		
+
 		controller.filterTableRules = AppendUnique(controller.filterTableRules, string(customChain), args)
 	}
 }
@@ -427,14 +427,14 @@ func AppendUnique(buffer bytes.Buffer, chain string, rule []string) bytes.Buffer
 
 func (controller *NetworkPolicyController) cleanupStaleRules(activePolicyChains, activePodFwChains map[string]bool,
 	deleteDefaultChains bool) error {
-	
+
 	return nil
 }
 
 func (controller *NetworkPolicyController) cleanupStaleIPSets(activePolicyIPSets map[string]bool) error {
 	controller.ipsetMutex.Lock()
 	defer controller.ipsetMutex.Unlock()
-	
+
 	cleanupPolicyIPSets := make([]*ipset.Set, 0)
 	ipsets, err := ipset.NewIPSet(false)
 	if err != nil {
