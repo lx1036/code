@@ -669,6 +669,14 @@ func (r *Raft) runLeader() {
 			err := r.restoreUserSnapshot(restore.meta, restore.reader)
 			restore.respond(err)
 
+		case future := <-r.configurationChangeChIfStable():
+			if r.getLeadershipTransferInProgress() {
+				klog.Warningf(ErrLeadershipTransferInProgress.Error())
+				future.respond(ErrLeadershipTransferInProgress)
+				continue
+			}
+			r.appendConfigurationEntry(future)
+
 		// INFO: @see handleStaleTerm()
 		case <-r.leaderState.stepDown:
 			r.setState(Follower)
@@ -689,6 +697,68 @@ func (r *Raft) runLeader() {
 			return
 		}
 	}
+}
+
+// configurationChangeChIfStable returns r.configurationChangeCh if it's safe
+// to process requests from it, or nil otherwise. This must only be called
+// from the main thread.
+//
+// Note that if the conditions here were to change outside of leaderLoop to take
+// this from nil to non-nil, we would need leaderLoop to be kicked.
+func (r *Raft) configurationChangeChIfStable() chan *configurationChangeFuture {
+	// Have to wait until:
+	// 1. The latest configuration is committed, and
+	// 2. This leader has committed some entry (the noop) in this term
+	//    https://groups.google.com/forum/#!msg/raft-dev/t4xj6dJTP6E/d2D9LrWRza8J
+	if r.configurations.latestIndex == r.configurations.committedIndex &&
+		r.getCommitIndex() >= r.leaderState.commitment.startIndex {
+		return r.configurationChangeCh
+	}
+	return nil
+}
+
+// requestConfigChange is a helper for the above functions that make
+// configuration change requests. 'req' describes the change. For timeout,
+// see AddVoter.
+func (r *Raft) requestConfigChange(req configurationChangeRequest, timeout time.Duration) IndexFuture {
+	var timer <-chan time.Time
+	if timeout > 0 {
+		timer = time.After(timeout)
+	}
+	future := &configurationChangeFuture{
+		req: req,
+	}
+	future.init()
+	select {
+	case <-timer:
+		return errorFuture{ErrEnqueueTimeout}
+	case r.configurationChangeCh <- future:
+		return future
+	case <-r.shutdownCh:
+		return errorFuture{ErrRaftShutdown}
+	}
+}
+
+// appendConfigurationEntry changes the configuration and adds a new
+// configuration entry to the log. This must only be called from the
+// main thread.
+func (r *Raft) appendConfigurationEntry(future *configurationChangeFuture) {
+	configuration, err := nextConfiguration(r.configurations.latest, r.configurations.latestIndex, future.req)
+	if err != nil {
+		future.respond(err)
+		return
+	}
+
+	future.log = pb.Log{
+		Type: pb.LogType_CONFIGURATION,
+		Data: EncodeConfiguration(configuration),
+	}
+
+	r.dispatchLogs([]*logFuture{&future.logFuture})
+	index := future.Index()
+	r.setLatestConfiguration(configuration, index)
+	r.leaderState.commitment.setConfiguration(configuration)
+	r.startReplication()
 }
 
 // dispatchLog is called on the leader to push a log to disk, mark it
