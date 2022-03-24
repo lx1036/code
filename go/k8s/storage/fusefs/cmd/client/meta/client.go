@@ -74,7 +74,7 @@ func (partition *Partition) Less(than btree.Item) bool {
 	return partition.Start < than.(*Partition).Start
 }
 
-// TODO: packet TCP 这块可以使用 grpc pb 来标准化
+// TODO: packet TCP 这块可以使用 grpc pb 来标准化, @see go/k8s/storage/raft/hashicorp/raft/transport_tcp_test.go
 
 type MetaClient struct {
 	sync.RWMutex
@@ -98,7 +98,7 @@ type MetaClient struct {
 	partitions     map[uint64]*Partition
 }
 
-func NewMetaClient(volumeName, owner, masterAddrs string) (*MetaClient, error) {
+func NewMetaClient(volumeName, masterAddrs string) (*MetaClient, error) {
 	addrs := strings.Split(masterAddrs, ",") // 127.0.0.1:9500,127.0.0.1:9600,127.0.0.1:9700
 	metaClient := &MetaClient{
 		volumeName:   volumeName,
@@ -240,6 +240,8 @@ type Volume struct {
 
 // INFO: get master `/vol` api, 获取该 volume 数据分布在哪些 partitions
 /*
+# meta cluster 有5台机器：
+100.160.161.13:9021,100.160.161.14:9021,100.160.161.31:9021,100.160.161.49:9021,100.160.161.50:9021
 {
     "code": 0,
     "msg": "success",
@@ -331,6 +333,7 @@ func (metaClient *MetaClient) IsVolumeReadOnly() bool {
 	return metaClient.status == ReadOnlyVol
 }
 
+// CreateInodeAndDentry INFO: 根据策略选择一个 rwPartition，然后从当前这个 partition 分配一个 inodeID
 func (metaClient *MetaClient) CreateInodeAndDentry(parentID fuseops.InodeID, filename string, mode, uid, gid uint32,
 	target []byte) (*proto.InodeInfo, error) {
 	parentPartition := metaClient.getPartitionByInode(parentID)
@@ -380,7 +383,6 @@ func (metaClient *MetaClient) GetInode(inodeID fuseops.InodeID) (*proto.InodeInf
 
 	packet := proto.NewPacketReqID()
 	packet.Opcode = proto.OpMetaInodeGet
-	packet.PartitionID = parentPartition.PartitionID
 	err := packet.MarshalData(&proto.InodeGetRequest{
 		VolName:     metaClient.volumeName,
 		PartitionID: parentPartition.PartitionID,
@@ -501,6 +503,7 @@ func (metaClient *MetaClient) LookupName(parentInodeID, currentInodeID fuseops.I
 	return "", nil
 }
 
+// Lookup INFO: 根据 child name，从 parent inode 中查询出 inode
 func (metaClient *MetaClient) Lookup(parentID fuseops.InodeID, name string) (inode uint64, mode uint32, err error) {
 	parentPartition := metaClient.getPartitionByInode(parentID)
 	if parentPartition == nil {

@@ -122,7 +122,7 @@ func NewFuseFS(opt *Config) (*FuseFS, error) {
 		dirHandleCache:  NewDirHandleCache(),
 		fileHandleCache: NewFileHandleCache(),
 	}
-	fs.metaClient, err = meta.NewMetaClient(opt.Volname, opt.Owner, opt.MasterAddr)
+	fs.metaClient, err = meta.NewMetaClient(opt.Volname, opt.MasterAddr)
 	if err != nil {
 		return nil, fmt.Errorf("NewMetaWrapper failed with err %v", err)
 	}

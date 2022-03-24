@@ -98,7 +98,7 @@ func (fs *FuseFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
 	return nil
 }
 
-// CreateFile INFO: 创建文件，其实是在 meta partition 中新建 inode/dentry 对象, `touch globalmount/2.txt`
+// CreateFile INFO: 创建文件，其实是在 meta partition 中新建 inode/dentry 对象, `touch globalmount/2.txt`, @see MkDir()
 func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) error {
 	fs.Lock()
 	defer fs.Unlock()
@@ -142,7 +142,8 @@ func (fs *FuseFS) CreateFile(ctx context.Context, op *fuseops.CreateFileOp) erro
 		parent.dentryCache.Put(op.Name, inodeInfo.Inode)
 	}
 
-	klog.Infof(fmt.Sprintf("[CreateFile]create filename:%s, parentInodeID:%d, handleID:%d successfully", op.Name, op.Parent, op.Handle))
+	klog.Infof(fmt.Sprintf("[CreateFile]createFile allocate inodeID:%d for filename:%s in parentInodeID:%d at handleID:%d successfully",
+		child.inodeID, op.Name, op.Parent, op.Handle))
 	return nil
 }
 
