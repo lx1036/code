@@ -9,7 +9,7 @@
   "walDir": "./tmp/master1/wal",
   "heartbeatPort": 9501,
   "replicaPort": 9502,
-  "peers": "1:127.0.0.1:9500",
+  "peers": "1/127.0.0.1:9500,2/127.0.0.1:9600,3/127.0.0.1:9700,",
   "retainLogs": 200,
 
   "endpoint": "http://s3.test.com"

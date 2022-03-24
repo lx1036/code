@@ -26,7 +26,7 @@ func (server *Server) startHTTPService() {
 	router := mux.NewRouter()
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			if server.partition.IsRaftLeader() {
+			if server.isRaftLeader() {
 				next.ServeHTTP(writer, request)
 				return
 			}
