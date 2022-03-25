@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
 
@@ -112,6 +111,7 @@ type Cluster struct {
 
 	retainLogs uint64
 	idAlloc    *IDAllocator
+	fsm        *Fsm
 
 	topology *Topology
 
@@ -121,8 +121,6 @@ type Cluster struct {
 	//volStatInfo      sync.Map
 
 	DisableAutoAllocate bool
-	fsm                 *MetadataFsm
-	partition           raftstore.Partition
 
 	nodeSetCapacity int
 }
@@ -137,10 +135,9 @@ func NewCluster(server *Server) *Cluster {
 		metaNodes:        make(map[string]*MetaNode),
 		buckets:          make(map[string]*DeleteBucketInfo),
 		metaNodeStatInfo: new(nodeStatInfo),
-		idAlloc:          NewIDAllocator(server.fsm.store, server.partition),
+		idAlloc:          NewIDAllocator(server.fsm.store, server.r),
 		topology:         newTopology(),
 		fsm:              server.fsm,
-		partition:        server.partition,
 		nodeSetCapacity:  server.nodeSetCapacity,
 	}
 }
@@ -194,7 +191,7 @@ func (cluster *Cluster) checkMetaPartitions() {
 
 func (cluster *Cluster) scheduleToUpdateStatInfo() {
 	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
-		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
+		if cluster.server.isRaftLeader() {
 			var (
 				total uint64
 				used  uint64
@@ -227,7 +224,7 @@ func (cluster *Cluster) scheduleToUpdateStatInfo() {
 func (cluster *Cluster) scheduleToCheckVolStatus() {
 	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
 		//check vols after switching leader two minutes
-		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
+		if cluster.server.isRaftLeader() {
 
 		}
 	}, time.Second*defaultIntervalToCheckMetaPartition)
@@ -262,7 +259,7 @@ func (cluster *Cluster) getVolume(volName string) (*Volume, error) {
 func (cluster *Cluster) scheduleToLoadMetaPartitions() {
 	go wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
 		//check vols after switching leader two minutes
-		if cluster.partition != nil && cluster.partition.IsRaftLeader() {
+		if cluster.server.isRaftLeader() {
 			if cluster.vols != nil {
 				//cluster.checkLoadMetaPartitions()
 			}
@@ -285,7 +282,7 @@ func (cluster *Cluster) addMetaNode(nodeAddr string) (uint64, error) {
 	node := cluster.topology.getAvailNodeSetForMetaNode()
 	if node == nil {
 		// create node set
-		id, err := cluster.idAlloc.allocateVolumeID()
+		id, err := cluster.idAlloc.allocateMetaNodeID()
 		if err != nil {
 			return 0, err
 		}
@@ -297,7 +294,7 @@ func (cluster *Cluster) addMetaNode(nodeAddr string) (uint64, error) {
 		cluster.topology.putNodeSet(node)
 	}
 
-	id, err := cluster.idAlloc.allocateVolumeID()
+	id, err := cluster.idAlloc.allocateMetaNodeID()
 	if err != nil {
 		return 0, err
 	}
@@ -347,12 +344,18 @@ func (cluster *Cluster) getAllMetaPartitionIDByMetaNode(addr string) (partitionI
 
 // 1. submit `createVol` to raft
 // 2. init 3 meta partition
-func (cluster *Cluster) createVol(name, owner string, capacity uint64) (*Volume, error) {
+func (cluster *Cluster) createVol(name, owner, accessKey, secretKey, endpoint string, capacity uint64, createBackend bool) (*Volume, error) {
 	cluster.volMutex.Lock()
 	defer cluster.volMutex.Unlock()
 
 	if _, ok := cluster.vols[name]; ok {
 		return nil, fmt.Errorf(fmt.Sprintf("volume %s is already existed", name))
+	}
+
+	if createBackend {
+		if err := cluster.CreateBucket(accessKey, secretKey, endpoint, name); err != nil {
+			return nil, fmt.Errorf(fmt.Sprintf("[createVol]create s3 bucket err:%v", err))
+		}
 	}
 
 	// submit `createVol` to raft

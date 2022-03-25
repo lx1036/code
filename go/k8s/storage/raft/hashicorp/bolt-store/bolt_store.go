@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"strconv"
+	"sync"
 
 	"github.com/hashicorp/raft"
 	bolt "go.etcd.io/bbolt"
@@ -16,7 +17,7 @@ import (
 var (
 	// Bucket names we perform transactions in
 	dbLogs = []byte("logs")
-	dbConf = []byte("conf")
+	dbFsm  = []byte("fsm")
 
 	// ErrKeyNotFound INFO: @see https://github.com/hashicorp/raft/blob/v1.3.3/api.go#L480-L484
 	ErrKeyNotFound = errors.New("not found")
@@ -25,6 +26,8 @@ var (
 // BoltStore provides access to bbolt for Raft to store and retrieve log entries.
 //  INFO: 内存 store @see github.com/hashicorp/raft@v1.3.3/inmem_store.go
 type BoltStore struct {
+	sync.Mutex
+
 	db *bolt.DB
 
 	// The path to the Bolt database file
@@ -82,7 +85,7 @@ func (b *BoltStore) initialize() error {
 		if _, err := tx.CreateBucketIfNotExists(dbLogs); err != nil {
 			return err
 		}
-		if _, err := tx.CreateBucketIfNotExists(dbConf); err != nil {
+		if _, err := tx.CreateBucketIfNotExists(dbFsm); err != nil {
 			return err
 		}
 
@@ -186,22 +189,20 @@ func (b *BoltStore) DeleteRange(min, max uint64) error {
 	})
 }
 
-/////////////////////////LogStore interface////////////////////////////////////////
-
 /////////////////////////StableStore interface////////////////////////////////////////
 // 持久化 term,candidate
 
 // Set is used to set a key/value set outside of the raft log
 func (b *BoltStore) Set(key []byte, val []byte) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(dbConf).Put(key, val)
+		return tx.Bucket(dbFsm).Put(key, val)
 	})
 }
 
 func (b *BoltStore) Get(key []byte) ([]byte, error) {
 	var value []byte
 	err := b.db.View(func(tx *bolt.Tx) error {
-		value = tx.Bucket(dbConf).Get(key)
+		value = tx.Bucket(dbFsm).Get(key)
 		if value == nil {
 			// INFO: @see https://github.com/hashicorp/raft/blob/v1.3.3/raft.go#L1502-L1512
 			//  @see https://github.com/hashicorp/raft/blob/v1.3.3/api.go#L480-L484
@@ -211,6 +212,38 @@ func (b *BoltStore) Get(key []byte) ([]byte, error) {
 	})
 
 	return value, err
+}
+
+func (b *BoltStore) Delete(key []byte) error {
+	return b.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(dbFsm).Delete(key)
+	})
+}
+
+func (b *BoltStore) BatchDelete(cmdMap map[string][]byte) error {
+	return b.db.Batch(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(dbFsm)
+		for key, _ := range cmdMap {
+			err := bucket.Delete([]byte(key))
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (b *BoltStore) BatchPut(cmdMap map[string]string) error {
+	return b.db.Batch(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(dbFsm)
+		for key, value := range cmdMap {
+			err := bucket.Put([]byte(key), []byte(value))
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (b *BoltStore) SetUint64(key []byte, val uint64) error {
@@ -226,4 +259,43 @@ func (b *BoltStore) GetUint64(key []byte) (uint64, error) {
 	return strconv.ParseUint(string(val), 10, 64)
 }
 
-/////////////////////////StableStore interface////////////////////////////////////////
+// Persist INFO: snapshot fsm data into sink @see https://github.com/hashicorp/raft/blob/v1.3.3/snapshot.go#L185-L190
+func (b *BoltStore) Persist(sink raft.SnapshotSink) error {
+	b.Lock()
+	defer b.Unlock()
+
+	values := make(map[string]string, 0)
+	err := b.db.View(func(tx *bolt.Tx) error {
+		return tx.Bucket(dbLogs).ForEach(func(k, v []byte) error {
+			values[string(k)] = string(v)
+			return nil
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	data, _ := json.Marshal(values)
+	_, err = sink.Write(data)
+	if err != nil {
+		return err
+	}
+
+	return sink.Close()
+}
+
+func (b *BoltStore) Release() {
+}
+
+// Restore INFO: restore data from snapshot @see https://github.com/hashicorp/raft/blob/v1.3.3/fsm.go#L234-L247
+func (b *BoltStore) Restore(data []byte) error {
+	b.Lock()
+	defer b.Unlock()
+
+	values := make(map[string]string, 0)
+	if err := json.Unmarshal(data, &values); err != nil {
+		return err
+	}
+
+	return b.BatchPut(values)
+}

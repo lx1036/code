@@ -16,10 +16,14 @@ import (
 )
 
 const (
-	ParamsOwner    = "owner"
-	ParamsName     = "name"
-	ParamsCapacity = "capacity"
-	ParamsAddrKey  = "addr"
+	ParamsOwner            = "owner"
+	ParamsAccessKey        = "accessKey"
+	ParamsSecretKey        = "secretKey"
+	ParamsEndpoint         = "endpoint"
+	ParamsName             = "name"
+	ParamsCapacity         = "capacity"
+	ParamsAddrKey          = "addr"
+	ParamsCreateBackendKey = "createBackend"
 )
 
 func (server *Server) startHTTPService() {
@@ -137,6 +141,10 @@ func (server *Server) getVolStat(writer http.ResponseWriter, request *http.Reque
 func (server *Server) createVol(writer http.ResponseWriter, request *http.Request) {
 	name := request.FormValue(ParamsName)
 	owner := request.FormValue(ParamsOwner)
+	accessKey := request.FormValue(ParamsAccessKey)
+	secretKey := request.FormValue(ParamsSecretKey)
+	endpoint := request.FormValue(ParamsEndpoint)
+	createBackend, _ := strconv.ParseBool(request.FormValue(ParamsCreateBackendKey))
 	capacityStr := request.FormValue(ParamsCapacity)
 	capacity, err := strconv.ParseUint(capacityStr, 10, 64)
 	if err != nil {
@@ -144,7 +152,10 @@ func (server *Server) createVol(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 
-	if vol, err := server.cluster.createVol(name, owner, capacity); err != nil {
+	if len(endpoint) == 0 {
+		endpoint = server.s3Endpoint
+	}
+	if vol, err := server.cluster.createVol(name, owner, accessKey, secretKey, endpoint, capacity, createBackend); err != nil {
 		http.Error(writer, fmt.Sprintf("create volume %s err: %v", name, err), http.StatusInternalServerError)
 		return
 	} else {

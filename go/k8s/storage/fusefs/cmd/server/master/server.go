@@ -96,6 +96,7 @@ type Server struct {
 	clusterName string
 	localIP     string
 	httpPort    int
+	s3Endpoint  string
 
 	cluster         *Cluster
 	nodeSetCapacity int
@@ -109,7 +110,7 @@ type Server struct {
 
 	retainLogs  uint64
 	storeDir    string // boltdb statemachine
-	fsm         *MetadataFsm
+	fsm         *Fsm
 	boltdbStore *raftstore.BoltDBStore
 	raftStore   *raftstore.RaftStore
 	partition   raftstore.Partition
@@ -126,6 +127,7 @@ func NewServer(config Config) *Server {
 		storeDir:        storeDir,
 		retainLogs:      config.RetainLogs,
 		nodeSetCapacity: config.nodeSetCapacity,
+		s3Endpoint:      config.Endpoint,
 	}
 
 	var localRaftAddr string
@@ -168,7 +170,7 @@ func NewServer(config Config) *Server {
 	}
 	c := raft.DefaultConfig()
 	c.LocalID = raft.ServerID(strconv.FormatUint(server.id, 10))
-	fsm := &Fsm{}
+	fsm := newFsm(store) // INFO: 这是 fsm boltdb 文件，一般尽量和 raft-log boltdb 文件，是两个文件。这里仅仅测试，使用同一个就行。
 	r, err := raft.NewRaft(c, fsm, store, store, snapshots, transport)
 	if err != nil {
 		klog.Fatal(err)
@@ -189,6 +191,8 @@ func (server *Server) Start() (err error) {
 	// 2. cluster -> partition raft
 	server.cluster = NewCluster(server)
 	server.cluster.start()
+
+	// 3. start http server
 	server.startHTTPService()
 
 	return nil
