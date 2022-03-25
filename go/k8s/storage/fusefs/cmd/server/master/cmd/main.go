@@ -16,6 +16,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// TODO: 把 tiglabs/raft 替换为 hashicorp/raft
+
 // go run . --config=./master.json
 func main() {
 	logs.InitLogs()

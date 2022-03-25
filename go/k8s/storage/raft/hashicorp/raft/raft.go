@@ -977,6 +977,7 @@ func (r *Raft) setLeader(leader ServerAddress) {
 // Leader is used to return the current leader of the cluster.
 // It may return empty string if there is no current leader
 // or the leader is unknown.
+// @see appendEntries() 中的 r.setLeader() 调用
 func (r *Raft) Leader() ServerAddress {
 	r.leaderLock.RLock()
 	leader := r.leader
@@ -1238,7 +1239,7 @@ func (r *Raft) appendEntries(rpc RPC, cmd *pb.AppendEntriesRequest) {
 		resp.Term = cmd.Term
 	}
 
-	// Save the current leader
+	// INFO: Save the current leader, 每次 log 都可以保存最新的 leaderAddr，这样上层应用可以通过 r.Leader() 获得最新的 leaderAddr
 	r.setLeader(r.transport.DecodePeer(cmd.Leader))
 
 	// INFO: 对于 heartbeat AppendEntriesRequest, PrevLogIndex、Entries、LeaderCommitIndex 都是 0

@@ -76,6 +76,11 @@ func (partition *Partition) Less(than btree.Item) bool {
 
 // TODO: packet TCP 这块可以使用 grpc pb 来标准化, @see go/k8s/storage/raft/hashicorp/raft/transport_tcp_test.go
 
+// INFO: 调用 master-cluster API:
+//  /admin/getVol: 获取 S3 endpoint
+//  /client/volStat: 获取该 volume 的 totalSize/usedSize
+//  /client/vol: 获取该 volume 分配的 meta partition 数据(包含 inode 范围，以及 partition LeaderAddress)
+
 type MetaClient struct {
 	sync.RWMutex
 
@@ -242,6 +247,10 @@ type Volume struct {
 /*
 # meta cluster 有5台机器：
 100.160.161.13:9021,100.160.161.14:9021,100.160.161.31:9021,100.160.161.49:9021,100.160.161.50:9021
+# 默认选择 defaultReplicaNum=3 台机器作为 meta partition，且
+* 第一台 meta partition 的 inode 范围: 0~16777216(defaultMetaPartitionInodeIDStep = 1 << 24 // 16MB)
+* 第二台 meta partition 的 inode 范围：16777217~33554433(16777217+defaultMetaPartitionInodeIDStep)
+* 第三台 meta partition 的 inode 范围：33554433~9223372036854775807(defaultMaxMetaPartitionInodeID = 1<<63 - 1)
 {
     "code": 0,
     "msg": "success",
