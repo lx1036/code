@@ -31,7 +31,7 @@ func (server *Server) startHTTPService() {
 				return
 			}
 
-			if len(server.leaderInfo.addr) == 0 {
+			if len(server.r.Leader()) == 0 {
 				http.Error(writer, fmt.Sprintf("no raft leader"), http.StatusBadRequest)
 				return
 			}
@@ -40,7 +40,7 @@ func (server *Server) startHTTPService() {
 			reverseProxy := &httputil.ReverseProxy{
 				Director: func(request *http.Request) {
 					request.URL.Scheme = "http"
-					request.URL.Host = server.leaderInfo.addr
+					request.URL.Host = string(server.r.Leader())
 				},
 			}
 			reverseProxy.ServeHTTP(writer, request)
@@ -66,7 +66,7 @@ func (server *Server) startHTTPService() {
 	router.NewRoute().Methods(http.MethodPost).Path("/metapartition/expand").HandlerFunc(server.createMetaPartition)
 
 	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", server.ip, server.port), router); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", server.localIP, server.httpPort), router); err != nil {
 			klog.Fatal(err)
 		}
 	}()

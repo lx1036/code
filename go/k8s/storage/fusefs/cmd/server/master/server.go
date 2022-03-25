@@ -14,7 +14,6 @@ import (
 	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
 
 	"github.com/hashicorp/raft"
-	"github.com/tiglabs/raft/proto"
 	"k8s.io/klog/v2"
 )
 
@@ -74,8 +73,7 @@ const (
 type Config struct {
 	ID          uint64 `json:"id"`
 	ClusterName string `json:"clusterName"`
-	IP          string `json:"ip"`
-	Port        int    `json:"port"`
+	HttpPort    int    `json:"httpPort"`
 
 	// raft
 	HeartbeatPort int    `json:"heartbeatPort"`
@@ -96,8 +94,8 @@ type Config struct {
 type Server struct {
 	id          uint64
 	clusterName string
-	ip          string
-	port        int
+	localIP     string
+	httpPort    int
 
 	cluster         *Cluster
 	nodeSetCapacity int
@@ -107,12 +105,11 @@ type Server struct {
 	peers    []raft.Server
 	isLeader bool
 	walDir   string // raft log wal
-	leader   raft.ServerAddress
+	//leader   raft.ServerAddress
 
 	retainLogs  uint64
 	storeDir    string // boltdb statemachine
 	fsm         *MetadataFsm
-	leaderInfo  *LeaderInfo
 	boltdbStore *raftstore.BoltDBStore
 	raftStore   *raftstore.RaftStore
 	partition   raftstore.Partition
@@ -124,13 +121,11 @@ func NewServer(config Config) *Server {
 	storeDir, _ := filepath.Abs(config.StoreDir)
 	server := &Server{
 		id:              config.ID,
-		ip:              config.IP,
-		port:            config.Port,
+		httpPort:        config.HttpPort,
 		walDir:          walDir,
 		storeDir:        storeDir,
 		retainLogs:      config.RetainLogs,
 		nodeSetCapacity: config.nodeSetCapacity,
-		leaderInfo:      &LeaderInfo{},
 	}
 
 	var localRaftAddr string
@@ -138,10 +133,10 @@ func NewServer(config Config) *Server {
 	for _, peer := range peers {
 		values := strings.Split(peer, "/") // 1/127.0.0.1:9500
 		id, _ := strconv.ParseUint(values[0], 10, 64)
+		addr := values[1] // 127.0.0.1:9500
 		values = strings.Split(values[1], ":")
-		addr := values[0]
 		if id == server.id {
-			localRaftAddr = addr
+			server.localIP = values[0] // 127.0.0.1
 		}
 		server.peers = append(server.peers, raft.Server{
 			Suffrage: raft.Voter,
@@ -207,66 +202,6 @@ func (server *Server) watchLeaderCh() {
 
 func (server *Server) isRaftLeader() bool {
 	return server.isLeader
-}
-
-func (server *Server) handleApplySnapshot() {
-	server.fsm.restore()
-	server.restoreIDAlloc()
-	return
-}
-
-// LeaderInfo represents the leader's information
-
-func (server *Server) handleLeaderChange(leader uint64) {
-	/*if leader == 0 {
-		klog.Error("action[handleLeaderChange] but no leader")
-		return
-	}
-
-	oldLeaderAddr := server.leaderInfo.addr
-	server.leaderInfo.addr = AddrDatabase[leader]
-	klog.Infof("action[handleLeaderChange] change leader to [%v] ", server.leaderInfo.addr)
-	server.reverseProxy = server.newReverseProxy()
-
-	if server.id == leader {
-		klog.Infof(server.clusterName, fmt.Sprintf("clusterID[%v] leader is changed to %v",
-			server.clusterName, server.leaderInfo.addr))
-		if oldLeaderAddr != server.leaderInfo.addr {
-			//server.loadMetadata()
-			server.metaReady = true
-		}
-		server.cluster.checkMetaNodeHeartbeat()
-	} else {
-		klog.Infof(server.clusterName, fmt.Sprintf("clusterID[%v] leader is changed to %v",
-			server.clusterName, server.leaderInfo.addr))
-		//server.clearMetadata()
-		server.metaReady = false
-	}*/
-}
-
-func (server *Server) handlePeerChange(confChange *proto.ConfChange) (err error) {
-	var msg string
-	addr := string(confChange.Context)
-	switch confChange.Type {
-	case proto.ConfAddNode:
-		var arr []string
-		if arr = strings.Split(addr, ":"); len(arr) < 2 {
-			msg = fmt.Sprintf("action[handlePeerChange] clusterID[%v] nodeAddr[%v] is invalid", server.clusterName, addr)
-			break
-		}
-		server.raftStore.AddNodeWithPort(confChange.Peer.ID, arr[0], int(server.heartbeatPort), int(server.replicaPort))
-		AddrDatabase[confChange.Peer.ID] = string(confChange.Context)
-		msg = fmt.Sprintf("clusterID[%v] peerID:%v,nodeAddr[%v] has been add", server.clusterName, confChange.Peer.ID, addr)
-	case proto.ConfRemoveNode:
-		server.raftStore.DeleteNode(confChange.Peer.ID)
-		msg = fmt.Sprintf("clusterID[%v] peerID:%v,nodeAddr[%v] has been removed", server.clusterName, confChange.Peer.ID, addr)
-	}
-	klog.Infof(msg)
-	return
-}
-
-func (server *Server) restoreIDAlloc() {
-	server.cluster.idAlloc.restore()
 }
 
 func (server *Server) Stop() {

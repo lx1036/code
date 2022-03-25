@@ -2,13 +2,10 @@
 {
   "id": 1,
   "clusterName": "fusefs",
-  "ip": "127.0.0.1",
-  "port": 9500,
+  "httpPort": 9501,
 
   "storeDir": "./tmp/master1/db",
   "walDir": "./tmp/master1/wal",
-  "heartbeatPort": 9501,
-  "replicaPort": 9502,
   "peers": "1/127.0.0.1:9500,2/127.0.0.1:9600,3/127.0.0.1:9700,",
   "retainLogs": 200,
 
