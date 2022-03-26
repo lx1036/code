@@ -6,9 +6,7 @@ import (
 	"k8s-lx1036/k8s/network/network-policy/pkg/controller"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
 	"sync"
 	"time"
 
@@ -36,7 +34,7 @@ func NewNetworkPolicyCommand(stopCh <-chan struct{}) *cobra.Command {
 func runCommand(option *options.Options, stopCh <-chan struct{}) error {
 	var ipsetMutex sync.Mutex
 
-	restConfig, err := NewRestConfig(option.Kubeconfig)
+	restConfig, err := clientcmd.BuildConfigFromFlags("", option.Kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -72,21 +70,4 @@ func runCommand(option *options.Options, stopCh <-chan struct{}) error {
 
 	<-stopCh
 	return nil
-}
-
-func NewRestConfig(kubeconfig string) (*rest.Config, error) {
-	var config *rest.Config
-	if _, err := os.Stat(kubeconfig); err == nil {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return config, nil
 }

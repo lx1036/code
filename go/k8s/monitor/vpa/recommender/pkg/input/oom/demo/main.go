@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"os"
@@ -33,7 +32,7 @@ func main() {
 	if len(*kubeconfig) == 0 {
 		os.Exit(1)
 	}
-	config, err := NewRestConfig(*kubeconfig)
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err)
 	}
@@ -74,23 +73,4 @@ func main() {
 	}()
 
 	<-stopCh
-}
-
-func NewRestConfig(kubeconfig string) (*rest.Config, error) {
-	var config *rest.Config
-	if _, err := os.Stat(kubeconfig); err == nil {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			return nil, err
-		}
-	} else { //Use Incluster Configuration
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Use protobufs for communication with apiserver
-	//config.ContentType = "application/vnd.kubernetes.protobuf"
-	return config, nil
 }

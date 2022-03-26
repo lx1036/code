@@ -5,14 +5,15 @@ import (
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/autoscaler/vertical-pod-autoscaler/pkg/recommender/logic"
 	"time"
 
 	"k8s-lx1036/k8s/monitor/vpa/recommender/cmd/app/options"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned"
 	v1 "k8s-lx1036/k8s/monitor/vpa/recommender/pkg/client/clientset/versioned/typed/autoscaling.k9s.io/v1"
-	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/utils"
 	"k8s.io/client-go/kubernetes"
 
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
 
@@ -73,7 +74,7 @@ func (r *Recommender) UpdateVPAs() {
 }
 
 func NewRecommender(option *options.Options) (*Recommender, error) {
-	restConfig, err := utils.NewRestConfig(option.Kubeconfig)
+	restConfig, err := clientcmd.BuildConfigFromFlags("", option.Kubeconfig)
 	if err != nil {
 		return nil, err
 	}

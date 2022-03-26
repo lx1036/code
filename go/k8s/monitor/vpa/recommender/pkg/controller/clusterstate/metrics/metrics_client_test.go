@@ -6,7 +6,7 @@ import (
 	"k8s.io/klog/v2"
 	"testing"
 
-	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/utils"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -20,7 +20,7 @@ func TestMetricsClient(test *testing.T) {
 		return
 	}
 
-	restConfig, err := utils.NewRestConfig(*kubeconfig)
+	restConfig, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err)
 	}

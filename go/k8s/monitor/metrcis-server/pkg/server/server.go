@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"k8s-lx1036/k8s/monitor/metrcis-server/pkg/api"
@@ -14,7 +13,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
@@ -43,27 +41,8 @@ type Server struct {
 	informer informers.SharedInformerFactory
 }
 
-func NewRestConfig(kubeconfig string) (*rest.Config, error) {
-	var config *rest.Config
-	if _, err := os.Stat(kubeconfig); err == nil {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			return nil, err
-		}
-	} else { //Use Incluster Configuration
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Use protobufs for communication with apiserver
-	config.ContentType = "application/vnd.kubernetes.protobuf"
-	return config, nil
-}
-
 func NewServer(config *Config) (*Server, error) {
-	restConfig, err := NewRestConfig(config.Kubeconfig)
+	restConfig, err := clientcmd.BuildConfigFromFlags("", config.Kubeconfig)
 	if err != nil {
 		return nil, err
 	}
