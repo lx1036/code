@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,8 @@ type Interface interface {
 	BgpPeers() BgpPeerInformer
 	// Eips returns a EipInformer.
 	Eips() EipInformer
+	// IPPools returns a IPPoolInformer.
+	IPPools() IPPoolInformer
 }
 
 type version struct {
@@ -56,4 +58,9 @@ func (v *version) BgpPeers() BgpPeerInformer {
 // Eips returns a EipInformer.
 func (v *version) Eips() EipInformer {
 	return &eipInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// IPPools returns a IPPoolInformer.
+func (v *version) IPPools() IPPoolInformer {
+	return &iPPoolInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
