@@ -1,0 +1,18 @@
+
+---
+
+apiVersion: bgplb.k9s.io/v1
+kind: IPPool
+metadata:
+  name: default
+spec:
+  cidr: "100.20.30.0/24"
+
+---
+
+apiVersion: bgplb.k9s.io/v1
+kind: IPPool
+metadata:
+  name: ippool2
+spec:
+  cidr: "200.20.30.0/24"

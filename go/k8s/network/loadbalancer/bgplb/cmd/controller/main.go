@@ -4,13 +4,14 @@ import (
 	"flag"
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/controller/service"
 
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
 
+// go run . --kubeconfig=`echo $HOME`/.kube/config
 func main() {
 	var (
-		//port       = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
 	)
 	flag.Parse()
@@ -20,6 +21,6 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	service.New(restConfig)
-
+	c := service.New(restConfig)
+	c.Run(genericapiserver.SetupSignalContext(), 1)
 }

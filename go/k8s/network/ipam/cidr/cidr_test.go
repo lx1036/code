@@ -2,8 +2,20 @@ package cidr
 
 import (
 	"fmt"
+	"net"
 	"testing"
 )
+
+func TestIPRange(test *testing.T) {
+	c1, _ := ParseCIDR("100.217.144.0/20")
+	start, end := c1.IPRange()
+	fmt.Println(start, end, c1.Gateway()) // 100.217.144.0 100.217.159.255 100.217.144.1
+
+	_, ipnet1, _ := net.ParseCIDR("100.217.144.0/20")
+	fmt.Println(ipnet1.Mask.String())
+	ones, bits := ipnet1.Mask.Size()
+	fmt.Println(ones, bits, len(ipnet1.Mask))
+}
 
 func TestSubNetting(t *testing.T) {
 	c1, _ := ParseCIDR("100.217.144.0/20")
