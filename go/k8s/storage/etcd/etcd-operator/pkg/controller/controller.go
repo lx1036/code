@@ -9,7 +9,6 @@ import (
 	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/client/clientset/versioned"
 	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/client/informers/externalversions"
 	etcdClusterLister "k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/client/listers/etcd.k9s.io/v1"
-	"k8s-lx1036/k8s/storage/etcd/etcd-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,6 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -50,7 +50,7 @@ type EtcdClusterController struct {
 }
 
 func NewController(option *options.Options) (*EtcdClusterController, error) {
-	restConfig, err := utils.NewRestConfig(option.Kubeconfig)
+	restConfig, err := clientcmd.BuildConfigFromFlags("", option.Kubeconfig)
 	if err != nil {
 		return nil, err
 	}

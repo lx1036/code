@@ -158,7 +158,7 @@ func TestNewBoltStore(t *testing.T) {
 	if _, err := tx.CreateBucket([]byte(dbLogs)); err != bolt.ErrBucketExists {
 		t.Fatalf("bad: %v", err)
 	}
-	if _, err := tx.CreateBucket([]byte(dbConf)); err != bolt.ErrBucketExists {
+	if _, err := tx.CreateBucket([]byte(dbFsm)); err != bolt.ErrBucketExists {
 		t.Fatalf("bad: %v", err)
 	}
 }

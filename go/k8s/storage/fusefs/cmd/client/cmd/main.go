@@ -38,8 +38,8 @@ func main() {
 	var config string
 	cmd := &cobra.Command{
 		Use:   "client",
-		Short: "Runs the FuseFS client",
-		Long:  `responsible for fusefs client`,
+		Short: "FuseFS client",
+		Long:  "Run the FuseFS client",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(config) == 0 {
 				klog.Fatal("config is required")
@@ -82,7 +82,6 @@ func runCommand(configFile string) error {
 	mountConfig := &fuse.MountConfig{
 		FSName:                  "fuse-" + config.Volname,
 		Subtype:                 "fuse", // `cat /proc/mounts | grep sunfs` -> xxx fuse.sunfs xxx
-		ReadOnly:                config.ReadOnly,
 		DisableWritebackCaching: true,
 	}
 	if config.Debug {

@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,6 +39,10 @@ func (c *FakeBgplbV1) BgpPeers(namespace string) v1.BgpPeerInterface {
 
 func (c *FakeBgplbV1) Eips(namespace string) v1.EipInterface {
 	return &FakeEips{c, namespace}
+}
+
+func (c *FakeBgplbV1) IPPools() v1.IPPoolInterface {
+	return &FakeIPPools{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

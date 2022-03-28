@@ -1,6 +1,36 @@
 
 
-## FUSE(Filesystem in Userspace)
+# FUSE(Filesystem in Userspace)
+Linux 文件系统为每个文件分配两个数据结构：inode 和 dentry。
+
+目前进度(2022-03-24)：该 fusefs-client 可以直接本地与 polefs meta/master 组件一起使用！！！
+可以本地 debug 运行起来，然后本地测试：
+```shell
+# read/write file
+cat globalmount/1.txt
+cat globalmount/2.txt
+echo adfadf > globalmount/3.txt
+cat globalmount/3.txt
+touch globalmount/4.txt
+
+# read/write dir
+ll globalmount
+mkdir globalmount/abc
+echo adfadf > globalmount/abc/1.txt
+cat globalmount/abc/1.txt
+```
+
+### 调试用户读写目录和文件对应的 fuse 函数
+```shell
+# 当前 ./globalmount 目录下只有一个 hello 文件 
+# `ll` 命令触发的 fuse 接口函数(读目录)
+OpenDir (inode 1, PID 34787) -> ReadDir (inode 1, PID 34787) -> 
+LookUpInode (parent 1, name "hello", PID 34787) -> ReadDir (inode 1, PID 34787) ->
+ReadDir (inode 1, PID 34787) -> ReadDir (inode 1, PID 34787) -> 
+GetInodeAttributes (inode 1, PID 34787) -> ReleaseDirHandle(PID 34787) -> 
+LookUpInode(parent 1, name "hello", PID 34787) -> LookUpInode (parent 1, name "hello", PID 34787)
+```
+
 
 ### Fuse 内核模块
 linux fuse: https://github.com/torvalds/linux/blob/master/fs/fuse

@@ -127,7 +127,7 @@
     "lite-server": "2.5.4",
     "lodash": "4.17.21",
     "minimatch": "3.0.4",
-    "minimist": "1.2.5",
+    "minimist": "1.2.6",
     "ngx-i18nsupport": "0.17.1",
     "node-gyp": "6.1.0",
     "node-sass": "7.0.0",

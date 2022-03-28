@@ -2,6 +2,9 @@ package master
 
 import (
 	"fmt"
+	boltdb "k8s-lx1036/k8s/storage/raft/hashicorp/bolt-store"
+	"net"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -10,7 +13,7 @@ import (
 	"k8s-lx1036/k8s/storage/fusefs/cmd/server/meta/partition/raftstore"
 	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
 
-	"github.com/tiglabs/raft/proto"
+	"github.com/hashicorp/raft"
 	"k8s.io/klog/v2"
 )
 
@@ -70,8 +73,7 @@ const (
 type Config struct {
 	ID          uint64 `json:"id"`
 	ClusterName string `json:"clusterName"`
-	IP          string `json:"ip"`
-	Port        int    `json:"port"`
+	HttpPort    int    `json:"httpPort"`
 
 	// raft
 	HeartbeatPort int    `json:"heartbeatPort"`
@@ -92,24 +94,26 @@ type Config struct {
 type Server struct {
 	id          uint64
 	clusterName string
-	ip          string
-	port        int
+	localIP     string
+	httpPort    int
+	s3Endpoint  string
 
 	cluster         *Cluster
 	nodeSetCapacity int
 
 	// raft
-	peers         []raftstore.PeerAddress
-	heartbeatPort int
-	replicaPort   int
-	walDir        string // raft log wal
-	retainLogs    uint64
-	storeDir      string // boltdb statemachine
-	fsm           *MetadataFsm
-	leaderInfo    *LeaderInfo
-	boltdbStore   *raftstore.BoltDBStore
-	raftStore     *raftstore.RaftStore
-	partition     raftstore.Partition
+	r        *raft.Raft
+	peers    []raft.Server
+	isLeader bool
+	walDir   string // raft log wal
+	//leader   raft.ServerAddress
+
+	retainLogs  uint64
+	storeDir    string // boltdb statemachine
+	fsm         *Fsm
+	boltdbStore *raftstore.BoltDBStore
+	raftStore   *raftstore.RaftStore
+	partition   raftstore.Partition
 }
 
 // NewServer creates a new server
@@ -118,135 +122,90 @@ func NewServer(config Config) *Server {
 	storeDir, _ := filepath.Abs(config.StoreDir)
 	server := &Server{
 		id:              config.ID,
-		ip:              config.IP,
-		port:            config.Port,
-		heartbeatPort:   config.HeartbeatPort,
-		replicaPort:     config.ReplicaPort,
+		httpPort:        config.HttpPort,
 		walDir:          walDir,
 		storeDir:        storeDir,
 		retainLogs:      config.RetainLogs,
 		nodeSetCapacity: config.nodeSetCapacity,
-		leaderInfo:      &LeaderInfo{},
+		s3Endpoint:      config.Endpoint,
 	}
 
+	var localRaftAddr string
 	peers := strings.Split(config.Peers, ",")
 	for _, peer := range peers {
-		values := strings.Split(peer, ":") // 1:127.0.0.1:9500
+		values := strings.Split(peer, "/") // 1/127.0.0.1:9500
 		id, _ := strconv.ParseUint(values[0], 10, 64)
-		port, _ := strconv.Atoi(values[2])
-		server.peers = append(server.peers, raftstore.PeerAddress{
-			Peer: proto.Peer{
-				ID: id,
-			},
-			Address:       values[1],
-			Port:          port,
-			HeartbeatPort: server.heartbeatPort,
-			ReplicaPort:   server.replicaPort,
+		addr := values[1] // 127.0.0.1:9500
+		values = strings.Split(values[1], ":")
+		if id == server.id {
+			server.localIP = values[0] // 127.0.0.1
+		}
+		server.peers = append(server.peers, raft.Server{
+			Suffrage: raft.Voter,
+			ID:       raft.ServerID(strconv.FormatUint(id, 10)),
+			Address:  raft.ServerAddress(addr),
 		})
 	}
+
+	if len(localRaftAddr) == 0 {
+		klog.Fatal(fmt.Sprintf("local raft addr is empty"))
+	}
+	addr, err := net.ResolveTCPAddr("tcp", localRaftAddr)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	transport, err := raft.NewTCPTransport(localRaftAddr, addr, 2, 5*time.Second, os.Stderr)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	raftDir := fmt.Sprintf("%s/raft_%d", walDir, server.id) // raft log 存储在目录下 ./tmp/master1/wal/raft_1/raft-log.db
+	store, err := boltdb.NewBoltStore(filepath.Join(raftDir, "raft-log.db"))
+	if err != nil {
+		klog.Fatal(err)
+	}
+	// ./tmp/master1/wal/raft_1/snapshots/{snapshotID}/{meta.json,state.bin}
+	snapshots, err := raft.NewFileSnapshotStore(raftDir, 2, os.Stderr)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	c := raft.DefaultConfig()
+	c.LocalID = raft.ServerID(strconv.FormatUint(server.id, 10))
+	fsm := newFsm(store) // INFO: 这是 fsm boltdb 文件，一般尽量和 raft-log boltdb 文件，是两个文件。这里仅仅测试，使用同一个就行。
+	r, err := raft.NewRaft(c, fsm, store, store, snapshots, transport)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	server.r = r
 
 	return server
 }
 
 func (server *Server) Start() (err error) {
-	// 1. create a partition raft and statemachine
-	if server.raftStore, err = raftstore.NewRaftStore(&raftstore.Config{
-		NodeID:            server.id,
-		IPAddr:            server.ip,
-		HeartbeatPort:     server.heartbeatPort,
-		ReplicaPort:       server.replicaPort,
-		RaftPath:          server.walDir,
-		NumOfLogsToRetain: server.retainLogs,
-		TickInterval:      1000, // 1s
-		ElectionTick:      5,    // [5 * 1s, 2 * 5 * 1s)
-	}); err != nil {
-		return err
-	}
-	server.boltdbStore, err = raftstore.NewBoltDBStore(server.storeDir)
-	if err != nil {
-		return err
-	}
-
-	server.fsm = newMetadataFsm(server.boltdbStore, server.retainLogs, server.raftStore.RaftServer())
-	server.fsm.registerLeaderChangeHandler(server.handleLeaderChange)
-	server.fsm.registerPeerChangeHandler(server.handlePeerChange)
-	server.fsm.registerApplySnapshotHandler(server.handleApplySnapshot)
-	server.fsm.restore()
-	if server.partition, err = server.raftStore.CreatePartition(&raftstore.PartitionConfig{
-		ID:      GroupID,
-		Peers:   server.peers,
-		Applied: server.fsm.applied,
-		SM:      server.fsm,
-	}); err != nil {
-		return err
-	}
+	// 1. create a partition raft
+	server.r.BootstrapCluster(raft.Configuration{
+		Servers: server.peers,
+	})
+	go server.watchLeaderCh()
+	klog.Infof(fmt.Sprintf("raft is started"))
 
 	// 2. cluster -> partition raft
 	server.cluster = NewCluster(server)
 	server.cluster.start()
+
+	// 3. start http server
 	server.startHTTPService()
 
 	return nil
 }
 
-func (server *Server) handleApplySnapshot() {
-	server.fsm.restore()
-	server.restoreIDAlloc()
-	return
-}
-
-// LeaderInfo represents the leader's information
-
-func (server *Server) handleLeaderChange(leader uint64) {
-	/*if leader == 0 {
-		klog.Error("action[handleLeaderChange] but no leader")
-		return
+func (server *Server) watchLeaderCh() {
+	for leader := range server.r.LeaderCh() {
+		server.isLeader = leader
 	}
-
-	oldLeaderAddr := server.leaderInfo.addr
-	server.leaderInfo.addr = AddrDatabase[leader]
-	klog.Infof("action[handleLeaderChange] change leader to [%v] ", server.leaderInfo.addr)
-	server.reverseProxy = server.newReverseProxy()
-
-	if server.id == leader {
-		klog.Infof(server.clusterName, fmt.Sprintf("clusterID[%v] leader is changed to %v",
-			server.clusterName, server.leaderInfo.addr))
-		if oldLeaderAddr != server.leaderInfo.addr {
-			//server.loadMetadata()
-			server.metaReady = true
-		}
-		server.cluster.checkMetaNodeHeartbeat()
-	} else {
-		klog.Infof(server.clusterName, fmt.Sprintf("clusterID[%v] leader is changed to %v",
-			server.clusterName, server.leaderInfo.addr))
-		//server.clearMetadata()
-		server.metaReady = false
-	}*/
 }
 
-func (server *Server) handlePeerChange(confChange *proto.ConfChange) (err error) {
-	var msg string
-	addr := string(confChange.Context)
-	switch confChange.Type {
-	case proto.ConfAddNode:
-		var arr []string
-		if arr = strings.Split(addr, ":"); len(arr) < 2 {
-			msg = fmt.Sprintf("action[handlePeerChange] clusterID[%v] nodeAddr[%v] is invalid", server.clusterName, addr)
-			break
-		}
-		server.raftStore.AddNodeWithPort(confChange.Peer.ID, arr[0], int(server.heartbeatPort), int(server.replicaPort))
-		AddrDatabase[confChange.Peer.ID] = string(confChange.Context)
-		msg = fmt.Sprintf("clusterID[%v] peerID:%v,nodeAddr[%v] has been add", server.clusterName, confChange.Peer.ID, addr)
-	case proto.ConfRemoveNode:
-		server.raftStore.DeleteNode(confChange.Peer.ID)
-		msg = fmt.Sprintf("clusterID[%v] peerID:%v,nodeAddr[%v] has been removed", server.clusterName, confChange.Peer.ID, addr)
-	}
-	klog.Infof(msg)
-	return
-}
-
-func (server *Server) restoreIDAlloc() {
-	server.cluster.idAlloc.restore()
+func (server *Server) isRaftLeader() bool {
+	return server.isLeader
 }
 
 func (server *Server) Stop() {

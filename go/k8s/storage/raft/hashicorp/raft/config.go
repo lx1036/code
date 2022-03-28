@@ -220,8 +220,8 @@ func (c *configurations) Clone() configurations {
 type ConfigurationChangeCommand uint8
 
 const (
-	// AddStaging makes a server Staging unless its Voter.
-	AddStaging ConfigurationChangeCommand = iota
+	// AddVoter makes a server Staging unless its Voter.
+	AddVoter ConfigurationChangeCommand = iota
 	// AddNonvoter makes a server Nonvoter unless its Staging or Voter.
 	AddNonvoter
 	// DemoteVoter makes a server Nonvoter unless its absent.
@@ -235,8 +235,8 @@ const (
 
 func (c ConfigurationChangeCommand) String() string {
 	switch c {
-	case AddStaging:
-		return "AddStaging"
+	case AddVoter:
+		return "AddVoter"
 	case AddNonvoter:
 		return "AddNonvoter"
 	case DemoteVoter:
@@ -329,4 +329,45 @@ func DecodeConfiguration(buf []byte) Configuration {
 		panic(fmt.Errorf("failed to decode configuration: %v", err))
 	}
 	return configuration
+}
+
+// nextConfiguration generates a new Configuration from the current one and a
+// configuration change request. It's split from appendConfigurationEntry so
+// that it can be unit tested easily.
+func nextConfiguration(current Configuration, currentIndex uint64, change configurationChangeRequest) (Configuration, error) {
+	if change.prevIndex > 0 && change.prevIndex != currentIndex {
+		return Configuration{}, fmt.Errorf("configuration changed since %v (latest is %v)", change.prevIndex, currentIndex)
+	}
+
+	configuration := current.Clone()
+	switch change.command {
+	case AddVoter:
+		newServer := Server{
+			Suffrage: Voter,
+			ID:       change.serverID,
+			Address:  change.serverAddress,
+		}
+		found := false
+		for i, server := range configuration.Servers {
+			if server.ID == change.serverID {
+				if server.Suffrage == Voter {
+					configuration.Servers[i].Address = change.serverAddress
+				} else {
+					configuration.Servers[i] = newServer
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			configuration.Servers = append(configuration.Servers, newServer)
+		}
+	}
+
+	// Make sure we didn't do something bad like remove the last voter
+	if err := checkConfiguration(configuration); err != nil {
+		return Configuration{}, err
+	}
+
+	return configuration, nil
 }

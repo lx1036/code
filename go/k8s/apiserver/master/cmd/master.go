@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-	
+
 	"k8s-lx1036/k8s/apiserver/master"
 	"k8s-lx1036/k8s/apiserver/master/reconcilers"
-	
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
@@ -31,7 +31,7 @@ func main() {
 		klog.Error(fmt.Sprintf("kubeconfig path should not be empty"))
 		return
 	}
-	
+
 	nodeTunneler, proxyTransport := CreateNodeDialer()
 	kubeAPIServerConfig := CreateKubeAPIServerConfig(nodeTunneler, proxyTransport)
 	GenericConfig := &genericapiserver.RecommendedConfig{
@@ -43,7 +43,7 @@ func main() {
 	if err != nil {
 		return
 	}
-	
+
 	err = kubeAPIServer.GenericAPIServer.PrepareRun().Run(genericapiserver.SetupSignalHandler())
 	if err != nil {
 		return
@@ -52,7 +52,7 @@ func main() {
 
 func CreateKubeAPIServerConfig(proxyTransport *http.Transport) *master.Config {
 	genericConfig, versionedInformers := buildGenericConfig(proxyTransport)
-	
+
 	config := &master.Config{
 		GenericConfig: genericConfig,
 		ExtraConfig: master.ExtraConfig{
@@ -60,7 +60,7 @@ func CreateKubeAPIServerConfig(proxyTransport *http.Transport) *master.Config {
 			EndpointReconcilerType: reconcilers.LeaseEndpointReconcilerType,
 		},
 	}
-	
+
 	return config
 }
 
@@ -71,7 +71,7 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config,
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return kubeAPIServer, nil
 }
 
@@ -79,16 +79,16 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config,
 func buildGenericConfig(proxyTransport *http.Transport) (genericConfig *genericapiserver.Config, versionedInformers clientgoinformers.SharedInformerFactory) {
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
 	genericConfig.MergedResourceConfig = master.DefaultAPIResourceConfigSource()
-	
+
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
-	
+
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 	genericConfig.ExternalAddress = "127.0.0.1:8082"
-	
+
 	kubeClientConfig, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		return
@@ -100,8 +100,8 @@ func buildGenericConfig(proxyTransport *http.Transport) (genericConfig *generica
 	if err != nil {
 		return
 	}
-	
+
 	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
-	
+
 	return
 }

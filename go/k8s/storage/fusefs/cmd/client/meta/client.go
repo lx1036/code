@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	RefreshMetaPartitionsInterval = time.Second * 120
+	RefreshMetaPartitionsInterval = time.Second * 60
 
 	DefaultBTreeDegree = 32
 )
@@ -61,6 +61,26 @@ type JsonResponse struct {
 	Data json.RawMessage `json:"data"`
 }
 
+type Partition struct {
+	PartitionID uint64
+	Start       fuseops.InodeID // 起始 inodeID
+	End         fuseops.InodeID // 终止 inodeID
+	Members     []string
+	LeaderAddr  string
+	Status      int8
+}
+
+func (partition *Partition) Less(than btree.Item) bool {
+	return partition.Start < than.(*Partition).Start
+}
+
+// TODO: packet TCP 这块可以使用 grpc pb 来标准化, @see go/k8s/storage/raft/hashicorp/raft/transport_tcp_test.go
+
+// INFO: 调用 master-cluster API:
+//  /admin/getVol: 获取 S3 endpoint
+//  /client/volStat: 获取该 volume 的 totalSize/usedSize
+//  /client/vol: 获取该 volume 分配的 meta partition 数据(包含 inode 范围，以及 partition LeaderAddress)
+
 type MetaClient struct {
 	sync.RWMutex
 
@@ -83,7 +103,7 @@ type MetaClient struct {
 	partitions     map[uint64]*Partition
 }
 
-func NewMetaClient(volumeName, owner, masterAddrs string) (*MetaClient, error) {
+func NewMetaClient(volumeName, masterAddrs string) (*MetaClient, error) {
 	addrs := strings.Split(masterAddrs, ",") // 127.0.0.1:9500,127.0.0.1:9600,127.0.0.1:9700
 	metaClient := &MetaClient{
 		volumeName:   volumeName,
@@ -94,13 +114,13 @@ func NewMetaClient(volumeName, owner, masterAddrs string) (*MetaClient, error) {
 		partitions:     make(map[uint64]*Partition),
 	}
 
-	if err := metaClient.getVolumeInfo(); err != nil {
+	if err := metaClient.getS3Endpoint(); err != nil {
 		return nil, err
 	}
-	if err := metaClient.updateVolStatInfo(); err != nil {
+	if err := metaClient.getVolStatInfo(); err != nil {
 		return nil, err
 	}
-	if err := metaClient.updateMetaPartitions(); err != nil {
+	if err := metaClient.getPartitionsForVol(); err != nil {
 		return nil, err
 	}
 
@@ -111,8 +131,8 @@ func NewMetaClient(volumeName, owner, masterAddrs string) (*MetaClient, error) {
 
 func (metaClient *MetaClient) start() {
 	wait.UntilWithContext(context.TODO(), func(ctx context.Context) {
-		metaClient.updateVolStatInfo()
-		metaClient.updateMetaPartitions()
+		metaClient.getVolStatInfo()
+		metaClient.getPartitionsForVol()
 		//metaClient.updateClientInfo()
 	}, RefreshMetaPartitionsInterval)
 }
@@ -129,7 +149,24 @@ type SimpleVolView struct {
 	BucketDeleted bool
 }
 
-func (metaClient *MetaClient) getVolumeInfo() error {
+/*
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "ID": 78,
+    "Name": "pvc-30e5e4f1-e04f-4d53-9c76-50a6bc35abb0",
+    "Owner": "fusefs",
+    "MpReplicaNum": 3,
+    "Status": 0,
+    "Capacity": 100,
+    "MpCnt": 3,
+    "S3Endpoint": "http://fusefs.s3.cn",
+    "BucketDeleted": false
+  }
+}
+*/
+func (metaClient *MetaClient) getS3Endpoint() error {
 	url := fmt.Sprintf("http://%s%s?name=%s", metaClient.masterLeader, "/admin/getVol", metaClient.volumeName)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -153,11 +190,24 @@ func (metaClient *MetaClient) getVolumeInfo() error {
 		return err
 	}
 
-	metaClient.S3Endpoint = simpleVolView.S3Endpoint
+	metaClient.S3Endpoint = simpleVolView.S3Endpoint // "http://fusefs.s3.cn"
 	return nil
 }
 
-func (metaClient *MetaClient) updateVolStatInfo() error {
+/*
+pv: pvc-30e5e4f1-e04f-4d53-9c76-50a6bc35abb0 大小为 100G
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "Name": "pvc-30e5e4f1-e04f-4d53-9c76-50a6bc35abb0",
+    "TotalSize": 107374182400,
+    "UsedSize": 452,
+    "Status": 0
+  }
+}
+*/
+func (metaClient *MetaClient) getVolStatInfo() error {
 	url := fmt.Sprintf("http://%s%s?name=%s", metaClient.masterLeader, "/client/volStat", metaClient.volumeName)
 	resp, err := http.Get(url)
 	data, err := ioutil.ReadAll(resp.Body)
@@ -193,8 +243,62 @@ type Volume struct {
 	MetaPartitions []*Partition
 }
 
-// INFO: get master `/vol` api
-func (metaClient *MetaClient) updateMetaPartitions() error {
+// INFO: get master `/vol` api, 获取该 volume 数据分布在哪些 partitions
+/*
+# meta cluster 有5台机器：
+100.160.161.13:9021,100.160.161.14:9021,100.160.161.31:9021,100.160.161.49:9021,100.160.161.50:9021
+# 默认选择 defaultReplicaNum=3 台机器作为 meta partition，且
+* 第一台 meta partition 的 inode 范围: 0~16777216(defaultMetaPartitionInodeIDStep = 1 << 24 // 16MB)
+* 第二台 meta partition 的 inode 范围：16777217~33554433(16777217+defaultMetaPartitionInodeIDStep)
+* 第三台 meta partition 的 inode 范围：33554433~9223372036854775807(defaultMaxMetaPartitionInodeID = 1<<63 - 1)
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "Name": "pvc-30e5e4f1-e04f-4d53-9c76-50a6bc35abb0",
+        "Status": 0,
+        "MetaPartitions": [
+            {
+                "PartitionID": 266,
+                "Start": 0,
+                "End": 16777216,
+                "Members": [
+                    "100.160.161.49:9021",
+                    "100.160.161.13:9021",
+                    "100.160.161.50:9021"
+                ],
+                "LeaderAddr": "100.160.161.50:9021",
+                "Status": 2
+            },
+            {
+                "PartitionID": 267,
+                "Start": 16777217,
+                "End": 33554433,
+                "Members": [
+                    "100.160.161.32:9021",
+                    "100.160.161.31:9021",
+                    "100.160.161.14:9021"
+                ],
+                "LeaderAddr": "100.160.161.32:9021",
+                "Status": 2
+            },
+            {
+                "PartitionID": 268,
+                "Start": 33554434,
+                "End": 9223372036854775807,
+                "Members": [
+                    "100.160.161.49:9021",
+                    "100.160.161.13:9021",
+                    "100.160.161.50:9021"
+                ],
+                "LeaderAddr": "100.160.161.50:9021",
+                "Status": 2
+            }
+        ]
+    }
+}
+*/
+func (metaClient *MetaClient) getPartitionsForVol() error {
 	url := fmt.Sprintf("http://%s%s?name=%s", metaClient.masterLeader, "/client/vol", metaClient.volumeName)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -216,40 +320,20 @@ func (metaClient *MetaClient) updateMetaPartitions() error {
 	for _, partition := range volume.MetaPartitions {
 		metaClient.replaceOrInsert(partition)
 		if partition.Status == proto.ReadWrite {
-			klog.Infof(fmt.Sprintf("%+v", partition))
 			metaClient.rwPartitions = append(metaClient.rwPartitions, partition)
 		}
 	}
 
-	/*if len(metaClient.rwPartitions) != 0 { // log
-		var partitions []Partition
-		for _, partition := range metaClient.rwPartitions {
-			partitions = append(partitions, *partition)
-		}
-		klog.Infof(fmt.Sprintf("%+v", partitions))
-	}*/
-
-	//metaClient.volumeName = volume.Name
-	//metaClient.volumeID = volume.ID
-	//metaClient.volumeCreateTime = volume.CreateTime
 	return nil
 }
 
 func (metaClient *MetaClient) replaceOrInsert(partition *Partition) {
 	value, ok := metaClient.partitions[partition.PartitionID]
 	if ok {
-		metaClient.deletePartitions(value)
+		delete(metaClient.partitions, value.PartitionID)
+		metaClient.partitionsTree.Delete(value)
 	}
 
-	metaClient.addPartitions(partition)
-}
-
-func (metaClient *MetaClient) deletePartitions(partition *Partition) {
-	delete(metaClient.partitions, partition.PartitionID)
-	metaClient.partitionsTree.Delete(partition)
-}
-
-func (metaClient *MetaClient) addPartitions(partition *Partition) {
 	metaClient.partitions[partition.PartitionID] = partition
 	metaClient.partitionsTree.ReplaceOrInsert(partition)
 }
@@ -258,6 +342,7 @@ func (metaClient *MetaClient) IsVolumeReadOnly() bool {
 	return metaClient.status == ReadOnlyVol
 }
 
+// CreateInodeAndDentry INFO: 根据策略选择一个 rwPartition，然后从当前这个 partition 分配一个 inodeID
 func (metaClient *MetaClient) CreateInodeAndDentry(parentID fuseops.InodeID, filename string, mode, uid, gid uint32,
 	target []byte) (*proto.InodeInfo, error) {
 	parentPartition := metaClient.getPartitionByInode(parentID)
@@ -307,7 +392,6 @@ func (metaClient *MetaClient) GetInode(inodeID fuseops.InodeID) (*proto.InodeInf
 
 	packet := proto.NewPacketReqID()
 	packet.Opcode = proto.OpMetaInodeGet
-	packet.PartitionID = parentPartition.PartitionID
 	err := packet.MarshalData(&proto.InodeGetRequest{
 		VolName:     metaClient.volumeName,
 		PartitionID: parentPartition.PartitionID,
@@ -316,8 +400,6 @@ func (metaClient *MetaClient) GetInode(inodeID fuseops.InodeID) (*proto.InodeInf
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: packet TCP 这块可以使用 grpc pb 来标准化
 
 	conn, err := net.Dial("tcp", parentPartition.LeaderAddr)
 	if err != nil {
@@ -430,6 +512,7 @@ func (metaClient *MetaClient) LookupName(parentInodeID, currentInodeID fuseops.I
 	return "", nil
 }
 
+// Lookup INFO: 根据 child name，从 parent inode 中查询出 inode
 func (metaClient *MetaClient) Lookup(parentID fuseops.InodeID, name string) (inode uint64, mode uint32, err error) {
 	parentPartition := metaClient.getPartitionByInode(parentID)
 	if parentPartition == nil {
@@ -603,17 +686,4 @@ func (metaClient *MetaClient) SetAttr(inodeID fuseops.InodeID, valid, mode, uid,
 
 func (metaClient *MetaClient) Statfs() (total, used, inodeCount uint64) {
 	return metaClient.totalSize, metaClient.usedSize, metaClient.inodeCount
-}
-
-type Partition struct {
-	PartitionID uint64
-	Start       fuseops.InodeID
-	End         fuseops.InodeID
-	Members     []string
-	LeaderAddr  string
-	Status      int8
-}
-
-func (partition *Partition) Less(than btree.Item) bool {
-	return partition.Start < than.(*Partition).Start
 }

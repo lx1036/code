@@ -6,11 +6,11 @@ import (
 
 	"k8s-lx1036/k8s/network/loadbalancer/kube-router/cmd/app/options"
 	"k8s-lx1036/k8s/network/loadbalancer/kube-router/pkg/controllers/routing"
-	"k8s-lx1036/k8s/network/loadbalancer/kube-router/pkg/utils"
 
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
 
@@ -33,7 +33,7 @@ func NewKubeRouterCommand(stopCh <-chan struct{}) *cobra.Command {
 }
 
 func runCommand(option *options.Options, stopCh <-chan struct{}) error {
-	clientConfig, err := utils.NewRestConfig(option.Kubeconfig)
+	clientConfig, err := clientcmd.BuildConfigFromFlags("", option.Kubeconfig)
 	if err != nil {
 		return err
 	}

@@ -61,12 +61,12 @@ var gInodeInfo = map[fuseops.InodeID]inodeInfo{
 				Name:   "hello",
 				Type:   fuseutil.DT_File,
 			},
-			fuseutil.Dirent{
+			/*fuseutil.Dirent{
 				Offset: 2,
 				Inode:  dirInode,
 				Name:   "dir",
 				Type:   fuseutil.DT_Directory,
-			},
+			},*/
 		},
 	},
 
@@ -321,7 +321,7 @@ INFO:
 // TODO: 目前还不支持 mkdir
 
 // mkdir -p /tmp/fuse/hellofs
-// go run . --mountpoint=/tmp/fuse/hellofs
+// go run . --mountpoint=./globalmount
 func main() {
 	flag.Parse()
 

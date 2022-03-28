@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,6 +59,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Bgplb().V1().BgpPeers().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("eips"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Bgplb().V1().Eips().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("ippools"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Bgplb().V1().IPPools().Informer()}, nil
 
 	}
 

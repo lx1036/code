@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	
+
 	"k8s-lx1036/k8s/kubelet/pkg/cm/topologymanager"
 	"k8s-lx1036/k8s/kubelet/pkg/devicemanager/checkpoint"
 	"k8s-lx1036/k8s/kubelet/pkg/lifecycle"
-	
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
@@ -49,42 +49,42 @@ type ActivePodsFunc func() []*v1.Pod
 type ManagerImpl struct {
 	socketname string
 	socketdir  string
-	
+
 	endpoints map[string]endpointInfo // Key is ResourceName
 	mutex     sync.Mutex
-	
+
 	server *grpc.Server
 	wg     sync.WaitGroup
-	
+
 	// allDevices is a map by resource name of all the devices currently registered to the device manager
 	allDevices map[string]map[string]pluginapi.Device
-	
+
 	// healthyDevices contains all of the registered healthy resourceNames and their exported device IDs.
 	healthyDevices map[string]sets.String
-	
+
 	// unhealthyDevices contains all of the unhealthy devices and their exported device IDs.
 	unhealthyDevices map[string]sets.String
-	
+
 	// allocatedDevices contains allocated deviceIds, keyed by resourceName.
 	allocatedDevices map[string]sets.String
-	
+
 	// podDevices contains pod to allocated device mapping.
 	podDevices podDevices
-	
+
 	// List of NUMA Nodes available on the underlying machine
 	numaNodes []int
-	
+
 	// Store of Topology Affinties that the Device Manager can query.
 	topologyAffinityStore topologymanager.Store
-	
+
 	// devicesToReuse contains devices that can be reused as they have been allocated to
 	// init containers.
 	devicesToReuse PodReusableDevices
-	
+
 	// callback is used for updating devices' states in one time call.
 	// e.g. a new device is advertised, two old devices are deleted and a running device fails.
 	callback monitorCallback
-	
+
 	// activePods is a method for listing active pods on the node
 	// so the amount of pluginResources requested by existing pods
 	// could be counted when updating allocated devices
@@ -92,25 +92,25 @@ type ManagerImpl struct {
 	// sourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness.
 	// We use it to determine when we can purge inactive pods from checkpointed state.
 	sourcesReady config.SourcesReady
-	
+
 	checkpointManager checkpointmanager.CheckpointManager
 }
 
 // topology: numa拓扑结构，统计节点的numa节点个数，为容器分配设备时提供Topology hints
 func newManagerImpl(socketPath string, topology []cadvisorapi.Node,
 	topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
-	
+
 	klog.V(2).Infof("Creating Device Plugin manager at %s", socketPath)
-	
+
 	if socketPath == "" || !filepath.IsAbs(socketPath) {
 		return nil, fmt.Errorf("bad socketPath, must be an absolute path: %s", socketPath)
 	}
-	
+
 	var numaNodes []int
 	for _, node := range topology {
 		numaNodes = append(numaNodes, node.Id)
 	}
-	
+
 	dir, file := filepath.Split(socketPath)
 	manager := &ManagerImpl{
 		endpoints:             make(map[string]endpointInfo),
@@ -125,10 +125,10 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node,
 		topologyAffinityStore: topologyAffinityStore,
 		devicesToReuse:        make(PodReusableDevices),
 	}
-	
+
 	// INFO: ???
 	manager.callback = manager.genericDeviceUpdateCallback
-	
+
 	// The following structures are populated with real implementations in manager.Start()
 	// Before that, initializes them to perform no-op operations.
 	manager.activePods = func() []*v1.Pod { return []*v1.Pod{} }
@@ -138,7 +138,7 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node,
 		return nil, fmt.Errorf("failed to initialize checkpoint manager: %v", err)
 	}
 	manager.checkpointManager = checkpointManager
-	
+
 	return manager, nil
 }
 
@@ -160,13 +160,13 @@ func (m *ManagerImpl) readCheckpoint() error {
 		}
 		return err
 	}
-	
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	podDeviceEntry, registeredDevs := deviceManagerCheckpoint.GetData()
 	m.podDevices.fromCheckpointData(podDeviceEntry)
 	m.allocatedDevices = m.podDevices.devices()
-	
+
 	for resource := range registeredDevs {
 		// During start up, creates empty healthyDevices list so that the resource capacity
 		// will stay zero till the corresponding device plugin re-registers.
@@ -174,7 +174,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 		m.unhealthyDevices[resource] = sets.NewString()
 		m.endpoints[resource] = endpointInfo{endpoint: newStoppedEndpointImpl(resource), opts: nil}
 	}
-	
+
 	return nil
 }
 
@@ -184,44 +184,44 @@ func (m *ManagerImpl) readCheckpoint() error {
 // Device Manager启动的时候，首先会加载checkpoint文件中内容，然后启动一个RPC Server
 func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
 	klog.V(2).Infof("Starting Device Plugin manager")
-	
+
 	m.activePods = activePods
 	m.sourcesReady = sourcesReady
-	
+
 	// Loads in allocatedDevices information from disk.
 	err := m.readCheckpoint()
 	if err != nil {
 		klog.Warningf("Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date. Err: %v", err)
 	}
-	
+
 	socketPath := filepath.Join(m.socketdir, m.socketname)
 	if err = os.MkdirAll(m.socketdir, 0750); err != nil {
 		return err
 	}
-	
+
 	// Removes all stale sockets in m.socketdir. Device plugins can monitor
 	// this and use it as a signal to re-register with the new Kubelet.
 	if err := m.removeContents(m.socketdir); err != nil {
 		klog.Errorf("Fail to clean up stale contents under %s: %v", m.socketdir, err)
 	}
-	
+
 	s, err := net.Listen("unix", socketPath)
 	if err != nil {
 		klog.Errorf("failed to listen to socket while starting device plugin registry, with error %v", err)
 		return err
 	}
-	
+
 	m.wg.Add(1)
 	m.server = grpc.NewServer([]grpc.ServerOption{}...)
-	
+
 	pluginapi.RegisterRegistrationServer(m.server, m)
 	go func() {
 		defer m.wg.Done()
 		m.server.Serve(s)
 	}()
-	
+
 	klog.V(2).Infof("Serving device plugin registration server on %q", socketPath)
-	
+
 	return nil
 }
 
@@ -278,14 +278,14 @@ func (m *ManagerImpl) Stop() error {
 	for _, eInfo := range m.endpoints {
 		eInfo.endpoint.stop()
 	}
-	
+
 	if m.server == nil {
 		return nil
 	}
 	m.server.Stop()
 	m.wg.Wait()
 	m.server = nil
-	
+
 	return nil
 }
 
@@ -321,13 +321,13 @@ func (m *ManagerImpl) UpdateAllocatedDevices() {
 // 客户端代码在 device_plugin.go::Register(kubeletEndpoint, resourceName string, pluginSockDir string)
 func (m *ManagerImpl) Register(ctx context.Context, request *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
 	klog.Infof("Got registration request from device plugin with resource name %q", request.ResourceName)
-	
+
 	// TODO: for now, always accepts newest device plugin. Later may consider to
 	// add some policies here, e.g., verify whether an old device plugin with the
 	// same resource name is still alive to determine whether we want to accept
 	// the new registration.
 	go m.addEndpoint(request)
-	
+
 	return &pluginapi.Empty{}, nil
 }
 
@@ -337,7 +337,7 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 		klog.Errorf("Failed to dial device plugin with request %v: %v", r, err)
 		return
 	}
-	
+
 	m.registerEndpoint(r.ResourceName, r.Options, e)
 	go func() {
 		m.runEndpoint(r.ResourceName, e)
@@ -347,14 +347,14 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 func (m *ManagerImpl) runEndpoint(resourceName string, e Endpoint) {
 	e.run()
 	e.stop()
-	
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	
+
 	if old, ok := m.endpoints[resourceName]; ok && old.endpoint == e {
 		m.markResourceUnhealthy(resourceName)
 	}
-	
+
 	klog.V(2).Infof("Endpoint (%s, %v) became unhealthy", resourceName, e)
 }
 
@@ -374,7 +374,7 @@ func (m *ManagerImpl) markResourceUnhealthy(resourceName string) {
 func (m *ManagerImpl) registerEndpoint(resourceName string, options *pluginapi.DevicePluginOptions, e Endpoint) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	
+
 	m.endpoints[resourceName] = endpointInfo{endpoint: e, opts: options}
 	klog.V(2).Infof("Registered endpoint %v", e)
 }

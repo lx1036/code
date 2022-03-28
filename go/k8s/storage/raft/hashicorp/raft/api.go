@@ -36,6 +36,23 @@ var (
 	ErrAbortedByRestore = errors.New("snapshot restored while committing log")
 )
 
+// AddVoter will add the given server to the cluster as a staging server. If the
+// server is already in the cluster as a voter, this updates the server's address.
+// This must be run on the leader or it will fail. The leader will promote the
+// staging server to a voter once that server is ready. If nonzero, prevIndex is
+// the index of the only configuration upon which this change may be applied; if
+// another configuration entry has been added in the meantime, this request will
+// fail. If nonzero, timeout is how long this server should wait before the
+// configuration change log entry is appended.
+func (r *Raft) AddVoter(id ServerID, address ServerAddress, prevIndex uint64, timeout time.Duration) IndexFuture {
+	return r.requestConfigChange(configurationChangeRequest{
+		command:       AddVoter,
+		serverID:      id,
+		serverAddress: address,
+		prevIndex:     prevIndex,
+	}, timeout)
+}
+
 // Apply is used to apply a command to the FSM in a highly consistent
 // manner. This returns a future that can be used to wait on the application.
 // An optional timeout can be provided to limit the amount of time we wait

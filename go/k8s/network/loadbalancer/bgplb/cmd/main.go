@@ -1,12 +1,14 @@
 package main
 
 import (
-	"k8s-lx1036/k8s/network/loadbalancer/bgplb/cmd/app"
-	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/apis/bgplb/v1"
-	genericapiserver "k8s.io/apiserver/pkg/server"
+	"flag"
 	"os"
 	"runtime"
 
+	"k8s-lx1036/k8s/network/loadbalancer/bgplb/cmd/app"
+	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/apis/bgplb.k9s.io/v1"
+
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/component-base/logs"
 )
@@ -28,5 +30,4 @@ func main() {
 	if err := cmd.Execute(); err != nil {
 		panic(err)
 	}
-
 }

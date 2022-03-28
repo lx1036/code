@@ -32,10 +32,10 @@ func NewDeleteBucketInfo(id uint64, accessKey, secretKey, endpoint, region, buck
 }
 
 // CreateBucket creates a new bucket in s3
-func (cluster *Cluster) CreateBucket(accessKey, secretKey, endpoint, region, bucketName string) (err error) {
+func (cluster *Cluster) CreateBucket(accessKey, secretKey, endpoint, bucketName string) (err error) {
 	credential := credentials.NewStaticCredentials(accessKey, secretKey, "")
 	config := &aws.Config{
-		Region:           aws.String(region),
+		Region:           aws.String("beijing"),
 		Endpoint:         aws.String(endpoint),
 		S3ForcePathStyle: aws.Bool(true),
 		Credentials:      credential,

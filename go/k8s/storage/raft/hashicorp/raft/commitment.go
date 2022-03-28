@@ -44,6 +44,22 @@ func newCommitment(commitCh chan struct{}, configuration Configuration, startInd
 	}
 }
 
+// Called when a new cluster membership configuration is created: it will be
+// used to determine commitment from now on. 'configuration' is the servers in
+// the cluster.
+func (c *commitment) setConfiguration(configuration Configuration) {
+	c.Lock()
+	defer c.Unlock()
+	oldMatchIndexes := c.matchIndexes
+	c.matchIndexes = make(map[ServerID]uint64)
+	for _, server := range configuration.Servers {
+		if server.Suffrage == Voter {
+			c.matchIndexes[server.ID] = oldMatchIndexes[server.ID] // defaults to 0
+		}
+	}
+	c.recalculate()
+}
+
 // INFO: 这里每一个 follower replication 已经发送 success=true，每一次都要重新计算下 commitIndex，当一半以上多数 follower replication
 //  发送成功，commitIndex 就是中间的那个数 quorumMatchIndex
 // Match is called once a server completes writing entries to disk: either the
