@@ -35,16 +35,11 @@ func (l *LoadBalancer) Allocate(service *corev1.Service, key string) (*corev1.Se
 		lbIP = net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 	}
 
-	// choose ippool
-	ippoolName := svc.Annotations["loadbalancer/ippool-name"]
-	if len(ippoolName) == 0 {
-		ippoolName = "default"
+	// choose ippool allocator
+	alloc, err := l.getAllocator(svc)
+	if err != nil {
+		return nil, err
 	}
-	alloc, ok := l.allocators[ippoolName]
-	if !ok {
-		return nil, NoIPPoolErr
-	}
-	cidr := alloc.GetCidr()
 
 	if lbIP != nil { // allocated loadbalancer ip
 		allocResult, err := alloc.Allocate(lbIP, key)
@@ -75,6 +70,40 @@ func (l *LoadBalancer) Allocate(service *corev1.Service, key string) (*corev1.Se
 	l.owner[key] = lbIP.String()
 	svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{IP: lbIP.String()}}
 	return svc, nil
+}
+
+func (l *LoadBalancer) Release(service *corev1.Service) error {
+	var lbIP net.IP
+
+	svc := service.DeepCopy()
+	alloc, err := l.getAllocator(svc)
+	if err != nil {
+		return err
+	}
+
+	if len(svc.Status.LoadBalancer.Ingress) == 1 {
+		lbIP = net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+	}
+
+	if lbIP != nil {
+		return alloc.Release(lbIP)
+	}
+
+	return nil
+}
+
+func (l *LoadBalancer) getAllocator(service *corev1.Service) (ipam.Allocator, error) {
+	ippoolName := service.Annotations["loadbalancer/ippool-name"]
+	if len(ippoolName) == 0 {
+		ippoolName = "default"
+	}
+
+	alloc, ok := l.allocators[ippoolName]
+	if !ok {
+		return nil, NoIPPoolErr
+	}
+
+	return alloc, nil
 }
 
 func (l *LoadBalancer) AddAllocator(name string, allocator ipam.Allocator) {

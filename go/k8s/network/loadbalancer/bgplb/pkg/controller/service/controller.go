@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"time"
 
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/client/clientset/versioned"
@@ -47,6 +48,7 @@ type Controller struct {
 	syncFuncs []cache.InformerSynced
 
 	balancer *LoadBalancer
+	backoff
 }
 
 func New(restConfig *restclient.Config) *Controller {
@@ -127,9 +129,8 @@ func New(restConfig *restclient.Config) *Controller {
 					}
 				}
 
-				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(svc)
-				if err == nil {
-					c.queue.Add(svcKey(key))
+				if err := c.balancer.Release(svc); err != nil {
+					klog.Errorf(fmt.Sprintf("%v", err))
 				}
 			},
 		},
@@ -180,17 +181,22 @@ func (s *Controller) processNextWorkItem(ctx context.Context) bool {
 		if err == nil {
 			s.queue.Forget(key)
 			return true
+		} else {
+			if errors.Is(err, NoIPPoolErr) {
+				s.queue.AddAfter(key, s.Duration())
+			}
 		}
 	case ippoolKey:
 		err = s.syncIPPool(ctx, key.(string))
 		if err == nil {
 			s.queue.Forget(key)
 			return true
+		} else {
+			s.queue.AddRateLimited(key)
 		}
 	}
 
 	runtime.HandleError(fmt.Errorf("error processing %v (will retry): %v", key, err))
-	s.queue.AddRateLimited(key)
 	return true
 }
 
@@ -245,23 +251,23 @@ func (s *Controller) syncService(ctx context.Context, key string) error {
 	return err
 }
 
-func (s *Controller) processServiceDeletion(ctx context.Context, service *corev1.Service, key string) error {
-	return s.balancer.EnsureLoadBalancerDeleted()
-}
-
 func (s *Controller) processServiceCreateOrUpdate(ctx context.Context, service *corev1.Service, key string) error {
 	svc, err := s.balancer.Allocate(service, key)
 	if err != nil {
 		if errors.Is(err, NoIPPoolErr) {
-			s.events.Event(service, corev1.EventTypeWarning, "NoIPPool",
-				fmt.Sprintf("%s for service %s/%s", NoIPPoolErr.Error(), service.Namespace, service.Name))
+			s.events.Event(service, corev1.EventTypeWarning, "NoIPPool", fmt.Sprintf("%v", NoIPPoolErr))
 		}
 
 		if errors.Is(err, ipallocator.ErrFull) {
-
+			s.events.Event(service, corev1.EventTypeWarning, "IPPoolFull", fmt.Sprintf("%v", ipallocator.ErrFull))
 		}
 
 		return err
+	}
+
+	if reflect.DeepEqual(service.Status, svc.Status) {
+		klog.Infof(fmt.Sprintf("service status %s/%s no change", svc.Namespace, svc.Name))
+		return nil
 	}
 
 	return s.updateSvcStatus(ctx, svc)
