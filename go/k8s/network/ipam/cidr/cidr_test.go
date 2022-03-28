@@ -78,3 +78,11 @@ func TestSubNetting(t *testing.T) {
 	100.217.159.192/26
 	*/
 }
+
+func TestForEach(test *testing.T) {
+	c1, _ := ParseCIDR("100.216.137.0/25")
+	c1.ForEachIP(func(ip string) error {
+		fmt.Println(ip)
+		return nil
+	})
+}

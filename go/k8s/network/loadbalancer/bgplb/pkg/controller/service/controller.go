@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"reflect"
 	"time"
 
@@ -20,7 +18,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -159,58 +159,58 @@ func New(restConfig *restclient.Config) *Controller {
 	return c
 }
 
-func (s *Controller) Run(ctx context.Context, workers int) {
+func (c *Controller) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
-	defer s.queue.ShutDown()
+	defer c.queue.ShutDown()
 
 	klog.Info("Starting service controller")
 	defer klog.Info("Shutting down service controller")
 
-	s.crdFactory.Start(ctx.Done())
-	go s.svcInformer.Run(ctx.Done())
+	c.crdFactory.Start(ctx.Done())
+	go c.svcInformer.Run(ctx.Done())
 
-	if !cache.WaitForNamedCacheSync("service", ctx.Done(), s.syncFuncs...) {
+	if !cache.WaitForNamedCacheSync("service", ctx.Done(), c.syncFuncs...) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, s.worker, time.Second)
+		go wait.UntilWithContext(ctx, c.worker, time.Second)
 	}
 
 	<-ctx.Done()
 }
 
-func (s *Controller) worker(ctx context.Context) {
-	for s.processNextWorkItem(ctx) {
+func (c *Controller) worker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
-func (s *Controller) processNextWorkItem(ctx context.Context) bool {
-	key, quit := s.queue.Get()
+func (c *Controller) processNextWorkItem(ctx context.Context) bool {
+	key, quit := c.queue.Get()
 	if quit {
 		return false
 	}
-	defer s.queue.Done(key)
+	defer c.queue.Done(key)
 
 	var err error
 	switch t := key.(type) {
 	case svcKey:
-		err = s.syncService(ctx, string(t))
+		err = c.syncService(ctx, string(t))
 		if err == nil {
-			s.queue.Forget(key)
+			c.queue.Forget(key)
 			return true
 		} else {
 			if errors.Is(err, NoIPPoolErr) {
-				s.queue.AddAfter(key, s.Duration())
+				c.queue.AddAfter(key, c.Duration())
 			}
 		}
 	case ippoolKey:
-		err = s.syncIPPool(ctx, string(t))
+		err = c.syncIPPool(ctx, string(t))
 		if err == nil {
-			s.queue.Forget(key)
+			c.queue.Forget(key)
 			return true
 		} else {
-			s.queue.AddRateLimited(key)
+			c.queue.AddRateLimited(key)
 		}
 	}
 
@@ -218,11 +218,11 @@ func (s *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
-func (s *Controller) syncIPPool(ctx context.Context, key string) error {
-	ippool, err := s.ippoolLister.Get(key)
+func (c *Controller) syncIPPool(ctx context.Context, key string) error {
+	ippool, err := c.ippoolLister.Get(key)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			s.balancer.DeleteAllocator(key)
+			c.balancer.DeleteAllocator(key)
 		} else {
 			return err
 		}
@@ -232,18 +232,18 @@ func (s *Controller) syncIPPool(ctx context.Context, key string) error {
 		return fmt.Errorf("ippool cidr is empty")
 	}
 
-	if err := s.balancer.AddAllocator(key, *ippool); err != nil {
+	if err := c.balancer.AddAllocator(key, *ippool); err != nil {
 		return err
 	}
 
 	// INFO: list all unallocated loadbalancer service, and allocate ip for it.
 	go func() {
-		for _, obj := range s.svcIndexer.List() {
+		for _, obj := range c.svcIndexer.List() {
 			svc := obj.(*corev1.Service)
 			if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && len(svc.Status.LoadBalancer.Ingress) == 0 {
 				name, _ := cache.MetaNamespaceKeyFunc(svc)
-				if err = s.processServiceCreateOrUpdate(ctx, svc, name); err != nil {
-					klog.Errorf(fmt.Sprintf("allocate ip for service:%s err:%v", name, err))
+				if err = c.processServiceCreateOrUpdate(ctx, svc, name); err != nil {
+					klog.Errorf(fmt.Sprintf("allocate ip for service:%c err:%v", name, err))
 				}
 			}
 		}
@@ -251,22 +251,22 @@ func (s *Controller) syncIPPool(ctx context.Context, key string) error {
 
 	// update ippool status metadata
 	objCopy := ippool.DeepCopy()
-	allocator := s.balancer.GetAllocator(key)
+	allocator := c.balancer.GetAllocator(key)
 	objCopy.Status.PoolSize = allocator.Free()
 	objCopy.Status.Usage = allocator.Free()
 	objCopy.Status.FirstIP = allocator.FirstIP().String()
 	objCopy.Status.LastIP = allocator.LastIP().String()
-	return s.updateIPPoolStatus(ctx, objCopy)
+	return c.updateIPPoolStatus(ctx, objCopy)
 }
 
-func (s *Controller) syncService(ctx context.Context, key string) error {
+func (c *Controller) syncService(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing service %q (%v)", key, time.Since(startTime))
 	}()
 
 	// service holds the latest service info from apiserver
-	service, exists, err := s.svcIndexer.GetByKey(key)
+	service, exists, err := c.svcIndexer.GetByKey(key)
 	switch {
 	case !exists:
 		// 不会存在这种情况，这里保留下代码，主要学习 switch 这种代码用法
@@ -274,31 +274,31 @@ func (s *Controller) syncService(ctx context.Context, key string) error {
 		runtime.HandleError(fmt.Errorf("unable to retrieve service %v from store: %v", key, err))
 	default:
 		svc := service.(*corev1.Service)
-		err = s.processServiceCreateOrUpdate(ctx, svc, key)
+		err = c.processServiceCreateOrUpdate(ctx, svc, key)
 	}
 
 	return err
 }
 
-func (s *Controller) processServiceCreateOrUpdate(ctx context.Context, service *corev1.Service, key string) error {
-	svc, err := s.balancer.Allocate(service, key)
+func (c *Controller) processServiceCreateOrUpdate(ctx context.Context, service *corev1.Service, key string) error {
+	svc, err := c.balancer.Allocate(service, key)
 	if err != nil {
 		if errors.Is(err, NoIPPoolErr) {
-			s.events.Event(service, corev1.EventTypeWarning, "NoIPPoolErr", fmt.Sprintf("%v", NoIPPoolErr))
+			c.events.Event(service, corev1.EventTypeWarning, "NoIPPoolErr", fmt.Sprintf("%v", NoIPPoolErr))
 		}
 
 		if errors.Is(err, ipallocator.ErrFull) { // change to choose free ippool
-			s.events.Event(service, corev1.EventTypeWarning, "IPPoolFullErr", fmt.Sprintf("%v", ipallocator.ErrFull))
+			c.events.Event(service, corev1.EventTypeWarning, "IPPoolFullErr", fmt.Sprintf("%v", ipallocator.ErrFull))
 
-			for ippoolName, allocator := range s.balancer.ListAllocators() {
+			for ippoolName, allocator := range c.balancer.ListAllocators() {
 				if allocator.IsFull() {
 					continue
 				}
 
-				s.events.Event(service, corev1.EventTypeWarning, "IPPoolChange", fmt.Sprintf("choose ippool %s instead for service", ippoolName))
+				c.events.Event(service, corev1.EventTypeWarning, "IPPoolChange", fmt.Sprintf("choose ippool %c instead for service", ippoolName))
 				newSvc := service.DeepCopy()
 				newSvc.Annotations[svcIPPoolAnnotation] = ippoolName
-				return s.patchService(service, newSvc)
+				return c.patchService(service, newSvc)
 			}
 		}
 
@@ -306,30 +306,33 @@ func (s *Controller) processServiceCreateOrUpdate(ctx context.Context, service *
 	}
 
 	if reflect.DeepEqual(service.Status, svc.Status) {
-		klog.Infof(fmt.Sprintf("service status %s/%s no change", svc.Namespace, svc.Name))
+		klog.Infof(fmt.Sprintf("service status %c/%c no change", svc.Namespace, svc.Name))
 		return nil
 	}
 
-	err = s.updateSvcStatus(ctx, svc)
+	err = c.updateSvcStatus(ctx, svc)
 	if err == nil {
-		klog.Infof(fmt.Sprintf("allocate ip:%s for service:%s", svc.Status.LoadBalancer.Ingress[0].IP, key))
-		s.events.Event(service, corev1.EventTypeNormal, "AllocateIP", fmt.Sprintf("allocate ip %s", svc.Status.LoadBalancer.Ingress[0].IP))
+		klog.Infof(fmt.Sprintf("allocate ip:%c for service:%c", svc.Status.LoadBalancer.Ingress[0].IP, key))
+		c.events.Event(service, corev1.EventTypeNormal, "AllocateIP", fmt.Sprintf("allocate ip %c", svc.Status.LoadBalancer.Ingress[0].IP))
 	}
 
 	// update ippool.status.used
 	go func() {
-		ippoolName := s.balancer.getIPPoolNameByService(svc)
-		ippool, err := s.crdClient.BgplbV1().IPPools().Get(ctx, ippoolName, metav1.GetOptions{})
+		ippoolName := c.balancer.getIPPoolNameByService(svc)
+		ippool, err := c.crdClient.BgplbV1().IPPools().Get(ctx, ippoolName, metav1.GetOptions{})
 		if err != nil {
 			klog.Errorf(fmt.Sprintf("%v", err))
 			return
 		}
 		ippool.Status.Usage = ippool.Status.Usage - 1
 		if ippool.Status.Usage == 0 {
-			klog.Warningf(fmt.Sprintf("ippool:%s is full at %s", ippool.Name, time.Now().String()))
+			klog.Warningf(fmt.Sprintf("ippool:%c is full at %c", ippool.Name, time.Now().String()))
+		}
+		if ippool.Status.Used == nil {
+			ippool.Status.Used = make(map[string]string)
 		}
 		ippool.Status.Used[svc.Status.LoadBalancer.Ingress[0].IP] = key
-		if err = s.updateIPPoolStatus(ctx, ippool); err != nil {
+		if err = c.updateIPPoolStatus(ctx, ippool); err != nil {
 			klog.Errorf(fmt.Sprintf("%v", err))
 			return
 		}
@@ -338,35 +341,35 @@ func (s *Controller) processServiceCreateOrUpdate(ctx context.Context, service *
 	return err
 }
 
-func (s *Controller) updateSvcStatus(ctx context.Context, service *corev1.Service) error {
-	_, err := s.kubeClient.CoreV1().Services(service.Namespace).UpdateStatus(ctx, service, metav1.UpdateOptions{})
+func (c *Controller) updateSvcStatus(ctx context.Context, service *corev1.Service) error {
+	_, err := c.kubeClient.CoreV1().Services(service.Namespace).UpdateStatus(ctx, service, metav1.UpdateOptions{})
 	return err
 }
 
-func (s *Controller) updateIPPoolStatus(ctx context.Context, ippool *v1.IPPool) error {
-	_, err := s.crdClient.BgplbV1().IPPools().UpdateStatus(ctx, ippool, metav1.UpdateOptions{})
+func (c *Controller) updateIPPoolStatus(ctx context.Context, ippool *v1.IPPool) error {
+	_, err := c.crdClient.BgplbV1().IPPools().UpdateStatus(ctx, ippool, metav1.UpdateOptions{})
 	return err
 }
 
-func (s *Controller) patchService(oldSvc, newSvc *corev1.Service) error {
+func (c *Controller) patchService(oldSvc, newSvc *corev1.Service) error {
 	key, _ := cache.MetaNamespaceKeyFunc(oldSvc)
 	oldData, err := json.Marshal(oldSvc)
 	if err != nil {
-		return fmt.Errorf("failed to marshal the existing service %s err: %v", key, err)
+		return fmt.Errorf("failed to marshal the existing service %c err: %v", key, err)
 	}
 
 	newData, err := json.Marshal(newSvc)
 	if err != nil {
-		return fmt.Errorf("failed to marshal the new service %s err: %v", key, err)
+		return fmt.Errorf("failed to marshal the new service %c err: %v", key, err)
 	}
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &corev1.Service{})
 	if err != nil {
 		return fmt.Errorf("failed to create a two-way merge patch: %v", err)
 	}
-	if _, err := s.kubeClient.CoreV1().Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+	if _, err := c.kubeClient.CoreV1().Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("failed to patch the service: %v", err)
 	}
-	
+
 	return nil
 }
 
