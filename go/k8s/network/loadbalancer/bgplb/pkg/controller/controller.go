@@ -3,7 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
-	gobgpapi "github.com/osrg/gobgp/api"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
 	v1 "k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/apis/bgplb.k9s.io/v1"
 	"k8s.io/client-go/tools/cache"
 	"net"
@@ -12,12 +12,12 @@ import (
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/cmd/app/options"
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/client/clientset/versioned"
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/client/informers/externalversions"
-	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/utils"
 
-	gobgp "github.com/osrg/gobgp/pkg/server"
+	gobgp "github.com/osrg/gobgp/v3/pkg/server"
 	"google.golang.org/grpc"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
 
@@ -34,7 +34,7 @@ func NewController(option *options.Options) (*BgpLBController, error) {
 	grpcOpts := []grpc.ServerOption{grpc.MaxRecvMsgSize(maxSize), grpc.MaxSendMsgSize(maxSize)}
 	bgpServer := gobgp.NewBgpServer(gobgp.GrpcListenAddress(option.GrpcHosts), gobgp.GrpcOption(grpcOpts))
 
-	restConfig, err := utils.NewRestConfig(option.Kubeconfig)
+	restConfig, err := clientcmd.BuildConfigFromFlags("", option.Kubeconfig)
 	if err != nil {
 		return nil, err
 	}

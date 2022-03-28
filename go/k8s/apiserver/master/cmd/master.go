@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"k8s-lx1036/k8s/apiserver/master"
 	"k8s-lx1036/k8s/apiserver/master/reconcilers"
 
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
@@ -20,7 +18,6 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/master/tunneler"
 )
 
 var (
@@ -53,22 +50,7 @@ func main() {
 	}
 }
 
-// CreateNodeDialer creates the dialer infrastructure to connect to the nodes.
-func CreateNodeDialer() (tunneler.Tunneler, *http.Transport) {
-	// Setup nodeTunneler if needed
-	var nodeTunneler tunneler.Tunneler
-	var proxyDialerFn utilnet.DialFunc
-	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
-	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
-	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
-		DialContext:     proxyDialerFn,
-		TLSClientConfig: proxyTLSClientConfig,
-	})
-
-	return nodeTunneler, proxyTransport
-}
-
-func CreateKubeAPIServerConfig(nodeTunneler tunneler.Tunneler, proxyTransport *http.Transport) *master.Config {
+func CreateKubeAPIServerConfig(proxyTransport *http.Transport) *master.Config {
 	genericConfig, versionedInformers := buildGenericConfig(proxyTransport)
 
 	config := &master.Config{

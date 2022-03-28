@@ -18,7 +18,6 @@ package controllers
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,7 +28,7 @@ import (
 // CustomGrafanaDashboardReconciler reconciles a CustomGrafanaDashboard object
 type CustomGrafanaDashboardReconciler struct {
 	client.Client
-	Log    logr.Logger
+	//Log    logr.Logger
 	Scheme *runtime.Scheme
 }
 

@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 )
 
 // Host is an interface that plugins can use to access the kubelet.

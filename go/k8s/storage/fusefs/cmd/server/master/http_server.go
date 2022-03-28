@@ -16,22 +16,26 @@ import (
 )
 
 const (
-	ParamsOwner    = "owner"
-	ParamsName     = "name"
-	ParamsCapacity = "capacity"
-	ParamsAddrKey  = "addr"
+	ParamsOwner            = "owner"
+	ParamsAccessKey        = "accessKey"
+	ParamsSecretKey        = "secretKey"
+	ParamsEndpoint         = "endpoint"
+	ParamsName             = "name"
+	ParamsCapacity         = "capacity"
+	ParamsAddrKey          = "addr"
+	ParamsCreateBackendKey = "createBackend"
 )
 
 func (server *Server) startHTTPService() {
 	router := mux.NewRouter()
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			if server.partition.IsRaftLeader() {
+			if server.isRaftLeader() {
 				next.ServeHTTP(writer, request)
 				return
 			}
 
-			if len(server.leaderInfo.addr) == 0 {
+			if len(server.r.Leader()) == 0 {
 				http.Error(writer, fmt.Sprintf("no raft leader"), http.StatusBadRequest)
 				return
 			}
@@ -40,7 +44,7 @@ func (server *Server) startHTTPService() {
 			reverseProxy := &httputil.ReverseProxy{
 				Director: func(request *http.Request) {
 					request.URL.Scheme = "http"
-					request.URL.Host = server.leaderInfo.addr
+					request.URL.Host = string(server.r.Leader())
 				},
 			}
 			reverseProxy.ServeHTTP(writer, request)
@@ -66,7 +70,7 @@ func (server *Server) startHTTPService() {
 	router.NewRoute().Methods(http.MethodPost).Path("/metapartition/expand").HandlerFunc(server.createMetaPartition)
 
 	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", server.ip, server.port), router); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", server.localIP, server.httpPort), router); err != nil {
 			klog.Fatal(err)
 		}
 	}()
@@ -137,6 +141,10 @@ func (server *Server) getVolStat(writer http.ResponseWriter, request *http.Reque
 func (server *Server) createVol(writer http.ResponseWriter, request *http.Request) {
 	name := request.FormValue(ParamsName)
 	owner := request.FormValue(ParamsOwner)
+	accessKey := request.FormValue(ParamsAccessKey)
+	secretKey := request.FormValue(ParamsSecretKey)
+	endpoint := request.FormValue(ParamsEndpoint)
+	createBackend, _ := strconv.ParseBool(request.FormValue(ParamsCreateBackendKey))
 	capacityStr := request.FormValue(ParamsCapacity)
 	capacity, err := strconv.ParseUint(capacityStr, 10, 64)
 	if err != nil {
@@ -144,7 +152,10 @@ func (server *Server) createVol(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 
-	if vol, err := server.cluster.createVol(name, owner, capacity); err != nil {
+	if len(endpoint) == 0 {
+		endpoint = server.s3Endpoint
+	}
+	if vol, err := server.cluster.createVol(name, owner, accessKey, secretKey, endpoint, capacity, createBackend); err != nil {
 		http.Error(writer, fmt.Sprintf("create volume %s err: %v", name, err), http.StatusInternalServerError)
 		return
 	} else {

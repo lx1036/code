@@ -14,7 +14,6 @@ import (
 	sparkApplicationInformer "k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/client/informers/externalversions"
 	sparkApplicationLister "k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/client/listers/sparkoperator.k9s.io/v1"
 	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/config"
-	"k8s-lx1036/k8s/bigdata/spark-on-k8s/spark-operator/pkg/utils"
 
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +29,7 @@ import (
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
@@ -64,7 +64,7 @@ type Controller struct {
 }
 
 func NewController(option *options.Options) (*Controller, error) {
-	restConfig, err := utils.NewRestConfig(option.Kubeconfig)
+	restConfig, err := clientcmd.BuildConfigFromFlags("", option.Kubeconfig)
 	if err != nil {
 		return nil, err
 	}

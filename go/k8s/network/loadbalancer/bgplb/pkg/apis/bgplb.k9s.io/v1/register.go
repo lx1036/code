@@ -38,6 +38,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&BgpPeer{},
 		&EipList{},
 		&Eip{},
+		&IPPoolList{},
+		&IPPool{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

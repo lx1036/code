@@ -12,3 +12,4 @@ OpenLB: 类似于 MetalLB(https://github.com/metallb/metallb)，使用 gobgp(htt
 (1) BGP LoadBalancer Service IP，且自带 Service IPAM，且支持 Multi-IPPool，且支持 CRD 配置更友好。
 比 MetalLB 配置使用更友好的 CRD 模式。
 
+(2) LoadBalancer Service IPAM Controller allocate IP 和 BGP Speaker 宣告 pod cidr、loadbalancer service ExternalIP。

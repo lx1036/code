@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ type BgplbV1Interface interface {
 	BgpConvesGetter
 	BgpPeersGetter
 	EipsGetter
+	IPPoolsGetter
 }
 
 // BgplbV1Client is used to interact with features provided by the bgplb.k9s.io group.
@@ -47,6 +48,10 @@ func (c *BgplbV1Client) BgpPeers(namespace string) BgpPeerInterface {
 
 func (c *BgplbV1Client) Eips(namespace string) EipInterface {
 	return newEips(c, namespace)
+}
+
+func (c *BgplbV1Client) IPPools() IPPoolInterface {
+	return newIPPools(c)
 }
 
 // NewForConfig creates a new BgplbV1Client for the given config.

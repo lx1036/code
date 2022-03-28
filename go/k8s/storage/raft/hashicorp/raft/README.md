@@ -17,6 +17,11 @@ candidate 之后，获取 grant vote 必要条件：
 
 (2) log replication
 
+(2.1) membership change
+raft membership change: 
+* https://zhuanlan.zhihu.com/p/359206808
+* https://www.zhihu.com/question/517688434
+
 
 
 (3) safety

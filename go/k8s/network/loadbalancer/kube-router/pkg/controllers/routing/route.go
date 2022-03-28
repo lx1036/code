@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	gobgpapi "github.com/osrg/gobgp/api"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog/v2"
 )
@@ -30,54 +30,12 @@ func (controller *NetworkRoutingController) injectRoute(path *gobgpapi.Path) err
 		return err
 	}
 
-	tunnelName := generateTunnelName(nextHop.String())
 	sameSubnet := controller.nodeSubnet.Contains(nextHop)
 
 	// INFO: 如果是删除路由请求
 	if path.IsWithdraw {
 		klog.Infof("Removing route: '%s via %s' from peer in the routing table", dst, nextHop)
-
-		// The path might be withdrawn because the peer became unestablished or it may be withdrawn because just the
-		// path was withdrawn. Check to see if the peer is still established before deciding whether to clean the
-		// tunnel and tunnel routes or whether to just delete the destination route.
-		peerEstablished, err := controller.isPeerEstablished(nextHop.String())
-		if err != nil {
-			klog.Errorf("encountered error while checking peer status: %v", err)
-		}
-		if err == nil && !peerEstablished {
-			klog.Infof("Peer '%s' was not found any longer, removing tunnel and routes", nextHop.String())
-			controller.cleanupTunnel(dst, tunnelName)
-			return nil
-		}
-
 		return deleteRoutesByDestination(dst)
-	}
-
-	shouldCreateTunnel := func() bool {
-		if !controller.enableOverlays {
-			return false
-		}
-		if controller.overlayType == "full" {
-			return true
-		}
-		if controller.overlayType == "subnet" && !sameSubnet {
-			return true
-		}
-		return false
-	}
-
-	// create IPIP tunnels only when node is not in same subnet or overlay-type is set to 'full'
-	// if the user has disabled overlays, don't create tunnels. If we're not creating a tunnel, check to see if there is
-	// any cleanup that needs to happen.
-	if shouldCreateTunnel() {
-		link, err = controller.setupOverlayTunnel(tunnelName, nextHop)
-		if err != nil {
-			return err
-		}
-	} else {
-		// knowing that a tunnel shouldn't exist for this route, check to see if there are any lingering tunnels /
-		// routes that need to be cleaned up.
-		controller.cleanupTunnel(dst, tunnelName)
 	}
 
 	switch {

@@ -3,24 +3,64 @@ package routing
 import (
 	"context"
 	"fmt"
-	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/any"
-	gobgpapi "github.com/osrg/gobgp/api"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"strconv"
 
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/any"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
+	bgppacket "github.com/osrg/gobgp/v3/pkg/packet/bgp"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
 
 // INFO: ECMP(Equal Cost Multi-Path) 等价路由: 多条不同链路到达同一目的地址的网络环境，即同一个 dst 多个 next hop
 
+func getNextHop(path *gobgpapi.Path) string {
+	for _, pattr := range path.Pattrs {
+		var msg ptypes.DynamicAny
+		ptypes.UnmarshalAny(pattr, &msg)
+		switch t := msg.Message.(type) {
+		case *gobgpapi.NextHopAttribute:
+			return t.NextHop
+		}
+	}
+
+	return ""
+}
+
+func (controller *NetworkRoutingController) isVIPExistedInTable(vip string) bool {
+	existed := false
+	err := controller.bgpServer.ListPath(context.Background(), &gobgpapi.ListPathRequest{
+		TableType: gobgpapi.TableType_GLOBAL,
+		Family:    &gobgpapi.Family{Afi: gobgpapi.Family_AFI_IP, Safi: gobgpapi.Family_SAFI_UNICAST},
+		Prefixes: []*gobgpapi.TableLookupPrefix{
+			{
+				Prefix: vip,
+			},
+		},
+	}, func(destination *gobgpapi.Destination) {
+		for _, path := range destination.Paths {
+			if getNextHop(path) == controller.nodeIP.String() {
+				existed = true
+			}
+		}
+	})
+
+	return err == nil && existed
+}
+
 func (controller *NetworkRoutingController) advertiseVIPs(vips []string) {
 	for _, vip := range vips {
 		klog.Infof(fmt.Sprintf("advertising route: '%s/32 via %s' to peers", vip, controller.nodeIP.String()))
 
+		if controller.isVIPExistedInTable(vip) {
+			continue
+		}
+
 		a1, _ := ptypes.MarshalAny(&gobgpapi.OriginAttribute{
-			Origin: 0,
+			Origin: uint32(bgppacket.BGP_ORIGIN_ATTR_TYPE_IGP),
 		})
 		a2, _ := ptypes.MarshalAny(&gobgpapi.NextHopAttribute{
 			NextHop: controller.nodeIP.String(),
@@ -31,6 +71,7 @@ func (controller *NetworkRoutingController) advertiseVIPs(vips []string) {
 			PrefixLen: 32,
 		})
 		_, err := controller.bgpServer.AddPath(context.Background(), &gobgpapi.AddPathRequest{
+			TableType: gobgpapi.TableType_GLOBAL,
 			Path: &gobgpapi.Path{
 				Family: &gobgpapi.Family{Afi: gobgpapi.Family_AFI_IP, Safi: gobgpapi.Family_SAFI_UNICAST},
 				Nlri:   nlri,
@@ -46,6 +87,10 @@ func (controller *NetworkRoutingController) advertiseVIPs(vips []string) {
 func (controller *NetworkRoutingController) withdrawVIPs(vips []string) {
 	for _, vip := range vips {
 		klog.Infof(fmt.Sprintf("withdrawing route: '%s/32 via %s' to peers", vip, controller.nodeIP.String()))
+
+		if !controller.isVIPExistedInTable(vip) {
+			continue
+		}
 
 		a1, _ := ptypes.MarshalAny(&gobgpapi.OriginAttribute{
 			Origin: 0,
@@ -72,35 +117,47 @@ func (controller *NetworkRoutingController) withdrawVIPs(vips []string) {
 	}
 }
 
-func (controller *NetworkRoutingController) getAllVIPs() ([]string, []string, error) {
-	return controller.getVIPs(false)
+func (controller *NetworkRoutingController) getAllVIPs(svc *corev1.Service) ([]string, []string, error) {
+	return controller.getVIPs(svc, false)
 }
 
-func (controller *NetworkRoutingController) getActiveVIPs() ([]string, []string, error) {
-	return controller.getVIPs(true)
+func (controller *NetworkRoutingController) getActiveVIPs(svc *corev1.Service) ([]string, []string, error) {
+	return controller.getVIPs(svc, true)
 }
 
-func (controller *NetworkRoutingController) getVIPs(onlyActiveEndpoints bool) ([]string, []string, error) {
+func (controller *NetworkRoutingController) getAllActiveVIPs() ([]string, []string, error) {
+	toAdvertiseList := make([]string, 0)
+	toWithdrawList := make([]string, 0)
+	for _, obj := range controller.serviceLister.List() {
+		svc := obj.(*corev1.Service)
+		toAdvertise, toWithdraw, err := controller.getActiveVIPs(svc)
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("svc %/%s get active vips err:%v", svc.Namespace, svc.Name, err))
+			continue
+		}
+
+		toAdvertiseList = append(toAdvertiseList, toAdvertise...)
+		toWithdrawList = append(toWithdrawList, toWithdraw...)
+	}
+
+	return toAdvertiseList, toWithdrawList, nil
+}
+
+func (controller *NetworkRoutingController) getVIPs(svc *corev1.Service, onlyActiveEndpoints bool) ([]string, []string, error) {
 	toAdvertiseList := make([]string, 0)
 	toWithdrawList := make([]string, 0)
 
-	services, err := controller.serviceLister.List(labels.Everything())
+	toAdvertise, toWithdraw, err := controller.getVIPsForService(svc, onlyActiveEndpoints)
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, svc := range services {
-		toAdvertise, toWithdraw, err := controller.getVIPsForService(svc, onlyActiveEndpoints)
-		if err != nil {
-			return nil, nil, err
-		}
 
-		if len(toAdvertise) > 0 {
-			toAdvertiseList = append(toAdvertiseList, toAdvertise...)
-		}
+	if len(toAdvertise) > 0 {
+		toAdvertiseList = append(toAdvertiseList, toAdvertise...)
+	}
 
-		if len(toWithdraw) > 0 {
-			toWithdrawList = append(toWithdrawList, toWithdraw...)
-		}
+	if len(toWithdraw) > 0 {
+		toWithdrawList = append(toWithdrawList, toWithdraw...)
 	}
 
 	return toAdvertiseList, toWithdrawList, nil
@@ -112,11 +169,9 @@ const (
 
 func (controller *NetworkRoutingController) getVIPsForService(svc *corev1.Service, onlyActiveEndpoints bool) ([]string, []string, error) {
 	advertise := true
-
 	_, hasLocalAnnotation := svc.Annotations[svcLocalAnnotation]
 	hasLocalTrafficPolicy := svc.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal
 	isLocal := hasLocalAnnotation || hasLocalTrafficPolicy
-
 	if onlyActiveEndpoints && isLocal {
 		var err error
 		advertise, err = controller.nodeHasEndpointsForService(svc)
@@ -136,15 +191,28 @@ func (controller *NetworkRoutingController) getVIPsForService(svc *corev1.Servic
 
 // INFO: 如果这个 service 是 ServiceExternalTrafficPolicyTypeLocal，那 kube-router 和 endpoint 在一个 node 上， 该 service ip 才会被宣告
 func (controller *NetworkRoutingController) nodeHasEndpointsForService(svc *corev1.Service) (bool, error) {
-	endpoint, err := controller.endpointLister.Endpoints(svc.Namespace).Get(svc.Name)
+	key, err := cache.MetaNamespaceKeyFunc(svc)
 	if err != nil {
 		return false, err
 	}
-
-	for _, subset := range endpoint.Subsets {
+	obj, exists, err := controller.endpointLister.GetByKey(key)
+	if err != nil {
+		return false, err
+	}
+	if !exists {
+		return false, fmt.Errorf("endpoint resource doesn't exist for service: %q", svc.Name)
+	}
+	endpoints := obj.(*corev1.Endpoints)
+	for _, subset := range endpoints.Subsets {
 		for _, address := range subset.Addresses {
-			if (address.NodeName != nil && *address.NodeName == controller.nodeName) || address.IP == controller.nodeIP.String() {
-				return true, nil
+			if address.NodeName != nil {
+				if *address.NodeName == controller.nodeName {
+					return true, nil
+				}
+			} else {
+				if address.IP == controller.nodeIP.String() {
+					return true, nil
+				}
 			}
 		}
 	}
@@ -162,14 +230,13 @@ func (controller *NetworkRoutingController) getAllVIPsForService(svc *corev1.Ser
 	ipList := make([]string, 0)
 
 	if controller.shouldAdvertiseService(svc, svcAdvertiseClusterAnnotation, controller.advertiseClusterIP) {
-		clusterIP := controller.getClusterIP(svc)
-		if len(clusterIP) != 0 {
-			ipList = append(ipList, clusterIP)
+		if len(svc.Spec.ClusterIP) != 0 {
+			ipList = append(ipList, svc.Spec.ClusterIP)
 		}
 	}
 
 	if controller.shouldAdvertiseService(svc, svcAdvertiseExternalAnnotation, controller.advertiseExternalIP) {
-		ipList = append(ipList, controller.getExternalIPs(svc)...)
+		ipList = append(ipList, svc.Spec.ExternalIPs...)
 	}
 
 	if controller.shouldAdvertiseService(svc, svcAdvertiseLoadBalancerAnnotation, controller.advertiseLoadBalancerIP) {
@@ -183,55 +250,20 @@ func (controller *NetworkRoutingController) shouldAdvertiseService(svc *corev1.S
 	returnValue := defaultValue
 	stringValue, exists := svc.Annotations[annotation]
 	if exists {
-		// Service annotations overrides defaults.
 		returnValue, _ = strconv.ParseBool(stringValue)
 	}
 	return returnValue
 }
 
-func (controller *NetworkRoutingController) getClusterIP(svc *corev1.Service) string {
-	clusterIP := ""
-	if svc.Spec.Type == corev1.ServiceTypeClusterIP ||
-		svc.Spec.Type == corev1.ServiceTypeNodePort ||
-		svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
-		if !ClusterIPIsNoneOrBlank(svc.Spec.ClusterIP) {
-			clusterIP = svc.Spec.ClusterIP
-		}
-	}
-
-	return clusterIP
-}
-
-func (controller *NetworkRoutingController) getExternalIPs(svc *corev1.Service) []string {
-	externalIPList := make([]string, 0)
-	if svc.Spec.Type == corev1.ServiceTypeClusterIP ||
-		svc.Spec.Type == corev1.ServiceTypeNodePort ||
-		svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
-		// skip headless services
-		if !ClusterIPIsNoneOrBlank(svc.Spec.ClusterIP) {
-			externalIPList = append(externalIPList, svc.Spec.ExternalIPs...)
-		}
-	}
-
-	return externalIPList
-}
-
 func (controller *NetworkRoutingController) getLoadBalancerIPs(svc *corev1.Service) []string {
 	loadBalancerIPList := make([]string, 0)
 	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
-		// skip headless services
-		if !ClusterIPIsNoneOrBlank(svc.Spec.ClusterIP) {
-			for _, ingress := range svc.Status.LoadBalancer.Ingress {
-				if len(ingress.IP) > 0 {
-					loadBalancerIPList = append(loadBalancerIPList, ingress.IP)
-				}
+		for _, ingress := range svc.Status.LoadBalancer.Ingress {
+			if len(ingress.IP) > 0 {
+				loadBalancerIPList = append(loadBalancerIPList, ingress.IP)
 			}
 		}
 	}
 
 	return loadBalancerIPList
-}
-
-func ClusterIPIsNoneOrBlank(clusterIP string) bool {
-	return clusterIP == corev1.ClusterIPNone || len(clusterIP) == 0
 }

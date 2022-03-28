@@ -2,10 +2,6 @@ package server
 
 import (
 	"fmt"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"os"
-
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -92,21 +88,4 @@ func findContainerStatusByName(status *corev1.PodStatus, name string) (*corev1.C
 	}
 
 	return nil, fmt.Errorf("unable to find status for container with name %v in pod status (it may not be running)", name)
-}
-
-func NewRestConfig(kubeconfig string) (*rest.Config, error) {
-	var config *rest.Config
-	if _, err := os.Stat(kubeconfig); err == nil {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return config, nil
 }

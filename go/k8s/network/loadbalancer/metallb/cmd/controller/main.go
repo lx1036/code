@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// INFO: IPAM
+// INFO: LoadBalancer Service IPAM，参考自 metallb controller cmd
 
 type svcKey string
 type cmKey string

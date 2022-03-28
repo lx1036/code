@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	gobgpapi "github.com/osrg/gobgp/api"
-	gobgp "github.com/osrg/gobgp/pkg/server"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
+	gobgp "github.com/osrg/gobgp/v3/pkg/server"
 
 	"github.com/golang/protobuf/ptypes"
 	log "github.com/sirupsen/logrus"

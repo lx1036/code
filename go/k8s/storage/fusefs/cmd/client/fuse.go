@@ -46,25 +46,15 @@ const (
 )
 
 type Config struct {
-	MountPoint string `json:"mountPoint"`
-
 	//volname is also s3 bucket
-	Region    string `json:"region" default:"beijing"`
-	Volname   string `json:"volName"`
-	Owner     string `json:"owner"`
-	AccessKey string `json:"accessKey"`
-	SecretKey string `json:"secretKey"`
+	Volname      string `json:"volName"`
+	Owner        string `json:"owner"`
+	AccessKey    string `json:"accessKey"`
+	SecretKey    string `json:"secretKey"`
+	FullPathName string `json:"fullPathName" default:"false"`
 
 	MasterAddr string `json:"masterAddr"`
-
-	ReadRate    int64
-	WriteRate   int64
-	EnSyncWrite int64
-	BufSize     int64 `json:"bufSize"`
-
-	ReadOnly bool `json:"readOnly"`
-
-	FullPathName bool `json:"fullPathName"`
+	MountPoint string `json:"mountPoint"`
 
 	Debug bool `json:"debug" default:"false"`
 }
@@ -122,8 +112,9 @@ func NewFuseFS(opt *Config) (*FuseFS, error) {
 	value, _ := user.Current()
 	uid, _ := strconv.ParseUint(value.Uid, 10, 32)
 	gid, _ := strconv.ParseUint(value.Gid, 10, 32)
+	fullPathName, _ := strconv.ParseBool(opt.FullPathName)
 	fs := &FuseFS{
-		fullPathName: opt.FullPathName,
+		fullPathName: fullPathName,
 		uid:          uint32(uid),
 		gid:          uint32(gid),
 
@@ -131,7 +122,7 @@ func NewFuseFS(opt *Config) (*FuseFS, error) {
 		dirHandleCache:  NewDirHandleCache(),
 		fileHandleCache: NewFileHandleCache(),
 	}
-	fs.metaClient, err = meta.NewMetaClient(opt.Volname, opt.Owner, opt.MasterAddr)
+	fs.metaClient, err = meta.NewMetaClient(opt.Volname, opt.MasterAddr)
 	if err != nil {
 		return nil, fmt.Errorf("NewMetaWrapper failed with err %v", err)
 	}

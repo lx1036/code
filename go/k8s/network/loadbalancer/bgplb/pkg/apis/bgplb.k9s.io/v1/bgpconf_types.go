@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/golang/protobuf/jsonpb"
-	gobgpapi "github.com/osrg/gobgp/api"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

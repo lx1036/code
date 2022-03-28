@@ -6,8 +6,7 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/ptypes"
-	gobgpapi "github.com/osrg/gobgp/api"
-	"github.com/vishvananda/netlink"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
 )
 
 // parseBGPPath takes in a GoBGP Path and parses out the destination subnet and the next hop from its attributes.
@@ -25,7 +24,8 @@ func parseBGPPath(path *gobgpapi.Path) (*net.IPNet, net.IP, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid nlri in advertised path")
 	}
-	dstSubnet, err := netlink.ParseIPNet(prefix.Prefix + "/" + fmt.Sprint(prefix.PrefixLen))
+
+	_, dstSubnet, err := net.ParseCIDR(prefix.Prefix + "/" + fmt.Sprint(prefix.PrefixLen))
 	if err != nil {
 		return nil, nil, fmt.Errorf("couldn't parse IP subnet from nlri advertised path")
 	}

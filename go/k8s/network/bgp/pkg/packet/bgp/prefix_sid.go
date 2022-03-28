@@ -8,7 +8,7 @@ import (
 	"net"
 
 	"github.com/golang/protobuf/ptypes"
-	api "github.com/osrg/gobgp/api"
+	api "github.com/osrg/gobgp/v3/api"
 )
 
 const (

@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 
-	"github.com/vishvananda/netlink"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -81,27 +80,3 @@ func GetNodeObject(clientset kubernetes.Interface) (*corev1.Node, error) {
 const (
 	IPInIPHeaderLength = 20
 )
-
-// GetMTUFromNodeIP returns the MTU by detecting it from the IP on the node and figuring in tunneling configurations
-func GetMTUFromNodeIP(nodeIP net.IP, overlayEnabled bool) (int, error) {
-	links, err := netlink.LinkList()
-	if err != nil {
-		return 0, errors.New("failed to get list of links")
-	}
-	for _, link := range links {
-		addresses, err := netlink.AddrList(link, netlink.FAMILY_ALL)
-		if err != nil {
-			return 0, errors.New("failed to get list of addr")
-		}
-		for _, addr := range addresses {
-			if addr.IPNet.IP.Equal(nodeIP) {
-				linkMTU := link.Attrs().MTU
-				if overlayEnabled {
-					return linkMTU - IPInIPHeaderLength, nil // -20 to accommodate IPIP header
-				}
-				return linkMTU, nil
-			}
-		}
-	}
-	return 0, errors.New("failed to find interface with specified node IP")
-}

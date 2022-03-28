@@ -14,10 +14,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const (
-	applied = "applied"
-)
-
 type raftLeaderChangeHandler func(leader uint64)
 
 type raftPeerChangeHandler func(confChange *proto.ConfChange) (err error)

@@ -19,6 +19,7 @@ type Dentry struct {
 	expiration int64 // second
 }
 
+// DentryCache INFO: dentry 就是保存 file/dir name 和其 inode 的映射
 type DentryCache struct {
 	sync.Mutex
 

@@ -37,8 +37,9 @@ func (raftState RaftState) String() string {
 }
 
 type raftState struct {
-	// The current state
-	state RaftState
+	// currentTerm commitIndex, lastApplied,  must be kept at the top of
+	// the struct so they're 64 bit aligned which is a requirement for
+	// atomic ops on 32 bit platforms.
 
 	// The current term, cache of StableStore
 	currentTerm uint64
@@ -55,6 +56,9 @@ type raftState struct {
 	// Cache the latest log from LogStore
 	lastLogIndex uint64
 	lastLogTerm  uint64
+
+	// The current state
+	state RaftState
 }
 
 func (r *raftState) getState() RaftState {
