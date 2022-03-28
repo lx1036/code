@@ -2,18 +2,21 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	v1 "k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/client/listers/bgplb.k9s.io/v1"
-	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/ipam"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/fields"
 	"net"
 	"time"
 
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/client/clientset/versioned"
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/client/informers/externalversions"
+	v1 "k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/client/listers/bgplb.k9s.io/v1"
+	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/ipam"
 
+	"github.com/cilium/ipam/service/ipallocator"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -87,46 +90,48 @@ func New(restConfig *restclient.Config) *Controller {
 	})
 
 	svcWatcher := cache.NewListWatchFromClient(kubeClient.CoreV1().RESTClient(), "services", corev1.NamespaceAll, fields.Everything())
-	c.svcIndexer, c.svcInformer = cache.NewIndexerInformer(svcWatcher, &corev1.Service{}, 0, cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			if !wantsLoadBalancer(obj.(*corev1.Service)) {
-				return
-			}
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(svcKey(key))
-			}
-		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			if !wantsLoadBalancer(newObj.(*corev1.Service)) {
-				return
-			}
-			key, err := cache.MetaNamespaceKeyFunc(newObj)
-			if err == nil {
-				c.queue.Add(svcKey(key))
+	c.svcIndexer, c.svcInformer = cache.NewIndexerInformer(svcWatcher, &corev1.Service{}, 0, cache.FilteringResourceEventHandler{
+		FilterFunc: func(obj interface{}) bool {
+			switch t := obj.(type) {
+			case *corev1.Service:
+				return t.Spec.Type == corev1.ServiceTypeLoadBalancer // only watch LoadBalancer service
+			default:
+				runtime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", c, obj))
+				return false
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
-			svc, ok := obj.(*corev1.Service)
-			if !ok {
-				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				if err == nil {
+					c.queue.Add(svcKey(key))
+				}
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(newObj)
+				if err == nil {
+					c.queue.Add(svcKey(key))
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				svc, ok := obj.(*corev1.Service)
 				if !ok {
-					klog.Errorf("unexpected object type: %v", obj)
-					return
+					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						klog.Errorf("unexpected object type: %v", obj)
+						return
+					}
+					if svc, ok = tombstone.Obj.(*corev1.Service); !ok {
+						klog.Errorf("unexpected object type: %v", obj)
+						return
+					}
 				}
-				if svc, ok = tombstone.Obj.(*corev1.Service); !ok {
-					klog.Errorf("unexpected object type: %v", obj)
-					return
-				}
-			}
-			if !wantsLoadBalancer(svc) {
-				return
-			}
 
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(svcKey(key))
-			}
+				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(svc)
+				if err == nil {
+					c.queue.Add(svcKey(key))
+				}
+			},
 		},
 	}, cache.Indexers{})
 
@@ -199,12 +204,22 @@ func (s *Controller) syncIPPool(ctx context.Context, key string) error {
 		}
 	}
 
+	if len(ippool.Spec.Cidr) == 0 {
+		return fmt.Errorf("ippool cidr is empty")
+	}
+
 	_, cidr, err := net.ParseCIDR(ippool.Spec.Cidr)
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("parse ippool:%s cidr:%s err:%v", key, ippool.Spec.Cidr, err))
 	}
 	allocator := ipam.NewHostScopeAllocator(cidr)
 	s.balancer.AddAllocator(key, allocator)
+
+	// TODO: list all unallocated loadbalancer service, and allocate ip for it.
+	go func() {
+
+	}()
+
 	return nil
 }
 
@@ -235,9 +250,26 @@ func (s *Controller) processServiceDeletion(ctx context.Context, service *corev1
 }
 
 func (s *Controller) processServiceCreateOrUpdate(ctx context.Context, service *corev1.Service, key string) error {
-	s.balancer.Allocate()
+	svc, err := s.balancer.Allocate(service, key)
+	if err != nil {
+		if errors.Is(err, NoIPPoolErr) {
+			s.events.Event(service, corev1.EventTypeWarning, "NoIPPool",
+				fmt.Sprintf("%s for service %s/%s", NoIPPoolErr.Error(), service.Namespace, service.Name))
+		}
 
-	s.updateSvcStatus(svc)
+		if errors.Is(err, ipallocator.ErrFull) {
+
+		}
+
+		return err
+	}
+
+	return s.updateSvcStatus(ctx, svc)
+}
+
+func (s *Controller) updateSvcStatus(ctx context.Context, service *corev1.Service) error {
+	_, err := s.kubeClient.CoreV1().Services(service.Namespace).UpdateStatus(ctx, service, metav1.UpdateOptions{})
+	return err
 }
 
 // @see k8s.io/cloud-provider@v0.23.4/controllers/service/controller.go

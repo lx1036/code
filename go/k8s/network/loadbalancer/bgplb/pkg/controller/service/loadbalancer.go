@@ -1,11 +1,14 @@
 package service
 
 import (
+	"errors"
 	"fmt"
-	v1 "k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/apis/bgplb.k9s.io/v1"
-	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/ipam"
 	"net"
 
+	v1 "k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/apis/bgplb.k9s.io/v1"
+	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/ipam"
+
+	"github.com/cilium/ipam/service/ipallocator"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -14,7 +17,7 @@ var (
 )
 
 type LoadBalancer struct {
-	allocator map[string]ipam.Allocator
+	allocators map[string]ipam.Allocator
 
 	// owner maps an IP to the owner
 	owner map[string]string
@@ -33,27 +36,40 @@ func (l *LoadBalancer) Allocate(service *corev1.Service, key string) (*corev1.Se
 	}
 
 	// choose ippool
-	var cidr *net.IPNet
 	ippoolName := svc.Annotations["loadbalancer/ippool-name"]
 	if len(ippoolName) == 0 {
 		ippoolName = "default"
 	}
-	alloc, ok := l.allocator[ippoolName]
+	alloc, ok := l.allocators[ippoolName]
 	if !ok {
 		return nil, NoIPPoolErr
 	}
+	cidr := alloc.GetCidr()
 
-	if lbIP != nil {
-		if cidr.Contains(lbIP) {
-			ip, err := alloc.Allocate(lbIP, key)
+	if lbIP != nil { // allocated loadbalancer ip
+		allocResult, err := alloc.Allocate(lbIP, key)
+		if err != nil { // obsolete loadbalancer ip and reallocate
+			if errors.Is(err, &ipallocator.ErrNotInRange{}) {
+				lbIP = nil
+			} else {
+				return nil, err
+			}
 		} else {
-			lbIP = nil
+			lbIP = allocResult.IP
 		}
 	}
 
 	if lbIP == nil {
 		ip, err := alloc.AllocateNext(key)
-		lbIP = ip.IP
+		if err != nil {
+			if errors.Is(err, ipallocator.ErrFull) {
+
+			} else {
+				return nil, err
+			}
+		} else {
+			lbIP = ip.IP
+		}
 	}
 
 	l.owner[key] = lbIP.String()
@@ -62,9 +78,9 @@ func (l *LoadBalancer) Allocate(service *corev1.Service, key string) (*corev1.Se
 }
 
 func (l *LoadBalancer) AddAllocator(name string, allocator ipam.Allocator) {
-	l.allocator[name] = allocator
+	l.allocators[name] = allocator
 }
 
 func (l *LoadBalancer) DeleteAllocator(name string) {
-	delete(l.allocator, name)
+	delete(l.allocators, name)
 }
