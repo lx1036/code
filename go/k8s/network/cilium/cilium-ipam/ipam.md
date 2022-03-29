@@ -26,8 +26,12 @@ spec:
 ```
 
 
-(2) 一个节点可以多个 pod cidr, 节点的 pod cidr 可以支持按需动态扩容和回收
+(2) 一个节点可以多个 pod cidr
 自定义 IPAM: @see https://mp.weixin.qq.com/s/l0kGo4Fb9NTfLgjQrt88pg
+
+
+(3) 节点的 pod cidr 可以支持按需动态扩容和回收。监听节点 IP 使用率情况，当节点的 pod cidr 使用率过高时，支持动态扩容。
+
 
 # 设计
 (1) choose specified IPPool ippool1 based on nodeSelector
