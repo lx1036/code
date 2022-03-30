@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/ipam/allocator/clusterpool"
+	"k8s.io/klog/v2"
 	"net"
 
 	"github.com/projectcalico/calico/libcalico-go/lib/selector"
@@ -42,8 +43,14 @@ func NewLoadBalancer(ippools []apiv1.IPPool) (*LoadBalancer, error) {
 }
 
 func (l *LoadBalancer) Allocate(node *corev1.Node, key string) (*net.IPNet, error) {
-	pool := l.GetAllocatorByNode(node)
+	pool, err := l.GetAllocatorByNode(node)
+	if err != nil {
+		return nil, err
+	}
 	ipnet, err := pool.allocator.Allocate()
+	if err != nil {
+		return nil, err
+	}
 
 	l.owner[key] = ipnet
 
@@ -51,7 +58,10 @@ func (l *LoadBalancer) Allocate(node *corev1.Node, key string) (*net.IPNet, erro
 }
 
 func (l *LoadBalancer) Release(node *corev1.Node) error {
-	pool := l.GetAllocatorByNode(node)
+	pool, err := l.GetAllocatorByNode(node)
+	if err != nil {
+		return err
+	}
 	key, _ := cache.MetaNamespaceKeyFunc(node)
 
 	ipnet, ok := l.owner[key]
@@ -62,7 +72,7 @@ func (l *LoadBalancer) Release(node *corev1.Node) error {
 	return pool.allocator.Release(ipnet)
 }
 
-func (l *LoadBalancer) GetAllocatorByNode(node *corev1.Node) *Pool {
+func (l *LoadBalancer) GetAllocatorByNode(node *corev1.Node) (*Pool, error) {
 	var p *Pool
 	for _, pool := range l.allocators {
 		ok, err := isIPPoolByNode(node, pool.ippool)
@@ -76,7 +86,11 @@ func (l *LoadBalancer) GetAllocatorByNode(node *corev1.Node) *Pool {
 		}
 	}
 
-	return p
+	if p == nil {
+		return nil, fmt.Errorf(fmt.Sprintf("choose no ippool for node:%s", node.Name))
+	}
+
+	return p, nil
 }
 
 func (l *LoadBalancer) AddAllocator(name string, ippool apiv1.IPPool) error {
@@ -98,9 +112,14 @@ func (l *LoadBalancer) AddAllocator(name string, ippool apiv1.IPPool) error {
 	return nil
 }
 
+func (l *LoadBalancer) DeleteAllocator(name string) {
+	delete(l.allocators, name)
+}
+
 func isIPPoolByNode(node *corev1.Node, ippool apiv1.IPPool) (bool, error) {
 	sel, err := selector.Parse(ippool.Spec.NodeSelector)
 	if err != nil {
+		klog.Errorf(fmt.Sprintf("parse ippool NodeSelector err:%v", err))
 		return false, err
 	}
 

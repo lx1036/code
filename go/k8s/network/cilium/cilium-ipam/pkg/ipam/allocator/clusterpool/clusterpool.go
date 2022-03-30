@@ -31,6 +31,10 @@ func (cidr *CIDRAllocator) Release(ipnet *net.IPNet) error {
 	return cidr.cidrSet.Release(ipnet)
 }
 
+func (cidr *CIDRAllocator) InRange(ipnet *net.IPNet) bool {
+	return cidr.cidrSet.InRange(ipnet)
+}
+
 func ForEachIP(ipnet net.IPNet, iterator func(ip string) error) error {
 	next := make(net.IP, len(ipnet.IP))
 	copy(next, ipnet.IP)

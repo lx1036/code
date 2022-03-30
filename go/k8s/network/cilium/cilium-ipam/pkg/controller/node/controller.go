@@ -2,11 +2,14 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/ipam/allocator/clusterpool"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"net"
+	"strings"
 	"time"
 
 	apiv1 "k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/apis/ipam.k9s.io/v1"
@@ -228,7 +231,9 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		err = c.syncNode(ctx, string(t))
 	}
 
-	runtime.HandleError(fmt.Errorf("error processing %v (will retry): %v", key, err))
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("error processing %v (will retry): %v", key, err))
+	}
 	return true
 }
 
@@ -236,7 +241,7 @@ func (c *Controller) syncIPPool(ctx context.Context, key string) error {
 	ippool, err := c.ippoolLister.Get(key)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			// TODO: delete ippool resource
+			c.balancer.DeleteAllocator(key)
 			return nil
 		} else {
 			return err
@@ -249,14 +254,69 @@ func (c *Controller) syncIPPool(ctx context.Context, key string) error {
 func (c *Controller) syncNode(ctx context.Context, key string) error {
 	node, err := c.nodeLister.Get(key)
 	if err != nil {
+		return err
+	}
+
+	cn, err := c.ciliumClient.CiliumV2().CiliumNodes().Get(ctx, node.Name, metav1.GetOptions{})
+	if err != nil {
 		if apierrors.IsNotFound(err) {
-			// TODO: delete ippool resource
-			return nil
+			return c.AllocateNode(ctx, node, key)
 		} else {
 			return err
 		}
 	}
 
+	pool, err := c.balancer.GetAllocatorByNode(node)
+	if err != nil {
+		return err
+	}
+
+	var (
+		inRange    []string
+		notInRange []string
+	)
+	for _, podCidr := range cn.Spec.IPAM.PodCIDRs {
+		_, ipnet, _ := net.ParseCIDR(podCidr)
+		if pool.allocator.InRange(ipnet) {
+			inRange = append(inRange, podCidr)
+		} else {
+			notInRange = append(notInRange, podCidr)
+		}
+	}
+
+	switch {
+	case len(notInRange) == 0:
+		return nil
+
+	case len(notInRange) != 0 && len(inRange) == 0:
+		ipnet, err := c.balancer.Allocate(node, key)
+		if err != nil {
+			return err
+		}
+		inRange = []string{ipnet.String()}
+	}
+
+	cnCopy := cn.DeepCopy()
+	cnCopy.Spec.IPAM.PodCIDRs = inRange
+	inRangePool := make(ipamTypes.AllocationMap)
+	for _, in := range inRange {
+		_, ipnet, _ := net.ParseCIDR(in)
+		_ = clusterpool.ForEachIP(*ipnet, func(ip string) error {
+			inRangePool[ip] = ipamTypes.AllocationIP{}
+			return nil
+		})
+	}
+	cnCopy.Spec.IPAM.Pool = inRangePool
+	if err = c.patchCiliumNode(cn, cnCopy); err != nil {
+		return err
+	}
+
+	klog.Infof(fmt.Sprintf("allocate pod cidr %s for CiliumNode:%s", strings.Join(cnCopy.Spec.IPAM.PodCIDRs, ","), key))
+	//c.events.Event(cn, corev1.EventTypeNormal, "AllocateCidr", fmt.Sprintf("allocate cidr %s", strings.Join(cnCopy.Spec.IPAM.PodCIDRs, ",")))
+	return nil
+}
+
+func (c *Controller) AllocateNode(ctx context.Context, node *corev1.Node, key string) error {
 	// allocate node subnet from specified ippool, and create CiliumNode
 	ipnet, err := c.balancer.Allocate(node, key)
 	if err != nil {
@@ -275,8 +335,8 @@ func (c *Controller) syncNode(ctx context.Context, key string) error {
 			Labels: node.Labels,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: node.APIVersion,
-					Kind:       node.Kind,
+					APIVersion: "v1",
+					Kind:       "Node",
 					Name:       node.Name,
 					UID:        node.UID,
 				},
@@ -297,7 +357,30 @@ func (c *Controller) syncNode(ctx context.Context, key string) error {
 		return err
 	}
 
-	c.events.Event(cn, corev1.EventTypeNormal, "AllocateCidr", fmt.Sprintf("allocate cidr %s", ipnet.String()))
+	//c.events.Event(cn, corev1.EventTypeNormal, "AllocateCidr", fmt.Sprintf("allocate cidr %s", ipnet.String()))
+	return nil
+}
+
+func (c *Controller) patchCiliumNode(oldCN, newCN *ciliumAPIV2.CiliumNode) error {
+	key, _ := cache.MetaNamespaceKeyFunc(oldCN)
+	oldData, err := json.Marshal(oldCN)
+	if err != nil {
+		return fmt.Errorf("failed to marshal the existing CiliumNode %s err: %v", key, err)
+	}
+
+	newData, err := json.Marshal(newCN)
+	if err != nil {
+		return fmt.Errorf("failed to marshal the new CiliumNode %s err: %v", key, err)
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &ciliumAPIV2.CiliumNode{})
+	if err != nil {
+		return fmt.Errorf("failed to create a two-way merge patch: %v", err)
+	}
+
+	if _, err := c.ciliumClient.CiliumV2().CiliumNodes().Patch(context.TODO(), oldCN.Name, types.MergePatchType,
+		patchBytes, metav1.PatchOptions{}); err != nil {
+		return fmt.Errorf("failed to patch the CiliumNode: %v", err)
+	}
 
 	return nil
 }

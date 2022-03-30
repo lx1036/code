@@ -16,7 +16,7 @@ type IPPoolList struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=ipp,singular=ippool
 // +kubebuilder:printcolumn:name="Cidr",type="string",JSONPath=".spec.cidr"
-// +kubebuilder:printcolumn:name="BlockSize",type="int",JSONPath=".spec.blockSize"
+// +kubebuilder:printcolumn:name="BlockSize",type="integer",JSONPath=".spec.blockSize"
 // +kubebuilder:printcolumn:name="NodeSelector",type="string",JSONPath=".spec.nodeSelector"
 
 type IPPool struct {

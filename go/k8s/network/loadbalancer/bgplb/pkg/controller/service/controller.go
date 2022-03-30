@@ -355,12 +355,12 @@ func (c *Controller) patchService(oldSvc, newSvc *corev1.Service) error {
 	key, _ := cache.MetaNamespaceKeyFunc(oldSvc)
 	oldData, err := json.Marshal(oldSvc)
 	if err != nil {
-		return fmt.Errorf("failed to marshal the existing service %c err: %v", key, err)
+		return fmt.Errorf("failed to marshal the existing service %s err: %v", key, err)
 	}
 
 	newData, err := json.Marshal(newSvc)
 	if err != nil {
-		return fmt.Errorf("failed to marshal the new service %c err: %v", key, err)
+		return fmt.Errorf("failed to marshal the new service %s err: %v", key, err)
 	}
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &corev1.Service{})
 	if err != nil {

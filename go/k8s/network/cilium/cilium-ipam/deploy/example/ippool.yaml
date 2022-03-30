@@ -1,0 +1,15 @@
+
+
+---
+
+apiVersion: ipam.k9s.io/v1
+kind: IPPool
+metadata:
+  name: ippool1
+spec:
+  cidr: "100.20.30.0/24"
+  blockSize: 27
+  nodeSelector: "group/network=='default'"
+
+---
+
