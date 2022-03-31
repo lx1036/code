@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	NoIPPoolErr = fmt.Errorf("has no ippool in cluster")
+	NoIPPoolErr = fmt.Errorf("has no ippool in cluster for current service")
 )
 
 const (

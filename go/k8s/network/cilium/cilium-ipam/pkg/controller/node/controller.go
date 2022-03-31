@@ -3,11 +3,8 @@ package node
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/ipam/allocator/clusterpool"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"net"
 	"strings"
 	"time"
@@ -16,16 +13,21 @@ import (
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/client/clientset/versioned"
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/client/informers/externalversions"
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/client/listers/ipam.k9s.io/v1"
+	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/ipam/allocator/clusterpool"
 
 	ipamTypes "github.com/cilium/cilium/pkg/ipam/types"
 	ciliumAPIV2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	ciliumClientSet "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned"
 	ciliumExternalversions "github.com/cilium/cilium/pkg/k8s/client/informers/externalversions"
 	ciliumListerV2 "github.com/cilium/cilium/pkg/k8s/client/listers/cilium.io/v2"
+	"github.com/cilium/ipam/cidrset"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -35,6 +37,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	clientretry "k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 )
@@ -64,6 +67,11 @@ type Controller struct {
 
 	balancer *LoadBalancer
 }
+
+// INFO:
+//  方案一：ipam.mode=kubernetes，且 kube-controller-manager allocate-node-cidrs=false，然后根据 nodeSelector 选择特定的 ippool，
+//  再去 annotation node "io.cilium.network.ipv4-pod-cidr: 100.20.30.0/24"，缺点是：每一个 node 只有一个 pod cidr，不能动态扩容；优点是：实现简单
+//  方案二：ipam.mode=crd, 且 cilium daemon 需要开启 enable-endpoint-routes: 'true'(这个机制不是最优的)，每一个 pod 一条路由。优点是：可以配置多个 pod cidr，缺点是：实现复杂，不太好弄
 
 func New(restConfig *restclient.Config) *Controller {
 	kubeClient := kubernetes.NewForConfigOrDie(restConfig)
@@ -155,6 +163,12 @@ func New(restConfig *restclient.Config) *Controller {
 				c.queue.Add(nodeKey(key))
 			}
 		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			key, err := cache.MetaNamespaceKeyFunc(newObj)
+			if err == nil {
+				c.queue.Add(nodeKey(key))
+			}
+		},
 		DeleteFunc: func(obj interface{}) {
 			node, ok := obj.(*corev1.Node)
 			if !ok {
@@ -175,7 +189,7 @@ func New(restConfig *restclient.Config) *Controller {
 		},
 	})
 
-	c.syncFuncs = append(c.syncFuncs, c.nodeInformer.HasSynced, c.ippoolInformer.HasSynced)
+	c.syncFuncs = append(c.syncFuncs, c.nodeInformer.HasSynced, c.ippoolInformer.HasSynced, c.ciliumNodeInformer.HasSynced)
 
 	ippools, err := crdClient.IpamV1().IPPools().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -228,7 +242,8 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	case ippoolKey:
 		err = c.syncIPPool(ctx, string(t))
 	case nodeKey:
-		err = c.syncNode(ctx, string(t))
+		//err = c.syncNode(ctx, string(t))
+		err = c.syncK8sNode(ctx, string(t))
 	}
 
 	if err != nil {
@@ -242,6 +257,7 @@ func (c *Controller) syncIPPool(ctx context.Context, key string) error {
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			c.balancer.DeleteAllocator(key)
+			klog.Infof(fmt.Sprintf("delete ippool %s", key))
 			return nil
 		} else {
 			return err
@@ -249,6 +265,78 @@ func (c *Controller) syncIPPool(ctx context.Context, key string) error {
 	}
 
 	return c.balancer.AddAllocator(key, *ippool)
+}
+
+func (c *Controller) syncK8sNode(ctx context.Context, key string) error {
+	node, err := c.nodeLister.Get(key)
+	if err != nil {
+		return err
+	}
+
+	newNode, err := c.balancer.Allocate(node, key)
+	if err != nil {
+		if errors.Is(err, NoIPPoolErr) {
+			c.events.Event(node, corev1.EventTypeWarning, "NoIPPoolErr", fmt.Sprintf("%v", NoIPPoolErr))
+			klog.Errorf(fmt.Sprintf("choose no ippool base on NodeSelector for node:%s", key))
+			return nil
+		}
+
+		if errors.Is(err, cidrset.ErrCIDRRangeNoCIDRsRemaining) {
+			c.events.Event(node, corev1.EventTypeWarning, "IPPoolFullErr", fmt.Sprintf("%v", cidrset.ErrCIDRRangeNoCIDRsRemaining))
+		}
+
+		return err
+	}
+
+	if node.Annotations != nil && node.Annotations[ipv4PodCidr] == newNode.Annotations[ipv4PodCidr] {
+		klog.Infof(fmt.Sprintf("node %s annotation %s no change", key, ipv4PodCidr))
+		return nil
+	}
+
+	return c.patchK8sNode(ctx, node, newNode)
+}
+
+func (c *Controller) patchK8sNode(ctx context.Context, oldNode, newNode *corev1.Node) error {
+	var err error
+	var oldNodeObj, newNodeObj *corev1.Node
+	key, _ := cache.MetaNamespaceKeyFunc(oldNode)
+	firstTry := true
+	return clientretry.RetryOnConflict(clientretry.DefaultRetry, func() error {
+		if firstTry {
+			oldNodeObj = oldNode
+			newNodeObj = newNode
+		} else {
+			oldNode, err = c.kubeClient.CoreV1().Nodes().Get(ctx, key, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			newestNode := oldNode.DeepCopy()
+			if newestNode.Annotations == nil {
+				newestNode.Annotations = make(map[string]string)
+			}
+			newestNode.Annotations[ipv4PodCidr] = newNode.Annotations[ipv4PodCidr]
+			oldNodeObj = oldNode
+			newNodeObj = newestNode
+		}
+
+		oldData, err := json.Marshal(oldNodeObj)
+		if err != nil {
+			return fmt.Errorf("failed to marshal the existing node %s err: %v", key, err)
+		}
+		newData, err := json.Marshal(newNodeObj)
+		if err != nil {
+			return fmt.Errorf("failed to marshal the new node %s err: %v", key, err)
+		}
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &corev1.Node{})
+		if err != nil {
+			return fmt.Errorf("failed to create a two-way merge patch: %v", err)
+		}
+		if _, err = c.kubeClient.CoreV1().Nodes().Patch(ctx, oldNode.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+			return fmt.Errorf("failed to patch the node: %v", err)
+		}
+
+		return nil
+	})
 }
 
 func (c *Controller) syncNode(ctx context.Context, key string) error {
@@ -266,7 +354,7 @@ func (c *Controller) syncNode(ctx context.Context, key string) error {
 		}
 	}
 
-	pool, err := c.balancer.GetAllocatorByNode(node)
+	pool, err := c.balancer.getAllocatorByNode(node)
 	if err != nil {
 		return err
 	}
@@ -324,10 +412,10 @@ func (c *Controller) AllocateNode(ctx context.Context, node *corev1.Node, key st
 	}
 
 	pool := make(ipamTypes.AllocationMap)
-	_ = clusterpool.ForEachIP(*ipnet, func(ip string) error {
+	/*_ = clusterpool.ForEachIP(*ipnet, func(ip string) error {
 		pool[ip] = ipamTypes.AllocationIP{}
 		return nil
-	})
+	})*/
 
 	cn := &ciliumAPIV2.CiliumNode{
 		ObjectMeta: metav1.ObjectMeta{

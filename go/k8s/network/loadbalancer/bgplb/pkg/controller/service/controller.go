@@ -28,6 +28,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	clientretry "k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 )
@@ -298,7 +299,7 @@ func (c *Controller) processServiceCreateOrUpdate(ctx context.Context, service *
 				c.events.Event(service, corev1.EventTypeWarning, "IPPoolChange", fmt.Sprintf("choose ippool %c instead for service", ippoolName))
 				newSvc := service.DeepCopy()
 				newSvc.Annotations[svcIPPoolAnnotation] = ippoolName
-				return c.patchService(service, newSvc)
+				return c.patchService(ctx, service, newSvc)
 			}
 		}
 
@@ -351,26 +352,47 @@ func (c *Controller) updateIPPoolStatus(ctx context.Context, ippool *v1.IPPool) 
 	return err
 }
 
-func (c *Controller) patchService(oldSvc, newSvc *corev1.Service) error {
+func (c *Controller) patchService(ctx context.Context, oldSvc, newSvc *corev1.Service) error {
+	var err error
+	var oldSvcObj, newSvcObj *corev1.Service
 	key, _ := cache.MetaNamespaceKeyFunc(oldSvc)
-	oldData, err := json.Marshal(oldSvc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal the existing service %s err: %v", key, err)
-	}
+	firstTry := true
+	return clientretry.RetryOnConflict(clientretry.DefaultRetry, func() error {
+		if firstTry {
+			oldSvcObj = oldSvc
+			newSvcObj = newSvc
+		} else {
+			oldSvc, err = c.kubeClient.CoreV1().Services(oldSvc.Namespace).Get(ctx, key, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			newestSvc := oldSvc.DeepCopy()
+			if newestSvc.Annotations == nil {
+				newestSvc.Annotations = make(map[string]string)
+			}
+			newestSvc.Annotations[svcIPPoolAnnotation] = newSvc.Annotations[svcIPPoolAnnotation]
+			oldSvcObj = oldSvc
+			newSvcObj = newestSvc
+		}
 
-	newData, err := json.Marshal(newSvc)
-	if err != nil {
-		return fmt.Errorf("failed to marshal the new service %s err: %v", key, err)
-	}
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &corev1.Service{})
-	if err != nil {
-		return fmt.Errorf("failed to create a two-way merge patch: %v", err)
-	}
-	if _, err := c.kubeClient.CoreV1().Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
-		return fmt.Errorf("failed to patch the service: %v", err)
-	}
+		oldData, err := json.Marshal(oldSvcObj)
+		if err != nil {
+			return fmt.Errorf("failed to marshal the existing service %s err: %v", key, err)
+		}
+		newData, err := json.Marshal(newSvcObj)
+		if err != nil {
+			return fmt.Errorf("failed to marshal the new service %s err: %v", key, err)
+		}
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &corev1.Service{})
+		if err != nil {
+			return fmt.Errorf("failed to create a two-way merge patch: %v", err)
+		}
+		if _, err := c.kubeClient.CoreV1().Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+			return fmt.Errorf("failed to patch the service: %v", err)
+		}
 
-	return nil
+		return nil
+	})
 }
 
 // @see k8s.io/cloud-provider@v0.23.4/controllers/service/controller.go

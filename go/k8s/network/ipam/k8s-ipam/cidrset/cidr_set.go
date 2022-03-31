@@ -208,3 +208,15 @@ func (s *CidrSet) Occupy(cidr *net.IPNet) error {
 	cidrSetUsage.WithLabelValues(s.label).Set(float64(s.allocatedCIDRs) / float64(s.maxCIDRs))
 	return nil
 }
+
+// InRange returns true if the given CIDR is inside the range of the allocatable
+// CidrSet.
+func (s *CidrSet) InRange(cidr *net.IPNet) bool {
+	s.Lock()
+	defer s.Unlock()
+	return s.inRange(cidr)
+}
+
+func (s *CidrSet) inRange(cidr *net.IPNet) bool {
+	return s.clusterCIDR.Contains(cidr.IP.Mask(s.clusterCIDR.Mask)) || cidr.Contains(s.clusterCIDR.IP.Mask(cidr.Mask))
+}

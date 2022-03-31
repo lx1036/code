@@ -2,6 +2,7 @@ package clusterpool
 
 import (
 	"net"
+	"strconv"
 
 	"github.com/cilium/ipam/cidrset"
 )
@@ -9,7 +10,8 @@ import (
 // @see https://github.com/cilium/cilium/blob/v1.11.1/pkg/ipam/allocator/clusterpool/clusterpool.go
 
 type CIDRAllocator struct {
-	cidrSet *cidrset.CidrSet
+	cidrSet  *cidrset.CidrSet
+	maskSize int
 }
 
 func NewCIDRAllocator(cidr *net.IPNet, maskSize int) (*CIDRAllocator, error) {
@@ -19,11 +21,26 @@ func NewCIDRAllocator(cidr *net.IPNet, maskSize int) (*CIDRAllocator, error) {
 	}
 
 	return &CIDRAllocator{
-		cidrSet: cidrSet,
+		cidrSet:  cidrSet,
+		maskSize: maskSize,
 	}, nil
 }
 
-func (cidr *CIDRAllocator) Allocate() (*net.IPNet, error) {
+// Allocate ipnet 是 []cidr 之一，则 occupy；否则返回 nil
+func (cidr *CIDRAllocator) Allocate(ipnet *net.IPNet) (*net.IPNet, error) {
+	if ipnet.Mask.String() == strconv.Itoa(cidr.maskSize) && cidr.cidrSet.InRange(ipnet) {
+		err := cidr.cidrSet.Occupy(ipnet)
+		if err != nil {
+			return nil, err
+		}
+
+		return ipnet, nil
+	}
+
+	return nil, nil
+}
+
+func (cidr *CIDRAllocator) AllocateNext() (*net.IPNet, error) {
 	return cidr.cidrSet.AllocateNext()
 }
 
