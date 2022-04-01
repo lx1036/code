@@ -2,6 +2,7 @@ package cidr
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
 	"net"
 	"testing"
 )
@@ -85,4 +86,13 @@ func TestForEach(test *testing.T) {
 		fmt.Println(ip)
 		return nil
 	})
+
+	_, ipnet, _ := net.ParseCIDR("100.216.137.0/25")
+	_, ipnet2, _ := net.ParseCIDR("100.216.137.0/25")
+	if ipnet.String() == ipnet2.String() {
+		klog.Info("equal")
+	}
+	ones, bit := ipnet.Mask.Size()
+	klog.Info(ones, bit)
+	klog.Info(ipnet.Mask.String())
 }

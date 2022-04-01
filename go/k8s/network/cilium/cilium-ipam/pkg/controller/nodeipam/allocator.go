@@ -1,4 +1,4 @@
-package node
+package nodeipam
 
 import (
 	"fmt"
@@ -31,7 +31,7 @@ type LoadBalancer struct {
 	// map ippool name to allocator
 	allocators map[string]*Pool
 
-	// owner maps an node to the IPNet
+	// owner maps a node to the IPNet
 	owner map[string]*net.IPNet
 }
 
@@ -60,6 +60,10 @@ func (l *LoadBalancer) Allocate(node *corev1.Node, key string) (*corev1.Node, er
 		if err != nil {
 			ipnet = nil
 		}
+	}
+
+	if value, ok := l.owner[key]; ok && ipnet.String() == value.String() {
+		return node, nil
 	}
 
 	alloc, err := l.getAllocatorByNode(node)
@@ -147,6 +151,10 @@ func (l *LoadBalancer) AddAllocator(name string, ippool apiv1.IPPool) error {
 
 func (l *LoadBalancer) DeleteAllocator(name string) {
 	delete(l.allocators, name)
+}
+
+func (l *LoadBalancer) ListAllocators() map[string]*Pool {
+	return l.allocators
 }
 
 func isIPPoolByNode(node *corev1.Node, ippool apiv1.IPPool) (bool, error) {

@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/controller/node"
+	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/controller/nodeipam"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/tools/clientcmd"
@@ -22,6 +22,6 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	c := node.New(restConfig)
+	c := nodeipam.New(restConfig)
 	c.Run(genericapiserver.SetupSignalContext(), 1)
 }

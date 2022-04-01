@@ -296,7 +296,7 @@ func (c *Controller) processServiceCreateOrUpdate(ctx context.Context, service *
 					continue
 				}
 
-				c.events.Event(service, corev1.EventTypeWarning, "IPPoolChange", fmt.Sprintf("choose ippool %c instead for service", ippoolName))
+				c.events.Event(service, corev1.EventTypeWarning, "IPPoolChange", fmt.Sprintf("choose ippool %s instead for service", ippoolName))
 				newSvc := service.DeepCopy()
 				newSvc.Annotations[svcIPPoolAnnotation] = ippoolName
 				return c.patchService(ctx, service, newSvc)
