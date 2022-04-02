@@ -42,33 +42,32 @@ type BgpPeerInformer interface {
 type bgpPeerInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
-	namespace        string
 }
 
 // NewBgpPeerInformer constructs a new informer for BgpPeer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewBgpPeerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredBgpPeerInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewBgpPeerInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredBgpPeerInformer(client, resyncPeriod, indexers, nil)
 }
 
 // NewFilteredBgpPeerInformer constructs a new informer for BgpPeer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredBgpPeerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredBgpPeerInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BgplbV1().BgpPeers(namespace).List(context.TODO(), options)
+				return client.BgplbV1().BgpPeers().List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BgplbV1().BgpPeers(namespace).Watch(context.TODO(), options)
+				return client.BgplbV1().BgpPeers().Watch(context.TODO(), options)
 			},
 		},
 		&bgplbk9siov1.BgpPeer{},
@@ -78,7 +77,7 @@ func NewFilteredBgpPeerInformer(client versioned.Interface, namespace string, re
 }
 
 func (f *bgpPeerInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredBgpPeerInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredBgpPeerInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *bgpPeerInformer) Informer() cache.SharedIndexInformer {

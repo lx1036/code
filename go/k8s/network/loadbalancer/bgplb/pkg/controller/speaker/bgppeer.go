@@ -1,4 +1,4 @@
-package controller
+package speaker
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func (controller *BgpLBController) onBGPPeerAdd(obj interface{}) {
+func (controller *SpeakerController) onBGPPeerAdd(obj interface{}) {
 	peer := obj.(*v1.BgpPeer)
 	klog.Infof("bgpPeer %s/%s was added, enqueuing it for submission", peer.Namespace, peer.Name)
 
@@ -37,11 +37,11 @@ func (controller *BgpLBController) onBGPPeerAdd(obj interface{}) {
 	}
 }
 
-func (controller *BgpLBController) onBGPPeerUpdate(oldObj, newObj interface{}) {
+func (controller *SpeakerController) onBGPPeerUpdate(oldObj, newObj interface{}) {
 
 }
 
-func (controller *BgpLBController) onBGPPeerDelete(obj interface{}) {
+func (controller *SpeakerController) onBGPPeerDelete(obj interface{}) {
 	peer, ok := obj.(*v1.BgpPeer)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)

@@ -52,7 +52,7 @@ func (v *version) BgpConves() BgpConfInformer {
 
 // BgpPeers returns a BgpPeerInformer.
 func (v *version) BgpPeers() BgpPeerInformer {
-	return &bgpPeerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &bgpPeerInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // Eips returns a EipInformer.

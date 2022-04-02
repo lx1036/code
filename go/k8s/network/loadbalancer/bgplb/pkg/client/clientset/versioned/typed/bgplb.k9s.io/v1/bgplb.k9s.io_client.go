@@ -42,8 +42,8 @@ func (c *BgplbV1Client) BgpConves(namespace string) BgpConfInterface {
 	return newBgpConves(c, namespace)
 }
 
-func (c *BgplbV1Client) BgpPeers(namespace string) BgpPeerInterface {
-	return newBgpPeers(c, namespace)
+func (c *BgplbV1Client) BgpPeers() BgpPeerInterface {
+	return newBgpPeers(c)
 }
 
 func (c *BgplbV1Client) Eips(namespace string) EipInterface {

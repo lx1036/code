@@ -18,12 +18,16 @@ type BgpPeerList struct {
 }
 
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,shortName=peer,singular=bgppeer
-// +kubebuilder:printcolumn:name="As",type="integer",JSONPath=".spec.as"
-// +kubebuilder:printcolumn:name="PeerAs",type="integer",JSONPath=".spec.conf.peerAs"
-// +kubebuilder:printcolumn:name="NeighborAddress",type="string",JSONPath=".spec.conf.neighborAddress"
+// +kubebuilder:resource:scope=Cluster,shortName=bgpp,singular=bgppeer
+// +kubebuilder:printcolumn:name="PeerAddress",type="string",JSONPath=".spec.peerAddress"
+// +kubebuilder:printcolumn:name="PeerAsn",type="string",JSONPath=".spec.peerAsn"
+// +kubebuilder:printcolumn:name="PeerPort",type="integer",JSONPath=".spec.peerPort"
+// +kubebuilder:printcolumn:name="SourceAddress",type="string",JSONPath=".spec.sourceAddress"
+// +kubebuilder:printcolumn:name="MyAsn",type="string",JSONPath=".spec.myAsn"
+// +kubebuilder:printcolumn:name="SourcePort",type="integer",JSONPath=".spec.sourcePort"
 
 type BgpPeer struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -34,12 +38,19 @@ type BgpPeer struct {
 }
 
 type BgpPeerSpec struct {
-	Conf            *PeerConf        `json:"conf,omitempty"`
-	EbgpMultihop    *EbgpMultihop    `json:"ebgpMultihop,omitempty"`
-	Timers          *Timers          `json:"timers,omitempty"`
-	Transport       *Transport       `json:"transport,omitempty"`
-	GracefulRestart *GracefulRestart `json:"gracefulRestart,omitempty"`
-	AfiSafis        []*AfiSafi       `json:"afiSafis,omitempty"`
+	PeerAddress   string `json:"peerAddress"`
+	PeerAsn       string `json:"peerAsn"`
+	PeerPort      int    `json:"peerPort,omitempty"`
+	SourceAddress string `json:"sourceAddress,omitempty"`
+	MyAsn         string `json:"myAsn"`
+	SourcePort    int    `json:"sourcePort,omitempty"`
+
+	//Conf            *PeerConf        `json:"conf,omitempty"`
+	//EbgpMultihop    *EbgpMultihop    `json:"ebgpMultihop,omitempty"`
+	//Timers          *Timers          `json:"timers,omitempty"`
+	//Transport       *Transport       `json:"transport,omitempty"`
+	//GracefulRestart *GracefulRestart `json:"gracefulRestart,omitempty"`
+	//AfiSafis        []*AfiSafi       `json:"afiSafis,omitempty"`
 
 	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty"`
 }

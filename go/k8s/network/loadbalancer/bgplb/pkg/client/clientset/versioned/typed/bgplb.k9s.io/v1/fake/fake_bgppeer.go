@@ -33,7 +33,6 @@ import (
 // FakeBgpPeers implements BgpPeerInterface
 type FakeBgpPeers struct {
 	Fake *FakeBgplbV1
-	ns   string
 }
 
 var bgppeersResource = schema.GroupVersionResource{Group: "bgplb.k9s.io", Version: "v1", Resource: "bgppeers"}
@@ -43,8 +42,7 @@ var bgppeersKind = schema.GroupVersionKind{Group: "bgplb.k9s.io", Version: "v1",
 // Get takes name of the bgpPeer, and returns the corresponding bgpPeer object, and an error if there is any.
 func (c *FakeBgpPeers) Get(ctx context.Context, name string, options v1.GetOptions) (result *bgplbk9siov1.BgpPeer, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(bgppeersResource, c.ns, name), &bgplbk9siov1.BgpPeer{})
-
+		Invokes(testing.NewRootGetAction(bgppeersResource, name), &bgplbk9siov1.BgpPeer{})
 	if obj == nil {
 		return nil, err
 	}
@@ -54,8 +52,7 @@ func (c *FakeBgpPeers) Get(ctx context.Context, name string, options v1.GetOptio
 // List takes label and field selectors, and returns the list of BgpPeers that match those selectors.
 func (c *FakeBgpPeers) List(ctx context.Context, opts v1.ListOptions) (result *bgplbk9siov1.BgpPeerList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(bgppeersResource, bgppeersKind, c.ns, opts), &bgplbk9siov1.BgpPeerList{})
-
+		Invokes(testing.NewRootListAction(bgppeersResource, bgppeersKind, opts), &bgplbk9siov1.BgpPeerList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -76,15 +73,13 @@ func (c *FakeBgpPeers) List(ctx context.Context, opts v1.ListOptions) (result *b
 // Watch returns a watch.Interface that watches the requested bgpPeers.
 func (c *FakeBgpPeers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(bgppeersResource, c.ns, opts))
-
+		InvokesWatch(testing.NewRootWatchAction(bgppeersResource, opts))
 }
 
 // Create takes the representation of a bgpPeer and creates it.  Returns the server's representation of the bgpPeer, and an error, if there is any.
 func (c *FakeBgpPeers) Create(ctx context.Context, bgpPeer *bgplbk9siov1.BgpPeer, opts v1.CreateOptions) (result *bgplbk9siov1.BgpPeer, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(bgppeersResource, c.ns, bgpPeer), &bgplbk9siov1.BgpPeer{})
-
+		Invokes(testing.NewRootCreateAction(bgppeersResource, bgpPeer), &bgplbk9siov1.BgpPeer{})
 	if obj == nil {
 		return nil, err
 	}
@@ -94,8 +89,7 @@ func (c *FakeBgpPeers) Create(ctx context.Context, bgpPeer *bgplbk9siov1.BgpPeer
 // Update takes the representation of a bgpPeer and updates it. Returns the server's representation of the bgpPeer, and an error, if there is any.
 func (c *FakeBgpPeers) Update(ctx context.Context, bgpPeer *bgplbk9siov1.BgpPeer, opts v1.UpdateOptions) (result *bgplbk9siov1.BgpPeer, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(bgppeersResource, c.ns, bgpPeer), &bgplbk9siov1.BgpPeer{})
-
+		Invokes(testing.NewRootUpdateAction(bgppeersResource, bgpPeer), &bgplbk9siov1.BgpPeer{})
 	if obj == nil {
 		return nil, err
 	}
@@ -106,8 +100,7 @@ func (c *FakeBgpPeers) Update(ctx context.Context, bgpPeer *bgplbk9siov1.BgpPeer
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeBgpPeers) UpdateStatus(ctx context.Context, bgpPeer *bgplbk9siov1.BgpPeer, opts v1.UpdateOptions) (*bgplbk9siov1.BgpPeer, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(bgppeersResource, "status", c.ns, bgpPeer), &bgplbk9siov1.BgpPeer{})
-
+		Invokes(testing.NewRootUpdateSubresourceAction(bgppeersResource, "status", bgpPeer), &bgplbk9siov1.BgpPeer{})
 	if obj == nil {
 		return nil, err
 	}
@@ -117,14 +110,13 @@ func (c *FakeBgpPeers) UpdateStatus(ctx context.Context, bgpPeer *bgplbk9siov1.B
 // Delete takes name of the bgpPeer and deletes it. Returns an error if one occurs.
 func (c *FakeBgpPeers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(bgppeersResource, c.ns, name), &bgplbk9siov1.BgpPeer{})
-
+		Invokes(testing.NewRootDeleteAction(bgppeersResource, name), &bgplbk9siov1.BgpPeer{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeBgpPeers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(bgppeersResource, c.ns, listOpts)
+	action := testing.NewRootDeleteCollectionAction(bgppeersResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &bgplbk9siov1.BgpPeerList{})
 	return err
@@ -133,8 +125,7 @@ func (c *FakeBgpPeers) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 // Patch applies the patch and returns the patched bgpPeer.
 func (c *FakeBgpPeers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *bgplbk9siov1.BgpPeer, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(bgppeersResource, c.ns, name, pt, data, subresources...), &bgplbk9siov1.BgpPeer{})
-
+		Invokes(testing.NewRootPatchSubresourceAction(bgppeersResource, name, pt, data, subresources...), &bgplbk9siov1.BgpPeer{})
 	if obj == nil {
 		return nil, err
 	}

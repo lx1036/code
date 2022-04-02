@@ -1,4 +1,4 @@
-package controller
+package speaker
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func (controller *BgpLBController) onBGPConfAdd(obj interface{}) {
+func (controller *SpeakerController) onBGPConfAdd(obj interface{}) {
 	bgpConf := obj.(*v1.BgpConf)
 	klog.Infof("bgpConf %s/%s was added, enqueuing it for submission", bgpConf.Namespace, bgpConf.Name)
 
@@ -30,10 +30,10 @@ func (controller *BgpLBController) onBGPConfAdd(obj interface{}) {
 	}
 }
 
-func (controller *BgpLBController) onBGPConfUpdate(oldObj, newObj interface{}) {
+func (controller *SpeakerController) onBGPConfUpdate(oldObj, newObj interface{}) {
 
 }
 
-func (controller *BgpLBController) onBGPConfDelete(obj interface{}) {
+func (controller *SpeakerController) onBGPConfDelete(obj interface{}) {
 
 }

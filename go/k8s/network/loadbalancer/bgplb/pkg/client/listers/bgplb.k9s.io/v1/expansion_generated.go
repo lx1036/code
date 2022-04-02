@@ -30,10 +30,6 @@ type BgpConfNamespaceListerExpansion interface{}
 // BgpPeerLister.
 type BgpPeerListerExpansion interface{}
 
-// BgpPeerNamespaceListerExpansion allows custom methods to be added to
-// BgpPeerNamespaceLister.
-type BgpPeerNamespaceListerExpansion interface{}
-
 // EipListerExpansion allows custom methods to be added to
 // EipLister.
 type EipListerExpansion interface{}

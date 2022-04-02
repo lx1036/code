@@ -32,8 +32,9 @@ type BgpPeerLister interface {
 	// List lists all BgpPeers in the indexer.
 	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.BgpPeer, err error)
-	// BgpPeers returns an object that can list and get BgpPeers.
-	BgpPeers(namespace string) BgpPeerNamespaceLister
+	// Get retrieves the BgpPeer from the index for a given name.
+	// Objects returned here must be treated as read-only.
+	Get(name string) (*v1.BgpPeer, error)
 	BgpPeerListerExpansion
 }
 
@@ -55,41 +56,9 @@ func (s *bgpPeerLister) List(selector labels.Selector) (ret []*v1.BgpPeer, err e
 	return ret, err
 }
 
-// BgpPeers returns an object that can list and get BgpPeers.
-func (s *bgpPeerLister) BgpPeers(namespace string) BgpPeerNamespaceLister {
-	return bgpPeerNamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-
-// BgpPeerNamespaceLister helps list and get BgpPeers.
-// All objects returned here must be treated as read-only.
-type BgpPeerNamespaceLister interface {
-	// List lists all BgpPeers in the indexer for a given namespace.
-	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.BgpPeer, err error)
-	// Get retrieves the BgpPeer from the indexer for a given namespace and name.
-	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.BgpPeer, error)
-	BgpPeerNamespaceListerExpansion
-}
-
-// bgpPeerNamespaceLister implements the BgpPeerNamespaceLister
-// interface.
-type bgpPeerNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all BgpPeers in the indexer for a given namespace.
-func (s bgpPeerNamespaceLister) List(selector labels.Selector) (ret []*v1.BgpPeer, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.BgpPeer))
-	})
-	return ret, err
-}
-
-// Get retrieves the BgpPeer from the indexer for a given namespace and name.
-func (s bgpPeerNamespaceLister) Get(name string) (*v1.BgpPeer, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+// Get retrieves the BgpPeer from the index for a given name.
+func (s *bgpPeerLister) Get(name string) (*v1.BgpPeer, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}
