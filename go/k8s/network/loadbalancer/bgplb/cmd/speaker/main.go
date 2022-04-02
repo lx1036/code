@@ -2,11 +2,11 @@ package main
 
 import (
 	"flag"
-	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/controller/speaker"
 	"os"
 	"runtime"
 
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/apis/bgplb.k9s.io/v1"
+	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/controller/speaker"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -21,9 +21,11 @@ func init() {
 
 var (
 	kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
-	grpcHosts  = flag.String("grpcHosts", ":50051", "specify the hosts that gobgpd listens on")
+	grpcPort   = flag.Int("grpcPort", 50051, "specify the hosts port that gobgpd listens on")
+	nodeName   = flag.String("nodeName", "", "k8s worker node name")
 )
 
+// go run . --kubeconfig=`echo $HOME`/.kube/config --nodeName=xxx
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
@@ -39,5 +41,6 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	c := speaker.NewSpeakerController(restConfig, *grpcHosts)
+	c := speaker.NewSpeakerController(restConfig, *grpcPort, *nodeName)
+	c.Run(genericapiserver.SetupSignalContext(), 1)
 }

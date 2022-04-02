@@ -38,12 +38,20 @@ type BgpPeer struct {
 }
 
 type BgpPeerSpec struct {
-	PeerAddress   string `json:"peerAddress"`
-	PeerAsn       string `json:"peerAsn"`
-	PeerPort      int    `json:"peerPort,omitempty"`
+	// +kubebuilder:validation:Required
+	PeerAddress string `json:"peerAddress,required"`
+
+	// +kubebuilder:validation:Required
+	PeerAsn int `json:"peerAsn,required"`
+
+	PeerPort int `json:"peerPort,omitempty"`
+
 	SourceAddress string `json:"sourceAddress,omitempty"`
-	MyAsn         string `json:"myAsn"`
-	SourcePort    int    `json:"sourcePort,omitempty"`
+
+	// +kubebuilder:validation:Required
+	MyAsn int `json:"myAsn,required"`
+
+	SourcePort int `json:"sourcePort,omitempty"`
 
 	//Conf            *PeerConf        `json:"conf,omitempty"`
 	//EbgpMultihop    *EbgpMultihop    `json:"ebgpMultihop,omitempty"`

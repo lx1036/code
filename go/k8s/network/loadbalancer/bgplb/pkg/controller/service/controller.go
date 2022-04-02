@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/utils"
 	"reflect"
 	"time"
 
@@ -52,7 +53,7 @@ type Controller struct {
 	syncFuncs []cache.InformerSynced
 
 	balancer *LoadBalancer
-	backoff
+	utils.Backoff
 }
 
 func New(restConfig *restclient.Config) *Controller {
@@ -173,6 +174,8 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	if !cache.WaitForNamedCacheSync("service", ctx.Done(), c.syncFuncs...) {
 		return
 	}
+
+	klog.Info("cache is synced")
 
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, c.worker, time.Second)

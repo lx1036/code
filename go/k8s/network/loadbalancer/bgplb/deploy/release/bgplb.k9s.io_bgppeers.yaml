@@ -50,7 +50,7 @@ spec:
           spec:
             properties:
               myAsn:
-                type: string
+                type: integer
               nodeSelector:
                 properties:
                   matchExpressions:
@@ -77,7 +77,7 @@ spec:
               peerAddress:
                 type: string
               peerAsn:
-                type: string
+                type: integer
               peerPort:
                 type: integer
               sourceAddress:

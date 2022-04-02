@@ -12,7 +12,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func (controller *SpeakerController) onBGPPeerAdd(obj interface{}) {
+func (c *SpeakerController) onBGPPeerAdd(obj interface{}) {
 	peer := obj.(*v1.BgpPeer)
 	klog.Infof("bgpPeer %s/%s was added, enqueuing it for submission", peer.Namespace, peer.Name)
 
@@ -28,7 +28,7 @@ func (controller *SpeakerController) onBGPPeerAdd(obj interface{}) {
 		return
 	}
 
-	err = controller.bgpServer.AddPeer(context.Background(), &gobgpapi.AddPeerRequest{
+	err = c.bgpServer.AddPeer(context.Background(), &gobgpapi.AddPeerRequest{
 		Peer: bgpPeer,
 	})
 	if err != nil {
@@ -37,11 +37,11 @@ func (controller *SpeakerController) onBGPPeerAdd(obj interface{}) {
 	}
 }
 
-func (controller *SpeakerController) onBGPPeerUpdate(oldObj, newObj interface{}) {
+func (c *SpeakerController) onBGPPeerUpdate(oldObj, newObj interface{}) {
 
 }
 
-func (controller *SpeakerController) onBGPPeerDelete(obj interface{}) {
+func (c *SpeakerController) onBGPPeerDelete(obj interface{}) {
 	peer, ok := obj.(*v1.BgpPeer)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
@@ -64,7 +64,7 @@ func (controller *SpeakerController) onBGPPeerDelete(obj interface{}) {
 			return
 		}
 
-		err = controller.bgpServer.DeletePeer(context.TODO(), &gobgpapi.DeletePeerRequest{
+		err = c.bgpServer.DeletePeer(context.TODO(), &gobgpapi.DeletePeerRequest{
 			Address:   bgpPeer.Conf.NeighborAddress,
 			Interface: bgpPeer.Conf.NeighborInterface,
 		})

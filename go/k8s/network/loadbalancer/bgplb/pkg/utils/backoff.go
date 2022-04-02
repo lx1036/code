@@ -1,21 +1,21 @@
-package service
+package utils
 
 import "time"
 
 const (
-	backoffMax    = 60 * time.Minute
+	backoffMax    = 300 * time.Second
 	backoffFactor = 2
 )
 
-type backoff struct {
+type Backoff struct {
 	nextDelay time.Duration
 }
 
 // Duration returns how long to wait before the next retry.
-func (b *backoff) Duration() time.Duration {
+func (b *Backoff) Duration() time.Duration {
 	ret := b.nextDelay
 	if b.nextDelay == 0 {
-		b.nextDelay = time.Minute
+		b.nextDelay = time.Second
 	} else {
 		b.nextDelay *= backoffFactor
 		if b.nextDelay > backoffMax {
@@ -25,6 +25,6 @@ func (b *backoff) Duration() time.Duration {
 	return ret
 }
 
-func (b *backoff) Reset() {
+func (b *Backoff) Reset() {
 	b.nextDelay = 0
 }

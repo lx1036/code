@@ -9,7 +9,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func (controller *SpeakerController) onBGPConfAdd(obj interface{}) {
+func (c *SpeakerController) onBGPConfAdd(obj interface{}) {
 	bgpConf := obj.(*v1.BgpConf)
 	klog.Infof("bgpConf %s/%s was added, enqueuing it for submission", bgpConf.Namespace, bgpConf.Name)
 
@@ -20,8 +20,8 @@ func (controller *SpeakerController) onBGPConfAdd(obj interface{}) {
 	}
 
 	// stop bgp server firstly
-	controller.bgpServer.StopBgp(context.TODO(), &gobgpapi.StopBgpRequest{})
-	err = controller.bgpServer.StartBgp(context.TODO(), &gobgpapi.StartBgpRequest{
+	c.bgpServer.StopBgp(context.TODO(), &gobgpapi.StopBgpRequest{})
+	err = c.bgpServer.StartBgp(context.TODO(), &gobgpapi.StartBgpRequest{
 		Global: global,
 	})
 	if err != nil {
@@ -30,10 +30,10 @@ func (controller *SpeakerController) onBGPConfAdd(obj interface{}) {
 	}
 }
 
-func (controller *SpeakerController) onBGPConfUpdate(oldObj, newObj interface{}) {
+func (c *SpeakerController) onBGPConfUpdate(oldObj, newObj interface{}) {
 
 }
 
-func (controller *SpeakerController) onBGPConfDelete(obj interface{}) {
+func (c *SpeakerController) onBGPConfDelete(obj interface{}) {
 
 }
