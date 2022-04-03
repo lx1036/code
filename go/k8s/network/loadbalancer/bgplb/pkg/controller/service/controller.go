@@ -240,18 +240,12 @@ func (c *Controller) syncIPPool(ctx context.Context, key string) error {
 		return err
 	}
 
+	klog.Infof(fmt.Sprintf("add new ippool %s for cidr %s", key, ippool.Spec.Cidr))
+	c.events.Event(ippool, corev1.EventTypeNormal, "NewIPPoolAdded", fmt.Sprintf("add new ippool %s for cidr %s", key, ippool.Spec.Cidr))
+
 	// INFO: list all unallocated loadbalancer service, and allocate ip for it.
-	go func() {
-		for _, obj := range c.svcIndexer.List() {
-			svc := obj.(*corev1.Service)
-			if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && len(svc.Status.LoadBalancer.Ingress) == 0 {
-				name, _ := cache.MetaNamespaceKeyFunc(svc)
-				if err = c.processServiceCreateOrUpdate(ctx, svc, name); err != nil {
-					klog.Errorf(fmt.Sprintf("allocate ip for service:%c err:%v", name, err))
-				}
-			}
-		}
-	}()
+	//  这里不需要去处理 service，service for NoIPPoolErr 已经放到 queue 里，等待新的 IPPool
+	//go c.processServiceAfterNewIPPool(ctx)
 
 	// update ippool status metadata
 	objCopy := ippool.DeepCopy()
@@ -266,7 +260,7 @@ func (c *Controller) syncIPPool(ctx context.Context, key string) error {
 func (c *Controller) syncService(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing service %q (%v)", key, time.Since(startTime))
+		klog.Infof("Finished syncing service %q (%v)", key, time.Since(startTime))
 	}()
 
 	// service holds the latest service info from apiserver
@@ -282,6 +276,18 @@ func (c *Controller) syncService(ctx context.Context, key string) error {
 	}
 
 	return err
+}
+
+func (c *Controller) processServiceAfterNewIPPool(ctx context.Context) {
+	for _, obj := range c.svcIndexer.List() {
+		svc := obj.(*corev1.Service)
+		if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && len(svc.Status.LoadBalancer.Ingress) == 0 {
+			name, _ := cache.MetaNamespaceKeyFunc(svc)
+			if err := c.processServiceCreateOrUpdate(ctx, svc, name); err != nil {
+				klog.Errorf(fmt.Sprintf("allocate ip for service:%s err:%v", name, err))
+			}
+		}
+	}
 }
 
 func (c *Controller) processServiceCreateOrUpdate(ctx context.Context, service *corev1.Service, key string) error {
