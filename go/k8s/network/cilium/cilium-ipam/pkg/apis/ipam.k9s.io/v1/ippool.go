@@ -34,8 +34,12 @@ type IPPoolSpec struct {
 	// +kubebuilder:default:=27
 	BlockSize int `json:"blockSize"`
 
-	// +kubebuilder:default:=all()
-	NodeSelector string `json:"nodeSelector"`
+	// TODO: 使用 K8s 风格的 nodeSelectors, not calico ippool nodeSelector https://projectcalico.docs.tigera.io/reference/resources/ippool#node-selector
+	//  @see https://metallb.universe.tf/configuration/#bgp-configuration
+	//  @see https://github.com/cilium/metallb/blob/v0.9.6/pkg/config/config.go#L47-L60
+
+	// +kubebuilder:validation:Required
+	NodeSelectors []*metav1.LabelSelector `json:"nodeSelectors"`
 }
 
 type IPPoolStatus struct {

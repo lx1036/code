@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/utils"
+	"net"
 	"reflect"
 	"time"
 
@@ -13,6 +13,7 @@ import (
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/client/clientset/versioned"
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/client/informers/externalversions"
 	listerv1 "k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/client/listers/bgplb.k9s.io/v1"
+	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/utils"
 
 	"github.com/cilium/ipam/service/ipallocator"
 	corev1 "k8s.io/api/core/v1"
@@ -76,29 +77,48 @@ func New(restConfig *restclient.Config) *Controller {
 	c.crdFactory = externalversions.NewSharedInformerFactory(crdClient, 0)
 	c.ippoolInformer = c.crdFactory.Bgplb().V1().IPPools().Informer()
 	c.ippoolLister = c.crdFactory.Bgplb().V1().IPPools().Lister()
-	c.ippoolInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(ippoolKey(key))
+	c.ippoolInformer.AddEventHandler(cache.FilteringResourceEventHandler{
+		FilterFunc: func(obj interface{}) bool {
+			switch t := obj.(type) {
+			case *v1.IPPool:
+				if len(t.Spec.Cidr) == 0 {
+					return false
+				}
+				_, _, err := net.ParseCIDR(t.Spec.Cidr)
+				if err != nil {
+					klog.Errorf(fmt.Sprintf("ippool:%s cidr is err:%v", t.Name, err))
+					return false
+				}
+				return true
+			default:
+				runtime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", c, obj))
+				return false
 			}
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			oldIPPool := oldObj.(*v1.IPPool)
-			newIPPool := newObj.(*v1.IPPool)
-			if oldIPPool.Spec.Cidr == newIPPool.Spec.Cidr { // only care about cidr change
-				return
-			}
-			key, err := cache.MetaNamespaceKeyFunc(newObj)
-			if err == nil {
-				c.queue.Add(ippoolKey(key))
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(ippoolKey(key))
-			}
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				if err == nil {
+					c.queue.Add(ippoolKey(key))
+				}
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				oldIPPool := oldObj.(*v1.IPPool)
+				newIPPool := newObj.(*v1.IPPool)
+				if oldIPPool.Spec.Cidr == newIPPool.Spec.Cidr { // only care about cidr change
+					return
+				}
+				key, err := cache.MetaNamespaceKeyFunc(newObj)
+				if err == nil {
+					c.queue.Add(ippoolKey(key))
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				if err == nil {
+					c.queue.Add(ippoolKey(key))
+				}
+			},
 		},
 	})
 
@@ -121,6 +141,12 @@ func New(restConfig *restclient.Config) *Controller {
 				}
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
+				oldSvc := oldObj.(*corev1.Service)
+				newSvc := newObj.(*corev1.Service)
+				if reflect.DeepEqual(oldSvc.Status.LoadBalancer.Ingress, newSvc.Status.LoadBalancer.Ingress) {
+					return
+				}
+
 				key, err := cache.MetaNamespaceKeyFunc(newObj)
 				if err == nil {
 					c.queue.Add(svcKey(key))
@@ -214,6 +240,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		} else {
 			if errors.Is(err, NoIPPoolErr) {
 				c.queue.AddAfter(key, c.Duration())
+				return true
 			}
 		}
 	case ippoolKey:
@@ -226,7 +253,9 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		}
 	}
 
-	runtime.HandleError(fmt.Errorf("error processing %v (will retry): %v", key, err))
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("error processing %v (will retry): %v", key, err))
+	}
 	return true
 }
 

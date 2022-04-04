@@ -10,6 +10,8 @@ import (
 	"github.com/projectcalico/calico/libcalico-go/lib/selector"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
@@ -107,16 +109,19 @@ func (l *LoadBalancer) Release(node *corev1.Node) error {
 		return fmt.Errorf("no allocated cidr for node:%s", key)
 	}
 
-	return pool.allocator.Release(ipnet)
+	err = pool.allocator.Release(ipnet)
+	if err != nil {
+		return err
+	}
+
+	delete(l.owner, key)
+	return nil
 }
 
 func (l *LoadBalancer) getAllocatorByNode(node *corev1.Node) (*Pool, error) {
 	var p *Pool
 	for _, pool := range l.allocators {
-		ok, err := isIPPoolByNode(node, pool.ippool)
-		if err != nil {
-			continue
-		}
+		ok := isIPPoolByNode(node, pool.ippool)
 		if ok {
 			p = pool
 			break
@@ -157,12 +162,43 @@ func (l *LoadBalancer) ListAllocators() map[string]*Pool {
 	return l.allocators
 }
 
-func isIPPoolByNode(node *corev1.Node, ippool apiv1.IPPool) (bool, error) {
-	sel, err := selector.Parse(ippool.Spec.NodeSelector)
-	if err != nil {
-		klog.Errorf(fmt.Sprintf("parse ippool NodeSelector err:%v", err))
-		return false, err
+// k8s 风格 nodeSelector
+// https://metallb.universe.tf/configuration/#bgp-configuration
+// https://github.com/cilium/metallb/blob/v0.9.6/pkg/config/config.go#L47-L60
+func isIPPoolByNode(node *corev1.Node, ippool apiv1.IPPool) bool {
+	ok := false
+	for _, nodeSelector := range ippool.Spec.NodeSelectors {
+		sel, err := metav1.LabelSelectorAsSelector(nodeSelector)
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("nodeSelector %s for node %s err:%v", nodeSelector.String(), node.Name, err))
+			continue
+		}
+
+		if sel.Empty() || !sel.Matches(labels.Set(node.Labels)) {
+			continue
+		}
+
+		ok = true
+		break
 	}
 
-	return sel.Evaluate(node.Labels), nil
+	return ok
+}
+
+// calico 风格 nodeSelector https://projectcalico.docs.tigera.io/reference/resources/ippool#node-selector
+func isIPPoolByNodeWithCalico(node *corev1.Node, ippool apiv1.IPPool) bool {
+	ok := false
+	for _, nodeSelector := range ippool.Spec.NodeSelectors {
+		sel, err := selector.Parse(nodeSelector.String())
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("parse ippool NodeSelector err:%v", err))
+			continue
+		}
+
+		if ok = sel.Evaluate(node.Labels); ok {
+			break
+		}
+	}
+
+	return ok
 }
