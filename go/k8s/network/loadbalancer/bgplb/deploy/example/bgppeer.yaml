@@ -1,0 +1,17 @@
+
+
+---
+
+apiVersion: bgplb.k9s.io/v1
+kind: BGPPeer
+metadata:
+  name: node1 # 必须是 worker node name
+spec:
+  peerAddress: "127.0.0.1"
+  peerAsn: 64512
+  peerPort: 1790
+  sourceAddress: "127.0.0.1"
+#  sourceAddress: "10.208.40.114"
+  myAsn: 65001
+  sourcePort: 1791
+---

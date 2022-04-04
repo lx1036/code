@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1
 
+// BGPPeerListerExpansion allows custom methods to be added to
+// BGPPeerLister.
+type BGPPeerListerExpansion interface{}
+
 // BgpConfListerExpansion allows custom methods to be added to
 // BgpConfLister.
 type BgpConfListerExpansion interface{}
@@ -25,14 +29,6 @@ type BgpConfListerExpansion interface{}
 // BgpConfNamespaceListerExpansion allows custom methods to be added to
 // BgpConfNamespaceLister.
 type BgpConfNamespaceListerExpansion interface{}
-
-// BgpPeerListerExpansion allows custom methods to be added to
-// BgpPeerLister.
-type BgpPeerListerExpansion interface{}
-
-// BgpPeerNamespaceListerExpansion allows custom methods to be added to
-// BgpPeerNamespaceLister.
-type BgpPeerNamespaceListerExpansion interface{}
 
 // EipListerExpansion allows custom methods to be added to
 // EipLister.

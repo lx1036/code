@@ -30,45 +30,42 @@ import (
 	rest "k8s.io/client-go/rest"
 )
 
-// BgpPeersGetter has a method to return a BgpPeerInterface.
+// BGPPeersGetter has a method to return a BGPPeerInterface.
 // A group's client should implement this interface.
-type BgpPeersGetter interface {
-	BgpPeers(namespace string) BgpPeerInterface
+type BGPPeersGetter interface {
+	BGPPeers() BGPPeerInterface
 }
 
-// BgpPeerInterface has methods to work with BgpPeer resources.
-type BgpPeerInterface interface {
-	Create(ctx context.Context, bgpPeer *v1.BgpPeer, opts metav1.CreateOptions) (*v1.BgpPeer, error)
-	Update(ctx context.Context, bgpPeer *v1.BgpPeer, opts metav1.UpdateOptions) (*v1.BgpPeer, error)
-	UpdateStatus(ctx context.Context, bgpPeer *v1.BgpPeer, opts metav1.UpdateOptions) (*v1.BgpPeer, error)
+// BGPPeerInterface has methods to work with BGPPeer resources.
+type BGPPeerInterface interface {
+	Create(ctx context.Context, bGPPeer *v1.BGPPeer, opts metav1.CreateOptions) (*v1.BGPPeer, error)
+	Update(ctx context.Context, bGPPeer *v1.BGPPeer, opts metav1.UpdateOptions) (*v1.BGPPeer, error)
+	UpdateStatus(ctx context.Context, bGPPeer *v1.BGPPeer, opts metav1.UpdateOptions) (*v1.BGPPeer, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.BgpPeer, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.BgpPeerList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.BGPPeer, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.BGPPeerList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.BgpPeer, err error)
-	BgpPeerExpansion
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.BGPPeer, err error)
+	BGPPeerExpansion
 }
 
-// bgpPeers implements BgpPeerInterface
-type bgpPeers struct {
+// bGPPeers implements BGPPeerInterface
+type bGPPeers struct {
 	client rest.Interface
-	ns     string
 }
 
-// newBgpPeers returns a BgpPeers
-func newBgpPeers(c *BgplbV1Client, namespace string) *bgpPeers {
-	return &bgpPeers{
+// newBGPPeers returns a BGPPeers
+func newBGPPeers(c *BgplbV1Client) *bGPPeers {
+	return &bGPPeers{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
-// Get takes name of the bgpPeer, and returns the corresponding bgpPeer object, and an error if there is any.
-func (c *bgpPeers) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.BgpPeer, err error) {
-	result = &v1.BgpPeer{}
+// Get takes name of the bGPPeer, and returns the corresponding bGPPeer object, and an error if there is any.
+func (c *bGPPeers) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.BGPPeer, err error) {
+	result = &v1.BGPPeer{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("bgppeers").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -77,15 +74,14 @@ func (c *bgpPeers) Get(ctx context.Context, name string, options metav1.GetOptio
 	return
 }
 
-// List takes label and field selectors, and returns the list of BgpPeers that match those selectors.
-func (c *bgpPeers) List(ctx context.Context, opts metav1.ListOptions) (result *v1.BgpPeerList, err error) {
+// List takes label and field selectors, and returns the list of BGPPeers that match those selectors.
+func (c *bGPPeers) List(ctx context.Context, opts metav1.ListOptions) (result *v1.BGPPeerList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.BgpPeerList{}
+	result = &v1.BGPPeerList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("bgppeers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -94,43 +90,40 @@ func (c *bgpPeers) List(ctx context.Context, opts metav1.ListOptions) (result *v
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested bgpPeers.
-func (c *bgpPeers) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a watch.Interface that watches the requested bGPPeers.
+func (c *bGPPeers) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("bgppeers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
-// Create takes the representation of a bgpPeer and creates it.  Returns the server's representation of the bgpPeer, and an error, if there is any.
-func (c *bgpPeers) Create(ctx context.Context, bgpPeer *v1.BgpPeer, opts metav1.CreateOptions) (result *v1.BgpPeer, err error) {
-	result = &v1.BgpPeer{}
+// Create takes the representation of a bGPPeer and creates it.  Returns the server's representation of the bGPPeer, and an error, if there is any.
+func (c *bGPPeers) Create(ctx context.Context, bGPPeer *v1.BGPPeer, opts metav1.CreateOptions) (result *v1.BGPPeer, err error) {
+	result = &v1.BGPPeer{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("bgppeers").
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(bgpPeer).
+		Body(bGPPeer).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Update takes the representation of a bgpPeer and updates it. Returns the server's representation of the bgpPeer, and an error, if there is any.
-func (c *bgpPeers) Update(ctx context.Context, bgpPeer *v1.BgpPeer, opts metav1.UpdateOptions) (result *v1.BgpPeer, err error) {
-	result = &v1.BgpPeer{}
+// Update takes the representation of a bGPPeer and updates it. Returns the server's representation of the bGPPeer, and an error, if there is any.
+func (c *bGPPeers) Update(ctx context.Context, bGPPeer *v1.BGPPeer, opts metav1.UpdateOptions) (result *v1.BGPPeer, err error) {
+	result = &v1.BGPPeer{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("bgppeers").
-		Name(bgpPeer.Name).
+		Name(bGPPeer.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(bgpPeer).
+		Body(bGPPeer).
 		Do(ctx).
 		Into(result)
 	return
@@ -138,24 +131,22 @@ func (c *bgpPeers) Update(ctx context.Context, bgpPeer *v1.BgpPeer, opts metav1.
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *bgpPeers) UpdateStatus(ctx context.Context, bgpPeer *v1.BgpPeer, opts metav1.UpdateOptions) (result *v1.BgpPeer, err error) {
-	result = &v1.BgpPeer{}
+func (c *bGPPeers) UpdateStatus(ctx context.Context, bGPPeer *v1.BGPPeer, opts metav1.UpdateOptions) (result *v1.BGPPeer, err error) {
+	result = &v1.BGPPeer{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("bgppeers").
-		Name(bgpPeer.Name).
+		Name(bGPPeer.Name).
 		SubResource("status").
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(bgpPeer).
+		Body(bGPPeer).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Delete takes name of the bgpPeer and deletes it. Returns an error if one occurs.
-func (c *bgpPeers) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+// Delete takes name of the bGPPeer and deletes it. Returns an error if one occurs.
+func (c *bGPPeers) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("bgppeers").
 		Name(name).
 		Body(&opts).
@@ -164,13 +155,12 @@ func (c *bgpPeers) Delete(ctx context.Context, name string, opts metav1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *bgpPeers) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *bGPPeers) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("bgppeers").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -179,11 +169,10 @@ func (c *bgpPeers) DeleteCollection(ctx context.Context, opts metav1.DeleteOptio
 		Error()
 }
 
-// Patch applies the patch and returns the patched bgpPeer.
-func (c *bgpPeers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.BgpPeer, err error) {
-	result = &v1.BgpPeer{}
+// Patch applies the patch and returns the patched bGPPeer.
+func (c *bGPPeers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.BGPPeer, err error) {
+	result = &v1.BGPPeer{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("bgppeers").
 		Name(name).
 		SubResource(subresources...).

@@ -24,10 +24,10 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// BGPPeers returns a BGPPeerInformer.
+	BGPPeers() BGPPeerInformer
 	// BgpConves returns a BgpConfInformer.
 	BgpConves() BgpConfInformer
-	// BgpPeers returns a BgpPeerInformer.
-	BgpPeers() BgpPeerInformer
 	// Eips returns a EipInformer.
 	Eips() EipInformer
 	// IPPools returns a IPPoolInformer.
@@ -45,14 +45,14 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
+// BGPPeers returns a BGPPeerInformer.
+func (v *version) BGPPeers() BGPPeerInformer {
+	return &bGPPeerInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
 // BgpConves returns a BgpConfInformer.
 func (v *version) BgpConves() BgpConfInformer {
 	return &bgpConfInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// BgpPeers returns a BgpPeerInformer.
-func (v *version) BgpPeers() BgpPeerInformer {
-	return &bgpPeerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Eips returns a EipInformer.

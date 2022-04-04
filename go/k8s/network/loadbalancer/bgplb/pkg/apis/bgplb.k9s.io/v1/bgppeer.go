@@ -11,41 +11,60 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type BgpPeerList struct {
+type BGPPeerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []BgpPeer `json:"items"`
+	Items           []BGPPeer `json:"items"`
 }
 
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,shortName=peer,singular=bgppeer
-// +kubebuilder:printcolumn:name="As",type="integer",JSONPath=".spec.as"
-// +kubebuilder:printcolumn:name="PeerAs",type="integer",JSONPath=".spec.conf.peerAs"
-// +kubebuilder:printcolumn:name="NeighborAddress",type="string",JSONPath=".spec.conf.neighborAddress"
+// +kubebuilder:resource:scope=Cluster,shortName=bgpp,singular=bgppeer
+// +kubebuilder:printcolumn:name="PeerAddress",type="string",JSONPath=".spec.peerAddress"
+// +kubebuilder:printcolumn:name="PeerAsn",type="string",JSONPath=".spec.peerAsn"
+// +kubebuilder:printcolumn:name="PeerPort",type="integer",JSONPath=".spec.peerPort"
+// +kubebuilder:printcolumn:name="SourceAddress",type="string",JSONPath=".spec.sourceAddress"
+// +kubebuilder:printcolumn:name="MyAsn",type="string",JSONPath=".spec.myAsn"
+// +kubebuilder:printcolumn:name="SourcePort",type="integer",JSONPath=".spec.sourcePort"
 
-type BgpPeer struct {
+type BGPPeer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   BgpPeerSpec   `json:"spec,omitempty"`
-	Status BgpPeerStatus `json:"status,omitempty"`
+	Spec   BGPPeerSpec   `json:"spec,omitempty"`
+	Status BGPPeerStatus `json:"status,omitempty"`
 }
 
-type BgpPeerSpec struct {
-	Conf            *PeerConf        `json:"conf,omitempty"`
-	EbgpMultihop    *EbgpMultihop    `json:"ebgpMultihop,omitempty"`
-	Timers          *Timers          `json:"timers,omitempty"`
-	Transport       *Transport       `json:"transport,omitempty"`
-	GracefulRestart *GracefulRestart `json:"gracefulRestart,omitempty"`
-	AfiSafis        []*AfiSafi       `json:"afiSafis,omitempty"`
+type BGPPeerSpec struct {
+	// +kubebuilder:validation:Required
+	PeerAddress string `json:"peerAddress,required"`
+
+	// +kubebuilder:validation:Required
+	PeerAsn int `json:"peerAsn,required"`
+
+	PeerPort int `json:"peerPort,omitempty"`
+
+	SourceAddress string `json:"sourceAddress,omitempty"`
+
+	// +kubebuilder:validation:Required
+	MyAsn int `json:"myAsn,required"`
+
+	SourcePort int `json:"sourcePort,omitempty"`
+
+	//Conf            *PeerConf        `json:"conf,omitempty"`
+	//EbgpMultihop    *EbgpMultihop    `json:"ebgpMultihop,omitempty"`
+	//Timers          *Timers          `json:"timers,omitempty"`
+	//Transport       *Transport       `json:"transport,omitempty"`
+	//GracefulRestart *GracefulRestart `json:"gracefulRestart,omitempty"`
+	//AfiSafis        []*AfiSafi       `json:"afiSafis,omitempty"`
 
 	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty"`
 }
 
 // ConvertToGoBgpPeer INFO: convert to pb message，可以借鉴！！！
-func (spec BgpPeerSpec) ConvertToGoBgpPeer() (*gobgpapi.Peer, error) {
+func (spec BGPPeerSpec) ConvertToGoBgpPeer() (*gobgpapi.Peer, error) {
 	spec.NodeSelector = nil
 
 	jsonBytes, err := json.Marshal(spec)
@@ -63,7 +82,7 @@ func (spec BgpPeerSpec) ConvertToGoBgpPeer() (*gobgpapi.Peer, error) {
 	return &result, nil
 }
 
-type BgpPeerStatus struct {
+type BGPPeerStatus struct {
 	NodesPeerStatus map[string]NodePeerStatus `json:"nodesPeerStatus,omitempty"`
 }
 

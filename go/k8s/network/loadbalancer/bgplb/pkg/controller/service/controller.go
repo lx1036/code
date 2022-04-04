@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/utils"
 	"reflect"
 	"time"
 
@@ -52,7 +53,7 @@ type Controller struct {
 	syncFuncs []cache.InformerSynced
 
 	balancer *LoadBalancer
-	backoff
+	utils.Backoff
 }
 
 func New(restConfig *restclient.Config) *Controller {
@@ -60,8 +61,8 @@ func New(restConfig *restclient.Config) *Controller {
 	crdClient := versioned.NewForConfigOrDie(restConfig)
 
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
-	broadcaster.StartRecordingToSink(&typedv1.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	//broadcaster.StartStructuredLogging(0)
+	broadcaster.StartRecordingToSink(&typedv1.EventSinkImpl{Interface: kubeClient.CoreV1().Events(corev1.NamespaceAll)})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "service-ipam-controller"})
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
@@ -141,6 +142,11 @@ func New(restConfig *restclient.Config) *Controller {
 
 				if err := c.balancer.Release(svc); err != nil {
 					klog.Errorf(fmt.Sprintf("%v", err))
+				} else {
+					ip := svc.Status.LoadBalancer.Ingress[0].IP
+					if len(ip) != 0 {
+						klog.Infof(fmt.Sprintf("release service %s/%s ip %s", svc.Namespace, svc.Name, ip))
+					}
 				}
 			},
 		},
@@ -148,11 +154,14 @@ func New(restConfig *restclient.Config) *Controller {
 
 	c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced, c.ippoolInformer.HasSynced)
 
-	ippools, err := crdClient.BgplbV1().IPPools().List(context.TODO(), metav1.ListOptions{})
+	// INFO: 这里有个矛盾点，如果先 list ippool，然后 allocate service from ippool A，然后 ippool A CreateEvent 又重新加入，会覆盖原来的 ippool A allocator。
+	//  所以，先不 list ippool。
+	/*ippools, err := crdClient.BgplbV1().IPPools().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		klog.Fatal(err)
-	}
-	c.balancer, err = NewLoadBalancer(ippools.Items)
+	}*/
+	var err error
+	c.balancer, err = NewLoadBalancer([]v1.IPPool{})
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -170,9 +179,11 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	c.crdFactory.Start(ctx.Done())
 	go c.svcInformer.Run(ctx.Done())
 
-	if !cache.WaitForNamedCacheSync("service", ctx.Done(), c.syncFuncs...) {
+	if !cache.WaitForNamedCacheSync("service-ipam", ctx.Done(), c.syncFuncs...) {
 		return
 	}
+
+	klog.Info("cache is synced")
 
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, c.worker, time.Second)
@@ -237,18 +248,12 @@ func (c *Controller) syncIPPool(ctx context.Context, key string) error {
 		return err
 	}
 
+	klog.Infof(fmt.Sprintf("add new ippool %s for cidr %s", key, ippool.Spec.Cidr))
+	c.events.Event(ippool, corev1.EventTypeNormal, "NewIPPoolAdded", fmt.Sprintf("add new ippool %s for cidr %s", key, ippool.Spec.Cidr))
+
 	// INFO: list all unallocated loadbalancer service, and allocate ip for it.
-	go func() {
-		for _, obj := range c.svcIndexer.List() {
-			svc := obj.(*corev1.Service)
-			if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && len(svc.Status.LoadBalancer.Ingress) == 0 {
-				name, _ := cache.MetaNamespaceKeyFunc(svc)
-				if err = c.processServiceCreateOrUpdate(ctx, svc, name); err != nil {
-					klog.Errorf(fmt.Sprintf("allocate ip for service:%c err:%v", name, err))
-				}
-			}
-		}
-	}()
+	//  这里不需要去处理 service，service for NoIPPoolErr 已经放到 queue 里，等待新的 IPPool
+	//go c.processServiceAfterNewIPPool(ctx)
 
 	// update ippool status metadata
 	objCopy := ippool.DeepCopy()
@@ -263,7 +268,7 @@ func (c *Controller) syncIPPool(ctx context.Context, key string) error {
 func (c *Controller) syncService(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing service %q (%v)", key, time.Since(startTime))
+		klog.Infof("Finished syncing service %q (%v)", key, time.Since(startTime))
 	}()
 
 	// service holds the latest service info from apiserver
@@ -279,6 +284,18 @@ func (c *Controller) syncService(ctx context.Context, key string) error {
 	}
 
 	return err
+}
+
+func (c *Controller) processServiceAfterNewIPPool(ctx context.Context) {
+	for _, obj := range c.svcIndexer.List() {
+		svc := obj.(*corev1.Service)
+		if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && len(svc.Status.LoadBalancer.Ingress) == 0 {
+			name, _ := cache.MetaNamespaceKeyFunc(svc)
+			if err := c.processServiceCreateOrUpdate(ctx, svc, name); err != nil {
+				klog.Errorf(fmt.Sprintf("allocate ip for service:%s err:%v", name, err))
+			}
+		}
+	}
 }
 
 func (c *Controller) processServiceCreateOrUpdate(ctx context.Context, service *corev1.Service, key string) error {
@@ -307,39 +324,43 @@ func (c *Controller) processServiceCreateOrUpdate(ctx context.Context, service *
 	}
 
 	if reflect.DeepEqual(service.Status, svc.Status) {
-		klog.Infof(fmt.Sprintf("service status %c/%c no change", svc.Namespace, svc.Name))
-		return nil
+		klog.Infof(fmt.Sprintf("service status %s/%s no change", svc.Namespace, svc.Name))
+		return c.updateIPPoolUsedStatus(ctx, svc, key)
 	}
 
-	err = c.updateSvcStatus(ctx, svc)
-	if err == nil {
-		klog.Infof(fmt.Sprintf("allocate ip:%c for service:%c", svc.Status.LoadBalancer.Ingress[0].IP, key))
-		c.events.Event(service, corev1.EventTypeNormal, "AllocateIP", fmt.Sprintf("allocate ip %c", svc.Status.LoadBalancer.Ingress[0].IP))
+	if err = c.updateSvcStatus(ctx, svc); err != nil {
+		return err
 	}
+	klog.Infof(fmt.Sprintf("allocate ip:%s for service:%s", svc.Status.LoadBalancer.Ingress[0].IP, key))
+	c.events.Event(service, corev1.EventTypeNormal, "AllocateIP", fmt.Sprintf("allocate ip %s", svc.Status.LoadBalancer.Ingress[0].IP))
 
 	// update ippool.status.used
-	go func() {
-		ippoolName := c.balancer.getIPPoolNameByService(svc)
-		ippool, err := c.crdClient.BgplbV1().IPPools().Get(ctx, ippoolName, metav1.GetOptions{})
-		if err != nil {
-			klog.Errorf(fmt.Sprintf("%v", err))
-			return
-		}
-		ippool.Status.Usage = ippool.Status.Usage - 1
-		if ippool.Status.Usage == 0 {
-			klog.Warningf(fmt.Sprintf("ippool:%c is full at %c", ippool.Name, time.Now().String()))
-		}
-		if ippool.Status.Used == nil {
-			ippool.Status.Used = make(map[string]string)
-		}
-		ippool.Status.Used[svc.Status.LoadBalancer.Ingress[0].IP] = key
-		if err = c.updateIPPoolStatus(ctx, ippool); err != nil {
-			klog.Errorf(fmt.Sprintf("%v", err))
-			return
-		}
-	}()
+	return c.updateIPPoolUsedStatus(ctx, svc, key)
+}
 
-	return err
+func (c *Controller) updateIPPoolUsedStatus(ctx context.Context, svc *corev1.Service, key string) error {
+	ippoolName := c.balancer.getIPPoolNameByService(svc)
+	ipp, err := c.crdClient.BgplbV1().IPPools().Get(ctx, ippoolName, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("%v", err))
+		return err
+	}
+	ippool := ipp.DeepCopy()
+	ippool.Status.Usage = ippool.Status.Usage - 1
+	if ippool.Status.Usage == 0 {
+		klog.Warningf(fmt.Sprintf("ippool:%s is full at %s", ippool.Name, time.Now().String()))
+	}
+	if ippool.Status.Used == nil {
+		ippool.Status.Used = make(map[string]string)
+	}
+	ippool.Status.Used[svc.Status.LoadBalancer.Ingress[0].IP] = key
+	if err = c.updateIPPoolStatus(ctx, ippool); err != nil {
+		klog.Errorf(fmt.Sprintf("%v", err))
+		return err
+	}
+
+	klog.Infof(fmt.Sprintf("update ippool status for used %s=%s", svc.Status.LoadBalancer.Ingress[0].IP, key))
+	return nil
 }
 
 func (c *Controller) updateSvcStatus(ctx context.Context, service *corev1.Service) error {
