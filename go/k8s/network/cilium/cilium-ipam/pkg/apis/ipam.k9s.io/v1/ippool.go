@@ -38,8 +38,8 @@ type IPPoolSpec struct {
 	//  @see https://metallb.universe.tf/configuration/#bgp-configuration
 	//  @see https://github.com/cilium/metallb/blob/v0.9.6/pkg/config/config.go#L47-L60
 
-	// +kubebuilder:default:=all()
-	NodeSelectors []metav1.LabelSelector `json:"nodeSelector"`
+	// +kubebuilder:validation:Required
+	NodeSelectors []*metav1.LabelSelector `json:"nodeSelectors"`
 }
 
 type IPPoolStatus struct {

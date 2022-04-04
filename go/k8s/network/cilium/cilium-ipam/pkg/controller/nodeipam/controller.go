@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -105,7 +106,7 @@ func New(restConfig *restclient.Config) *NodeIPAMController {
 		FilterFunc: func(obj interface{}) bool {
 			switch t := obj.(type) {
 			case *apiv1.IPPool:
-				if len(t.Spec.Cidr) == 0 || len(t.Spec.NodeSelector) == 0 {
+				if len(t.Spec.Cidr) == 0 || len(t.Spec.NodeSelectors) == 0 {
 					return false
 				}
 				_, _, err := net.ParseCIDR(t.Spec.Cidr)
@@ -170,6 +171,11 @@ func New(restConfig *restclient.Config) *NodeIPAMController {
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
+			node := newObj.(*corev1.Node)
+			if node.Annotations != nil && len(node.Annotations[ipv4PodCidr]) != 0 {
+				return
+			}
+
 			key, err := cache.MetaNamespaceKeyFunc(newObj)
 			if err == nil {
 				c.queue.Add(nodeKey(key))
@@ -197,11 +203,12 @@ func New(restConfig *restclient.Config) *NodeIPAMController {
 
 	c.syncFuncs = append(c.syncFuncs, c.nodeInformer.HasSynced, c.ippoolInformer.HasSynced)
 
-	ippools, err := crdClient.IpamV1().IPPools().List(context.TODO(), metav1.ListOptions{})
+	/*ippools, err := crdClient.IpamV1().IPPools().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		klog.Fatal(err)
-	}
-	c.balancer, err = NewLoadBalancer(ippools.Items)
+	}*/
+	var err error
+	c.balancer, err = NewLoadBalancer([]apiv1.IPPool{})
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -250,6 +257,10 @@ func (c *NodeIPAMController) processNextWorkItem(ctx context.Context) bool {
 	case nodeKey:
 		//err = c.syncNode(ctx, string(t))
 		err = c.syncK8sNode(ctx, string(t))
+		if errors.Is(err, NoIPPoolErr) { // wait for added ippool
+			c.queue.AddAfter(key, time.Second*5)
+			return true
+		}
 	}
 
 	if err != nil {
@@ -306,7 +317,7 @@ func (c *NodeIPAMController) syncK8sNode(ctx context.Context, key string) error 
 		if errors.Is(err, NoIPPoolErr) {
 			c.events.Event(node, corev1.EventTypeWarning, "NoIPPoolErr", fmt.Sprintf("%v", NoIPPoolErr))
 			klog.Errorf(fmt.Sprintf("choose no ippool base on NodeSelector for node:%s", key))
-			return nil
+			return err
 		}
 
 		if errors.Is(err, cidrset.ErrCIDRRangeNoCIDRsRemaining) {
@@ -317,19 +328,7 @@ func (c *NodeIPAMController) syncK8sNode(ctx context.Context, key string) error 
 					continue
 				}
 
-				tokens, err := tokenizer.Tokenize(allocator.ippool.Spec.NodeSelector)
-				if err != nil {
-					continue
-				}
-				var label, value string
-				for _, token := range tokens {
-					if token.Kind == tokenizer.TokLabel {
-						label = token.Value.(string)
-					}
-					if token.Kind == tokenizer.TokStringLiteral {
-						value = token.Value.(string)
-					}
-				}
+				label, value := ParseLabelValue(allocator.ippool.Spec.NodeSelectors)
 				if len(label) != 0 && len(value) != 0 { // 只考虑类似 "key=='value'" 的 nodeSelector
 					c.events.Event(node, corev1.EventTypeWarning, "IPPoolChange", fmt.Sprintf("choose ippool %s instead for node", ippoolName))
 					newNode = node.DeepCopy()
@@ -360,6 +359,46 @@ func (c *NodeIPAMController) syncK8sNode(ctx context.Context, key string) error 
 		return nil
 	}
 	return err
+}
+
+func ParseLabelValue(selectors []*metav1.LabelSelector) (label, value string) {
+	for _, selector := range selectors {
+		sel, err := metav1.LabelSelectorAsSelector(selector)
+		if err != nil {
+			continue
+		}
+
+		requirements, _ := sel.Requirements()
+		for _, requirement := range requirements {
+			op := requirement.Operator()
+			if op == selection.Equals || op == selection.DoubleEquals || op == selection.In {
+				if len(requirement.Values().List()) != 0 {
+					label = requirement.Key()
+					value = requirement.Values().List()[0]
+					return
+				}
+			}
+		}
+	}
+
+	return
+}
+
+func ParseLabelValueWithCalico(input string) (label, value string) {
+	tokens, err := tokenizer.Tokenize(input)
+	if err != nil {
+		return
+	}
+
+	for _, token := range tokens {
+		if token.Kind == tokenizer.TokLabel {
+			label = token.Value.(string)
+		}
+		if token.Kind == tokenizer.TokStringLiteral {
+			value = token.Value.(string)
+		}
+	}
+	return
 }
 
 func (c *NodeIPAMController) patchK8sNode(ctx context.Context, oldNode, newNode *corev1.Node) error {
