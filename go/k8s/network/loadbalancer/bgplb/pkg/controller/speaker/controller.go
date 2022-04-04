@@ -100,7 +100,7 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 		klog.Fatal(err)
 	}
 
-	addr := ":50053"
+	addr := "127.0.0.1:50053"
 	if grpcPort != 0 {
 		addr = fmt.Sprintf("%s,%s:%d", addr, c.nodeIP.String(), grpcPort)
 	}
@@ -344,9 +344,9 @@ func (c *SpeakerController) syncBgpPeer(ctx context.Context, key string) error {
 			},
 			GracefulRestart: &gobgpapi.GracefulRestart{ // https://github.com/osrg/gobgp/blob/master/docs/sources/graceful-restart.md
 				Enabled:      true,
-				RestartTime:  uint32((90 * time.Second).Seconds()),
-				DeferralTime: uint32((120 * time.Second).Seconds()),
-				//LocalRestarting: true, // 如果打开，则需要 120 * time.Second 后才会发送 BGP Update 报文，路由信息
+				RestartTime:  uint32((120 * time.Second).Seconds()), // route server 会在 RestartTime 之后 withdraw route
+				DeferralTime: uint32((300 * time.Second).Seconds()),
+				//LocalRestarting: true, // 如果打开，则需要 DeferralTime 后才会发送 BGP Update 报文，路由信息
 			},
 			AfiSafis: []*gobgpapi.AfiSafi{
 				{
@@ -359,11 +359,6 @@ func (c *SpeakerController) syncBgpPeer(ctx context.Context, key string) error {
 							Enabled: true,
 						},
 					},
-					AddPaths: &gobgpapi.AddPaths{
-						Config: &gobgpapi.AddPathsConfig{
-							SendMax: 10,
-						},
-					},
 				},
 				{
 					Config: &gobgpapi.AfiSafiConfig{
@@ -373,11 +368,6 @@ func (c *SpeakerController) syncBgpPeer(ctx context.Context, key string) error {
 					MpGracefulRestart: &gobgpapi.MpGracefulRestart{
 						Config: &gobgpapi.MpGracefulRestartConfig{
 							Enabled: true,
-						},
-					},
-					AddPaths: &gobgpapi.AddPaths{
-						Config: &gobgpapi.AddPathsConfig{
-							SendMax: 10,
 						},
 					},
 				},
@@ -571,8 +561,8 @@ func (c *SpeakerController) advertiseAllServiceIP(ctx context.Context) {
 		return
 	}
 
+	count := 0
 	klog.Infof(fmt.Sprintf("advertise service ip in period start..."))
-	defer klog.Infof(fmt.Sprintf("advertise service ip in period end..."))
 	for _, obj := range c.svcIndexer.List() {
 		svc := obj.(*corev1.Service)
 		if svc.Spec.Type != corev1.ServiceTypeLoadBalancer || len(svc.Status.LoadBalancer.Ingress) == 0 {
@@ -589,8 +579,11 @@ func (c *SpeakerController) advertiseAllServiceIP(ctx context.Context) {
 			continue
 		}
 
+		count++
 		klog.Infof(fmt.Sprintf("advertise service %s/%s ip %s via nextHop %s", svc.Namespace, svc.Name, ip, c.nodeIP.String()))
 	}
+
+	klog.Infof(fmt.Sprintf("advertise %d service ip in period end...", count))
 }
 
 // GetNodeIP returns the most valid external facing IP address for a node.
