@@ -11,10 +11,10 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type BgpPeerList struct {
+type BGPPeerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []BgpPeer `json:"items"`
+	Items           []BGPPeer `json:"items"`
 }
 
 // +genclient
@@ -29,15 +29,15 @@ type BgpPeerList struct {
 // +kubebuilder:printcolumn:name="MyAsn",type="string",JSONPath=".spec.myAsn"
 // +kubebuilder:printcolumn:name="SourcePort",type="integer",JSONPath=".spec.sourcePort"
 
-type BgpPeer struct {
+type BGPPeer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   BgpPeerSpec   `json:"spec,omitempty"`
-	Status BgpPeerStatus `json:"status,omitempty"`
+	Spec   BGPPeerSpec   `json:"spec,omitempty"`
+	Status BGPPeerStatus `json:"status,omitempty"`
 }
 
-type BgpPeerSpec struct {
+type BGPPeerSpec struct {
 	// +kubebuilder:validation:Required
 	PeerAddress string `json:"peerAddress,required"`
 
@@ -64,7 +64,7 @@ type BgpPeerSpec struct {
 }
 
 // ConvertToGoBgpPeer INFO: convert to pb message，可以借鉴！！！
-func (spec BgpPeerSpec) ConvertToGoBgpPeer() (*gobgpapi.Peer, error) {
+func (spec BGPPeerSpec) ConvertToGoBgpPeer() (*gobgpapi.Peer, error) {
 	spec.NodeSelector = nil
 
 	jsonBytes, err := json.Marshal(spec)
@@ -82,7 +82,7 @@ func (spec BgpPeerSpec) ConvertToGoBgpPeer() (*gobgpapi.Peer, error) {
 	return &result, nil
 }
 
-type BgpPeerStatus struct {
+type BGPPeerStatus struct {
 	NodesPeerStatus map[string]NodePeerStatus `json:"nodesPeerStatus,omitempty"`
 }
 

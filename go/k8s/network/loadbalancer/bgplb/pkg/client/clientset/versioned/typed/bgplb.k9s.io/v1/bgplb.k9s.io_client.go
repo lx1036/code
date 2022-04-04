@@ -27,8 +27,8 @@ import (
 
 type BgplbV1Interface interface {
 	RESTClient() rest.Interface
+	BGPPeersGetter
 	BgpConvesGetter
-	BgpPeersGetter
 	EipsGetter
 	IPPoolsGetter
 }
@@ -38,12 +38,12 @@ type BgplbV1Client struct {
 	restClient rest.Interface
 }
 
-func (c *BgplbV1Client) BgpConves(namespace string) BgpConfInterface {
-	return newBgpConves(c, namespace)
+func (c *BgplbV1Client) BGPPeers() BGPPeerInterface {
+	return newBGPPeers(c)
 }
 
-func (c *BgplbV1Client) BgpPeers() BgpPeerInterface {
-	return newBgpPeers(c)
+func (c *BgplbV1Client) BgpConves(namespace string) BgpConfInterface {
+	return newBgpConves(c, namespace)
 }
 
 func (c *BgplbV1Client) Eips(namespace string) EipInterface {

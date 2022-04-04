@@ -3,7 +3,7 @@ package utils
 import "time"
 
 const (
-	backoffMax    = 300 * time.Second
+	backoffMax    = 10 * time.Second
 	backoffFactor = 2
 )
 

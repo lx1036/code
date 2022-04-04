@@ -29,12 +29,12 @@ type FakeBgplbV1 struct {
 	*testing.Fake
 }
 
-func (c *FakeBgplbV1) BgpConves(namespace string) v1.BgpConfInterface {
-	return &FakeBgpConves{c, namespace}
+func (c *FakeBgplbV1) BGPPeers() v1.BGPPeerInterface {
+	return &FakeBGPPeers{c}
 }
 
-func (c *FakeBgplbV1) BgpPeers() v1.BgpPeerInterface {
-	return &FakeBgpPeers{c}
+func (c *FakeBgplbV1) BgpConves(namespace string) v1.BgpConfInterface {
+	return &FakeBgpConves{c, namespace}
 }
 
 func (c *FakeBgplbV1) Eips(namespace string) v1.EipInterface {

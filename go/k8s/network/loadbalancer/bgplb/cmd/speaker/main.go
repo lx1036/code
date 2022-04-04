@@ -21,8 +21,9 @@ func init() {
 
 var (
 	kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
-	grpcPort   = flag.Int("grpcPort", 50051, "specify the hosts port that gobgpd listens on")
+	grpcPort   = flag.Int("grpcPort", 0, "specify the hosts port that gobgpd listens on")
 	nodeName   = flag.String("nodeName", "", "k8s worker node name")
+	debug      = flag.Bool("deubg", false, "debug level log")
 )
 
 // go run . --kubeconfig=`echo $HOME`/.kube/config --nodeName=xxx
@@ -41,6 +42,6 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	c := speaker.NewSpeakerController(restConfig, *grpcPort, *nodeName)
+	c := speaker.NewSpeakerController(restConfig, *grpcPort, *nodeName, *debug)
 	c.Run(genericapiserver.SetupSignalContext(), 1)
 }

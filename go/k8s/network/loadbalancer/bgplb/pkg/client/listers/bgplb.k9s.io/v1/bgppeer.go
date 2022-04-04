@@ -26,38 +26,38 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// BgpPeerLister helps list BgpPeers.
+// BGPPeerLister helps list BGPPeers.
 // All objects returned here must be treated as read-only.
-type BgpPeerLister interface {
-	// List lists all BgpPeers in the indexer.
+type BGPPeerLister interface {
+	// List lists all BGPPeers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.BgpPeer, err error)
-	// Get retrieves the BgpPeer from the index for a given name.
+	List(selector labels.Selector) (ret []*v1.BGPPeer, err error)
+	// Get retrieves the BGPPeer from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.BgpPeer, error)
-	BgpPeerListerExpansion
+	Get(name string) (*v1.BGPPeer, error)
+	BGPPeerListerExpansion
 }
 
-// bgpPeerLister implements the BgpPeerLister interface.
-type bgpPeerLister struct {
+// bGPPeerLister implements the BGPPeerLister interface.
+type bGPPeerLister struct {
 	indexer cache.Indexer
 }
 
-// NewBgpPeerLister returns a new BgpPeerLister.
-func NewBgpPeerLister(indexer cache.Indexer) BgpPeerLister {
-	return &bgpPeerLister{indexer: indexer}
+// NewBGPPeerLister returns a new BGPPeerLister.
+func NewBGPPeerLister(indexer cache.Indexer) BGPPeerLister {
+	return &bGPPeerLister{indexer: indexer}
 }
 
-// List lists all BgpPeers in the indexer.
-func (s *bgpPeerLister) List(selector labels.Selector) (ret []*v1.BgpPeer, err error) {
+// List lists all BGPPeers in the indexer.
+func (s *bGPPeerLister) List(selector labels.Selector) (ret []*v1.BGPPeer, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.BgpPeer))
+		ret = append(ret, m.(*v1.BGPPeer))
 	})
 	return ret, err
 }
 
-// Get retrieves the BgpPeer from the index for a given name.
-func (s *bgpPeerLister) Get(name string) (*v1.BgpPeer, error) {
+// Get retrieves the BGPPeer from the index for a given name.
+func (s *bGPPeerLister) Get(name string) (*v1.BGPPeer, error) {
 	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
@@ -65,5 +65,5 @@ func (s *bgpPeerLister) Get(name string) (*v1.BgpPeer, error) {
 	if !exists {
 		return nil, errors.NewNotFound(v1.Resource("bgppeer"), name)
 	}
-	return obj.(*v1.BgpPeer), nil
+	return obj.(*v1.BGPPeer), nil
 }

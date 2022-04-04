@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/apis/bgplb.k9s.io/v1"
@@ -17,6 +18,7 @@ import (
 	gobgpapi "github.com/osrg/gobgp/v3/api"
 	bgppacket "github.com/osrg/gobgp/v3/pkg/packet/bgp"
 	gobgp "github.com/osrg/gobgp/v3/pkg/server"
+	apb "google.golang.org/protobuf/types/known/anypb"
 
 	"google.golang.org/grpc"
 	corev1 "k8s.io/api/core/v1"
@@ -41,6 +43,8 @@ const (
 )
 
 type SpeakerController struct {
+	sync.RWMutex
+
 	kubeClient kubernetes.Interface
 	crdClient  *versioned.Clientset
 	events     record.EventRecorder
@@ -52,7 +56,7 @@ type SpeakerController struct {
 	svcInformer     cache.Controller
 	epIndexer       cache.Indexer
 	epInformer      cache.Controller
-	bgppeerLister   listerv1.BgpPeerLister
+	bgpPeerLister   listerv1.BGPPeerLister
 	bgppeerInformer cache.SharedIndexInformer
 
 	syncFuncs        []cache.InformerSynced
@@ -60,6 +64,7 @@ type SpeakerController struct {
 	nodeName         string
 	nodeIP           net.IP
 	bgpServerStarted bool
+	peerConnected    bool
 
 	utils.Backoff
 }
@@ -67,14 +72,14 @@ type SpeakerController struct {
 type svcKey string
 type bgppeer string
 
-func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName string) *SpeakerController {
+func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName string, debug bool) *SpeakerController {
 	kubeClient := kubernetes.NewForConfigOrDie(restConfig)
 	crdClient := versioned.NewForConfigOrDie(restConfig)
 
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
+	//broadcaster.StartStructuredLogging(0)
 	broadcaster.StartRecordingToSink(&typedv1.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "service-ipam-controller"})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "bgp-speaker-controller"})
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	c := &SpeakerController{
@@ -95,19 +100,27 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 		klog.Fatal(err)
 	}
 
-	bgpServer := gobgp.NewBgpServer(gobgp.GrpcListenAddress(fmt.Sprintf("%s:%d,127.0.0.1:50051", c.nodeIP.String(), grpcPort)),
-		gobgp.GrpcOption([]grpc.ServerOption{
-			grpc.MaxRecvMsgSize(maxSize),
-			grpc.MaxSendMsgSize(maxSize),
-		}))
+	addr := ":50053"
+	if grpcPort != 0 {
+		addr = fmt.Sprintf("%s,%s:%d", addr, c.nodeIP.String(), grpcPort)
+	}
+	bgpServer := gobgp.NewBgpServer(gobgp.GrpcListenAddress(addr), gobgp.GrpcOption([]grpc.ServerOption{
+		grpc.MaxRecvMsgSize(maxSize),
+		grpc.MaxSendMsgSize(maxSize),
+	}))
 	c.bgpServer = bgpServer
+	if debug {
+		c.bgpServer.SetLogLevel(context.TODO(), &gobgpapi.SetLogLevelRequest{
+			Level: gobgpapi.SetLogLevelRequest_DEBUG,
+		})
+	}
 
 	// only watch nodeName bgppeer @see https://github.com/kubernetes/kubernetes/blob/v1.23.5/pkg/kubelet/kubelet.go#L408-L416
 	c.crdFactory = externalversions.NewSharedInformerFactoryWithOptions(crdClient, 0, externalversions.WithTweakListOptions(func(options *metav1.ListOptions) {
 		options.FieldSelector = fields.Set{metav1.ObjectNameField: c.nodeName}.String()
 	}))
-	c.bgppeerInformer = c.crdFactory.Bgplb().V1().BgpPeers().Informer()
-	c.bgppeerLister = c.crdFactory.Bgplb().V1().BgpPeers().Lister()
+	c.bgppeerInformer = c.crdFactory.Bgplb().V1().BGPPeers().Informer()
+	c.bgpPeerLister = c.crdFactory.Bgplb().V1().BGPPeers().Lister()
 	c.bgppeerInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
@@ -116,14 +129,14 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			bgpp, ok := obj.(*v1.BgpPeer)
+			bgpp, ok := obj.(*v1.BGPPeer)
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
 					klog.Errorf("unexpected object type: %v", obj)
 					return
 				}
-				if bgpp, ok = tombstone.Obj.(*v1.BgpPeer); !ok {
+				if bgpp, ok = tombstone.Obj.(*v1.BGPPeer); !ok {
 					klog.Errorf("unexpected object type: %v", obj)
 					return
 				}
@@ -178,8 +191,10 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 				// withdraw route
 				ip := svc.Status.LoadBalancer.Ingress[0].IP
 				if c.isIPAdvertised(ip) {
-					if err = c.withdrawIP(ip); err != nil {
+					if err = c.withdrawIP(context.TODO(), ip); err != nil {
 						klog.Errorf(fmt.Sprintf("%v", err))
+					} else {
+						klog.Infof(fmt.Sprintf("withdraw route %s via nextHop %s", ip, c.nodeIP.String()))
 					}
 				}
 			},
@@ -188,7 +203,7 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 
 	endpointWatcher := cache.NewListWatchFromClient(kubeClient.CoreV1().RESTClient(), "endpoints", corev1.NamespaceAll, fields.Everything())
 	c.epIndexer, c.epInformer = cache.NewIndexerInformer(endpointWatcher, &corev1.Endpoints{}, 0,
-		cache.FilteringResourceEventHandler{}, cache.Indexers{})
+		cache.ResourceEventHandlerFuncs{}, cache.Indexers{})
 
 	c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced, c.epInformer.HasSynced, c.bgppeerInformer.HasSynced)
 
@@ -202,9 +217,10 @@ func (c *SpeakerController) Run(ctx context.Context, workers int) {
 	klog.Info("Starting BGP speaker controller")
 	defer klog.Info("Shutting down BGP speaker controller")
 
+	go c.bgpServer.Serve()
 	c.crdFactory.Start(ctx.Done())
 	go c.svcInformer.Run(ctx.Done())
-	go c.bgpServer.Serve()
+	go c.epInformer.Run(ctx.Done())
 
 	if !cache.WaitForNamedCacheSync("bgp-speaker", ctx.Done(), c.syncFuncs...) {
 		return
@@ -217,6 +233,9 @@ func (c *SpeakerController) Run(ctx context.Context, workers int) {
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, c.worker, time.Second)
 	}
+
+	// 参考自 kube-router，使用周期函数来确保所有 BGP advertise LoadBalancer service ingress ip
+	go wait.UntilWithContext(ctx, c.advertiseAllServiceIP, time.Second*60)
 
 	<-ctx.Done()
 }
@@ -236,8 +255,8 @@ func (c *SpeakerController) processNextWorkItem(ctx context.Context) bool {
 	var err error
 	switch t := key.(type) {
 	case svcKey:
-		if !c.bgpServerStarted { // wait for create BGPPeer
-			c.queue.AddAfter(key, c.Duration())
+		if !c.peerConnected { // wait for create BGPPeer
+			c.queue.AddAfter(key, time.Second*5)
 			break
 		}
 		err = c.syncService(ctx, string(t))
@@ -256,19 +275,22 @@ func (c *SpeakerController) processNextWorkItem(ctx context.Context) bool {
 }
 
 func (c *SpeakerController) syncBgpPeer(ctx context.Context, key string) error {
-	bgpp, err := c.bgppeerLister.Get(key)
+	c.Lock()
+	defer c.Unlock()
+
+	bgpp, err := c.bgpPeerLister.Get(key)
 	if err != nil {
 		return err
 	}
 
+	var listenPort int32
+	var sourceAddress string
 	if !c.bgpServerStarted {
-		var listenPort int32
 		if bgpp.Spec.SourcePort == 0 {
 			listenPort = DefaultBGPPort
 		} else {
 			listenPort = int32(bgpp.Spec.SourcePort)
 		}
-		var sourceAddress string
 		if len(bgpp.Spec.SourceAddress) == 0 {
 			sourceAddress = c.nodeIP.String()
 		} else {
@@ -287,7 +309,7 @@ func (c *SpeakerController) syncBgpPeer(ctx context.Context, key string) error {
 		} else {
 			// add import route policy
 			// - inject any route advertised from peer
-			err = c.bgpServer.AddPolicyAssignment(ctx, &gobgpapi.AddPolicyAssignmentRequest{
+			/*err = c.bgpServer.AddPolicyAssignment(ctx, &gobgpapi.AddPolicyAssignmentRequest{
 				Assignment: &gobgpapi.PolicyAssignment{
 					Name:          "global",
 					Direction:     gobgpapi.PolicyDirection_IMPORT,
@@ -296,9 +318,7 @@ func (c *SpeakerController) syncBgpPeer(ctx context.Context, key string) error {
 			})
 			if err != nil {
 				return err
-			}
-
-			c.bgpServerStarted = true
+			}*/
 		}
 	}
 
@@ -310,24 +330,23 @@ func (c *SpeakerController) syncBgpPeer(ctx context.Context, key string) error {
 	}
 	err = c.bgpServer.AddPeer(ctx, &gobgpapi.AddPeerRequest{
 		Peer: &gobgpapi.Peer{
-			ApplyPolicy: nil,
 			Conf: &gobgpapi.PeerConf{
 				NeighborAddress: bgpp.Spec.PeerAddress,
 				PeerAsn:         uint32(bgpp.Spec.PeerAsn),
 			},
-			EbgpMultihop: &gobgpapi.EbgpMultihop{
+			EbgpMultihop: &gobgpapi.EbgpMultihop{ // https://github.com/osrg/gobgp/blob/master/docs/sources/ebgp-multihop.md
 				Enabled:     true,
 				MultihopTtl: 5,
 			},
 			Transport: &gobgpapi.Transport{
-				LocalAddress: c.nodeIP.String(),
-				RemotePort:   remotePort,
+				//LocalAddress: c.nodeIP.String(),
+				RemotePort: remotePort,
 			},
-			GracefulRestart: &gobgpapi.GracefulRestart{
-				Enabled:         true,
-				RestartTime:     uint32((90 * time.Second).Seconds()),
-				DeferralTime:    uint32((360 * time.Second).Seconds()),
-				LocalRestarting: true,
+			GracefulRestart: &gobgpapi.GracefulRestart{ // https://github.com/osrg/gobgp/blob/master/docs/sources/graceful-restart.md
+				Enabled:      true,
+				RestartTime:  uint32((90 * time.Second).Seconds()),
+				DeferralTime: uint32((120 * time.Second).Seconds()),
+				//LocalRestarting: true, // 如果打开，则需要 120 * time.Second 后才会发送 BGP Update 报文，路由信息
 			},
 			AfiSafis: []*gobgpapi.AfiSafi{
 				{
@@ -366,7 +385,39 @@ func (c *SpeakerController) syncBgpPeer(ctx context.Context, key string) error {
 		},
 	})
 
+	if err == nil {
+		klog.Infof(fmt.Sprintf("add BGPPeer neighbor %s:%d asn:%d for local %s:%d asn:%d",
+			bgpp.Spec.PeerAddress, remotePort, bgpp.Spec.PeerAsn, sourceAddress, listenPort, bgpp.Spec.MyAsn))
+
+		c.bgpServerStarted = true
+	}
+
+	// check peer established
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
+		peerConnected, err := c.isPeerEstablished(ctx, bgpp.Spec.PeerAddress)
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("peer %s established err:%v", bgpp.Spec.PeerAddress, err))
+			return
+		}
+
+		c.peerConnected = peerConnected
+	}, time.Second)
+
 	return err
+}
+
+func (c *SpeakerController) isPeerEstablished(ctx context.Context, peerIP string) (bool, error) {
+	var peerConnected bool
+	err := c.bgpServer.ListPeer(ctx, &gobgpapi.ListPeerRequest{Address: peerIP}, func(peer *gobgpapi.Peer) {
+		if peer.Conf.NeighborAddress == peerIP && peer.State.SessionState == gobgpapi.PeerState_ESTABLISHED {
+			peerConnected = true
+		}
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return peerConnected, nil
 }
 
 func (c *SpeakerController) syncService(ctx context.Context, key string) error {
@@ -389,14 +440,16 @@ func (c *SpeakerController) processServiceCreateOrUpdate(ctx context.Context, se
 	ok := c.shouldAdvertiseService(service)
 	if !ok {
 		if c.isIPAdvertised(ip) {
-			return c.withdrawIP(ip)
+			defer klog.Infof(fmt.Sprintf("withdraw route: %s/32 via nextHop %s", ip, c.nodeIP.String()))
+			return c.withdrawIP(ctx, ip)
 		}
 
 		return nil
 	}
 
 	if !c.isIPAdvertised(ip) {
-		return c.advertiseIP(ip)
+		defer klog.Infof(fmt.Sprintf("advertise route: %s/32 via nextHop %s", ip, c.nodeIP.String()))
+		return c.advertiseIP(ctx, ip)
 	}
 
 	return nil
@@ -467,19 +520,19 @@ func (c *SpeakerController) isIPAdvertised(ip string) bool {
 	return err == nil && existed
 }
 
-func (c *SpeakerController) advertiseIP(ip string) error {
-	a1, _ := ptypes.MarshalAny(&gobgpapi.OriginAttribute{
+func (c *SpeakerController) advertiseIP(ctx context.Context, ip string) error {
+	a1, _ := apb.New(&gobgpapi.OriginAttribute{
 		Origin: uint32(bgppacket.BGP_ORIGIN_ATTR_TYPE_IGP),
 	})
-	a2, _ := ptypes.MarshalAny(&gobgpapi.NextHopAttribute{
+	a2, _ := apb.New(&gobgpapi.NextHopAttribute{
 		NextHop: c.nodeIP.String(),
 	})
 	attrs := []*any.Any{a1, a2}
-	nlri, _ := ptypes.MarshalAny(&gobgpapi.IPAddressPrefix{
+	nlri, _ := apb.New(&gobgpapi.IPAddressPrefix{
 		Prefix:    ip,
 		PrefixLen: 32,
 	})
-	_, err := c.bgpServer.AddPath(context.Background(), &gobgpapi.AddPathRequest{
+	_, err := c.bgpServer.AddPath(ctx, &gobgpapi.AddPathRequest{
 		TableType: gobgpapi.TableType_GLOBAL,
 		Path: &gobgpapi.Path{
 			Family: &gobgpapi.Family{Afi: gobgpapi.Family_AFI_IP, Safi: gobgpapi.Family_SAFI_UNICAST},
@@ -491,19 +544,19 @@ func (c *SpeakerController) advertiseIP(ip string) error {
 	return err
 }
 
-func (c *SpeakerController) withdrawIP(ip string) error {
-	a1, _ := ptypes.MarshalAny(&gobgpapi.OriginAttribute{
+func (c *SpeakerController) withdrawIP(ctx context.Context, ip string) error {
+	a1, _ := apb.New(&gobgpapi.OriginAttribute{
 		Origin: 0,
 	})
-	a2, _ := ptypes.MarshalAny(&gobgpapi.NextHopAttribute{
+	a2, _ := apb.New(&gobgpapi.NextHopAttribute{
 		NextHop: c.nodeIP.String(),
 	})
 	attrs := []*any.Any{a1, a2}
-	nlri, _ := ptypes.MarshalAny(&gobgpapi.IPAddressPrefix{
+	nlri, _ := apb.New(&gobgpapi.IPAddressPrefix{
 		Prefix:    ip,
 		PrefixLen: 32,
 	})
-	return c.bgpServer.DeletePath(context.Background(), &gobgpapi.DeletePathRequest{
+	return c.bgpServer.DeletePath(ctx, &gobgpapi.DeletePathRequest{
 		TableType: gobgpapi.TableType_GLOBAL,
 		Path: &gobgpapi.Path{
 			Family: &gobgpapi.Family{Afi: gobgpapi.Family_AFI_IP, Safi: gobgpapi.Family_SAFI_UNICAST},
@@ -511,6 +564,33 @@ func (c *SpeakerController) withdrawIP(ip string) error {
 			Pattrs: attrs,
 		},
 	})
+}
+
+func (c *SpeakerController) advertiseAllServiceIP(ctx context.Context) {
+	if !c.peerConnected {
+		return
+	}
+
+	klog.Infof(fmt.Sprintf("advertise service ip in period start..."))
+	defer klog.Infof(fmt.Sprintf("advertise service ip in period end..."))
+	for _, obj := range c.svcIndexer.List() {
+		svc := obj.(*corev1.Service)
+		if svc.Spec.Type != corev1.ServiceTypeLoadBalancer || len(svc.Status.LoadBalancer.Ingress) == 0 {
+			continue
+		}
+
+		if !c.shouldAdvertiseService(svc) {
+			continue
+		}
+
+		ip := svc.Status.LoadBalancer.Ingress[0].IP
+		if err := c.advertiseIP(ctx, ip); err != nil {
+			klog.Errorf(fmt.Sprintf("advertise service %s/%s ip %s err:%v", svc.Namespace, svc.Name, ip, err))
+			continue
+		}
+
+		klog.Infof(fmt.Sprintf("advertise service %s/%s ip %s via nextHop %s", svc.Namespace, svc.Name, ip, c.nodeIP.String()))
+	}
 }
 
 // GetNodeIP returns the most valid external facing IP address for a node.
