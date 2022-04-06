@@ -9,7 +9,11 @@ metadata:
 spec:
   cidr: "100.20.30.0/24"
   blockSize: 27
-  nodeSelector: "group/network=='default'"
+  nodeSelectors:
+    - matchExpressions:
+        - key: "group/network"
+          operator: In
+          values: ["default"]
 
 ---
 

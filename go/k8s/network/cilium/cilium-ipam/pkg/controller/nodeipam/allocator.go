@@ -65,10 +65,10 @@ func (l *LoadBalancer) Allocate(node *corev1.Node, key string) (*corev1.Node, er
 	}
 
 	if value, ok := l.owner[key]; ok && ipnet.String() == value.String() {
-		return node, nil
+		return n, nil
 	}
 
-	alloc, err := l.getAllocatorByNode(node)
+	alloc, err := l.getAllocatorByNode(n)
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +123,12 @@ func (l *LoadBalancer) getAllocatorByNode(node *corev1.Node) (*Pool, error) {
 	for _, pool := range l.allocators {
 		ok := isIPPoolByNode(node, pool.ippool)
 		if ok {
+			// 这里不需要考虑 IPPool is full, 交给上层调用处理，见 cidrset.ErrCIDRRangeNoCIDRsRemaining
+			/*if pool.allocator.IsFull() {
+				klog.Warningf(fmt.Sprintf("nodeSelector matches node %s, but ippool %s is full", node.Name, pool.ippool.Name))
+				continue
+			}*/
+
 			p = pool
 			break
 		}
@@ -151,6 +157,7 @@ func (l *LoadBalancer) AddAllocator(name string, ippool apiv1.IPPool) error {
 		allocator: allocator,
 	}
 
+	klog.Infof(fmt.Sprintf("added ippool %s for cidr %s blockSize %d into allocator", ippool.Name, ippool.Spec.Cidr, ippool.Spec.BlockSize))
 	return nil
 }
 

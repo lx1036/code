@@ -14,12 +14,11 @@ import (
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/client/clientset/versioned"
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/client/informers/externalversions"
 	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/client/listers/ipam.k9s.io/v1"
+	"k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/ipam/allocator/clusterpool"
 
-	//ipamTypes "github.com/cilium/cilium/pkg/ipam/types"
-	//ciliumAPIV2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
-	//ciliumClientSet "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned"
-	//ciliumExternalversions "github.com/cilium/cilium/pkg/k8s/client/informers/externalversions"
-	//ciliumListerV2 "github.com/cilium/cilium/pkg/k8s/client/listers/cilium.io/v2"
+	ipamTypes "github.com/cilium/cilium/pkg/ipam/types"
+	ciliumAPIV2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
+	ciliumClientSet "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned"
 	"github.com/cilium/ipam/cidrset"
 	"github.com/projectcalico/calico/libcalico-go/lib/selector/tokenizer"
 
@@ -45,6 +44,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	ipamK8s = "kubernetes"
+	ipamCrd = "crd"
+)
+
 type nodeKey string
 type ippoolKey string
 
@@ -52,11 +56,11 @@ type NodeIPAMController struct {
 	lock              sync.Mutex
 	nodesInProcessing sets.String
 
-	kubeClient kubernetes.Interface
-	crdClient  *versioned.Clientset
-	//ciliumClient *ciliumClientSet.Clientset
-	events record.EventRecorder
-	queue  workqueue.RateLimitingInterface
+	kubeClient   kubernetes.Interface
+	crdClient    *versioned.Clientset
+	ciliumClient *ciliumClientSet.Clientset
+	events       record.EventRecorder
+	queue        workqueue.RateLimitingInterface
 
 	crdFactory     externalversions.SharedInformerFactory
 	ippoolLister   v1.IPPoolLister
@@ -72,6 +76,7 @@ type NodeIPAMController struct {
 	syncFuncs []cache.InformerSynced
 
 	balancer *LoadBalancer
+	ipam     string
 }
 
 // INFO:
@@ -79,24 +84,25 @@ type NodeIPAMController struct {
 //  再去 annotation node "io.cilium.network.ipv4-pod-cidr: 100.20.30.0/24"，缺点是：每一个 node 只有一个 pod cidr，不能动态扩容；优点是：实现简单
 //  方案二：ipam.mode=crd, 且 cilium daemon 需要开启 enable-endpoint-routes: 'true'(这个机制不是最优的)，每一个 pod 一条路由。优点是：可以配置多个 pod cidr，缺点是：实现复杂，不太好弄
 
-func New(restConfig *restclient.Config) *NodeIPAMController {
+func New(restConfig *restclient.Config, ipam string) *NodeIPAMController {
 	kubeClient := kubernetes.NewForConfigOrDie(restConfig)
 	crdClient := versioned.NewForConfigOrDie(restConfig)
-	//ciliumClient := ciliumClientSet.NewForConfigOrDie(restConfig)
+	ciliumClient := ciliumClientSet.NewForConfigOrDie(restConfig)
 
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
 	broadcaster.StartRecordingToSink(&typedv1.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "node-ipam-controller"})
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	c := &NodeIPAMController{
-		kubeClient: kubeClient,
-		crdClient:  crdClient,
-		//ciliumClient: ciliumClient,
+		kubeClient:        kubeClient,
+		crdClient:         crdClient,
+		ciliumClient:      ciliumClient,
 		events:            recorder,
 		queue:             queue,
 		nodesInProcessing: sets.NewString(),
+
+		ipam: ipam,
 	}
 
 	c.crdFactory = externalversions.NewSharedInformerFactory(crdClient, 0)
@@ -127,7 +133,6 @@ func New(restConfig *restclient.Config) *NodeIPAMController {
 					c.queue.Add(ippoolKey(key))
 				}
 			},
-			UpdateFunc: nil,
 			DeleteFunc: func(obj interface{}) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
 				if err == nil {
@@ -171,8 +176,26 @@ func New(restConfig *restclient.Config) *NodeIPAMController {
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			node := newObj.(*corev1.Node)
-			if node.Annotations != nil && len(node.Annotations[ipv4PodCidr]) != 0 {
+			oldNode := oldObj.(*corev1.Node)
+			newNode := newObj.(*corev1.Node)
+			if newNode.Annotations != nil && len(newNode.Annotations[ipv4PodCidr]) != 0 {
+				if !reflect.DeepEqual(oldNode.Labels, newNode.Labels) {
+					cn, err := c.ciliumClient.CiliumV2().CiliumNodes().Get(context.TODO(), newNode.Name, metav1.GetOptions{})
+					if err != nil {
+						klog.Errorf(fmt.Sprintf("get CiliumNode %s err:%v", newNode.Name, err))
+						return
+					}
+
+					cnCopy := cn.DeepCopy()
+					cnCopy.Labels = newNode.Labels
+					if err = c.patchCiliumNode(context.TODO(), cn, cnCopy); err != nil {
+						klog.Errorf(fmt.Sprintf("patch CiliumNode %s labels err:%v", newNode.Name, err))
+						return
+					} else {
+						klog.Infof(fmt.Sprintf("patch CiliumNode %s labels", newNode.Name))
+					}
+				}
+
 				return
 			}
 
@@ -257,7 +280,9 @@ func (c *NodeIPAMController) processNextWorkItem(ctx context.Context) bool {
 	case nodeKey:
 		//err = c.syncNode(ctx, string(t))
 		err = c.syncK8sNode(ctx, string(t))
-		if errors.Is(err, NoIPPoolErr) { // wait for added ippool
+		if errors.Is(err, NoIPPoolErr) {
+			// wait for added ippool
+			// (或者也可以不考虑后加了 ippool 能适配 node labels 这种情况，需要用户重新更新 node labels)
 			c.queue.AddAfter(key, time.Second*5)
 			return true
 		}
@@ -336,7 +361,7 @@ func (c *NodeIPAMController) syncK8sNode(ctx context.Context, key string) error 
 						newNode.Labels = make(map[string]string)
 					}
 					newNode.Labels[label] = value
-					return c.patchK8sNode(ctx, node, newNode)
+					return patchK8sNode(ctx, c.kubeClient, node, newNode)
 				}
 			}
 		}
@@ -353,12 +378,92 @@ func (c *NodeIPAMController) syncK8sNode(ctx context.Context, key string) error 
 		return nil
 	}
 
-	if err = c.patchK8sNode(ctx, node, newNode); err == nil {
-		klog.Infof(fmt.Sprintf("allocate cidr %s for node %s", node.Annotations[ipv4PodCidr], key))
-		c.events.Event(node, corev1.EventTypeNormal, "AllocateCidr", fmt.Sprintf("allocate cidr %s", node.Annotations[ipv4PodCidr]))
-		return nil
+	if err = patchK8sNode(ctx, c.kubeClient, node, newNode); err == nil {
+		klog.Infof(fmt.Sprintf("allocate cidr %s for node %s", newNode.Annotations[ipv4PodCidr], key))
+		c.events.Event(node, corev1.EventTypeNormal, "AllocateCidr", fmt.Sprintf("allocate cidr %s", newNode.Annotations[ipv4PodCidr]))
+
+		if c.ipam == ipamCrd {
+			cn, err := c.ciliumClient.CiliumV2().CiliumNodes().Get(ctx, newNode.Name, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					err = c.createCiliumNode(ctx, newNode)
+				}
+				return err
+			}
+
+			_, ipnet, _ := net.ParseCIDR(newNode.Annotations[ipv4PodCidr])
+			allocation := make(ipamTypes.AllocationMap)
+			_ = clusterpool.ForEachIP(*ipnet, func(ip string) error {
+				allocation[ip] = ipamTypes.AllocationIP{}
+				return nil
+			})
+			cnCopy := cn.DeepCopy()
+			cnCopy.Spec.IPAM.Pool = allocation
+			cnCopy.Spec.IPAM.PodCIDRs = []string{ipnet.String()}
+			return c.patchCiliumNode(ctx, cn, cnCopy)
+		}
+
+		return err
 	}
+
 	return err
+}
+
+func (c *NodeIPAMController) createCiliumNode(ctx context.Context, node *corev1.Node) error {
+	_, ipnet, _ := net.ParseCIDR(node.Annotations[ipv4PodCidr])
+	allocation := make(ipamTypes.AllocationMap)
+	_ = clusterpool.ForEachIP(*ipnet, func(ip string) error {
+		allocation[ip] = ipamTypes.AllocationIP{}
+		return nil
+	})
+	cn := &ciliumAPIV2.CiliumNode{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   node.Name,
+			Labels: node.Labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Node",
+					Name:       node.Name,
+					UID:        node.UID,
+				},
+			},
+		},
+		Spec: ciliumAPIV2.NodeSpec{
+			IPAM: ipamTypes.IPAMSpec{
+				Pool: allocation,
+				PodCIDRs: []string{
+					ipnet.String(),
+				},
+			},
+		},
+	}
+	_, err := c.ciliumClient.CiliumV2().CiliumNodes().Create(ctx, cn, metav1.CreateOptions{})
+	return err
+}
+
+func (c *NodeIPAMController) patchCiliumNode(ctx context.Context, oldCN, newCN *ciliumAPIV2.CiliumNode) error {
+	key, _ := cache.MetaNamespaceKeyFunc(oldCN)
+	oldData, err := json.Marshal(oldCN)
+	if err != nil {
+		return fmt.Errorf("failed to marshal the existing CiliumNode %s err: %v", key, err)
+	}
+
+	newData, err := json.Marshal(newCN)
+	if err != nil {
+		return fmt.Errorf("failed to marshal the new CiliumNode %s err: %v", key, err)
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &ciliumAPIV2.CiliumNode{})
+	if err != nil {
+		return fmt.Errorf("failed to create a two-way merge patch: %v", err)
+	}
+
+	if _, err := c.ciliumClient.CiliumV2().CiliumNodes().Patch(ctx, oldCN.Name, types.MergePatchType,
+		patchBytes, metav1.PatchOptions{}); err != nil {
+		return fmt.Errorf("failed to patch the CiliumNode: %v", err)
+	}
+
+	return nil
 }
 
 func ParseLabelValue(selectors []*metav1.LabelSelector) (label, value string) {
@@ -401,7 +506,7 @@ func ParseLabelValueWithCalico(input string) (label, value string) {
 	return
 }
 
-func (c *NodeIPAMController) patchK8sNode(ctx context.Context, oldNode, newNode *corev1.Node) error {
+func patchK8sNode(ctx context.Context, kubeClient kubernetes.Interface, oldNode, newNode *corev1.Node) error {
 	var err error
 	var oldNodeObj, newNodeObj *corev1.Node
 	key, _ := cache.MetaNamespaceKeyFunc(oldNode)
@@ -411,7 +516,7 @@ func (c *NodeIPAMController) patchK8sNode(ctx context.Context, oldNode, newNode 
 			oldNodeObj = oldNode
 			newNodeObj = newNode
 		} else {
-			oldNode, err = c.kubeClient.CoreV1().Nodes().Get(ctx, key, metav1.GetOptions{})
+			oldNode, err = kubeClient.CoreV1().Nodes().Get(ctx, key, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -436,7 +541,7 @@ func (c *NodeIPAMController) patchK8sNode(ctx context.Context, oldNode, newNode 
 		if err != nil {
 			return fmt.Errorf("failed to create a two-way merge patch: %v", err)
 		}
-		if _, err = c.kubeClient.CoreV1().Nodes().Patch(ctx, oldNode.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+		if _, err = kubeClient.CoreV1().Nodes().Patch(ctx, oldNode.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 			return fmt.Errorf("failed to patch the node: %v", err)
 		}
 
@@ -551,29 +656,5 @@ func (c *NodeIPAMController) patchK8sNode(ctx context.Context, oldNode, newNode 
 //	}
 //
 //	//c.events.Event(cn, corev1.EventTypeNormal, "AllocateCidr", fmt.Sprintf("allocate cidr %s", ipnet.String()))
-//	return nil
-//}
-
-//func (c *NodeIPAMController) patchCiliumNode(oldCN, newCN *ciliumAPIV2.CiliumNode) error {
-//	key, _ := cache.MetaNamespaceKeyFunc(oldCN)
-//	oldData, err := json.Marshal(oldCN)
-//	if err != nil {
-//		return fmt.Errorf("failed to marshal the existing CiliumNode %s err: %v", key, err)
-//	}
-//
-//	newData, err := json.Marshal(newCN)
-//	if err != nil {
-//		return fmt.Errorf("failed to marshal the new CiliumNode %s err: %v", key, err)
-//	}
-//	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &ciliumAPIV2.CiliumNode{})
-//	if err != nil {
-//		return fmt.Errorf("failed to create a two-way merge patch: %v", err)
-//	}
-//
-//	if _, err := c.ciliumClient.CiliumV2().CiliumNodes().Patch(context.TODO(), oldCN.Name, types.MergePatchType,
-//		patchBytes, metav1.PatchOptions{}); err != nil {
-//		return fmt.Errorf("failed to patch the CiliumNode: %v", err)
-//	}
-//
 //	return nil
 //}

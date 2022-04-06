@@ -24,9 +24,6 @@ spec:
     - jsonPath: .spec.blockSize
       name: BlockSize
       type: integer
-    - jsonPath: .spec.nodeSelector
-      name: NodeSelector
-      type: string
     name: v1
     schema:
       openAPIV3Schema:
