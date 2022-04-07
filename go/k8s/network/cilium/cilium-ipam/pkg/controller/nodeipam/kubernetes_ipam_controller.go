@@ -47,6 +47,8 @@ import (
 const (
 	ipamK8s = "kubernetes"
 	ipamCrd = "crd"
+
+	ipThreshold = 5
 )
 
 type nodeKey string
@@ -258,7 +260,63 @@ func (c *NodeIPAMController) Run(ctx context.Context, workers int) {
 		go wait.UntilWithContext(ctx, c.worker, time.Second)
 	}
 
+	if c.ipam == ipamCrd {
+		// check if podCIDR is full, 否则添加新的 podCIDR
+		go wait.UntilWithContext(ctx, c.checkInsufficient, time.Second*60)
+	}
+
 	<-ctx.Done()
+}
+
+func (c *NodeIPAMController) checkInsufficient(ctx context.Context) {
+	nodes, err := c.ciliumClient.CiliumV2().CiliumNodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("list CiliumNodes err:%v", err))
+		return
+	}
+
+	for _, cn := range nodes.Items {
+		used := len(cn.Status.IPAM.Used)
+		total := len(cn.Spec.IPAM.Pool)
+		if total-used < ipThreshold {
+			node, err := c.kubeClient.CoreV1().Nodes().Get(ctx, cn.Name, metav1.GetOptions{})
+			if err != nil {
+				continue
+			}
+
+			alloc, err := c.balancer.getAllocatorByNode(node)
+			if err != nil {
+				continue
+			}
+
+			ipnet, err := alloc.allocator.AllocateNext()
+			if err != nil {
+				if errors.Is(err, cidrset.ErrCIDRRangeNoCIDRsRemaining) {
+					klog.Errorf(fmt.Sprintf("IPPool %s has no remaining cidr", alloc.ippool.Name))
+				}
+				continue
+			}
+
+			cnCopy := cn.DeepCopy()
+			cnCopy.Spec.IPAM.PodCIDRs = append(cnCopy.Spec.IPAM.PodCIDRs, ipnet.String())
+			allocation := make(ipamTypes.AllocationMap)
+			for _, podCidr := range cnCopy.Spec.IPAM.PodCIDRs {
+				_, ipnet, _ := net.ParseCIDR(podCidr)
+				_ = clusterpool.ForEachIP(*ipnet, func(ip string) error {
+					allocation[ip] = ipamTypes.AllocationIP{}
+					return nil
+				})
+			}
+			cnCopy.Spec.IPAM.Pool = allocation
+			err = c.patchCiliumNode(ctx, &cn, cnCopy)
+			if err != nil {
+				klog.Errorf(fmt.Sprintf("patch CiliumNode %s ipam podcidr err:%v", cn.Name, err))
+				continue
+			}
+
+			klog.Infof(fmt.Sprintf("add new podcidr %s for CiliumNode %s", ipnet.String(), cn.Name))
+		}
+	}
 }
 
 func (c *NodeIPAMController) worker(ctx context.Context) {
@@ -347,6 +405,8 @@ func (c *NodeIPAMController) syncK8sNode(ctx context.Context, key string) error 
 
 		if errors.Is(err, cidrset.ErrCIDRRangeNoCIDRsRemaining) {
 			// 如果当前 ippool is full, change other free ippool
+			alloc, _ := c.balancer.getAllocatorByNode(node)
+			klog.Errorf(fmt.Sprintf("IPPool %s has no remaining cidr", alloc.ippool.Name))
 			c.events.Event(node, corev1.EventTypeWarning, "IPPoolFullErr", fmt.Sprintf("%v", cidrset.ErrCIDRRangeNoCIDRsRemaining))
 			for ippoolName, allocator := range c.balancer.ListAllocators() {
 				if allocator.allocator.IsFull() {
@@ -383,6 +443,7 @@ func (c *NodeIPAMController) syncK8sNode(ctx context.Context, key string) error 
 		c.events.Event(node, corev1.EventTypeNormal, "AllocateCidr", fmt.Sprintf("allocate cidr %s", newNode.Annotations[ipv4PodCidr]))
 
 		if c.ipam == ipamCrd {
+			// patch CiliumNode pool
 			cn, err := c.ciliumClient.CiliumV2().CiliumNodes().Get(ctx, newNode.Name, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
@@ -391,15 +452,17 @@ func (c *NodeIPAMController) syncK8sNode(ctx context.Context, key string) error 
 				return err
 			}
 
-			_, ipnet, _ := net.ParseCIDR(newNode.Annotations[ipv4PodCidr])
-			allocation := make(ipamTypes.AllocationMap)
-			_ = clusterpool.ForEachIP(*ipnet, func(ip string) error {
-				allocation[ip] = ipamTypes.AllocationIP{}
-				return nil
-			})
 			cnCopy := cn.DeepCopy()
+			cnCopy.Spec.IPAM.PodCIDRs = append(cnCopy.Spec.IPAM.PodCIDRs, newNode.Annotations[ipv4PodCidr])
+			allocation := make(ipamTypes.AllocationMap)
+			for _, podCidr := range cnCopy.Spec.IPAM.PodCIDRs {
+				_, ipnet, _ := net.ParseCIDR(podCidr)
+				_ = clusterpool.ForEachIP(*ipnet, func(ip string) error {
+					allocation[ip] = ipamTypes.AllocationIP{}
+					return nil
+				})
+			}
 			cnCopy.Spec.IPAM.Pool = allocation
-			cnCopy.Spec.IPAM.PodCIDRs = []string{ipnet.String()}
 			return c.patchCiliumNode(ctx, cn, cnCopy)
 		}
 
