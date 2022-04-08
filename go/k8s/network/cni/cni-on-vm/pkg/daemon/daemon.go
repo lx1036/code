@@ -7,8 +7,8 @@ import (
 	"os"
 	"sync"
 
-	"k8s-lx1036/k8s/network/cni/eni/pkg/rpc"
-	"k8s-lx1036/k8s/network/cni/eni/pkg/types"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/rpc"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
 )
 
 const (
@@ -41,7 +41,7 @@ type EniBackendServer struct {
 
 	cniBinPath string
 
-	eniResMgr ResourceManager
+	eniIPResMgr ResourceManager
 
 	ipFamily *types.IPFamily
 
@@ -71,8 +71,8 @@ func newEniBackendServer(daemonMode, configFilePath, kubeconfig string) (rpc.Eni
 
 	var err error
 	switch daemonMode {
-	case daemonModeENIOnly:
-		server.eniResMgr, err = newENIResourceManager(poolConfig, ecs, localResource[types.ResourceTypeENI], ipFamily)
+	case daemonModeENIMultiIP:
+		server.eniIPResMgr, err = newENIIPResourceManager(poolConfig, ecs, server.k8s, localResource[types.ResourceTypeENI])
 
 	}
 

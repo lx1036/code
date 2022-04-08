@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s-lx1036/k8s/network/cni/eni/pkg/daemon"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/daemon"
 
 	"k8s.io/klog/v2"
 )

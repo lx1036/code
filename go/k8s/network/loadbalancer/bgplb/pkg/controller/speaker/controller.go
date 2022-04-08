@@ -228,7 +228,7 @@ func (c *SpeakerController) Run(ctx context.Context, workers int) {
 
 	klog.Info("cache is synced")
 
-	defer c.bgpServer.StopBgp(ctx, &gobgpapi.StopBgpRequest{})
+	defer c.bgpServer.Stop()
 
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, c.worker, time.Second)

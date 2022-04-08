@@ -2,9 +2,9 @@ package driver
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/network/cni/eni/pkg/sysctl"
-	"k8s-lx1036/k8s/network/cni/eni/pkg/tc"
-	"k8s-lx1036/k8s/network/cni/eni/pkg/types"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/sysctl"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/tc"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
 	"k8s.io/klog/v2"
 
 	"github.com/containernetworking/plugins/pkg/ns"

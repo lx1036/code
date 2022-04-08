@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"k8s-lx1036/k8s/network/cni/eni/pkg/rpc"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/rpc"
 
 	"google.golang.org/grpc"
 )

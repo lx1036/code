@@ -4,8 +4,8 @@ import (
 	"context"
 	"net"
 
-	"k8s-lx1036/k8s/network/cni/eni/pkg/ipam"
-	"k8s-lx1036/k8s/network/cni/eni/pkg/types"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/ipam"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 )

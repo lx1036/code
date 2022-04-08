@@ -9,10 +9,10 @@ import (
 	"runtime"
 	"time"
 
-	"k8s-lx1036/k8s/network/cni/eni/cmd/plugin/driver"
-	"k8s-lx1036/k8s/network/cni/eni/pkg/link"
-	"k8s-lx1036/k8s/network/cni/eni/pkg/rpc"
-	eniTypes "k8s-lx1036/k8s/network/cni/eni/pkg/types"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/cmd/plugin/driver"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/link"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/rpc"
+	eniTypes "k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
