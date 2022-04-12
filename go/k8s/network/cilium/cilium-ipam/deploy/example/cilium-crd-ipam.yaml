@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cilium-config
+  namespace: kube-system
+
+data:
+  auto-create-cilium-node-resource: 'false' # cilium daemon 不根据 K8s Node 修改 CiliumNode spec.ipam, 只有 'crd' ipam 需要
+  auto-direct-node-routes: 'false'
+  bpf-map-dynamic-size-ratio: '0.0025'
+  bpf-policy-map-max: '16384'
+  cluster-name: default
+  cluster-pool-ipv4-cidr: 20.216.0.0/16
+  cluster-pool-ipv4-mask-size: '25'
+  debug: 'false'
+  disable-cnp-status-updates: 'true'
+  enable-auto-protect-node-port-range: 'true'
+  enable-bpf-clock-probe: 'true'
+  enable-bpf-masquerade: 'true'
+  enable-cilium-endpoint-slice: 'true'
+  enable-endpoint-health-checking: 'true'
+  enable-endpoint-routes: 'true' # 每一个 pod/endpoint 加上一个 route, 只有 'crd' ipam 需要
+  enable-ipv4: 'true'
+  enable-ipv6: 'false'
+  enable-local-node-route: 'true' # 不需要给 ipv4AllocCIDR 加上一个 route: `{ipv4AllocCIDR} via {ip} dev cilium_host src {ip}`
+  enable-metrics: 'true'
+  enable-remote-node-identity: 'true'
+  enable-session-affinity: 'true'
+  enable-well-known-identities: 'false'
+  enable-xt-socket-fallback: 'true'
+  identity-allocation-mode: crd
+  install-iptables-rules: 'true'
+  ipam: crd # crd ipam
+  ipv4-native-routing-cidr: 20.216.0.0/16
+  k8s-require-ipv4-pod-cidr: 'true' # 关闭，cilium agent 启动不需要再去检查 K8s Node spec.ipam 或者 "io.cilium.network.ipv4-pod-cidr" 来取值 ipv4AllocCIDR
+  k8s-require-ipv6-pod-cidr: 'false'
+  kube-proxy-replacement: strict
+  masquerade: 'true'
+  monitor-aggregation: medium
+  monitor-aggregation-flags: all
+  monitor-aggregation-interval: 5s
+  node-port-bind-protection: 'true'
+  node-port-mode: dsr
+  operator-api-serve-addr: 127.0.0.1:9234
+  operator-prometheus-serve-addr: ':6942'
+  preallocate-bpf-maps: 'false'
+  sidecar-istio-proxy-image: cilium/istio_proxy
+  tofqdns-enable-poller: 'false'
+  tunnel: disabled
+  wait-bpf-mount: 'false'

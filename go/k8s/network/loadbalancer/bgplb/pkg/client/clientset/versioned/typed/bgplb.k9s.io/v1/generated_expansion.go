@@ -18,9 +18,9 @@ limitations under the License.
 
 package v1
 
-type BgpConfExpansion interface{}
+type BGPPeerExpansion interface{}
 
-type BgpPeerExpansion interface{}
+type BgpConfExpansion interface{}
 
 type EipExpansion interface{}
 

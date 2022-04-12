@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"k8s.io/client-go/tools/cache"
 	"net"
+	"sync"
 
 	v1 "k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/apis/bgplb.k9s.io/v1"
 	"k8s-lx1036/k8s/network/loadbalancer/bgplb/pkg/ipam"
@@ -23,6 +24,8 @@ const (
 )
 
 type LoadBalancer struct {
+	sync.RWMutex
+
 	// map ippool name to allocator
 	allocators map[string]ipam.Allocator
 
@@ -47,8 +50,10 @@ func NewLoadBalancer(ippools []v1.IPPool) (*LoadBalancer, error) {
 }
 
 func (l *LoadBalancer) Allocate(service *corev1.Service, key string) (*corev1.Service, error) {
-	var lbIP net.IP
+	l.Lock()
+	defer l.Unlock()
 
+	var lbIP net.IP
 	svc := service.DeepCopy()
 	if len(svc.Status.LoadBalancer.Ingress) == 1 {
 		lbIP = net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
@@ -137,6 +142,9 @@ func (l *LoadBalancer) GetAllocator(name string) ipam.Allocator {
 }
 
 func (l *LoadBalancer) AddAllocator(name string, ippool v1.IPPool) error {
+	l.Lock()
+	defer l.Unlock()
+
 	_, cidr, err := net.ParseCIDR(ippool.Spec.Cidr)
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("parse ippool:%s cidr:%s err:%v", name, ippool.Spec.Cidr, err))

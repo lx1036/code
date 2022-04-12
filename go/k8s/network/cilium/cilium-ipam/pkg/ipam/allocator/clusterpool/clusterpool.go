@@ -2,7 +2,6 @@ package clusterpool
 
 import (
 	"net"
-	"strconv"
 
 	"github.com/cilium/ipam/cidrset"
 )
@@ -28,7 +27,8 @@ func NewCIDRAllocator(cidr *net.IPNet, maskSize int) (*CIDRAllocator, error) {
 
 // Allocate ipnet 是 []cidr 之一，则 occupy；否则返回 nil
 func (cidr *CIDRAllocator) Allocate(ipnet *net.IPNet) (*net.IPNet, error) {
-	if ipnet.Mask.String() == strconv.Itoa(cidr.maskSize) && cidr.cidrSet.InRange(ipnet) {
+	ones, _ := ipnet.Mask.Size()
+	if ones == cidr.maskSize && cidr.cidrSet.InRange(ipnet) {
 		err := cidr.cidrSet.Occupy(ipnet)
 		if err != nil {
 			return nil, err
@@ -50,6 +50,10 @@ func (cidr *CIDRAllocator) Release(ipnet *net.IPNet) error {
 
 func (cidr *CIDRAllocator) InRange(ipnet *net.IPNet) bool {
 	return cidr.cidrSet.InRange(ipnet)
+}
+
+func (cidr *CIDRAllocator) IsFull() bool {
+	return cidr.cidrSet.IsFull()
 }
 
 func ForEachIP(ipnet net.IPNet, iterator func(ip string) error) error {

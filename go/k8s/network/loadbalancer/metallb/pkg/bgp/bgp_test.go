@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
-	gobgpapi "github.com/osrg/gobgp/v3/api"
-	gobgp "github.com/osrg/gobgp/v3/pkg/server"
-
 	"github.com/golang/protobuf/ptypes"
+	gobgpapi "github.com/osrg/gobgp/v3/api"
+	bgppacket "github.com/osrg/gobgp/v3/pkg/packet/bgp"
+	gobgp "github.com/osrg/gobgp/v3/pkg/server"
 	log "github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"google.golang.org/protobuf/types/known/anypb"
+	apb "google.golang.org/protobuf/types/known/anypb"
 	"k8s.io/klog/v2"
 )
 
@@ -79,7 +80,7 @@ func runBGPRouteServer(ctx context.Context, port int32) (chan *gobgpapi.Peer, er
 
 	global := &gobgpapi.StartBgpRequest{
 		Global: &gobgpapi.Global{
-			As:              64543,
+			Asn:             64543,
 			RouterId:        "1.2.3.4",
 			ListenPort:      port,
 			ListenAddresses: []string{"127.0.0.1"},
@@ -104,19 +105,19 @@ func runBGPRouteServer(ctx context.Context, port int32) (chan *gobgpapi.Peer, er
 	}*/
 
 	peers := make(chan *gobgpapi.Peer, 1000)
-	newPeer := func(peer *gobgpapi.Peer) {
+	/*newPeer := func(peer *gobgpapi.Peer) {
 		klog.Info(peer.String())
 		peers <- peer
 	}
 	if err := s.MonitorPeer(context.TODO(), &gobgpapi.MonitorPeerRequest{}, newPeer); err != nil {
 		return nil, err
-	}
+	}*/
 
 	peer := &gobgpapi.AddPeerRequest{
 		Peer: &gobgpapi.Peer{
 			Conf: &gobgpapi.PeerConf{
 				NeighborAddress: "127.0.0.1",
-				PeerAs:          64544,
+				PeerAsn:         64544,
 			},
 			Transport: &gobgpapi.Transport{
 				PassiveMode: true,
@@ -145,7 +146,7 @@ func TestBGPMonitor(test *testing.T) {
 	go s.Serve()
 	_ = s.StartBgp(context.Background(), &gobgpapi.StartBgpRequest{
 		Global: &gobgpapi.Global{
-			As:         1,
+			Asn:        1,
 			RouterId:   "1.1.1.1",
 			ListenPort: 10179,
 		},
@@ -154,7 +155,7 @@ func TestBGPMonitor(test *testing.T) {
 	p1 := &gobgpapi.Peer{
 		Conf: &gobgpapi.PeerConf{
 			NeighborAddress: "127.0.0.1",
-			PeerAs:          2,
+			PeerAsn:         2,
 		},
 		Transport: &gobgpapi.Transport{
 			PassiveMode: true,
@@ -163,14 +164,14 @@ func TestBGPMonitor(test *testing.T) {
 	}
 	_ = s.AddPeer(context.Background(), &gobgpapi.AddPeerRequest{Peer: p1})
 
-	nlri, _ := ptypes.MarshalAny(&gobgpapi.IPAddressPrefix{
+	nlri, _ := apb.New(&gobgpapi.IPAddressPrefix{
 		Prefix:    "10.20.30.40",
 		PrefixLen: 32,
 	})
-	a1, _ := ptypes.MarshalAny(&gobgpapi.OriginAttribute{
+	a1, _ := apb.New(&gobgpapi.OriginAttribute{
 		Origin: 0,
 	})
-	a2, _ := ptypes.MarshalAny(&gobgpapi.NextHopAttribute{
+	a2, _ := apb.New(&gobgpapi.NextHopAttribute{
 		NextHop: "1.1.1.1",
 	})
 	attrs := []*anypb.Any{a1, a2}
@@ -187,7 +188,7 @@ func TestBGPMonitor(test *testing.T) {
 	go t.Serve()
 	_ = t.StartBgp(context.Background(), &gobgpapi.StartBgpRequest{
 		Global: &gobgpapi.Global{
-			As:         2,
+			Asn:        2,
 			RouterId:   "2.2.2.2",
 			ListenPort: 10180,
 		},
@@ -197,7 +198,7 @@ func TestBGPMonitor(test *testing.T) {
 	p2 := &gobgpapi.Peer{
 		Conf: &gobgpapi.PeerConf{
 			NeighborAddress: "127.0.0.1",
-			PeerAs:          1,
+			PeerAsn:         1,
 		},
 		Transport: &gobgpapi.Transport{
 			RemotePort: 10179,
@@ -210,14 +211,15 @@ func TestBGPMonitor(test *testing.T) {
 		},
 	}
 	ch := make(chan struct{})
-	go t.MonitorPeer(context.Background(), &gobgpapi.MonitorPeerRequest{}, func(peer *gobgpapi.Peer) {
-		if peer.State.SessionState == gobgpapi.PeerState_ESTABLISHED {
-			klog.Info(peer.String())
+	go t.WatchEvent(context.TODO(), &gobgpapi.WatchEventRequest{}, func(response *gobgpapi.WatchEventResponse) {
+		p := response.GetPeer().GetPeer()
+		if p.State.SessionState == gobgpapi.PeerState_ESTABLISHED {
+			klog.Info(p.String())
 			//close(ch)
 		}
 	})
 
-	injectRoute := func(path *gobgpapi.Path) {
+	/*injectRoute := func(path *gobgpapi.Path) {
 		dst, nextHop, err := parseBGPPath(path)
 		if err != nil {
 			klog.Error(err)
@@ -225,17 +227,23 @@ func TestBGPMonitor(test *testing.T) {
 		}
 
 		klog.Infof(fmt.Sprintf("dst:%s, nextHop:%s", dst.String(), nextHop.String()))
-	}
+	}*/
 	// gobgp -p 50065 global rib add -a ipv4 100.0.0.0/24 nexthop 20.20.20.20
 	// gobgp -p 50064 global rib
 	// gobgp -p 50065 global rib summary
-	go t.MonitorTable(context.TODO(), &gobgpapi.MonitorTableRequest{
+	go t.WatchEvent(context.TODO(), &gobgpapi.WatchEventRequest{
+		//Table:
+	}, func(response *gobgpapi.WatchEventResponse) {
+
+	})
+
+	/*go t.MonitorTable(context.TODO(), &gobgpapi.MonitorTableRequest{
 		TableType: gobgpapi.TableType_GLOBAL,
 		Family: &gobgpapi.Family{
 			Afi:  gobgpapi.Family_AFI_IP,
 			Safi: gobgpapi.Family_SAFI_UNICAST,
 		},
-	}, injectRoute)
+	}, injectRoute)*/
 
 	_ = t.AddPeer(context.Background(), &gobgpapi.AddPeerRequest{Peer: p2})
 
@@ -294,17 +302,23 @@ func parseBGPNextHop(path *gobgpapi.Path) (net.IP, error) {
 // 交换机这边添加路由：gobgp -p 50052 -d global rib add -a ipv4 200.0.0.0/24 nexthop 20.20.20.20
 // 验证node这边是否收到路由，不应该收到路由：gobgp -p 50053 -d neighbor 127.0.0.1 adj-in
 func TestRouteServer(test *testing.T) {
-	log.SetLevel(log.DebugLevel)
 	ch := make(chan struct{})
 
 	// bgp1
-	s := gobgp.NewBgpServer(gobgp.GrpcListenAddress(":50053"))
+	s := gobgp.NewBgpServer(gobgp.GrpcListenAddress(":50054"))
+	s.SetLogLevel(context.TODO(), &gobgpapi.SetLogLevelRequest{
+		Level: gobgpapi.SetLogLevelRequest_DEBUG,
+	})
 	go s.Serve()
 	_ = s.StartBgp(context.Background(), &gobgpapi.StartBgpRequest{
 		Global: &gobgpapi.Global{
-			As:         65001,     // AS Number, 公司内需要调用 NetOPS API 会给本机和交换机 AS Number
+			Asn:        65001,     // AS Number, 公司内需要调用 NetOPS API 会给本机和交换机 AS Number
 			RouterId:   "2.2.2.2", // 一般选择当前机器 IP
 			ListenPort: 1791,
+			GracefulRestart: &gobgpapi.GracefulRestart{
+				Enabled:             true,
+				NotificationEnabled: true,
+			},
 		},
 	})
 	defer s.StopBgp(context.Background(), &gobgpapi.StopBgpRequest{})
@@ -313,26 +327,71 @@ func TestRouteServer(test *testing.T) {
 	p1 := &gobgpapi.Peer{
 		Conf: &gobgpapi.PeerConf{
 			NeighborAddress: "127.0.0.1",
-			PeerAs:          64512,
+			PeerAsn:         64512,
+		},
+		EbgpMultihop: &gobgpapi.EbgpMultihop{
+			Enabled:     true,
+			MultihopTtl: 5,
 		},
 		Transport: &gobgpapi.Transport{
 			RemotePort: 1790,
 		},
+		GracefulRestart: &gobgpapi.GracefulRestart{
+			Enabled:      true,
+			RestartTime:  uint32((90 * time.Second).Seconds()),
+			DeferralTime: uint32((120 * time.Second).Seconds()),
+			//LocalRestarting: true,
+		},
+		AfiSafis: []*gobgpapi.AfiSafi{
+			{
+				Config: &gobgpapi.AfiSafiConfig{
+					Family:  &gobgpapi.Family{Afi: gobgpapi.Family_AFI_IP, Safi: gobgpapi.Family_SAFI_UNICAST},
+					Enabled: true,
+				},
+				MpGracefulRestart: &gobgpapi.MpGracefulRestart{
+					Config: &gobgpapi.MpGracefulRestartConfig{
+						Enabled: true,
+					},
+				},
+				AddPaths: &gobgpapi.AddPaths{
+					Config: &gobgpapi.AddPathsConfig{
+						SendMax: 10,
+					},
+				},
+			},
+			{
+				Config: &gobgpapi.AfiSafiConfig{
+					Family:  &gobgpapi.Family{Afi: gobgpapi.Family_AFI_IP6, Safi: gobgpapi.Family_SAFI_UNICAST},
+					Enabled: true,
+				},
+				MpGracefulRestart: &gobgpapi.MpGracefulRestart{
+					Config: &gobgpapi.MpGracefulRestartConfig{
+						Enabled: true,
+					},
+				},
+				AddPaths: &gobgpapi.AddPaths{
+					Config: &gobgpapi.AddPathsConfig{
+						SendMax: 10,
+					},
+				},
+			},
+		},
 	}
 	_ = s.AddPeer(context.Background(), &gobgpapi.AddPeerRequest{Peer: p1})
 
-	nlri, _ := ptypes.MarshalAny(&gobgpapi.IPAddressPrefix{
+	nlri, _ := apb.New(&gobgpapi.IPAddressPrefix{
 		Prefix:    "10.20.30.0",
 		PrefixLen: 24,
 	})
-	a1, _ := ptypes.MarshalAny(&gobgpapi.OriginAttribute{
-		Origin: 0,
+	a1, _ := apb.New(&gobgpapi.OriginAttribute{
+		Origin: uint32(bgppacket.BGP_ORIGIN_ATTR_TYPE_IGP),
 	})
-	a2, _ := ptypes.MarshalAny(&gobgpapi.NextHopAttribute{
+	a2, _ := apb.New(&gobgpapi.NextHopAttribute{
 		NextHop: "30.30.30.30",
 	})
 	attrs := []*anypb.Any{a1, a2}
 	s.AddPath(context.TODO(), &gobgpapi.AddPathRequest{
+		TableType: gobgpapi.TableType_GLOBAL,
 		Path: &gobgpapi.Path{
 			Family: &gobgpapi.Family{Afi: gobgpapi.Family_AFI_IP, Safi: gobgpapi.Family_SAFI_UNICAST},
 			Nlri:   nlri,
