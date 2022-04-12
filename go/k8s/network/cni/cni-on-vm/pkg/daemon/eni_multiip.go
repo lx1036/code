@@ -3,8 +3,7 @@ package daemon
 import (
 	"context"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/ipam"
-
-	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/pool"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
 )
 
 type networkContext struct {
@@ -16,12 +15,12 @@ type networkContext struct {
 
 type eniIPResourceManager struct {
 	trunkENI *types.ENI
-	pool     *pool.SimpleObjectPool
+	pool     *SimpleObjectPool
 }
 
 func newENIIPResourceManager(poolConfig *types.PoolConfig, ecs ipam.API, k8s Kubernetes, allocatedResources map[string]resourceManagerInitItem) (*eniIPResourceManager, error) {
 
-	poolCfg := pool.Config{
+	poolCfg := Config{
 		Name:     poolNameENIIP,
 		Type:     typeNameENIIP,
 		MaxIdle:  poolConfig.MaxPoolSize,
@@ -30,7 +29,7 @@ func newENIIPResourceManager(poolConfig *types.PoolConfig, ecs ipam.API, k8s Kub
 		Capacity: capacity,
 	}
 
-	p, err := pool.NewSimpleObjectPool(poolCfg)
+	p, err := NewSimpleObjectPool(poolCfg)
 	if err != nil {
 		return nil, err
 	}

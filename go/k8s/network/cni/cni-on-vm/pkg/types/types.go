@@ -6,6 +6,7 @@ import (
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils"
 	"net"
 	"strings"
+	"time"
 )
 
 type IPNetSet struct {
@@ -44,6 +45,21 @@ type ENI struct {
 	VSwitchCIDR IPNetSet
 
 	VSwitchID string
+}
+
+// GetResourceID return mac address of eni
+func (e *ENI) GetResourceID() string {
+	return e.MAC
+}
+
+type ENIIP struct {
+	ENI   *ENI
+	IPSet IPSet
+}
+
+// GetResourceID return mac address of eni and secondary ip address
+func (e *ENIIP) GetResourceID() string {
+	return fmt.Sprintf("%s.%s", e.ENI.GetResourceID(), e.IPSet.String())
 }
 
 func ToIPNetSet(ip *rpc.IPSet) (*IPNetSet, error) {
@@ -123,4 +139,40 @@ func ToIPSet(ip *rpc.IPSet) (*IPSet, error) {
 		}
 	}
 	return ipSet, nil
+}
+
+type ResourceManagerInitItem struct {
+	item    ResourceItem
+	PodInfo *PodInfo
+}
+
+type ResourceItem struct {
+	Type         string        `json:"type"`
+	ID           string        `json:"id"`
+	ExtraEipInfo *ExtraEipInfo `json:"extra_eip_info"`
+
+	ENIID  string `json:"eni_id"`
+	ENIMAC string `json:"eni_mac"`
+	IPv4   string `json:"ipv4"`
+	IPv6   string `json:"ipv6"`
+}
+
+type PodInfo struct {
+	//K8sPod *v1.Pod
+	Name           string
+	Namespace      string
+	TcIngress      uint64
+	TcEgress       uint64
+	PodNetworkType string
+	PodIP          string // used for eip and mip
+	PodIPs         IPSet  // used for eip and mip
+	SandboxExited  bool
+	EipInfo        PodEipInfo
+	IPStickTime    time.Duration
+	PodENI         bool
+	PodUID         string
+}
+
+func PodInfoKey(namespace, name string) string {
+	return fmt.Sprintf("%s/%s", namespace, name)
 }
