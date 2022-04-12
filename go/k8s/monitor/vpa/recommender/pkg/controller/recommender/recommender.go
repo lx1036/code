@@ -5,7 +5,6 @@ import (
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate"
 	"k8s-lx1036/k8s/monitor/vpa/recommender/pkg/controller/clusterstate/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/autoscaler/vertical-pod-autoscaler/pkg/recommender/logic"
 	"time"
 
 	"k8s-lx1036/k8s/monitor/vpa/recommender/cmd/app/options"

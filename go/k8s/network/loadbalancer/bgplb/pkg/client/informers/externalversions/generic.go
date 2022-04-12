@@ -53,10 +53,10 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=bgplb.k9s.io, Version=v1
+	case v1.SchemeGroupVersion.WithResource("bgppeers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Bgplb().V1().BGPPeers().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("bgpconves"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Bgplb().V1().BgpConves().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("bgppeers"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Bgplb().V1().BgpPeers().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("eips"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Bgplb().V1().Eips().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("ippools"):

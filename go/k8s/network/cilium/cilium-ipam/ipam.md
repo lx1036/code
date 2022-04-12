@@ -5,7 +5,7 @@ IPAM: https://docs.cilium.io/en/stable/concepts/networking/ipam/
 Cilium Operator 创建 CiliumNode，并通过 IPAM 来从 Cluster CIDR 中分配 Pod CIDR，给 Daemon Agent 使用。
 Cilium IPAM Mode: cluster-pool(默认)、crd(自定义)、aws eni、azure、alibaba cloud
 cluster-pool: https://docs.cilium.io/en/stable/concepts/networking/ipam/cluster-pool/
-crd: https://docs.cilium.io/en/stable/gettingstarted/ipam-cluster-pool/
+crd: https://docs.cilium.io/en/stable/gettingstarted/ipam-crd/
 
 
 # 需求
@@ -26,8 +26,12 @@ spec:
 ```
 
 
-(2) 一个节点可以多个 pod cidr, 节点的 pod cidr 可以支持按需动态扩容和回收
+(2) 一个节点可以多个 pod cidr
 自定义 IPAM: @see https://mp.weixin.qq.com/s/l0kGo4Fb9NTfLgjQrt88pg
+
+
+(3) 节点的 pod cidr 可以支持按需动态扩容和回收。监听节点 IP 使用率情况，当节点的 pod cidr 使用率过高时，支持动态扩容。
+
 
 # 设计
 (1) choose specified IPPool ippool1 based on nodeSelector
@@ -63,6 +67,7 @@ spec:
       20.216.255.20: { }
     podCIDRs:
     - 20.216.255.0/24
+    - 30.216.255.0/24
 
 ```
 

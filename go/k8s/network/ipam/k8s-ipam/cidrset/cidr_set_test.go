@@ -84,3 +84,44 @@ func TestCIDRSetFullyAllocated(t *testing.T) {
 		})
 	}
 }
+
+func TestOccupy(t *testing.T) {
+	fixtures := []struct {
+		clusterCIDRStr string
+		subNetMaskSize int
+		expectedCIDR   string
+		description    string
+	}{
+		{
+			clusterCIDRStr: "127.123.1.0/24",
+			subNetMaskSize: 26,
+			expectedCIDR:   "127.123.1.0/26", // 127.123.1.0/26, 127.123.1.64/26, 127.123.1.128/26, 127.123.1.192/26
+			description:    "Fully allocated CIDR with IPv4",
+		},
+	}
+
+	for _, fixture := range fixtures {
+		t.Run(fixture.description, func(t *testing.T) {
+			ip, clusterCIDR, _ := net.ParseCIDR(fixture.clusterCIDRStr)
+			klog.Infof(fmt.Sprintf("ip:%s, clusterCIDR:%s", ip.String(), clusterCIDR.String()))
+			cidrSet, err := NewCIDRSet(clusterCIDR, fixture.subNetMaskSize)
+			if err != nil {
+				t.Fatalf("unexpected error: %v for %v", err, fixture.description)
+			}
+
+			_, ipnet, _ := net.ParseCIDR("127.123.1.32/27") // INFO: 这里居然可以 Occupy "127.123.1.32/27"，不符合预期
+			if cidrSet.InRange(ipnet) {
+				klog.Infof(fmt.Sprintf("%s is in range", ipnet.String()))
+			}
+			if err = cidrSet.Occupy(ipnet); err != nil {
+				t.Fatal(err)
+			}
+
+			cidr, err := cidrSet.AllocateNext()
+			if err != nil {
+				t.Fatal(err)
+			}
+			klog.Infof(fmt.Sprintf("%s", cidr.String()))
+		})
+	}
+}

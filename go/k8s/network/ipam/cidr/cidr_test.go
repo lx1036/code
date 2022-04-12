@@ -2,8 +2,21 @@ package cidr
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
+	"net"
 	"testing"
 )
+
+func TestIPRange(test *testing.T) {
+	c1, _ := ParseCIDR("100.217.144.0/20")
+	start, end := c1.IPRange()
+	fmt.Println(start, end, c1.Gateway()) // 100.217.144.0 100.217.159.255 100.217.144.1
+
+	_, ipnet1, _ := net.ParseCIDR("100.217.144.0/20")
+	fmt.Println(ipnet1.Mask.String())
+	ones, bits := ipnet1.Mask.Size()
+	fmt.Println(ones, bits, len(ipnet1.Mask))
+}
 
 func TestSubNetting(t *testing.T) {
 	c1, _ := ParseCIDR("100.217.144.0/20")
@@ -65,4 +78,21 @@ func TestSubNetting(t *testing.T) {
 	100.217.159.128/26
 	100.217.159.192/26
 	*/
+}
+
+func TestForEach(test *testing.T) {
+	c1, _ := ParseCIDR("100.216.137.0/25")
+	c1.ForEachIP(func(ip string) error {
+		fmt.Println(ip)
+		return nil
+	})
+
+	_, ipnet, _ := net.ParseCIDR("100.216.137.0/25")
+	_, ipnet2, _ := net.ParseCIDR("100.216.137.0/25")
+	if ipnet.String() == ipnet2.String() {
+		klog.Info("equal")
+	}
+	ones, bit := ipnet.Mask.Size()
+	klog.Info(ones, bit)
+	klog.Info(ipnet.Mask.String())
 }

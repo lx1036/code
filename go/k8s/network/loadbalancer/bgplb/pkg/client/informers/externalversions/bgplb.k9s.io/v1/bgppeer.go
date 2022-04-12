@@ -32,59 +32,58 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// BgpPeerInformer provides access to a shared informer and lister for
-// BgpPeers.
-type BgpPeerInformer interface {
+// BGPPeerInformer provides access to a shared informer and lister for
+// BGPPeers.
+type BGPPeerInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.BgpPeerLister
+	Lister() v1.BGPPeerLister
 }
 
-type bgpPeerInformer struct {
+type bGPPeerInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
-	namespace        string
 }
 
-// NewBgpPeerInformer constructs a new informer for BgpPeer type.
+// NewBGPPeerInformer constructs a new informer for BGPPeer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewBgpPeerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredBgpPeerInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewBGPPeerInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredBGPPeerInformer(client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredBgpPeerInformer constructs a new informer for BgpPeer type.
+// NewFilteredBGPPeerInformer constructs a new informer for BGPPeer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredBgpPeerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredBGPPeerInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BgplbV1().BgpPeers(namespace).List(context.TODO(), options)
+				return client.BgplbV1().BGPPeers().List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BgplbV1().BgpPeers(namespace).Watch(context.TODO(), options)
+				return client.BgplbV1().BGPPeers().Watch(context.TODO(), options)
 			},
 		},
-		&bgplbk9siov1.BgpPeer{},
+		&bgplbk9siov1.BGPPeer{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *bgpPeerInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredBgpPeerInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *bGPPeerInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredBGPPeerInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *bgpPeerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&bgplbk9siov1.BgpPeer{}, f.defaultInformer)
+func (f *bGPPeerInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&bgplbk9siov1.BGPPeer{}, f.defaultInformer)
 }
 
-func (f *bgpPeerInformer) Lister() v1.BgpPeerLister {
-	return v1.NewBgpPeerLister(f.Informer().GetIndexer())
+func (f *bGPPeerInformer) Lister() v1.BGPPeerLister {
+	return v1.NewBGPPeerLister(f.Informer().GetIndexer())
 }

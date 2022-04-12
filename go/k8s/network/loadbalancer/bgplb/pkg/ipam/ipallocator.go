@@ -50,6 +50,16 @@ type Allocator interface {
 	AllocateNext(owner string) (*AllocationResult, error)
 
 	GetCidr() *net.IPNet
+
+	Free() int
+
+	IsFull() bool
+
+	Used() int
+
+	FirstIP() net.IP
+
+	LastIP() net.IP
 }
 
 // @see https://github.com/cilium/cilium/blob/v1.12.0-rc0/pkg/ipam/hostscope.go
@@ -85,6 +95,51 @@ func (alloc *hostScopeAllocator) GetCidr() *net.IPNet {
 	return alloc.allocCIDR
 }
 
+func (alloc *hostScopeAllocator) Free() int {
+	return alloc.allocator.Free()
+}
+
+func (alloc *hostScopeAllocator) IsFull() bool {
+	return alloc.Free() == 0
+}
+
+func (alloc *hostScopeAllocator) Used() int {
+	return alloc.allocator.Used()
+}
+
+// FirstIP 第一个可用 IP
+func (alloc *hostScopeAllocator) FirstIP() net.IP {
+	ip := alloc.allocCIDR.IP
+	dst := make(net.IP, len(ip))
+	copy(dst, ip)
+
+	IncrIP(dst)
+
+	return dst
+}
+
+// LastIP 最后一个可用 IP
+func (alloc *hostScopeAllocator) LastIP() net.IP {
+	bcst := alloc.Broadcast()
+	DecrIP(bcst)
+	return bcst
+}
+
+// Broadcast 最后一个 IP
+func (alloc *hostScopeAllocator) Broadcast() net.IP {
+	ip := alloc.allocCIDR.IP
+	dst := make(net.IP, len(ip))
+	copy(dst, ip)
+
+	mask := alloc.allocCIDR.Mask
+	for i := 0; i < len(mask); i++ {
+		ipIdx := len(dst) - i - 1
+		dst[ipIdx] = ip[ipIdx] | ^mask[len(mask)-i-1]
+	}
+
+	return dst
+}
+
 func NewHostScopeAllocator(n *net.IPNet) Allocator {
 	cidrRange, err := ipallocator.NewCIDRRange(n)
 	if err != nil {
@@ -96,4 +151,31 @@ func NewHostScopeAllocator(n *net.IPNet) Allocator {
 	}
 
 	return a
+}
+
+// IncrIP IP地址自增
+func IncrIP(ip net.IP) {
+	for i := len(ip) - 1; i >= 0; i-- {
+		ip[i]++
+		if ip[i] > 0 {
+			break
+		}
+	}
+}
+
+// DecrIP IP地址自减
+func DecrIP(ip net.IP) {
+	length := len(ip)
+	for i := length - 1; i >= 0; i-- {
+		ip[length-1]--
+		if ip[length-1] < 0xFF {
+			break
+		}
+		for j := 1; j < length; j++ {
+			ip[length-j-1]--
+			if ip[length-j-1] < 0xFF {
+				return
+			}
+		}
+	}
 }
