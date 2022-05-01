@@ -205,5 +205,5 @@ var EniBackend_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "rpc/rpc.proto",
+	Metadata: "pkg/rpc/rpc.proto",
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/metric"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	"sync"
 	"time"
 
@@ -18,26 +19,6 @@ import (
 const (
 	CheckIdleInterval = 2 * time.Minute
 )
-
-// ObjectFactory interface of network resource object factory
-type ObjectFactory interface {
-	// Create res with count
-	Create(count int) ([]types.NetworkResource, error)
-	Dispose(types.NetworkResource) error
-	ListResource() (map[string]types.NetworkResource, error)
-	Check(types.NetworkResource) error
-	// Reconcile run periodicity
-	Reconcile()
-}
-
-type eniIPFactory struct {
-	name string
-}
-
-// ListResource load all eni info from metadata
-func (f *eniIPFactory) ListResource() (map[string]types.NetworkResource, error) {
-
-}
 
 var (
 	ErrNoAvailableResource = errors.New("no available resource")
@@ -68,15 +49,23 @@ type ENI struct {
 type Config struct {
 	Name        string
 	Type        string
-	Factory     ObjectFactory
+	Factory     *eniIPFactory
 	Initializer Initializer
 	MinIdle     int
 	MaxIdle     int
 	Capacity    int
 }
 
+type poolItem struct {
+	res           types.NetworkResource
+	reservation   time.Time
+	idempotentKey string
+}
+
 type SimpleObjectPool struct {
 	lock sync.Mutex
+
+	factory *eniIPFactory
 
 	idle     *priorityQueue
 	inuse    map[string]poolItem
@@ -87,6 +76,8 @@ type SimpleObjectPool struct {
 
 	metricIdle  prometheus.Gauge
 	metricTotal prometheus.Gauge
+
+	notifyCh chan interface{}
 }
 
 func NewSimpleObjectPool(cfg Config, ecs ipam.API, allocatedResources map[string]types.ResourceManagerInitItem) (*SimpleObjectPool, error) {
@@ -245,13 +236,75 @@ func (p *SimpleObjectPool) sizeLocked() int {
 	return p.idle.Size() + len(p.inuse) + len(p.invalid)
 }
 
+func (p *SimpleObjectPool) Acquire(ctx context.Context, resID, idempotentKey string) (types.NetworkResource, error) {
+	p.lock.Lock()
+	if resItem, ok := p.inuse[resID]; ok && resItem.idempotentKey == idempotentKey {
+		p.lock.Unlock()
+		return resItem.res, nil
+	}
+
+	if p.idle.Size() > 0 {
+		var item *poolItem
+		if len(resID) > 0 {
+			item = p.idle.Rob(resID)
+			if item == nil {
+				item = p.idle.Pop()
+			}
+		}
+		res := item.res
+		p.inuse[res.GetResourceID()] = poolItem{
+			res:           res,
+			reservation:   time.Time{},
+			idempotentKey: idempotentKey,
+		}
+		p.lock.Unlock()
+		p.metricIdle.Dec()
+		p.notify()
+		klog.Infof(fmt.Sprintf("acquire ip resource xxx"))
+		return res, nil
+	}
+
+	size := p.sizeLocked()
+	if size >= p.capacity {
+		p.lock.Unlock()
+		klog.Infof(fmt.Sprintf("acquire (expect %s), size %d, capacity %d: return err %v", resID, size,
+			p.capacity, ErrNoAvailableResource))
+
+		return nil, ErrNoAvailableResource
+	}
+
+	p.lock.Unlock()
+
+	select {
+	case <-p.tokenCh: // call IP API for create ip for current ENI
+		res, err := p.factory.Create(1)
+		if err != nil || len(res) == 0 {
+			p.tokenCh <- struct{}{}
+			return nil, fmt.Errorf("error create from factory: %v", err)
+		}
+
+		klog.Infof(fmt.Sprintf("call IP API for create ip xxx"))
+		p.AddInuse(res[0], idempotentKey)
+		return res[0], nil
+	case <-ctx.Done():
+		return nil, ErrContextDone
+	}
+}
+
+func (p *SimpleObjectPool) notify() {
+	select {
+	case p.notifyCh <- true:
+	default:
+	}
+}
+
 // @see https://github.com/kubernetes/kubernetes/blob/v1.23.5/staging/src/k8s.io/client-go/util/workqueue/delaying_queue.go
 // @see https://github.com/AliyunContainerService/terway/blob/main/pkg/pool/queue.go
 
 type eniIPItem struct {
-	res         *types.ENIIP
+	res        *types.ENIIP
 	expiration time.Time
-	key         string
+	key        string
 }
 
 // 最小/大堆实现 priority queue
@@ -293,7 +346,7 @@ func (q *eniIPPriorityQueue) Pop() *poolItem {
 	item := q.items[0]
 	q.items[0] = q.items[q.size-1]
 	q.size--
-	q.bubbleDowm(0)
+	q.bubbleDown(0)
 	return item
 }
 

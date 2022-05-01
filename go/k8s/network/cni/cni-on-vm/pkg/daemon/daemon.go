@@ -42,6 +42,7 @@ type EniBackendServer struct {
 	cniBinPath string
 
 	eniIPResMgr ResourceManager
+	enableTrunk bool
 
 	ipFamily *types.IPFamily
 
@@ -62,6 +63,13 @@ func newEniBackendServer(daemonMode, configFilePath, kubeconfig string) (rpc.Eni
 		cniBinPath:  cniBinPath,
 	}
 
+	daemonConfig, err := GetDaemonConfig(configFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	server.enableTrunk = daemonConfig.EnableENITrunking
+
 	switch daemonMode {
 	case daemonModeENIOnly, daemonModeENIMultiIP, daemonModeVPC:
 		server.daemonMode = daemonMode
@@ -73,6 +81,9 @@ func newEniBackendServer(daemonMode, configFilePath, kubeconfig string) (rpc.Eni
 	switch daemonMode {
 	case daemonModeENIMultiIP:
 		server.eniIPResMgr, err = newENIIPResourceManager(poolConfig, ecs, server.k8s, localResource[types.ResourceTypeENI])
+		if err != nil {
+			return nil, err
+		}
 
 	}
 
@@ -85,37 +96,45 @@ func (server *EniBackendServer) AllocateIP(ctx context.Context, request *rpc.All
 	defer server.RUnlock()
 
 	// 0. Get pod Info
-	podinfo, err := server.k8s.GetPod(r.K8SPodNamespace, r.K8SPodName)
+	podInfo, err := server.k8s.GetPod(r.K8SPodNamespace, r.K8SPodName)
 
 	// 1. Init Context
-	allocIPReply := &rpc.AllocateIPReply{IPv4: server.ipFamily.IPv4, IPv6: server.ipFamily.IPv6}
+	allocIPReply := &rpc.AllocateIPReply{
+		IPv4: server.ipFamily.IPv4,
+		IPv6: server.ipFamily.IPv6,
+	}
 
 	// 3. Allocate network resource for pod
+	var netConfs []*rpc.NetConf
 	switch podInfo.PodNetworkType {
 
-	case podNetworkTypeVPCENI:
-		var eni *types.ENI
-		eni, err = server.allocateENI(networkContext, &oldRes)
-		if err != nil {
-			return nil, fmt.Errorf("error get allocated vpc ENI ip for: %+v, result: %+v", podinfo, err)
-		}
+	case podNetworkTypeENIMultiIP:
+		eniIP, err := server.allocateENIMultiIP(networkContext, &oldRes)
 
-		allocIPReply.IPType = rpc.IPType_TypeVPCENI
+		netConfs = append(netConfs, &rpc.NetConf{
+			BasicInfo: &rpc.BasicInfo{
+				PodIP:       eniIP.IPSet.ToRPC(),
+				PodCIDR:     eniIP.ENI.VSwitchCIDR.ToRPC(),
+				GatewayIP:   eniIP.ENI.GatewayIP.ToRPC(),
+				ServiceCIDR: server.k8s.GetServiceCIDR().ToRPC(),
+			},
+			ENIInfo: &rpc.ENIInfo{
+				MAC:   eniIP.ENI.MAC,
+				Trunk: false,
+			},
+			Pod: &rpc.Pod{
+				Ingress: podInfo.TcIngress,
+				Egress:  podInfo.TcEgress,
+			},
+			IfName:       "",
+			ExtraRoutes:  nil,
+			DefaultRoute: true,
+		})
+		if err = defaultForNetConf(netConfs); err != nil {
+			return nil, err
+		}
 		allocIPReply.Success = true
-		allocIPReply.BasicInfo = &rpc.BasicInfo{
-			PodIP:       eni.PrimaryIP.ToRPC(),
-			PodCIDR:     eni.VSwitchCIDR.ToRPC(),
-			GatewayIP:   eni.GatewayIP.ToRPC(),
-			ServiceCIDR: server.k8s.GetServiceCIDR().ToRPC(),
-		}
-		allocIPReply.ENIInfo = &rpc.ENIInfo{
-			MAC:   eni.MAC,
-			Trunk: podinfo.PodENI && server.enableTrunk && eni.Trunk,
-		}
-		allocIPReply.Pod = &rpc.Pod{
-			Ingress: podinfo.TcIngress,
-			Egress:  podinfo.TcEgress,
-		}
+
 	default:
 		return nil, fmt.Errorf("not support pod network type")
 	}
@@ -127,17 +146,20 @@ func (server *EniBackendServer) AllocateIP(ctx context.Context, request *rpc.All
 	}
 
 	// 5. return allocate result
+	allocIPReply.NetConfs = netConfs
+	allocIPReply.EnableTrunking = server.enableTrunk
 	return allocIPReply, err
 }
 
-func (server *EniBackendServer) allocateENI() (*types.ENI, error) {
+func (server *EniBackendServer) allocateENIMultiIP(ctx *networkContext, old *types.PodResources) (*types.ENIIP, error) {
+	oldENIIPID := ""
 
-	res, err := server.eniResMgr.Allocate(ctx, oldENIID)
+	res, err := server.eniIPResMgr.Allocate(ctx, oldENIIPID)
 	if err != nil {
 		return nil, err
 	}
 
-	return res.(*types.ENI), nil
+	return res.(*types.ENIIP), nil
 }
 
 func (server *EniBackendServer) ReleaseIP(ctx context.Context, request *rpc.ReleaseIPRequest) (*rpc.ReleaseIPReply, error) {
@@ -150,4 +172,45 @@ func (server *EniBackendServer) GetIPInfo(ctx context.Context, request *rpc.GetI
 
 func (server *EniBackendServer) RecordEvent(ctx context.Context, request *rpc.EventRequest) (*rpc.EventReply, error) {
 	panic("implement me")
+}
+
+func defaultForNetConf(netConf []*rpc.NetConf) error {
+	// ignore netConf check
+	if len(netConf) == 0 {
+		return nil
+	}
+	defaultRouteSet := false
+	defaultIfSet := false
+	for i := 0; i < len(netConf); i++ {
+		if netConf[i].DefaultRoute && defaultRouteSet {
+			return fmt.Errorf("default route is dumplicated")
+		}
+		defaultRouteSet = defaultRouteSet || netConf[i].DefaultRoute
+
+		if defaultIf(netConf[i].IfName) {
+			defaultIfSet = true
+		}
+	}
+
+	if !defaultIfSet {
+		return fmt.Errorf("default interface is not set")
+	}
+
+	if !defaultRouteSet {
+		for i := 0; i < len(netConf); i++ {
+			if netConf[i].IfName == "" || netConf[i].IfName == "eth0" {
+				netConf[i].DefaultRoute = true
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+func defaultIf(name string) bool {
+	if name == "" || name == "eth0" {
+		return true
+	}
+	return false
 }
