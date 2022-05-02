@@ -18,6 +18,11 @@ import (
 
 const (
 	CheckIdleInterval = 2 * time.Minute
+
+	defaultPoolBackoff = 1 * time.Minute
+
+	// 每一个弹性网卡最多 10 个 IP
+	maxIPBacklog = 10
 )
 
 var (
@@ -33,20 +38,7 @@ type ENIIP struct {
 	err error
 }
 
-type ENI struct {
-	lock sync.Mutex
-
-	*types.ENI
-	ips       []*ENIIP
-	pending   int
-	ipBacklog chan struct{}
-	ecs       ipam.API
-	done      chan struct{}
-	// Unix timestamp to mark when this ENI can allocate Pod IP.
-	ipAllocInhibitExpireAt time.Time
-}
-
-type Config struct {
+type PoolConfig struct {
 	Name        string
 	Type        string
 	Factory     *eniIPFactory
@@ -65,22 +57,26 @@ type poolItem struct {
 type SimpleObjectPool struct {
 	lock sync.Mutex
 
+	name    string
 	factory *eniIPFactory
 
-	idle     *priorityQueue
-	inuse    map[string]poolItem
-	invalid  map[string]poolItem
-	maxIdle  int
-	minIdle  int
-	capacity int
+	idle        *priorityQueue
+	inuse       map[string]poolItem
+	invalid     map[string]poolItem
+	maxIdle     int
+	minIdle     int
+	capacity    int
+	backoffTime time.Duration
 
 	metricIdle  prometheus.Gauge
 	metricTotal prometheus.Gauge
 
 	notifyCh chan interface{}
+	// concurrency to create resource. tokenCh = capacity - (idle + inuse + dispose)
+	tokenCh chan struct{}
 }
 
-func NewSimpleObjectPool(cfg Config, ecs ipam.API, allocatedResources map[string]types.ResourceManagerInitItem) (*SimpleObjectPool, error) {
+func NewSimpleObjectPool(cfg PoolConfig, ecs ipam.API, allocatedResources map[string]types.ResourceManagerInitItem) (*SimpleObjectPool, error) {
 	if cfg.MinIdle > cfg.MaxIdle {
 		return nil, ErrInvalidArguments
 	}
@@ -111,28 +107,36 @@ func NewSimpleObjectPool(cfg Config, ecs ipam.API, allocatedResources map[string
 	// not use main ENI for ENI multiple ip allocate
 	ctx := context.Background()
 	enis, err := ecs.GetAttachedENIs(ctx, false)
-
+	if err != nil {
+		return nil, fmt.Errorf("get attach ENI on pool init err:%v", err)
+	}
+	if pool.factory.enableTrunk {
+		// TODO: trunk 模式 @see https://github.com/AliyunContainerService/terway/blob/main/docs/terway-trunk.md
+	}
+	// 每一个 eni 网卡开启一个 goroutine，然后为该网卡分配一定数量的 IP。
+	// 类似于 hashicorp/raft leader 为每一个 follower 开启一个 goroutine 来 replicate/heartbeat log。
 	for _, eni := range enis {
 		ipv4s, _, err := ecs.GetENIIPs(ctx, eni.ID) // 使用 ENI ID 查询 ENI IP info
-
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("get ips for eni %s err:%v", eni.ID, err))
+			continue
+		}
 		poolENI := &ENI{
 			ENI:       eni,
-			ips:       []*ENIIP{},
+			ips:       make([]*ENIIP, 0),
 			ecs:       ecs,
 			ipBacklog: make(chan struct{}, maxIPBacklog),
 			done:      make(chan struct{}, 1),
 		}
-
+		pool.factory.enis = append(pool.factory.enis, poolENI)
 		for _, ip := range ipv4s {
 			eniIP := &types.ENIIP{
 				ENI:   eni,
 				IPSet: types.IPSet{IPv4: ip},
 			}
-
 			poolENI.ips = append(poolENI.ips, &ENIIP{
 				ENIIP: eniIP,
 			})
-
 			res, ok := allocatedResources[eniIP.GetResourceID()]
 			if !ok {
 				pool.AddIdle(eniIP)
@@ -141,7 +145,13 @@ func NewSimpleObjectPool(cfg Config, ecs ipam.API, allocatedResources map[string
 			}
 		}
 
-		go poolENI.allocateWorker(factory.ipResultChan)
+		select {
+		case pool.factory.maxENIChan <- struct{}{}:
+		default:
+			klog.Warningf("exist enis already over eni limits, maxENI config will not be available")
+		}
+
+		go poolENI.allocateWorker(pool.factory.ipResultChan)
 	}
 
 	if err := pool.preload(); err != nil {
@@ -151,6 +161,18 @@ func NewSimpleObjectPool(cfg Config, ecs ipam.API, allocatedResources map[string
 	go pool.startCheckIdleTicker()
 
 	return pool, nil
+}
+
+func (p *SimpleObjectPool) preload() error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	tokenCount := p.capacity - p.sizeLocked()
+	for i := 0; i < tokenCount; i++ {
+		p.tokenCh <- struct{}{}
+	}
+
+	return nil
 }
 
 func (p *SimpleObjectPool) startCheckIdleTicker() {
@@ -296,60 +318,4 @@ func (p *SimpleObjectPool) notify() {
 	case p.notifyCh <- true:
 	default:
 	}
-}
-
-// @see https://github.com/kubernetes/kubernetes/blob/v1.23.5/staging/src/k8s.io/client-go/util/workqueue/delaying_queue.go
-// @see https://github.com/AliyunContainerService/terway/blob/main/pkg/pool/queue.go
-
-type eniIPItem struct {
-	res        *types.ENIIP
-	expiration time.Time
-	key        string
-}
-
-// 最小/大堆实现 priority queue
-type eniIPPriorityQueue []*eniIPItem
-
-func (q *eniIPPriorityQueue) Less(i, j int) bool {
-	return q.items[i].reservation.Before(q.items[j].reservation)
-}
-
-func (q *eniIPPriorityQueue) Swap(i, j int) {
-	q.items[i], q.items[j] = q.items[j], q.items[i]
-}
-
-func (q *eniIPPriorityQueue) Push(item *poolItem) {
-	q.items = append(q.items, item)
-
-	// bubble up
-	index := len(q.items) - 1
-	for index > 0 {
-		parent := (index - 1) / 2
-		if !q.items[index].less(q.items[parent]) {
-			break
-		}
-		q.Swap(index, parent)
-		index = parent
-	}
-
-}
-
-func (q *eniIPPriorityQueue) Peek() *poolItem {
-	return q.items[0]
-}
-
-func (q *eniIPPriorityQueue) Pop() *poolItem {
-	if q.size == 0 {
-		return nil
-	}
-
-	item := q.items[0]
-	q.items[0] = q.items[q.size-1]
-	q.size--
-	q.bubbleDown(0)
-	return item
-}
-
-func (q *eniIPPriorityQueue) Size() int {
-	return len(*q)
 }

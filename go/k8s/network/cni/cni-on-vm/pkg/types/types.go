@@ -9,6 +9,13 @@ import (
 	"time"
 )
 
+// NetworkResource interface of network resources
+type NetworkResource interface {
+	GetResourceID() string
+	GetType() string
+	ToResItems() []ResourceItem
+}
+
 type IPNetSet struct {
 	IPv4 *net.IPNet
 	IPv6 *net.IPNet
