@@ -48,19 +48,13 @@ type PoolConfig struct {
 	Capacity    int
 }
 
-type poolItem struct {
-	res           types.NetworkResource
-	reservation   time.Time
-	idempotentKey string
-}
-
 type SimpleObjectPool struct {
 	lock sync.Mutex
 
 	name    string
 	factory *eniIPFactory
 
-	idle        *priorityQueue
+	idle        *PriorityQueue
 	inuse       map[string]poolItem
 	invalid     map[string]poolItem
 	maxIdle     int

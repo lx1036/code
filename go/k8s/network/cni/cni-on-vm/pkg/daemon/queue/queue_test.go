@@ -1,41 +1,43 @@
-package daemon
+package queue
 
 import (
+	"fmt"
+	"k8s.io/klog/v2"
+	"testing"
 	"time"
-
-	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
 )
 
-// @see https://github.com/kubernetes/kubernetes/blob/v1.23.5/staging/src/k8s.io/client-go/util/workqueue/delaying_queue.go
-// @see https://github.com/AliyunContainerService/terway/blob/main/pkg/pool/queue.go
+// @see Min Heap: https://www.cs.usfca.edu/~galles/visualization/Heap.html
+// https://www.cnblogs.com/yahuian/p/11945144.html
+// 最小/大堆比较简单
 
-type poolItem struct {
-	res           types.NetworkResource
-	reservation   time.Time
-	idempotentKey string
+type Item struct {
+	value  int
+	expire time.Time
 }
 
-func (item *poolItem) Less(other *poolItem) bool {
-	return item.reservation.Before(other.reservation)
+func (item *Item) Less(other *Item) bool {
+	//return item.expire.Before(i.expire)
+	return item.value < other.value
 }
 
 type PriorityQueue struct {
-	items []*poolItem
+	items []*Item
 }
 
 func NewPriorityQueue() *PriorityQueue {
 	return &PriorityQueue{
-		items: make([]*poolItem, 0),
+		items: make([]*Item, 0),
 	}
 }
 
-func (pq *PriorityQueue) Push(item *poolItem) {
+func (pq *PriorityQueue) Push(item *Item) {
 	pq.items = append(pq.items, item)
 	index := len(pq.items)
 	pq.up(index - 1)
 }
 
-func (pq *PriorityQueue) Peek() *poolItem {
+func (pq *PriorityQueue) Peek() *Item {
 	if len(pq.items) == 0 {
 		return nil
 	}
@@ -43,7 +45,7 @@ func (pq *PriorityQueue) Peek() *poolItem {
 	return pq.items[0]
 }
 
-func (pq *PriorityQueue) Pop() *poolItem {
+func (pq *PriorityQueue) Pop() *Item {
 	result := pq.items[0]
 	length := len(pq.items)
 	pq.items[0] = pq.items[length-1]
@@ -86,4 +88,47 @@ func (pq *PriorityQueue) down(index int) {
 
 func (pq *PriorityQueue) swap(index, parent int) {
 	pq.items[index], pq.items[parent] = pq.items[parent], pq.items[index]
+}
+
+func TestPriorityQueue(test *testing.T) {
+	pq := NewPriorityQueue()
+	data := []*Item{ // 完全二叉树：3 6 15 10 7 20 30 17 19
+		&Item{value: 3},
+		&Item{value: 10},
+		&Item{value: 15},
+		&Item{value: 20},
+		&Item{value: 30},
+		&Item{value: 19},
+		&Item{value: 17},
+		&Item{value: 6},
+		&Item{value: 7},
+	}
+	for _, value := range data { // 3 10 15 20 30 19 17 6 7
+		pq.Push(value)
+	}
+	for len(pq.items) != 0 {
+		item := pq.Pop()
+		klog.Infof(fmt.Sprintf("%d", item.value)) // 3 6 7 10 15 17 19 20 30
+	}
+}
+
+func TestQueue(test *testing.T) {
+	pq := NewPriorityQueue()
+	items := []*Item{
+		&Item{
+			value: 1,
+		},
+		&Item{
+			value: 2,
+		},
+		&Item{
+			value: 3,
+		},
+	}
+	pq.items = items
+	length := len(pq.items)
+	pq.items = pq.items[:length-1]
+	for _, item := range pq.items {
+		klog.Infof(fmt.Sprintf("%d", item.value))
+	}
 }
