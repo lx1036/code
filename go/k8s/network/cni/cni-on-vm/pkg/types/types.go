@@ -2,11 +2,26 @@ package types
 
 import (
 	"fmt"
+	cniTypes "github.com/containernetworking/cni/pkg/types"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/rpc"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils"
 	"net"
 	"strings"
 	"time"
+)
+
+const (
+	ResourceTypeENIIP = "eniIP"
+)
+
+type DataPath int
+
+const (
+	VPCRoute DataPath = iota
+	PolicyRoute
+	IPVlan
+	ExclusiveENI
+	Vlan
 )
 
 // NetworkResource interface of network resources
@@ -30,6 +45,27 @@ func (i *IPNetSet) String() string {
 		result = append(result, i.IPv6.String())
 	}
 	return strings.Join(result, ",")
+}
+
+func ToIPNetSet(ip *rpc.IPSet) (*IPNetSet, error) {
+	if ip == nil {
+		return nil, fmt.Errorf("ip is nil")
+	}
+	ipNetSet := &IPNetSet{}
+	var err error
+	if ip.IPv4 != "" {
+		_, ipNetSet.IPv4, err = net.ParseCIDR(ip.IPv4)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if ip.IPv6 != "" {
+		_, ipNetSet.IPv6, err = net.ParseCIDR(ip.IPv6)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ipNetSet, nil
 }
 
 // IPSet is the type hole both ipv4 and ipv6 net.IP
@@ -69,25 +105,19 @@ func (e *ENIIP) GetResourceID() string {
 	return fmt.Sprintf("%s.%s", e.ENI.GetResourceID(), e.IPSet.String())
 }
 
-func ToIPNetSet(ip *rpc.IPSet) (*IPNetSet, error) {
-	if ip == nil {
-		return nil, fmt.Errorf("ip is nil")
+func (e *ENIIP) GetType() string {
+	return ResourceTypeENIIP
+}
+
+func (e *ENIIP) ToResItems() []ResourceItem {
+	return []ResourceItem{
+		{
+			Type:   e.GetType(),
+			ID:     e.GetResourceID(),
+			ENIID:  e.ENI.ID,
+			ENIMAC: e.ENI.MAC,
+		},
 	}
-	ipNetSet := &IPNetSet{}
-	var err error
-	if ip.IPv4 != "" {
-		_, ipNetSet.IPv4, err = net.ParseCIDR(ip.IPv4)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if ip.IPv6 != "" {
-		_, ipNetSet.IPv6, err = net.ParseCIDR(ip.IPv6)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return ipNetSet, nil
 }
 
 func IPv6(ip net.IP) bool {
@@ -183,3 +213,75 @@ type PodInfo struct {
 func PodInfoKey(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
 }
+
+type SetupConfig struct {
+	HostVethIfName string
+	HostIPSet      *IPNetSet
+
+	ContainerIfName string
+	ContainerIPNet  *IPNetSet
+	GatewayIP       *IPSet
+	MTU             int
+	ENIIndex        int
+	ENIGatewayIP    *IPSet
+
+	// disable create peer for exclusiveENI
+	DisableCreatePeer bool
+
+	// StripVlan or use vlan
+	StripVlan bool
+	Vid       int
+
+	DefaultRoute bool
+	MultiNetwork bool
+
+	// add extra route in container
+	ExtraRoutes []cniTypes.Route
+
+	ServiceCIDR *IPNetSet
+	// ipvlan
+	HostStackCIDRs []*net.IPNet
+
+	Ingress uint64
+	Egress  uint64
+}
+
+// CNIConf is the cni network config
+type CNIConf struct {
+	cniTypes.NetConf
+
+	// HostVethPrefix is the veth for container prefix on host
+	HostVethPrefix string `json:"veth_prefix"`
+
+	// eniIPVirtualType is the ipvlan for container
+	ENIIPVirtualType string `json:"eniip_virtual_type"`
+
+	// HostStackCIDRs is a list of CIDRs, all traffic targeting these CIDRs will be redirected to host network stack
+	HostStackCIDRs []string `json:"host_stack_cidrs"`
+
+	DisableHostPeer bool `yaml:"disable_host_peer" json:"disable_host_peer"` // disable create peer for host and container. This will also disable ability for service
+
+	VlanStripType VlanStripType `yaml:"vlan_strip_type" json:"vlan_strip_type"` // used in multi ip mode, how datapath config vlan
+
+	// MTU is container and ENI network interface MTU
+	MTU int `json:"mtu"`
+
+	// RuntimeConfig represents the options to be passed in by the runtime.
+	//RuntimeConfig cni.RuntimeConfig `json:"runtimeConfig"`
+
+	// Debug
+	Debug bool `json:"debug"`
+}
+
+func (n *CNIConf) IPVlan() bool {
+	return strings.ToLower(n.ENIIPVirtualType) == "ipvlan"
+}
+
+// VlanStripType how datapath handle vlan
+type VlanStripType string
+
+// how datapath handle vlan
+const (
+	VlanStripTypeFilter = "filter"
+	VlanStripTypeVlan   = "vlan"
+)

@@ -27,7 +27,7 @@ type networkContext struct {
 	context.Context
 	resources  []types.ResourceItem
 	pod        *types.PodInfo
-	k8sService Kubernetes
+	k8sService K8sService
 }
 
 type eniIPResourceManager struct {
@@ -35,12 +35,12 @@ type eniIPResourceManager struct {
 	pool     *SimpleObjectPool
 }
 
-func newENIIPResourceManager(poolConfig *ResourceConfig, ecs ipam.API, k8s K8s, allocatedResources map[string]resourceManagerInitItem) (*eniIPResourceManager, error) {
+func newENIIPResourceManager(poolConfig *ResourceConfig, ecs ipam.API, k8s K8sService, allocatedResources map[string]resourceManagerInitItem) (*eniIPResourceManager, error) {
 	factory := NewENIIPFactory(poolConfig, ecs)
 
 	p, err := NewSimpleObjectPool(PoolConfig{
-		Name:     poolNameENIIP,
-		Type:     typeNameENIIP,
+		Name:     "eniIP",
+		Type:     "eniIP",
 		MaxIdle:  poolConfig.MaxPoolSize,
 		MinIdle:  poolConfig.MinPoolSize,
 		Factory:  factory,
@@ -62,6 +62,13 @@ func newENIIPResourceManager(poolConfig *ResourceConfig, ecs ipam.API, k8s K8s, 
 
 func (m *eniIPResourceManager) Allocate(ctx *networkContext, id string) (types.NetworkResource, error) {
 	return m.pool.Acquire(ctx, id, podInfoKey(ctx.pod.Namespace, ctx.pod.Name))
+}
+
+func (m *eniIPResourceManager) Release(ctx *networkContext, resItem types.ResourceItem) error {
+	if ctx != nil && ctx.pod != nil {
+		return m.pool.ReleaseWithReservation(resItem.ID, ctx.pod.IPStickTime)
+	}
+	return m.pool.Release(resItem.ID)
 }
 
 type eniIPFactory struct {
@@ -97,9 +104,13 @@ func NewENIIPFactory(poolConfig *ResourceConfig, ecs ipam.API) *eniIPFactory {
 	return factory
 }
 
+func (f *eniIPFactory) Reconcile() {
+	// check ENI SecurityGroup
+}
+
 // ListResource load all eni info from metadata
 func (f *eniIPFactory) ListResource() (map[string]types.NetworkResource, error) {
-
+	return nil, nil
 }
 
 // Create call IP API to allocate next count ip for current EIP. 为所有 ENI 都分配 count IP
@@ -166,6 +177,10 @@ func (f *eniIPFactory) Create(count int) ([]types.NetworkResource, error) {
 	}
 
 	return ipResult, nil
+}
+
+func (f *eniIPFactory) Dispose() error {
+
 }
 
 func (f *eniIPFactory) getENIs() []*ENI {

@@ -21,4 +21,13 @@ var (
 		// not accessory to put capacity, max_idle or min_idle into labels ?
 		[]string{"name", "type", "capacity", "max_idle", "min_idle"},
 	)
+
+	ResourcePoolDisposed = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "resource_pool_disposed_count",
+			Help: "disposed resources amount in the pool",
+		},
+		// not accessory to put capacity, max_idle or min_idle into labels ?
+		[]string{"name", "type", "capacity", "max_idle", "min_idle"},
+	)
 )

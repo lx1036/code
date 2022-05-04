@@ -4,18 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	cniTypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/pkg/errors"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/cmd/cni-plugin/driver"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/link"
 	"net"
 	"runtime"
 	"time"
 
-	"k8s-lx1036/k8s/network/cni/cni-on-vm/cmd/plugin/driver"
-	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/link"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/rpc"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
 	eniTypes "k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
 
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
@@ -32,7 +33,7 @@ const (
 	defaultEventTimeout = 10 * time.Second
 
 	defaultVethForENI = "veth1"
-	defaultVethPrefix = "cali"
+	defaultVethPrefix = "lxc"
 )
 
 var (
@@ -44,7 +45,7 @@ var (
 
 // NetConf is the cni network config
 type NetConf struct {
-	types.NetConf
+	cniTypes.NetConf
 
 	// HostVethPrefix is the veth for container prefix on host
 	HostVethPrefix string `json:"veth_prefix"`
@@ -63,11 +64,11 @@ type NetConf struct {
 
 // K8SArgs is cni args of kubernetes, @see https://github.com/kubernetes/kubernetes/blob/v1.19.7/pkg/kubelet/dockershim/network/cni/cni.go#L400-L405
 type K8SArgs struct {
-	types.CommonArgs
+	cniTypes.CommonArgs
 	IP                         net.IP
-	K8S_POD_NAME               types.UnmarshallableString // nolint
-	K8S_POD_NAMESPACE          types.UnmarshallableString // nolint
-	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString // nolint
+	K8S_POD_NAME               cniTypes.UnmarshallableString // nolint
+	K8S_POD_NAMESPACE          cniTypes.UnmarshallableString // nolint
+	K8S_POD_INFRA_CONTAINER_ID cniTypes.UnmarshallableString // nolint
 }
 
 func init() {
@@ -101,7 +102,7 @@ func parseCmdArgs(args *skel.CmdArgs) (string, ns.NetNS, *NetConf, *K8SArgs, err
 	}
 
 	k8sConfig := K8SArgs{}
-	if err = types.LoadArgs(args.Args, &k8sConfig); err != nil {
+	if err = cniTypes.LoadArgs(args.Args, &k8sConfig); err != nil {
 		return "", nil, nil, nil, fmt.Errorf("error parse args, %w", err)
 	}
 
@@ -130,12 +131,6 @@ func getNetworkClient() (rpc.EniBackendClient, func(), error) {
 		grpcConn.Close()
 		cancel()
 	}, nil
-}
-
-func initDrivers(ipv4, ipv6 bool) {
-	veth = driver.NewVETHDriver(ipv4, ipv6)
-	ipvlan = driver.NewIPVlanDriver(ipv4, ipv6)
-	rawNIC = driver.NewRawNICDriver(ipv4, ipv6)
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
@@ -204,113 +199,41 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 	}()
 
-	ipv4, ipv6 := allocateIPReply.IPv4, allocateIPReply.IPv6
-	initDrivers(ipv4, ipv6)
-	hostIPSet, err := driver.GetHostIP(ipv4, ipv6)
-	hostVETHName, _ := link.VethNameForPod(string(k8sConfig.K8S_POD_NAME), string(k8sConfig.K8S_POD_NAMESPACE), defaultVethPrefix)
+	hostIPSet, err := driver.GetHostIP(true, false) // 宿主机 eth0 地址
+	if err != nil {
+		return err
+	}
+	hostVethIfName, err := link.VethNameForPod(string(k8sConfig.K8S_POD_NAME), string(k8sConfig.K8S_POD_NAMESPACE), defaultVethPrefix)
+	if err != nil {
+		return err
+	}
 
 	var containerIPNet *eniTypes.IPNetSet
 	var gatewayIPSet *eniTypes.IPSet
-	switch allocateIPReply.IPType {
-	case rpc.IPType_TypeVPCENI:
-		if allocateIPReply.GetENIInfo() == nil || allocateIPReply.GetBasicInfo() == nil ||
-			allocateIPReply.GetPod() == nil {
-			return fmt.Errorf("vpcEni ip result is empty: %v", allocateIPReply)
-		}
+	for _, netConf := range allocateIPReply.NetConfs {
+		var setupCfg *types.SetupConfig
+		setupCfg, err = parseSetupConf(args, netConf, conf, allocateIPReply.IPType)
+		setupCfg.HostVethIfName = hostVethIfName
+		setupCfg.HostIPSet = hostIPSet
 
-		serviceCIDR := allocateIPReply.GetBasicInfo().GetServiceCIDR()
-		var svc *eniTypes.IPNetSet
-		svc, err = eniTypes.ToIPNetSet(serviceCIDR)
-		if err != nil {
-			return err
-		}
+		switch allocateIPReply.IPType {
 
-		var extraRoutes []types.Route
-		if ipv4 {
-			extraRoutes = append(extraRoutes, types.Route{Dst: *svc.IPv4, GW: LinkIP})
-		}
-		if ipv6 {
-			extraRoutes = append(extraRoutes, types.Route{Dst: *svc.IPv6, GW: LinkIPv6})
-		}
-		for _, v := range conf.HostStackCIDRs {
-			_, cidr, err := net.ParseCIDR(v)
-			if err != nil {
-				return fmt.Errorf("host_stack_cidrs(%s) is invaild: %v", v, err)
-
-			}
-			r := types.Route{
-				Dst: *cidr,
+		case rpc.IPType_TypeENIMultiIP: // ipvlan
+			if !conf.IPVlan() {
+				continue
 			}
 
-			if eniTypes.IPv6(cidr.IP) {
-				r.GW = LinkIPv6
-			} else {
-				r.GW = LinkIP
+			if setupCfg.ContainerIfName == args.IfName {
+				containerIPNet = setupCfg.ContainerIPNet
+				gatewayIPSet = setupCfg.GatewayIP
 			}
-			extraRoutes = append(extraRoutes, r)
+			err = driver.NewIPVlanDriver().Setup(setupCfg, cniNetns)
+
+			err = driver.NewPolicyRoute().Setup(setupCfg, cniNetns)
+
+		default:
+			return fmt.Errorf("not support this network type")
 		}
-
-		podIP := allocateIPReply.GetBasicInfo().GetPodIP()
-		gatewayIP := allocateIPReply.GetBasicInfo().GetGatewayIP()
-		eniMAC := allocateIPReply.GetENIInfo().GetMAC()
-		containerIPNet, err = eniTypes.BuildIPNet(podIP, &rpc.IPSet{IPv4: "0.0.0.0/32", IPv6: "::/128"})
-		if err != nil {
-			return err
-		}
-		gatewayIPSet, err = eniTypes.ToIPSet(gatewayIP)
-		if err != nil {
-			return err
-		}
-		var deviceID int32
-		deviceID, err = link.GetDeviceNumber(eniMAC)
-		if err != nil {
-			return err
-		}
-		ingress := allocateIPReply.GetPod().GetIngress()
-		egress := allocateIPReply.GetPod().GetEgress()
-
-		// TODO: file lock
-
-		setupCfg := &driver.SetupConfig{
-			HostVETHName:    hostVETHName,
-			ContainerIfName: defaultVethForENI,
-			ContainerIPNet:  containerIPNet,
-			GatewayIP:       gatewayIPSet,
-			MTU:             conf.MTU,
-			ENIIndex:        int(deviceID),
-			Ingress:         ingress,
-			Egress:          egress,
-			ExtraRoutes:     extraRoutes,
-			HostIPSet:       hostIPSet,
-		}
-
-		err = veth.Setup(setupCfg, cniNetns)
-		if err != nil {
-			return fmt.Errorf("setup veth network for eni failed: %v", err)
-		}
-		defer func() {
-			if err != nil {
-				if e := veth.Teardown(&driver.TeardownCfg{
-					HostVETHName:    hostVETHName,
-					ContainerIfName: args.IfName,
-				}, cniNetns); e != nil {
-					err = errors.Wrapf(err, "tear down veth network for eni failed: %v", e)
-				}
-			}
-		}()
-
-		setupCfg.ContainerIfName = args.IfName
-		err = rawNIC.Setup(setupCfg, cniNetns)
-		if err != nil {
-			return fmt.Errorf("setup network for vpc eni failed: %v", err)
-		}
-
-	case rpc.IPType_TypeENIMultiIP:
-
-	case rpc.IPType_TypeVPCIP:
-
-	default:
-		return fmt.Errorf("not support this network type")
 	}
 
 	index := 0
@@ -345,13 +268,126 @@ func cmdAdd(args *skel.CmdArgs) error {
 			Message:         fmt.Sprintf("Allocate IP %s for Pod", containerIPNet.String()),
 		})
 
-	return types.PrintResult(result, confVersion)
+	return cniTypes.PrintResult(result, confVersion)
+}
+
+func cmdDel(args *skel.CmdArgs) error {
+	panic("not implemented")
 }
 
 func cmdCheck(args *skel.CmdArgs) error {
 	panic("not implemented")
 }
 
-func cmdDel(args *skel.CmdArgs) error {
-	panic("not implemented")
+func parseSetupConf(args *skel.CmdArgs, alloc *rpc.NetConf, conf *types.CNIConf, ipType rpc.IPType) (*types.SetupConfig, error) {
+	var (
+		err            error
+		containerIPNet *types.IPNetSet
+		gatewayIPSet   *types.IPSet
+		serviceCIDR    *types.IPNetSet
+		eniGatewayIP   *types.IPSet
+		deviceID       int32
+		trunkENI       bool
+		vid            uint32
+
+		ingress uint64
+		egress  uint64
+
+		routes []cniTypes.Route
+
+		disableCreatePeer bool
+	)
+
+	serviceCIDR, err = types.ToIPNetSet(alloc.GetBasicInfo().GetServiceCIDR())
+	if err != nil {
+		return nil, err
+	}
+
+	podIP := alloc.GetBasicInfo().GetPodIP()
+	subNet := alloc.GetBasicInfo().GetPodCIDR()
+	gatewayIP := alloc.GetBasicInfo().GetGatewayIP()
+	containerIPNet, err = types.BuildIPNet(podIP, subNet)
+	if err != nil {
+		return nil, err
+	}
+	gatewayIPSet, err = types.ToIPSet(gatewayIP)
+	if err != nil {
+		return nil, err
+	}
+	disableCreatePeer = conf.DisableHostPeer
+
+	if alloc.GetENIInfo() != nil {
+		mac := alloc.GetENIInfo().GetMAC()
+		if mac != "" {
+			deviceID, err = link.GetDeviceNumberByMac(mac)
+			if err != nil {
+				return nil, err
+			}
+		}
+		trunkENI = alloc.GetENIInfo().GetTrunk()
+		vid = alloc.GetENIInfo().GetVid()
+		if alloc.GetENIInfo().GetGatewayIP() != nil {
+			eniGatewayIP, err = types.ToIPSet(alloc.GetENIInfo().GetGatewayIP())
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if alloc.GetPod() != nil {
+		ingress = alloc.GetPod().GetIngress()
+		egress = alloc.GetPod().GetEgress()
+	}
+
+	hostStackCIDRs := make([]*net.IPNet, 0)
+	for _, v := range conf.HostStackCIDRs {
+		_, cidr, err := net.ParseCIDR(v)
+		if err != nil {
+			return nil, fmt.Errorf("host_stack_cidrs(%s) is invaild: %v", v, err)
+		}
+		hostStackCIDRs = append(hostStackCIDRs, cidr)
+	}
+
+	containerIfName := alloc.IfName
+	if containerIfName == "" {
+		containerIfName = args.IfName
+	}
+
+	for _, r := range alloc.GetExtraRoutes() {
+		ip, n, err := net.ParseCIDR(r.Dst)
+		if err != nil {
+			return nil, fmt.Errorf("error parse extra routes, %w", err)
+		}
+		route := cniTypes.Route{Dst: *n}
+		if ip.To4() != nil {
+			route.GW = gatewayIPSet.IPv4
+		} else {
+			route.GW = gatewayIPSet.IPv6
+		}
+		routes = append(routes, route)
+	}
+
+	return &types.SetupConfig{
+		ContainerIfName: containerIfName,
+		ContainerIPNet:  containerIPNet,
+		GatewayIP:       gatewayIPSet,
+
+		MTU:          conf.MTU,
+		ENIIndex:     int(deviceID), // 弹性网卡 interface index in host network namespace
+		ENIGatewayIP: eniGatewayIP,
+
+		DisableCreatePeer: disableCreatePeer,
+		StripVlan:         trunkENI,
+		Vid:               int(vid), // vlan id
+		DefaultRoute:      alloc.GetDefaultRoute(),
+
+		MultiNetwork: false,
+		ExtraRoutes:  routes,
+
+		ServiceCIDR:    serviceCIDR,
+		HostStackCIDRs: hostStackCIDRs,
+
+		Ingress: ingress,
+		Egress:  egress,
+	}, nil
 }

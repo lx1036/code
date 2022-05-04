@@ -19,7 +19,7 @@ import (
 const (
 	CheckIdleInterval = 2 * time.Minute
 
-	defaultPoolBackoff = 1 * time.Minute
+	defaultPoolBackoff = 30 * time.Second
 
 	// 每一个弹性网卡最多 10 个 IP
 	maxIPBacklog = 10
@@ -39,20 +39,19 @@ type ENIIP struct {
 }
 
 type PoolConfig struct {
-	Name        string
-	Type        string
-	Factory     *eniIPFactory
-	Initializer Initializer
-	MinIdle     int
-	MaxIdle     int
-	Capacity    int
+	Name     string
+	Type     string
+	Factory  *eniIPFactory
+	MinIdle  int
+	MaxIdle  int
+	Capacity int
 }
 
 type SimpleObjectPool struct {
 	lock sync.Mutex
 
-	name    string
-	factory *eniIPFactory
+	name         string
+	eniIPFactory *eniIPFactory
 
 	idle        *PriorityQueue
 	inuse       map[string]poolItem
@@ -62,8 +61,9 @@ type SimpleObjectPool struct {
 	capacity    int
 	backoffTime time.Duration
 
-	metricIdle  prometheus.Gauge
-	metricTotal prometheus.Gauge
+	metricIdle     prometheus.Gauge
+	metricTotal    prometheus.Gauge
+	metricDisposed prometheus.Counter
 
 	notifyCh chan interface{}
 	// concurrency to create resource. tokenCh = capacity - (idle + inuse + dispose)
@@ -80,8 +80,8 @@ func NewSimpleObjectPool(cfg PoolConfig, ecs ipam.API, allocatedResources map[st
 	}
 
 	pool := &SimpleObjectPool{
-		name:    cfg.Name,
-		factory: cfg.Factory,
+		name:         cfg.Name,
+		eniIPFactory: cfg.Factory,
 
 		inuse:   make(map[string]poolItem),
 		idle:    NewPriorityQueue(),
@@ -94,8 +94,9 @@ func NewSimpleObjectPool(cfg PoolConfig, ecs ipam.API, allocatedResources map[st
 		tokenCh:     make(chan struct{}, cfg.Capacity),
 		backoffTime: defaultPoolBackoff,
 
-		metricIdle:  metric.ResourcePoolIdle.WithLabelValues(cfg.Name, cfg.Name, fmt.Sprint(cfg.Capacity), fmt.Sprint(cfg.MaxIdle), fmt.Sprint(cfg.MinIdle)),
-		metricTotal: metric.ResourcePoolTotal.WithLabelValues(cfg.Name, cfg.Name, fmt.Sprint(cfg.Capacity), fmt.Sprint(cfg.MaxIdle), fmt.Sprint(cfg.MinIdle)),
+		metricIdle:     metric.ResourcePoolIdle.WithLabelValues(cfg.Name, cfg.Type, fmt.Sprint(cfg.Capacity), fmt.Sprint(cfg.MaxIdle), fmt.Sprint(cfg.MinIdle)),
+		metricTotal:    metric.ResourcePoolTotal.WithLabelValues(cfg.Name, cfg.Type, fmt.Sprint(cfg.Capacity), fmt.Sprint(cfg.MaxIdle), fmt.Sprint(cfg.MinIdle)),
+		metricDisposed: metric.ResourcePoolDisposed.WithLabelValues(cfg.Name, cfg.Type, fmt.Sprint(cfg.Capacity), fmt.Sprint(cfg.MaxIdle), fmt.Sprint(cfg.MinIdle)),
 	}
 
 	// not use main ENI for ENI multiple ip allocate
@@ -104,7 +105,7 @@ func NewSimpleObjectPool(cfg PoolConfig, ecs ipam.API, allocatedResources map[st
 	if err != nil {
 		return nil, fmt.Errorf("get attach ENI on pool init err:%v", err)
 	}
-	if pool.factory.enableTrunk {
+	if pool.eniIPFactory.enableTrunk {
 		// TODO: trunk 模式 @see https://github.com/AliyunContainerService/terway/blob/main/docs/terway-trunk.md
 	}
 	// 每一个 eni 网卡开启一个 goroutine，然后为该网卡分配一定数量的 IP。
@@ -122,7 +123,7 @@ func NewSimpleObjectPool(cfg PoolConfig, ecs ipam.API, allocatedResources map[st
 			ipBacklog: make(chan struct{}, maxIPBacklog),
 			done:      make(chan struct{}, 1),
 		}
-		pool.factory.enis = append(pool.factory.enis, poolENI)
+		pool.eniIPFactory.enis = append(pool.eniIPFactory.enis, poolENI)
 		for _, ip := range ipv4s {
 			eniIP := &types.ENIIP{
 				ENI:   eni,
@@ -140,12 +141,12 @@ func NewSimpleObjectPool(cfg PoolConfig, ecs ipam.API, allocatedResources map[st
 		}
 
 		select {
-		case pool.factory.maxENIChan <- struct{}{}:
+		case pool.eniIPFactory.maxENIChan <- struct{}{}:
 		default:
 			klog.Warningf("exist enis already over eni limits, maxENI config will not be available")
 		}
 
-		go poolENI.allocateWorker(pool.factory.ipResultChan)
+		go poolENI.allocateWorker(pool.eniIPFactory.ipResultChan)
 	}
 
 	if err := pool.preload(); err != nil {
@@ -161,12 +162,16 @@ func (p *SimpleObjectPool) preload() error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	tokenCount := p.capacity - p.sizeLocked()
+	tokenCount := p.capacity - p.sizeLocked() // capacity 减去已经使用的，preload 先补位
 	for i := 0; i < tokenCount; i++ {
-		p.tokenCh <- struct{}{}
+		p.tokenCh <- struct{}{} // @see checkInsufficient()
 	}
 
 	return nil
+}
+
+func (p *SimpleObjectPool) sizeLocked() int {
+	return p.idle.Size() + len(p.inuse) + len(p.invalid)
 }
 
 func (p *SimpleObjectPool) startCheckIdleTicker() {
@@ -182,16 +187,22 @@ func (p *SimpleObjectPool) startCheckIdleTicker() {
 
 	for {
 		select {
-		case <-tick:
-			p.checkResync() // make sure pool is synced
-			p.checkIdle()
-			p.checkInsufficient()
-		case <-reconcileTick:
-			p.factory.Reconcile()
-		case <-p.notifyCh:
+		case <-tick: // 每次 2min ~ 4min 一次循环
+			p.checkIdle()         // 多了则回收
+			p.checkInsufficient() // 少了则创建
+		case <-reconcileTick: // 每次 1h ~ 2h 一次循环
+			p.eniIPFactory.Reconcile()
+		case <-p.notifyCh: // 立即检查
 			p.checkIdle()
 			p.checkInsufficient()
 		}
+	}
+}
+
+func (p *SimpleObjectPool) notify() {
+	select {
+	case p.notifyCh <- true:
+	default:
 	}
 }
 
@@ -209,12 +220,12 @@ func (p *SimpleObjectPool) AddInuse(eniIP *types.ENIIP, key string) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.inuse[key] = poolItem{res: eniIP, key: key}
+	p.inuse[key] = poolItem{res: eniIP, idempotentKey: key}
 
 	p.metricIdle.Inc()
 }
 
-// 检查过期的 ENIIP 资源，然后调用后端 api，释放该弹性网卡 ENI 的 IP
+// INFO: 回收多余的 idle ENIIP, idle 数量在 [minIdle, maxIdle]，如[0,10]，多余的部分则根据过期时间回收 ENIIP 资源(用后端 api，释放该弹性网卡 ENI 的 IP)
 func (p *SimpleObjectPool) checkIdle() {
 	for {
 		item := p.peekIdleExpired()
@@ -222,6 +233,22 @@ func (p *SimpleObjectPool) checkIdle() {
 			break
 		}
 
+		err := p.eniIPFactory.Dispose(item.res)
+		if err == nil {
+			klog.Infof(fmt.Sprintf("dispose ENIIP xxx"))
+
+			p.metricIdle.Dec()
+			p.metricTotal.Dec()
+			p.metricDisposed.Inc()
+
+			p.tokenCh <- struct{}{}
+			p.backoffTime = defaultPoolBackoff
+		} else {
+			klog.Errorf(fmt.Sprintf("dispose ENIIP xxx err:%v", err))
+			p.AddIdle(item.res)
+			p.backoffTime = p.backoffTime * 2
+			time.Sleep(p.backoffTime)
+		}
 	}
 }
 
@@ -248,8 +275,53 @@ func (p *SimpleObjectPool) tooManyIdleLocked() bool {
 	return p.idle.Size() > p.maxIdle || (p.idle.Size() > 0 && p.sizeLocked() > p.capacity)
 }
 
-func (p *SimpleObjectPool) sizeLocked() int {
-	return p.idle.Size() + len(p.inuse) + len(p.invalid)
+// INFO: 创建不足的 idle ENIIP, idle 数量在 [minIdle, maxIdle]，如[5,10]，不足的部分则调用后端 api 来分配 ENIIP
+func (p *SimpleObjectPool) checkInsufficient() {
+	addition := p.minIdle - p.idle.Size()
+	if addition > (p.capacity - p.sizeLocked()) {
+		addition = p.capacity - p.sizeLocked()
+	}
+	if addition <= 0 {
+		return
+	}
+
+	var tokenAcquired int
+	for i := 0; i < addition; i++ {
+		// pending resources
+		select {
+		case <-p.tokenCh:
+			tokenAcquired++
+		default:
+			continue
+		}
+	}
+	if tokenAcquired <= 0 {
+		return
+	}
+
+	res, err := p.eniIPFactory.Create(tokenAcquired) // 可能后端创建不了足够的 tokenAcquired 个 ENIIP
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("error create from factory: %v", err))
+		p.backoffTime = p.backoffTime * 2
+		time.Sleep(p.backoffTime)
+		return
+	}
+	if tokenAcquired == len(res) {
+		p.backoffTime = defaultPoolBackoff
+	}
+
+	for _, eniIP := range res {
+		p.AddIdle(eniIP)
+		tokenAcquired--
+	}
+	for i := 0; i < tokenAcquired; i++ {
+		// release token
+		p.tokenCh <- struct{}{}
+	}
+
+	if tokenAcquired != 0 {
+		p.notify()
+	}
 }
 
 func (p *SimpleObjectPool) Acquire(ctx context.Context, resID, idempotentKey string) (types.NetworkResource, error) {
@@ -293,7 +365,7 @@ func (p *SimpleObjectPool) Acquire(ctx context.Context, resID, idempotentKey str
 
 	select {
 	case <-p.tokenCh: // call IP API for create ip for current ENI
-		res, err := p.factory.Create(1)
+		res, err := p.eniIPFactory.Create(1)
 		if err != nil || len(res) == 0 {
 			p.tokenCh <- struct{}{}
 			return nil, fmt.Errorf("error create from factory: %v", err)
@@ -307,9 +379,29 @@ func (p *SimpleObjectPool) Acquire(ctx context.Context, resID, idempotentKey str
 	}
 }
 
-func (p *SimpleObjectPool) notify() {
-	select {
-	case p.notifyCh <- true:
-	default:
+func (p *SimpleObjectPool) Release(resID string) error {
+	return p.ReleaseWithReservation(resID, 0)
+}
+
+func (p *SimpleObjectPool) ReleaseWithReservation(resID string, reservation time.Duration) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	res, ok := p.inuse[resID]
+	if !ok {
+		klog.Errorf(fmt.Sprintf("release %s err %v", resID, ErrInvalidState))
+		return ErrInvalidState
 	}
+
+	delete(p.inuse, resID)
+
+	reserveTo := time.Now()
+	if reservation > 0 {
+		reserveTo = reserveTo.Add(reservation)
+	}
+
+	p.idle.Push(&poolItem{res: res.res, reservation: reserveTo})
+	p.metricIdle.Inc()
+	p.notify() // 立即检查 idle
+	return nil
 }

@@ -39,6 +39,8 @@ type EniBackendServer struct {
 	kubeConfig     string
 	master         string
 
+	k8sService *K8sService
+
 	cniBinPath string
 
 	eniIPResMgr ResourceManager
@@ -61,6 +63,8 @@ func newEniBackendServer(daemonMode, configFilePath, kubeconfig string) (rpc.Eni
 		//master:         master,
 		pendingPods: sync.Map{},
 		cniBinPath:  cniBinPath,
+
+		k8sService: newK8sServiceOrDie(kubeconfig, daemonMode),
 	}
 
 	daemonConfig, err := GetDaemonConfig(configFilePath)
@@ -163,7 +167,17 @@ func (server *EniBackendServer) allocateENIMultiIP(ctx *networkContext, old *typ
 }
 
 func (server *EniBackendServer) ReleaseIP(ctx context.Context, request *rpc.ReleaseIPRequest) (*rpc.ReleaseIPReply, error) {
-	panic("implement me")
+	server.RLock()
+	defer server.RUnlock()
+
+	// 0. Get pod Info
+	podInfo, err := server.k8s.GetPod(r.K8SPodNamespace, r.K8SPodName)
+
+	releaseReply := &rpc.ReleaseIPReply{
+		Success: true,
+		IPv4:    true,
+	}
+
 }
 
 func (server *EniBackendServer) GetIPInfo(ctx context.Context, request *rpc.GetInfoRequest) (*rpc.GetInfoReply, error) {

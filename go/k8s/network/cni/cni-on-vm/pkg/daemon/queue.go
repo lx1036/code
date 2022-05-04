@@ -53,6 +53,10 @@ func (pq *PriorityQueue) Pop() *poolItem {
 	return result
 }
 
+func (pq *PriorityQueue) Size() int {
+	return len(pq.items)
+}
+
 func (pq *PriorityQueue) up(index int) {
 	for {
 		parent := (index - 1) / 2                                       // parent==index==0 即最小堆顶端
