@@ -1,13 +1,16 @@
 package driver
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/vishvananda/netlink/nl"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/types"
 	"k8s.io/klog/v2"
 	"net"
 
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 )
 
 /*
@@ -184,6 +187,10 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 	}
 	// (3.2) 确保有一个 clsact qdisc 排队规则，然后在该规则里创建 filter
 	// tc clsact qdisc 为 tc 提供了一个加载 ebpf 的入口。确保 parentLink 必须有 clsact qdisc
+	// 参考 ifb ingress/egress 限流例子：go/k8s/network/cilium/bpf/tc-bpf/tc/bandwidth/ifb_creator.go
+	// add filter on host device to mirror traffic to ifb device
+	// `tc qdisc add dev eth0 handle ffff: clsact`
+	// `tc filter add dev eth0 parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb0`
 	qdiscs, _ := netlink.QdiscList(parentLink) // `tc qdisc show dev eth0`
 	found := false
 	for _, qdisc := range qdiscs {
@@ -192,39 +199,68 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 			break
 		}
 	}
+	clsact := &netlink.GenericQdisc{ // `tc qdisc add dev eth0 handle ffff0000: clsact`
+		QdiscAttrs: netlink.QdiscAttrs{
+			LinkIndex: parentLink.Attrs().Index,
+			Parent:    netlink.HANDLE_CLSACT,
+			Handle:    netlink.HANDLE_CLSACT & 0xffff0000,
+		},
+		QdiscType: QdiscClsact,
+	}
 	if !found {
-		_ = netlink.QdiscAdd(&netlink.GenericQdisc{
-			QdiscAttrs: netlink.QdiscAttrs{
-				LinkIndex: parentLink.Attrs().Index,
-				Parent:    netlink.HANDLE_CLSACT,
-				Handle:    netlink.HANDLE_CLSACT & 0xffff0000,
-			},
-			QdiscType: QdiscClsact,
-		})
+		_ = netlink.QdiscAdd(clsact)
 	}
-	parent := uint32(netlink.HANDLE_CLSACT&0xffff0000 | netlink.HANDLE_MIN_EGRESS&0x0000ffff)
-	filters, _ := netlink.FilterList(parentLink, parent)
-	for _, filter := range filters {
-
-	}
-	for i, i2 := range tcFilters {
-		netlink.FilterAdd(&netlink.U32{
+	//parent := uint32(netlink.HANDLE_CLSACT&0xffff0000 | netlink.HANDLE_MIN_EGRESS&0x0000ffff)
+	cidrs := append(cfg.HostStackCIDRs, cfg.ServiceCIDR.IPv4)
+	ptype := uint16(unix.PACKET_HOST)
+	for _, cidr := range cidrs { // `tc filter add dev eth0 parent`
+		err = netlink.FilterAdd(&netlink.U32{
 			FilterAttrs: netlink.FilterAttrs{
-				LinkIndex: 0,
-				Handle:    0,
-				Parent:    0,
-				Priority:  0,
-				Protocol:  0,
+				LinkIndex: parentLink.Attrs().Index,
+				Parent:    clsact.QdiscAttrs.Handle,
+				Priority:  40000,
+				Protocol:  unix.ETH_P_IP,
 			},
-			ClassId:    0,
-			Divisor:    0,
-			Hash:       0,
-			Link:       0,
-			RedirIndex: 0,
-			Sel:        nil,
-			Actions:    nil,
+			Sel: &netlink.TcU32Sel{
+				Nkeys: 1,
+				Flags: nl.TC_U32_TERMINAL,
+				Keys: []netlink.TcU32Key{
+					{
+						Mask: binary.BigEndian.Uint32(net.IP(cidr.Mask).To4()),
+						Val:  binary.BigEndian.Uint32(cidr.IP.Mask(cidr.Mask).To4()),
+						Off:  16,
+					},
+				},
+			},
+			Actions: []netlink.Action{
+				&netlink.MirredAction{
+					ActionAttrs: netlink.ActionAttrs{
+						Action: netlink.TC_ACT_STOLEN,
+					},
+					MirredAction: netlink.TCA_INGRESS_REDIR, // ingress
+					Ifindex:      slaveLink.Attrs().Index,   // mirred redirect to slaveLink
+				},
+				&netlink.TunnelKeyAction{
+					ActionAttrs: netlink.ActionAttrs{
+						Action: netlink.TC_ACT_PIPE,
+					},
+					Action: netlink.TCA_TUNNEL_KEY_UNSET,
+				},
+				&netlink.SkbEditAction{
+					ActionAttrs: netlink.ActionAttrs{
+						Action: netlink.TC_ACT_PIPE,
+					},
+					PType: &ptype,
+				},
+			},
 		})
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("tc filter add err:%v", err))
+			continue
+		}
 	}
+
+	return nil
 }
 
 func (ipvlan *IPvlanDriver) AddRoute() {
