@@ -2,7 +2,7 @@ package driver
 
 import (
 	"github.com/containernetworking/plugins/pkg/ns"
-	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/types"
 )
 
 type PolicyRoute struct{}

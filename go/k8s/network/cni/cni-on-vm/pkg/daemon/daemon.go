@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/rpc"
-	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/types"
 )
 
 const (

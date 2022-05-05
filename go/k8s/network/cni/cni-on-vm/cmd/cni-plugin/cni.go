@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
-	"github.com/pkg/errors"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/cmd/cni-plugin/driver"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/link"
 	"net"
@@ -13,8 +12,7 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/rpc"
-	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
-	eniTypes "k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/types"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	current "github.com/containernetworking/cni/pkg/types/100"
@@ -208,8 +206,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
-	var containerIPNet *eniTypes.IPNetSet
-	var gatewayIPSet *eniTypes.IPSet
+	var containerIPNet *types.IPNetSet
+	var gatewayIPSet *types.IPSet
 	for _, netConf := range allocateIPReply.NetConfs {
 		var setupCfg *types.SetupConfig
 		setupCfg, err = parseSetupConf(args, netConf, conf, allocateIPReply.IPType)

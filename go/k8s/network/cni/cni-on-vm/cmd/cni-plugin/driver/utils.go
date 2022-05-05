@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net"
 
-	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/sysctl"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/types"
 
 	"github.com/vishvananda/netlink"
 	k8snet "k8s.io/apimachinery/pkg/util/net"

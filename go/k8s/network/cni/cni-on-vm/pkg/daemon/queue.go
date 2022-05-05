@@ -3,7 +3,7 @@ package daemon
 import (
 	"time"
 
-	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/types"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/types"
 )
 
 // @see https://github.com/kubernetes/kubernetes/blob/v1.23.5/staging/src/k8s.io/client-go/util/workqueue/delaying_queue.go
