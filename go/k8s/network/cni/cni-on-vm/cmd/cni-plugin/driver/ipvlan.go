@@ -37,6 +37,10 @@ var (
 	_, defaultRoute, _ = net.ParseCIDR("0.0.0.0/0")
 )
 
+const (
+	QdiscClsact = "clsact"
+)
+
 // IPvlanDriver INFO: IPVlan Linux docs：https://www.kernel.org/doc/Documentation/networking/ipvlan.txt
 type IPvlanDriver struct {
 	name string
@@ -62,16 +66,16 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 		}
 	}
 
-	// (1) 创建容器的 ipvlan eth0 interface
+	// (1) 创建容器侧的 ipvlan interface
 	link, err := netlink.LinkByName(cfg.HostVethIfName) // 为了兼容
 	if err == nil {
 		_ = netlink.LinkDel(link)
 	}
 	err = netlink.LinkAdd(&netlink.IPVlan{ // 在 container network namespace 内创建一个 ipvlan 网卡，且 name=HostVethIfName
 		LinkAttrs: netlink.LinkAttrs{
-			MTU:         cfg.MTU,
 			Name:        cfg.HostVethIfName,
 			ParentIndex: parentLink.Attrs().Index,
+			MTU:         cfg.MTU,
 			Namespace:   netlink.NsFd(int(netNS.Fd())), // container network namespace
 		},
 		Mode: netlink.IPVLAN_MODE_L2,
@@ -135,6 +139,92 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 		})
 	})
 
+	// (3) 创建宿主机侧的 ipvlan interface
+	// 为了让Pod可以访问Service时可以经过宿主机的network namespace中的iptables/ipvs规则，
+	// 所以另外增加了一个veth网卡打通Pod和宿主机的网络，并将集群的Service网段指向到这个veth网卡上。
+	// (3.1) create and config slave ipvlan interface for service/hostStack cidr
+	slaveLinkName := fmt.Sprintf("ipvlan_slave_%d", parentLink.Attrs().Index)
+	slaveLink, err := netlink.LinkByName(slaveLinkName) // 为了兼容
+	if err == nil {
+		_ = netlink.LinkDel(slaveLink)
+	}
+	err = netlink.LinkAdd(&netlink.IPVlan{ // 在 host network namespace 这一侧
+		LinkAttrs: netlink.LinkAttrs{
+			Name:        slaveLinkName,
+			ParentIndex: parentLink.Attrs().Index,
+			MTU:         cfg.MTU,
+		},
+		Mode: netlink.IPVLAN_MODE_L2,
+	})
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("add slave ipvlan interface name %s err:%v", slaveLinkName, err))
+		return err
+	}
+	slaveLink, _ = netlink.LinkByName(slaveLinkName)
+	if err = netlink.LinkSetARPOff(slaveLink); err != nil {
+		return err
+	}
+	err = netlink.AddrAdd(slaveLink, &netlink.Addr{
+		IPNet: cfg.HostIPSet.IPv4,
+		Scope: int(netlink.SCOPE_HOST),
+	})
+	if err != nil {
+		return err
+	}
+	err = netlink.RouteAdd(&netlink.Route{ // add route to container
+		LinkIndex: slaveLink.Attrs().Index,
+		Scope:     netlink.SCOPE_LINK,
+		Dst: &net.IPNet{ // podIP/32
+			IP:   cfg.ContainerIPNet.IPv4.IP,
+			Mask: net.CIDRMask(32, 32),
+		},
+	})
+	if err != nil {
+		return err
+	}
+	// (3.2) 确保有一个 clsact qdisc 排队规则，然后在该规则里创建 filter
+	// tc clsact qdisc 为 tc 提供了一个加载 ebpf 的入口。确保 parentLink 必须有 clsact qdisc
+	qdiscs, _ := netlink.QdiscList(parentLink) // `tc qdisc show dev eth0`
+	found := false
+	for _, qdisc := range qdiscs {
+		if qdisc.Type() == QdiscClsact {
+			found = true
+			break
+		}
+	}
+	if !found {
+		_ = netlink.QdiscAdd(&netlink.GenericQdisc{
+			QdiscAttrs: netlink.QdiscAttrs{
+				LinkIndex: parentLink.Attrs().Index,
+				Parent:    netlink.HANDLE_CLSACT,
+				Handle:    netlink.HANDLE_CLSACT & 0xffff0000,
+			},
+			QdiscType: QdiscClsact,
+		})
+	}
+	parent := uint32(netlink.HANDLE_CLSACT&0xffff0000 | netlink.HANDLE_MIN_EGRESS&0x0000ffff)
+	filters, _ := netlink.FilterList(parentLink, parent)
+	for _, filter := range filters {
+
+	}
+	for i, i2 := range tcFilters {
+		netlink.FilterAdd(&netlink.U32{
+			FilterAttrs: netlink.FilterAttrs{
+				LinkIndex: 0,
+				Handle:    0,
+				Parent:    0,
+				Priority:  0,
+				Protocol:  0,
+			},
+			ClassId:    0,
+			Divisor:    0,
+			Hash:       0,
+			Link:       0,
+			RedirIndex: 0,
+			Sel:        nil,
+			Actions:    nil,
+		})
+	}
 }
 
 func (ipvlan *IPvlanDriver) AddRoute() {
