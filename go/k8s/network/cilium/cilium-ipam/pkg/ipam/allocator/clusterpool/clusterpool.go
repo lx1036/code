@@ -4,6 +4,7 @@ import (
 	"net"
 
 	"github.com/cilium/ipam/cidrset"
+	"github.com/containernetworking/plugins/pkg/ip"
 )
 
 // @see https://github.com/cilium/cilium/blob/v1.11.1/pkg/ipam/allocator/clusterpool/clusterpool.go
@@ -63,17 +64,7 @@ func ForEachIP(ipnet net.IPNet, iterator func(ip string) error) error {
 		if err := iterator(next.String()); err != nil {
 			return err
 		}
-		IncrIP(next)
+		next = ip.NextIP(next)
 	}
 	return nil
-}
-
-// IncrIP IP地址自增
-func IncrIP(ip net.IP) {
-	for i := len(ip) - 1; i >= 0; i-- {
-		ip[i]++
-		if ip[i] > 0 {
-			break
-		}
-	}
 }
