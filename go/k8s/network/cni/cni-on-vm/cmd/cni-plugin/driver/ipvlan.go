@@ -3,6 +3,7 @@ package driver
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink/nl"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/types"
@@ -12,6 +13,9 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
+
+// INFO: @see https://github.com/containernetworking/plugins/blob/main/plugins/main/ipvlan/ipvlan.go
+//  https://www.cni.dev/plugins/current/main/ipvlan/
 
 /*
 ```
@@ -38,6 +42,29 @@ sudo ip netns exec net1 ip addr
 
 var (
 	_, defaultRoute, _ = net.ParseCIDR("0.0.0.0/0")
+	ifname             = "net1"
+	conf               = `{
+	"cniVersion": "0.3.0",
+	"name": "cni-plugin-sbr-test",
+	"type": "sbr",
+	"prevResult": {
+		"cniVersion": "0.3.0",
+		"interfaces": [
+			{
+				"name": "net1"
+			}
+		],
+		"ips": [
+			{
+				"version": "4",
+				"address": "192.168.1.209/24",
+				"gateway": "192.168.1.1",
+				"interface": 0
+			}
+		],
+		"routes": []
+	}
+}`
 )
 
 const (
@@ -69,48 +96,41 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 		}
 	}
 
-	// (1) 创建容器侧的 ipvlan interface
-	link, err := netlink.LinkByName(cfg.HostVethIfName) // 为了兼容
-	if err == nil {
-		_ = netlink.LinkDel(link)
-	}
-	err = netlink.LinkAdd(&netlink.IPVlan{ // 在 container network namespace 内创建一个 ipvlan 网卡，且 name=HostVethIfName
+	// (1) 创建容器侧的 ipvlan interface, configure ip and add default route, arp neigh
+	// due to kernel bug we have to create with tmpname or it might
+	// collide with the name on the host and error out
+	// INFO: cfg.ContainerIfName 有可能是 eth0 等，会触发内核 bug
+	tmpName, _ := ip.RandomVethName()
+	err = netlink.LinkAdd(&netlink.IPVlan{
 		LinkAttrs: netlink.LinkAttrs{
-			Name:        cfg.HostVethIfName,
-			ParentIndex: parentLink.Attrs().Index,
+			Name:        tmpName,
+			ParentIndex: parentLink.Attrs().Index, // parent link 是弹性网卡
 			MTU:         cfg.MTU,
-			Namespace:   netlink.NsFd(int(netNS.Fd())), // container network namespace
+			Flags:       net.FlagUp,                    // `ip link set ipv1 up`
+			Namespace:   netlink.NsFd(int(netNS.Fd())), // 在 container network namespace 内创建一个 ipvlan 网卡，且 name=HostVethIfName
 		},
 		Mode: netlink.IPVLAN_MODE_L2,
 	})
 	if err != nil {
-		klog.Errorf(fmt.Sprintf("add ipvlan interface name %s err:%v", cfg.HostVethIfName, err))
+		klog.Errorf(fmt.Sprintf("add ipvlan interface name %s err:%v", tmpName, err))
 		return err
 	}
-	err = netNS.Do(func(netNS ns.NetNS) error { // rename to default "eth0"
-		l, err := netlink.LinkByName(cfg.HostVethIfName)
-		if err != nil {
-			return err
-		}
-		err = netlink.LinkSetName(l, cfg.ContainerIfName)
-		if err != nil {
-			return err
-		}
-		return netlink.LinkSetUp(l) // `sudo ip netns exec net1 ip link set ipv1 up`
-	})
-	if err != nil {
-		klog.Errorf(fmt.Sprintf("rename ipvlan interface name in container network namespace from %s to %s"))
-		return err
-	}
-
-	// (2) add ip and add default route, arp neigh
 	err = netNS.Do(func(netNS ns.NetNS) error {
-		l, err := netlink.LinkByName(cfg.ContainerIfName)
+		containerLink, err := netlink.LinkByName(tmpName)
 		if err != nil {
 			return err
 		}
-		err = netlink.AddrAdd(l, &netlink.Addr{ // `sudo ip netns exec net1 ip addr add 10.0.1.10/24 dev ipv1`
-			IPNet: cfg.ContainerIPNet.IPv4,
+		err = netlink.LinkSetName(containerLink, cfg.ContainerIfName)
+		if err != nil {
+			return err
+		}
+		containerLink, err = netlink.LinkByName(cfg.ContainerIfName)
+		if err != nil {
+			return err
+		}
+		// ipvlan 网卡 和 parentLink 共享相同的 MAC 地址
+		err = netlink.AddrAdd(containerLink, &netlink.Addr{ // `sudo ip netns exec net1 ip addr add 10.0.1.10/24 dev ipv1`
+			IPNet: cfg.ContainerIPNet.IPv4, // 这里是 10.0.1.10/24，不是 10.0.1.10/32
 		})
 		if err != nil {
 			return err
@@ -118,14 +138,14 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 
 		routes := []*netlink.Route{
 			{
-				LinkIndex: l.Attrs().Index,
+				LinkIndex: containerLink.Attrs().Index,
 				Scope:     netlink.SCOPE_UNIVERSE,
 				Dst:       defaultRoute,
 				Gw:        cfg.GatewayIP.IPv4,
 				Flags:     int(netlink.FLAG_ONLINK),
 			},
 			{
-				LinkIndex: l.Attrs().Index,
+				LinkIndex: containerLink.Attrs().Index,
 				Scope:     netlink.SCOPE_LINK,
 				Dst:       cfg.HostIPSet.IPv4,
 			},
@@ -135,54 +155,76 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 		}
 
 		return netlink.NeighAdd(&netlink.Neigh{ // arp host IP to container eth0 mac
-			LinkIndex:    l.Attrs().Index,
+			LinkIndex:    containerLink.Attrs().Index,
 			IP:           cfg.HostIPSet.IPv4.IP,
-			HardwareAddr: l.Attrs().HardwareAddr,
+			HardwareAddr: containerLink.Attrs().HardwareAddr,
 			State:        netlink.NUD_PERMANENT,
 		})
 	})
 
-	// (3) 创建宿主机侧的 ipvlan interface
+	// (3) 配置 tc filter
 	// 为了让Pod可以访问Service时可以经过宿主机的network namespace中的iptables/ipvs规则，
 	// 所以另外增加了一个veth网卡打通Pod和宿主机的网络，并将集群的Service网段指向到这个veth网卡上。
 	// (3.1) create and config slave ipvlan interface for service/hostStack cidr
 	slaveLinkName := fmt.Sprintf("ipvlan_slave_%d", parentLink.Attrs().Index)
-	slaveLink, err := netlink.LinkByName(slaveLinkName) // 为了兼容
-	if err == nil {
-		_ = netlink.LinkDel(slaveLink)
-	}
-	err = netlink.LinkAdd(&netlink.IPVlan{ // 在 host network namespace 这一侧
-		LinkAttrs: netlink.LinkAttrs{
-			Name:        slaveLinkName,
-			ParentIndex: parentLink.Attrs().Index,
-			MTU:         cfg.MTU,
-		},
-		Mode: netlink.IPVLAN_MODE_L2,
-	})
+	slaveLink, err := netlink.LinkByName(slaveLinkName)
 	if err != nil {
-		klog.Errorf(fmt.Sprintf("add slave ipvlan interface name %s err:%v", slaveLinkName, err))
-		return err
+		if _, ok := err.(netlink.LinkNotFoundError); ok {
+			err = netlink.LinkAdd(&netlink.IPVlan{ // 在 host network namespace 这一侧
+				LinkAttrs: netlink.LinkAttrs{
+					Name:        slaveLinkName,
+					ParentIndex: parentLink.Attrs().Index,
+					MTU:         cfg.MTU,
+					Flags:       net.FlagUp, // `ip link set ipv1 up`
+				},
+				Mode: netlink.IPVLAN_MODE_L2,
+			})
+			if err != nil {
+				klog.Errorf(fmt.Sprintf("add slave ipvlan interface name %s err:%v", slaveLinkName, err))
+				return err
+			}
+		}
+	} else {
+		if slaveLink.Attrs().MTU != cfg.MTU {
+			if err = netlink.LinkSetMTU(slaveLink, cfg.MTU); err != nil {
+				return err
+			}
+		}
 	}
-	slaveLink, _ = netlink.LinkByName(slaveLinkName)
-	if err = netlink.LinkSetARPOff(slaveLink); err != nil {
-		return err
+	if slaveLink.Attrs().Flags&unix.IFF_NOARP != 0 { // arp off
+		if err = netlink.LinkSetARPOff(slaveLink); err != nil {
+			return err
+		}
 	}
-	err = netlink.AddrAdd(slaveLink, &netlink.Addr{
-		IPNet: cfg.HostIPSet.IPv4,
-		Scope: int(netlink.SCOPE_HOST),
-	})
+	addrs, err := netlink.AddrList(slaveLink, netlink.FAMILY_V4)
 	if err != nil {
 		return err
 	}
-	err = netlink.RouteAdd(&netlink.Route{ // add route to container
+	found := false
+	for _, addr := range addrs {
+		if addr.IPNet.String() == cfg.HostIPSet.IPv4.String() && addr.Scope == int(netlink.SCOPE_HOST) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		err = netlink.AddrAdd(slaveLink, &netlink.Addr{
+			IPNet: cfg.HostIPSet.IPv4,
+			Scope: int(netlink.SCOPE_HOST),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	if err = netlink.RouteAdd(&netlink.Route{ // add route to container
 		LinkIndex: slaveLink.Attrs().Index,
 		Scope:     netlink.SCOPE_LINK,
 		Dst: &net.IPNet{ // podIP/32
 			IP:   cfg.ContainerIPNet.IPv4.IP,
 			Mask: net.CIDRMask(32, 32),
 		},
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 	// (3.2) 确保有一个 clsact qdisc 排队规则，然后在该规则里创建 filter
@@ -192,7 +234,7 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 	// `tc qdisc add dev eth0 handle ffff: clsact`
 	// `tc filter add dev eth0 parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb0`
 	qdiscs, _ := netlink.QdiscList(parentLink) // `tc qdisc show dev eth0`
-	found := false
+	found = false
 	for _, qdisc := range qdiscs {
 		if qdisc.Type() == QdiscClsact {
 			found = true
@@ -211,9 +253,10 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 		_ = netlink.QdiscAdd(clsact)
 	}
 	//parent := uint32(netlink.HANDLE_CLSACT&0xffff0000 | netlink.HANDLE_MIN_EGRESS&0x0000ffff)
+	// INFO: 只有 serviceCIDR/hostStackCIDR 网段才会重定向到 slaveLink ipvlan interface
 	cidrs := append(cfg.HostStackCIDRs, cfg.ServiceCIDR.IPv4)
 	ptype := uint16(unix.PACKET_HOST)
-	for _, cidr := range cidrs { // `tc filter add dev eth0 parent`
+	for _, cidr := range cidrs { // `tc filter add dev eth0 parent ffff0000: protocol ip u32 match ip src 192.168.0.0/16 action mirred ingress redirect dev slaveLink`
 		err = netlink.FilterAdd(&netlink.U32{
 			FilterAttrs: netlink.FilterAttrs{
 				LinkIndex: parentLink.Attrs().Index,
@@ -232,6 +275,7 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 					},
 				},
 			},
+			RedirIndex: slaveLink.Attrs().Index, // redirect dev slaveLink
 			Actions: []netlink.Action{
 				&netlink.MirredAction{
 					ActionAttrs: netlink.ActionAttrs{
@@ -263,12 +307,34 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 	return nil
 }
 
-func (ipvlan *IPvlanDriver) AddRoute() {
-
-}
-
 func (ipvlan *IPvlanDriver) Teardown(cfg *TeardownCfg, netNS ns.NetNS) error {
-	panic("implement me")
+	err := netNS.Do(func(netNS ns.NetNS) error {
+		link, err := netlink.LinkByName(cfg.ContainerIfName)
+		if err != nil {
+			return err
+		}
+
+		return netlink.LinkDel(link)
+	})
+	if err != nil {
+		return err
+	}
+
+	// delete route to pod
+	routes, err := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{
+		Dst: cfg.ContainerIPNet.IPv4,
+	}, netlink.RT_FILTER_DST)
+	if err != nil {
+		return err
+	}
+	for _, route := range routes {
+		if err = netlink.RouteDel(&route); err != nil {
+			klog.Errorf(fmt.Sprintf("delelete route %s err:%v", route.String(), err))
+			continue
+		}
+	}
+
+	return nil
 }
 
 func (ipvlan *IPvlanDriver) Check(cfg *CheckConfig) error {

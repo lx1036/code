@@ -14,4 +14,24 @@ func TestNet(test *testing.T) {
 	}
 
 	klog.Infof(fmt.Sprintf("%s", v4.String()))
+
+	netConfs := []string{"net1", "net2"}
+	for _, conf := range netConfs {
+		klog.Info(conf)
+
+		dataPath := "ipvlan"
+		avaliable := true
+		switch dataPath {
+		case "ipvlan":
+			if avaliable {
+				klog.Info("ipvlan")
+				continue
+			}
+			fallthrough
+		case "policyRoute":
+			klog.Info("policyRoute")
+		default:
+			klog.Info("default")
+		}
+	}
 }
