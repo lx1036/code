@@ -138,16 +138,16 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 
 		routes := []*netlink.Route{
 			{
-				LinkIndex: containerLink.Attrs().Index,
-				Scope:     netlink.SCOPE_UNIVERSE,
 				Dst:       defaultRoute,
 				Gw:        cfg.GatewayIP.IPv4,
+				LinkIndex: containerLink.Attrs().Index,
+				Scope:     netlink.SCOPE_UNIVERSE,
 				Flags:     int(netlink.FLAG_ONLINK),
 			},
 			{
+				Dst:       cfg.HostIPSet.IPv4,
 				LinkIndex: containerLink.Attrs().Index,
 				Scope:     netlink.SCOPE_LINK,
-				Dst:       cfg.HostIPSet.IPv4,
 			},
 		}
 		for _, route := range routes {
