@@ -18,7 +18,8 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 )
 
-/* INFO:
+/* INFO: @see https://www.cni.dev/plugins/current/main/ipvlan/
+    https://github.com/containernetworking/plugins/blob/main/plugins/main/ipvlan/ipvlan.go
     以 eth0 为 parent link，创建一个 ipvlan link，然后从 ipam 获取 ip 并配置新建的 ipvlan 网卡
 	{
 	"name": "mynet",
@@ -29,12 +30,7 @@ import (
 		"subnet": "10.1.2.0/24"
 		}
 	}
-
 */
-
-var (
-	_, defaultRoute, _ = net.ParseCIDR("0.0.0.0/0")
-)
 
 func init() {
 	// this ensures that main runs only on main thread (thread group leader).
@@ -110,7 +106,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
-	// (1)IP 从 PrevResult 中获取
+	// (1)IP 从 PrevResult 中获取，或者 IP 从 IPAM 二进制中获取
 	var result *current.Result
 	haveResult := false
 	if conf.IPAM.Type == "" && conf.PrevResult != nil {
@@ -122,7 +118,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 			haveResult = true
 		}
 	}
-	// (1)IP 从 IPAM 二进制中获取
 	if !haveResult {
 		var err1 error
 		ipamResult, err1 := ipam.ExecAdd(conf.IPAM.Type, args.StdinData)
@@ -175,16 +170,22 @@ func cmdAdd(args *skel.CmdArgs) error {
 					containerLink.Attrs().Name, err))
 				continue
 			}
-		}
 
-		if err = netlink.RouteAdd(&netlink.Route{ // default route `sudo ip netns exec net1 ip route add default dev ipvlan1`
-			Dst: defaultRoute,
-			//Gw: gateway,
-			LinkIndex: containerLink.Attrs().Index,
-			Scope:     netlink.SCOPE_UNIVERSE,
-			Flags:     int(netlink.FLAG_ONLINK),
-		}); err != nil {
-			return err
+			if gw != nil {
+				defaultRoute := &net.IPNet{
+					IP:   net.IPv4zero,
+					Mask: net.CIDRMask(0, 32),
+				}
+				if err = netlink.RouteAdd(&netlink.Route{ // default route `sudo ip netns exec net1 ip route add default dev ipvlan1`
+					Dst:       defaultRoute,
+					Gw:        gw,
+					LinkIndex: containerLink.Attrs().Index,
+					Scope:     netlink.SCOPE_UNIVERSE,
+					Flags:     int(netlink.FLAG_ONLINK),
+				}); err != nil {
+					return err
+				}
+			}
 		}
 
 		for _, r := range result.Routes { // extra routes
