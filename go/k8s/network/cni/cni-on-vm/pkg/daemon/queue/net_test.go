@@ -35,3 +35,21 @@ func TestNet(test *testing.T) {
 		}
 	}
 }
+
+func TestDefer(test *testing.T) {
+	data, err := getData()
+	defer func() {
+		if err != nil {
+			klog.Info("release")
+		}
+	}()
+	if err != nil {
+		return
+	}
+
+	klog.Info(data)
+}
+
+func getData() (string, error) {
+	return "data", fmt.Errorf("error")
+}

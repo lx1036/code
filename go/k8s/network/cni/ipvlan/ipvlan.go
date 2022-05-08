@@ -132,9 +132,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 
 		// Convert whatever the IPAM result was into the current Result type
-		result, err = current.NewResultFromResult(ipamResult)
-		if err != nil {
-			return err
+		result, err1 = current.NewResultFromResult(ipamResult)
+		if err1 != nil {
+			return err1
 		}
 
 		if len(result.IPs) == 0 {
@@ -148,7 +148,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		// All addresses belong to the ipvlan interface
 		ipc.Interface = current.Int(0)
 	}
-
+	// configure container IP and routes
 	err = netNS.Do(func(_ ns.NetNS) error {
 		containerLink, err := netlink.LinkByName(args.IfName)
 		if err != nil {
@@ -200,7 +200,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 				Gw:        gateway,
 				LinkIndex: containerLink.Attrs().Index,
 			}); err != nil {
-				klog.Errorf(fmt.Sprintf("failed to add route '%v via %v dev %v': %v"))
+				klog.Errorf(fmt.Sprintf("failed to add route '%s via %s dev %s' err: %v", r.Dst.String(), gw.String(), args.IfName, err))
 				continue
 			}
 		}

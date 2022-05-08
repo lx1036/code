@@ -205,7 +205,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		if err != nil {
 			return fmt.Errorf("failed to get link %s: %v", args.IfName, err)
 		}
-		addrs, err := netlink.AddrList(containerLink, netlink.FAMILY_ALL)
+		addrs, err := netlink.AddrList(containerLink, netlink.FAMILY_V4)
 		if err != nil {
 			return fmt.Errorf("failed to list all addrs: %v", err)
 		}
