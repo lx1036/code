@@ -3,7 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"runtime"
+
 	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ip"
@@ -12,12 +16,8 @@ import (
 	"github.com/containernetworking/plugins/pkg/utils"
 	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
 	"github.com/vishvananda/netlink"
-	"k8s.io/kubernetes/pkg/util/iptables"
-	"net"
-	"runtime"
-
-	"github.com/containernetworking/cni/pkg/types"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/utils/exec"
 )
 
