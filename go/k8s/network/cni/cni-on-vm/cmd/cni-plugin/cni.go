@@ -32,6 +32,9 @@ const (
 
 	defaultVethForENI = "veth1"
 	defaultVethPrefix = "lxc"
+
+	TypeENIMultiIP_IPVLAN      = "ipvlan"
+	TypeENIMultiIP_POLICYROUTE = "policyRoute"
 )
 
 var (
@@ -216,19 +219,24 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 		switch allocateIPReply.IPType {
 
-		case rpc.IPType_TypeENIMultiIP: // ipvlan
-			if !conf.IPVlan() {
-				continue
-			}
-
+		case rpc.IPType_TypeENIMultiIP: // ipvlan or policyRoute
+			eniMultiIPType := TypeENIMultiIP_IPVLAN
 			if setupCfg.ContainerIfName == args.IfName {
 				containerIPNet = setupCfg.ContainerIPNet
 				gatewayIPSet = setupCfg.GatewayIP
 			}
-			err = driver.NewIPVlanDriver().Setup(setupCfg, cniNetns)
 
-			err = driver.NewPolicyRoute().Setup(setupCfg, cniNetns)
+			switch eniMultiIPType {
+			case TypeENIMultiIP_IPVLAN:
+				err = driver.NewIPVlanDriver().Setup(setupCfg, cniNetns) // ipvlan 模式
 
+			case TypeENIMultiIP_POLICYROUTE:
+				err = driver.NewPolicyRoute().Setup(setupCfg, cniNetns) // veth 策略路由模式
+			}
+
+			if err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("not support this network type")
 		}
