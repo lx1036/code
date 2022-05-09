@@ -37,6 +37,11 @@ func TestNet(test *testing.T) {
 }
 
 func TestDefer(test *testing.T) {
+	markBit := 13
+	markValue := 1 << uint(markBit)
+	markDef := fmt.Sprintf("%#x/%#x", markValue, markValue)
+	klog.Info(markDef)
+
 	data, err := getData()
 	defer func() {
 		if err != nil {
