@@ -6,8 +6,8 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// GetDeviceNumber get interface device number by mac address
-func GetDeviceNumber(mac string) (int32, error) {
+// GetDeviceNumberByMac get interface device number by mac address
+func GetDeviceNumberByMac(mac string) (int32, error) {
 	linkList, err := netlink.LinkList()
 	if err != nil {
 		return 0, errors.Wrapf(err, "error get link list from netlink")

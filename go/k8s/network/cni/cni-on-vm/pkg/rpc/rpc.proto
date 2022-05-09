@@ -15,6 +15,19 @@ service EniBackend {
   }
 }
 
+message NetConf {
+  BasicInfo BasicInfo = 1;
+  ENIInfo ENIInfo = 2;
+  Pod Pod = 3;
+  string IfName = 4;
+  repeated Route ExtraRoutes = 5;
+  bool DefaultRoute = 6;
+}
+
+message Route {
+  string Dst = 1;
+}
+
 message AllocateIPRequest {
   string K8sPodName = 1;
   string K8sPodNamespace = 2;
@@ -39,6 +52,8 @@ message BasicInfo {
 message ENIInfo {
   string MAC = 1;
   bool Trunk = 2; // eni is trunk
+  uint32 Vid = 3; // vlan ID
+  IPSet GatewayIP = 4;
 }
 
 enum IPType {
@@ -56,11 +71,10 @@ message Pod {
 message AllocateIPReply {
   bool Success = 1;
   IPType IPType = 2;
-  BasicInfo BasicInfo = 3;
-  ENIInfo ENIInfo = 4;
-  Pod Pod = 5;
-  bool IPv4 = 6;
-  bool IPv6 = 7;
+  bool IPv4 = 3;
+  bool IPv6 = 4;
+  repeated NetConf NetConfs = 5;
+  bool EnableTrunking = 6;
 }
 
 message ReleaseIPRequest {
