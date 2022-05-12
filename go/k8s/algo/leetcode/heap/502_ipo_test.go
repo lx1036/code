@@ -1,4 +1,4 @@
-package two_heaps
+package heap
 
 // https://leetcode-cn.com/problems/ipo/
 

@@ -1,4 +1,4 @@
-package two_heaps
+package heap
 
 import (
 	"container/heap"
