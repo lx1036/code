@@ -16,6 +16,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 	current "github.com/containernetworking/cni/pkg/types/100"
+	"github.com/containernetworking/cni/pkg/version"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"google.golang.org/grpc"
@@ -80,58 +81,7 @@ func init() {
 }
 
 func main() {
-	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, GetSpecVersionSupported(), "")
-}
-
-func parseCmdArgs(args *skel.CmdArgs) (string, ns.NetNS, *NetConf, *K8SArgs, error) {
-	versionDecoder := &cniversion.ConfigDecoder{}
-	confVersion, err := versionDecoder.Decode(args.StdinData)
-	if err != nil {
-		return "", nil, nil, nil, err
-	}
-	netNS, err := ns.GetNS(args.Netns) // open fd /proc/{pid}/ns/net
-	if err != nil {
-		return "", nil, nil, nil, err
-	}
-
-	conf := NetConf{}
-	if err = json.Unmarshal(args.StdinData, &conf); err != nil {
-		return "", nil, nil, nil, fmt.Errorf("error parse args, %w", err)
-	}
-	if conf.MTU == 0 {
-		conf.MTU = defaultMTU
-	}
-
-	k8sConfig := K8SArgs{}
-	if err = cniTypes.LoadArgs(args.Args, &k8sConfig); err != nil {
-		return "", nil, nil, nil, fmt.Errorf("error parse args, %w", err)
-	}
-
-	return confVersion, netNS, &conf, &k8sConfig, nil
-}
-
-// INFO: 获取 ENI gRPC Client，调用 ENI
-func getNetworkClient() (rpc.EniBackendClient, func(), error) {
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), defaultCniTimeout)
-	grpcConn, err := grpc.DialContext(timeoutCtx, defaultSocketPath, grpc.WithInsecure(), grpc.WithContextDialer(
-		func(ctx context.Context, s string) (net.Conn, error) {
-			unixAddr, err := net.ResolveUnixAddr("unix", defaultSocketPath)
-			if err != nil {
-				return nil, fmt.Errorf("error while resolve unix addr:%w", err)
-			}
-			d := &net.Dialer{}
-			return d.DialContext(timeoutCtx, "unix", unixAddr.String())
-		}))
-	if err != nil {
-		cancel()
-		return nil, nil, fmt.Errorf("error dial to terway %s, %w", defaultSocketPath, err)
-	}
-
-	eniBackendClient := rpc.NewEniBackendClient(grpcConn)
-	return eniBackendClient, func() {
-		grpcConn.Close()
-		cancel()
-	}, nil
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "eni")
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
@@ -283,6 +233,57 @@ func cmdDel(args *skel.CmdArgs) error {
 
 func cmdCheck(args *skel.CmdArgs) error {
 	panic("not implemented")
+}
+
+func parseCmdArgs(args *skel.CmdArgs) (string, ns.NetNS, *NetConf, *K8SArgs, error) {
+	versionDecoder := &cniversion.ConfigDecoder{}
+	confVersion, err := versionDecoder.Decode(args.StdinData)
+	if err != nil {
+		return "", nil, nil, nil, err
+	}
+	netNS, err := ns.GetNS(args.Netns) // open fd /proc/{pid}/ns/net
+	if err != nil {
+		return "", nil, nil, nil, err
+	}
+
+	conf := NetConf{}
+	if err = json.Unmarshal(args.StdinData, &conf); err != nil {
+		return "", nil, nil, nil, fmt.Errorf("error parse args, %w", err)
+	}
+	if conf.MTU == 0 {
+		conf.MTU = defaultMTU
+	}
+
+	k8sConfig := K8SArgs{}
+	if err = cniTypes.LoadArgs(args.Args, &k8sConfig); err != nil {
+		return "", nil, nil, nil, fmt.Errorf("error parse args, %w", err)
+	}
+
+	return confVersion, netNS, &conf, &k8sConfig, nil
+}
+
+// INFO: 获取 ENI gRPC Client，调用 ENI
+func getNetworkClient() (rpc.EniBackendClient, func(), error) {
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), defaultCniTimeout)
+	grpcConn, err := grpc.DialContext(timeoutCtx, defaultSocketPath, grpc.WithInsecure(), grpc.WithContextDialer(
+		func(ctx context.Context, s string) (net.Conn, error) {
+			unixAddr, err := net.ResolveUnixAddr("unix", defaultSocketPath)
+			if err != nil {
+				return nil, fmt.Errorf("error while resolve unix addr:%w", err)
+			}
+			d := &net.Dialer{}
+			return d.DialContext(timeoutCtx, "unix", unixAddr.String())
+		}))
+	if err != nil {
+		cancel()
+		return nil, nil, fmt.Errorf("error dial to terway %s, %w", defaultSocketPath, err)
+	}
+
+	eniBackendClient := rpc.NewEniBackendClient(grpcConn)
+	return eniBackendClient, func() {
+		grpcConn.Close()
+		cancel()
+	}, nil
 }
 
 func parseSetupConf(args *skel.CmdArgs, alloc *rpc.NetConf, conf *types.CNIConf, ipType rpc.IPType) (*types.SetupConfig, error) {
