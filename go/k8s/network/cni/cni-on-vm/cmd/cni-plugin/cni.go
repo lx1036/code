@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/alexflint/go-filemutex"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/cmd/cni-plugin/driver"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/link"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"net"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -28,6 +31,7 @@ const (
 
 	defaultCniTimeout = 120 * time.Second
 	defaultSocketPath = "/var/run/eni/eni.socket"
+	defaultCNILock    = "/var/run/eni/eni.lock"
 
 	defaultEventTimeout = 10 * time.Second
 
@@ -228,7 +232,65 @@ func cmdAdd(args *skel.CmdArgs) error {
 }
 
 func cmdDel(args *skel.CmdArgs) error {
-	panic("not implemented")
+	_, cniNetns, conf, k8sConfig, err := parseCmdArgs(args)
+	if err != nil {
+		return err
+	}
+	defer cniNetns.Close()
+
+	klog.Infof(fmt.Sprintf("args: %+v", *args))
+
+	eniBackendClient, closeConn, err := getNetworkClient()
+	if err != nil {
+		return fmt.Errorf("error create grpc client,pod %s/%s, %w", string(k8sConfig.K8S_POD_NAMESPACE), string(k8sConfig.K8S_POD_NAME), err)
+	}
+	defer closeConn()
+
+	timeoutContext, cancel := context.WithTimeout(context.Background(), defaultCniTimeout)
+	defer cancel()
+
+	ipInfoReply, err := eniBackendClient.GetIPInfo(timeoutContext, &rpc.GetInfoRequest{
+		K8SPodName:             string(k8sConfig.K8S_POD_NAME),
+		K8SPodNamespace:        string(k8sConfig.K8S_POD_NAMESPACE),
+		K8SPodInfraContainerId: string(k8sConfig.K8S_POD_INFRA_CONTAINER_ID),
+	})
+	if err != nil {
+		return fmt.Errorf("error get ip from terway, pod %s/%s, %w", string(k8sConfig.K8S_POD_NAMESPACE), string(k8sConfig.K8S_POD_NAME), err)
+	}
+
+	// 文件锁
+	lock, err := GetFileLock(defaultCNILock)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+
+	for _, netConf := range ipInfoReply.NetConfs {
+		teardownCfg, err := parseTeardownConf(args, netConf, conf, ipInfoReply.IPType)
+		if err != nil {
+			return err
+		}
+		switch ipInfoReply.IPType {
+		case rpc.IPType_TypeENIMultiIP: // ipvlan or policyRoute
+			err = driver.NewIPVlanDriver().Teardown(teardownCfg, cniNetns) // ipvlan 模式
+			if err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("not support this network type")
+		}
+	}
+
+	releaseIPReply, err := eniBackendClient.ReleaseIP(timeoutContext, &rpc.ReleaseIPRequest{
+		K8SPodName:             string(k8sConfig.K8S_POD_NAME),
+		K8SPodNamespace:        string(k8sConfig.K8S_POD_NAMESPACE),
+		K8SPodInfraContainerId: string(k8sConfig.K8S_POD_INFRA_CONTAINER_ID),
+		Reason:                 "normal release",
+	})
+	if err != nil || !releaseIPReply.GetSuccess() {
+		return fmt.Errorf("error release ip for pod, maybe cause resource leak: %v, %s", err, releaseIPReply.String())
+	}
+	return nil
 }
 
 func cmdCheck(args *skel.CmdArgs) error {
@@ -397,4 +459,59 @@ func parseSetupConf(args *skel.CmdArgs, alloc *rpc.NetConf, conf *types.CNIConf,
 		Ingress: ingress,
 		Egress:  egress,
 	}, nil
+}
+
+func parseTeardownConf(args *skel.CmdArgs, alloc *rpc.NetConf, conf *types.CNIConf, ipType rpc.IPType) (*types.TeardownCfg, error) {
+	if alloc.GetBasicInfo() == nil {
+		return nil, fmt.Errorf("return empty pod alloc info: %v", alloc)
+	}
+
+	var (
+		err            error
+		containerIPNet *types.IPNetSet
+		serviceCIDR    *types.IPNetSet
+	)
+
+	serviceCIDR, err = types.ToIPNetSet(alloc.GetBasicInfo().GetServiceCIDR())
+	if err != nil {
+		return nil, err
+	}
+
+	podIP := alloc.GetBasicInfo().GetPodIP()
+	subNet := alloc.GetBasicInfo().GetPodCIDR()
+	containerIPNet, err = types.BuildIPNet(podIP, subNet)
+	if err != nil {
+		return nil, err
+	}
+
+	containerIfName := alloc.IfName
+	if containerIfName == "" {
+		containerIfName = args.IfName
+	}
+
+	return &types.TeardownCfg{
+		ContainerIfName: containerIfName,
+		ContainerIPNet:  containerIPNet,
+		ServiceCIDR:     serviceCIDR,
+	}, nil
+}
+
+func GetFileLock(path string) (*filemutex.FileMutex, error) {
+	path, _ = filepath.Abs(path)
+	lock, err := filemutex.New(path)
+	if err != nil {
+		return nil, fmt.Errorf(fmt.Sprintf("failed to open lock %s: %v", path, err))
+	}
+
+	err = wait.PollImmediate(200*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		if err := lock.Lock(); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock: %v", err)
+	}
+
+	return lock, nil
 }

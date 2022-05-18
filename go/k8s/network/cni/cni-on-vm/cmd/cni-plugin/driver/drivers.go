@@ -1,50 +1,18 @@
 package driver
 
 import (
-	"net"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/types"
 
-	eniTypes "k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/types"
-
-	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/plugins/pkg/ns"
 )
 
 // NetnsDriver to config container netns interface and routes
 type NetnsDriver interface {
-	Setup(cfg *SetupConfig, netNS ns.NetNS) error
+	Setup(cfg *types.SetupConfig, netNS ns.NetNS) error
 
-	Teardown(cfg *TeardownCfg, netNS ns.NetNS) error
+	Teardown(cfg *types.TeardownCfg, netNS ns.NetNS) error
 
 	Check(cfg *CheckConfig) error
-}
-
-type SetupConfig struct {
-	HostVETHName string
-
-	ContainerIfName string
-	ContainerIPNet  *eniTypes.IPNetSet
-	GatewayIP       *eniTypes.IPSet
-	MTU             int
-	ENIIndex        int
-	TrunkENI        bool
-
-	// add extra route in container
-	ExtraRoutes []types.Route
-
-	ServiceCIDR *eniTypes.IPNetSet
-	HostIPSet   *eniTypes.IPNetSet
-	// ipvlan
-	HostStackCIDRs []*net.IPNet
-
-	Ingress uint64
-	Egress  uint64
-}
-
-type TeardownCfg struct {
-	HostVETHName string
-
-	ContainerIfName string
-	ContainerIPNet  *eniTypes.IPNetSet
 }
 
 type RecordPodEvent func(msg string)
@@ -57,9 +25,9 @@ type CheckConfig struct {
 	HostVETHName    string
 	ContainerIFName string
 
-	ContainerIPNet *eniTypes.IPNetSet
-	HostIPSet      *eniTypes.IPNetSet
-	GatewayIP      *eniTypes.IPSet
+	ContainerIPNet *types.IPNetSet
+	HostIPSet      *types.IPNetSet
+	GatewayIP      *types.IPSet
 
 	ENIIndex int32 // phy device
 	TrunkENI bool

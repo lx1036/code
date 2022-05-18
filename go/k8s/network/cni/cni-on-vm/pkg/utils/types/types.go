@@ -246,6 +246,14 @@ type SetupConfig struct {
 	Egress  uint64
 }
 
+type TeardownCfg struct {
+	ContainerIfName string
+
+	ContainerIPNet *IPNetSet
+
+	ServiceCIDR *IPNetSet
+}
+
 // CNIConf is the cni network config
 type CNIConf struct {
 	cniTypes.NetConf

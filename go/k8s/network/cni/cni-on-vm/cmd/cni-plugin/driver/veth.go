@@ -26,7 +26,7 @@ func NewVETHDriver(ipv4, ipv6 bool) *VETHDriver {
 }
 
 // INFO:
-func (driver *VETHDriver) Setup(cfg *SetupConfig, netNS ns.NetNS) error {
+func (driver *VETHDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error {
 	prevHostLink, err := netlink.LinkByName(cfg.HostVETHName)
 	if err == nil {
 		err = netlink.LinkDel(prevHostLink)
@@ -218,7 +218,7 @@ func (driver *VETHDriver) Setup(cfg *SetupConfig, netNS ns.NetNS) error {
 	return nil
 }
 
-func (driver *VETHDriver) Teardown(cfg *TeardownCfg, netNS ns.NetNS) error {
+func (driver *VETHDriver) Teardown(cfg *types.TeardownCfg, netNS ns.NetNS) error {
 	panic("implement me")
 }
 

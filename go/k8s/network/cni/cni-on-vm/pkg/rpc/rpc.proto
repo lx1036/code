@@ -103,13 +103,18 @@ message GetInfoRequest {
 
 message GetInfoReply {
   IPType IPType = 1;
-  BasicInfo BasicInfo = 2;
-  ENIInfo ENIInfo = 3;
-  Pod Pod = 4;
-  bool IPv4 = 5;
-  bool IPv6 = 6;
+  bool Success = 2;
+  bool IPv4 = 3;
+  bool IPv6 = 4;
+  repeated NetConf NetConfs = 5;
+  bool EnableTrunking = 6;
+  Error Error = 7;
 }
 
+enum Error {
+  ErrNoErr = 0;
+  ErrCRDNotFound = 1;
+}
 
 enum EventTarget {
   EventTargetNode = 0;

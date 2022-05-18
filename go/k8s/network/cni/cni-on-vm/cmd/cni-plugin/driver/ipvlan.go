@@ -307,7 +307,8 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 	return nil
 }
 
-func (ipvlan *IPvlanDriver) Teardown(cfg *TeardownCfg, netNS ns.NetNS) error {
+// Teardown 删除路由和eth0网卡
+func (ipvlan *IPvlanDriver) Teardown(cfg *types.TeardownCfg, netNS ns.NetNS) error {
 	err := netNS.Do(func(netNS ns.NetNS) error {
 		link, err := netlink.LinkByName(cfg.ContainerIfName)
 		if err != nil {

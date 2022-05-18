@@ -1,6 +1,9 @@
 package driver
 
-import "github.com/containernetworking/plugins/pkg/ns"
+import (
+	"github.com/containernetworking/plugins/pkg/ns"
+	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/types"
+)
 
 // RawNicDriver put nic in net ns
 type RawNicDriver struct {
@@ -17,11 +20,11 @@ func NewRawNICDriver(ipv4, ipv6 bool) *RawNicDriver {
 	}
 }
 
-func (driver *RawNicDriver) Setup(cfg *SetupConfig, netNS ns.NetNS) error {
+func (driver *RawNicDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error {
 	panic("implement me")
 }
 
-func (driver *RawNicDriver) Teardown(cfg *TeardownCfg, netNS ns.NetNS) error {
+func (driver *RawNicDriver) Teardown(cfg *types.TeardownCfg, netNS ns.NetNS) error {
 	panic("implement me")
 }
 
