@@ -3,16 +3,20 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/alexflint/go-filemutex"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog/v2"
+	"path/filepath"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/version"
 	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"net"
 	"runtime"
 )
@@ -24,6 +28,8 @@ import (
 
 const (
 	firstTableID = 100
+
+	defaultCNILock = "/var/run/cni/sbr.lock"
 )
 
 func init() {
@@ -195,6 +201,13 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 	defer netNS.Close()
 
+	// 文件锁
+	lock, err := GetFileLock(defaultCNILock)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+
 	// delete ip rules for the deleted interface
 	return netNS.Do(func(_ ns.NetNS) error {
 		rules, err := netlink.RuleList(netlink.FAMILY_ALL)
@@ -270,4 +283,24 @@ func getNextTableID(rules []netlink.Rule, routes []netlink.Route, candidateID in
 	}
 
 	return table
+}
+
+func GetFileLock(path string) (*filemutex.FileMutex, error) {
+	path, _ = filepath.Abs(path)
+	lock, err := filemutex.New(path)
+	if err != nil {
+		return nil, fmt.Errorf(fmt.Sprintf("failed to open lock %s: %v", path, err))
+	}
+
+	err = wait.PollImmediate(200*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		if err := lock.Lock(); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock: %v", err)
+	}
+
+	return lock, nil
 }
