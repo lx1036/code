@@ -100,7 +100,7 @@ func (server *EniBackendServer) AllocateIP(ctx context.Context, request *rpc.All
 	defer server.RUnlock()
 
 	// 0. Get pod Info
-	podInfo, err := server.k8s.GetPod(r.K8SPodNamespace, r.K8SPodName)
+	podInfo, err := server.k8sService.GetPod(request.K8SPodNamespace, request.K8SPodName)
 
 	// 1. Init Context
 	allocIPReply := &rpc.AllocateIPReply{
@@ -171,7 +171,7 @@ func (server *EniBackendServer) ReleaseIP(ctx context.Context, request *rpc.Rele
 	defer server.RUnlock()
 
 	// 0. Get pod Info
-	podInfo, err := server.k8s.GetPod(r.K8SPodNamespace, r.K8SPodName)
+	podInfo, err := server.k8sService.GetPod(request.K8SPodNamespace, request.K8SPodName)
 
 	releaseReply := &rpc.ReleaseIPReply{
 		Success: true,
@@ -181,7 +181,22 @@ func (server *EniBackendServer) ReleaseIP(ctx context.Context, request *rpc.Rele
 }
 
 func (server *EniBackendServer) GetIPInfo(ctx context.Context, request *rpc.GetInfoRequest) (*rpc.GetInfoReply, error) {
-	panic("implement me")
+
+	// 0. Get pod Info
+	podinfo, err := server.k8sService.GetPod(request.K8SPodNamespace, request.K8SPodName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error get pod info for: %+v", r)
+	}
+
+	getIPInfoResult := &rpc.GetInfoReply{IPv4: server.ipFamily.IPv4, IPv6: server.ipFamily.IPv6}
+
+	var netConf []*rpc.NetConf
+	// 2. return network info for pod
+	switch podinfo.PodNetworkType {
+	case podNetworkTypeENIMultiIP:
+
+	}
+
 }
 
 func (server *EniBackendServer) RecordEvent(ctx context.Context, request *rpc.EventRequest) (*rpc.EventReply, error) {

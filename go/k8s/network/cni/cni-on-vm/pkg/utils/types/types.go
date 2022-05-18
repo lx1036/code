@@ -293,3 +293,8 @@ const (
 	VlanStripTypeFilter = "filter"
 	VlanStripTypeVlan   = "vlan"
 )
+
+type IPFamily struct {
+	IPv4 bool
+	IPv6 bool
+}
