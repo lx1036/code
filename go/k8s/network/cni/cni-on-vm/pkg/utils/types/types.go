@@ -74,6 +74,16 @@ type IPSet struct {
 	IPv6 net.IP
 }
 
+func (i *IPSet) SetIP(str string) *IPSet {
+	ip := net.ParseIP(str)
+	if ip == nil {
+		return i
+	}
+
+	i.IPv4 = ip
+	return i
+}
+
 type ENI struct {
 	ID               string
 	MAC              string
@@ -192,6 +202,16 @@ type ResourceItem struct {
 	ENIMAC string `json:"eni_mac"`
 	IPv4   string `json:"ipv4"`
 	IPv6   string `json:"ipv6"`
+}
+
+// PodEipInfo store pod eip info
+// NOTE: this is the type store in db
+type PodEipInfo struct {
+	PodEip          bool
+	PodEipID        string
+	PodEipIP        string
+	PodEipBandWidth int
+	//PodEipChargeType InternetChargeType
 }
 
 type PodInfo struct {

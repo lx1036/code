@@ -181,22 +181,69 @@ func (server *EniBackendServer) ReleaseIP(ctx context.Context, request *rpc.Rele
 }
 
 func (server *EniBackendServer) GetIPInfo(ctx context.Context, request *rpc.GetInfoRequest) (*rpc.GetInfoReply, error) {
-
-	// 0. Get pod Info
+	// 1. Get pod Info
 	podinfo, err := server.k8sService.GetPod(request.K8SPodNamespace, request.K8SPodName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error get pod info for: %+v", r)
+		return nil, fmt.Errorf(fmt.Sprintf("get pod info request %+v, err:%v", request.String(), err))
 	}
 
+	// 1. Init Context
+	networkContext := &networkContext{
+		Context:    ctx,
+		resources:  []types.ResourceItem{},
+		pod:        podinfo,
+		k8sService: server.k8sService,
+	}
 	getIPInfoResult := &rpc.GetInfoReply{IPv4: server.ipFamily.IPv4, IPv6: server.ipFamily.IPv6}
+
+	server.RLock()
+	podRes, err := server.getPodResource(podinfo)
+	server.RUnlock()
+	if err != nil {
+		return getIPInfoResult, err
+	}
 
 	var netConf []*rpc.NetConf
 	// 2. return network info for pod
 	switch podinfo.PodNetworkType {
 	case podNetworkTypeENIMultiIP:
+		getIPInfoResult.IPType = rpc.IPType_TypeENIMultiIP
+		resItems := podRes.GetResourceItemByType(types.ResourceTypeENIIP)
+		if len(resItems) > 0 {
+			// only have one
+			res, err := server.eniIPResMgr.Stat(networkContext, resItems[0].ID)
+			if err == nil {
+				eniIP := res.(*types.ENIIP)
+				netConf = append(netConf, &rpc.NetConf{
+					BasicInfo: &rpc.BasicInfo{
+						PodIP:       eniIP.IPSet.ToRPC(),
+						PodCIDR:     eniIP.ENI.VSwitchCIDR.ToRPC(),
+						GatewayIP:   eniIP.ENI.GatewayIP.ToRPC(),
+						ServiceCIDR: server.k8sService.GetServiceCIDR().ToRPC(),
+					},
+					ENIInfo: &rpc.ENIInfo{
+						MAC:   eniIP.ENI.MAC,
+						Trunk: false,
+					},
+					Pod: &rpc.Pod{
+						Ingress: podinfo.TcIngress,
+						Egress:  podinfo.TcEgress,
+					},
+					IfName:      "",
+					ExtraRoutes: nil,
+				})
+			}
+		}
+		if err = defaultForNetConf(netConfs); err != nil {
+			return getIPInfoResult, err
+		}
 
 	}
 
+	getIPInfoResult.NetConfs = netConf
+	getIPInfoResult.EnableTrunking = server.enableTrunk
+
+	return getIPInfoResult, nil
 }
 
 func (server *EniBackendServer) RecordEvent(ctx context.Context, request *rpc.EventRequest) (*rpc.EventReply, error) {
