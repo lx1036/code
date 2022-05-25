@@ -1,7 +1,7 @@
 package main
 
 import (
-	"k8s-lx1036/k8s/network/iptables/iptables"
+	"k8s-lx1036/k8s/network/network-policy/iptables/iptables"
 )
 
 func main() {

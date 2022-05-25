@@ -14,7 +14,7 @@
 
 # iptables 三篇精选文章
 **[(1)iptables防火墙-四表/五链、数据包匹配流程、编写iptables规则](https://zhuanlan.zhihu.com/p/84432006)**
-**[(2)iptables防火墙-SNAT/DNAT策略及应用](https://zhuanlan.zhihu.com/p/87468533)**
+**[(2)iptables防火墙-SNAT/DNAT策略及应用](https://blog.51cto.com/u_13959738/2986309)**
 **[(3)iptables防火墙-规则的导出/导入、使用防火墙脚本程序](https://zhuanlan.zhihu.com/p/87483037)**
 
 
@@ -134,19 +134,5 @@ brctl show
 # **[iptables 详解系列](http://www.zsythink.net/archives/tag/iptables/)**
 
 
-# iptables IP 地址伪装
-MASQUERADE，地址伪装，算是snat中的一种特例，可以实现自动化的snat。
-SNAT 使用：
-```shell
-# SNAT 可以一个或几个 IP
-iptables -t nat -A POSTROUTING -s 10.8.0.0/255.255.255.0 -o eth0 -j SNAT --to-source 192.168.5.3
-iptables -t nat -A POSTROUTING -s 10.8.0.0/255.255.255.0 -o eth0 -j SNAT --to-source 192.168.5.3-192.168.5.5
-
-# 但是有个缺点，--to-source 如果出口的 IP 地址是变动的，就不好用了
-# MASQUERADE就是针对这种场景而设计的，他的作用是，从服务器的网卡上，自动获取当前ip地址来做NAT
-# 如此配置的话，不用指定SNAT的目标ip了，不管现在eth0的出口获得了怎样的动态ip，MASQUERADE会自动读取eth0现在的ip地址然后做SNAT出去，这样就实现了很好的动态SNAT地址转换
-iptables -t nat -A POSTROUTING -s 10.8.0.0/255.255.255.0 -o eth0 -j MASQUERADE
-
-```
 
 
