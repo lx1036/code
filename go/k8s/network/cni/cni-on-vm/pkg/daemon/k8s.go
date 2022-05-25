@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	"strconv"
 	"time"
@@ -19,11 +20,17 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// TODO: K8sService 里无需 db 保存 PodInfo
+
+// INFO: 这里把 Pod -> convertPod() -> PodInfo 然后存入 pods boltdb 中，这样在处理 delete pod 时(无法通过k8sClient获取Pod)可以获取到 PodInfo,
+//  为此，还需要异步清理 pods boltdb.
+//  处理 delete pod 时从db中获取到 PodInfo,
+
 const (
 	podNetworkTypeENIMultiIP = "ENIMultiIP"
 
-	dbPath = "/var/lib/cni/pod.db"
-	dbName = "pods"
+	//dbPath = "/var/lib/cni/pod.db"
+	//dbName = "pods"
 
 	defaultStickTimeForSts = 5 * time.Minute
 
@@ -43,7 +50,8 @@ func podInfoKey(namespace, name string) string {
 }
 
 type K8sService struct {
-	client kubernetes.Interface
+	nodeName string
+	client   kubernetes.Interface
 
 	storage storage.DiskStorage
 
@@ -98,6 +106,18 @@ func (k8sService *K8sService) GetPod(namespace, name string) (*types.PodInfo, er
 	}
 
 	return podInfo, nil
+}
+
+func (k8sService *K8sService) GetLocalPods() ([]*types.PodInfo, error) {
+	podList, err := k8sService.client.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector("spec.nodeName", k8sService.nodeName).String(),
+	})
+	if err != nil {
+
+	}
+	for _, item := range podList.Items {
+		convertPod()
+	}
 }
 
 func convertPod(daemonMode string, pod *corev1.Pod) *types.PodInfo {
