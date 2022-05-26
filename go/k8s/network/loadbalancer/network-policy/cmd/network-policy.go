@@ -5,7 +5,7 @@ import (
 	"os"
 	"runtime"
 
-	"k8s-lx1036/k8s/network/network-policy/cmd/app"
+	"k8s-lx1036/k8s/network/loadbalancer/network-policy/cmd/app"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/logs"

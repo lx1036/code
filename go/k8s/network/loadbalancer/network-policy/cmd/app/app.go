@@ -2,8 +2,8 @@ package app
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/network/network-policy/cmd/app/options"
-	"k8s-lx1036/k8s/network/network-policy/pkg/controller"
+	"k8s-lx1036/k8s/network/loadbalancer/network-policy/cmd/app/options"
+	"k8s-lx1036/k8s/network/loadbalancer/network-policy/pkg/controller"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"

@@ -248,7 +248,6 @@ func (runner *Runner) UpdateRealServer(vs *VirtualServer, rs *RealServer) error 
 	return nil
 }
 
-// 构建 runner 对象来 crud runner
 func New() (Interface, error) {
 	handle, err := ipvs.New("")
 	if err != nil {

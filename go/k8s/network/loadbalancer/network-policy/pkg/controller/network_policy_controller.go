@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s-lx1036/k8s/network/network-policy/pkg/ipset"
+	"k8s-lx1036/k8s/network/loadbalancer/network-policy/pkg/ipset"
 
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/util/iptables"
@@ -45,6 +45,7 @@ var (
 // iptables -t filter --list-rules
 
 type NetworkPolicyController struct {
+	sync.Mutex
 	ipsetMutex *sync.Mutex
 
 	networkPolicyLister cache.Indexer
@@ -63,7 +64,8 @@ type NetworkPolicyController struct {
 	syncPeriod       time.Duration
 	nodeIP           net.IP
 
-	stopCh chan struct{}
+	syncChan chan struct{}
+	stopCh   chan struct{}
 }
 
 func NewNetworkPolicyController(
@@ -86,6 +88,8 @@ func NewNetworkPolicyController(
 		networkPolicyLister: networkPolicyInformer.GetIndexer(),
 		podLister:           podInformer.GetIndexer(),
 		namespaceLister:     namespaceInformer.GetIndexer(),
+
+		syncChan: make(chan struct{}, 1), // network policy 同时只能处理一个，因为前一个会影响后面的. 通过 channel 可以精细化控制 sync 速度, @see sync()
 	}
 
 	nodeName := os.Getenv("NODE_NAME")
@@ -105,26 +109,34 @@ func NewNetworkPolicyController(
 
 	networkPolicyInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			controller.syncPolicy()
+			policy, ok := obj.(*networking.NetworkPolicy)
+			if !ok {
+				return
+			}
+			controller.onNetworkPolicyUpdate(policy)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			controller.syncPolicy()
+			policy, ok := newObj.(*networking.NetworkPolicy)
+			if !ok {
+				return
+			}
+			controller.onNetworkPolicyUpdate(policy)
 		},
 		DeleteFunc: func(obj interface{}) {
-			netpol, ok := obj.(*networking.NetworkPolicy)
+			policy, ok := obj.(*networking.NetworkPolicy)
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
 					klog.Errorf("unexpected object type: %v", obj)
 					return
 				}
-				if netpol, ok = tombstone.Obj.(*networking.NetworkPolicy); !ok {
+				if policy, ok = tombstone.Obj.(*networking.NetworkPolicy); !ok {
 					klog.Errorf("unexpected object type: %v", obj)
 					return
 				}
 			}
-			klog.V(2).Infof("Received network policy: %s/%s delete event", netpol.Namespace, netpol.Name)
-			controller.syncPolicy()
+
+			controller.onNetworkPolicyUpdate(policy)
 		},
 	})
 
@@ -342,11 +354,24 @@ func (controller *NetworkPolicyController) Run() {
 		select {
 		case <-controller.stopCh:
 			return
+
+		case <-controller.syncChan:
+			controller.ipsetMutex.Lock()
+			controller.syncPolicy()
+			controller.ipsetMutex.Unlock()
+
 		case <-t.C:
 			controller.syncPolicy()
 		}
 	}
+}
 
+func (controller *NetworkPolicyController) sync() {
+	select {
+	case controller.syncChan <- struct{}{}:
+	default:
+		klog.Infof("Already pending sync, dropping request")
+	}
 }
 
 // Sync synchronizes iptables to desired state of network policies

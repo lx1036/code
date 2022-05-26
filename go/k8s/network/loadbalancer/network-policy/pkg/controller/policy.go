@@ -2,7 +2,7 @@ package controller
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/network/network-policy/pkg/ipset"
+	"k8s-lx1036/k8s/network/loadbalancer/network-policy/pkg/ipset"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -557,6 +557,14 @@ func (controller *NetworkPolicyController) appendIPTableRules(policyChainName, c
 	controller.filterTableRules.WriteString(strings.Join(markArgs, " "))
 	args = append(args, "-m", "mark", "--mark", ConntrackMark, "-j", "RETURN", "\n")
 	controller.filterTableRules.WriteString(strings.Join(args, " "))
+}
+
+func (controller *NetworkPolicyController) onNetworkPolicyUpdate(policy *networking.NetworkPolicy) {
+	controller.Lock()
+	defer controller.Unlock()
+
+	klog.Infof("Received update for network policy: %s/%s", policy.Namespace, policy.Name)
+	controller.sync()
 }
 
 func policyRulePortsHasNamedPort(npPorts []networking.NetworkPolicyPort) bool {

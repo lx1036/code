@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-demo
+spec:
+  selector:
+    app: nginx-demo
+  ports: # 多个 port 时需要有 name，且 name 不可以重复
+    - port: 8088
+      targetPort: 80
+      protocol: TCP
+      name: "name-8088"
+    - port: 8089
+      targetPort: 80
+      protocol: TCP
+      name: "name-8089"
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: "name-80"

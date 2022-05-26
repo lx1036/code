@@ -2,18 +2,20 @@ package main
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/moby/ipvs"
-	"log"
+	"k8s.io/klog/v2"
 )
 
-func main() {
+func TestIPVS(test *testing.T) {
 	handle, err := ipvs.New("")
 	if err != nil {
-		log.Fatalf("ipvs.New: %s", err)
+		klog.Fatalf("ipvs.New: %s", err)
 	}
 	svcs, err := handle.GetServices()
 	if err != nil {
-		log.Fatalf("handle.GetServices: %s", err)
+		klog.Fatalf("handle.GetServices: %s", err)
 	}
 
 	for _, svc := range svcs {
