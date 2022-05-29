@@ -23,16 +23,15 @@ func (controller *NetworkServiceController) onEndpointUpdate(endpoint *corev1.En
 	if err != nil {
 		return
 	}
-
 	svc, exist, err := controller.svcLister.GetByKey(key)
 	if err != nil {
 		klog.Errorf(fmt.Sprintf("failed to get svc %s err: %v", key, err))
 		return
 	}
-	if !exist { // ignore endpoint has no service
+	if !exist { // ignore endpoint has no service, if service is deleted, syncService handle it.
 		return
 	}
-	if IsHeadlessService(svc.(*corev1.Service)) {
+	if IsHeadlessService(svc.(*corev1.Service)) || IsExternalNameService(svc.(*corev1.Service)) {
 		return
 	}
 
@@ -101,6 +100,16 @@ func (controller *NetworkServiceController) buildEndpointInfo() endpointInfoMap 
 	}
 
 	return endpointsMap
+}
+
+func hasLocalEndpoint(endpoints []endpointInfo) bool {
+	for _, endpoint := range endpoints {
+		if endpoint.isLocal {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isEndpointsForLeaderElection(ep *corev1.Endpoints) bool {

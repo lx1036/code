@@ -13,6 +13,9 @@ import (
 	"sync"
 )
 
+// INFO: @see https://github.com/kubernetes/kubernetes/blob/master/pkg/util/ipvs/ipvs_linux.go
+//  https://github.com/cloudnativelabs/kube-router/blob/master/pkg/controllers/proxy/network_services_controller.go#L131-L140
+
 const (
 	KubeDummyIf = "kube-dummy-if"
 )
@@ -92,22 +95,20 @@ func (ln *linuxNetworking) EnsureAddressBind(link netlink.Link, ip string, addRo
 	return nil
 }
 
-func (ln *linuxNetworking) AddOrUpdateVirtualServer(svcInfo serviceInfo) error {
+func (ln *linuxNetworking) AddOrUpdateVirtualServer(ipvsSvc *ipvs.Service) error {
 	ln.Lock()
 	defer ln.Unlock()
 
-	ipvsSvc := toIPVSService(svcInfo)
 	oldIpvsSvc, _ := ln.ipvsHandle.GetService(ipvsSvc)
-
 	if oldIpvsSvc == nil || !equalIPVSService(oldIpvsSvc, ipvsSvc) {
 		if oldIpvsSvc == nil {
-			if err := ln.AddVirtualServer(svcInfo); err != nil {
-				klog.Errorf(fmt.Sprintf("Add new ipvs service %s/%s for virtual server err: %v", svcInfo.namespace, svcInfo.name, err))
+			if err := ln.AddVirtualServer(ipvsSvc); err != nil {
+				klog.Errorf(fmt.Sprintf("Add new ipvs service for virtual server err: %v", err))
 				return err
 			}
 		} else {
-			if err := ln.UpdateVirtualServer(svcInfo); err != nil {
-				klog.Errorf(fmt.Sprintf("Edit existed ipvs service %s/%s for virtual server err: %v", svcInfo.namespace, svcInfo.name, err))
+			if err := ln.UpdateVirtualServer(ipvsSvc); err != nil {
+				klog.Errorf(fmt.Sprintf("Edit existed ipvs service for virtual server err: %v", err))
 				return err
 			}
 		}
@@ -116,11 +117,10 @@ func (ln *linuxNetworking) AddOrUpdateVirtualServer(svcInfo serviceInfo) error {
 	return nil
 }
 
-func (ln *linuxNetworking) GetVirtualServer(svcInfo serviceInfo) (*ipvs.Service, error) {
+func (ln *linuxNetworking) GetVirtualServer(ipvsSvc *ipvs.Service) (*ipvs.Service, error) {
 	ln.Lock()
 	defer ln.Unlock()
 
-	ipvsSvc := toIPVSService(svcInfo)
 	oldIpvsSvc, err := ln.ipvsHandle.GetService(ipvsSvc)
 	if err != nil {
 		return nil, err
@@ -129,20 +129,18 @@ func (ln *linuxNetworking) GetVirtualServer(svcInfo serviceInfo) (*ipvs.Service,
 }
 
 // AddVirtualServer `ipvsadm --add-service xxx`
-func (ln *linuxNetworking) AddVirtualServer(svcInfo serviceInfo) error {
+func (ln *linuxNetworking) AddVirtualServer(ipvsSvc *ipvs.Service) error {
 	ln.Lock()
 	defer ln.Unlock()
 
-	ipvsSvc := toIPVSService(svcInfo)
 	return ln.ipvsHandle.NewService(ipvsSvc)
 }
 
 // UpdateVirtualServer `ipvsadm --edit-service xxx`
-func (ln *linuxNetworking) UpdateVirtualServer(svcInfo serviceInfo) error {
+func (ln *linuxNetworking) UpdateVirtualServer(ipvsSvc *ipvs.Service) error {
 	ln.Lock()
 	defer ln.Unlock()
 
-	ipvsSvc := toIPVSService(svcInfo)
 	return ln.ipvsHandle.UpdateService(ipvsSvc)
 }
 
@@ -167,11 +165,32 @@ func (ln *linuxNetworking) DelRealServer(ipvsSvc *ipvs.Service, dst *ipvs.Destin
 	return ln.ipvsHandle.DelDestination(ipvsSvc, dst)
 }
 
-func toIPVSService(svcInfo serviceInfo) *ipvs.Service {
+func clusterIPToIPVSService(svcInfo serviceInfo) *ipvs.Service {
 	ipvsSvc := &ipvs.Service{
-		Address:   svcInfo.address,
+		Address:   svcInfo.address, // clusterIP
 		Protocol:  stringToProtocol(svcInfo.protocol),
-		Port:      uint16(svcInfo.port),
+		Port:      uint16(svcInfo.port), // clusterIP
+		SchedName: svcInfo.scheduler,
+		Flags:     svcInfo.flags,
+		Timeout:   svcInfo.sessionAffinityTimeoutSeconds,
+	}
+
+	if ip4 := svcInfo.address.To4(); ip4 != nil {
+		ipvsSvc.AddressFamily = unix.AF_INET
+		ipvsSvc.Netmask = 0xffffffff
+	} else {
+		ipvsSvc.AddressFamily = unix.AF_INET6
+		ipvsSvc.Netmask = 128
+	}
+
+	return ipvsSvc
+}
+
+func nodePortToIPVSService(svcInfo serviceInfo) *ipvs.Service {
+	ipvsSvc := &ipvs.Service{
+		Address:   NodeIP, // nodePort
+		Protocol:  stringToProtocol(svcInfo.protocol),
+		Port:      uint16(svcInfo.nodePort), // nodePort
 		SchedName: svcInfo.scheduler,
 		Flags:     svcInfo.flags,
 		Timeout:   svcInfo.sessionAffinityTimeoutSeconds,

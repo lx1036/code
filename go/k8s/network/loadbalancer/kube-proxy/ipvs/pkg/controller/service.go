@@ -51,6 +51,7 @@ type serviceInfo struct {
 	name      string
 	namespace string
 
+	// ClusterIP/NodePort
 	address    net.IP
 	port       int
 	targetPort string
@@ -60,6 +61,7 @@ type serviceInfo struct {
 	flags                         uint32
 	sessionAffinity               bool
 	sessionAffinityTimeoutSeconds uint32
+	isLocal                       bool
 
 	directServerReturn       bool
 	directServerReturnMethod string
@@ -71,7 +73,6 @@ type serviceInfo struct {
 	skipLbIps          bool
 	externalIPs        []string
 	loadBalancerIPs    []string
-	isLocal            bool
 }
 
 type serviceInfoMap map[string]*serviceInfo
@@ -108,6 +109,9 @@ func (controller *NetworkServiceController) buildSvcInfo() serviceInfoMap {
 				// https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/core/v1/defaults.go#L106
 				svcInfo.sessionAffinityTimeoutSeconds = uint32(*svc.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 				svcInfo.flags |= ipvsPersistentFlagHex
+			} else {
+				svcInfo.sessionAffinityTimeoutSeconds = 0
+				svcInfo.flags &^= ipvsPersistentFlagHex
 			}
 			for _, lbIngress := range svc.Status.LoadBalancer.Ingress {
 				if len(lbIngress.IP) > 0 {

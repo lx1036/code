@@ -1,20 +1,61 @@
+
+# ClusterIP/NodePort service
 apiVersion: v1
 kind: Service
 metadata:
   name: nginx-demo
 spec:
+  type: ClusterIP # ClusterIP or NodePort
+#  clusterIP: 200.168.113.202 # ClusterIP and NodePort 都会有
+  externalTrafficPolicy: Cluster # Cluster or Local
+  sessionAffinity: ClientIP # session affinity 的 service
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
   selector:
     app: nginx-demo
   ports: # 多个 port 时需要有 name，且 name 不可以重复
     - port: 8088
+      #nodePort: 32416 # NodePort 会多个 nodePort
       targetPort: 80
       protocol: TCP
       name: "name-8088"
     - port: 8089
+      #nodePort: 32417 # NodePort 会多个 nodePort
       targetPort: 80
       protocol: TCP
       name: "name-8089"
     - port: 80
+      #nodePort: 32419 # NodePort 会多个 nodePort
       targetPort: 80
       protocol: TCP
       name: "name-80"
+
+---
+
+# LoadBalancer service
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-demo-lb
+spec:
+  type: LoadBalancer
+  # clusterIP: 200.168.113.202 # ClusterIP and NodePort and LoadBalancer 都会有
+  externalTrafficPolicy: Cluster # Cluster or Local
+  sessionAffinity: ClientIP # session affinity 的 service
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  selector:
+    app: nginx-demo-lb
+  ports:
+    - port: 80
+      #nodePort: 32419 # NodePort 会多个 nodePort
+      targetPort: 80
+      protocol: TCP
+      name: "name-80"
+status: # 只有 LoadBalancer 会有 ingress IP，这个一般是 loadbalancer operator 来分配
+  loadBalancer:
+    ingress:
+      - ip: 100.20.30.110  

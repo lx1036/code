@@ -29,8 +29,10 @@ type NetworkServiceController struct {
 
 	ln *linuxNetworking
 
-	nodeIP   net.IP
-	nodeName string
+	nodeIP          net.IP
+	nodeName        string
+	readyForUpdates bool
+	syncPeriod      time.Duration // The delay between ipvs config synchronizations (e.g. '5s', '1m', '2h22m')
 
 	svcLister   cache.Indexer
 	epLister    cache.Indexer
@@ -38,7 +40,6 @@ type NetworkServiceController struct {
 	endpointMap endpointInfoMap
 
 	syncChan chan struct{}
-	stopCh   chan struct{}
 }
 
 func NewNetworkPolicyController(
@@ -52,7 +53,8 @@ func NewNetworkPolicyController(
 	}
 
 	c := &NetworkServiceController{
-		ln: ln,
+		ln:         ln,
+		syncPeriod: time.Minute,
 
 		svcLister: svcInformer.GetIndexer(),
 		epLister:  epInformer.GetIndexer(),
@@ -171,13 +173,26 @@ func NewNetworkPolicyController(
 	return c, nil
 }
 
-func (controller *NetworkServiceController) Run() {
+func (controller *NetworkServiceController) Run(stopCh <-chan struct{}) {
 	t := time.NewTicker(controller.syncPeriod)
 	defer t.Stop()
 
+	select {
+	case <-stopCh:
+		klog.Info("Shutting down network services controller")
+		return
+	default:
+		err := controller.doSync()
+		if err != nil {
+			klog.Fatalf(fmt.Sprintf("Failed to perform initial full sync %v", err))
+		}
+		controller.readyForUpdates = true
+	}
+
 	for {
 		select {
-		case <-controller.stopCh:
+		case <-stopCh:
+			controller.readyForUpdates = false
 			return
 
 		case <-controller.syncChan:
@@ -191,7 +206,7 @@ func (controller *NetworkServiceController) Run() {
 			controller.Unlock()
 
 		case <-t.C:
-			controller.syncAll()
+			controller.doSync()
 		}
 	}
 }
@@ -207,9 +222,13 @@ func (controller *NetworkServiceController) sync() {
 // INFO: 因为 delete 事件也是 onServiceUpdate() 使用的 svcLister.List()，没有考虑 delete 事件，所以需要整体全部捞一遍来 cleanup
 func (controller *NetworkServiceController) syncService(serviceMap serviceInfoMap, endpointMap endpointInfoMap) {
 	err := controller.syncClusterIPService(serviceMap, endpointMap)
-	controller.syncNodePortService(serviceMap, endpointMap)
-
-	//controller.cleanup
+	if err != nil {
+		return
+	}
+	err = controller.syncNodePortService(serviceMap, endpointMap)
+	if err != nil {
+		return
+	}
 
 }
 
@@ -225,13 +244,17 @@ func (controller *NetworkServiceController) syncClusterIPService(serviceMap serv
 
 	for svcID, svcInfo := range serviceMap {
 		endpoints := endpointMap[svcID]
+		if svcInfo.isLocal && !hasLocalEndpoint(endpoints) { // ClusterIP service has no local eps, skip create ipvs vs/rs at current node
+			continue
+		}
 
 		// (1)add ipvs service virtual server
-		if err := controller.ln.AddOrUpdateVirtualServer(*svcInfo); err != nil {
+		ipvsSvc := clusterIPToIPVSService(*svcInfo)
+		if err := controller.ln.AddOrUpdateVirtualServer(ipvsSvc); err != nil {
 			klog.Errorf(fmt.Sprintf("[syncClusterIPService]AddOrUpdateVirtualServer for %s/%s err:%v", svcInfo.namespace, svcInfo.name, err))
 			continue
 		}
-		ipvsSvc, err := controller.ln.GetVirtualServer(*svcInfo)
+		ipvsSvc, err = controller.ln.GetVirtualServer(ipvsSvc)
 		if err != nil {
 			klog.Errorf(fmt.Sprintf("failed to get ipvs service %s/%s err: %v", svcInfo.namespace, svcInfo.name, err))
 			continue
@@ -243,51 +266,97 @@ func (controller *NetworkServiceController) syncClusterIPService(serviceMap serv
 			continue
 		}
 
-		// (3) add/delete ipvs real server
-		destinations, err := controller.ln.ListRealServer(ipvsSvc)
+		controller.syncEndpoints(svcInfo, ipvsSvc, endpoints)
+	}
+
+	return nil
+}
+
+func (controller *NetworkServiceController) syncNodePortService(serviceMap serviceInfoMap, endpointMap endpointInfoMap) error {
+	dummyVipInterface, err := controller.ln.EnsureDummyDevice()
+	if err != nil {
+		return errors.New("Failed creating dummy interface: " + err.Error())
+	}
+
+	for svcID, svcInfo := range serviceMap {
+		endpoints := endpointMap[svcID]
+		if svcInfo.nodePort == 0 { // service is not NodePort
+			continue
+		}
+
+		if svcInfo.isLocal && !hasLocalEndpoint(endpoints) { // NodePort service has no local eps, skip create ipvs vs/rs at current node
+			continue
+		}
+
+		// (1)add ipvs service virtual server
+		ipvsSvc := nodePortToIPVSService(*svcInfo)
+		if err := controller.ln.AddOrUpdateVirtualServer(ipvsSvc); err != nil {
+			klog.Errorf(fmt.Sprintf("[syncClusterIPService]AddOrUpdateVirtualServer for %s/%s err:%v", svcInfo.namespace, svcInfo.name, err))
+			continue
+		}
+		ipvsSvc, err = controller.ln.GetVirtualServer(ipvsSvc)
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("failed to get ipvs service %s/%s err: %v", svcInfo.namespace, svcInfo.name, err))
+			continue
+		}
+
+		// (2) assign clusterIP to dummy interface, add route in local table
+		err = controller.ln.EnsureAddressBind(dummyVipInterface, svcInfo.address.String(), true)
 		if err != nil {
 			continue
 		}
-		oldDst := make(map[string]*ipvs.Destination)
-		for _, destination := range destinations {
-			key := fmt.Sprintf("%s:%d", destination.Address.String(), destination.Port)
-			oldDst[key] = destination
+
+		controller.syncEndpoints(svcInfo, ipvsSvc, endpoints)
+	}
+
+	return nil
+}
+
+func (controller *NetworkServiceController) syncEndpoints(svcInfo *serviceInfo, ipvsSvc *ipvs.Service, endpoints []endpointInfo) {
+	// (3) add/delete ipvs real server
+	destinations, err := controller.ln.ListRealServer(ipvsSvc)
+	if err != nil {
+		klog.Errorf(fmt.Sprintf("failed to list real server for svc %s/%s err: %v", svcInfo.namespace, svcInfo.name, err))
+		return
+	}
+	oldDst := make(map[string]*ipvs.Destination)
+	for _, destination := range destinations {
+		key := fmt.Sprintf("%s:%d", destination.Address.String(), destination.Port)
+		oldDst[key] = destination
+	}
+	newDst := make(map[string]endpointInfo)
+	for _, endpoint := range endpoints {
+		if svcInfo.isLocal && !endpoint.isLocal { // skip if endpoint is not externalTrafficPolicyLocal
+			continue
 		}
-		newDst := make(map[string]endpointInfo)
-		for _, endpoint := range endpoints {
-			if svcInfo.isLocal && !endpoint.isLocal {
+		key := fmt.Sprintf("%s:%d", endpoint.address.String(), endpoint.port)
+		newDst[key] = endpoint
+	}
+	for key, info := range newDst { // add new ipvs real server
+		_, ok := oldDst[key]
+		if !ok {
+			dst := ipvs.Destination{
+				Address:       info.address,
+				AddressFamily: syscall.AF_INET,
+				Port:          uint16(info.port),
+				Weight:        1,
+			}
+			if err = controller.ln.AddRealServer(ipvsSvc, &dst); err != nil {
+				klog.Errorf(fmt.Sprintf("failed to add new ipvs real server err: %v", err))
 				continue
 			}
-			key := fmt.Sprintf("%s:%d", endpoint.address.String(), endpoint.port)
-			newDst[key] = endpoint
 		}
-		for key, info := range newDst { // add new ipvs real server
-			_, ok := oldDst[key]
-			if !ok {
-				dst := ipvs.Destination{
-					Address:       info.address,
-					AddressFamily: syscall.AF_INET,
-					Port:          uint16(info.port),
-					Weight:        1,
-				}
-				if err = controller.ln.AddRealServer(ipvsSvc, &dst); err != nil {
-					klog.Errorf(fmt.Sprintf("failed to add new ipvs real server err: %v", err))
-					continue
-				}
-			}
-		}
-		for key, destination := range oldDst { // delete old ipvs real server
-			_, ok := newDst[key]
-			if !ok {
-				if err = controller.ln.DelRealServer(ipvsSvc, destination); err != nil {
-					klog.Errorf(fmt.Sprintf("failed to add new ipvs real server err: %v", err))
-					continue
-				}
+	}
+	for key, destination := range oldDst { // delete old ipvs real server
+		_, ok := newDst[key]
+		if !ok {
+			if err = controller.ln.DelRealServer(ipvsSvc, destination); err != nil {
+				klog.Errorf(fmt.Sprintf("failed to add new ipvs real server err: %v", err))
+				continue
 			}
 		}
 	}
 
-	return nil
 }
 
 // GetNodeIP returns the most valid external facing IP address for a node.
