@@ -6,11 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/apis/networking"
 	"net"
 	"os"
 	"reflect"
@@ -20,10 +15,17 @@ import (
 
 	"k8s-lx1036/k8s/network/loadbalancer/network-policy/pkg/ipset"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/utils/exec"
 )
+
+// INFO: @see https://github.com/kubernetes/kubernetes/blob/master/pkg/proxy/iptables/proxier.go
 
 const (
 	kubeInputChainName     = "KUBE-ROUTER-INPUT"
@@ -34,8 +36,9 @@ const (
 	ConntrackMark = "0x10000/0x10000"
 )
 
+// INFO: 为何是 INPUT/OUTPUT/FORWARD 这三个 chain？因为 filter table 包含这三个 table，针对每一个内置的 chain 则 -j 自定义的 chain
 var (
-	defaultChains = map[iptables.Chain]iptables.Chain{
+	iptablesJumpChains = map[iptables.Chain]iptables.Chain{
 		iptables.ChainInput:   kubeInputChainName,
 		iptables.ChainForward: kubeForwardChainName,
 		iptables.ChainOutput:  kubeOutputChainName,
@@ -60,7 +63,7 @@ type NetworkPolicyController struct {
 	serviceExternalIPRanges []net.IPNet
 	serviceNodePortRange    string
 
-	filterTableRules bytes.Buffer // 不需要实例化
+	filterTableRules *bytes.Buffer
 	syncPeriod       time.Duration
 	nodeIP           net.IP
 
@@ -84,6 +87,8 @@ func NewNetworkPolicyController(
 
 		iptablesCmdHandler: iptables.New(exec.New(), iptables.ProtocolIPv4),
 		ipsetCmdHandler:    ipsetCmdHandler,
+
+		filterTableRules: bytes.NewBuffer(nil),
 
 		networkPolicyLister: networkPolicyInformer.GetIndexer(),
 		podLister:           podInformer.GetIndexer(),
@@ -214,23 +219,15 @@ func NewNetworkPolicyController(
 func (controller *NetworkPolicyController) ensureDefaultNetworkPolicyChain() {
 	// `iptables -t filter -S KUBE-NWPLCY-DEFAULT 1`
 	// `iptables -t filter -S KUBE-NWPLCY-DEFAULT`
-	exists, err := controller.iptablesCmdHandler.ChainExists(iptables.TableFilter, kubeDefaultNetpolChain)
-	if err != nil {
-		klog.Fatalf("failed to check for the existence of chain %s, error: %v", kubeDefaultNetpolChain, err)
-	}
-	if !exists {
-		// `iptables -t filter -N KUBE-NWPLCY-DEFAULT`
-		_, err = controller.iptablesCmdHandler.EnsureChain(iptables.TableFilter, kubeDefaultNetpolChain)
-		if err != nil {
-			klog.Fatalf("failed to run iptables command to create %s chain due to %s",
-				kubeDefaultNetpolChain, err.Error())
-		}
+	// `iptables -t filter -N KUBE-NWPLCY-DEFAULT`
+	if _, err := controller.iptablesCmdHandler.EnsureChain(iptables.TableFilter, kubeDefaultNetpolChain); err != nil {
+		klog.Fatalf("failed to run iptables command to create %s chain due to %s",
+			kubeDefaultNetpolChain, err.Error())
 	}
 
 	// `iptables -t filter -A KUBE-NWPLCY-DEFAULT -j MARK -m comment --comment "rule to mark traffic matching a network policy" --set-xmark 0x10000/0x10000`
 	markArgs := []string{"-j", "MARK", "-m", "comment", "--comment", "rule to mark traffic matching a network policy", "--set-xmark", "0x10000/0x10000"}
-	_, err = controller.iptablesCmdHandler.EnsureRule(iptables.Append, iptables.TableFilter, kubeDefaultNetpolChain, markArgs...)
-	if err != nil {
+	if _, err := controller.iptablesCmdHandler.EnsureRule(iptables.Append, iptables.TableFilter, kubeDefaultNetpolChain, markArgs...); err != nil {
 		klog.Fatalf("Failed to run iptables command: %s", err.Error())
 	}
 }
@@ -259,13 +256,13 @@ func (controller *NetworkPolicyController) ensureTopLevelChains() {
 			strings.Join(*ruleSpec, " "))
 	}
 
-	for builtinChain, customChain := range defaultChains {
+	for builtinChain, customChain := range iptablesJumpChains {
 		_, err := controller.iptablesCmdHandler.EnsureChain(iptables.TableFilter, customChain)
 		if err != nil {
 			klog.Fatalf("failed to run iptables command to create %s chain due to %s", customChain, err.Error())
 		}
 
-		args := []string{"-m", "comment", "--comment", "kube-router netpol", "-j", string(customChain)}
+		args := []string{"-m", "comment", "--comment", `"kube-router netpol"`, "-j", string(customChain)}
 		_, err = addUUIDForRuleSpec(builtinChain, &args)
 		if err != nil {
 			klog.Fatalf("Failed to get uuid for rule: %s", err.Error())
@@ -428,7 +425,7 @@ func (controller *NetworkPolicyController) syncPolicy() {
 func (controller *NetworkPolicyController) ensureExplicitAccept() {
 	// for the traffic to/from the local pod's let network policy controller be
 	// authoritative entity to ACCEPT the traffic if it complies to network policies
-	for _, customChain := range defaultChains {
+	for _, customChain := range iptablesJumpChains {
 		args := []string{"-m", "comment", "--comment", "rule to explicitly ACCEPT traffic that comply to network policies",
 			"-m", "mark", "--mark", "0x20000/0x20000", "-j", "ACCEPT"}
 

@@ -274,7 +274,7 @@ func (controller *NetworkPolicyController) syncNetworkPolicyChains(networkPolici
 	for _, policy := range networkPoliciesInfo {
 		// ensure there is a unique chain per network policy in filter table
 		policyChainName := networkPolicyChainName(policy.namespace, policy.name)
-		controller.filterTableRules.WriteString(":" + policyChainName + "\n")
+		controller.filterTableRules.WriteString(":" + policyChainName + "\n") // 新建则需要写 ":KUBE-SERVICES - [0:0]\n"
 		activePolicyChains[policyChainName] = true
 
 		currentPodIPs := make([]string, 0, len(policy.targetPods))
@@ -525,6 +525,7 @@ func (controller *NetworkPolicyController) refreshIPSet(ipsetName, setType strin
 	controller.ipsetCmdHandler.RefreshSet(ipsetName, setEntries, setType)
 }
 
+// INFO: 所谓的 network policy 就是：结合 policy 来定位 -m set --match-set ipset_podIPs, 然后打上 mark --set-xmark，只有该 mark 的才可以通过 -j RETURN
 // https://linux.die.net/man/8/iptables --set
 // CONNMARK: --set-mark mark[/mask] "Set connection mark. If a mask is specified then only those bits set in the mask is modified."
 // `iptables -A {chain} -m comment --comment {comment} -m set --match-set {srcIPSetName} src -m set --match-set {dstIPSetName} dst -p {protocol} --dport {port} -j MARK --set-xmark 0x10000/0x10000`
