@@ -27,7 +27,7 @@ type networkContext struct {
 	context.Context
 	resources  []types.ResourceItem
 	pod        *types.PodInfo
-	k8sService K8sService
+	k8sService *K8sService
 }
 
 type eniIPResourceManager struct {
