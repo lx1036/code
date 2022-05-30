@@ -34,11 +34,17 @@ func TestLoadBalancer(test *testing.T) {
 	}
 	kubeClient := kubernetes.NewForConfigOrDie(restConfig)
 
-	//svc, _ := kubeClient.CoreV1().Services("default").Get(context.TODO(), "nginx-demo", metav1.GetOptions{})
+	svc, err := kubeClient.CoreV1().Services("default").Get(context.TODO(), "nginx-demo", metav1.GetOptions{})
+	if err == nil {
+		for _, port := range svc.Spec.Ports {
+			klog.Info(port.Name)
+		}
+	}
+
 	//svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{IP: "100.20.30.43"}}
 	//kubeClient.CoreV1().Services("default").UpdateStatus(context.Background(), svc, metav1.UpdateOptions{})
 
-	node, _ := kubeClient.CoreV1().Nodes().Get(context.TODO(), "stark13.add.bjyt.qihoo.net", metav1.GetOptions{})
+	node, _ := kubeClient.CoreV1().Nodes().Get(context.TODO(), "xxx", metav1.GetOptions{})
 	nodeCopy := node.DeepCopy()
 	//nodeCopy.Spec.PodCIDRs = []string{}
 	//nodeCopy.Spec.PodCIDR = ""

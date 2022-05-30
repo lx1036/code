@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,16 +24,16 @@ type Item struct {
 type MemoryStorage struct {
 	sync.RWMutex
 
-	store map[string]*Item
+	store map[string]interface{}
 }
 
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
-		store: make(map[string]*Item),
+		store: make(map[string]interface{}),
 	}
 }
 
-func (s *MemoryStorage) Put(key string, value *Item) error {
+func (s *MemoryStorage) Put(key string, value interface{}) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -42,7 +41,7 @@ func (s *MemoryStorage) Put(key string, value *Item) error {
 	return nil
 }
 
-func (s *MemoryStorage) Get(key string) (*Item, error) {
+func (s *MemoryStorage) Get(key string) (interface{}, error) {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -53,11 +52,11 @@ func (s *MemoryStorage) Get(key string) (*Item, error) {
 	return value, nil
 }
 
-func (s *MemoryStorage) List() ([]*Item, error) {
+func (s *MemoryStorage) List() ([]interface{}, error) {
 	s.RLock()
 	defer s.RUnlock()
 
-	var items []*Item
+	var items []interface{}
 	for _, item := range s.store {
 		items = append(items, item)
 	}
@@ -73,13 +72,18 @@ func (s *MemoryStorage) Delete(key string) error {
 	return nil
 }
 
+type Serializer func(interface{}) ([]byte, error)
+type Deserializer func([]byte) (interface{}, error)
+
 type DiskStorage struct {
-	name   string
-	db     *bolt.DB
-	memory *MemoryStorage
+	name         string
+	db           *bolt.DB
+	memory       *MemoryStorage
+	serializer   Serializer
+	deserializer Deserializer
 }
 
-func NewDiskStorage(name string, path string) (Storage, error) {
+func NewDiskStorage(name string, path string, serializer Serializer, deserializer Deserializer) (*DiskStorage, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return nil, err
 	}
@@ -90,9 +94,11 @@ func NewDiskStorage(name string, path string) (Storage, error) {
 	}
 
 	s := &DiskStorage{
-		db:     db,
-		name:   name,
-		memory: NewMemoryStorage(),
+		db:           db,
+		name:         name,
+		memory:       NewMemoryStorage(),
+		serializer:   serializer,
+		deserializer: deserializer,
 	}
 	if err = s.load(); err != nil {
 		return nil, err
@@ -114,17 +120,18 @@ func (s *DiskStorage) load() error {
 	return s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(s.name))
 		return bucket.ForEach(func(k, v []byte) error {
-			var item Item
-			if err = json.Unmarshal(v, &item); err != nil {
+			obj, err := s.deserializer(v)
+			if err != nil {
 				return err
 			}
-			return s.memory.Put(string(k), &item)
+
+			return s.memory.Put(string(k), obj)
 		})
 	})
 }
 
-func (s *DiskStorage) Put(key string, value *Item) error {
-	data, err := json.Marshal(value)
+func (s *DiskStorage) Put(key string, value interface{}) error {
+	data, err := s.serializer(value)
 	if err != nil {
 		return err
 	}
@@ -140,11 +147,11 @@ func (s *DiskStorage) Put(key string, value *Item) error {
 	return s.memory.Put(key, value)
 }
 
-func (s *DiskStorage) Get(key string) (*Item, error) {
+func (s *DiskStorage) Get(key string) (interface{}, error) {
 	return s.memory.Get(key)
 }
 
-func (s *DiskStorage) List() ([]*Item, error) {
+func (s *DiskStorage) List() ([]interface{}, error) {
 	return s.memory.List()
 }
 

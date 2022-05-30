@@ -84,6 +84,10 @@ func (i *IPSet) SetIP(str string) *IPSet {
 	return i
 }
 
+func (i *IPSet) GetIPv4() string {
+	return i.IPv4.String()
+}
+
 type ENI struct {
 	ID               string
 	MAC              string
@@ -103,6 +107,23 @@ type ENI struct {
 // GetResourceID return mac address of eni
 func (e *ENI) GetResourceID() string {
 	return e.MAC
+}
+
+func (e *ENI) GetType() string {
+	return ResourceTypeENI
+}
+
+func (e *ENI) ToResItems() []ResourceItem {
+	return []ResourceItem{
+		{
+			Type:   e.GetType(),
+			ID:     e.GetResourceID(),
+			ENIID:  e.ID,
+			ENIMAC: e.MAC,
+			IPv4:   e.PrimaryIP.GetIPv4(),
+			//IPv6:   e.PrimaryIP.GetIPv6(),
+		},
+	}
 }
 
 type ENIIP struct {
@@ -232,6 +253,16 @@ type PodInfo struct {
 
 func PodInfoKey(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
+}
+
+type PodResources struct {
+	Resources []ResourceItem
+	PodInfo   *PodInfo
+}
+
+type PodResource struct {
+	Resource ResourceItem
+	PodInfo  *PodInfo
 }
 
 type SetupConfig struct {
