@@ -413,9 +413,8 @@ func (controller *NetworkServiceController) writeServiceToEndpointRules() {
 			}
 			comment := fmt.Sprintf(`"%s -> %s"`, svcNameString, epInfo.Endpoint)
 
-			args = append(args[:0],
-				"-A", string(svcChain),
-			)
+			// @see https://ipset.netfilter.org/iptables-extensions.man.html --reap
+			args = append(args[:0], "-A", string(svcChain))
 			args = controller.appendServiceCommentLocked(args, comment)
 			args = append(args, "-m", "recent", "--name", string(epInfo.ChainName),
 				"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds()), "--reap",
