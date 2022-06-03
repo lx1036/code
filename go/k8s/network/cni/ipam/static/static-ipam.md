@@ -2,7 +2,7 @@
 
 
 # Static IPAM
-Static IPAM: https://www.cni.dev/plugins/ipam/static/
+Static IPAM: https://www.cni.dev/plugins/current/ipam/static/
 
 
 
