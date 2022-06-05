@@ -11,6 +11,10 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 )
 
+const (
+	IPAMType = "host-local"
+)
+
 type Range struct {
 	Subnet     types.IPNet `json:"subnet"`
 	RangeStart net.IP      `json:"rangeStart,omitempty"` // The first ip, inclusive
@@ -239,6 +243,8 @@ func LoadIPAMConfig(bytes []byte, envArgs string) (*IPAMConfig, string, error) {
 
 	if n.IPAM == nil {
 		return nil, "", fmt.Errorf("IPAM config missing 'ipam' key")
+	} else if n.IPAM.Type != IPAMType {
+		return nil, "", fmt.Errorf(fmt.Sprintf("ipam type %s is not valid", n.IPAM.Type))
 	}
 
 	if envArgs != "" {
