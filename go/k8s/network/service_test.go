@@ -84,3 +84,11 @@ func PatchNodeCIDRs(c clientset.Interface, node types.NodeName, cidrs []string) 
 	}
 	return nil
 }
+
+func TestMap(test *testing.T) {
+	requestedIPs := map[string]string{"a": "a"} //net.IP cannot be a key
+	remainingIPs := map[string]string{}
+	remainingIPs = requestedIPs
+	delete(requestedIPs, "a")
+	klog.Info(remainingIPs) // map[]
+}

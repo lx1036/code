@@ -12,17 +12,20 @@ import (
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/host-local-ipam/pkg/store"
 )
 
+// INFO: host-local allocator 从 subnet 一个个自增获取 ip，且 ip 保存在本地磁盘文件内
+//  feature: 多个 ippool, 从 []Range 中分配一个 ip，一个 ippool 分配完成，就下一个 ippool
+
 type IPAllocator struct {
-	r       *Range
-	store   store.Store
-	rangeID string // Used for tracking last reserved ip
+	rangeset *RangeSet
+	store    store.Store
+	rangeID  string // Used for tracking last reserved ip
 }
 
-func NewIPAllocator(r *Range, store store.Store, id int) *IPAllocator {
+func NewIPAllocator(rangeset *RangeSet, store store.Store, id int) *IPAllocator {
 	return &IPAllocator{
-		r:       r,
-		store:   store,
-		rangeID: strconv.Itoa(id),
+		rangeset: rangeset,
+		store:    store,
+		rangeID:  strconv.Itoa(id),
 	}
 }
 
@@ -36,34 +39,34 @@ func (alloc *IPAllocator) AllocateNext(containerID, ifName string) (*current.IPC
 	allocatedIPs := alloc.store.GetByID(containerID, ifName)
 	for _, allocatedIP := range allocatedIPs {
 		// check whether the existing IP belong to this range set
-		if _, err := alloc.r.RangeFor(allocatedIP); err == nil {
+		if _, err := alloc.rangeset.RangeFor(allocatedIP); err == nil {
 			return nil, fmt.Errorf("%s has been allocated to %s, duplicate allocation is not allowed",
 				allocatedIP.String(), containerID)
 		}
+	}
 
-		iter, err := alloc.GetIter()
+	iter, err := alloc.GetIter()
+	if err != nil {
+		return nil, err
+	}
+	for {
+		reservedIP, gw = iter.Next()
+		if reservedIP == nil {
+			break
+		}
+
+		reserved, err := alloc.store.Reserve(containerID, ifName, reservedIP.IP, alloc.rangeID)
 		if err != nil {
 			return nil, err
 		}
-		for {
-			reservedIP, gw = iter.Next()
-			if reservedIP == nil {
-				break
-			}
 
-			reserved, err := alloc.store.Reserve(containerID, ifName, reservedIP.IP, alloc.rangeID)
-			if err != nil {
-				return nil, err
-			}
-
-			if reserved {
-				break
-			}
+		if reserved {
+			break
 		}
 	}
 
 	if reservedIP == nil {
-		return nil, fmt.Errorf("no IP addresses available in range set: %s", alloc.r.String())
+		return nil, fmt.Errorf("no IP addresses available in range set: %s", alloc.rangeset.String())
 	}
 
 	return &current.IPConfig{
@@ -72,12 +75,13 @@ func (alloc *IPAllocator) AllocateNext(containerID, ifName string) (*current.IPC
 	}, nil
 }
 
+// AllocateIP INFO: 分配指定的 ip
 func (alloc *IPAllocator) AllocateIP(containerID, ifName string, requestedIP net.IP) (*current.IPConfig, error) {
 	if err := canonicalizeIP(&requestedIP); err != nil {
 		return nil, err
 	}
 
-	r, err := alloc.r.RangeFor(requestedIP)
+	r, err := alloc.rangeset.RangeFor(requestedIP)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +96,7 @@ func (alloc *IPAllocator) AllocateIP(containerID, ifName string, requestedIP net
 	}
 	if !reserved {
 		return nil, fmt.Errorf("requested IP address %s is not available in range set %s",
-			requestedIP, alloc.r.String())
+			requestedIP, alloc.rangeset.String())
 	}
 
 	return &current.IPConfig{
@@ -109,10 +113,10 @@ func (alloc *IPAllocator) Release(containerID, ifName string) error {
 }
 
 type RangeIterator struct {
-	r *Range
+	rangeset *RangeSet
 
 	// The current range id
-	rangeIdx int
+	rangeIdx int // rangeset 包含多个 range，即 [rangeIdx]range
 
 	// Our current position
 	cur net.IP
@@ -128,7 +132,7 @@ type RangeIterator struct {
 // We may wish to consider avoiding recently-released IPs in the future.
 func (alloc *IPAllocator) GetIter() (*RangeIterator, error) {
 	iter := RangeIterator{
-		r: alloc.r,
+		rangeset: alloc.rangeset,
 	}
 
 	// Round-robin by trying to allocate from the last reserved IP + 1
@@ -139,20 +143,24 @@ func (alloc *IPAllocator) GetIter() (*RangeIterator, error) {
 	if err != nil && !os.IsNotExist(err) {
 		klog.Info(fmt.Errorf("error retrieving last reserved ip: %v", err))
 	} else if lastReservedIP != nil {
-		startFromLastReservedIP = alloc.r.Contains(lastReservedIP)
+		startFromLastReservedIP = alloc.rangeset.Contains(lastReservedIP)
 	}
 
 	// Find the range in the set with this IP
 	if startFromLastReservedIP {
-		if alloc.r.Contains(lastReservedIP) {
-			iter.rangeIdx = 0
-			// We advance the cursor on every Next(), so the first call
-			// to next() will return lastReservedIP + 1
-			iter.cur = lastReservedIP
+		for i, r := range *alloc.rangeset {
+			if r.Contains(lastReservedIP) {
+				iter.rangeIdx = i
+
+				// We advance the cursor on every Next(), so the first call
+				// to next() will return lastReservedIP + 1
+				iter.cur = lastReservedIP
+				break
+			}
 		}
 	} else { // 首次分配 ip 从 0 开始
 		iter.rangeIdx = 0
-		iter.startIP = alloc.r.RangeStart
+		iter.startIP = (*alloc.rangeset)[iter.rangeIdx].RangeStart
 	}
 
 	return &iter, nil
@@ -161,32 +169,39 @@ func (alloc *IPAllocator) GetIter() (*RangeIterator, error) {
 // Next returns the next IP, its mask, and its gateway. Returns nil
 // if the iterator has been exhausted
 func (i *RangeIterator) Next() (*net.IPNet, net.IP) {
+	r := (*i.rangeset)[i.rangeIdx]
+
 	// If this is the first time iterating and we're not starting in the middle
 	// of the range, then start at rangeStart, which is inclusive
 	if i.cur == nil {
-		i.cur = i.r.RangeStart
+		i.cur = r.RangeStart
 		i.startIP = i.cur
-		if i.cur.Equal(i.r.Gateway) {
+		if i.cur.Equal(r.Gateway) {
 			return i.Next()
 		}
-		return &net.IPNet{IP: i.cur, Mask: i.r.Subnet.Mask}, i.r.Gateway
+		return &net.IPNet{IP: i.cur, Mask: r.Subnet.Mask}, r.Gateway
 	}
 
-	i.cur = ip.NextIP(i.cur)
-	if i.cur.Equal(i.r.RangeEnd) {
-		return nil, nil // ip is exhausted
+	if i.cur.Equal(r.RangeEnd) {
+		i.rangeIdx += 1
+		i.rangeIdx %= len(*i.rangeset)
+		r = (*i.rangeset)[i.rangeIdx]
+
+		i.cur = r.RangeStart
+	} else {
+		i.cur = ip.NextIP(i.cur)
 	}
 
 	if i.startIP == nil {
 		i.startIP = i.cur
 	} else if i.cur.Equal(i.startIP) {
-		// IF we've looped back to where we started, give up
+		// IF we've looped back to where we started, ip is exhausted
 		return nil, nil
 	}
 
-	if i.cur.Equal(i.r.Gateway) {
+	if i.cur.Equal(r.Gateway) {
 		return i.Next()
 	}
 
-	return &net.IPNet{IP: i.cur, Mask: i.r.Subnet.Mask}, i.r.Gateway
+	return &net.IPNet{IP: i.cur, Mask: r.Subnet.Mask}, r.Gateway
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/host-local-ipam/pkg/allocator"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/host-local-ipam/pkg/store/disk"
@@ -40,37 +41,48 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer store.Close()
 
-	var requestedIPs []net.IP
+	requestedIPs, remainingIPs := map[string]net.IP{}, map[string]net.IP{} //net.IP cannot be a key
 	for _, ip := range ipamConf.IPArgs {
-		requestedIPs = append(requestedIPs, ip) // 指定的分配的这些 ip
+		requestedIPs[ip.String()] = ip
+		remainingIPs[ip.String()] = ip
 	}
 
+	ipAllocator := allocator.NewIPAllocator(&ipamConf.Ranges, store, 0)
+	// Check to see if there are any custom IPs requested in this range.
+	var requestedIP net.IP
 	if len(requestedIPs) != 0 {
-		for idx, rangeset := range ipamConf.Ranges {
-			ipAllocator := allocator.NewIPAllocator(&rangeset, store, idx)
-			for _, ip := range requestedIPs {
-				if rangeset.Contains(ip) {
-					ipConf, err := ipAllocator.AllocateIP(args.ContainerID, args.IfName, ip)
-					if err != nil {
-						ipAllocator.Release(args.ContainerID, args.IfName)
-						return fmt.Errorf("failed to allocate for range %d: %v", idx, err)
-					}
+		for k, ip := range requestedIPs {
+			if ipamConf.Ranges.Contains(ip) {
+				requestedIP = ip
+				delete(remainingIPs, k)
 
-					result.IPs = append(result.IPs, ipConf)
+				ipConf, err := ipAllocator.AllocateIP(args.ContainerID, args.IfName, requestedIP)
+				if err != nil {
+					ipAllocator.Release(args.ContainerID, args.IfName)
+					continue
 				}
+
+				result.IPs = append(result.IPs, ipConf)
 			}
 		}
 	} else {
-		for idx, rangeset := range ipamConf.Ranges {
-			ipAllocator := allocator.NewIPAllocator(&rangeset, store, idx)
-			ipConf, err := ipAllocator.AllocateNext(args.ContainerID, args.IfName)
-			if err != nil {
-				ipAllocator.Release(args.ContainerID, args.IfName)
-				return fmt.Errorf("failed to allocate for range %d: %v", idx, err)
-			}
-
-			result.IPs = append(result.IPs, ipConf)
+		ipConf, err := ipAllocator.AllocateNext(args.ContainerID, args.IfName)
+		if err != nil {
+			ipAllocator.Release(args.ContainerID, args.IfName)
+			return fmt.Errorf("failed to allocate for range: %v", err)
 		}
+
+		result.IPs = append(result.IPs, ipConf)
+	}
+
+	if len(remainingIPs) != 0 {
+		var msg []string
+		for _, arg := range ipamConf.IPArgs {
+			msg = append(msg, arg.String())
+		}
+
+		return fmt.Errorf(fmt.Sprintf("requested ip args %s is not in range for subnets %s",
+			strings.Join(msg, ","), ipamConf.Ranges.String()))
 	}
 
 	result.Routes = ipamConf.Routes
@@ -79,9 +91,26 @@ func cmdAdd(args *skel.CmdArgs) error {
 }
 
 func cmdDel(args *skel.CmdArgs) error {
+	ipamConf, _, err := allocator.LoadIPAMConfig(args.StdinData, args.Args)
+	if err != nil {
+		return err
+	}
+
+	store, err := disk.New(ipamConf.Name, ipamConf.DataDir)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	ipAllocator := allocator.NewIPAllocator(&ipamConf.Ranges, store, 0)
+	err = ipAllocator.Release(args.ContainerID, args.IfName)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func cmdCheck(args *skel.CmdArgs) error {
-
+	return nil
 }
