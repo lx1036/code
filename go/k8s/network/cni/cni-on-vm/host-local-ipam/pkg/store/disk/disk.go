@@ -38,7 +38,7 @@ func New(name, dataDir string) (*Store, error) {
 
 func (s *Store) Reserve(id string, ifname string, ip net.IP, rangeID string) (bool, error) {
 	f, err := os.OpenFile(s.getIPFile(ip), os.O_RDWR|os.O_EXCL|os.O_CREATE, 0644)
-	if os.IsExist(err) {
+	if os.IsExist(err) { // 通过文件是否存在，来确定 ip 是否已经被分配
 		return false, nil
 	}
 	if err != nil {

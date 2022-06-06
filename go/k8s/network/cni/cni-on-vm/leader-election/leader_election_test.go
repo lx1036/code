@@ -71,6 +71,7 @@ func TestLeaderElectionForHostLocalClusterWideIPAM(test *testing.T) {
 
 	wg.Wait()
 
+	// 没有阻塞
 	klog.Info(fmt.Sprintf("ip is %s", newip.String()))
 }
 

@@ -1,9 +1,10 @@
-package kubernetes
+package ipam
 
 import (
 	"context"
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"net"
 	"sync"
@@ -20,6 +21,16 @@ import (
 func IPManagement(ctx context.Context, mode int, ipamConf allocator.IPAMConfig, containerID string,
 	podRef string) (net.IPNet, error) {
 	var err error
+
+	restConfig, err := clientcmd.BuildConfigFromFlags("", option.Kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to construct lister client: %v", err)
+	}
 
 	ipam, err := NewKubernetesIPAM(containerID, ipamConf)
 	if err != nil {
@@ -68,7 +79,7 @@ func IPManagement(ctx context.Context, mode int, ipamConf allocator.IPAMConfig, 
 	return newip, err
 }
 
-func IPManagementKubernetesUpdate(ctx context.Context, mode int, ipam *KubernetesIPAM, ipamConf allocator.IPAMConfig,
+func IPManagementKubernetesUpdate(ctx context.Context, mode int, ipam *Client, ipamConf allocator.IPAMConfig,
 	containerID string, podRef string) (net.IPNet, error) {
 
 	var newip net.IPNet
@@ -79,7 +90,7 @@ func IPManagementKubernetesUpdate(ctx context.Context, mode int, ipam *Kubernete
 		return newip, fmt.Errorf("got an unknown mode passed to IPManagement: %v", mode)
 	}
 
-	pool, err = ipam.GetIPPool(requestCtx, ipamConf.Range)
+	pool, err := ipam.GetOrCreateIPPool(requestCtx, ipamConf.Range)
 	reservelist := pool.Allocations()
 	switch mode {
 	case allocator.Allocate:

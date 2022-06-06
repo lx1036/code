@@ -2,14 +2,15 @@ package allocator
 
 import (
 	"fmt"
-	"github.com/containernetworking/plugins/pkg/ip"
-	"k8s.io/klog/v2"
 	"net"
 	"os"
 	"strconv"
 
-	current "github.com/containernetworking/cni/pkg/types/100"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/host-local-ipam/pkg/store"
+
+	current "github.com/containernetworking/cni/pkg/types/100"
+	"github.com/containernetworking/plugins/pkg/ip"
+	"k8s.io/klog/v2"
 )
 
 // INFO: host-local allocator 从 subnet 一个个自增获取 ip，且 ip 保存在本地磁盘文件内
