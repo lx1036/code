@@ -52,6 +52,7 @@ type EniBackendServer struct {
 
 	cniBinPath string
 
+	eniMgr      ResourceManager
 	eniIPResMgr ResourceManager
 	enableTrunk bool
 
@@ -124,6 +125,8 @@ func newEniBackendServer(daemonMode, configFilePath, kubeconfig string) (rpc.Eni
 		if err != nil {
 			return nil, err
 		}
+
+	case daemonModeENIOnly: // 网卡单IP模式，也可以参考青云的只支持的网卡单IP模式：https://github.com/yunify/hostnic-cni/blob/master/docs/proposal.md
 
 	}
 
