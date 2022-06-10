@@ -92,3 +92,8 @@ func TestMap(test *testing.T) {
 	delete(requestedIPs, "a")
 	klog.Info(remainingIPs) // map[]
 }
+
+func TestRouteTable(test *testing.T) {
+	//klog.Infof(fmt.Sprintf("%d", unix.RT_TABLE_MAIN))
+	klog.Infof(fmt.Sprintf("%d", 0xfe)) // 254
+}

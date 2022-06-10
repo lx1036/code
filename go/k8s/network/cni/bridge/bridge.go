@@ -243,6 +243,15 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 		// INFO: IP地址伪装，在该 result.IPs IP 段内做 SNAT，source ip 地址选择本机机器出口网卡 eth0 的地址。
 		//  访问 pod 时候，目标地址是 pod ip，但是 src ip 选择 IP 伪装的机器地址
+
+		// INFO: 见 node-snat.md 文档，IPMasq 主要就是在访问公网时候，需要 podIP snat nodeIP 来使用 nodeIP 作为 src ip, 回包会被 reverse 成 podIP
+		//  @see github.com/containernetworking/plugins/pkg/ip/ipmasq_linux.go
+		//  @see https://github.com/aws/amazon-vpc-cni-k8s/blob/master/docs/cni-proposal.md#pod-to-external-communications
+
+		// INFO:
+		//  `iptables -t nat -A chain_name -d podIP/32 -j ACCEPT`
+		//  `iptables -t nat -A chain_name ! -d 224.0.0.0/4 -j MASQUERADE`
+		//  `iptables -t nat -A POSTROUTING -s podIP -m addrtype ! --dst-type LOCAL -j chain_name` // 同机 pod 访问不应该 snat nodeIP
 		if conf.IPMasq {
 			chain := utils.FormatChainName(conf.Name, args.ContainerID)
 			comment := utils.FormatComment(conf.Name, args.ContainerID)
@@ -253,9 +262,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 				return err
 			}
 			for _, ipConfig := range result.IPs {
-				markArgs := []string{"-s", ipConfig.Address.IP.String(), "-j", chain, "-m", "comment", "--comment", comment}
-				_, _ = iptablesCmdHandler.EnsureRule(iptables.Append, iptables.TableNAT, iptables.ChainPostrouting, markArgs...)
-
 				markArgsSlice := [][]string{
 					{"-d", ipConfig.Address.String(), "-j", "ACCEPT", "-m", "comment", "--comment", comment},
 					{"!", "-d", multicastNet, "-j", "MASQUERADE", "-m", "comment", "--comment", comment}, // IP 伪装
@@ -263,6 +269,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 				for _, value := range markArgsSlice {
 					_, _ = iptablesCmdHandler.EnsureRule(iptables.Append, iptables.TableNAT, iptables.Chain(chain), value...)
 				}
+
+				markArgs := []string{"-s", ipConfig.Address.IP.String(), "-m", "addrtype", "!", "--dst-type", "LOCAL", "-j", chain, "-m", "comment", "--comment", comment}
+				_, _ = iptablesCmdHandler.EnsureRule(iptables.Append, iptables.TableNAT, iptables.ChainPostrouting, markArgs...)
 			}
 		}
 	}
