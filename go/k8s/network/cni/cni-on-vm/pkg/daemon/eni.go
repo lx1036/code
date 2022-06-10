@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/ipam"
-	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/pool"
 	"k8s-lx1036/k8s/network/cni/cni-on-vm/pkg/utils/types"
 )
 
@@ -51,6 +50,23 @@ func (f *eniFactory) CreateWithIPCount(count int, trunk bool) ([]types.NetworkRe
 		return nil, err
 	}
 	return []types.NetworkResource{eni}, nil
+}
+
+type ENIManager struct {
+	pool *SimpleObjectPool
+}
+
+// INFO: 因为 newENIManager 和 newENIIPManager 都需要用到 pool，但是初始化逻辑有些不同，所以不能直接都是用 NewSimpleObjectPool() 搞定，
+//  所以还是要像 terway 那样在初始化函数 Initializer() 中分别定义!!! 所以，ENI 和 ENIIP 两种模式还是有很大的学习价值!!!
+
+func newENIManager(poolConfig *types.PoolConfig, ecs ipam.API, allocatedResources map[string]resourceManagerInitItem, ipFamily *types.IPFamily, k8s Kubernetes) {
+
+	p, err := NewSimpleObjectPool(poolCfg)
+
+}
+
+func (m *ENIManager) Allocate(ctx *networkContext, prefer string) (types.NetworkResource, error) {
+
 }
 
 // ENI 每一个弹性网卡
