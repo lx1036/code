@@ -1,7 +1,7 @@
 
 # Linux bridge
 
-# 如何连通两个 ns 之间的容器？
+## 如何连通两个 ns 之间的容器？
 
 ```shell
 ip link add br0 type bridge
@@ -73,4 +73,19 @@ ip addr add 172.17.186.101/24 dev br0
 **[Linux 虚拟网络设备详解之 Bridge 网桥](https://www.cnblogs.com/bakari/p/10529575.html)**
 
 
+## bridge hairpin
+bridge hairpin 定义：bridge 默认不允许包从收到包的端口发出，比如 bridge 从一个端口收到一个广播报文后，会将其广播到所有其他端口。而 bridge 
+打开 haripin 模式后，允许从这个端口收到的包仍然从这个端口发出。这个特性用于NAT场景下，比如docker的nat网络，一个容器访问其自身映射到主机的端口时，
+包到达bridge设备后走到ip协议栈，经过iptables规则的 dnat 转换后发现又需要从bridge的收包端口发出，需要开启端口的hairpin mode。
+这个是 bridge 的一个概念。
+```shell
+brctl hairpin <bridge> <port> {on|off} turn hairpin on/off
+```
+
+### k8s service loopback
+**hairpin 概念推广到 K8s 来说，说白了就是，一个 pod 访问一个 clusterIP/nodePort/externalIP service 后，经过 ipvs/iptables DNAT 后还是自己的 podIP，就是 hairpin
+模式。** 所以，需要加一个 iptable snat rule 来把 src podIP 换成 src serviceIP。@see https://github.com/cloudnativelabs/kube-router/blob/master/pkg/controllers/proxy/network_services_controller.go#L1333-L1486 ，加了一个 iptable rule:
+```shell
+iptable -t nat -A ipvsHairpinChainName -s endpointIP/32 -d endpointIP/32 -m ipvs --vaddr serviceIP --vport servicePort -j SNAT --to-source serviceIP
+```
 
