@@ -30,6 +30,28 @@ const (
 	defaultReplicaNum                          = 3
 )
 
+type VolStatus uint8
+
+const (
+	ReadWriteVol   VolStatus = 1
+	MarkDeletedVol VolStatus = 2
+	ReadOnlyVol    VolStatus = 3
+)
+
+const (
+	opSyncAddMetaNode         uint32 = 0x01
+	opSyncAddVol              uint32 = 0x02
+	opSyncAddMetaPartition    uint32 = 0x03
+	opSyncUpdateMetaPartition uint32 = 0x04
+	opSyncDeleteMetaNode      uint32 = 0x05
+	opSyncPutCluster          uint32 = 0x08
+	opSyncUpdateVol           uint32 = 0x09
+	opSyncDeleteVol           uint32 = 0x0A
+	opSyncDeleteMetaPartition uint32 = 0x0B
+	opSyncAddNodeSet          uint32 = 0x0C
+	opSyncUpdateNodeSet       uint32 = 0x0D
+)
+
 const (
 	keySeparator         = "#"
 	metaNodeAcronym      = "mn"
@@ -43,7 +65,7 @@ const (
 	volPrefix            = "#vol#"
 	metaPartitionPrefix  = "#metapartition#"
 	clusterPrefix        = keySeparator + clusterAcronym + keySeparator
-	nodeSetPrefix        = "#s#"
+	nodeSetPrefix        = "#nodeset#"
 	bucketPrefix         = keySeparator + bucketAcronym + keySeparator
 	clientPrefix         = keySeparator + clientAcronym + keySeparator
 )
@@ -113,7 +135,7 @@ type Cluster struct {
 	idAlloc    *IDAllocator
 	fsm        *Fsm
 
-	topology *Topology
+	nodeSets *NodeSets
 
 	metaNodes        map[string]*MetaNode
 	metaNodeStatInfo *nodeStatInfo
@@ -136,7 +158,7 @@ func NewCluster(server *Server) *Cluster {
 		buckets:          make(map[string]*DeleteBucketInfo),
 		metaNodeStatInfo: new(nodeStatInfo),
 		idAlloc:          NewIDAllocator(server.fsm.store, server.r),
-		topology:         newTopology(),
+		nodeSets:         newNodeSets(),
 		fsm:              server.fsm,
 		nodeSetCapacity:  server.nodeSetCapacity,
 	}
@@ -279,7 +301,7 @@ func (cluster *Cluster) addMetaNode(nodeAddr string) (uint64, error) {
 
 	var metaNode *MetaNode
 	metaNode = newMetaNode(nodeAddr, cluster.Name)
-	node := cluster.topology.getAvailNodeSetForMetaNode()
+	node := cluster.nodeSets.getAvailNodeSetForMetaNode()
 	if node == nil {
 		// create node set
 		id, err := cluster.idAlloc.allocateMetaNodeID()
@@ -291,7 +313,7 @@ func (cluster *Cluster) addMetaNode(nodeAddr string) (uint64, error) {
 			return 0, err
 		}
 
-		cluster.topology.putNodeSet(node)
+		cluster.nodeSets.putNodeSet(node)
 	}
 
 	id, err := cluster.idAlloc.allocateMetaNodeID()
@@ -348,14 +370,22 @@ func (cluster *Cluster) createVol(name, owner, accessKey, secretKey, endpoint st
 	cluster.volMutex.Lock()
 	defer cluster.volMutex.Unlock()
 
+	var err error
+
 	if _, ok := cluster.vols[name]; ok {
 		return nil, fmt.Errorf(fmt.Sprintf("volume %s is already existed", name))
 	}
 
 	if createBackend {
-		if err := cluster.CreateBucket(accessKey, secretKey, endpoint, name); err != nil {
+		if err = cluster.CreateBucket(accessKey, secretKey, endpoint, name); err != nil {
 			return nil, fmt.Errorf(fmt.Sprintf("[createVol]create s3 bucket err:%v", err))
 		}
+
+		defer func() {
+			if err != nil {
+				_ = cluster.DeleteBucket(accessKey, secretKey, endpoint, name)
+			}
+		}()
 	}
 
 	// submit `createVol` to raft
@@ -381,18 +411,19 @@ func (cluster *Cluster) createVol(name, owner, accessKey, secretKey, endpoint st
 			end = defaultMaxMetaPartitionInodeID
 		}
 		// (1)tcp every host for create meta partition
-		if mp, err := cluster.tcpCreateMetaPartition(vol, start, end); err != nil {
+		mp, err := cluster.tcpCreateMetaPartition(vol, start, end)
+		if err != nil {
 			klog.Errorf("[createMetaPartitions]vol[%v] create meta partition err[%v]", vol.Name, err)
 			break
-		} else {
-			// (2)submit `create 3 meta partitions` to raft
-			if err = cluster.submitMetaPartition(opSyncAddMetaPartition, mp); err != nil {
-				klog.Errorf("[createMetaPartitions]vol[%v] submit meta partition to raft err[%v]", vol.Name, err)
-				break
-			}
-
-			vol.addMetaPartition(mp)
 		}
+
+		// (2)submit `create 3 meta partitions` to raft
+		if err = cluster.submitMetaPartition(opSyncAddMetaPartition, mp); err != nil {
+			klog.Errorf("[createMetaPartitions]vol[%v] submit meta partition to raft err[%v]", vol.Name, err)
+			break
+		}
+
+		vol.addMetaPartition(mp)
 	}
 	if len(vol.MetaPartitions) != vol.metaPartitionCount {
 		return nil, fmt.Errorf("[createVol]vol %s init meta partition failed,mpCount[%v],expectCount[%v]",
@@ -425,22 +456,50 @@ func (cluster *Cluster) tcpCreateMetaPartition(vol *Volume, start, end uint64) (
 	if partitionID, err = cluster.idAlloc.allocateMetaPartitionID(); err != nil {
 		return nil, err
 	}
-	mp = newMetaPartition(partitionID, start, end, vol.metaPartitionCount, vol.Name, vol.ID, false)
-	mp.setHosts(hosts)
-	mp.setPeers(peers)
 
+	mp = &MetaPartition{
+		PartitionID: partitionID,
+		Start:       start,
+		End:         end,
+		Replicas:    make([]*MetaReplica, 0),
+		ReplicaNum:  vol.metaPartitionCount,
+		Status:      Unavailable,
+		volID:       vol.ID,
+		volName:     vol.Name,
+		Hosts:       hosts,
+		Peers:       peers,
+		MissNodes:   make(map[string]int64, 0),
+	}
+
+	// tcp call metaNode for create partition
 	for _, host := range hosts {
 		wg.Add(1)
 		go func(host string) {
 			defer wg.Done()
-			if err = cluster.syncCreateMetaPartitionToMetaNode(host, mp); err != nil {
+
+			req := &proto.CreateMetaPartitionRequest{
+				Start:       start,
+				End:         end,
+				PartitionID: partitionID,
+				Members:     peers,
+				VolName:     vol.Name,
+			}
+			task := proto.NewAdminTask(proto.OpCreateMetaPartition, host, req)
+			task.ID = fmt.Sprintf("%v_pid[%v]", task.ID, partitionID)
+			task.PartitionID = partitionID
+			metaNode, err := cluster.getMetaNode(host)
+			if err != nil {
+				klog.Error(err)
+			}
+			_, err = metaNode.Sender.syncSendAdminTask(task)
+			if err != nil {
 				klog.Error(err)
 			}
 		}(host)
 	}
 	wg.Wait()
 
-	mp.Status = proto.ReadWrite
+	mp.Status = ReadWrite
 	return mp, nil
 }
 
@@ -466,12 +525,12 @@ func (cluster *Cluster) chooseTargetMetaHosts(excludeNodeSet *nodeSet, excludeHo
 		slaveAddrs []string
 		masterPeer []proto.Peer
 		slavePeers []proto.Peer
-		ns         *nodeSet
+		nodeSets   *nodeSet
 	)
-	if ns, err = cluster.topology.allocNodeSetForMetaNode(excludeNodeSet, uint8(replicaNum)); err != nil {
+	if nodeSets, err = cluster.nodeSets.allocNodeSetForMetaNode(excludeNodeSet, uint8(replicaNum)); err != nil {
 		return nil, nil, err
 	}
-	if masterAddr, masterPeer, err = ns.getAvailMetaNodeHosts(excludeHosts, 1); err != nil {
+	if masterAddr, masterPeer, err = nodeSets.getAvailMetaNodeHosts(excludeHosts, 1); err != nil {
 		return nil, nil, err
 	}
 	peers = append(peers, masterPeer...)
@@ -481,7 +540,7 @@ func (cluster *Cluster) chooseTargetMetaHosts(excludeNodeSet *nodeSet, excludeHo
 		return
 	}
 	excludeHosts = append(excludeHosts, hosts...)
-	if slaveAddrs, slavePeers, err = ns.getAvailMetaNodeHosts(excludeHosts, otherReplica); err != nil {
+	if slaveAddrs, slavePeers, err = nodeSets.getAvailMetaNodeHosts(excludeHosts, otherReplica); err != nil {
 		return nil, nil, err
 	}
 	hosts = append(hosts, slaveAddrs...)
@@ -493,141 +552,7 @@ func (cluster *Cluster) chooseTargetMetaHosts(excludeNodeSet *nodeSet, excludeHo
 	return
 }
 
-// tcp call metaNode for create partition
-func (cluster *Cluster) syncCreateMetaPartitionToMetaNode(host string, mp *MetaPartition) (err error) {
-	req := &proto.CreateMetaPartitionRequest{
-		Start:       mp.Start,
-		End:         mp.End,
-		PartitionID: mp.PartitionID,
-		Members:     mp.Peers,
-		VolName:     mp.volName,
-	}
-	task := proto.NewAdminTask(proto.OpCreateMetaPartition, host, req)
-	task.ID = fmt.Sprintf("%v_pid[%v]", task.ID, mp.PartitionID)
-	task.PartitionID = mp.PartitionID
-
-	metaNode, err := cluster.getMetaNode(host)
-	if err != nil {
-		return err
-	}
-
-	_, err = metaNode.Sender.syncSendAdminTask(task)
-	return err
-}
-
 ////////////////////////////Submit cmd to Raft///////////////////////////////////
-
-type VolStatus uint8
-
-const (
-	ReadWriteVol   VolStatus = 1
-	MarkDeletedVol VolStatus = 2
-	ReadOnlyVol    VolStatus = 3
-)
-
-const (
-	opSyncAddMetaNode         uint32 = 0x01
-	opSyncAddVol              uint32 = 0x02
-	opSyncAddMetaPartition    uint32 = 0x03
-	opSyncUpdateMetaPartition uint32 = 0x04
-	opSyncDeleteMetaNode      uint32 = 0x05
-	opSyncPutCluster          uint32 = 0x08
-	opSyncUpdateVol           uint32 = 0x09
-	opSyncDeleteVol           uint32 = 0x0A
-	opSyncDeleteMetaPartition uint32 = 0x0B
-	opSyncAddNodeSet          uint32 = 0x0C
-	opSyncUpdateNodeSet       uint32 = 0x0D
-)
-
-//key=#vol#volID,value=json.Marshal(vv)
-func (cluster *Cluster) submitVol(opType uint32, vol *Volume) (err error) {
-	cmd := new(RaftCmd)
-	cmd.Op = opType
-	cmd.K = fmt.Sprintf("%s%d", volPrefix, vol.ID)
-	data := struct {
-		ID     uint64    `json:"id"`
-		Name   string    `json:"name"`
-		Owner  string    `json:"owner"`
-		Status VolStatus `json:"status"`
-	}{
-		ID:     vol.ID,
-		Name:   vol.Name,
-		Owner:  vol.Owner,
-		Status: vol.Status,
-	}
-	cmd.V, _ = json.Marshal(&data)
-	return cluster.submit(cmd)
-}
-
-// key=#s#
-func (cluster *Cluster) submitNodeSet(opType uint32, nset *nodeSet) error {
-	cmd := new(RaftCmd)
-	cmd.Op = opType
-	cmd.K = fmt.Sprintf("%s%s", nodeSetPrefix, strconv.FormatUint(nset.ID, 10))
-	data := struct {
-		ID          uint64 `json:"id"`
-		Capacity    int    `json:"capacity"`
-		MetaNodeLen int    `json:"metaNodeLen"`
-	}{
-		ID:          nset.ID,
-		Capacity:    nset.Capacity,
-		MetaNodeLen: nset.metaNodeLen,
-	}
-	cmd.V, _ = json.Marshal(&data)
-	return cluster.submit(cmd)
-}
-
-// key=#metanode#
-func (cluster *Cluster) submitMetaNode(opType uint32, metaNode *MetaNode) error {
-	cmd := new(RaftCmd)
-	cmd.Op = opType
-	cmd.K = fmt.Sprintf("%s%s", metaNodePrefix, strconv.FormatUint(metaNode.ID, 10))
-	data := struct {
-		ID        uint64 `json:"id"`
-		NodeSetID uint64 `json:"nodeSetID"`
-		Addr      string `json:"addr"`
-	}{
-		ID:        metaNode.ID,
-		NodeSetID: metaNode.NodeSetID,
-		Addr:      metaNode.Addr,
-	}
-	cmd.V, _ = json.Marshal(&data)
-	return cluster.submit(cmd)
-}
-
-// #metapartition#{volID}#{partitionID}
-func (cluster *Cluster) submitMetaPartition(opType uint32, mp *MetaPartition) error {
-	cmd := new(RaftCmd)
-	cmd.Op = opType
-	cmd.K = fmt.Sprintf("%s%s#%s", metaPartitionPrefix, strconv.FormatUint(mp.volID, 10),
-		strconv.FormatUint(mp.PartitionID, 10))
-	data := &struct {
-		PartitionID   uint64
-		Start         uint64
-		End           uint64
-		VolID         uint64
-		ReplicaNum    int
-		Status        int8
-		VolName       string
-		Hosts         string
-		Peers         []proto.Peer
-		OfflinePeerID uint64
-		IsMarkDeleted bool
-	}{
-		PartitionID: mp.PartitionID,
-		Start:       mp.Start,
-		End:         mp.End,
-		VolID:       mp.volID,
-		ReplicaNum:  mp.ReplicaNum,
-		Status:      mp.Status,
-		VolName:     mp.volName,
-		Hosts:       strings.Join(mp.Hosts, "_"),
-		Peers:       mp.Peers,
-	}
-	cmd.V, _ = json.Marshal(&data)
-	return cluster.submit(cmd)
-}
-
 // apply log to fsm
 func (cluster *Cluster) submit(cmd *RaftCmd) error {
 	data, _ := json.Marshal(cmd)

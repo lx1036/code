@@ -131,7 +131,7 @@ func (alloc *IDAllocator) allocateMetaPartitionID() (partitionID uint64, err err
 }
 
 func (alloc *IDAllocator) restore(key string) uint64 {
-	value, err := alloc.store.Get([]byte(maxMetaNodeIDKey))
+	value, err := alloc.store.Get([]byte(key))
 	if len(value) == 0 || err != nil {
 		return 0
 	}

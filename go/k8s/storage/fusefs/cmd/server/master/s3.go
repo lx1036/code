@@ -61,6 +61,28 @@ func (cluster *Cluster) CreateBucket(accessKey, secretKey, endpoint, bucketName 
 	return nil
 }
 
+func (cluster *Cluster) DeleteBucket(accessKey, secretKey, endpoint, bucketName string) (err error) {
+	credential := credentials.NewStaticCredentials(accessKey, secretKey, "")
+	config := &aws.Config{
+		Region:           aws.String("beijing"),
+		Endpoint:         aws.String(endpoint),
+		S3ForcePathStyle: aws.Bool(true),
+		Credentials:      credential,
+	}
+	sess := session.Must(session.NewSession(config))
+	s3Client := s3.New(sess)
+
+	_, err = s3Client.DeleteBucket(&s3.DeleteBucketInput{
+		Bucket: aws.String(bucketName),
+	})
+	if err != nil {
+		klog.Errorf("Failed to create bucket[%v], error: %v", bucketName, err)
+		return err
+	}
+
+	return nil
+}
+
 // INFO: 从 s3 中删除该 bucket 中所有文件
 func (cluster *Cluster) deleteListObjects(accessKey, secretKey, endpoint, region,
 	bucketName string) (deleteDone bool, err error) {

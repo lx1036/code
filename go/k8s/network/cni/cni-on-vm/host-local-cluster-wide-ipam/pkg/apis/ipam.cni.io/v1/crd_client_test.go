@@ -62,8 +62,6 @@ func TestControllerRuntimeClient(test *testing.T) {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	
-	
 
 	namespace := "default"
 	name := "ippool1"

@@ -3,13 +3,11 @@ package master
 import (
 	"encoding/json"
 	"fmt"
+	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
+	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
 	"net/http"
 	"net/http/httputil"
 	"strconv"
-	"strings"
-
-	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
-	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
 
 	"github.com/gorilla/mux"
 	"k8s.io/klog/v2"
@@ -40,6 +38,7 @@ func (server *Server) startHTTPService() {
 				return
 			}
 
+			// TODO: proxy request 还有些问题，后续修改
 			// proxy request to raft leader
 			reverseProxy := &httputil.ReverseProxy{
 				Director: func(request *http.Request) {
@@ -78,7 +77,7 @@ func (server *Server) startHTTPService() {
 
 // cluster
 func (server *Server) getClusterInfo(writer http.ResponseWriter, request *http.Request) {
-	data, _ := json.Marshal(&proto.ClusterInfo{Cluster: server.cluster.Name, Ip: strings.Split(request.RemoteAddr, ":")[0]})
+	data, _ := json.Marshal(&proto.ClusterInfo{Cluster: server.cluster.Name, Ip: request.RemoteAddr})
 	send(writer, http.StatusOK, data)
 	return
 }
