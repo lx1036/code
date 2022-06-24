@@ -106,6 +106,21 @@ CILIUM_POST_nat chain 包含的 rules 如上，podIP Masq 的 rule 主要是这�
 不过，eBPF 虽然性能高，但实现复杂。
 
 
+## 与 calico 对比
+calico 也有 podIP masq 成 nodeIP 的功能，见 **[Configure outgoing NAT](https://projectcalico.docs.tigera.io/networking/workloads-outside-cluster)** , 可以通过参数 `natOutgoing` 配置：
+```yaml
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: default-ipv4-ippool
+spec:
+  cidr: 192.168.0.0/16
+  natOutgoing: true
+```
+
+我们生产 K8s 有少量的集群，容器网络插件用的是 calico，配置都是关闭的 `natOutgoing: false`。calico 默认应该是下发 iptables 规则实现的 SNAT。
+
+
 ## 总结
 cilium 默认使用 podIP Masq，这样当 pod 不是访问其他 pod 时，会把 podIP SNAT 为 nodeIP，尤其在 podIP 是私网不可达且访问集群外部资源时有用。
 但是，由于我们采用 cilium + BGP 模式，podIP 在公司内网可达，不需要这个功能，所以需要配置关闭。

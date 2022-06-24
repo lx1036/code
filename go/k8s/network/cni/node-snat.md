@@ -28,5 +28,7 @@ bridge 和 ptp plugin 都有 ipMasq 配置参数，用来配置 podIP SNAT nodeI
 # 实现
 使用 iptables 实现 SNAT.
 
+可以参考 **[iptables snat masquerading](go/k8s/network/cilium/cilium-podIP-masq问题记录.md)**
+
 
 # 参考文献
