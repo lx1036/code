@@ -36,7 +36,7 @@ https://github.com/cilium/cilium/blob/v1.11.5/pkg/k8s/node.go#L114-L155
 
 
 (2) 关闭 kube-controller-manager `--allocate-node-cidrs=false` 。但是目前已经部署的 K8s 已经开启，K8s Node .Spec.PodCIDR 已经被分配值了，所以除了改变 `--allocate-node-cidrs=false` 参数外，
-还需要重新生成 K8s Node：每一台都要人工删除 K8s Node 对象，然后重启该 Node 上的 kubelet 使其生成 .Spec.PodCIDR 没有值的 K8s Node 对象。
+还需要重新生成 K8s Node：每一台都要人工删除 K8s Node 对象，然后重启该 Node 上的 kubelet 使其生成 .Spec.PodCIDR 没有值的 K8s Node 对象(该方法废弃，直接 patch 掉 Node .Spec.PodCIDR 就行)。
 
 
 (3)最后一步就简单了，用 helm chart 部署 cilium-ipam operator。首次部署时，直接在代码仓库下 https://v.src.corp.qihoo.net/opsdev/loadbalancer 执行 `make cilim-ipam-install` 命令就行；
