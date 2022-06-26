@@ -183,10 +183,12 @@
   resolved "https://registry.npm.taobao.org/@angular/compiler/download/@angular/compiler-9.0.2.tgz#be238eb2e575e2945f8e88c4ae09d99b280b797d"
   integrity sha1-viOOsuV14pRfjojErgnZmygLeX0=
 
-"@angular/core@9.0.2":
-  version "9.0.2"
-  resolved "https://registry.npm.taobao.org/@angular/core/download/@angular/core-9.0.2.tgz#250093b6a4d3137e2cc30e73e6cee919f1386165"
-  integrity sha1-JQCTtqTTE34sww5z5s7pGfE4YWU=
+"@angular/core@11.0.5":
+  version "11.0.5"
+  resolved "https://registry.yarnpkg.com/@angular/core/-/core-11.0.5.tgz#b8c448c3cd4f6dae7327cc1ba4ee2aa29c8dbc26"
+  integrity sha512-XAXWQi7R3ucZXQwx9QK5jSKJeQyRJ53u2dQDpr7R5stzeCy1a5hrNOkZLg9zOTTPcth/6+FrOrRZP9SMdxtw3w==
+  dependencies:
+    tslib "^2.0.0"
 
 "@angular/flex-layout@9.0.0-beta.29":
   version "9.0.0-beta.29"
@@ -6146,9 +6148,9 @@ events@^3.0.0:
   integrity sha1-mgoN+vYok9krh1uPJpjKQRSXPog=
 
 eventsource@^1.0.7:
-  version "1.0.7"
-  resolved "https://registry.npm.taobao.org/eventsource/download/eventsource-1.0.7.tgz#8fbc72c93fcd34088090bc0a4e64f4b5cee6d8d0"
-  integrity sha1-j7xyyT/NNAiAkLwKTmT0tc7m2NA=
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/eventsource/-/eventsource-1.1.1.tgz#4544a35a57d7120fba4fa4c86cb4023b2c09df2f"
+  integrity sha512-qV5ZC0h7jYIAOhArFJgSfdyz6rALJyb270714o7ZtNnw2WSJ+eexhKtE0O8LYPRsHZHf2osHKZBxGPvm3kPkCA==
   dependencies:
     original "^1.0.0"
 
@@ -10784,8 +10786,8 @@ ordered-read-streams@^1.0.0:
 
 original@^1.0.0:
   version "1.0.2"
-  resolved "https://registry.npm.taobao.org/original/download/original-1.0.2.tgz#e442a61cffe1c5fd20a65f3261c26663b303f25f"
-  integrity sha1-5EKmHP/hxf0gpl8yYcJmY7MD8l8=
+  resolved "https://registry.yarnpkg.com/original/-/original-1.0.2.tgz#e442a61cffe1c5fd20a65f3261c26663b303f25f"
+  integrity sha512-hyBVl6iqqUOJ8FqRe+l/gS8H+kKYjrEndd5Pm1MfBtsEKA038HkkdbAl/72EAXGyonD/PFsvmVG+EvcIpliMBg==
   dependencies:
     url-parse "^1.4.3"
 
@@ -14431,20 +14433,15 @@ ts-node@8.6.2:
     source-map-support "^0.5.6"
     yn "3.1.1"
 
-tslib@1.10.0, tslib@^1.8.0, tslib@^1.8.1, tslib@^1.9.0:
+tslib@1.10.0:
   version "1.10.0"
   resolved "https://registry.npm.taobao.org/tslib/download/tslib-1.10.0.tgz#c3c19f95973fb0a62973fb09d90d961ee43e5c8a"
   integrity sha1-w8GflZc/sKYpc/sJ2Q2WHuQ+XIo=
 
-tslib@1.13.0:
+tslib@1.13.0, tslib@^1.7.1, tslib@^1.8.0, tslib@^1.8.1, tslib@^1.9.0:
   version "1.13.0"
   resolved "https://registry.npm.taobao.org/tslib/download/tslib-1.13.0.tgz#c881e13cc7015894ed914862d276436fa9a47043"
   integrity sha1-yIHhPMcBWJTtkUhi0nZDb6mkcEM=
-
-tslib@^1.7.1:
-  version "1.11.1"
-  resolved "https://registry.npm.taobao.org/tslib/download/tslib-1.11.1.tgz#eb15d128827fbee2841549e171f45ed338ac7e35"
-  integrity sha1-6xXRKIJ/vuKEFUnhcfRe0zisfjU=
 
 tslib@^2.0.0:
   version "2.0.1"

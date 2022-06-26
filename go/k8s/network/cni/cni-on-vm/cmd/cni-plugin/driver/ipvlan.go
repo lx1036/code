@@ -130,7 +130,11 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 		}
 		// ipvlan 网卡 和 parentLink 共享相同的 MAC 地址
 		err = netlink.AddrAdd(containerLink, &netlink.Addr{ // `sudo ip netns exec net1 ip addr add 10.0.1.10/24 dev ipv1`
-			IPNet: cfg.ContainerIPNet.IPv4, // 这里是 10.0.1.10/24，不是 10.0.1.10/32
+			//IPNet: cfg.ContainerIPNet.IPv4, // 这里是 10.0.1.10/24，不是 10.0.1.10/32
+			IPNet: &net.IPNet{ // 好像应该是 10.0.1.10/32，即 podIP/32
+				IP:   cfg.ContainerIPNet.IPv4.IP,
+				Mask: net.CIDRMask(32, 32),
+			},
 		})
 		if err != nil {
 			return err

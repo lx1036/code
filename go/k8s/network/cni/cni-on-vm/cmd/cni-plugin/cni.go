@@ -191,6 +191,10 @@ func cmdAdd(args *skel.CmdArgs) error {
 			if err != nil {
 				return err
 			}
+
+		case rpc.IPType_TypeVPCENI:
+			err = driver.NewExclusiveENIDriver().Setup(setupCfg, cniNetns) // eni 单 IP 模式
+
 		default:
 			return fmt.Errorf("not support this network type")
 		}

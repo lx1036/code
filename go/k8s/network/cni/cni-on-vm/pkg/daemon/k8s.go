@@ -28,6 +28,7 @@ import (
 
 const (
 	podNetworkTypeENIMultiIP = "ENIMultiIP"
+	podNetworkTypeVPCENI     = "ENIIP"
 
 	//dbPath = "/var/lib/cni/pod.db"
 	//dbName = "pods"

@@ -46,6 +46,17 @@ func main() {
 }
 
 // portmap 必须是 chain plugin
+// INFO:
+//  DNAT:
+//   PREROUTING, OUTPUT: --dst-type local -j CNI-HOSTPORT-DNAT
+//   CNI-HOSTPORT-DNAT: -m multiport --destination-ports 8080,8081 -j CNI-DN-abcd123
+//   CNI-HOSTPORT-SETMARK: -j MARK --set-xmark 0x2000/0x2000
+//   CNI-DN-abcd123: -p tcp -s 172.16.30.0/24 --dport 8080 -j CNI-HOSTPORT-SETMARK
+//   CNI-DN-abcd123: -p tcp -s 127.0.0.1 --dport 8080 -j CNI-HOSTPORT-SETMARK
+//   CNI-DN-abcd123: -p tcp --dport 8080 -j DNAT --to-destination 172.16.30.2:8080
+//  SNAT:
+//   POSTROUTING: -j CNI-HOSTPORT-MASQ
+//   CNI-HOSTPORT-MASQ: --mark 0x2000 -j MASQUERADE
 func cmdAdd(args *skel.CmdArgs) error {
 	netConf, err := loadConf(args.StdinData, args.IfName)
 	if err != nil {

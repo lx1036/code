@@ -12,57 +12,85 @@ ipvlan: 从一个网卡虚拟出多个网卡，这些网卡拥有相同的mac地
 并且 DHCP server 也要正确配置使用该字段作为机器标识，而不是使用 mac 地址
 
 ## 两种模式
-ipvlan 有两种不同的模式：L2 和 L3。
+ipvlan 有两种不同的模式：L2(二层交换机)和 L3(三层交换机)。
+二层交换机 和 三层交换机 主要的区别就是：二层交换机通过 mac 地址(arp 协议)来决定下一跳；三层交换机通过 ip 决定下一跳，下一跳 ip 通过查询路由表路由。
+**[二、三层交换机之间到底有什么区别](https://mp.weixin.qq.com/s/U_-fjMPvh1W4_c1ao34YAg)**
 
 ### L2 模式
 
 ```shell
-ip netns add ns0
-ip netns add ns1
-
-ip link add link eth0 ipvl0 type ipvlan mode l2
-ip link add link eth0 ipvl1 type ipvlan mode l2
-
-ip link set dev ipvl0 netns ns0
-ip link set dev ipvl1 netns ns1
-
-# For ns0
-ip netns exec ns0 bash
-ip link set dev ipvl0 up
-ip link set dev lo up
-ip -4 addr add 127.0.0.1 dev lo
-ip -4 addr add $IPADDR dev ipvl0
-ip -4 route add default via $ROUTER dev ipvl0
-# For ns1
-ip netns exec ns1 bash
-ip link set dev ipvl1 up
-ip link set dev lo up
-ip -4 addr add 127.0.0.1 dev lo
-ip -4 addr add $IPADDR dev ipvl1
-ip -4 route add default via $ROUTER dev ipvl1
+ip link add dummy-ipvlan-l2 type dummy
+ip link set dummy-ipvlan-l2 up
+ip netns add net-ipvlan-l2-1
+ip netns add net-ipvlan-l2-2
+ip link add ipv1 link dummy-ipvlan-l2 type ipvlan mode l2
+ip link add ipv2 link dummy-ipvlan-l2 type ipvlan mode l2
+ip link add ipv3 link dummy-ipvlan-l2 type ipvlan mode l2
+ip link set ipv1 netns net-ipvlan-l2-1
+ip link set ipv2 netns net-ipvlan-l2-2
+ip link set ipv3 netns net-ipvlan-l2-1
+ip netns exec net-ipvlan-l2-1 ip link set ipv1 up
+ip netns exec net-ipvlan-l2-2 ip link set ipv2 up
+ip netns exec net-ipvlan-l2-1 ip link set ipv3 up
+ip netns exec net-ipvlan-l2-1 ip addr add 200.1.1.10/24 dev ipv1
+ip netns exec net-ipvlan-l2-2 ip addr add 200.1.2.10/24 dev ipv2
+ip netns exec net-ipvlan-l2-1 ip addr add 200.2.1.10/32 dev ipv3
+ip netns exec net-ipvlan-l2-1 ip route add default dev ipv1
+ip netns exec net-ipvlan-l2-2 ip route add default dev ipv2
+ip netns exec net-ipvlan-l2-1 ping -c 3 200.1.2.10
+ip netns exec net-ipvlan-l2-2 ping -c 3 200.1.1.10
+ip netns exec net-ipvlan-l2-2 ping -c 3 200.2.1.10
 ```
 
 ### L3 模式
 
 ```shell
-# 测试使用 IPVlan L3 模式下两个 ns 下的容器网络互通
-sudo ip netns add net1
-sudo ip netns add net2
-# 分别创建 ipvlan 网卡，父网卡是 eth0
-sudo ip link add ipv1 link eth0 type ipvlan mode l3
-sudo ip link add ipv2 link eth0 type ipvlan mode l3
+# 测试使用 IPVlan L3 模式下两个 net namespace 下的容器网络互通
+
+# 父网卡是自建的 dummy type 虚拟网卡
+ip link add dummy-ipvlan-l3 type dummy
+ip link set dummy-ipvlan-l3 up
+ip netns add net-ipvlan-l3-3
+ip netns add net-ipvlan-l3-4
+ip link add ipv1 link dummy-ipvlan-l3 type ipvlan mode l3
+ip link add ipv2 link dummy-ipvlan-l3 type ipvlan mode l3
+ip link add ipv3 link dummy-ipvlan-l3 type ipvlan mode l3
 # 移动网卡到对应的 ns
-sudo ip link set ipv1 netns net1
-sudo ip link set ipv2 netns net2
-sudo ip netns exec net1 ip link set ipv1 up # ip netns exec net1 bash
-sudo ip netns exec net2 ip link set ipv2 up
+ip link set ipv1 netns net-ipvlan-l3-3
+ip link set ipv2 netns net-ipvlan-l3-4
+ip link set ipv3 netns net-ipvlan-l3-3
+ip netns exec net-ipvlan-l3-3 ip link set ipv1 up
+ip netns exec net-ipvlan-l3-4 ip link set ipv2 up
+ip netns exec net-ipvlan-l3-3 ip link set ipv3 up
 # 配置 ip 地址和默认路由
-sudo ip netns exec net1 ip addr add 10.0.1.10/24 dev ipv1
-sudo ip netns exec net2 ip addr add 10.0.2.10/24 dev ipv2
-sudo ip netns exec net1 ip route add default dev ipv1
-sudo ip netns exec net2 ip route add default dev ipv2
+ip netns exec net-ipvlan-l3-3 ip addr add 200.0.1.10/24 dev ipv1
+ip netns exec net-ipvlan-l3-4 ip addr add 200.0.2.10/24 dev ipv2
+ip netns exec net-ipvlan-l3-3 ip addr add 210.0.1.10/32 dev ipv3
+ip netns exec net-ipvlan-l3-3 ip route add default dev ipv1
+ip netns exec net-ipvlan-l3-4 ip route add default dev ipv2
 # 测试两个 ns 的容器连通性
-sudo ip netns exec net1 ping -c 3 10.0.2.10
+ip netns exec net-ipvlan-l3-3 ping -c 3 200.0.2.10
+ip netns exec net-ipvlan-l3-4 ping -c 3 200.0.1.10
+ip netns exec net-ipvlan-l3-4 ping -c 3 210.0.1.10
+```
+
+问题：但是在 host net namespace 下无法 ping/curl 通 200.0.2.10 等 ipvlan 网卡，以及 service ip？
+
+```shell
+# veth pair 打通容器网络
+# 可以看这个，已经经过验证
+ip link add veth-test-2 type veth peer name veth-test-3
+ip netns add net-veth-2
+ip link set veth-test-2 netns net-veth-2
+ip link set veth-test-2 up
+ip netns exec net-veth-2 ip link set veth-test-2 up
+ip netns exec net-veth-2 ip route add 169.254.1.1 dev veth-test-2
+ip netns exec net-veth-2 ip route add default via 169.254.1.1 dev veth-test-2
+ip netns exec net-veth-2 ip neigh add 169.254.1.1 dev veth-test-2 lladdr ee:ee:ee:ee:ee:ee
+ip link set addr ee:ee:ee:ee:ee:ee veth-test-3
+ip netns exec net-veth-2 ip addr add 100.162.253.162 dev veth-test-2 # 100.162.253.162 随便写的 pod ip
+ip route add 100.162.253.162 dev veth-test-3
+ip netns exec net-veth-2 curl -I 192.168.246.174 # 192.168.246.174 为 service ip
 ```
 
 

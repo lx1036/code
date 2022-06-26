@@ -233,7 +233,7 @@ func (b *BoltStore) BatchDelete(cmdMap map[string][]byte) error {
 	})
 }
 
-func (b *BoltStore) BatchPut(cmdMap map[string]string) error {
+func (b *BoltStore) BatchPut(cmdMap map[string][]byte) error {
 	return b.db.Batch(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(dbFsm)
 		for key, value := range cmdMap {
@@ -292,7 +292,7 @@ func (b *BoltStore) Restore(data []byte) error {
 	b.Lock()
 	defer b.Unlock()
 
-	values := make(map[string]string, 0)
+	values := make(map[string][]byte, 0)
 	if err := json.Unmarshal(data, &values); err != nil {
 		return err
 	}

@@ -30,12 +30,12 @@ type networkContext struct {
 	k8sService *K8sService
 }
 
-type eniIPResourceManager struct {
+type eniIPManager struct {
 	trunkENI *types.ENI
 	pool     *SimpleObjectPool
 }
 
-func newENIIPResourceManager(poolConfig *ResourceConfig, ecs ipam.API, k8s K8sService, allocatedResources map[string]resourceManagerInitItem) (*eniIPResourceManager, error) {
+func newENIIPManager(poolConfig *ResourceConfig, ecs ipam.API, k8s K8sService, allocatedResources map[string]resourceManagerInitItem) (*eniIPManager, error) {
 	factory := NewENIIPFactory(poolConfig, ecs)
 
 	p, err := NewSimpleObjectPool(PoolConfig{
@@ -52,7 +52,7 @@ func newENIIPResourceManager(poolConfig *ResourceConfig, ecs ipam.API, k8s K8sSe
 
 	var trunkENI *types.ENI
 
-	mgr := &eniIPResourceManager{
+	mgr := &eniIPManager{
 		pool:     p,
 		trunkENI: trunkENI,
 	}
@@ -60,11 +60,11 @@ func newENIIPResourceManager(poolConfig *ResourceConfig, ecs ipam.API, k8s K8sSe
 	return mgr, nil
 }
 
-func (m *eniIPResourceManager) Allocate(ctx *networkContext, id string) (types.NetworkResource, error) {
+func (m *eniIPManager) Allocate(ctx *networkContext, id string) (types.NetworkResource, error) {
 	return m.pool.Acquire(ctx, id, podInfoKey(ctx.pod.Namespace, ctx.pod.Name))
 }
 
-func (m *eniIPResourceManager) Release(ctx *networkContext, resItem types.ResourceItem) error {
+func (m *eniIPManager) Release(ctx *networkContext, resItem types.ResourceItem) error {
 	if ctx != nil && ctx.pod != nil {
 		return m.pool.ReleaseWithReservation(resItem.ID, ctx.pod.IPStickTime)
 	}

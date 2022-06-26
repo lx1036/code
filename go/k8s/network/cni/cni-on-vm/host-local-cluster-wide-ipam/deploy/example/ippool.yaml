@@ -1,0 +1,9 @@
+
+
+
+apiVersion: ipam.cni.io/v1
+kind: IPPool
+metadata:
+  name: ippool1
+spec:
+  range: "100.30.30.0/24"

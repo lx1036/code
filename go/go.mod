@@ -11,6 +11,7 @@ require (
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/BurntSushi/toml v0.4.1
 	github.com/Shopify/sarama v1.19.0
+	github.com/alexflint/go-filemutex v1.1.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1501
 	github.com/astaxie/beego v1.12.1
 	github.com/aws/aws-sdk-go v1.40.45
@@ -19,8 +20,8 @@ require (
 	github.com/cilium/cilium v1.12.0-rc0
 	github.com/cilium/ipam v0.0.0-20211026130907-54a76012817c
 	github.com/container-storage-interface/spec v1.5.0
-	github.com/containerd/cgroups v1.0.1
-	github.com/containerd/containerd v1.5.10
+	github.com/containerd/cgroups v1.0.3
+	github.com/containerd/containerd v1.5.13
 	github.com/containerd/go-cni v1.1.3
 	github.com/containernetworking/cni v1.1.0
 	github.com/containernetworking/plugins v1.1.1
@@ -79,6 +80,8 @@ require (
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/moby/ipvs v1.0.1
 	github.com/nbio/st v0.0.0-20140626010706-e9e8d9816f32
+	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/gomega v1.17.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.2
 	github.com/opencontainers/runc v1.1.2
@@ -120,7 +123,7 @@ require (
 	golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220111092808-5a964db01320
+	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
@@ -165,7 +168,6 @@ require (
 	github.com/mdlayher/ethernet v0.0.0-20190606142754-0394541c37b7 // indirect
 	github.com/mdlayher/ndp v0.0.0-20200602162440-17ab9e3e5567 // indirect
 	github.com/mdlayher/raw v0.0.0-20210412142147-51b895745faf // indirect
-	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f // indirect
@@ -178,7 +180,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
-	github.com/Microsoft/hcsshim v0.8.23 // indirect
+	github.com/Microsoft/hcsshim v0.8.24 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect

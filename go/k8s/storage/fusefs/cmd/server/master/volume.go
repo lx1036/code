@@ -1,6 +1,8 @@
 package master
 
 import (
+	"encoding/json"
+	"fmt"
 	"sync"
 )
 
@@ -73,4 +75,13 @@ func (vol *Volume) cloneMetaPartitionMap() map[uint64]*MetaPartition {
 	}
 
 	return mps
+}
+
+//key=#vol#volID,value=json.Marshal(vv)
+func (cluster *Cluster) submitVol(opType uint32, vol *Volume) (err error) {
+	cmd := new(RaftCmd)
+	cmd.Op = opType
+	cmd.K = fmt.Sprintf("%s%d", volPrefix, vol.ID)
+	cmd.V, _ = json.Marshal(vol)
+	return cluster.submit(cmd)
 }
