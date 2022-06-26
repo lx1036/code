@@ -1,6 +1,9 @@
 package master
 
 import (
+	"encoding/json"
+	"fmt"
+	"strconv"
 	"sync"
 
 	"k8s-lx1036/k8s/storage/fusefs/pkg/proto"
@@ -49,23 +52,12 @@ type MetaPartition struct {
 	//LoadResponse []*proto.MetaPartitionLoadResponse
 }
 
-func newMetaPartition(partitionID, start, end uint64, replicaNum int, volName string, volID uint64, isMarkDeleted bool) (mp *MetaPartition) {
-	mp = &MetaPartition{PartitionID: partitionID, Start: start, End: end, volName: volName, volID: volID}
-	mp.ReplicaNum = replicaNum
-	mp.Replicas = make([]*MetaReplica, 0)
-	mp.Status = Unavailable
-	mp.MissNodes = make(map[string]int64, 0)
-	mp.Peers = make([]proto.Peer, 0)
-	mp.Hosts = make([]string, 0)
-	//mp.LoadResponse = make([]*proto.MetaPartitionLoadResponse, 0)
-	//mp.IsMarkDeleted = isMarkDeleted
-	return
-}
-
-func (mp *MetaPartition) setPeers(peers []proto.Peer) {
-	mp.Peers = peers
-}
-
-func (mp *MetaPartition) setHosts(hosts []string) {
-	mp.Hosts = hosts
+// #metapartition#{volID}#{partitionID}
+func (cluster *Cluster) submitMetaPartition(opType uint32, mp *MetaPartition) error {
+	cmd := new(RaftCmd)
+	cmd.Op = opType
+	cmd.K = fmt.Sprintf("%s%s#%s", metaPartitionPrefix, strconv.FormatUint(mp.volID, 10),
+		strconv.FormatUint(mp.PartitionID, 10))
+	cmd.V, _ = json.Marshal(mp)
+	return cluster.submit(cmd)
 }

@@ -24,6 +24,16 @@ const (
 	Vlan
 )
 
+// IPAMType how terway deal with ip resource
+type IPAMType string
+
+// how terway deal with ip resource
+const (
+	IPAMTypeCRD       = "crd"
+	IPAMTypePreferCRD = "preferCRD"
+	IPAMTypeDefault   = ""
+)
+
 // NetworkResource interface of network resources
 type NetworkResource interface {
 	GetResourceID() string

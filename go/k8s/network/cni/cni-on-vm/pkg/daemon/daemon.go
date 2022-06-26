@@ -61,6 +61,7 @@ type EniBackendServer struct {
 	pendingPods sync.Map // 并发安全的 map
 	storage     *storage.DiskStorage
 	ipam        ipam.API
+	ipamType    types.IPAMType
 }
 
 func newEniBackendServer(daemonMode, configFilePath, kubeconfig string) (rpc.EniBackendServer, error) {
@@ -93,8 +94,11 @@ func newEniBackendServer(daemonMode, configFilePath, kubeconfig string) (rpc.Eni
 	if err != nil {
 		return nil, err
 	}
+
+	// INFO: get local eni only when mode is ExclusiveENI
+
 	server.restoreLocalENI()
-	eniList, err := server.storage.List()
+	eniList, err := server.storage.List() // 部署时 boltdb 文件在 hostPath 上
 	if err != nil {
 		return nil, err
 	}
@@ -121,13 +125,13 @@ func newEniBackendServer(daemonMode, configFilePath, kubeconfig string) (rpc.Eni
 	var err error
 	switch daemonMode {
 	case daemonModeENIMultiIP:
-		server.eniIPResMgr, err = newENIIPResourceManager(poolConfig, ecs, server.k8s, localResource)
+		server.eniIPResMgr, err = newENIIPManager(poolConfig, ecs, server.k8s, localResource)
 		if err != nil {
 			return nil, err
 		}
 
 	case daemonModeENIOnly: // 网卡单IP模式，也可以参考青云的只支持的网卡单IP模式：https://github.com/yunify/hostnic-cni/blob/master/docs/proposal.md
-
+		server.eniMgr, err = newENIManager(poolConfig, ecs, server.k8s, localResource)
 	}
 
 	return server, nil
@@ -158,6 +162,10 @@ func (server *EniBackendServer) restoreLocalENI() error {
 		return err
 	}
 	for _, podInfo := range podsInfo {
+		if podInfo.PodNetworkType != podNetworkTypeVPCENI { // INFO: 只有是网卡单IP模式
+			continue
+		}
+
 		if eni, ok := ipENIMap[podInfo.PodIPs.IPv4.String()]; ok {
 			server.storage.Put(podInfoKey(podInfo.Namespace, podInfo.Name), types.PodResources{
 				PodInfo:   podInfo,
@@ -212,6 +220,13 @@ func (server *EniBackendServer) AllocateIP(ctx context.Context, request *rpc.All
 			return nil, err
 		}
 		allocIPReply.Success = true
+
+	case podNetworkTypeVPCENI:
+		if server.ipamType == types.IPAMTypeCRD {
+
+		} else {
+			eni, err = server.allocateENI(networkContext, &oldRes)
+		}
 
 	default:
 		return nil, fmt.Errorf("not support pod network type")

@@ -1,11 +1,26 @@
 
 # Cilium IPAM
+解决方案：https://cilium.slack.com/archives/C1MATJ5U5/p1644297760855179
+
 IPAM: https://docs.cilium.io/en/stable/concepts/networking/ipam/
 
 Cilium Operator 创建 CiliumNode，并通过 IPAM 来从 Cluster CIDR 中分配 Pod CIDR，给 Daemon Agent 使用。
 Cilium IPAM Mode: cluster-pool(默认)、crd(自定义)、aws eni、azure、alibaba cloud
 cluster-pool: https://docs.cilium.io/en/stable/concepts/networking/ipam/cluster-pool/
 crd: https://docs.cilium.io/en/stable/gettingstarted/ipam-crd/
+
+# Cilium Kubernetes IPAM
+解决方案：https://cilium.slack.com/archives/C1MATJ5U5/p1644297760855179
+
+cilium ipam:kubernetes 工作机制：**[kubernetes ipam](https://docs.cilium.io/en/stable/concepts/networking/ipam/kubernetes/)**
+cilium agent 会等待并 retrieveNodeInformation(corev1.node)，读取 node.Spec.PodCIDRs，没有则读取 node.Spec.PodCIDR，没有则
+读取 node.Annotations["io.cilium.network.ipv4-pod-cidr"]，可以见代码：
+* https://github.com/cilium/cilium/blob/v1.12.0-rc0/pkg/k8s/init.go#L190-L260
+* https://github.com/cilium/cilium/blob/v1.12.0-rc0/pkg/k8s/node.go#L52-L206
+
+## K8s NodeIPAM Controller
+**[KEP-2593: Enhanced NodeIPAM to support Discontiguous Cluster CIDR](https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/2593-multiple-cluster-cidrs)** : 该提议基本实现了我们的所有需求，
+包括多个 ippool, 每个 node 可以多个 cidr，blockSize 可以根据 node 而变化，以及 ippool.Cidr 可以不连续的，等等。
 
 
 # 需求

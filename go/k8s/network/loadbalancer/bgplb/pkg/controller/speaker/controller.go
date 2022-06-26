@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,6 +58,8 @@ type SpeakerController struct {
 	svcInformer     cache.Controller
 	epIndexer       cache.Indexer
 	epInformer      cache.Controller
+	nodeIndexer     cache.Indexer
+	nodeInformer    cache.Controller
 	bgpPeerLister   listerv1.BGPPeerLister
 	bgppeerInformer cache.SharedIndexInformer
 
@@ -70,6 +74,7 @@ type SpeakerController struct {
 }
 
 type svcKey string
+type nodeKey string
 type bgppeer string
 
 func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName string, debug bool) *SpeakerController {
@@ -121,30 +126,41 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 	}))
 	c.bgppeerInformer = c.crdFactory.Bgplb().V1().BGPPeers().Informer()
 	c.bgpPeerLister = c.crdFactory.Bgplb().V1().BGPPeers().Lister()
-	c.bgppeerInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(bgppeer(key))
+	c.bgppeerInformer.AddEventHandler(cache.FilteringResourceEventHandler{
+		FilterFunc: func(obj interface{}) bool {
+			switch t := obj.(type) {
+			case *v1.BGPPeer:
+				return t.Name == nodeName // only watch current nodeName BGPPeer
+			default:
+				runtime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", c, obj))
+				return false
 			}
 		},
-		DeleteFunc: func(obj interface{}) {
-			bgpp, ok := obj.(*v1.BGPPeer)
-			if !ok {
-				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				if err == nil {
+					c.queue.Add(bgppeer(key))
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				bgpp, ok := obj.(*v1.BGPPeer)
 				if !ok {
-					klog.Errorf("unexpected object type: %v", obj)
-					return
+					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						klog.Errorf("unexpected object type: %v", obj)
+						return
+					}
+					if bgpp, ok = tombstone.Obj.(*v1.BGPPeer); !ok {
+						klog.Errorf("unexpected object type: %v", obj)
+						return
+					}
 				}
-				if bgpp, ok = tombstone.Obj.(*v1.BGPPeer); !ok {
-					klog.Errorf("unexpected object type: %v", obj)
-					return
+				
+				if err = c.bgpServer.DeletePeer(context.TODO(), &gobgpapi.DeletePeerRequest{Address: bgpp.Spec.PeerAddress}); err != nil {
+					klog.Errorf(fmt.Sprintf("delete BGP peer %s err:%v", bgpp.Spec.PeerAddress, err))
 				}
-			}
-
-			if err = c.bgpServer.DeletePeer(context.TODO(), &gobgpapi.DeletePeerRequest{Address: bgpp.Spec.PeerAddress}); err != nil {
-				klog.Errorf(fmt.Sprintf("delete BGP peer %s err:%v", bgpp.Spec.PeerAddress, err))
-			}
+			},
 		},
 	})
 
@@ -191,7 +207,7 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 				// withdraw route
 				ip := svc.Status.LoadBalancer.Ingress[0].IP
 				if c.isIPAdvertised(ip) {
-					if err = c.withdrawIP(context.TODO(), ip); err != nil {
+					if err = c.withdrawCidr(context.TODO(), ip, 32); err != nil {
 						klog.Errorf(fmt.Sprintf("%v", err))
 					} else {
 						klog.Infof(fmt.Sprintf("withdraw route %s via nextHop %s", ip, c.nodeIP.String()))
@@ -204,8 +220,72 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 	endpointWatcher := cache.NewListWatchFromClient(kubeClient.CoreV1().RESTClient(), "endpoints", corev1.NamespaceAll, fields.Everything())
 	c.epIndexer, c.epInformer = cache.NewIndexerInformer(endpointWatcher, &corev1.Endpoints{}, 0,
 		cache.ResourceEventHandlerFuncs{}, cache.Indexers{})
-
-	c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced, c.epInformer.HasSynced, c.bgppeerInformer.HasSynced)
+	
+	nodeWatcher := cache.NewListWatchFromClient(kubeClient.CoreV1().RESTClient(), "nodes", corev1.NamespaceAll, fields.Everything())
+	c.nodeIndexer, c.nodeInformer = cache.NewIndexerInformer(nodeWatcher, &corev1.Node{}, 0, cache.FilteringResourceEventHandler{
+		FilterFunc: func(obj interface{}) bool {
+			switch t := obj.(type) {
+			case *corev1.Node:
+				// watch node has only annotations "io.cilium.network.ipv4-pod-cidr"
+				if t.Annotations != nil && len(t.Annotations[utils.V4CIDRName]) != 0 {
+					cidr := t.Annotations[utils.V4CIDRName]
+					_, _, err := net.ParseCIDR(cidr)
+					if err == nil {
+						return true
+					}
+				}
+				return false
+			default:
+				runtime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", c, obj))
+				return false
+			}
+		},
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				if err == nil {
+					c.queue.Add(nodeKey(key))
+				}
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(newObj)
+				if err == nil {
+					c.queue.Add(nodeKey(key))
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				node, ok := obj.(*corev1.Node)
+				if !ok {
+					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						klog.Errorf("unexpected object type: %v", obj)
+						return
+					}
+					if node, ok = tombstone.Obj.(*corev1.Node); !ok {
+						klog.Errorf("unexpected object type: %v", obj)
+						return
+					}
+				}
+				
+				// withdraw route
+				podCidr := node.Annotations[utils.V4CIDRName]
+				cidrStr := strings.Split(podCidr, "/")
+				ip := cidrStr[0]
+				cidrLen, err := strconv.Atoi(cidrStr[1])
+				if c.isIPAdvertised(ip) {
+					if err = c.withdrawCidr(context.TODO(), ip, uint32(cidrLen)); err != nil {
+						klog.Errorf(fmt.Sprintf("withdraw route err:%v", err))
+						return
+					}
+					
+					klog.Infof(fmt.Sprintf("withdraw route %s via nextHop %s", podCidr, c.nodeIP.String()))
+				}
+			},
+		},
+	}, cache.Indexers{})
+	
+	
+	c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced, c.epInformer.HasSynced, c.bgppeerInformer.HasSynced, c.nodeInformer.HasSynced)
 
 	return c
 }
@@ -260,6 +340,12 @@ func (c *SpeakerController) processNextWorkItem(ctx context.Context) bool {
 			break
 		}
 		err = c.syncService(ctx, string(t))
+	case nodeKey:
+		if !c.peerConnected { // wait for create BGPPeer
+			c.queue.AddAfter(key, time.Second*5)
+			break
+		}
+		err = c.syncNode(ctx, string(t))	
 	case bgppeer:
 		err = c.syncBgpPeer(ctx, string(t))
 	}
@@ -410,6 +496,39 @@ func (c *SpeakerController) isPeerEstablished(ctx context.Context, peerIP string
 	return peerConnected, nil
 }
 
+func (c *SpeakerController) syncNode(ctx context.Context, key string) error {
+	n, exists, err := c.nodeIndexer.GetByKey(key)
+	switch {
+	case !exists:
+		// 不会存在这种情况，这里保留下代码，主要学习 switch 这种代码用法
+	case err != nil:
+		runtime.HandleError(fmt.Errorf("unable to retrieve service %v from store: %v", key, err))
+	default:
+		node := n.(*corev1.Node)
+		err = c.processNodeCreateOrUpdate(ctx, node, key)
+	}
+	
+	return err
+}
+
+func (c *SpeakerController) processNodeCreateOrUpdate(ctx context.Context, node *corev1.Node, key string) error {
+	podCidr := node.Annotations[utils.V4CIDRName]
+	cidrStr := strings.Split(podCidr, "/")
+	ip := cidrStr[0]
+	cidrLen, err := strconv.Atoi(cidrStr[1])
+	if err != nil || cidrLen < 0 || cidrLen > 32 {
+		return fmt.Errorf("the pod CIDR IP given is not a proper mask: %d", cidrLen)
+	}
+	
+	if !c.isIPAdvertised(ip) {
+		defer klog.Infof(fmt.Sprintf("advertise route: %s via nextHop %s", podCidr, c.nodeIP.String()))
+		return c.advertiseCidr(ctx, ip, uint32(cidrLen))
+	}
+	
+	return nil
+}
+
+
 func (c *SpeakerController) syncService(ctx context.Context, key string) error {
 	service, exists, err := c.svcIndexer.GetByKey(key)
 	switch {
@@ -431,7 +550,7 @@ func (c *SpeakerController) processServiceCreateOrUpdate(ctx context.Context, se
 	if !ok {
 		if c.isIPAdvertised(ip) {
 			defer klog.Infof(fmt.Sprintf("withdraw route: %s/32 via nextHop %s", ip, c.nodeIP.String()))
-			return c.withdrawIP(ctx, ip)
+			return c.withdrawCidr(ctx, ip, 32)
 		}
 
 		return nil
@@ -439,7 +558,7 @@ func (c *SpeakerController) processServiceCreateOrUpdate(ctx context.Context, se
 
 	if !c.isIPAdvertised(ip) {
 		defer klog.Infof(fmt.Sprintf("advertise route: %s/32 via nextHop %s", ip, c.nodeIP.String()))
-		return c.advertiseIP(ctx, ip)
+		return c.advertiseCidr(ctx, ip, 32)
 	}
 
 	return nil
@@ -510,7 +629,7 @@ func (c *SpeakerController) isIPAdvertised(ip string) bool {
 	return err == nil && existed
 }
 
-func (c *SpeakerController) advertiseIP(ctx context.Context, ip string) error {
+func (c *SpeakerController) advertiseCidr(ctx context.Context, ip string, mask uint32) error {
 	a1, _ := apb.New(&gobgpapi.OriginAttribute{
 		Origin: uint32(bgppacket.BGP_ORIGIN_ATTR_TYPE_IGP),
 	})
@@ -520,7 +639,7 @@ func (c *SpeakerController) advertiseIP(ctx context.Context, ip string) error {
 	attrs := []*any.Any{a1, a2}
 	nlri, _ := apb.New(&gobgpapi.IPAddressPrefix{
 		Prefix:    ip,
-		PrefixLen: 32,
+		PrefixLen: mask,
 	})
 	_, err := c.bgpServer.AddPath(ctx, &gobgpapi.AddPathRequest{
 		TableType: gobgpapi.TableType_GLOBAL,
@@ -534,7 +653,7 @@ func (c *SpeakerController) advertiseIP(ctx context.Context, ip string) error {
 	return err
 }
 
-func (c *SpeakerController) withdrawIP(ctx context.Context, ip string) error {
+func (c *SpeakerController) withdrawCidr(ctx context.Context, ip string, mask uint32) error {
 	a1, _ := apb.New(&gobgpapi.OriginAttribute{
 		Origin: 0,
 	})
@@ -544,7 +663,7 @@ func (c *SpeakerController) withdrawIP(ctx context.Context, ip string) error {
 	attrs := []*any.Any{a1, a2}
 	nlri, _ := apb.New(&gobgpapi.IPAddressPrefix{
 		Prefix:    ip,
-		PrefixLen: 32,
+		PrefixLen: mask,
 	})
 	return c.bgpServer.DeletePath(ctx, &gobgpapi.DeletePathRequest{
 		TableType: gobgpapi.TableType_GLOBAL,
@@ -574,7 +693,7 @@ func (c *SpeakerController) advertiseAllServiceIP(ctx context.Context) {
 		}
 
 		ip := svc.Status.LoadBalancer.Ingress[0].IP
-		if err := c.advertiseIP(ctx, ip); err != nil {
+		if err := c.advertiseCidr(ctx, ip, 32); err != nil {
 			klog.Errorf(fmt.Sprintf("advertise service %s/%s ip %s err:%v", svc.Namespace, svc.Name, ip, err))
 			continue
 		}
