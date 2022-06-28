@@ -41,4 +41,7 @@ func runDaemon() {
 
 	d, err := app.NewDaemon()
 
+	// wait for cache sync
+	<-d.k8sCachesSynced
+
 }
