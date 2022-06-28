@@ -1,7 +1,11 @@
 package bpf
 
 import (
+	"bufio"
 	"fmt"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
+	"io"
 	"os"
 	"path"
 	"sync"
@@ -10,6 +14,59 @@ import (
 
 // MapType is an enumeration for valid BPF map types
 type MapType int
+
+func (t MapType) String() string {
+	switch t {
+	case MapTypeHash:
+		return "Hash"
+	case MapTypeArray:
+		return "Array"
+	case MapTypeProgArray:
+		return "Program array"
+	case MapTypePerfEventArray:
+		return "Event array"
+	case MapTypePerCPUHash:
+		return "Per-CPU hash"
+	case MapTypePerCPUArray:
+		return "Per-CPU array"
+	case MapTypeStackTrace:
+		return "Stack trace"
+	case MapTypeCgroupArray:
+		return "Cgroup array"
+	case MapTypeLRUHash:
+		return "LRU hash"
+	case MapTypeLRUPerCPUHash:
+		return "LRU per-CPU hash"
+	case MapTypeLPMTrie:
+		return "Longest prefix match trie"
+	case MapTypeArrayOfMaps:
+		return "Array of maps"
+	case MapTypeHashOfMaps:
+		return "Hash of maps"
+	case MapTypeDevMap:
+		return "Device Map"
+	case MapTypeSockMap:
+		return "Socket Map"
+	case MapTypeCPUMap:
+		return "CPU Redirect Map"
+	case MapTypeSockHash:
+		return "Socket Hash"
+	}
+
+	return "Unknown"
+}
+
+func (t MapType) allowsPreallocation() bool {
+	return t != MapTypeLPMTrie
+}
+
+func (t MapType) requiresPreallocation() bool {
+	switch t {
+	case MapTypeHash, MapTypePerCPUHash, MapTypeLPMTrie, MapTypeHashOfMaps:
+		return false
+	}
+	return true
+}
 
 // This enumeration must be in sync with enum bpf_map_type in <linux/bpf.h>
 const (
@@ -72,6 +129,60 @@ type MapInfo struct {
 	Flags         uint32
 	InnerID       uint32
 	OwnerProgType ProgType
+}
+
+/*
+GetMapInfo 获取
+cat /proc/17178/fdinfo/17
+pos:	0
+flags:	02000002
+mnt_id:	13
+map_type:	11
+key_size:	12
+value_size:	1
+max_entries:	65536
+map_flags:	0x1
+memlock:	3215360
+map_id:	5089
+*/
+func GetMapInfo(pid int, fd int) (*MapInfo, error) {
+	fdinfoFile := fmt.Sprintf("/proc/%d/fdinfo/%d", pid, fd)
+	file, err := os.Open(fdinfoFile)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	info := &MapInfo{}
+
+	// INFO: 这里可以借鉴，如何读取内容少量格式固定的文件
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		var value int
+
+		line := scanner.Text()
+		if n, err := fmt.Sscanf(line, "map_type:\t%d", &value); n == 1 && err == nil {
+			info.MapType = MapType(value)
+		} else if n, err := fmt.Sscanf(line, "key_size:\t%d", &value); n == 1 && err == nil {
+			info.KeySize = uint32(value)
+		} else if n, err := fmt.Sscanf(line, "value_size:\t%d", &value); n == 1 && err == nil {
+			info.ValueSize = uint32(value)
+			info.ReadValueSize = uint32(value)
+		} else if n, err := fmt.Sscanf(line, "max_entries:\t%d", &value); n == 1 && err == nil {
+			info.MaxEntries = uint32(value)
+		} else if n, err := fmt.Sscanf(line, "map_flags:\t0x%x", &value); n == 1 && err == nil {
+			info.Flags = uint32(value)
+		} else if n, err := fmt.Sscanf(line, "owner_prog_type:\t%d", &value); n == 1 && err == nil {
+			info.OwnerProgType = ProgType(value)
+		}
+	}
+
+	if scanner.Err() != nil {
+		return nil, scanner.Err()
+	}
+
+	return info, nil
 }
 
 type Map struct {
@@ -177,6 +288,34 @@ func (m *Map) openOrCreate(pin bool) (bool, error) {
 	return isNew, nil
 }
 
+func (m *Map) Open() error {
+	m.Lock()
+	defer m.Unlock()
+
+	return m.open()
+}
+
+func (m *Map) open() error {
+	if m.fd != 0 {
+		return nil
+	}
+
+	if err := m.setPathIfUnset(); err != nil {
+		return err
+	}
+
+	fd, err := ObjGet(m.path)
+	if err != nil {
+		return err
+	}
+
+	registerMap(m.path, m)
+
+	m.fd = fd
+	m.MapType = GetMapType(m.MapType)
+	return nil
+}
+
 func (m *Map) setPathIfUnset() error {
 	if m.path == "" {
 		if m.name == "" {
@@ -185,6 +324,82 @@ func (m *Map) setPathIfUnset() error {
 
 		m.path = MapPath(m.name)
 	}
+
+	return nil
+}
+
+// Create is similar to OpenOrCreate, but closes the map after creating or
+// opening it.
+func (m *Map) Create() (bool, error) {
+	isNew, err := m.OpenOrCreate()
+	if err != nil {
+		return isNew, err
+	}
+	return isNew, m.Close()
+}
+
+// DeleteAll deletes all entries of a map by traversing the map and deleting individual
+// entries. Note that if entries are added while the taversal is in progress,
+// such entries may survive the deletion process.
+func (m *Map) DeleteAll() error {
+	m.Lock()
+	defer m.Unlock()
+
+	nextKey := make([]byte, m.KeySize)
+
+	if m.cache != nil {
+		// Mark all entries for deletion, upon successful deletion,
+		// entries will be removed or the LastError will be updated
+		for _, entry := range m.cache {
+			entry.DesiredAction = Delete
+			entry.LastError = fmt.Errorf("deletion pending")
+		}
+	}
+
+	if err := m.open(); err != nil {
+		return err
+	}
+
+	mk := m.MapKey.DeepCopyMapKey()
+	mv := m.MapValue.DeepCopyMapValue()
+
+	for {
+		if err := GetFirstKey(m.fd, unsafe.Pointer(&nextKey[0])); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		err := DeleteElement(m.fd, unsafe.Pointer(&nextKey[0]))
+
+		mk, _, err2 := m.dumpParser(nextKey, []byte{}, mk, mv)
+		if err2 == nil {
+			m.deleteCacheEntry(mk, err)
+		} else {
+			log.WithError(err2).Warningf("Unable to correlate iteration key %v with cache entry. Inconsistent cache.", nextKey)
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func (m *Map) Close() error {
+	m.Lock()
+	defer m.Unlock()
+
+	if m.enableSync {
+		//mapControllers.RemoveController(m.controllerName())
+	}
+
+	if m.fd != 0 {
+		unix.Close(m.fd)
+		m.fd = 0
+	}
+
+	unregisterMap(m.path, m)
 
 	return nil
 }

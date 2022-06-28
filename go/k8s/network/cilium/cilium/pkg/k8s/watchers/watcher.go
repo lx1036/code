@@ -1,6 +1,9 @@
 package watchers
 
 import (
+	"fmt"
+	"github.com/cilium/cilium/pkg/logging/logfields"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/service"
 	"time"
 
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s"
@@ -31,12 +34,18 @@ type K8sWatcher struct {
 
 	// K8sSvcCache is a cache of all Kubernetes services and endpoints
 	K8sSvcCache k8s.ServiceCache
+
+	serviceBPFManager *service.ServiceBPFManager
 }
 
-func NewK8sWatcher() *K8sWatcher {
+func NewK8sWatcher(
+	serviceBPFManager *service.ServiceBPFManager,
+) *K8sWatcher {
 
 	return &K8sWatcher{
 		K8sSvcCache: k8s.NewServiceCache(datapath.LocalNodeAddressing()),
+
+		serviceBPFManager: serviceBPFManager,
 	}
 }
 
@@ -96,17 +105,28 @@ func (k *K8sWatcher) k8sServiceHandler() {
 	eventHandler := func(event k8s.ServiceEvent) {
 		defer event.SWG.Done()
 
+		svc := event.Service
+
 		switch event.Action {
 		case k8s.UpdateService:
 			if err := k.addK8sSVCs(event.ID, event.OldService, svc, event.Endpoints); err != nil {
-				scopedLog.WithError(err).Error("Unable to add/update service to implement k8s event")
+				klog.Errorf(fmt.Sprintf("Unable to add/update service to implement k8s event err:%v", err))
 			}
 
+			if !svc.IsExternal() {
+				return
+			}
+
+			// TODO: network policy
 		case k8s.DeleteService:
 			if err := k.delK8sSVCs(event.ID, event.Service, event.Endpoints); err != nil {
-				scopedLog.WithError(err).Error("Unable to delete service to implement k8s event")
+				klog.Errorf(fmt.Sprintf("Unable to delete service to implement k8s event err:%v", err))
 			}
 
+			if !svc.IsExternal() {
+				return
+			}
+			// TODO: network policy
 		}
 	}
 
@@ -125,5 +145,43 @@ func (k *K8sWatcher) addK8sSVCs(svcID k8s.ServiceID, oldSvc, svc *k8s.Service, e
 	if svc.IsHeadless {
 		return nil
 	}
+
+	svcs := datapathSVCs(svc, endpoints)
+	svcMap := hashSVCMap(svcs)
+
+	if oldSvc != nil {
+		// If we have oldService then we need to detect which frontends
+		// are no longer in the updated service and delete them in the datapath.
+
+		oldSVCs := datapathSVCs(oldSvc, endpoints)
+		oldSVCMap := hashSVCMap(oldSVCs)
+
+		for svcHash, oldSvc := range oldSVCMap {
+			if _, ok := svcMap[svcHash]; !ok {
+				if found, err := k.serviceBPFManager.DeleteService(oldSvc); err != nil {
+					scopedLog.WithError(err).WithField(logfields.Object, logfields.Repr(oldSvc)).
+						Warn("Error deleting service by frontend")
+				} else if !found {
+					scopedLog.WithField(logfields.Object, logfields.Repr(oldSvc)).Warn("service not found")
+				} else {
+					scopedLog.Debugf("# cilium lb delete-service %s %d 0", oldSvc.IP, oldSvc.Port)
+				}
+			}
+		}
+	}
+
+	for _, dpSvc := range svcs {
+		if _, _, err := k.serviceBPFManager.UpdateOrInsertService(dpSvc.Frontend, dpSvc.Backends, dpSvc.Type,
+			dpSvc.TrafficPolicy,
+			dpSvc.SessionAffinity, dpSvc.SessionAffinityTimeoutSec,
+			dpSvc.HealthCheckNodePort,
+			svcID.Name, svcID.Namespace); err != nil {
+			scopedLog.WithError(err).Error("Error while inserting service in LB map")
+		}
+	}
+	return nil
+}
+
+func (k *K8sWatcher) delK8sSVCs(svc k8s.ServiceID, svcInfo *k8s.Service, se *k8s.Endpoints) error {
 
 }

@@ -4,11 +4,15 @@
 package bpf
 
 import (
+	"fmt"
 	"github.com/cilium/cilium/pkg/datapath/linux/probes"
 	"golang.org/x/sys/unix"
+	"io"
+	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -84,6 +88,11 @@ const (
 	BPF_F_STACK_BUILD_ID = 1 << 5
 )
 
+var (
+	preAllocateMapSetting uint32 = BPF_F_NO_PREALLOC
+)
+
+// OpenOrCreateMap INFO: open or create a map file like cgroup in /sys/fs/bpf
 func OpenOrCreateMap(path string, mapType MapType, keySize, valueSize, maxEntries,
 	flags uint32, innerID uint32, pin bool) (int, bool, error) {
 	var fd int
@@ -217,4 +226,210 @@ func GetMapType(t MapType) MapType {
 		}
 	}
 	return t
+}
+
+// This struct must be in sync with union bpf_attr's anonymous struct used by
+// BPF_OBJ_*_ commands
+type bpfAttrObjOp struct {
+	pathname uint64
+	fd       uint32
+	pad0     [4]byte
+}
+
+// ObjGet reads the pathname and returns the map's fd read.
+func ObjGet(pathname string) (int, error) {
+	pathStr, err := unix.BytePtrFromString(pathname)
+	if err != nil {
+		return 0, fmt.Errorf("unable to convert pathname %q to byte pointer: %w", pathname, err)
+	}
+	bpfAttr := bpfAttrObjOp{
+		pathname: uint64(uintptr(unsafe.Pointer(pathStr))),
+	}
+
+	fd, _, errno := unix.Syscall(
+		unix.SYS_BPF,
+		BPF_OBJ_GET,
+		uintptr(unsafe.Pointer(&bpfAttr)),
+		unsafe.Sizeof(bpfAttr),
+	)
+	runtime.KeepAlive(pathStr)
+	runtime.KeepAlive(&bpfAttr)
+
+	if fd == 0 || errno != 0 {
+		return 0, &os.PathError{
+			Op:   "Unable to get object",
+			Err:  errno,
+			Path: pathname,
+		}
+	}
+
+	return int(fd), nil
+}
+
+// ObjPin stores the map's fd in pathname.
+func ObjPin(fd int, pathname string) error {
+	pathStr, err := unix.BytePtrFromString(pathname)
+	if err != nil {
+		return fmt.Errorf("Unable to convert pathname %q to byte pointer: %w", pathname, err)
+	}
+	bpfAttr := bpfAttrObjOp{
+		pathname: uint64(uintptr(unsafe.Pointer(pathStr))),
+		fd:       uint32(fd),
+	}
+
+	ret, _, errno := unix.Syscall(
+		unix.SYS_BPF,
+		BPF_OBJ_PIN,
+		uintptr(unsafe.Pointer(&bpfAttr)),
+		unsafe.Sizeof(bpfAttr),
+	)
+	runtime.KeepAlive(pathStr)
+	runtime.KeepAlive(&bpfAttr)
+
+	if ret != 0 || errno != 0 {
+		return fmt.Errorf("unable to pin object with file descriptor %d to %s: %s", fd, pathname, errno)
+	}
+
+	return nil
+}
+
+func objCheck(fd int, path string, mapType MapType, keySize, valueSize, maxEntries, flags uint32) bool {
+	info, err := GetMapInfo(os.Getpid(), fd)
+	if err != nil {
+		return false
+	}
+
+	mismatch := false
+	if info.MapType != mapType ||
+		info.KeySize != keySize ||
+		info.ValueSize != valueSize ||
+		info.MaxEntries != maxEntries ||
+		info.Flags != flags {
+		mismatch = true
+	}
+
+	if mismatch {
+		if info.MapType == MapTypeProgArray {
+			return false
+		}
+
+		klog.Warning("Removing map to allow for property upgrade (expect map data loss)")
+
+		// Kernel still holds map reference count via attached prog.
+		// Only exception is prog array, but that is already resolved
+		// differently.
+		os.Remove(path)
+		return true
+	}
+
+	return false
+}
+
+// ObjClose closes the map's fd.
+func ObjClose(fd int) error {
+	if fd > 0 {
+		return unix.Close(fd)
+	}
+	return nil
+}
+
+// GetPreAllocateMapFlags returns the map flags for map which use conditional
+// pre-allocation.
+func GetPreAllocateMapFlags(t MapType) uint32 {
+	switch {
+	case !t.allowsPreallocation():
+		return BPF_F_NO_PREALLOC
+	case t.requiresPreallocation():
+		return 0
+	}
+	return atomic.LoadUint32(&preAllocateMapSetting)
+}
+
+// UnpinMapIfExists unpins the given map identified by name.
+// If the map doesn't exist, returns success.
+func UnpinMapIfExists(name string) error {
+	path := MapPath(name)
+
+	if _, err := os.Stat(path); err != nil {
+		// Map doesn't exist
+		return nil
+	}
+
+	return os.RemoveAll(path)
+}
+
+// This struct must be in sync with union bpf_attr's anonymous struct used by
+// BPF_MAP_*_ELEM commands
+type bpfAttrMapOpElem struct {
+	mapFd uint32
+	pad0  [4]byte
+	key   uint64
+	value uint64 // union: value or next_key
+	flags uint64
+}
+
+// GetFirstKey fetches the first key in the map. If there are no keys in the
+// map, io.EOF is returned.
+func GetFirstKey(fd int, nextKey unsafe.Pointer) error {
+	bpfAttr := bpfAttrMapOpElem{
+		mapFd: uint32(fd),
+		key:   0, // NULL -> Get first element
+		value: uint64(uintptr(nextKey)),
+	}
+
+	ret := GetNextKeyFromPointers(fd, unsafe.Pointer(&bpfAttr), unsafe.Sizeof(bpfAttr))
+	runtime.KeepAlive(nextKey)
+	return ret
+}
+
+// GetNextKeyFromPointers stores, in nextKey, the next key after the key of the
+// map in fd. When there are no more keys, io.EOF is returned.
+func GetNextKeyFromPointers(fd int, structPtr unsafe.Pointer, sizeOfStruct uintptr) error {
+	ret, _, err := unix.Syscall(
+		unix.SYS_BPF,
+		BPF_MAP_GET_NEXT_KEY,
+		uintptr(structPtr),
+		sizeOfStruct,
+	)
+	runtime.KeepAlive(structPtr)
+
+	// BPF_MAP_GET_NEXT_KEY returns ENOENT when all keys have been iterated
+	// translate that to io.EOF to signify there are no next keys
+	if err == unix.ENOENT {
+		return io.EOF
+	}
+
+	if ret != 0 || err != 0 {
+		return fmt.Errorf("unable to get next key from map with file descriptor %d: %s", fd, err)
+	}
+
+	return nil
+}
+
+// DeleteElement deletes the map element with the given key.
+func DeleteElement(fd int, key unsafe.Pointer) error {
+	ret, err := deleteElement(fd, key)
+
+	if ret != 0 || err != 0 {
+		return fmt.Errorf("unable to delete element from map with file descriptor %d: %s", fd, err)
+	}
+
+	return nil
+}
+
+func deleteElement(fd int, key unsafe.Pointer) (uintptr, unix.Errno) {
+	bpfAttr := bpfAttrMapOpElem{
+		mapFd: uint32(fd),
+		key:   uint64(uintptr(key)),
+	}
+	ret, _, err := unix.Syscall(
+		unix.SYS_BPF,
+		BPF_MAP_DELETE_ELEM,
+		uintptr(unsafe.Pointer(&bpfAttr)),
+		unsafe.Sizeof(bpfAttr),
+	)
+	runtime.KeepAlive(key)
+	runtime.KeepAlive(&bpfAttr)
+
+	return ret, err
 }

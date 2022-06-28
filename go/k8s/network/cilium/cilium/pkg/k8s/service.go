@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"fmt"
 	"github.com/cilium/cilium/pkg/lock"
 	"sync"
 
@@ -19,8 +20,34 @@ const (
 	DeleteService
 )
 
+// ServiceID identifies the Kubernetes service
+type ServiceID struct {
+	Name      string `json:"serviceName,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// String returns the string representation of a service ID
+func (s ServiceID) String() string {
+	return fmt.Sprintf("%s/%s", s.Namespace, s.Name)
+}
+
 type ServiceEvent struct {
+	// ID is the identified of the service
+	ID ServiceID
+
 	Action CacheAction
+
+	// Service is the service structure
+	Service *Service
+
+	// OldService is the service structure
+	OldService *Service
+}
+
+// Service is an abstraction for a k8s service that is composed by the frontend IP
+// address (FEIP) and the map of the frontend ports (Ports).
+// +k8s:deepcopy-gen=true
+type Service struct {
 }
 
 type ServiceCache struct {

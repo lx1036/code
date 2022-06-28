@@ -2,9 +2,9 @@ package bpf
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"k8s.io/klog/v2"
 	"sync"
+
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -18,6 +18,12 @@ func registerMap(path string, m *Map) {
 	mutex.Unlock()
 
 	klog.Infof(fmt.Sprintf("Registered BPF map name %s path %s", m.name, path))
+}
 
-	log.WithField("path", path).Debug("Registered BPF map")
+func unregisterMap(path string, m *Map) {
+	mutex.Lock()
+	delete(mapRegister, path)
+	mutex.Unlock()
+
+	klog.Infof(fmt.Sprintf("Unregistered BPF map name %s path %s", m.name, path))
 }
