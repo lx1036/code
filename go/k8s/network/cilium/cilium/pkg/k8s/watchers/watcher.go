@@ -3,6 +3,7 @@ package watchers
 import (
 	"fmt"
 	"github.com/cilium/cilium/pkg/logging/logfields"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/endpoint/endpointmanager"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/service"
 	"time"
 
@@ -36,15 +37,19 @@ type K8sWatcher struct {
 	K8sSvcCache k8s.ServiceCache
 
 	serviceBPFManager *service.ServiceBPFManager
+
+	endpointManager *endpointmanager.EndpointManager
 }
 
 func NewK8sWatcher(
+	endpointManager *endpointmanager.EndpointManager,
 	serviceBPFManager *service.ServiceBPFManager,
 ) *K8sWatcher {
 
 	return &K8sWatcher{
 		K8sSvcCache: k8s.NewServiceCache(datapath.LocalNodeAddressing()),
 
+		endpointManager:   endpointManager,
 		serviceBPFManager: serviceBPFManager,
 	}
 }

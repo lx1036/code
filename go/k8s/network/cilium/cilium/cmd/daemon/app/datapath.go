@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/cilium/cilium/pkg/maps/ctmap"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
 	"os"
@@ -23,9 +24,32 @@ func (d *Daemon) initMaps() error {
 		}
 	}
 
-	if err := d.serviceBPFManager.InitMaps(option.Config.EnableIPv6, option.Config.EnableIPv4,
-		createSockRevNatMaps, option.Config.RestoreState); err != nil {
+	// INFO: init service bpf maps
+	createSockRevNatMaps := true
+	if err := d.serviceBPFManager.InitMaps(false, true, createSockRevNatMaps, true); err != nil {
 		log.WithError(err).Fatal("Unable to initialize service maps")
+	}
+
+	// INFO: init endpoint bpf maps
+	for _, ep := range d.endpointManager.GetEndpoints() {
+		ep.InitMap()
+	}
+	for _, ep := range d.endpointManager.GetEndpoints() {
+		if !ep.ConntrackLocal() {
+			continue
+		}
+		for _, m := range ctmap.LocalMaps(ep, option.Config.EnableIPv4,
+			option.Config.EnableIPv6) {
+			if _, err := m.Create(); err != nil {
+				return err
+			}
+		}
+	}
+	for _, m := range ctmap.GlobalMaps(option.Config.EnableIPv4,
+		option.Config.EnableIPv6) {
+		if _, err := m.Create(); err != nil {
+			return err
+		}
 	}
 
 }
