@@ -29,6 +29,14 @@ func NewDaemon() (*Daemon, error) {
 	// (1) Open or create BPF maps.
 	err = d.initMaps()
 
+	// Read the service IDs of existing services from the BPF map and
+	// reserve them. This must be done *before* connecting to the
+	// Kubernetes apiserver and serving the API to ensure service IDs are
+	// not changing across restarts or that a new service could accidentally
+	// use an existing service ID.
+	// Also, create missing v2 services from the corresponding legacy ones.
+	d.serviceBPFManager.RestoreServices()
+
 	d.k8sWatcher.RunK8sServiceHandler()
 
 	d.k8sCachesSynced = d.k8sWatcher.InitK8sSubsystem()

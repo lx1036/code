@@ -7,9 +7,27 @@ import (
 
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/lbmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/loadbalancer"
 )
 
 // INFO: 4 个 bpf 文件，cilium_lb4_services_v2/cilium_lb4_backends/cilium_lb4_reverse_nat/cilium_lb4_reverse_sk
+
+type svcInfo struct {
+	hash          string
+	frontend      loadbalancer.L3n4AddrID
+	backends      []loadbalancer.Backend
+	backendByHash map[string]*loadbalancer.Backend
+
+	svcType                   loadbalancer.SVCType
+	svcTrafficPolicy          loadbalancer.SVCTrafficPolicy
+	sessionAffinity           bool
+	sessionAffinityTimeoutSec uint32
+	svcHealthCheckNodePort    uint16
+	svcName                   string
+	svcNamespace              string
+
+	restoredFromDatapath bool
+}
 
 // ServiceBPFManager reflect service-related changes into BPF maps by datapath BPF program.
 // The changes can be triggered either by k8s_watcher or directly by API calls to the /services endpoint.
@@ -71,21 +89,65 @@ func (s *ServiceBPFManager) InitMaps(ipv6, ipv4, sockMaps, restore bool) error {
 	return nil
 }
 
-func (s *ServiceBPFManager) UpdateOrInsertService() {
+// RestoreServices restores services from BPF maps.
+//
+// The method should be called once before establishing a connectivity
+// to kube-apiserver.
+func (s *ServiceBPFManager) RestoreServices() error {
 	s.Lock()
 	defer s.Unlock()
 
+}
+
+func (s *ServiceBPFManager) UpdateOrInsertService(
+	frontend loadbalancer.L3n4AddrID, backends []loadbalancer.Backend, svcType loadbalancer.SVCType,
+	svcTrafficPolicy loadbalancer.SVCTrafficPolicy,
+	sessionAffinity bool, sessionAffinityTimeoutSec uint32,
+	svcHealthCheckNodePort uint16,
+	svcName, svcNamespace string) (bool, loadbalancer.ID, error) {
+	s.Lock()
+	defer s.Unlock()
+
+	// If needed, create svcInfo and allocate service ID
+	svc, ok, prevSessionAffinity, err := s.createSVCInfoIfNotExist(frontend, svcType, svcTrafficPolicy,
+		sessionAffinity, sessionAffinityTimeoutSec,
+		svcHealthCheckNodePort, svcName, svcNamespace)
+	if err != nil {
+		return false, loadbalancer.ID(0), err
+	}
+
 	// Update lbmaps (BPF service maps)
 	if err = s.updateOrInsertServiceIntoLBMaps(svc, onlyLocalBackends, prevBackendCount, newBackends,
-		obsoleteBackendIDs,
-		prevSessionAffinity, obsoleteSVCBackendIDs,
-		scopedLog); err != nil {
-		return false, lb.ID(0), err
+		obsoleteBackendIDs, prevSessionAffinity, obsoleteSVCBackendIDs); err != nil {
+		return false, loadbalancer.ID(0), err
 	}
+
+	if ok {
+		addMetric.Inc()
+	} else {
+		updateMetric.Inc()
+	}
+
+	s.notifyMonitorServiceUpsert(svc.frontend, svc.backends,
+		svc.svcType, svc.svcTrafficPolicy, svc.svcName, svc.svcNamespace)
+
+	return ok, loadbalancer.ID(svc.frontend.ID), nil
+}
+
+func (s *ServiceBPFManager) createSVCInfoIfNotExist(
+	frontend loadbalancer.L3n4AddrID,
+	svcType loadbalancer.SVCType,
+	svcTrafficPolicy loadbalancer.SVCTrafficPolicy,
+	sessionAffinity bool, sessionAffinityTimeoutSec uint32,
+	svcHealthCheckNodePort uint16,
+	svcName, svcNamespace string,
+) (*svcInfo, bool, bool, error) {
 
 }
 
-func (s *ServiceBPFManager) updateOrInsertServiceIntoLBMaps() {
+func (s *ServiceBPFManager) updateOrInsertServiceIntoLBMaps(svc *svcInfo, onlyLocalBackends bool,
+	prevBackendCount int, newBackends []loadbalancer.Backend, obsoleteBackendIDs []loadbalancer.BackendID,
+	prevSessionAffinity bool, obsoleteSVCBackendIDs []loadbalancer.BackendID) error {
 
 	err := s.lbmap.UpdateOrInsertService(
 		uint16(svc.frontend.ID), svc.frontend.L3n4Addr.IP,
@@ -101,7 +163,7 @@ func (s *ServiceBPFManager) updateOrInsertServiceIntoLBMaps() {
 }
 
 // DeleteService removes the given service.
-func (s *ServiceBPFManager) DeleteService(frontend lb.L3n4Addr) (bool, error) {
+func (s *ServiceBPFManager) DeleteService(frontend loadbalancer.L3n4Addr) (bool, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -121,7 +183,7 @@ func (s *ServiceBPFManager) deleteServiceLocked(svc *svcInfo) error {
 
 	// Delete affinity matches
 	if svc.sessionAffinity {
-		backendIDs := make([]lb.BackendID, 0, len(svc.backends))
+		backendIDs := make([]loadbalancer.BackendID, 0, len(svc.backends))
 		for _, b := range svc.backends {
 			backendIDs = append(backendIDs, b.ID)
 		}
@@ -150,6 +212,14 @@ func (s *ServiceBPFManager) deleteServiceLocked(svc *svcInfo) error {
 	return nil
 }
 
-func (s *ServiceBPFManager) notifyMonitorServiceDelete(id lb.ID) {
+func (s *ServiceBPFManager) notifyMonitorServiceDelete(id loadbalancer.ID) {
+
+}
+
+func (s *ServiceBPFManager) notifyMonitorServiceUpsert(frontend loadbalancer.L3n4AddrID, backends []loadbalancer.Backend,
+	svcType loadbalancer.SVCType, svcTrafficPolicy loadbalancer.SVCTrafficPolicy, svcName, svcNamespace string) {
+	if s.monitorNotify == nil {
+		return
+	}
 
 }

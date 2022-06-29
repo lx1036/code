@@ -2,12 +2,14 @@ package watchers
 
 import (
 	"fmt"
-	"github.com/cilium/cilium/pkg/logging/logfields"
-	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/endpoint/endpointmanager"
-	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/service"
 	"time"
 
+	"github.com/cilium/cilium/pkg/logging/logfields"
+
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/endpoint/endpointmanager"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/service"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/loadbalancer"
 
 	"k8s.io/klog/v2"
 )
@@ -188,5 +190,10 @@ func (k *K8sWatcher) addK8sSVCs(svcID k8s.ServiceID, oldSvc, svc *k8s.Service, e
 }
 
 func (k *K8sWatcher) delK8sSVCs(svc k8s.ServiceID, svcInfo *k8s.Service, se *k8s.Endpoints) error {
+
+}
+
+// datapathSVCs returns all services that should be set in the datapath.
+func datapathSVCs(svc *k8s.Service, endpoints *k8s.Endpoints) (svcs []loadbalancer.SVC) {
 
 }
