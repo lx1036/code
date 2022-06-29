@@ -69,8 +69,8 @@ func (s *ServiceBPFManager) InitMaps(ipv6, ipv4, sockMaps, restore bool) error {
 		return nil
 	}
 
-	toOpen := []*bpf.Map{}
-	toDelete := []*bpf.Map{}
+	var toOpen []*bpf.Map
+	var toDelete []*bpf.Map
 	if ipv4 {
 		toOpen = append(toOpen, lbmap.Service4MapV2, lbmap.Backend4Map, lbmap.RevNat4Map)
 		if !restore {
@@ -131,7 +131,7 @@ func (s *ServiceBPFManager) RestoreServices() error {
 func (s *ServiceBPFManager) restoreBackendsLocked() error {
 	backends, err := s.lbmap.DumpBackendMaps()
 	if err != nil {
-		return fmt.Errorf("Unable to dump backend maps: %s", err)
+		return fmt.Errorf("unable to dump backend maps: %s", err)
 	}
 
 	for _, b := range backends {

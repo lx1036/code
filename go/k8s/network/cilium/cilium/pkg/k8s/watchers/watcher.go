@@ -2,6 +2,7 @@ package watchers
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/cilium/cilium/pkg/logging/logfields"
@@ -85,6 +86,10 @@ func (k *K8sWatcher) InitK8sSubsystem() <-chan struct{} {
 // EnableK8sWatcher watch k8s service/endpoint/networkpolicy
 func (k *K8sWatcher) EnableK8sWatcher() error {
 
+	wg := &sync.WaitGroup{}
+
+	k.watchK8sNetworkPolicy(k8s.WatcherCli())
+
 	// watch kubernetes services
 	k.watchK8sService(k8s.WatcherCli(), swgSvcs)
 
@@ -98,9 +103,23 @@ func (k *K8sWatcher) EnableK8sWatcher() error {
 		}
 		fallthrough
 	default:
-		k.watchEndpoints(k8s.WatcherCli(), swgEps)
+		k.watchK8sEndpoints(k8s.WatcherCli(), swgEps)
 	}
 
+	// watch kubernetes pods
+	wg.Add(1)
+	go k.watchK8sPod(k8s.WatcherCli())
+
+	// watch kubernetes nodes
+	k.watchK8sNode(k8s.WatcherCli())
+
+	// watch kubernetes namespace
+	wg.Add(1)
+	go k.watchK8sNamespace(k8s.WatcherCli())
+
+	wg.Wait()
+
+	return nil
 }
 
 func (k *K8sWatcher) RunK8sServiceHandler() {

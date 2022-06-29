@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func (k *K8sWatcher) watchEndpoints(k8sClient kubernetes.Interface) {
+func (k *K8sWatcher) watchK8sEndpoints(k8sClient kubernetes.Interface) {
 	_, endpointController := cache.NewTransformingInformer(
 		cache.NewListWatchFromClient(k8sClient.CoreV1().RESTClient(),
 			"endpoints", corev1.NamespaceAll, fields.Everything()),
