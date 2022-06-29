@@ -2,7 +2,9 @@ package service
 
 import (
 	"fmt"
+	"github.com/cilium/cilium/pkg/counter"
 	"github.com/cilium/cilium/pkg/logging/logfields"
+	log "github.com/sirupsen/logrus"
 	"sync"
 
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf"
@@ -35,6 +37,12 @@ type ServiceBPFManager struct {
 	sync.RWMutex
 
 	lbmap *lbmap.LBBPFMap
+
+	backendByHash   map[string]*loadbalancer.Backend
+	backendRefCount counter.StringCounter
+
+	svcByHash map[string]*svcInfo
+	svcByID   map[loadbalancer.ID]*svcInfo
 }
 
 func NewServiceBPFManager(monitorNotify monitorNotify) *ServiceBPFManager {
@@ -97,6 +105,178 @@ func (s *ServiceBPFManager) RestoreServices() error {
 	s.Lock()
 	defer s.Unlock()
 
+	// Restore backend IDs
+	if err := s.restoreBackendsLocked(); err != nil {
+		return err
+	}
+
+	// Restore service cache from BPF maps
+	if err := s.restoreServicesLocked(); err != nil {
+		return err
+	}
+
+	// Remove no longer existing affinity matches
+	if err := s.deleteOrphanAffinityMatchesLocked(); err != nil {
+		return err
+	}
+
+	// Remove obsolete backends and release their IDs
+	if err := s.deleteOrphanBackends(); err != nil {
+		log.WithError(err).Warn("Failed to remove orphan backends")
+	}
+
+	return nil
+}
+
+func (s *ServiceBPFManager) restoreBackendsLocked() error {
+	backends, err := s.lbmap.DumpBackendMaps()
+	if err != nil {
+		return fmt.Errorf("Unable to dump backend maps: %s", err)
+	}
+
+	for _, b := range backends {
+		if err := RestoreBackendID(b.L3n4Addr, b.ID); err != nil {
+			return fmt.Errorf("unable to restore backend ID %d for %q: %s", b.ID, b.L3n4Addr, err)
+		}
+
+		hash := b.L3n4Addr.Hash()
+		s.backendByHash[hash] = b
+	}
+
+	return nil
+}
+
+func (s *ServiceBPFManager) restoreServicesLocked() error {
+	failed, restored := 0, 0
+
+	svcs, errors := s.lbmap.DumpServiceMaps()
+	for _, err := range errors {
+		log.WithError(err).Warning("Error occurred while dumping service maps")
+	}
+
+	for _, svc := range svcs {
+		scopedLog := log.WithFields(logrus.Fields{
+			"ServiceID": svc.Frontend.ID,
+			"ServiceIP": svc.Frontend.L3n4Addr.String(),
+		})
+		scopedLog.Debug("Restoring service")
+
+		if _, err := RestoreID(svc.Frontend.L3n4Addr, uint32(svc.Frontend.ID)); err != nil {
+			failed++
+			scopedLog.WithError(err).Warning("Unable to restore service ID")
+		}
+
+		newSVC := &svcInfo{
+			hash:          svc.Frontend.Hash(),
+			frontend:      svc.Frontend,
+			backends:      svc.Backends,
+			backendByHash: map[string]*loadbalancer.Backend{},
+			// Correct traffic policy will be restored by k8s_watcher after k8s
+			// service cache has been initialized
+			svcType:          svc.Type,
+			svcTrafficPolicy: svc.TrafficPolicy,
+
+			sessionAffinity:           svc.SessionAffinity,
+			sessionAffinityTimeoutSec: svc.SessionAffinityTimeoutSec,
+
+			// Indicate that the svc was restored from the BPF maps, so that
+			// SyncWithK8sFinished() could remove services which were restored
+			// from the maps but not present in the k8sServiceCache (e.g. a svc
+			// was deleted while cilium-agent was down).
+			restoredFromDatapath: true,
+		}
+
+		for j, backend := range svc.Backends {
+			hash := backend.L3n4Addr.Hash()
+			s.backendRefCount.Add(hash)
+			newSVC.backendByHash[hash] = &svc.Backends[j]
+		}
+
+		s.svcByHash[newSVC.hash] = newSVC
+		s.svcByID[newSVC.frontend.ID] = newSVC
+		restored++
+	}
+
+	log.WithFields(log.Fields{
+		"restored": restored,
+		"failed":   failed,
+	}).Info("Restored services from maps")
+
+	return nil
+}
+
+// deleteOrphanAffinityMatchesLocked removes affinity matches which point to
+// non-existent svc ID and backend ID tuples.
+func (s *ServiceBPFManager) deleteOrphanAffinityMatchesLocked() error {
+	matches, err := s.lbmap.DumpAffinityMatches()
+	if err != nil {
+		return err
+	}
+
+	toRemove := map[loadbalancer.ID][]loadbalancer.BackendID{}
+
+	local := make(map[loadbalancer.ID]map[loadbalancer.BackendID]struct{}, len(s.svcByID))
+	for id, svc := range s.svcByID {
+		if !svc.sessionAffinity {
+			continue
+		}
+		local[id] = make(map[loadbalancer.BackendID]struct{}, len(svc.backends))
+		for _, backend := range svc.backends {
+			local[id][backend.ID] = struct{}{}
+		}
+	}
+
+	for svcID, backendIDs := range matches {
+		for bID := range backendIDs {
+			found := false
+			if _, ok := local[loadbalancer.ID(svcID)]; ok {
+				if _, ok := local[loadbalancer.ID(svcID)][loadbalancer.BackendID(bID)]; ok {
+					found = true
+				}
+			}
+			if !found {
+				toRemove[loadbalancer.ID(svcID)] = append(toRemove[loadbalancer.ID(svcID)], loadbalancer.BackendID(bID))
+			}
+		}
+	}
+
+	for svcID, backendIDs := range toRemove {
+		s.deleteBackendsFromAffinityMatchMap(svcID, backendIDs)
+	}
+
+	return nil
+}
+
+func (s *ServiceBPFManager) deleteBackendsFromAffinityMatchMap(svcID loadbalancer.ID, backendIDs []loadbalancer.BackendID) {
+	log.WithFields(log.Fields{
+		logfields.Backends:  backendIDs,
+		logfields.ServiceID: svcID,
+	}).Debug("Deleting backends from session affinity match")
+
+	for _, bID := range backendIDs {
+		if err := s.lbmap.DeleteAffinityMatch(uint16(svcID), uint16(bID)); err != nil {
+			log.WithFields(log.Fields{
+				logfields.BackendID: bID,
+				logfields.ServiceID: svcID,
+			}).WithError(err).Warn("Unable to remove entry from affinity match map")
+		}
+	}
+}
+
+func (s *ServiceBPFManager) deleteOrphanBackends() error {
+	for hash, b := range s.backendByHash {
+		if s.backendRefCount[hash] == 0 {
+			log.WithField(logfields.BackendID, b.ID).Debug("Removing orphan backend")
+
+			DeleteBackendID(b.ID)
+			if err := s.lbmap.DeleteBackendByID(uint16(b.ID), false); err != nil {
+				return fmt.Errorf("unable to remove backend %d from map: %s", b.ID, err)
+			}
+			delete(s.backendByHash, hash)
+		}
+	}
+
+	return nil
 }
 
 func (s *ServiceBPFManager) UpdateOrInsertService(

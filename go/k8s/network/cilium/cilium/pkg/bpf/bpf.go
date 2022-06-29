@@ -433,3 +433,21 @@ func deleteElement(fd int, key unsafe.Pointer) (uintptr, unix.Errno) {
 
 	return ret, err
 }
+
+// LookupElementFromPointers looks up for the map value stored in fd with the given key. The value
+// is stored in the value unsafe.Pointer.
+func LookupElementFromPointers(fd int, structPtr unsafe.Pointer, sizeOfStruct uintptr) error {
+	ret, _, err := unix.Syscall(
+		unix.SYS_BPF,
+		BPF_MAP_LOOKUP_ELEM,
+		uintptr(structPtr),
+		sizeOfStruct,
+	)
+	runtime.KeepAlive(structPtr)
+
+	if ret != 0 || err != 0 {
+		return fmt.Errorf("Unable to lookup element in map with file descriptor %d: %s", fd, err)
+	}
+
+	return nil
+}

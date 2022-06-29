@@ -3,6 +3,7 @@ package bpf
 import (
 	"bufio"
 	"fmt"
+	"github.com/cilium/cilium/pkg/byteorder"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"path"
 	"sync"
 	"unsafe"
+
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/binary"
 )
 
 // MapType is an enumeration for valid BPF map types
@@ -185,6 +188,32 @@ func GetMapInfo(pid int, fd int) (*MapInfo, error) {
 	return info, nil
 }
 
+type DumpParser func(key []byte, value []byte, mapKey MapKey, mapValue MapValue) (MapKey, MapValue, error)
+type DumpCallback func(key MapKey, value MapValue)
+
+// DesiredAction is the action to be performed on the BPF map
+type DesiredAction int
+
+const (
+	// OK indicates that to further action is required and the entry is in
+	// sync
+	OK DesiredAction = iota
+
+	// Insert indicates that the entry needs to be created or updated
+	Insert
+
+	// Delete indicates that the entry needs to be deleted
+	Delete
+)
+
+type cacheEntry struct {
+	Key   MapKey
+	Value MapValue
+
+	DesiredAction DesiredAction
+	LastError     error
+}
+
 type Map struct {
 	sync.RWMutex
 
@@ -201,6 +230,9 @@ type Map struct {
 	// NonPersistent is true if the map does not contain persistent data
 	// and should be removed on startup.
 	NonPersistent bool
+
+	// DumpParser is a function for parsing keys and values from BPF maps
+	dumpParser DumpParser
 }
 
 // NewMap creates a new Map instance - object representing a BPF map
@@ -338,6 +370,75 @@ func (m *Map) Create() (bool, error) {
 	return isNew, m.Close()
 }
 
+// DumpWithCallback iterates over the Map and calls the given callback
+// function on each iteration. That callback function is receiving the
+// actual key and value. The callback function should consider creating a
+// deepcopy of the key and value on between each iterations to avoid memory
+// corruption.
+func (m *Map) DumpWithCallback(cb DumpCallback) error {
+	if err := m.Open(); err != nil {
+		return err
+	}
+
+	m.RLock()
+	defer m.RUnlock()
+
+	key := make([]byte, m.KeySize)
+	nextKey := make([]byte, m.KeySize)
+	value := make([]byte, m.ReadValueSize)
+
+	if err := GetFirstKey(m.fd, unsafe.Pointer(&nextKey[0])); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		return err
+	}
+
+	bpfCurrentKey := bpfAttrMapOpElem{
+		mapFd: uint32(m.fd),
+		key:   uint64(uintptr(unsafe.Pointer(&key[0]))),
+		value: uint64(uintptr(unsafe.Pointer(&nextKey[0]))),
+	}
+	bpfCurrentKeyPtr := unsafe.Pointer(&bpfCurrentKey)
+	bpfCurrentKeySize := unsafe.Sizeof(bpfCurrentKey)
+
+	bpfNextKey := bpfAttrMapOpElem{
+		mapFd: uint32(m.fd),
+		key:   uint64(uintptr(unsafe.Pointer(&nextKey[0]))),
+		value: uint64(uintptr(unsafe.Pointer(&value[0]))),
+	}
+	bpfNextKeyPtr := unsafe.Pointer(&bpfNextKey)
+	bpfNextKeySize := unsafe.Sizeof(bpfNextKey)
+
+	mk := m.MapKey.DeepCopyMapKey()
+	mv := m.MapValue.DeepCopyMapValue()
+
+	for {
+		err := LookupElementFromPointers(m.fd, bpfNextKeyPtr, bpfNextKeySize)
+		if err != nil {
+			return err
+		}
+
+		mk, mv, err = m.dumpParser(nextKey, value, mk, mv)
+		if err != nil {
+			return err
+		}
+
+		if cb != nil {
+			cb(mk, mv)
+		}
+
+		copy(key, nextKey)
+
+		if err := GetNextKeyFromPointers(m.fd, bpfCurrentKeyPtr, bpfCurrentKeySize); err != nil {
+			if err == io.EOF { // end of map, we're done iterating
+				return nil
+			}
+			return err
+		}
+	}
+}
+
 // DeleteAll deletes all entries of a map by traversing the map and deleting individual
 // entries. Note that if entries are added while the taversal is in progress,
 // such entries may survive the deletion process.
@@ -386,6 +487,49 @@ func (m *Map) DeleteAll() error {
 	}
 }
 
+// Delete deletes the map entry corresponding to the given key.
+func (m *Map) Delete(key MapKey) error {
+	m.Lock()
+	defer m.Unlock()
+
+	var err error
+	defer m.deleteCacheEntry(key, err)
+
+	if err = m.open(); err != nil {
+		return err
+	}
+
+	_, errno := deleteElement(m.fd, key.GetKeyPtr())
+	if errno != 0 {
+		err = fmt.Errorf("unable to delete element %s from map %s: %w", key, m.name, errno)
+	}
+	return err
+}
+
+// Caller must hold m.lock for writing
+func (m *Map) deleteCacheEntry(key MapKey, err error) {
+	if m.cache == nil {
+		return
+	}
+
+	k := key.String()
+	if err == nil {
+		delete(m.cache, k)
+	} else {
+		entry, ok := m.cache[k]
+		if !ok {
+			m.cache[k] = &cacheEntry{
+				Key: key,
+			}
+			entry = m.cache[k]
+		}
+
+		entry.DesiredAction = Delete
+		entry.LastError = err
+		//m.scheduleErrorResolver()
+	}
+}
+
 func (m *Map) Close() error {
 	m.Lock()
 	defer m.Unlock()
@@ -402,4 +546,21 @@ func (m *Map) Close() error {
 	unregisterMap(m.path, m)
 
 	return nil
+}
+
+// ConvertKeyValue converts key and value from bytes to given Golang struct pointers.
+func ConvertKeyValue(bKey []byte, bValue []byte, key MapKey, value MapValue) (MapKey, MapValue, error) {
+	if len(bKey) > 0 {
+		if err := binary.Read(bKey, byteorder.Native, key); err != nil {
+			return nil, nil, fmt.Errorf("Unable to convert key: %s", err)
+		}
+	}
+
+	if len(bValue) > 0 {
+		if err := binary.Read(bValue, byteorder.Native, value); err != nil {
+			return nil, nil, fmt.Errorf("Unable to convert value: %s", err)
+		}
+	}
+
+	return key, value, nil
 }

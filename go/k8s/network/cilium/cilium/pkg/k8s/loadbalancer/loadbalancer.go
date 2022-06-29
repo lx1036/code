@@ -1,7 +1,11 @@
 package loadbalancer
 
 import (
+	"crypto/sha512"
+	"fmt"
 	"net"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // SVCType is a type of a service.
@@ -72,6 +76,19 @@ type L3n4Addr struct {
 	Scope uint8
 }
 
+// Hash calculates L3n4Addr's internal SHA256Sum.
+func (a L3n4Addr) Hash() string {
+	// FIXME: Remove Protocol's omission once we care about protocols.
+	protoBak := a.Protocol
+	a.Protocol = ""
+	defer func() {
+		a.Protocol = protoBak
+	}()
+
+	str := []byte(fmt.Sprintf("%+v", a))
+	return fmt.Sprintf("%x", sha512.Sum512_256(str))
+}
+
 // ID is the ID of L3n4Addr endpoint (either service or backend).
 type ID uint32
 
@@ -86,4 +103,29 @@ type Backend struct {
 	// a node.
 	NodeName string
 	L3n4Addr
+}
+
+// NewBackend creates the Backend struct instance from given params.
+func NewBackend(id BackendID, protocol L4Type, ip net.IP, portNumber uint16) *Backend {
+	lbport := NewL4Addr(protocol, portNumber)
+	b := Backend{
+		ID:       id,
+		L3n4Addr: L3n4Addr{IP: ip, L4Addr: *lbport},
+	}
+	log.WithField("backend", b).Debug("created new LBBackend")
+
+	return &b
+}
+
+// SVC is a structure for storing service details.
+type SVC struct {
+	Frontend                  L3n4AddrID       // SVC frontend addr and an allocated ID
+	Backends                  []Backend        // List of service backends
+	Type                      SVCType          // Service type
+	TrafficPolicy             SVCTrafficPolicy // Service traffic policy
+	SessionAffinity           bool
+	SessionAffinityTimeoutSec uint32
+	HealthCheckNodePort       uint16 // Service health check node port
+	Name                      string // Service name
+	Namespace                 string // Service namespace
 }

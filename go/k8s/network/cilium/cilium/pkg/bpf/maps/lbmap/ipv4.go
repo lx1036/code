@@ -2,12 +2,12 @@ package lbmap
 
 import (
 	"fmt"
-	"github.com/cilium/cilium/pkg/loadbalancer"
 	"net"
 	"unsafe"
 
 	"github.com/cilium/cilium/pkg/u8proto"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/loadbalancer"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/types"
 )
 
