@@ -25,4 +25,7 @@ const (
 	// CiliumCHeaderPrefix is the prefix using when printing/writing an endpoint in a
 	// base64 form.
 	CiliumCHeaderPrefix = "CILIUM_BASE64_"
+
+	// TemplatesDir is the default path for the compiled template objects relative to StateDir
+	TemplatesDir = "templates"
 )

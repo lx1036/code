@@ -1,11 +1,12 @@
 package app
 
 import (
+	"context"
 	"github.com/cilium/cilium/pkg/controller"
-	"github.com/cilium/cilium/pkg/datapath/loader"
 	log "github.com/sirupsen/logrus"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/endpoint/endpointmanager"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/service"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath/loader"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/watchers"
 	"time"
 )

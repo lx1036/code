@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
+	nodeTypes "k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/node/types"
 	"os"
 
 	"k8s-lx1036/k8s/network/cilium/cilium/cmd/daemon/app"
@@ -45,5 +47,39 @@ func runDaemon() {
 	<-d.k8sCachesSynced
 
 	restoreComplete := d.initRestore(restoredEndpoints)
+	go func() {
+		if restoreComplete != nil {
+			<-restoreComplete
+		}
 
+	}()
+
+	srv := server.NewServer(d.instantiateAPI())
+	srv.EnabledListeners = []string{"unix"}
+	srv.SocketPath = option.Config.SocketPath
+	srv.ReadTimeout = apiTimeout
+	srv.WriteTimeout = apiTimeout
+	srv.ConfigureAPI()
+	defer srv.Shutdown()
+
+	errs := make(chan error, 1)
+
+	go func() {
+		errs <- srv.Serve()
+	}()
+
+	k8s.Client().MarkNodeReady(nodeTypes.GetName())
+
+	metricsErrs := app.InitMetrics()
+
+	select {
+	case err := <-metricsErrs:
+		if err != nil {
+			log.WithError(err).Fatal("Cannot start metrics server")
+		}
+	case err := <-errs:
+		if err != nil {
+			log.WithError(err).Fatal("Error returned from non-returning Serve() call")
+		}
+	}
 }
