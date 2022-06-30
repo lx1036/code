@@ -1,9 +1,13 @@
 package app
 
 import (
+	"github.com/cilium/cilium/pkg/controller"
+	"github.com/cilium/cilium/pkg/datapath/loader"
+	log "github.com/sirupsen/logrus"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/endpoint/endpointmanager"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/service"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/watchers"
+	"time"
 )
 
 type Daemon struct {
@@ -15,7 +19,7 @@ type Daemon struct {
 	endpointManager *endpointmanager.EndpointManager
 }
 
-func NewDaemon() (*Daemon, error) {
+func NewDaemon() (*Daemon, *endpointRestoreState, error) {
 
 	d := Daemon{
 		endpointManager: endpointmanager.NewEndpointManager(&watchers.EndpointSynchronizer{}),
@@ -41,4 +45,36 @@ func NewDaemon() (*Daemon, error) {
 
 	d.k8sCachesSynced = d.k8sWatcher.InitK8sSubsystem()
 
+	// restore endpoints before any IPs are allocated to avoid eventual IP
+	// conflicts later on, otherwise any IP conflict will result in the
+	// endpoint not being able to be restored.
+	restoredEndpoints, err := d.restoreOldEndpoints(option.Config.StateDir, true)
+	if err != nil {
+		log.WithError(err).Error("Unable to restore existing endpoints")
+	}
+
+	if err := d.allocateIPs(); err != nil {
+		return nil, nil, err
+	}
+
+	if err := d.syncEndpointsAndHostIPs(); err != nil {
+		return nil, nil, err
+	}
+	// Start the controller for periodic sync. The purpose of the
+	// controller is to ensure that endpoints and host IPs entries are
+	// reinserted to the bpf maps if they are ever removed from them.
+	controller.NewManager().UpdateController("sync-endpoints-and-host-ips",
+		controller.ControllerParams{
+			DoFunc: func(ctx context.Context) error {
+				return d.syncEndpointsAndHostIPs()
+			},
+			RunInterval: time.Minute,
+			Context:     d.ctx,
+		})
+
+	if err := loader.RestoreTemplates(option.Config.StateDir); err != nil {
+		log.WithError(err).Error("Unable to restore previous BPF templates")
+	}
+
+	return &d, restoredEndpoints, nil
 }
