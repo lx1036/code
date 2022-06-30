@@ -3,6 +3,7 @@ package watchers
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/client-go/tools/cache"
 	"net"
 	"strconv"
 	"sync"
@@ -39,13 +40,12 @@ const (
 )
 
 type K8sWatcher struct {
-
 	// K8sSvcCache is a cache of all Kubernetes services and endpoints
-	K8sSvcCache k8s.ServiceCache
+	K8sSvcCache     k8s.ServiceCache
+	endpointManager *endpointmanager.EndpointManager
+	podStore        cache.Store
 
 	serviceBPFManager *service.ServiceBPFManager
-
-	endpointManager *endpointmanager.EndpointManager
 }
 
 func NewK8sWatcher(

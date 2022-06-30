@@ -475,3 +475,9 @@ func (s *ServiceCache) deleteEndpoints(svcID EndpointSliceID, swg *lock.Stoppabl
 
 	return svcID.ServiceID
 }
+
+func (s *ServiceCache) DeleteEndpointSlices(epSlice *discoveryv1.EndpointSlice, swg *lock.StoppableWaitGroup) ServiceID {
+	svcID := ParseEndpointSliceID(epSlice)
+
+	return s.deleteEndpoints(svcID, swg)
+}

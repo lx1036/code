@@ -7,4 +7,6 @@ const (
 
 	// DefaultMapPrefix is the default prefix for all BPF maps.
 	DefaultMapPrefix = "tc/globals"
+
+	EnvNodeNameSpec = "K8S_NODE_NAME"
 )
