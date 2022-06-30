@@ -57,7 +57,11 @@ func NewDaemon() (*Daemon, *endpointRestoreState, error) {
 	if err := d.allocateIPs(); err != nil {
 		return nil, nil, err
 	}
-
+	
+	
+	err = d.init()
+	
+	
 	if err := d.syncEndpointsAndHostIPs(); err != nil {
 		return nil, nil, err
 	}
