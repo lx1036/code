@@ -130,6 +130,22 @@ func NewService(ip net.IP, externalIPs []string, loadBalancerIPs []string,
 	}
 }
 
+func (s *Service) UniquePorts() map[uint16]bool {
+	// We are not discriminating the different L4 protocols on the same L4
+	// port so we create the number of unique sets of service IP + service
+	// port.
+	uniqPorts := map[uint16]bool{}
+	for _, p := range s.Ports {
+		uniqPorts[p.Port] = true
+	}
+	return uniqPorts
+}
+
+// IsExternal returns true if the service is expected to serve out-of-cluster endpoints:
+func (s Service) IsExternal() bool {
+	return len(s.Selector) == 0
+}
+
 func parseIPs(externalIPs []string) map[string]net.IP {
 	m := map[string]net.IP{}
 	for _, externalIP := range externalIPs {

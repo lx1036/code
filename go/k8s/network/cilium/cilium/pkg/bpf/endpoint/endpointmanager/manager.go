@@ -16,6 +16,11 @@ var (
 // EndpointManager is a structure designed for containing state about the
 // collection of locally running endpoints.
 type EndpointManager struct {
+	mutex sync.RWMutex
+
+	// endpoints is the global list of endpoints indexed by ID. mutex must
+	// be held to read and write.
+	endpoints map[uint16]*endpoint.Endpoint
 }
 
 func NewEndpointManager(epSynchronizer EndpointResourceSynchronizer) *EndpointManager {
@@ -43,4 +48,16 @@ func (mgr *EndpointManager) InitMetrics() {
 
 		metrics.MustRegister(metrics.EndpointCount)
 	})
+}
+
+// GetHostEndpoint returns the host endpoint.
+func (mgr *EndpointManager) GetHostEndpoint() *endpoint.Endpoint {
+	mgr.mutex.RLock()
+	defer mgr.mutex.RUnlock()
+	for _, ep := range mgr.endpoints {
+		if ep.IsHost() {
+			return ep
+		}
+	}
+	return nil
 }

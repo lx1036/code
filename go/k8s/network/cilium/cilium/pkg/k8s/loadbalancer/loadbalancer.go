@@ -20,6 +20,9 @@ const (
 	SVCTypeLoadBalancer = SVCType("LoadBalancer")
 )
 
+// L4Type name.
+type L4Type string
+
 const (
 	NONE = L4Type("NONE")
 	// TCP type.
@@ -33,9 +36,6 @@ var (
 	AllProtocols = []L4Type{TCP, UDP}
 )
 
-// L4Type name.
-type L4Type string
-
 // L4Addr is an abstraction for the backend port with a L4Type, usually tcp or udp, and
 // the Port number.
 type L4Addr struct {
@@ -46,6 +46,13 @@ type L4Addr struct {
 // NewL4Addr creates a new L4Addr.
 func NewL4Addr(protocol L4Type, number uint16) *L4Addr {
 	return &L4Addr{Protocol: protocol, Port: number}
+}
+
+func (l *L4Addr) DeepCopy() *L4Addr {
+	return &L4Addr{
+		Port:     l.Port,
+		Protocol: l.Protocol,
+	}
 }
 
 // SVCTrafficPolicy defines which backends are chosen
@@ -74,6 +81,24 @@ type L3n4Addr struct {
 	IP net.IP
 	L4Addr
 	Scope uint8
+}
+
+// NewL3n4Addr creates a new L3n4Addr.
+func NewL3n4Addr(protocol L4Type, ip net.IP, portNumber uint16, scope uint8) *L3n4Addr {
+	lbport := NewL4Addr(protocol, portNumber)
+	addr := L3n4Addr{IP: ip, L4Addr: *lbport, Scope: scope}
+
+	return &addr
+}
+
+func (a *L3n4Addr) DeepCopy() *L3n4Addr {
+	copyIP := make(net.IP, len(a.IP))
+	copy(copyIP, a.IP)
+	return &L3n4Addr{
+		IP:     copyIP,
+		L4Addr: *a.L4Addr.DeepCopy(),
+		Scope:  a.Scope,
+	}
 }
 
 // Hash calculates L3n4Addr's internal SHA256Sum.
@@ -129,3 +154,10 @@ type SVC struct {
 	Name                      string // Service name
 	Namespace                 string // Service namespace
 }
+
+const (
+	// ScopeExternal is the lookup scope for services from outside the node.
+	ScopeExternal = 0
+	// ScopeInternal is the lookup scope for services from inside the node.
+	ScopeInternal = 1
+)
