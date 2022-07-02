@@ -15,7 +15,12 @@ import (
 
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/lxcmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath"
 )
+
+func (d *Daemon) Datapath() datapath.Datapath {
+	return d.datapath
+}
 
 // initMaps opens all BPF maps (and creates them if they do not exist). This
 // must be done *before* any operations which read BPF maps, especially
@@ -132,5 +137,22 @@ func (d *Daemon) syncEndpointsAndHostIPs() error {
 		}
 	}
 
+	return nil
+}
+
+// INFO: 把当前 node 的配置写入 /var/run/cilium/state/globals/node_config.h
+func (d *Daemon) createNodeConfigHeaderfile() error {
+	nodeConfigPath := option.Config.GetNodeConfigPath() // /var/run/cilium/state/globals/node_config.h
+	f, err := os.Create(nodeConfigPath)
+	if err != nil {
+		log.WithError(err).WithField(logfields.Path, nodeConfigPath).Fatal("Failed to create node configuration file")
+		return err
+	}
+	defer f.Close()
+
+	if err = d.datapath.WriteNodeConfig(f, &d.nodeDiscovery.LocalConfig); err != nil {
+		log.WithError(err).WithField(logfields.Path, nodeConfigPath).Fatal("Failed to write node configuration file")
+		return err
+	}
 	return nil
 }

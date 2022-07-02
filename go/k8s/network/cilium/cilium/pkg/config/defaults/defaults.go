@@ -1,8 +1,13 @@
 package defaults
 
+import "time"
+
 // Base
 const (
 	EnvNodeNameSpec = "K8S_NODE_NAME"
+
+	// ExecTimeout is a timeout for executing commands.
+	ExecTimeout = 300 * time.Second
 )
 
 // BPF
@@ -12,6 +17,13 @@ const (
 
 	// DefaultMapPrefix is the default prefix for all BPF maps.
 	DefaultMapPrefix = "tc/globals"
+
+	// RuntimePathRights are the default access rights of the RuntimePath directory
+	RuntimePathRights = 0775
+
+	////////////////////////////// bpf //////////////////////////////
+	// RestoreV4Addr is used as match for cilium_host v4 address
+	RestoreV4Addr = "cilium.v4.internal.raw "
 
 	// CHeaderFileName is the name of the C header file for BPF programs for a
 	// particular endpoint.
@@ -28,4 +40,10 @@ const (
 
 	// TemplatesDir is the default path for the compiled template objects relative to StateDir
 	TemplatesDir = "templates"
+)
+
+// Cgroup
+const (
+	// DefaultCgroupRoot is the default path where cilium cgroup2 should be mounted
+	DefaultCgroupRoot = "/var/run/cilium/cgroupv2"
 )

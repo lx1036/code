@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"k8s-lx1036/k8s/network/cilium/cilium/pkg/defaults"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/defaults"
 )
 
 // RestoreTemplates populates the object cache from templates on the filesystem

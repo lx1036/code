@@ -2,13 +2,23 @@ package app
 
 import (
 	"context"
-	"github.com/cilium/cilium/pkg/controller"
-	log "github.com/sirupsen/logrus"
-	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/endpoint/endpointmanager"
-	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/service"
-	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath/loader"
-	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/watchers"
+	"github.com/cilium/cilium/pkg/maps/sockmap"
+	"os"
 	"time"
+
+	"github.com/cilium/cilium/pkg/controller"
+	"github.com/cilium/cilium/pkg/logging/logfields"
+	log "github.com/sirupsen/logrus"
+
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/endpoint/endpointmanager"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/endpointpolicymap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/service"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/sockops"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/defaults"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath/loader"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/node/nodediscovery"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/watchers"
 )
 
 type Daemon struct {
@@ -18,12 +28,22 @@ type Daemon struct {
 	serviceBPFManager *service.ServiceBPFManager
 
 	endpointManager *endpointmanager.EndpointManager
+
+	// datapath is the underlying datapath implementation to use to
+	// implement all aspects of an agent
+	datapath datapath.Datapath
+
+	// nodeDiscovery defines the node discovery logic of the agent
+	nodeDiscovery *nodediscovery.NodeDiscovery
 }
 
-func NewDaemon() (*Daemon, *endpointRestoreState, error) {
+func NewDaemon(datapath datapath.Datapath) (*Daemon, *endpointRestoreState, error) {
 
 	d := Daemon{
 		endpointManager: endpointmanager.NewEndpointManager(&watchers.EndpointSynchronizer{}),
+		datapath:        datapath,
+
+		nodeDiscovery: nodediscovery.NewNodeDiscovery(nodeMngr, mtuConfig, netConf),
 	}
 	d.endpointManager.InitMetrics()
 
@@ -57,11 +77,9 @@ func NewDaemon() (*Daemon, *endpointRestoreState, error) {
 	if err := d.allocateIPs(); err != nil {
 		return nil, nil, err
 	}
-	
-	
+
 	err = d.init()
-	
-	
+
 	if err := d.syncEndpointsAndHostIPs(); err != nil {
 		return nil, nil, err
 	}
@@ -82,4 +100,39 @@ func NewDaemon() (*Daemon, *endpointRestoreState, error) {
 	}
 
 	return &d, restoredEndpoints, nil
+}
+
+func (d *Daemon) init() error {
+	globalsDir := option.Config.GetGlobalsDir()
+	if err := os.MkdirAll(globalsDir, defaults.RuntimePathRights); err != nil {
+		log.WithError(err).WithField(logfields.Path, globalsDir).Fatal("Could not create runtime directory")
+	}
+	if err := os.Chdir(option.Config.StateDir); err != nil {
+		log.WithError(err).WithField(logfields.Path, option.Config.StateDir).Fatal("Could not change to runtime directory")
+	}
+
+	// Remove any old sockops and re-enable with _new_ programs if flag is set
+	sockops.SockmapDisable()
+	sockops.SkmsgDisable()
+
+	if err := d.createNodeConfigHeaderfile(); err != nil {
+		return err
+	}
+
+	if option.Config.SockopsEnable {
+		endpointpolicymap.CreateEPPolicyMap()
+		if err := sockops.SockmapEnable(); err != nil {
+			log.WithError(err).Error("Failed to enable Sockmap")
+		} else if err := sockops.SkmsgEnable(); err != nil {
+			log.WithError(err).Error("Failed to enable Sockmsg")
+		} else {
+			sockmap.SockmapCreate()
+		}
+	}
+
+	if err := d.Datapath().Loader().Reinitialize(d.ctx, d, d.mtuConfig.GetDeviceMTU(), d.Datapath(), d.l7Proxy, d.ipam); err != nil {
+		return err
+	}
+
+	return nil
 }

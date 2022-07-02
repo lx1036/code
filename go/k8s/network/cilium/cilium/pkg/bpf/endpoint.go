@@ -3,7 +3,7 @@ package bpf
 import (
 	"net"
 
-	"k8s-lx1036/k8s/network/cilium/cilium/pkg/types"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/types"
 )
 
 // Must be in sync with ENDPOINT_KEY_* in <bpf/lib/common.h>

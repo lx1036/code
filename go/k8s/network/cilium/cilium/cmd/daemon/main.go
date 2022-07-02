@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	nodeTypes "k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/node/types"
 	"os"
 
 	"k8s-lx1036/k8s/network/cilium/cilium/cmd/daemon/app"
+	linuxdatapath "k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath/linux"
+	nodeTypes "k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/node/types"
 
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/spf13/cobra"
@@ -41,7 +42,7 @@ func main() {
 
 func runDaemon() {
 
-	d, restoredEndpoints, err := app.NewDaemon()
+	d, restoredEndpoints, err := app.NewDaemon(linuxdatapath.NewDatapath(datapathConfig, iptablesManager))
 
 	// wait for cache sync
 	<-d.k8sCachesSynced
