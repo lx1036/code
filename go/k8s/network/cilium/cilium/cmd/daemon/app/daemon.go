@@ -122,9 +122,9 @@ func (d *Daemon) init() error {
 
 	if option.Config.SockopsEnable {
 		endpointpolicymap.CreateEPPolicyMap()
-		if err := sockops.SockmapEnable(); err != nil {
+		if err := sockops.SockmapEnable(); err != nil { // BPF 程序一：监听 socket 事件，更新 sockmap
 			log.WithError(err).Error("Failed to enable Sockmap")
-		} else if err := sockops.SkmsgEnable(); err != nil {
+		} else if err := sockops.SkmsgEnable(); err != nil { // BPF 程序二：拦截 sendmsg 系统调用，socket 重定向
 			log.WithError(err).Error("Failed to enable Sockmsg")
 		} else {
 			sockmap.SockmapCreate()

@@ -39,6 +39,11 @@ const (
 
 	// TunnelDisabled specifies to disable encapsulation
 	TunnelDisabled = "disabled"
+
+	////////////////////////////// BPF //////////////////////////
+
+	// SockopsEnableName is the name of the option to enable sockops
+	SockopsEnableName = "sockops-enable"
 )
 
 // DaemonConfig is the configuration used by Daemon.
@@ -46,6 +51,8 @@ type DaemonConfig struct {
 	////////////////////////////// Base //////////////////////////
 	ConfigFile string
 	ConfigDir  string
+	// StateDir is the directory where runtime state of endpoints is stored
+	StateDir string // /var/run/cilium/state/
 	// EnableIPv4 is true when IPv4 is enabled
 	EnableIPv4 bool
 	// EnableIPv6 is true when IPv6 is enabled
@@ -95,6 +102,8 @@ type DaemonConfig struct {
 	Devices              []string // bpf_host device
 
 	////////////////////////////// BPF //////////////////////////
+	// EnableSockOps specifies whether to enable sockops (socket lookup).
+	SockopsEnable bool // socket bpf
 
 	InstallIptRules bool
 }
