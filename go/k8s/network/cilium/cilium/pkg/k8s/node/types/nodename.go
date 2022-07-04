@@ -5,7 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"os"
 
-	"k8s-lx1036/k8s/network/cilium/cilium/pkg/defaults"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/defaults"
 )
 
 var (
