@@ -156,7 +156,7 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 						return
 					}
 				}
-				
+
 				if err = c.bgpServer.DeletePeer(context.TODO(), &gobgpapi.DeletePeerRequest{Address: bgpp.Spec.PeerAddress}); err != nil {
 					klog.Errorf(fmt.Sprintf("delete BGP peer %s err:%v", bgpp.Spec.PeerAddress, err))
 				}
@@ -220,7 +220,7 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 	endpointWatcher := cache.NewListWatchFromClient(kubeClient.CoreV1().RESTClient(), "endpoints", corev1.NamespaceAll, fields.Everything())
 	c.epIndexer, c.epInformer = cache.NewIndexerInformer(endpointWatcher, &corev1.Endpoints{}, 0,
 		cache.ResourceEventHandlerFuncs{}, cache.Indexers{})
-	
+
 	nodeWatcher := cache.NewListWatchFromClient(kubeClient.CoreV1().RESTClient(), "nodes", corev1.NamespaceAll, fields.Everything())
 	c.nodeIndexer, c.nodeInformer = cache.NewIndexerInformer(nodeWatcher, &corev1.Node{}, 0, cache.FilteringResourceEventHandler{
 		FilterFunc: func(obj interface{}) bool {
@@ -266,7 +266,7 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 						return
 					}
 				}
-				
+
 				// withdraw route
 				podCidr := node.Annotations[utils.V4CIDRName]
 				cidrStr := strings.Split(podCidr, "/")
@@ -277,14 +277,13 @@ func NewSpeakerController(restConfig *restclient.Config, grpcPort int, nodeName 
 						klog.Errorf(fmt.Sprintf("withdraw route err:%v", err))
 						return
 					}
-					
+
 					klog.Infof(fmt.Sprintf("withdraw route %s via nextHop %s", podCidr, c.nodeIP.String()))
 				}
 			},
 		},
 	}, cache.Indexers{})
-	
-	
+
 	c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced, c.epInformer.HasSynced, c.bgppeerInformer.HasSynced, c.nodeInformer.HasSynced)
 
 	return c
@@ -345,7 +344,7 @@ func (c *SpeakerController) processNextWorkItem(ctx context.Context) bool {
 			c.queue.AddAfter(key, time.Second*5)
 			break
 		}
-		err = c.syncNode(ctx, string(t))	
+		err = c.syncNode(ctx, string(t))
 	case bgppeer:
 		err = c.syncBgpPeer(ctx, string(t))
 	}
@@ -507,7 +506,7 @@ func (c *SpeakerController) syncNode(ctx context.Context, key string) error {
 		node := n.(*corev1.Node)
 		err = c.processNodeCreateOrUpdate(ctx, node, key)
 	}
-	
+
 	return err
 }
 
@@ -519,15 +518,14 @@ func (c *SpeakerController) processNodeCreateOrUpdate(ctx context.Context, node 
 	if err != nil || cidrLen < 0 || cidrLen > 32 {
 		return fmt.Errorf("the pod CIDR IP given is not a proper mask: %d", cidrLen)
 	}
-	
+
 	if !c.isIPAdvertised(ip) {
 		defer klog.Infof(fmt.Sprintf("advertise route: %s via nextHop %s", podCidr, c.nodeIP.String()))
 		return c.advertiseCidr(ctx, ip, uint32(cidrLen))
 	}
-	
+
 	return nil
 }
-
 
 func (c *SpeakerController) syncService(ctx context.Context, key string) error {
 	service, exists, err := c.svcIndexer.GetByKey(key)
