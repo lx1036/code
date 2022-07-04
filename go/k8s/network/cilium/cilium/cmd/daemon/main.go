@@ -24,7 +24,7 @@ var (
 			if cmdRefDir != "" {
 				os.Exit(0)
 			}
-			initEnv(cmd)
+			initEnv()
 			runDaemon()
 		},
 	}

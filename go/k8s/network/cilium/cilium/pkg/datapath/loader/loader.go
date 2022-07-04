@@ -6,7 +6,6 @@ import (
 	"github.com/cilium/cilium/pkg/common"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/node"
-	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/sysctl"
 	log "github.com/sirupsen/logrus"
 	"os/exec"
@@ -17,6 +16,7 @@ import (
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/cgroup"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/defaults"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/option"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath"
 
 	"github.com/vishvananda/netlink"

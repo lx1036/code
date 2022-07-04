@@ -15,6 +15,7 @@ import (
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/service"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/sockops"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/defaults"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/option"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath/loader"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/node/nodediscovery"

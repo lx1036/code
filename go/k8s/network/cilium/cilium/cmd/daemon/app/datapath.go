@@ -15,6 +15,7 @@ import (
 
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/lxcmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/option"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath"
 )
 
@@ -26,7 +27,6 @@ func (d *Daemon) Datapath() datapath.Datapath {
 // must be done *before* any operations which read BPF maps, especially
 // restoring endpoints and services.
 func (d *Daemon) initMaps() error {
-
 	// Delete old maps if left over from an upgrade.
 	for _, name := range []string{"cilium_proxy4", "cilium_proxy6", "cilium_policy"} {
 		path := bpf.MapPath(name)
