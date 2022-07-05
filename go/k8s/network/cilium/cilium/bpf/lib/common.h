@@ -17,6 +17,50 @@
 #define DROP_UNSUPPORTED_L2 -166
 #define CILIUM_CALL_IPV4_FROM_LXC		7
 
+#define ENDPOINT_KEY_IPV4 1
+#define ENDPOINT_KEY_IPV6 2
+
+#ifndef AF_INET
+#define AF_INET 2
+#endif
+
+#ifndef AF_INET6
+#define AF_INET6 10
+#endif
+
+typedef __u64 mac_t;
+
+union v6addr {
+    struct {
+        __u32 p1;
+        __u32 p2;
+        __u32 p3;
+        __u32 p4;
+    };
+    struct {
+        __u64 d1;
+        __u64 d2;
+    };
+    __u8 addr[16];
+} __packed;
+
+/* Value of endpoint map */
+struct endpoint_info {
+    __u32		ifindex;
+    __u16		unused; /* used to be sec_label, no longer used */
+    __u16           lxc_id;
+    __u32		flags;
+    mac_t		mac;
+    mac_t		node_mac;
+    __u32		pad[4];
+};
+
+struct remote_endpoint_info {
+    __u32		sec_label;
+    __u32		tunnel_endpoint;
+    __u8		key;
+};
+
 
 // 验证数据：
 // (1)包的 header 长度是否正确

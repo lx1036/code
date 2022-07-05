@@ -3,7 +3,6 @@ package option
 import (
 	"bytes"
 	"fmt"
-	"github.com/cilium/cilium/pkg/defaults"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -11,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/defaults"
 )
 
 const (
@@ -19,11 +20,12 @@ const (
 
 	// ConfigFile is the Configuration file (default "$HOME/ciliumd.yaml")
 	ConfigFile = "config"
-
 	// ConfigDir is the directory that contains a file for each option where
 	// the filename represents the option name and the content of that file
 	// represents the value of that option.
 	ConfigDir = "config-dir"
+	// LibDir enables the directory path to store runtime build environment
+	LibDir = "lib-dir"
 
 	// InstallIptRules sets whether Cilium should install any iptables in general
 	InstallIptRules = "install-iptables-rules"
@@ -41,14 +43,16 @@ const (
 	TunnelDisabled = "disabled"
 
 	////////////////////////////// BPF //////////////////////////
-
 	// SockopsEnableName is the name of the option to enable sockops
 	SockopsEnableName = "sockops-enable"
+	// BPFCompileDebugName is the name of the option to enable BPF compiliation debugging
+	BPFCompileDebugName = "bpf-compile-debug"
 )
 
 // DaemonConfig is the configuration used by Daemon.
 type DaemonConfig struct {
 	////////////////////////////// Base //////////////////////////
+	LibDir     string // Cilium library files directory
 	ConfigFile string
 	ConfigDir  string
 	// StateDir is the directory where runtime state of endpoints is stored
@@ -102,13 +106,19 @@ type DaemonConfig struct {
 	Devices              []string // bpf_host device
 
 	////////////////////////////// BPF //////////////////////////
+	BpfDir string // BPF template files directory
 	// EnableSockOps specifies whether to enable sockops (socket lookup).
 	SockopsEnable bool // socket bpf
+	// BPFCompilationDebug specifies whether to compile BPF programs compilation
+	// debugging enabled.
+	BPFCompilationDebug bool
 
 	InstallIptRules bool
 }
 
 func (c *DaemonConfig) Populate() {
+	c.LibDir = viper.GetString(LibDir)
+	c.BpfDir = filepath.Join(c.LibDir, defaults.BpfDir)
 
 	c.AgentHealthPort = viper.GetInt(AgentHealthPort)
 	c.AgentLabels = viper.GetStringSlice(AgentLabels)

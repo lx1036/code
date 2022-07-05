@@ -8,8 +8,11 @@
 #include "compiler.h"
 
 
+
+
 #ifndef BPF_LICENSE
-# define BPF_LICENSE(NAME) char ____license[] __section_license = NAME
+# define BPF_LICENSE(NAME)				\
+	char ____license[] __section_license = NAME
 #endif
 
 #endif //__BPF_SECTION__

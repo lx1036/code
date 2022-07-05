@@ -21,5 +21,13 @@
 #undef __always_inline /* stddef.h defines its own */
 #define __always_inline inline __attribute__((always_inline))
 
+/* {READ,WRITE}_ONCE() with verifier workaround via bpf_barrier(). */
+
+#ifndef READ_ONCE
+# define READ_ONCE(X)						\
+			({ typeof(X) __val = __READ_ONCE(X);	\
+			   bpf_barrier();			\
+			   __val; })
+#endif
 
 #endif //__BPF_COMPILER_H_

@@ -3,7 +3,6 @@ package sockops
 import (
 	"context"
 	"fmt"
-	"github.com/cilium/cilium/pkg/datapath/loader"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -16,6 +15,7 @@ import (
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/cgroup"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/defaults"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/option"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath/loader"
 
 	"k8s.io/klog/v2"
 )
