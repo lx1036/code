@@ -127,12 +127,17 @@ eBPF Function Calls 作用：
 ## 常用 BPF 工具
 
 ### bpftool
+bpftool 是 linux 内核自带的工具，用来比如 attach BPF 程序到虚拟文件系统
+
 ```shell
 # https://manpages.ubuntu.com/manpages/focal/man8/bpftool-map.8.html
 yum install -y bpftool
 
 ```
 
+### BPF 虚拟文件系统
+和 cgroup /sys/fs/cgroup 虚拟文件系统一样，把一些 BPF 对象通过虚拟文件系统表示出来，可见文档：**[Persistent BPF objects](https://lwn.net/Articles/664688/)**
+或者查看 **[Object Pinning](http://arthurchiao.art/blog/cilium-bpf-xdp-reference-guide-zh/#14-object-pinning%E9%92%89%E4%BD%8F%E5%AF%B9%E8%B1%A1)** 
 
 
 ## 参考文献
