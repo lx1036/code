@@ -7,6 +7,7 @@
 #include "bpf_sockops.h"
 #include "../lib/endian.h"
 #include "../lib/common.h"
+#include "../lib/policy.h"
 #include "../lib/eps.h"
 #include "bpf/compiler.h"
 #include "bpf/helpers.h"

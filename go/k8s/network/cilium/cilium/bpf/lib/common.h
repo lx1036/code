@@ -9,7 +9,7 @@
 #include <bpf/ctx/common.h>
 #include <bpf/api.h>
 #include <linux/if_ether.h>
-
+#include "bpf/compiler.h"
 
 #include <endian.h>
 
@@ -42,6 +42,26 @@ union v6addr {
         __u64 d2;
     };
     __u8 addr[16];
+} __packed;
+
+/* Structure representing an IPv4 or IPv6 address, being used for:
+ *  - key as endpoints map
+ *  - key for tunnel endpoint map
+ *  - value for tunnel endpoint map
+ */
+struct endpoint_key {
+    union {
+        struct {
+            __u32		ip4;
+            __u32		pad1;
+            __u32		pad2;
+            __u32		pad3;
+        };
+        union v6addr	ip6;
+    };
+    __u8 family;
+    __u8 key;
+    __u16 pad5;
 } __packed;
 
 /* Value of endpoint map */

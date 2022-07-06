@@ -21,6 +21,10 @@
 #undef __always_inline /* stddef.h defines its own */
 #define __always_inline inline __attribute__((always_inline))
 
+#ifndef __packed
+# define __packed		__attribute__((packed))
+#endif
+
 /* {READ,WRITE}_ONCE() with verifier workaround via bpf_barrier(). */
 
 #ifndef READ_ONCE

@@ -16,6 +16,11 @@
 #endif
 
 
+/* Map access/manipulation */
+static void *BPF_FUNC(map_lookup_elem, const void *map, const void *key);
+static int BPF_FUNC(map_update_elem, const void *map, const void *key,
+                    const void *value, __u32 flags);
+static int BPF_FUNC(map_delete_elem, const void *map, const void *key);
 
 
 /* Sockops and SK_MSG helpers */

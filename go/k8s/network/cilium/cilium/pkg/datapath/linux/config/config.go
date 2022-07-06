@@ -11,17 +11,9 @@ import (
 	"github.com/cilium/cilium/pkg/datapath/link"
 	"github.com/cilium/cilium/pkg/identity"
 	"github.com/cilium/cilium/pkg/labels"
-	"github.com/cilium/cilium/pkg/maps/ctmap"
 	"github.com/cilium/cilium/pkg/maps/encrypt"
-	"github.com/cilium/cilium/pkg/maps/eppolicymap"
 	"github.com/cilium/cilium/pkg/maps/eventsmap"
-	"github.com/cilium/cilium/pkg/maps/fragmap"
 	"github.com/cilium/cilium/pkg/maps/ipmasq"
-	"github.com/cilium/cilium/pkg/maps/lbmap"
-	"github.com/cilium/cilium/pkg/maps/metricsmap"
-	"github.com/cilium/cilium/pkg/maps/nat"
-	"github.com/cilium/cilium/pkg/maps/neighborsmap"
-	"github.com/cilium/cilium/pkg/maps/policymap"
 	"github.com/cilium/cilium/pkg/maps/signalmap"
 	"github.com/cilium/cilium/pkg/maps/sockmap"
 	"github.com/cilium/cilium/pkg/maps/tunnel"
@@ -30,6 +22,14 @@ import (
 	"io"
 	"reflect"
 
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/ctmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/endpointpolicymap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/fragmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/lbmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/metricsmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/nat"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/neighborsmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/policymap"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/defaults"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath"
 )
@@ -107,7 +107,7 @@ func (h *HeaderfileWriter) WriteNodeConfig(w io.Writer, cfg *datapath.LocalNodeC
 	cDefinesMap["EVENTS_MAP"] = eventsmap.MapName
 	cDefinesMap["SIGNAL_MAP"] = signalmap.MapName
 	cDefinesMap["POLICY_CALL_MAP"] = policymap.PolicyCallMapName
-	cDefinesMap["EP_POLICY_MAP"] = eppolicymap.MapName
+	cDefinesMap["EP_POLICY_MAP"] = endpointpolicymap.MapName
 	cDefinesMap["LB6_REVERSE_NAT_MAP"] = "cilium_lb6_reverse_nat"
 	cDefinesMap["LB6_SERVICES_MAP_V2"] = "cilium_lb6_services_v2"
 	cDefinesMap["LB6_BACKEND_MAP"] = "cilium_lb6_backends"
