@@ -61,3 +61,14 @@ func (mgr *EndpointManager) GetHostEndpoint() *endpoint.Endpoint {
 	}
 	return nil
 }
+
+// GetEndpoints returns a slice of all endpoints present in endpoint manager.
+func (mgr *EndpointManager) GetEndpoints() []*endpoint.Endpoint {
+	mgr.mutex.RLock()
+	eps := make([]*endpoint.Endpoint, 0, len(mgr.endpoints))
+	for _, ep := range mgr.endpoints {
+		eps = append(eps, ep)
+	}
+	mgr.mutex.RUnlock()
+	return eps
+}

@@ -11,6 +11,10 @@ const (
 
 	// LibraryPath is the default path to the cilium libraries directory
 	LibraryPath = "/var/lib/cilium"
+
+	// HostDevice is the name of the device that connects the cilium IP
+	// space with the host's networking model
+	HostDevice = "cilium_host"
 )
 
 // BPF

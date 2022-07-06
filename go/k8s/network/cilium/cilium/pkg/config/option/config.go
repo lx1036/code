@@ -47,6 +47,8 @@ const (
 	SockopsEnableName = "sockops-enable"
 	// BPFCompileDebugName is the name of the option to enable BPF compiliation debugging
 	BPFCompileDebugName = "bpf-compile-debug"
+	// LimitTableMax defines the maximum CT or NAT table limit
+	LimitTableMax = 1 << 24 // 16Mi entries (~1GiB of entries per map)
 )
 
 // DaemonConfig is the configuration used by Daemon.

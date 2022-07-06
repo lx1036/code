@@ -2,19 +2,27 @@ package app
 
 import (
 	"fmt"
+	"github.com/cilium/cilium/pkg/controller"
 	"github.com/cilium/cilium/pkg/identity"
-	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/logging/logfields"
-	"github.com/cilium/cilium/pkg/maps/ctmap"
 	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/source"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
 	"net"
 	"os"
+	"time"
 
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/ipcache"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/ctmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/fragmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/lbmap"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/lxcmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/metricsmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/nat"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/neighborsmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/policymap"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/option"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath"
 )
@@ -43,9 +51,14 @@ func (d *Daemon) initMaps() error {
 		log.WithError(err).Fatal("Unable to initialize service maps")
 	}
 
+	// INFO: init cilium_call_policy BPF maps
+	if err := policymap.InitCallMap(); err != nil {
+		return err
+	}
+
 	// INFO: init endpoint bpf maps
 	for _, ep := range d.endpointManager.GetEndpoints() {
-		ep.InitMap()
+		ep.InitPolicyMap()
 	}
 	for _, ep := range d.endpointManager.GetEndpoints() {
 		if !ep.ConntrackLocal() {
@@ -58,26 +71,78 @@ func (d *Daemon) initMaps() error {
 			}
 		}
 	}
-	for _, m := range ctmap.GlobalMaps(option.Config.EnableIPv4,
-		option.Config.EnableIPv6) {
+	for _, m := range ctmap.GlobalMaps(option.Config.EnableIPv4, option.Config.EnableIPv6) {
 		if _, err := m.Create(); err != nil {
 			return err
 		}
 	}
 
+	ipv4Nat, _ := nat.GlobalMaps(option.Config.EnableIPv4, option.Config.EnableIPv6)
+	if option.Config.EnableIPv4 {
+		if _, err := ipv4Nat.Create(); err != nil {
+			return err
+		}
+	}
+
+	if option.Config.EnableNodePort {
+		if err := neighborsmap.InitMaps(option.Config.EnableIPv4, option.Config.EnableIPv6); err != nil {
+			return err
+		}
+	}
+
+	if option.Config.EnableIPv4FragmentsTracking {
+		if err := fragmap.InitMap(option.Config.FragmentsMapEntries); err != nil {
+			return err
+		}
+	}
+
+	// Set up the list of IPCache listeners in the daemon, to be
+	// used by syncEndpointsAndHostIPs()
+	// xDS cache will be added later by calling AddListener(), but only if necessary.
+	ipcache.IPIdentityCache.SetListeners([]ipcache.IPIdentityMappingListener{
+		datapathIpcache.NewListener(d, d),
+	})
+
+	// Start the controller for periodic sync of the metrics map with
+	// the prometheus server.
+	controller.NewManager().UpdateController("metricsmap-bpf-prom-sync",
+		controller.ControllerParams{
+			DoFunc:      metricsmap.SyncMetricsMap,
+			RunInterval: 5 * time.Second,
+			Context:     d.ctx,
+		})
+
+	if !option.Config.RestoreState {
+		// If we are not restoring state, all endpoints can be
+		// deleted. Entries will be re-populated.
+		lxcmap.LXCMap.DeleteAll()
+	}
+
+	if option.Config.EnableSessionAffinity {
+		if _, err := lbmap.AffinityMatchMap.OpenOrCreate(); err != nil {
+			return err
+		}
+		if option.Config.EnableIPv4 {
+			if _, err := lbmap.Affinity4Map.OpenOrCreate(); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // syncLXCMap adds local host enties to bpf lxcmap, as well as
 // ipcache, if needed, and also notifies the daemon and network policy
 // hosts cache if changes were made.
 func (d *Daemon) syncEndpointsAndHostIPs() error {
-	specialIdentities := []identity.IPIdentityPair{}
-
+	// INFO: netlink 获取本机器的所有真实网卡地址，如 eth0/eth1 等地址，和 cilium_host 虚拟网卡地址
 	addrs, err := d.datapath.LocalNodeAddressing().IPv4().LocalAddresses()
 	if err != nil {
 		log.WithError(err).Warning("Unable to list local IPv4 addresses")
 	}
 
+	var specialIdentities []identity.IPIdentityPair
 	for _, ip := range addrs {
 		if len(ip) > 0 {
 			specialIdentities = append(specialIdentities,
@@ -89,7 +154,7 @@ func (d *Daemon) syncEndpointsAndHostIPs() error {
 	}
 
 	specialIdentities = append(specialIdentities,
-		identity.IPIdentityPair{
+		identity.IPIdentityPair{ // "0.0.0.0/0"
 			IP:   net.IPv4zero,
 			Mask: net.CIDRMask(0, net.IPv4len*8),
 			ID:   identity.ReservedIdentityWorld,
@@ -106,7 +171,7 @@ func (d *Daemon) syncEndpointsAndHostIPs() error {
 		if isHost {
 			added, err := lxcmap.SyncHostEntry(ipIDPair.IP)
 			if err != nil {
-				return fmt.Errorf("Unable to add host entry to endpoint map: %s", err)
+				return fmt.Errorf("unable to add host entry to endpoint map: %s", err)
 			}
 			if added {
 				log.WithField(logfields.IPAddr, ipIDPair.IP).Debugf("Added local ip to endpoint map")
@@ -117,7 +182,7 @@ func (d *Daemon) syncEndpointsAndHostIPs() error {
 
 		// Upsert will not propagate (reserved:foo->ID) mappings across the cluster,
 		// and we specifically don't want to do so.
-		ipcache.IPIdentityCache.Upsert(ipIDPair.PrefixString(), nil, hostKey, nil, ipcache.Identity{
+		ipcache.IPIdentityCache.UpdateOrInsert(ipIDPair.PrefixString(), nil, hostKey, nil, ipcache.Identity{
 			ID:     ipIDPair.ID,
 			Source: source.Local,
 		})
