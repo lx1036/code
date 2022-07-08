@@ -6,12 +6,18 @@ import (
 	"flag"
 	"fmt"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
@@ -20,6 +26,52 @@ import (
 var (
 	kubeconfig = flag.String("kubeconfig", "", "absolute path to kubeconfig file")
 )
+
+// INFO: 这里已经是 ListAndWatch 机制了，服务端增量数据会被 push 到本地 cache，但是这里没有设置 event handler 去 **立即** 处理，
+//  而是周期处理，比如 BGP 宣告 pod cidr 或者 service clusterIP/loadbalancerIP ！！！
+func TestK8sListAndWatch(test *testing.T) {
+	flag.Parse()
+
+	if len(*kubeconfig) == 0 {
+		klog.Fatal("kubeconfig is empty")
+	}
+
+	restConfig, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	kubeClient := kubernetes.NewForConfigOrDie(restConfig)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 0,
+		informers.WithTweakListOptions(func(listOption *metav1.ListOptions) {
+			listOption.AllowWatchBookmarks = true
+		}))
+	podInformer := informerFactory.Core().V1().Pods()
+	podsSynced := podInformer.Informer().HasSynced
+	podsLister := podInformer.Lister()
+	ctx := genericapiserver.SetupSignalContext()
+	informerFactory.Start(ctx.Done())
+	if !cache.WaitForCacheSync(ctx.Done(), podsSynced) {
+		klog.Fatalf("failed to wait for caches to sync")
+		return
+	}
+
+	klog.Info("cache is synced")
+
+	listPods := func() {
+		pods, err := podsLister.Pods(corev1.NamespaceDefault).List(labels.Everything())
+		if err != nil {
+			klog.Fatal(err)
+		}
+		for _, pod := range pods {
+			klog.Infof(fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
+		}
+	}
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
+		listPods()
+	}, time.Second*5)
+
+	<-ctx.Done()
+}
 
 func TestLoadBalancer(test *testing.T) {
 	flag.Parse()
