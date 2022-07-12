@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"github.com/cilium/cilium/pkg/maps/sockmap"
 	"os"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/endpoint/endpointmanager"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/endpointpolicymap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/sockmap"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/service"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/sockops"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/defaults"

@@ -248,7 +248,7 @@ func ObjGet(pathname string) (int, error) {
 
 	fd, _, errno := unix.Syscall(
 		unix.SYS_BPF,
-		BPF_OBJ_GET,
+		unix.BPF_OBJ_GET,
 		uintptr(unsafe.Pointer(&bpfAttr)),
 		unsafe.Sizeof(bpfAttr),
 	)
