@@ -5,10 +5,12 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
+	"io"
 	"k8s-lx1036/k8s/network/calico/calico/felix/pkg/bpf/maps"
 	"os"
 	"os/exec"
 	"strings"
+	"unsafe"
 
 	"k8s-lx1036/k8s/network/calico/calico/felix/pkg/bpf/maps/arp"
 	"k8s-lx1036/k8s/network/calico/calico/felix/pkg/bpf/maps/conntrack"
@@ -30,7 +32,7 @@ const (
 	IterDelete IteratorAction = "delete"
 )
 
-type IterCallback func(k, v []byte) IteratorAction
+type IterCallback func(k, v []byte)
 
 type MapContext struct {
 	RepinningEnabled bool
@@ -248,9 +250,53 @@ func (m *Map) CopyDeltaFromOldMap() error {
 	panic("implement me")
 }
 
-func (m *Map) Iter(callback IterCallback) error {
-	//TODO implement me
-	panic("implement me")
+// DumpWithCallback 迭代每一个 key-value
+func (m *Map) DumpWithCallback(cb IterCallback) error {
+	key := make([]byte, m.KeySize)
+	nextKey := make([]byte, m.KeySize)
+	value := make([]byte, m.ValueSize)
+
+	if err := GetFirstKey(int(m.fd), unsafe.Pointer(&nextKey[0])); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		return err
+	}
+
+	bpfCurrentKey := bpfAttrMapOpElem{
+		mapFd: uint32(m.fd),
+		key:   uint64(uintptr(unsafe.Pointer(&key[0]))),
+		value: uint64(uintptr(unsafe.Pointer(&nextKey[0]))),
+	}
+	bpfCurrentKeyPtr := unsafe.Pointer(&bpfCurrentKey)
+	bpfCurrentKeySize := unsafe.Sizeof(bpfCurrentKey)
+	bpfNextKey := bpfAttrMapOpElem{
+		mapFd: uint32(m.fd),
+		key:   uint64(uintptr(unsafe.Pointer(&nextKey[0]))),
+		value: uint64(uintptr(unsafe.Pointer(&value[0]))),
+	}
+	bpfNextKeyPtr := unsafe.Pointer(&bpfNextKey)
+	bpfNextKeySize := unsafe.Sizeof(bpfNextKey)
+
+	for {
+		err := LookupElementFromPointers(int(m.fd), bpfNextKeyPtr, bpfNextKeySize)
+		if err != nil {
+			return err
+		}
+
+		if cb != nil {
+			cb(nextKey, value)
+		}
+
+		copy(key, nextKey)
+
+		if err := GetNextKeyFromPointers(int(m.fd), bpfCurrentKeyPtr, bpfCurrentKeySize); err != nil {
+			if err == io.EOF { // end of map, we're done iterating
+				return nil
+			}
+			return err
+		}
+	}
 }
 
 func (m *Map) Update(k, v []byte) error {

@@ -3,6 +3,7 @@ package bpf
 import (
 	"fmt"
 	"golang.org/x/sys/unix"
+	"io"
 	"os"
 	"runtime"
 	"unsafe"
@@ -243,4 +244,42 @@ func deleteElement(fd int, key unsafe.Pointer) (uintptr, unix.Errno) {
 	runtime.KeepAlive(&bpfAttr)
 
 	return ret, err
+}
+
+// GetNextKeyFromPointers stores, in nextKey, the next key after the key of the
+// map in fd. When there are no more keys, io.EOF is returned.
+func GetNextKeyFromPointers(fd int, structPtr unsafe.Pointer, sizeOfStruct uintptr) error {
+	ret, _, err := unix.Syscall(
+		unix.SYS_BPF,
+		unix.BPF_MAP_GET_NEXT_KEY,
+		uintptr(structPtr),
+		sizeOfStruct,
+	)
+	runtime.KeepAlive(structPtr)
+
+	// BPF_MAP_GET_NEXT_KEY returns ENOENT when all keys have been iterated
+	// translate that to io.EOF to signify there are no next keys
+	if err == unix.ENOENT {
+		return io.EOF
+	}
+
+	if ret != 0 || err != 0 {
+		return fmt.Errorf("unable to get next key from map with file descriptor %d: %s", fd, err)
+	}
+
+	return nil
+}
+
+// GetFirstKey fetches the first key in the map. If there are no keys in the
+// map, io.EOF is returned.
+func GetFirstKey(fd int, nextKey unsafe.Pointer) error {
+	bpfAttr := bpfAttrMapOpElem{
+		mapFd: uint32(fd),
+		key:   0, // NULL -> Get first element
+		value: uint64(uintptr(nextKey)),
+	}
+
+	ret := GetNextKeyFromPointers(fd, unsafe.Pointer(&bpfAttr), unsafe.Sizeof(bpfAttr))
+	runtime.KeepAlive(nextKey)
+	return ret
 }

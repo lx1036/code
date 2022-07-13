@@ -17,6 +17,8 @@ import (
 // };
 const frontendKeySize = 16
 
+type FrontendKey [frontendKeySize]byte // 4+4+2+1+4+1=16
+
 // struct calico_nat_v4_value {
 //    uint32_t id;
 //    uint32_t count;
@@ -25,6 +27,8 @@ const frontendKeySize = 16
 //    uint32_t flags;
 // };
 const frontendValueSize = 20
+
+type FrontendValue [frontendValueSize]byte // 4+4+4+4+4=20
 
 var FrontendMapParameters = maps.MapParameters{
 	Filename:   "/sys/fs/bpf/tc/globals/cali_v4_nat_fe",
