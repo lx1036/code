@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+
+	"k8s-lx1036/k8s/network/cni/flannel/pkg/ip"
 )
 
 type Config struct {
@@ -34,7 +36,7 @@ func getSubnetConfig(netConfPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to read net conf: %v", err)
 	}
 
-	config := Config{
+	config := &Config{
 		EnableIPv4: true, // Enable ipv4 by default
 	}
 	if err = json.Unmarshal([]byte(netConf), &config); err != nil {

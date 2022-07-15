@@ -2,6 +2,8 @@ package vxlan
 
 import (
 	"context"
+	"k8s-lx1036/k8s/network/cni/flannel/pkg/ip"
+	"net"
 	"sync"
 
 	"k8s-lx1036/k8s/network/cni/flannel/pkg/backend"
@@ -28,3 +30,6 @@ func (backend *VxlanBackend) RegisterNetwork(ctx context.Context, wg *sync.WaitG
 
 	return newNetwork(backend.subnetMgr, backend.extIface, dev, ip.IP4Net{}, lease)
 }
+
+// So we can make it JSON (un)marshalable
+type hardwareAddr net.HardwareAddr
