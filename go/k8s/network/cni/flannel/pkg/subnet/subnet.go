@@ -20,15 +20,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const (
-	nodeControllerSyncTimeout = 10 * time.Minute
-)
-
 type Manager interface {
 	GetNetworkConfig(ctx context.Context) (*Config, error)
 	AcquireLease(ctx context.Context, attrs *LeaseAttrs) (*Lease, error)
 	RenewLease(ctx context.Context, lease *Lease) error
-	WatchLease(ctx context.Context, sn ip.IP4Net, sn6 ip.IP6Net, cursor interface{}) (LeaseWatchResult, error)
+	WatchLease(ctx context.Context, sn ip.IP4Net, cursor interface{}) (LeaseWatchResult, error)
 	WatchLeases(ctx context.Context, cursor interface{}) (LeaseWatchResult, error)
 
 	Name() string
@@ -41,30 +37,6 @@ const (
 	EventRemoved
 )
 
-type LeaseAttrs struct {
-	PublicIP      ip.IP4
-	BackendType   string          `json:",omitempty"`
-	BackendData   json.RawMessage `json:",omitempty"`
-	BackendV6Data json.RawMessage `json:",omitempty"`
-}
-
-type Lease struct {
-	EnableIPv4 bool
-	Subnet     ip.IP4Net
-	Attrs      LeaseAttrs
-	Expiration time.Time
-
-	Asof int64
-}
-
-func (l *Lease) Key() string {
-	return MakeSubnetKey(l.Subnet)
-}
-
-func MakeSubnetKey(sn ip.IP4Net) string {
-	return sn.StringSep(".", "-")
-}
-
 type Event struct {
 	Type  EventType `json:"type"`
 	Lease Lease     `json:"lease,omitempty"`
@@ -76,11 +48,10 @@ type kubeSubnetManager struct {
 	nodeName   string
 
 	kubeClient kubernetes.Interface
-	store      cache.Store
+	nodeStore  listersv1.NodeLister
 	controller cache.Controller
 
 	annotations               annotations
-	nodeStore                 listersv1.NodeLister
 	nodeController            cache.Controller
 	setNodeNetworkUnavailable bool
 
@@ -88,6 +59,13 @@ type kubeSubnetManager struct {
 }
 
 // NewSubnetManager netConfPath=/etc/kube-flannel/net-conf.json
+// net-conf.json: |
+//    {
+//      "Network": "10.244.0.0/16",
+//      "Backend": {
+//        "Type": "vxlan"
+//      }
+//    }
 func NewSubnetManager(ctx context.Context, kubeConfig, prefix,
 	netConfPath string, setNodeNetworkUnavailable bool) (Manager, error) {
 	cfg, err := clientcmd.BuildConfigFromFlags("", kubeConfig)
@@ -110,13 +88,11 @@ func NewSubnetManager(ctx context.Context, kubeConfig, prefix,
 	}
 
 	// watch K8s node
-	subnetManager, err := newKubeSubnetManager(ctx, kubeClient, config, nodeName, prefix)
+	subnetManager, err := newKubeSubnetManager(ctx, kubeClient, config, nodeName, prefix, setNodeNetworkUnavailable)
 	if err != nil {
 		return nil, fmt.Errorf("error creating network manager: %s", err)
 	}
-	subnetManager.setNodeNetworkUnavailable = setNodeNetworkUnavailable
-	go subnetManager.Run(context.Background())
-	klog.Infof("Waiting %s for node controller to sync", nodeControllerSyncTimeout)
+	go subnetManager.Run(ctx)
 	syncCh := make(chan struct{})
 	go func() {
 		cache.WaitForCacheSync(ctx.Done(), subnetManager.controller.HasSynced)
@@ -133,18 +109,19 @@ func NewSubnetManager(ctx context.Context, kubeConfig, prefix,
 }
 
 func newKubeSubnetManager(ctx context.Context, kubeClient kubernetes.Interface,
-	config *Config, nodeName, prefix string) (*kubeSubnetManager, error) {
+	config *Config, nodeName, prefix string, setNodeNetworkUnavailable bool) (*kubeSubnetManager, error) {
 	annotation, err := newAnnotations(prefix)
 	if err != nil {
 		klog.Fatal(err)
 	}
 	subnetMgr := &kubeSubnetManager{
-		enableIPv4:  config.EnableIPv4,
-		kubeClient:  kubeClient,
-		subnetConf:  config,
-		nodeName:    nodeName,
-		annotations: annotation,
-		events:      make(chan Event, 5000),
+		enableIPv4:                config.EnableIPv4,
+		kubeClient:                kubeClient,
+		subnetConf:                config,
+		nodeName:                  nodeName,
+		annotations:               annotation,
+		events:                    make(chan Event, 5000),
+		setNodeNetworkUnavailable: setNodeNetworkUnavailable,
 	}
 
 	store, controller := cache.NewTransformingInformer(
@@ -177,7 +154,7 @@ func newKubeSubnetManager(ctx context.Context, kubeClient kubernetes.Interface,
 			},
 		}, nil)
 
-	subnetMgr.store = store
+	subnetMgr.nodeStore = listersv1.NewNodeLister(store.(cache.Indexer))
 	subnetMgr.controller = controller
 
 	return subnetMgr, nil
@@ -199,7 +176,7 @@ func (subnetMgr *kubeSubnetManager) handleAddLeaseEvent(et EventType, obj interf
 
 	l, err := subnetMgr.nodeToLease(*node)
 	if err != nil {
-		klog.Infof(fmt.Sprintf("Error turning node %q to lease: %v", n.ObjectMeta.Name, err))
+		klog.Infof(fmt.Sprintf("Error turning node %s to lease: %v", node.Name, err))
 		return
 	}
 
@@ -260,17 +237,29 @@ func (subnetMgr *kubeSubnetManager) GetNetworkConfig(ctx context.Context) (*Conf
 	return subnetMgr.subnetConf, nil
 }
 
-func (subnetMgr *kubeSubnetManager) AcquireLease(ctx context.Context, attrs *interface{}) (*interface{}, error) {
+func (subnetMgr *kubeSubnetManager) AcquireLease(ctx context.Context, attrs *LeaseAttrs) (*Lease, error) {
+	cachedNode, err := subnetMgr.nodeStore.Get(subnetMgr.nodeName)
+	if err != nil {
+		return nil, err
+	}
+	node := cachedNode.DeepCopy()
+	if node.Spec.PodCIDR == "" {
+		return nil, fmt.Errorf("node %q pod cidr not assigned", subnetMgr.nodeName)
+	}
+
+	data, err := attrs.BackendData.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+}
+
+func (subnetMgr *kubeSubnetManager) RenewLease(ctx context.Context, lease *Lease) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (subnetMgr *kubeSubnetManager) RenewLease(ctx context.Context, lease *interface{}) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (subnetMgr *kubeSubnetManager) WatchLease(ctx context.Context, sn interface{}, sn6 interface{}, cursor interface{}) (LeaseWatchResult, error) {
+func (subnetMgr *kubeSubnetManager) WatchLease(ctx context.Context, sn ip.IP4Net, cursor interface{}) (LeaseWatchResult, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -281,8 +270,7 @@ func (subnetMgr *kubeSubnetManager) WatchLeases(ctx context.Context, cursor inte
 }
 
 func (subnetMgr *kubeSubnetManager) Name() string {
-	//TODO implement me
-	panic("implement me")
+	return fmt.Sprintf("Kubernetes Subnet Manager - %s", subnetMgr.nodeName)
 }
 
 func getNodeName(kubeClient *kubernetes.Clientset) (string, error) {

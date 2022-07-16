@@ -15,7 +15,7 @@ type Manager interface {
 }
 
 type Backend interface {
-	RegisterNetwork(ctx context.Context, wg *sync.WaitGroup, config *subnet.Config) (Network, error)
+	RegisterNetwork(ctx context.Context, config *subnet.Config) (Network, error)
 }
 
 type Network interface {

@@ -58,7 +58,7 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	vxlanNetwork, err := vxlanBackend.RegisterNetwork(ctx, &wg, config)
+	vxlanNetwork, err := vxlanBackend.RegisterNetwork(ctx, config)
 	if err != nil {
 		klog.Fatal(err)
 	}

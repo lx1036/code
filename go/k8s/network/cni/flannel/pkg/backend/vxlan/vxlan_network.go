@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/vishvananda/netlink"
+	"net"
 	"syscall"
 
 	"k8s-lx1036/k8s/network/cni/flannel/pkg/backend"
@@ -40,6 +41,9 @@ func (network *vxlanNetwork) Run(ctx context.Context) {
 		network.handleSubnetEvents(evtBatch)
 	}
 }
+
+// So we can make it JSON (un)marshalable
+type hardwareAddr net.HardwareAddr
 
 type vxlanLeaseAttrs struct {
 	VNI     uint16
