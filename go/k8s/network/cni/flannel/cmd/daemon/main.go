@@ -3,13 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"k8s-lx1036/k8s/network/cni/flannel/pkg/ip"
+
 	"net"
 	"os"
 	"path/filepath"
 
 	"k8s-lx1036/k8s/network/cni/flannel/pkg/backend"
 	_ "k8s-lx1036/k8s/network/cni/flannel/pkg/backend/vxlan"
+	"k8s-lx1036/k8s/network/cni/flannel/pkg/ip"
+	"k8s-lx1036/k8s/network/cni/flannel/pkg/iptables"
 	"k8s-lx1036/k8s/network/cni/flannel/pkg/subnet"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -25,6 +27,8 @@ var (
 
 	ifaceName                 = flag.String("iface", "eth0", "interface to use (IP or name) for inter-host communication. Can be specified multiple times to check each option in order. Returns the first match found.")
 	ipMasq                    = flag.Bool("ip-masq", false, "setup IP masquerade rule for traffic destined outside of overlay network")
+	iptablesForwardRules      = flag.Bool("iptables-forward-rules", true, "add default accept rules to FORWARD chain in iptables")
+	iptablesResyncSeconds     = flag.Int("iptables-resync", 5, "resync period for iptables rules, in seconds")
 	setNodeNetworkUnavailable = flag.Bool("set-node-network-unavailable", true, "set NodeNetworkUnavailable after ready")
 )
 
@@ -63,6 +67,27 @@ func main() {
 		klog.Fatal(err)
 	}
 	go vxlanNetwork.Run(ctx)
+
+	// Set up ipMasq if needed
+	if *ipMasq {
+		if config.EnableIPv4 {
+			if err = recycleIPTables(config.Network, vxlanNetwork.Lease()); err != nil {
+				klog.Fatal(err)
+			}
+
+			go iptables.SetupAndEnsureIP4Tables(iptables.MasqRules(config.Network, vxlanNetwork.Lease()), *iptablesResyncSeconds)
+		}
+	}
+
+	// Always enables forwarding rules. This is needed for Docker versions >1.13 (https://docs.docker.com/engine/userguide/networking/default_network/container-communication/#container-communication-between-hosts)
+	// In Docker 1.12 and earlier, the default FORWARD chain policy was ACCEPT.
+	// In Docker 1.13 and later, Docker sets the default policy of the FORWARD chain to DROP.
+	if *iptablesForwardRules {
+		if config.EnableIPv4 {
+			klog.Infof("Changing default FORWARD chain policy to ACCEPT")
+			go iptables.SetupAndEnsureIP4Tables(iptables.ForwardRules(config.Network.String()), *iptablesResyncSeconds)
+		}
+	}
 
 	if err := WriteSubnetFile(*subnetFile, config, *ipMasq, vxlanNetwork); err != nil {
 		// Continue, even though it failed.

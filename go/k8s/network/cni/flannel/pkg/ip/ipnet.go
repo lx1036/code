@@ -1,6 +1,7 @@
 package ip
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -54,6 +55,16 @@ func ParseIP4(s string) (IP4, error) {
 type IP4Net struct {
 	IP        IP4
 	PrefixLen uint
+}
+
+func (n *IP4Net) UnmarshalJSON(j []byte) error {
+	j = bytes.Trim(j, "\"")
+	if _, val, err := net.ParseCIDR(string(j)); err != nil {
+		return err
+	} else {
+		*n = FromIPNet(val)
+		return nil
+	}
 }
 
 func (n IP4Net) String() string {
