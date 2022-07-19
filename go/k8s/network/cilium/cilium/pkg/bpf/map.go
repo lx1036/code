@@ -257,6 +257,29 @@ func NewMap(name string, mapType MapType, mapKey MapKey, keySize int, mapValue M
 	return m
 }
 
+// NewPerCPUHashMap creates a new Map type of "per CPU hash" - object representing a BPF map
+// The number of cpus is used to have the size representation of a value when
+// a lookup is made on this map types.
+func NewPerCPUHashMap(name string, mapKey MapKey, keySize int, mapValue MapValue, valueSize, cpus, maxEntries int, flags uint32, innerID uint32, dumpParser DumpParser) *Map {
+	m := &Map{
+		MapInfo: MapInfo{
+			MapType:       MapTypePerCPUHash,
+			MapKey:        mapKey,
+			KeySize:       uint32(keySize),
+			MapValue:      mapValue,
+			ReadValueSize: uint32(valueSize * cpus), // 这里不一样
+			ValueSize:     uint32(valueSize),
+			MaxEntries:    uint32(maxEntries),
+			Flags:         flags,
+			InnerID:       innerID,
+			OwnerProgType: ProgTypeUnspec,
+		},
+		name:       path.Base(name),
+		dumpParser: dumpParser,
+	}
+	return m
+}
+
 // WithCache enables use of a cache. This will store all entries inserted from
 // user space in a local cache (map) and will indicate the status of each
 // individual entry.

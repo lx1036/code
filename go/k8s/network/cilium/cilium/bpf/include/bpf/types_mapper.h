@@ -21,8 +21,10 @@ typedef unsigned int __u32;
 typedef __u32 __le32;
 typedef __u32 __be32;
 
-
 typedef __u16 __sum16;
 typedef __u32 __wsum;
+
+typedef __signed__ long long __s64;
+typedef unsigned long long __u64;
 
 #endif //__BPF_TYPES_MAPPER__

@@ -23,6 +23,8 @@ import (
 type Endpoint struct {
 	mutex sync.RWMutex
 
+	// ID of the endpoint, unique in the scope of the node
+	ID uint16
 	// state is the state the endpoint is in. See setState()
 	state string
 	// status contains the last n state transitions this endpoint went through

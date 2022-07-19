@@ -19,18 +19,25 @@ type linuxDatapath struct {
 	datapath.ConfigWriter
 
 	loader *loader.Loader
+
+	nodeAddressing datapath.NodeAddressing
 }
 
 // NewDatapath creates a new Linux datapath
 func NewDatapath(cfg DatapathConfiguration, ruleManager datapath.IptablesManager) datapath.Datapath {
 
 	dp := &linuxDatapath{
-		ConfigWriter: &config.HeaderfileWriter{},
-		loader:       loader.NewLoader(),
+		ConfigWriter:   &config.HeaderfileWriter{},
+		loader:         loader.NewLoader(),
+		nodeAddressing: NewNodeAddressing(),
 	}
 
 }
 
 func (l *linuxDatapath) Loader() datapath.Loader {
 	return l.loader
+}
+
+func (l *linuxDatapath) LocalNodeAddressing() datapath.NodeAddressing {
+	return l.nodeAddressing
 }

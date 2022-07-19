@@ -4082,7 +4082,7 @@ spec:
         # It can be deleted if this is a fresh installation, or if you have already
         # upgraded to use calico-ipam.
         - name: upgrade-ipam
-          image: calico/cni:v3.21.2
+          image: calico/cni:v3.22.2
           command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
           envFrom:
           - configMapRef:
@@ -4109,7 +4109,7 @@ spec:
         # This container installs the CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: calico/cni:v3.21.2
+          image: calico/cni:v3.22.2
           command: ["/opt/cni/bin/install"]
           envFrom:
           - configMapRef:
@@ -4150,7 +4150,7 @@ spec:
         # Adds a Flex Volume Driver that creates a per-pod Unix Domain Socket to allow Dikastes
         # to communicate with Felix over the Policy Sync API.
         - name: flexvol-driver
-          image: calico/pod2daemon-flexvol:v3.21.2
+          image: calico/pod2daemon-flexvol:v3.22.2
           volumeMounts:
           - name: flexvol-driver-host
             mountPath: /host/driver
@@ -4161,13 +4161,15 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: calico/node:v3.21.2
+          image: calico/node:v3.22.2
           envFrom:
           - configMapRef:
               # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
               name: kubernetes-services-endpoint
               optional: true
           env:
+            - name: FELIX_LOGSEVERITYSCREEN # debug log for felix
+              value: debug
             # Use Kubernetes API as the backing datastore.
             - name: DATASTORE_TYPE
               value: "kubernetes"
@@ -4380,7 +4382,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
         - name: calico-kube-controllers
-          image: calico/kube-controllers:v3.21.2
+          image: calico/kube-controllers:v3.22.2
           env:
             # Choose which controllers to run.
             - name: ENABLED_CONTROLLERS

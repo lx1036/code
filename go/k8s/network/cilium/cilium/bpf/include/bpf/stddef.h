@@ -7,6 +7,7 @@
 
 
 #define bool _Bool
+#define NULL	((void *)0)
 
 enum {
     false = 0,

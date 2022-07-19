@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"github.com/cilium/cilium/pkg/maps/sockmap"
 	"os"
 	"time"
 
@@ -12,9 +11,11 @@ import (
 
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/endpoint/endpointmanager"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/endpointpolicymap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/sockmap"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/service"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/sockops"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/defaults"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/config/option"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath/loader"
 	"k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/node/nodediscovery"
@@ -121,9 +122,9 @@ func (d *Daemon) init() error {
 
 	if option.Config.SockopsEnable {
 		endpointpolicymap.CreateEPPolicyMap()
-		if err := sockops.SockmapEnable(); err != nil {
+		if err := sockops.SockmapEnable(); err != nil { // BPF 程序一：监听 socket 事件，更新 sockmap
 			log.WithError(err).Error("Failed to enable Sockmap")
-		} else if err := sockops.SkmsgEnable(); err != nil {
+		} else if err := sockops.SkmsgEnable(); err != nil { // BPF 程序二：拦截 sendmsg 系统调用，socket 重定向
 			log.WithError(err).Error("Failed to enable Sockmsg")
 		} else {
 			sockmap.SockmapCreate()

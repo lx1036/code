@@ -8,6 +8,13 @@ const (
 
 	// ExecTimeout is a timeout for executing commands.
 	ExecTimeout = 300 * time.Second
+
+	// LibraryPath is the default path to the cilium libraries directory
+	LibraryPath = "/var/lib/cilium"
+
+	// HostDevice is the name of the device that connects the cilium IP
+	// space with the host's networking model
+	HostDevice = "cilium_host"
 )
 
 // BPF
@@ -40,6 +47,9 @@ const (
 
 	// TemplatesDir is the default path for the compiled template objects relative to StateDir
 	TemplatesDir = "templates"
+
+	// BpfDir is the default path for template files relative to LibDir
+	BpfDir = "bpf"
 )
 
 // Cgroup
