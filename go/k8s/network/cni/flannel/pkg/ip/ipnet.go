@@ -9,6 +9,16 @@ import (
 
 type IP4 uint32
 
+func FromIP(ip net.IP) IP4 {
+	ipv4 := ip.To4()
+
+	if ipv4 == nil {
+		panic("Address is not an IPv4 address")
+	}
+
+	return FromBytes(ipv4)
+}
+
 func (ip IP4) Octets() (a, b, c, d byte) {
 	a, b, c, d = byte(ip>>24), byte(ip>>16), byte(ip>>8), byte(ip)
 	return
@@ -55,6 +65,37 @@ func ParseIP4(s string) (IP4, error) {
 type IP4Net struct {
 	IP        IP4
 	PrefixLen uint
+}
+
+func (n *IP4Net) IncrementIP() {
+	n.IP++
+}
+
+func (n IP4Net) ToIPNet() *net.IPNet {
+	return &net.IPNet{
+		IP:   n.IP.ToIP(),
+		Mask: net.CIDRMask(int(n.PrefixLen), 32),
+	}
+}
+
+func (n IP4Net) Contains(ip IP4) bool {
+	return (uint32(n.IP) & n.Mask()) == (uint32(ip) & n.Mask())
+}
+
+func (n IP4Net) Equal(other IP4Net) bool {
+	return n.IP == other.IP && n.PrefixLen == other.PrefixLen
+}
+
+func (n IP4Net) Mask() uint32 {
+	var ones uint32 = 0xFFFFFFFF
+	return ones << (32 - n.PrefixLen)
+}
+
+func (n IP4Net) Next() IP4Net {
+	return IP4Net{
+		n.IP + (1 << (32 - n.PrefixLen)),
+		n.PrefixLen,
+	}
 }
 
 func (n *IP4Net) UnmarshalJSON(j []byte) error {

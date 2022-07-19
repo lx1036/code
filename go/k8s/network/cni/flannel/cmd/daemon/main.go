@@ -54,7 +54,7 @@ func main() {
 	extIface := &backend.ExternalInterface{
 		Iface:     iface,
 		IfaceAddr: ifaceAddr,
-		ExtAddr:   ifaceAddr,
+		ExtAddr:   ifaceAddr, // 这里配置的是 publicIP，也就是 nodeIP
 	}
 	// Create a backend manager then use it to create the backend and register the network with it.
 	backendMgr := backend.NewManager(ctx, subnetMgr, extIface)
@@ -125,7 +125,7 @@ func WriteSubnetFile(path string, config *subnet.Config, ipMasq bool, vxlanNetwo
 		network := config.Network
 		sn := vxlanNetwork.Lease().Subnet
 		// Write out the first usable IP by incrementing sn.IP by one
-		sn.IncrementIP()
+		sn.IncrementIP() // INFO: 因为第一个IP被 vxlan device 使用了，@see vxlanBackend.RegisterNetwork()
 		fmt.Fprintf(f, "FLANNEL_NETWORK=%s\n", network)
 		fmt.Fprintf(f, "FLANNEL_SUBNET=%s\n", sn)
 	}
