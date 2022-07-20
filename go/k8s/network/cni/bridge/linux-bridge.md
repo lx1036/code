@@ -44,7 +44,7 @@ Linux bridge 则有多个端口，数据可以从任何端口进来，进来之�
 # 创建一个 bridge
 # brctl addbr br1 # bridge-utils 软件包里的 brctl 工具管理网桥
 # sudo apt install -y bridge-utils(Ubuntu)
-# sudo yum install bridge-utils(CentOS)
+# sudo yum install bridge-utils(CentOS) 或者 yum install -y iproute iproute-devel iproute-tc
 ip link add name br0 type bridge
 ip link list
 ip link set br0 up

@@ -65,13 +65,14 @@ func (backend *VxlanBackend) RegisterNetwork(ctx context.Context, config *subnet
 			vni:       uint32(cfg.VNI),
 			name:      fmt.Sprintf("flannel.%v", cfg.VNI),
 			vtepIndex: backend.extIface.Iface.Index,
-			vtepAddr:  backend.extIface.IfaceAddr,
+			vtepAddr:  backend.extIface.IfaceAddr, // 这里是 nodeIP 地址，是这块的参数 local 10.206.67.15
 			vtepPort:  cfg.Port,
 			gbp:       cfg.GBP,
-			learning:  cfg.Learning,
+			learning:  cfg.Learning, // nolearning
 		}
 
 		// (1)创建了一个 vxlan 网卡
+		// 等于命令 `ip link add vxlan100 type vxlan id 100 dstport 4789 local 10.206.67.15 nolearning`
 		dev, err = newVXLANDevice(&devAttrs)
 		if err != nil {
 			return nil, err

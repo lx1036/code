@@ -96,10 +96,16 @@ func (network *vxlanNetwork) handleSubnetEvents(batch []subnet.Event) {
 			vxlanRoute = netlink.Route{
 				LinkIndex: network.dev.link.Attrs().Index,
 				Scope:     netlink.SCOPE_UNIVERSE,
-				Dst:       sn.ToIPNet(),
-				Gw:        sn.IP.ToIP(),
+				// 到达新 node 的 vxlan 网卡的路由，`10.230.91.0/24 via 10.230.91.0 dev flannel.1 onlink`,
+				// 然后 10.230.91.0 对应的 mac 在 ARP 表里，下面 AddARP() 设置了，然后这个 mac 对应的 IP 在 FDB 表里设置了，就是另一台 nodeIP，最后封包结束
+				Dst: sn.ToIPNet(),
+				Gw:  sn.IP.ToIP(), // 10.230.91.0
 			}
+			// flanneld在加入集群时会为每个其他节点生成一条on-link路由，on-link路由表示是直连路由，匹配该条路由的数据包将触发ARP请求获取目的IP的MAC地址
 			vxlanRoute.SetFlag(syscall.RTNH_F_ONLINK)
+
+			// INFO: 有了这条 onlink 路由，网桥 cni0 会把来自于 veth pair 的包转给 vxlan flannel.1 网卡
+			//  并且接收端的IP地址为10.230.93.0, 需要通过ARP获取MAC地址, @see http://just4coding.com/2021/11/03/flannel/
 
 			// directRouting is where the remote host is on the same subnet so vxlan isn't required.
 			directRoute = netlink.Route{
@@ -134,7 +140,7 @@ func (network *vxlanNetwork) handleSubnetEvents(batch []subnet.Event) {
 						klog.Error("AddARP failed: ", err)
 						continue
 					}
-					// 这里 attrs.PublicIP 就是 nodeIP
+					// 这里 attrs.PublicIP 就是 nodeIP, 或者也叫 VTEP IP 地址, 可以参考验证 @see http://just4coding.com/2020/04/20/vxlan-fdb/
 					if err := network.dev.AddFDB(neighbor{IP: attrs.PublicIP, MAC: net.HardwareAddr(vxlanAttrs.VtepMAC)}); err != nil {
 						// Try to clean up the ARP entry then continue
 						if err := network.dev.DelARP(neighbor{IP: sn.IP, MAC: net.HardwareAddr(vxlanAttrs.VtepMAC)}); err != nil {
