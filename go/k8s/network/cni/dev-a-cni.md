@@ -7,6 +7,14 @@ plugins: https://github.com/containernetworking/plugins
 cni debug tool: `go install github.com/containernetworking/cni/cnitool`
 
 
+# 设计 CNI
+设计需要考虑的问题：
+(1) 网络连通性问题：pod 和 pod, pod 和 service, pod 和 node, 以及 pod 和外部网络。
+(2) cni binary(与 kubelet 交互) 和 ipam daemon 职责划分。
+(3) 高效的 ipam 资源划分和使用。
+(4) 不同的机器(公有云机器型号不一样，支持的弹性网卡数量也不一样)网络资源配额可能不一致，如何让调度感知。
+(5) 异常处理，垃圾资源的回收。
+
 
 ## ENI 弹性网卡
 弹性网卡概念: https://help.aliyun.com/document_detail/58496.html
