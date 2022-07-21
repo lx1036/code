@@ -18,3 +18,21 @@
 * (4)ebpf 可以替换 iptables，解决 net packet filter 这些问题，而且不会有 rule 数量爆炸问题。并且，有时候 packet 不需要被 copy 到内核走 netfilter，性能高。
   linux kernel 社区里，目前正在提议 add bpfilter 来替换 netfilter，见 **[net: add bpfilter](https://lwn.net/Articles/747504/)** 。
 
+
+
+## 常见问题
+(1) 在 centos 机器上安装 bcc
+```shell
+yum update && yum install -y bcc-tools bcc bcc-devel
+
+# 安装好 bcc 和 bcc-tools 后，可以运行相关 tools 工具
+echo 'export PATH="$PATH:/usr/share/bcc/tools/"' >> /etc/profile
+source /etc/profile
+vfsstat # https://github.com/iovisor/bcc/blob/master/tools/vfsstat_example.txt
+```
+
+(2) 安装 ebpf 程序常用的工具
+
+```shell
+yum install libbpf-devel make clang llvm elfutils-libelf-devel bpftool bcc-tools bcc-devel -y
+```
