@@ -2,6 +2,7 @@ package datapath
 
 import (
 	"context"
+	"github.com/cilium/cilium/pkg/lock"
 
 	"github.com/cilium/cilium/pkg/datapath/loader/metrics"
 )
@@ -16,4 +17,13 @@ type Loader interface {
 	DeleteDatapath(ctx context.Context, ifName, direction string) error
 	Unload(ep Endpoint)
 	Reinitialize(ctx context.Context, o BaseProgramOwner, deviceMTU int, iptMgr IptablesManager, p Proxy, r RouteReserver) error
+}
+
+// BaseProgramOwner is any type for which a loader is building base programs.
+type BaseProgramOwner interface {
+	//DeviceConfiguration
+	GetCompilationLock() *lock.RWMutex
+	Datapath() Datapath
+	LocalConfig() *LocalNodeConfiguration
+	SetPrefilter(pf PreFilter)
 }

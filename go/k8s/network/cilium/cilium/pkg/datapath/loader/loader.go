@@ -183,9 +183,6 @@ func (l *Loader) Reinitialize(ctx context.Context, o datapath.BaseProgramOwner, 
 		return err
 	}
 
-	if !option.Config.IsFlannelMasterDeviceSet() {
-		r.ReserveLocalRoutes()
-	}
 	if err := o.Datapath().Node().NodeConfigurationChanged(*o.LocalConfig()); err != nil {
 		return err
 	}
