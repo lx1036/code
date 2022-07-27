@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/utils"
+	"k8s-lx1036/k8s/colocation/isolation-agent/pkg/utils"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

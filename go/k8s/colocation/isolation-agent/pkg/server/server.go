@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"k8s-lx1036/k8s/kubelet/isolation-agent/cmd/app/options"
-	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/cgroup"
-	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/scraper"
-	topologycpu "k8s-lx1036/k8s/kubelet/isolation-agent/pkg/topology"
-	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/utils"
+	"k8s-lx1036/k8s/colocation/isolation-agent/cmd/app/options"
+	"k8s-lx1036/k8s/colocation/isolation-agent/pkg/cgroup"
+	"k8s-lx1036/k8s/colocation/isolation-agent/pkg/scraper"
+	topologycpu "k8s-lx1036/k8s/colocation/isolation-agent/pkg/topology"
+	"k8s-lx1036/k8s/colocation/isolation-agent/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

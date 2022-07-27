@@ -1,8 +1,8 @@
 package app
 
 import (
-	"k8s-lx1036/k8s/kubelet/isolation-agent/cmd/app/options"
-	"k8s-lx1036/k8s/kubelet/isolation-agent/pkg/server"
+	"k8s-lx1036/k8s/colocation/isolation-agent/cmd/app/options"
+	"k8s-lx1036/k8s/colocation/isolation-agent/pkg/server"
 
 	"github.com/spf13/cobra"
 )
