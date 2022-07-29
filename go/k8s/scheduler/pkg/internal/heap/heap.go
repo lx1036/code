@@ -89,6 +89,13 @@ func (h *data) Pop() interface{} {
 	return item.obj
 }
 
+func (h *data) Peek() interface{} {
+	if len(h.queue) > 0 {
+		return h.items[h.queue[0]].obj
+	}
+	return nil
+}
+
 // 最小堆
 // Heap is a producer/consumer queue that implements a heap data structure.
 // It can be used to implement priority queues and similar data structures.
@@ -142,6 +149,10 @@ func (h *Heap) Pop() (interface{}, error) {
 		return obj, nil
 	}
 	return nil, fmt.Errorf("object was removed from heap data")
+}
+
+func (h *Heap) Peek() interface{} {
+	return h.data.Peek()
 }
 
 // Get returns the requested item, or sets exists=false.

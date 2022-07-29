@@ -14,13 +14,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 )
 
+var (
+	lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
+	mediumPriority                         = (lowPriority + highPriority) / 2
+)
+
 func newDefaultQueueSort() framework.LessFunc {
 	sort := &queuesort.PrioritySort{}
 	return sort.Less // pod Priority 高则排在最前面，最大堆
 }
-
-var lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
-var mediumPriority = (lowPriority + highPriority) / 2
 
 var highPriorityPod, highPriNominatedPod, medPriorityPod, unschedulablePod = v1.Pod{
 	ObjectMeta: metav1.ObjectMeta{

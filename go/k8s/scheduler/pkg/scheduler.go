@@ -257,14 +257,6 @@ func (scheduler *Scheduler) deleteNodeFromCache(obj interface{}) {
 
 // Run begins watching and scheduling.
 // It waits for cache to be synced, then starts scheduling and blocked until the context is done.
-func (scheduler *Scheduler) Run(ctx context.Context) {
-	if !cache.WaitForCacheSync(ctx.Done(), scheduler.scheduledPodsHasSynced) {
-		return
-	}
-	scheduler.PriorityQueue.Run()
-	wait.UntilWithContext(ctx, scheduler.scheduleOne, 0)
-	scheduler.PriorityQueue.Close()
-}
 
 // scheduleOne does the entire scheduling workflow for a single pod.
 // It is serialized on the scheduling algorithm's host fitting.
@@ -522,45 +514,65 @@ func New(client clientset.Interface, informerFactory informers.SharedInformerFac
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 	snapshot := internalcache.NewEmptySnapshot()
 
-	configurator := &Configurator{
-		client:                   client,
-		recorderFactory:          recorderFactory,
-		informerFactory:          informerFactory,
-		podInformer:              podInformer,
-		schedulerCache:           schedulerCache,
-		StopEverything:           stopEverything,
-		percentageOfNodesToScore: options.percentageOfNodesToScore,
-		podInitialBackoffSeconds: options.podInitialBackoffSeconds,
-		podMaxBackoffSeconds:     options.podMaxBackoffSeconds,
-		profiles:                 append([]config.KubeSchedulerProfile(nil), options.profiles...),
-		registry:                 registry,
-		nodeInfoSnapshot:         snapshot,
-		extenders:                options.extenders,
-		frameworkCapturer:        options.frameworkCapturer,
-	}
+	podQueue := internalqueue.NewPriorityQueue(
+		profiles[options.profiles[0].SchedulerName].QueueSortFunc(),
+		informerFactory,
+		internalqueue.WithPodInitialBackoffDuration(time.Duration(options.podInitialBackoffSeconds)*time.Second),
+		internalqueue.WithPodMaxBackoffDuration(time.Duration(options.podMaxBackoffSeconds)*time.Second),
+		internalqueue.WithPodNominator(nominator),
+		internalqueue.WithClusterEventMap(clusterEventMap),
+	)
 
 	metrics.Register()
 
-	var sched *Scheduler
-	source := options.schedulerAlgorithmSource
-	switch {
-	case source.Provider != nil:
-		// Create the config from a named algorithm provider.
-		sc, err := configurator.createFromProvider(*source.Provider)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
-		}
-		sched = sc
-	default:
-		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
-	}
-
-	// Additional tweaks to the config produced by the configurator.
-	sched.StopEverything = stopEverything
-	sched.client = client
-	sched.scheduledPodsHasSynced = podInformer.Informer().HasSynced
+	sched := newScheduler(
+		schedulerCache,
+		extenders,
+		internalqueue.MakeNextPodFunc(podQueue),
+		MakeDefaultErrorFunc(client, podLister, podQueue, schedulerCache),
+		stopEverything,
+		podQueue,
+		profiles,
+		client,
+		snapshot,
+		options.percentageOfNodesToScore,
+	)
 
 	addAllEventHandlers(sched, informerFactory, podInformer)
 
 	return sched, nil
+}
+
+// for test case
+func newScheduler(
+	cache internalcache.Cache,
+	extenders []framework.Extender,
+	nextPod func() *framework.QueuedPodInfo,
+	Error func(*framework.QueuedPodInfo, error),
+	stopEverything <-chan struct{},
+	schedulingQueue internalqueue.SchedulingQueue,
+	profiles profile.Map,
+	client clientset.Interface,
+	nodeInfoSnapshot *internalcache.Snapshot,
+	percentageOfNodesToScore int32) *Scheduler {
+	sched := Scheduler{
+		Cache:                    cache,
+		Extenders:                extenders,
+		NextPod:                  nextPod,
+		Error:                    Error,
+		StopEverything:           stopEverything,
+		SchedulingQueue:          schedulingQueue,
+		Profiles:                 profiles,
+		client:                   client,
+		nodeInfoSnapshot:         nodeInfoSnapshot,
+		percentageOfNodesToScore: percentageOfNodesToScore,
+	}
+	sched.SchedulePod = sched.schedulePod
+	return &sched
+}
+
+func (scheduler *Scheduler) Run(ctx context.Context) {
+	scheduler.PriorityQueue.Run()
+	wait.UntilWithContext(ctx, scheduler.scheduleOne, 0)
+	scheduler.PriorityQueue.Close()
 }

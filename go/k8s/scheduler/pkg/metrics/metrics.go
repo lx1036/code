@@ -21,11 +21,31 @@ var (
 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.`,
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"queue"})
+
+	SchedulerQueueIncomingPods = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "queue_incoming_pods_total",
+			Help:           "Number of pods added to scheduling queues by event and queue type.",
+			StabilityLevel: metrics.STABLE,
+		}, []string{"queue", "event"})
+
+	unschedulableReasons = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "unschedulable_pods",
+			Help:           "The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"plugin", "profile"})
 )
 
 // UnschedulablePods returns the pending pods metrics with the label unschedulable
 func UnschedulablePods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "unschedulable"})
+}
+
+func UnschedulableReason(plugin string, profile string) metrics.GaugeMetric {
+	return unschedulableReasons.With(metrics.Labels{"plugin": plugin, "profile": profile})
 }
 
 var registerMetrics sync.Once

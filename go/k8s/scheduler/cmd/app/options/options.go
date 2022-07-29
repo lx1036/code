@@ -90,10 +90,10 @@ func (o *Options) Validate() []error {
 }
 
 // NewOptions returns default scheduler app options.
-func NewOptions() (*Options, error) {
+func NewOptions() *Options {
 	o := &Options{}
 
-	return o, nil
+	return o
 }
 
 // makeLeaderElectionConfig builds a leader election configuration. It will
