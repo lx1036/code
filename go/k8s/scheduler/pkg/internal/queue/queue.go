@@ -16,7 +16,7 @@ import (
 	"k8s-lx1036/k8s/scheduler/pkg/metrics"
 	"k8s-lx1036/k8s/scheduler/pkg/util"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -139,11 +139,8 @@ type PriorityQueue struct {
 
 	clock util.Clock
 
-	stop chan struct{}
-
-	// closed indicates that the queue is closed.
-	// It is mainly used to let Pop() exit its control loop while waiting for an item.
-	closed bool
+	closed bool // queue 可以关闭
+	stop   chan struct{}
 }
 
 type priorityQueueOptions struct {
@@ -310,35 +307,35 @@ func (p *PriorityQueue) isPodBackoff(podInfo *framework.QueuedPodInfo) bool {
 	return p.getBackoffTime(podInfo).After(p.clock.Now())
 }
 
-func (p *PriorityQueue) AddNominatedPod(pod *v1.Pod, nodeName string) {
+func (p *PriorityQueue) AddNominatedPod(pod *corev1.Pod, nodeName string) {
 	panic("implement me")
 }
 
-func (p *PriorityQueue) DeleteNominatedPodIfExists(pod *v1.Pod) {
+func (p *PriorityQueue) DeleteNominatedPodIfExists(pod *corev1.Pod) {
 	panic("implement me")
 }
 
-func (p *PriorityQueue) UpdateNominatedPod(oldPod, newPod *v1.Pod) {
+func (p *PriorityQueue) UpdateNominatedPod(oldPod, newPod *corev1.Pod) {
 	panic("implement me")
 }
 
-func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []*v1.Pod {
+func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []*corev1.Pod {
 	panic("implement me")
 }
 
-func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
+func (p *PriorityQueue) Update(oldPod, newPod *corev1.Pod) error {
 	panic("implement me")
 }
 
-func (p *PriorityQueue) Delete(pod *v1.Pod) error {
+func (p *PriorityQueue) Delete(pod *corev1.Pod) error {
 	panic("implement me")
 }
 
-func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
+func (p *PriorityQueue) AssignedPodUpdated(pod *corev1.Pod) {
 	panic("implement me")
 }
 
-func (p *PriorityQueue) PendingPods() []*v1.Pod {
+func (p *PriorityQueue) PendingPods() []*corev1.Pod {
 	panic("implement me")
 }
 
@@ -347,7 +344,7 @@ func (p *PriorityQueue) NumUnschedulablePods() int {
 }
 
 // newQueuedPodInfo builds a QueuedPodInfo object.
-func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod) *framework.QueuedPodInfo {
+func (p *PriorityQueue) newQueuedPodInfo(pod *corev1.Pod) *framework.QueuedPodInfo {
 	now := p.clock.Now()
 	return &framework.QueuedPodInfo{
 		Pod:                     pod,
@@ -355,14 +352,14 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod) *framework.QueuedPodInfo {
 		InitialAttemptTimestamp: now,
 	}
 }
-func newQueuedPodInfoNoTimestamp(pod *v1.Pod) *framework.QueuedPodInfo {
+func newQueuedPodInfoNoTimestamp(pod *corev1.Pod) *framework.QueuedPodInfo {
 	return &framework.QueuedPodInfo{
 		Pod: pod,
 	}
 }
 
 // add pod to activeQ
-func (p *PriorityQueue) Add(pod *v1.Pod) error {
+func (p *PriorityQueue) Add(pod *corev1.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -418,8 +415,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 
 const queueClosed = "scheduling queue is closed"
 
-// 最大堆activeQ中pop一个pod出来，没有则一直block等待，同时p.schedulingCycle++
-// Pop() 函数会阻塞，这点很重要！！！
+// Pop 最大堆activeQ中pop一个pod出来，没有则一直block等待，同时p.schedulingCycle++, 函数会阻塞，这点很重要！！！
 func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -430,6 +426,8 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 		if p.closed {
 			return nil, fmt.Errorf(queueClosed)
 		}
+		// INFO: 调度队列为空时则阻塞等待。不过这里貌似可以参考 workqueue.NewRateLimitingQueue 的实现，
+		//  queue.Get() 可以一直阻塞，只有有数据时才会继续运行。不过使用 cond.Wait 实现也挺优雅
 		p.cond.Wait()
 	}
 
@@ -445,14 +443,14 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 
 // 该pod会把unschedulableQ中与其affinity匹配的pod放到activeQ中
 // 这样可以使得两个亲和性pod优先被调度起来
-func (p *PriorityQueue) AssignedPodAdded(pod *v1.Pod) {
+func (p *PriorityQueue) AssignedPodAdded(pod *corev1.Pod) {
 	p.lock.Lock()
 	p.movePodsToActiveOrBackoffQueue(p.getUnschedulablePodsWithMatchingAffinityTerm(pod), AssignedPodAdd)
 	p.lock.Unlock()
 }
 
 // 从 unschedulableQ 中寻找pods，该pods需要match到输入的pod affinity
-func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod) []*framework.QueuedPodInfo {
+func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *corev1.Pod) []*framework.QueuedPodInfo {
 	var podsToMove []*framework.QueuedPodInfo
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
 		up := pInfo.Pod
@@ -473,7 +471,7 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 	return podsToMove
 }
 
-type PreEnqueueCheck func(pod *v1.Pod) bool
+type PreEnqueueCheck func(pod *corev1.Pod) bool
 
 // MoveAllToActiveOrBackoffQueue 把 unschedulableQ 全部移动到 activeQ 或 podBackoffQ
 func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event framework.ClusterEvent, preCheck PreEnqueueCheck) {
@@ -507,5 +505,10 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 }
 
 func (p *PriorityQueue) Close() {
-	panic("implement me")
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	close(p.stop)
+	p.closed = true
+	p.cond.Broadcast()
 }

@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"k8s-lx1036/k8s/scheduler/pkg/framework"
+	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/framework/runtime"
 	internalqueue "k8s-lx1036/k8s/scheduler/pkg/internal/queue"
-	"k8s-lx1036/k8s/scheduler/pkg/profile"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -63,6 +63,7 @@ func (scheduler *Scheduler) onStorageClassAdd(obj interface{}) {
 		scheduler.PriorityQueue.MoveAllToActiveOrBackoffQueue(internalqueue.StorageClassAdd, nil)
 	}
 }
+
 func (scheduler *Scheduler) onServiceAdd(obj interface{}) {
 	scheduler.PriorityQueue.MoveAllToActiveOrBackoffQueue(internalqueue.ServiceAdd, nil)
 }
@@ -106,7 +107,7 @@ func (scheduler *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		klog.ErrorS(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
-	scheduler.SchedulingQueue.AssignedPodUpdated(newPod)
+	scheduler.PriorityQueue.AssignedPodUpdated(newPod)
 }
 func (scheduler *Scheduler) deletePodFromCache(obj interface{}) {
 	var pod *corev1.Pod
@@ -191,6 +192,7 @@ func (scheduler *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	}
 	prof.Framework.RejectWaitingPod(pod.UID)
 }
+
 func (scheduler *Scheduler) addNodeToCache(obj interface{}) {
 	node, ok := obj.(*corev1.Node)
 	if !ok {
@@ -252,7 +254,7 @@ func assignedPod(pod *corev1.Pod) bool {
 }
 
 // responsibleForPod returns true if the pod has asked to be scheduled by the given scheduler.
-func responsibleForPod(pod *corev1.Pod, profiles profile.Map) bool {
+func responsibleForPod(pod *corev1.Pod, profiles frameworkruntime.Frameworks) bool {
 	return profiles.HandlesSchedulerName(pod.Spec.SchedulerName)
 }
 
@@ -293,10 +295,10 @@ func addAllEventHandlers(
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *corev1.Pod:
-					return !assignedPod(t) && responsibleForPod(t, scheduler.Profiles)
+					return !assignedPod(t) && responsibleForPod(t, scheduler.Frameworks)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*corev1.Pod); ok {
-						return !assignedPod(pod) && responsibleForPod(pod, scheduler.Profiles)
+						return !assignedPod(pod) && responsibleForPod(pod, scheduler.Frameworks)
 					}
 					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *corev1.Pod in %T", obj, scheduler))
 					return false

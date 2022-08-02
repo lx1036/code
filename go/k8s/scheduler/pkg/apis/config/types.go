@@ -118,39 +118,39 @@ type PluginConfig struct {
 // be invoked before default plugins, default plugins must be disabled and re-enabled here in desired order.
 type Plugins struct {
 	// QueueSort is a list of plugins that should be invoked when sorting pods in the scheduling queue.
-	QueueSort *PluginSet
+	QueueSort PluginSet
 
 	// PreFilter is a list of plugins that should be invoked at "PreFilter" extension point of the scheduling framework.
-	PreFilter *PluginSet
+	PreFilter PluginSet
 
 	// Filter is a list of plugins that should be invoked when filtering out nodes that cannot run the Pod.
-	Filter *PluginSet
+	Filter PluginSet
 
 	// PostFilter is a list of plugins that are invoked after filtering phase, no matter whether filtering succeeds or not.
-	PostFilter *PluginSet
+	PostFilter PluginSet
 
 	// PreScore is a list of plugins that are invoked before scoring.
-	PreScore *PluginSet
+	PreScore PluginSet
 
 	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
-	Score *PluginSet
+	Score PluginSet
 
 	// Reserve is a list of plugins invoked when reserving/unreserving resources
 	// after a node is assigned to run the pod.
-	Reserve *PluginSet
+	Reserve PluginSet
 
 	// Permit is a list of plugins that control binding of a Pod. These plugins can prevent or delay binding of a Pod.
-	Permit *PluginSet
+	Permit PluginSet
 
 	// PreBind is a list of plugins that should be invoked before a pod is bound.
-	PreBind *PluginSet
+	PreBind PluginSet
 
 	// Bind is a list of plugins that should be invoked at "Bind" extension point of the scheduling framework.
 	// The scheduler call these plugins in order. Scheduler skips the rest of these plugins as soon as one returns success.
-	Bind *PluginSet
+	Bind PluginSet
 
 	// PostBind is a list of plugins that should be invoked after a pod is successfully bound.
-	PostBind *PluginSet
+	PostBind PluginSet
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.

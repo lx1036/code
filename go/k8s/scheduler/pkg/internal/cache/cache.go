@@ -95,6 +95,10 @@ func New(ttl time.Duration, stop <-chan struct{}) *Cache {
 	return cache
 }
 
+func (cache *Cache) run() {
+	go wait.Until(cache.cleanupExpiredAssumedPods, cache.period, cache.stop)
+}
+
 func (cache *Cache) PodCount() (int, error) {
 	panic("implement me")
 }
@@ -116,7 +120,7 @@ func (cache *Cache) ForgetPod(pod *v1.Pod) error {
 }
 
 func (cache *Cache) AddPod(pod *v1.Pod) error {
-	panic("implement me")
+
 }
 
 func (cache *Cache) UpdatePod(oldPod, newPod *v1.Pod) error {
@@ -163,9 +167,6 @@ func (cache *Cache) Dump() *Dump {
 	panic("implement me")
 }
 
-func (cache *Cache) run() {
-	go wait.Until(cache.cleanupExpiredAssumedPods, cache.period, cache.stop)
-}
 func (cache *Cache) cleanupExpiredAssumedPods() {
 	cache.cleanupAssumedPods(time.Now())
 }
