@@ -149,12 +149,15 @@ type Framework struct {
 	filterPlugins         []framework.FilterPlugin
 	postFilterPlugins     []framework.PostFilterPlugin
 	preScorePlugins       []framework.PreScorePlugin
-	scorePlugins          []framework.ScorePlugin
-	reservePlugins        []framework.ReservePlugin
-	preBindPlugins        []framework.PreBindPlugin
-	bindPlugins           []framework.BindPlugin
-	postBindPlugins       []framework.PostBindPlugin
-	permitPlugins         []framework.PermitPlugin
+
+	scorePlugins      []framework.ScorePlugin
+	scorePluginWeight map[string]int
+
+	reservePlugins  []framework.ReservePlugin
+	preBindPlugins  []framework.PreBindPlugin
+	bindPlugins     []framework.BindPlugin
+	postBindPlugins []framework.PostBindPlugin
+	permitPlugins   []framework.PermitPlugin
 
 	clientSet       clientset.Interface
 	eventRecorder   events.EventRecorder
@@ -170,6 +173,13 @@ type Framework struct {
 	runAllFilters bool
 }
 
+var defaultFrameworkOptions = frameworkOptions{
+	metricsRecorder: newMetricsRecorder(1000, time.Second),
+	clusterEventMap: make(map[framework.ClusterEvent]sets.String),
+	parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
+}
+
+// NewFramework 该函数实例化了一个 profile 包含的所有 plugins
 func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Option) (*Framework, error) {
 	options := defaultFrameworkOptions
 	for _, opt := range opts {
@@ -187,84 +197,157 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 		metricsRecorder:       options.metricsRecorder,
 		profileName:           options.profileName,
 		runAllFilters:         options.runAllFilters,
+
+		scorePluginWeight: make(map[string]int),
+		kubeConfig:        options.kubeConfig,
+		PodNominator:      options.podNominator,
+		parallelizer:      options.parallelizer,
 	}
-	f.preemptHandle = &preemptHandle{
-		extenders:     options.extenders,
-		PodNominator:  options.podNominator,
-		PluginsRunner: f,
+	if profile == nil {
+		return f, nil
 	}
-	if plugins == nil {
+	f.profileName = profile.SchedulerName
+	if profile.Plugins == nil {
 		return f, nil
 	}
 
-	// get needed plugins from config
-	pg := f.pluginsNeeded(plugins)
-
-	pluginConfig := make(map[string]runtime.Object, len(args))
-	for i := range args {
-		name := args[i].Name
+	pluginConfig := make(map[string]runtime.Object, len(profile.PluginConfig))
+	for i := range profile.PluginConfig {
+		name := profile.PluginConfig[i].Name
 		if _, ok := pluginConfig[name]; ok {
 			return nil, fmt.Errorf("repeated config for plugin %s", name)
 		}
-		pluginConfig[name] = args[i].Args
+		pluginConfig[name] = profile.PluginConfig[i].Args
 	}
 
 	pluginsMap := make(map[string]framework.Plugin)
 	var totalPriority int64
-	for name, factory := range r {
+	neededPlugins := f.pluginsNeeded(profile.Plugins) // get needed plugins from config file
+	outputProfile := config.KubeSchedulerProfile{
+		SchedulerName: f.profileName,
+		Plugins:       profile.Plugins,
+		PluginConfig:  make([]config.PluginConfig, 0, len(neededPlugins)),
+	}
+	for name, pluginFactory := range r { // r 包含所有 in-tree and out-of-tree plugins
 		// initialize only needed plugins.
-		if _, ok := pg[name]; !ok {
+		if _, ok := neededPlugins[name]; !ok {
 			continue
 		}
 
-		args, err := getPluginArgsOrDefault(pluginConfig, name)
-		if err != nil {
-			return nil, fmt.Errorf("getting args for Plugin %q: %w", name, err)
+		args := pluginConfig[name] // merge plugin args
+		if args != nil {
+			outputProfile.PluginConfig = append(outputProfile.PluginConfig, config.PluginConfig{
+				Name: name,
+				Args: args,
+			})
 		}
-		p, err := factory(args, f)
+
+		p, err := pluginFactory(args, f)
 		if err != nil {
 			return nil, fmt.Errorf("error initializing plugin %q: %v", name, err)
 		}
 		pluginsMap[name] = p
 
-		// a weight of zero is not permitted, plugins can be disabled explicitly
-		// when configured.
-		f.pluginNameToWeightMap[name] = int(pg[name].Weight)
-		if f.pluginNameToWeightMap[name] == 0 {
-			f.pluginNameToWeightMap[name] = 1
-		}
-		// Checks totalPriority against MaxTotalScore to avoid overflow
-		if int64(f.pluginNameToWeightMap[name])*framework.MaxNodeScore > framework.MaxTotalScore-totalPriority {
-			return nil, fmt.Errorf("total score of Score plugins could overflow")
-		}
-		totalPriority += int64(f.pluginNameToWeightMap[name]) * framework.MaxNodeScore
+		// Update ClusterEventMap in place.
+		fillEventToPluginMap(p, options.clusterEventMap)
 	}
 
-	for _, e := range f.getExtensionPoints(plugins) {
+	for _, e := range f.getExtensionPoints(profile.Plugins) {
 		if err := updatePluginList(e.slicePtr, e.plugins, pluginsMap); err != nil {
 			return nil, err
 		}
 	}
 
-	// Verifying the score weights again since Plugin.Name() could return a different
-	// value from the one used in the configuration.
-	for _, scorePlugin := range f.scorePlugins {
-		if f.pluginNameToWeightMap[scorePlugin.Name()] == 0 {
-			return nil, fmt.Errorf("score plugin %q is not configured with weight", scorePlugin.Name())
-		}
-	}
-
-	if len(f.queueSortPlugins) == 0 {
-		return nil, fmt.Errorf("no queue sort plugin is enabled")
-	}
-	if len(f.queueSortPlugins) > 1 {
-		return nil, fmt.Errorf("only one queue sort plugin can be enabled")
+	if len(f.queueSortPlugins) != 1 {
+		return nil, fmt.Errorf("one queue sort plugin required for profile with scheduler name %q", profile.SchedulerName)
 	}
 	if len(f.bindPlugins) == 0 {
 		return nil, fmt.Errorf("at least one bind plugin is needed")
 	}
 
+	if err := f.getScoreWeights(pluginsMap, profile.Plugins.Score.Enabled); err != nil {
+		return nil, err
+	}
+
 	return f, nil
+}
+
+func (f *Framework) getScoreWeights(pluginsMap map[string]framework.Plugin, plugins []config.Plugin) error {
+	var totalPriority int64
+	for _, e := range plugins {
+
+		if _, ok := f.scorePluginWeight[e.Name]; ok {
+			continue
+		}
+		f.scorePluginWeight[e.Name] = int(e.Weight)
+		if f.scorePluginWeight[e.Name] == 0 {
+			f.scorePluginWeight[e.Name] = 1
+		}
+
+		// Checks totalPriority against MaxTotalScore to avoid overflow
+		if int64(f.scorePluginWeight[e.Name])*framework.MaxNodeScore > framework.MaxTotalScore-totalPriority {
+			return fmt.Errorf("total score of Score plugins could overflow")
+		}
+		totalPriority += int64(f.scorePluginWeight[e.Name]) * framework.MaxNodeScore
+	}
+
+	for _, scorePlugin := range f.scorePlugins {
+		if f.scorePluginWeight[scorePlugin.Name()] == 0 {
+			return fmt.Errorf("score plugin %q is not configured with weight", scorePlugin.Name())
+		}
+	}
+
+	return nil
+}
+
+func (f *Framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
+	pgMap := make(map[string]config.Plugin)
+	if plugins == nil {
+		return pgMap
+	}
+
+	find := func(pgs *config.PluginSet) {
+		if pgs == nil {
+			return
+		}
+		for _, pg := range pgs.Enabled {
+			pgMap[pg.Name] = pg
+		}
+	}
+	for _, e := range f.getExtensionPoints(plugins) {
+		find(e.plugins)
+	}
+
+	return pgMap
+}
+
+type extensionPoint struct {
+	// the set of plugins to be configured at this extension point.
+	plugins *config.PluginSet
+	// a pointer to the slice storing plugins implementations that will run at this
+	// extension point.
+	slicePtr interface{}
+}
+
+// INFO: 这里是 framework 的排序的 hook 点
+func (f *Framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint {
+	return []extensionPoint{
+		{&plugins.QueueSort, &f.queueSortPlugins},
+
+		{&plugins.PreFilter, &f.preFilterPlugins},
+		{&plugins.Filter, &f.filterPlugins},
+		{&plugins.PostFilter, &f.postFilterPlugins},
+
+		{&plugins.Reserve, &f.reservePlugins},
+		{&plugins.PreScore, &f.preScorePlugins},
+		{&plugins.Score, &f.scorePlugins},
+
+		{&plugins.PreBind, &f.preBindPlugins},
+		{&plugins.Bind, &f.bindPlugins},
+		{&plugins.PostBind, &f.postBindPlugins},
+
+		{&plugins.Permit, &f.permitPlugins},
+	}
 }
 
 // SnapshotSharedLister returns the scheduler's SharedLister of the latest NodeInfo
@@ -319,7 +402,20 @@ func (f *Framework) QueueSortFunc() framework.LessFunc {
 }
 
 func (f *Framework) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
-	panic("implement me")
+	var result *framework.PreFilterResult
+	for _, pl := range f.preFilterPlugins {
+		r, s := f.runPreFilterPlugin(ctx, pl, state, pod)
+
+	}
+
+	return result, nil
+}
+
+func (f *Framework) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin,
+	state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+
+	result, status := pl.PreFilter(ctx, state, pod)
+
 }
 
 func (f *Framework) RunFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) framework.PluginToStatus {
@@ -421,61 +517,6 @@ func (f *Framework) HasScorePlugins() bool {
 func (f *Framework) ListPlugins() map[string][]config.Plugin {
 	panic("implement me")
 }
-
-func (f *Framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
-	pgMap := make(map[string]config.Plugin)
-
-	if plugins == nil {
-		return pgMap
-	}
-
-	find := func(pgs *config.PluginSet) {
-		if pgs == nil {
-			return
-		}
-		for _, pg := range pgs.Enabled {
-			pgMap[pg.Name] = pg
-		}
-	}
-	for _, e := range f.getExtensionPoints(plugins) {
-		find(e.plugins)
-	}
-
-	return pgMap
-}
-
-// extensionPoint encapsulates desired and applied set of plugins at a specific extension
-// point. This is used to simplify iterating over all extension points supported by the
-// Framework.
-type extensionPoint struct {
-	// the set of plugins to be configured at this extension point.
-	plugins *config.PluginSet
-	// a pointer to the slice storing plugins implementations that will run at this
-	// extension point.
-	slicePtr interface{}
-}
-
-func (f *Framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint {
-	return []extensionPoint{
-		{plugins.PreFilter, &f.preFilterPlugins},
-		{plugins.Filter, &f.filterPlugins},
-		{plugins.PostFilter, &f.postFilterPlugins},
-		{plugins.Reserve, &f.reservePlugins},
-		{plugins.PreScore, &f.preScorePlugins},
-		{plugins.Score, &f.scorePlugins},
-		{plugins.PreBind, &f.preBindPlugins},
-		{plugins.Bind, &f.bindPlugins},
-		{plugins.PostBind, &f.postBindPlugins},
-		{plugins.Permit, &f.permitPlugins},
-		{plugins.QueueSort, &f.queueSortPlugins},
-	}
-}
-
-var defaultFrameworkOptions = frameworkOptions{
-	metricsRecorder: newMetricsRecorder(1000, time.Second),
-}
-
-// NewFramework INFO: Framework 对象是一个框架对象，管理多个hooks点，在每一个hook点运行多个plugins
 
 func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, pluginsMap map[string]framework.Plugin) error {
 	return nil

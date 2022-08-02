@@ -7,6 +7,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
@@ -389,4 +390,11 @@ type NodeInfoLister interface {
 // SharedLister groups scheduler-specific listers.
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
+}
+
+// PreFilterResult wraps needed info for scheduler framework to act upon PreFilter phase.
+type PreFilterResult struct {
+	// The set of nodes that should be considered downstream; if nil then
+	// all nodes are eligible.
+	NodeNames sets.String
 }
