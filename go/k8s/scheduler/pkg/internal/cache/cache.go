@@ -36,8 +36,16 @@ type imageState struct {
 	nodes sets.String
 }
 
+// Dump is a dump of the cache state.
+type Dump struct {
+	AssumedPods map[string]bool
+	Nodes       map[string]*framework.NodeInfo
+}
+
+// INFO: Cache 设计原理 https://github.com/jindezgm/k8s-src-analysis/blob/master/kube-scheduler/Cache.md
 // INFO: 缓存了pod和node信息，同时缓存了调度结果，见属性 podStates
-type schedulerCache struct {
+
+type Cache struct {
 	stop   <-chan struct{}
 	ttl    time.Duration
 	period time.Duration
@@ -58,11 +66,40 @@ type schedulerCache struct {
 	imageStates map[string]*imageState
 }
 
-func (cache *schedulerCache) PodCount() (int, error) {
+// New returns a Cache implementation.
+// It automatically starts a go routine that manages expiration of assumed pods.
+// "ttl" is how long the assumed pod will get expired.
+// "stop" is the channel that would close the background goroutine.
+var (
+	cleanAssumedPeriod = 1 * time.Second
+)
+
+func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *Cache {
+	return &Cache{
+		ttl:    ttl,
+		period: period,
+		stop:   stop,
+
+		nodes:       make(map[string]*nodeInfoListItem),
+		nodeTree:    newNodeTree(nil),
+		assumedPods: make(map[string]bool),
+		podStates:   make(map[string]*podState),
+		imageStates: make(map[string]*imageState),
+	}
+}
+
+func New(ttl time.Duration, stop <-chan struct{}) *Cache {
+	cache := newSchedulerCache(ttl, cleanAssumedPeriod, stop)
+	cache.run()
+
+	return cache
+}
+
+func (cache *Cache) PodCount() (int, error) {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
+func (cache *Cache) AssumePod(pod *v1.Pod) error {
 	key, err := framework.GetPodKey(pod)
 	if err != nil {
 		return err
@@ -70,64 +107,72 @@ func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
 
 }
 
-func (cache *schedulerCache) FinishBinding(pod *v1.Pod) error {
+func (cache *Cache) FinishBinding(pod *v1.Pod) error {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
+func (cache *Cache) ForgetPod(pod *v1.Pod) error {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
+func (cache *Cache) AddPod(pod *v1.Pod) error {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) UpdatePod(oldPod, newPod *v1.Pod) error {
+func (cache *Cache) UpdatePod(oldPod, newPod *v1.Pod) error {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
+func (cache *Cache) RemovePod(pod *v1.Pod) error {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
+func (cache *Cache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
+func (cache *Cache) IsAssumedPod(pod *v1.Pod) (bool, error) {
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return false, err
+	}
+
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	return cache.assumedPods.Has(key), nil
+}
+
+func (cache *Cache) AddNode(node *v1.Node) *framework.NodeInfo {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) AddNode(node *v1.Node) error {
+func (cache *Cache) UpdateNode(oldNode, newNode *v1.Node) error {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
+func (cache *Cache) RemoveNode(node *v1.Node) error {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
+func (cache *Cache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
+func (cache *Cache) Dump() *Dump {
 	panic("implement me")
 }
 
-func (cache *schedulerCache) Dump() *Dump {
-	panic("implement me")
-}
-
-func (cache *schedulerCache) run() {
+func (cache *Cache) run() {
 	go wait.Until(cache.cleanupExpiredAssumedPods, cache.period, cache.stop)
 }
-func (cache *schedulerCache) cleanupExpiredAssumedPods() {
+func (cache *Cache) cleanupExpiredAssumedPods() {
 	cache.cleanupAssumedPods(time.Now())
 }
 
 // cleanupAssumedPods exists for making test deterministic by taking time as input argument.
 // It also reports metrics on the cache size for nodes, pods, and assumed pods.
-func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
+func (cache *Cache) cleanupAssumedPods(now time.Time) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	//defer cache.updateMetrics()
@@ -152,7 +197,7 @@ func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 	}
 }
 
-func (cache *schedulerCache) expirePod(key string, ps *podState) error {
+func (cache *Cache) expirePod(key string, ps *podState) error {
 	if err := cache.removePod(ps.pod); err != nil {
 		return err
 	}
@@ -165,7 +210,7 @@ func (cache *schedulerCache) expirePod(key string, ps *podState) error {
 // Removes a pod from the cached node info. If the node information was already
 // removed and there are no more pods left in the node, cleans up the node from
 // the cache.
-func (cache *schedulerCache) removePod(pod *v1.Pod) error {
+func (cache *Cache) removePod(pod *v1.Pod) error {
 	n, ok := cache.nodes[pod.Spec.NodeName]
 	if !ok {
 		klog.Errorf("node %v not found when trying to remove pod %v", pod.Spec.NodeName, pod.Name)
@@ -186,7 +231,7 @@ func (cache *schedulerCache) removePod(pod *v1.Pod) error {
 // removeNodeInfoFromList removes a NodeInfo from the "cache.nodes" doubly
 // linked list.
 // We assume cache lock is already acquired.
-func (cache *schedulerCache) removeNodeInfoFromList(name string) {
+func (cache *Cache) removeNodeInfoFromList(name string) {
 	ni, ok := cache.nodes[name]
 	if !ok {
 		klog.Errorf("No NodeInfo with name %v found in the cache", name)
@@ -210,7 +255,7 @@ func (cache *schedulerCache) removeNodeInfoFromList(name string) {
 // moveNodeInfoToHead moves a NodeInfo to the head of "cache.nodes" doubly
 // linked list. The head is the most recently updated NodeInfo.
 // We assume cache lock is already acquired.
-func (cache *schedulerCache) moveNodeInfoToHead(name string) {
+func (cache *Cache) moveNodeInfoToHead(name string) {
 	ni, ok := cache.nodes[name]
 	if !ok {
 		klog.Errorf("No NodeInfo with name %v found in the cache", name)
@@ -233,33 +278,4 @@ func (cache *schedulerCache) moveNodeInfoToHead(name string) {
 	ni.next = cache.headNode
 	ni.prev = nil
 	cache.headNode = ni
-}
-
-// New returns a Cache implementation.
-// It automatically starts a go routine that manages expiration of assumed pods.
-// "ttl" is how long the assumed pod will get expired.
-// "stop" is the channel that would close the background goroutine.
-var (
-	cleanAssumedPeriod = 1 * time.Second
-)
-
-func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedulerCache {
-	return &schedulerCache{
-		ttl:    ttl,
-		period: period,
-		stop:   stop,
-
-		nodes:       make(map[string]*nodeInfoListItem),
-		nodeTree:    newNodeTree(nil),
-		assumedPods: make(map[string]bool),
-		podStates:   make(map[string]*podState),
-		imageStates: make(map[string]*imageState),
-	}
-}
-
-func New(ttl time.Duration, stop <-chan struct{}) Cache {
-	cache := newSchedulerCache(ttl, cleanAssumedPeriod, stop)
-	cache.run()
-
-	return cache
 }

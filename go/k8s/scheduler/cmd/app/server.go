@@ -29,7 +29,7 @@ type Option func(runtime.Registry) error
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
 	opts := options.NewOptions()
 	cmd := &cobra.Command{
-		Use:  "dynamic-scheduler",
+		Use:  "kube-scheduler",
 		Long: "k8s scheduler for online and offline pods",
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -122,7 +122,6 @@ func Run(ctx context.Context, cc *config.Config, sched *scheduler.Scheduler) err
 	cc.EventBroadcaster.StartRecordingToSink(ctx.Done())
 
 	// Start all informers.
-	go cc.PodInformer.Informer().Run(ctx.Done())
 	cc.InformerFactory.Start(ctx.Done())
 
 	// Wait for all caches to sync before scheduling.

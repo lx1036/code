@@ -9,7 +9,7 @@ import (
 // nodeTree is a tree-like data structure that holds node names in each zone. Zone names are
 // keys to "NodeTree.tree" and values of "NodeTree.tree" are arrays of node names.
 // NodeTree is NOT thread-safe, any concurrent updates/reads from it must be synchronized by the caller.
-// It is used only by schedulerCache, and should stay as such.
+// It is used only by Cache, and should stay as such.
 type nodeTree struct {
 	tree      map[string]*nodeArray // a map from zone (region-zone) to an array of nodes in the zone.
 	zones     []string              // a list of all the zones in the tree (keys)

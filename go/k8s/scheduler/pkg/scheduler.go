@@ -18,12 +18,10 @@ import (
 	"k8s-lx1036/k8s/scheduler/pkg/util"
 
 	v1 "k8s.io/api/core/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -93,165 +91,6 @@ type Scheduler struct {
 type FrameworkCapturer func(config.KubeSchedulerProfile)
 
 ////////////////////// PriorityQueue ////////////////////////////
-func (scheduler *Scheduler) addPodToCache(obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		klog.Errorf("cannot convert to *v1.Pod: %v", obj)
-		return
-	}
-	klog.Infof("add event for scheduled pod %s/%s ", pod.Namespace, pod.Name)
-
-	// 存入scheduler的cache
-	if err := scheduler.SchedulerCache.AddPod(pod); err != nil {
-		klog.Errorf("scheduler cache AddPod failed: %v", err)
-	}
-
-	// 存入PriorityQueue
-	scheduler.PriorityQueue.AssignedPodAdded(pod)
-}
-func (scheduler *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
-
-}
-func (scheduler *Scheduler) deletePodFromCache(obj interface{}) {
-	var pod *v1.Pod
-	switch t := obj.(type) {
-	case *v1.Pod:
-		pod = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		pod, ok = t.Obj.(*v1.Pod)
-		if !ok {
-			klog.Errorf("cannot convert to *v1.Pod: %v", t.Obj)
-			return
-		}
-	default:
-		klog.Errorf("cannot convert to *v1.Pod: %v", t)
-		return
-	}
-	klog.Infof("delete event for scheduled pod %s/%s ", pod.Namespace, pod.Name)
-	// NOTE: Updates must be written to scheduler cache before invalidating
-	// equivalence cache, because we could snapshot equivalence cache after the
-	// invalidation and then snapshot the cache itself. If the cache is
-	// snapshotted before updates are written, we would update equivalence
-	// cache with stale information which is based on snapshot of old cache.
-	if err := scheduler.SchedulerCache.RemovePod(pod); err != nil {
-		klog.Errorf("scheduler cache RemovePod failed: %v", err)
-	}
-
-	scheduler.PriorityQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete)
-}
-func (scheduler *Scheduler) addPodToSchedulingQueue(obj interface{}) {
-	pod := obj.(*v1.Pod)
-	klog.V(3).Infof("add event for unscheduled pod %s/%s", pod.Namespace, pod.Name)
-	if err := scheduler.PriorityQueue.Add(pod); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to queue %T: %v", obj, err))
-	}
-}
-func (scheduler *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
-	pod := newObj.(*v1.Pod)
-	if scheduler.skipPodUpdate(pod) {
-		return
-	}
-	if err := scheduler.PriorityQueue.Update(oldObj.(*v1.Pod), pod); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
-	}
-}
-func (scheduler *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
-	var pod *v1.Pod
-	switch t := obj.(type) {
-	case *v1.Pod:
-		pod = obj.(*v1.Pod)
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		pod, ok = t.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, scheduler))
-			return
-		}
-	default:
-		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", scheduler, obj))
-		return
-	}
-	klog.V(3).Infof("delete event for unscheduled pod %s/%s", pod.Namespace, pod.Name)
-	if err := scheduler.PriorityQueue.Delete(pod); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
-	}
-	prof, err := scheduler.profileForPod(pod)
-	if err != nil {
-		// This shouldn't happen, because we only accept for scheduling the pods
-		// which specify a scheduler name that matches one of the profiles.
-		klog.Error(err)
-		return
-	}
-	prof.Framework.RejectWaitingPod(pod.UID)
-}
-func (scheduler *Scheduler) addNodeToCache(obj interface{}) {
-	node, ok := obj.(*v1.Node)
-	if !ok {
-		klog.Errorf("cannot convert to *v1.Node: %v", obj)
-		return
-	}
-
-	if err := scheduler.SchedulerCache.AddNode(node); err != nil {
-		klog.Errorf("scheduler cache AddNode failed: %v", err)
-	}
-
-	klog.V(3).Infof("add event for node %q", node.Name)
-	scheduler.PriorityQueue.MoveAllToActiveOrBackoffQueue(internalqueue.NodeAdd)
-}
-func (scheduler *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
-	oldNode, ok := oldObj.(*v1.Node)
-	if !ok {
-		klog.Errorf("cannot convert oldObj to *v1.Node: %v", oldObj)
-		return
-	}
-	newNode, ok := newObj.(*v1.Node)
-	if !ok {
-		klog.Errorf("cannot convert newObj to *v1.Node: %v", newObj)
-		return
-	}
-
-	if err := scheduler.SchedulerCache.UpdateNode(oldNode, newNode); err != nil {
-		klog.Errorf("scheduler cache UpdateNode failed: %v", err)
-	}
-
-	// Only activate unschedulable pods if the node became more schedulable.
-	// We skip the node property comparison when there is no unschedulable pods in the queue
-	// to save processing cycles. We still trigger a move to active queue to cover the case
-	// that a pod being processed by the scheduler is determined unschedulable. We want this
-	// pod to be reevaluated when a change in the cluster happens.
-	if scheduler.PriorityQueue.NumUnschedulablePods() == 0 {
-		scheduler.PriorityQueue.MoveAllToActiveOrBackoffQueue(internalqueue.Unknown)
-	} else if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != "" {
-		scheduler.PriorityQueue.MoveAllToActiveOrBackoffQueue(event)
-	}
-}
-func (scheduler *Scheduler) deleteNodeFromCache(obj interface{}) {
-	var node *v1.Node
-	switch t := obj.(type) {
-	case *v1.Node:
-		node = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		node, ok = t.Obj.(*v1.Node)
-		if !ok {
-			klog.Errorf("cannot convert to *v1.Node: %v", t.Obj)
-			return
-		}
-	default:
-		klog.Errorf("cannot convert to *v1.Node: %v", t)
-		return
-	}
-	klog.V(3).Infof("delete event for node %q", node.Name)
-	// NOTE: Updates must be written to scheduler cache before invalidating
-	// equivalence cache, because we could snapshot equivalence cache after the
-	// invalidation and then snapshot the cache itself. If the cache is
-	// snapshotted before updates are written, we would update equivalence
-	// cache with stale information which is based on snapshot of old cache.
-	if err := scheduler.SchedulerCache.RemoveNode(node); err != nil {
-		klog.Errorf("scheduler cache RemoveNode failed: %v", err)
-	}
-}
 
 ////////////////////// PriorityQueue ////////////////////////////
 
@@ -422,11 +261,6 @@ func (scheduler *Scheduler) skipPodSchedule(prof *profile.Profile, pod *v1.Pod) 
 	return false
 	// 存入PriorityQueue
 	scheduler.PriorityQueue.AssignedPodAdded(pod)
-}
-
-// responsibleForPod returns true if the pod has asked to be scheduled by the given scheduler.
-func responsibleForPod(pod *v1.Pod, profiles profile.Map) bool {
-	return profiles.HandlesSchedulerName(pod.Spec.SchedulerName)
 }
 
 type schedulerOptions struct {

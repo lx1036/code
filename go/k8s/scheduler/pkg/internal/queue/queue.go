@@ -38,38 +38,11 @@ const (
 	Unknown = "Unknown"
 	// PodAdd is the event when a new pod is added to API server.
 	PodAdd = "PodAdd"
-	// NodeAdd is the event when a new node is added to the cluster.
-	NodeAdd = "NodeAdd"
 	// ScheduleAttemptFailure is the event when a schedule attempt fails.
 	ScheduleAttemptFailure = "ScheduleAttemptFailure"
 	// BackoffComplete is the event when a pod finishes backoff.
 	BackoffComplete = "BackoffComplete"
-	// AssignedPodUpdate is the event when a pod is updated that causes pods with matching affinity
-	// terms to be more schedulable.
-	AssignedPodUpdate = "AssignedPodUpdate"
-	// AssignedPodDelete is the event when a pod is deleted that causes pods with matching affinity
-	// terms to be more schedulable.
-	AssignedPodDelete = "AssignedPodDelete"
-	// PvAdd is the event when a persistent volume is added in the cluster.
-	PvAdd = "PvAdd"
-	// PvUpdate is the event when a persistent volume is updated in the cluster.
-	PvUpdate = "PvUpdate"
-	// PvcAdd is the event when a persistent volume claim is added in the cluster.
-	PvcAdd = "PvcAdd"
-	// PvcUpdate is the event when a persistent volume claim is updated in the cluster.
-	PvcUpdate = "PvcUpdate"
-	// StorageClassAdd is the event when a StorageClass is added in the cluster.
-	StorageClassAdd = "StorageClassAdd"
-	// ServiceAdd is the event when a service is added in the cluster.
-	ServiceAdd = "ServiceAdd"
-	// ServiceUpdate is the event when a service is updated in the cluster.
-	ServiceUpdate = "ServiceUpdate"
-	// ServiceDelete is the event when a service is deleted in the cluster.
-	ServiceDelete = "ServiceDelete"
-	// CSINodeAdd is the event when a CSI node is added in the cluster.
-	CSINodeAdd = "CSINodeAdd"
-	// CSINodeUpdate is the event when a CSI node is updated in the cluster.
-	CSINodeUpdate = "CSINodeUpdate"
+
 	// NodeSpecUnschedulableChange is the event when unschedulable node spec is changed.
 	NodeSpecUnschedulableChange = "NodeSpecUnschedulableChange"
 	// NodeAllocatableChange is the event when node allocatable is changed.
@@ -212,6 +185,7 @@ func NewPriorityQueue(
 		podMaxBackoffDuration:             options.podMaxBackoffDuration,
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
 
+		// activeQ 排队顺序是 pod priority
 		activeQ: heap.New(podInfoKeyFunc, func(podInfo1, podInfo2 interface{}) bool {
 			pInfo1 := podInfo1.(*framework.QueuedPodInfo)
 			pInfo2 := podInfo2.(*framework.QueuedPodInfo)
@@ -237,6 +211,7 @@ func (p *PriorityQueue) Run() {
 	go wait.Until(p.flushUnschedulablePodsToActiveOrBackoffQueue, 30*time.Second, p.stop)
 }
 
+// backoffQ 排队顺序是 pod 创建时间
 func (p *PriorityQueue) podsCompareBackoffCompleted(podInfo1, podInfo2 interface{}) bool {
 	pInfo1 := podInfo1.(*framework.QueuedPodInfo)
 	pInfo2 := podInfo2.(*framework.QueuedPodInfo)
@@ -498,13 +473,17 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 	return podsToMove
 }
 
-// 把 unschedulableQ 和 podBackoffQ 全部 move 到 activeQ
-func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event framework.ClusterEvent) {
+type PreEnqueueCheck func(pod *v1.Pod) bool
+
+// MoveAllToActiveOrBackoffQueue 把 unschedulableQ 全部移动到 activeQ 或 podBackoffQ
+func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event framework.ClusterEvent, preCheck PreEnqueueCheck) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulablePods.podInfoMap))
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		unschedulablePods = append(unschedulablePods, pInfo)
+		if preCheck == nil || preCheck(pInfo.Pod) {
+			unschedulablePods = append(unschedulablePods, pInfo)
+		}
 	}
 	p.movePodsToActiveOrBackoffQueue(unschedulablePods, event)
 }
