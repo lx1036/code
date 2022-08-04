@@ -111,13 +111,12 @@ type Plugin interface {
 	Name() string
 }
 
-// FilterPlugin is an interface for Filter plugins. These plugins are called at the
-// filter extension point for filtering out hosts that cannot run a pod.
-// This concept used to be called 'predicate' in the original scheduler.
-// These plugins should return "Success", "Unschedulable" or "Error" in Status.code.
-// However, the scheduler accepts other valid codes as well.
-// Anything other than "Success" will lead to exclusion of the given host from
-// running the pod.
+type QueueSortPlugin interface {
+	Plugin
+	// Less are used to sort pods in the scheduling queue.
+	Less(*QueuedPodInfo, *QueuedPodInfo) bool
+}
+
 type FilterPlugin interface {
 	Plugin
 	// Filter is called by the scheduling framework.
@@ -135,24 +134,8 @@ type FilterPlugin interface {
 	Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *Status
 }
 
-// QueueSortPlugin is an interface that must be implemented by "QueueSort" plugins.
-// These plugins are used to sort pods in the scheduling queue. Only one queue sort
-// plugin may be enabled at a time.
-type QueueSortPlugin interface {
-	Plugin
-	// Less are used to sort pods in the scheduling queue.
-	Less(*QueuedPodInfo, *QueuedPodInfo) bool
-}
-
-// PreFilterExtensions is an interface that is included in plugins that allow specifying
-// callbacks to make incremental updates to its supposedly pre-calculated
-// state.
 type PreFilterExtensions interface {
-	// AddPod is called by the framework while trying to evaluate the impact
-	// of adding podToAdd to the node while scheduling podToSchedule.
 	AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
-	// RemovePod is called by the framework while trying to evaluate the impact
-	// of removing podToRemove from the node while scheduling podToSchedule.
 	RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
 }
 
@@ -283,12 +266,6 @@ type PreBindPlugin interface {
 // plugins are used to bind a pod to a Node.
 type BindPlugin interface {
 	Plugin
-	// Bind plugins will not be called until all pre-bind plugins have completed. Each
-	// bind plugin is called in the configured order. A bind plugin may choose whether
-	// or not to handle the given Pod. If a bind plugin chooses to handle a Pod, the
-	// remaining bind plugins are skipped. When a bind plugin does not handle a pod,
-	// it must return Skip in its Status code. If a bind plugin returns an Error, the
-	// pod is rejected and will not be bound.
 	Bind(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status
 }
 

@@ -52,10 +52,9 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	scheduleResult, err := scheduler.schedulePod(schedulingCycleCtx, fwk, state, pod)
-	if err != nil {
+	if err != nil { // INFO: 如果pod调度失败，则调用 PostFilter plugin 进行抢占
 		nominatedNode := ""
-		// INFO: 如果pod调度失败，则调用 PostFilter plugin 进行抢占
-		if fitError, ok := err.(*core.FitError); ok {
+		if fitError, ok := err.(framework.FitError); ok {
 			if !framework.HasPostFilterPlugins() {
 				klog.V(3).Infof("No PostFilter plugins are registered, so no preemption will be performed.")
 			} else {
@@ -74,7 +73,7 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 				}
 			}
 			// metrics
-		} else if err == core.ErrNoNodesAvailable {
+		} else if err == framework.ErrNoNodesAvailable {
 
 		} else {
 			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))

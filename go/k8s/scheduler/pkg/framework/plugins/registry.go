@@ -1,10 +1,11 @@
 package plugins
 
 import (
+	"k8s-lx1036/k8s/scheduler/pkg/framework/plugins/defaultbinder"
+	"k8s-lx1036/k8s/scheduler/pkg/framework/plugins/defaultpreemption"
 	"k8s-lx1036/k8s/scheduler/pkg/framework/plugins/nodename"
 	"k8s-lx1036/k8s/scheduler/pkg/framework/runtime"
 
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
@@ -18,10 +19,10 @@ import (
 
 func NewInTreeRegistry() runtime.Registry {
 	return runtime.Registry{
-		defaultbinder.Name:     defaultbinder.New,
-		defaultpreemption.Name: runtime.FactoryAdapter(fts, defaultpreemption.New),
-
 		queuesort.Name: queuesort.New,
+
+		defaultbinder.Name:     defaultbinder.New,
+		defaultpreemption.Name: defaultpreemption.New,
 
 		selectorspread.Name:                  selectorspread.New,
 		imagelocality.Name:                   imagelocality.New,

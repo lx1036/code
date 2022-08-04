@@ -3,7 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"k8s.io/klog/v2"
+	"reflect"
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/apis/config/scheme"
@@ -11,6 +11,7 @@ import (
 	schedulerapiv1 "k8s-lx1036/k8s/scheduler/pkg/apis/config/v1"
 	"k8s-lx1036/k8s/scheduler/pkg/framework"
 	"k8s-lx1036/k8s/scheduler/pkg/framework/parallelize"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -19,6 +20,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -255,12 +257,13 @@ func NewFramework(r Registry, profile *configv1.KubeSchedulerProfile, opts ...Op
 		fillEventToPluginMap(p, options.clusterEventMap)
 	}
 
+	// INFO: 这里函数会按照一个个 hook 点去从 profile.Plugins 去实例化 framework 的一堆 plugins，包括必备的 queueSort 和 bind plugins
+	//  这里不追 updatePluginList() 函数的逻辑了，节省时间，直接复制
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
-		if err := updatePluginList(e.slicePtr, e.plugins, pluginsMap); err != nil {
+		if err := updatePluginList(e.slicePtr, *e.plugins, pluginsMap); err != nil {
 			return nil, err
 		}
 	}
-
 	if len(f.queueSortPlugins) != 1 {
 		return nil, fmt.Errorf("one queue sort plugin required for profile with scheduler name %q", profile.SchedulerName)
 	}
@@ -273,6 +276,32 @@ func NewFramework(r Registry, profile *configv1.KubeSchedulerProfile, opts ...Op
 	}
 
 	return f, nil
+}
+
+func updatePluginList(pluginList interface{}, pluginSet configv1.PluginSet, pluginsMap map[string]framework.Plugin) error {
+	plugins := reflect.ValueOf(pluginList).Elem()
+	pluginType := plugins.Type().Elem()
+	set := sets.NewString()
+	for _, ep := range pluginSet.Enabled {
+		pg, ok := pluginsMap[ep.Name]
+		if !ok {
+			return fmt.Errorf("%s %q does not exist", pluginType.Name(), ep.Name)
+		}
+
+		if !reflect.TypeOf(pg).Implements(pluginType) {
+			return fmt.Errorf("plugin %q does not extend %s plugin", ep.Name, pluginType.Name())
+		}
+
+		if set.Has(ep.Name) {
+			return fmt.Errorf("plugin %q already registered as %q", ep.Name, pluginType.Name())
+		}
+
+		set.Insert(ep.Name)
+
+		newPlugins := reflect.Append(plugins, reflect.ValueOf(pg))
+		plugins.Set(newPlugins)
+	}
+	return nil
 }
 
 func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.ClusterEvent]sets.String) {
@@ -601,10 +630,6 @@ func (f *Framework) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framework.St
 
 func (f *Framework) RunBindPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	panic("implement me")
-}
-
-func updatePluginList(pluginList interface{}, pluginSet *configv1.PluginSet, pluginsMap map[string]framework.Plugin) error {
-	return nil
 }
 
 var configDecoder = scheme.Codecs.UniversalDecoder()

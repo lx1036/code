@@ -67,20 +67,26 @@ const (
 
 type TestQueueSortPlugin struct{}
 
-func (pl *TestQueueSortPlugin) Name() string {
-	return queueSortPlugin
-}
 func newQueueSortPlugin(_ runtime.Object, _ *Framework) (framework.Plugin, error) {
 	return &TestQueueSortPlugin{}, nil
+}
+func (pl *TestQueueSortPlugin) Less(_, _ *framework.QueuedPodInfo) bool {
+	return false
+}
+func (pl *TestQueueSortPlugin) Name() string {
+	return queueSortPlugin
 }
 
 type TestBindPlugin struct{}
 
+func newBindPlugin(_ runtime.Object, _ *Framework) (framework.Plugin, error) {
+	return &TestBindPlugin{}, nil
+}
 func (t TestBindPlugin) Name() string {
 	return bindPlugin
 }
-func newBindPlugin(_ runtime.Object, _ *Framework) (framework.Plugin, error) {
-	return &TestBindPlugin{}, nil
+func (t TestBindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *corev1.Pod, nodeName string) *framework.Status {
+	return nil
 }
 func newFrameworkWithQueueSortAndBind(r Registry, profile configv1.KubeSchedulerProfile, opts ...Option) (*Framework, error) {
 	if _, ok := r[queueSortPlugin]; !ok {
@@ -110,6 +116,7 @@ func TestPreFilterPlugins(test *testing.T) {
 		return preFilter2, nil
 	})
 	profile := configv1.KubeSchedulerProfile{
+		SchedulerName: "default-scheduler",
 		Plugins: &configv1.Plugins{
 			PreFilter: configv1.PluginSet{
 				Enabled: []configv1.Plugin{

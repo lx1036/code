@@ -37,6 +37,14 @@ var (
 			Help:           "The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"plugin", "profile"})
+
+	PreemptionAttempts = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "preemption_attempts_total",
+			Help:           "Total preemption attempts in the cluster till now",
+			StabilityLevel: metrics.STABLE,
+		})
 )
 
 // UnschedulablePods returns the pending pods metrics with the label unschedulable
