@@ -202,6 +202,19 @@ func (scheduler *Scheduler) findNodesThatPassFilters(
 	pod *corev1.Pod,
 	diagnosis framework.Diagnosis,
 	nodes []*framework.NodeInfo) ([]*corev1.Node, error) {
+	if !fwk.HasFilterPlugins() {
+
+	}
+
+	checkNode := func(i int) {
+		// We check the nodes starting from where we left off in the previous scheduling cycle,
+		// this is to make sure all nodes have the same chance of being examined across pods.
+		nodeInfo := nodes[(scheduler.nextStartNodeIndex+i)%len(nodes)]
+		status := fwk.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
+	}
+	// Stops searching for more nodes once the configured number of feasible nodes
+	// are found.
+	fwk.Parallelizer().Until(ctx, len(nodes), checkNode)
 
 }
 

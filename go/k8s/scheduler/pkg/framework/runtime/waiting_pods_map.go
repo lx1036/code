@@ -27,6 +27,6 @@ func newWaitingPodsMap() *waitingPodsMap {
 type waitingPod struct {
 	pod            *v1.Pod
 	pendingPlugins map[string]*time.Timer
-	s              chan *v1alpha1.Status
+	s              chan *framework.Status
 	mu             sync.RWMutex
 }

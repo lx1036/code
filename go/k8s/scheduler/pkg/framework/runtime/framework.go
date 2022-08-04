@@ -3,15 +3,14 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 	"time"
 
-	"k8s-lx1036/k8s/scheduler/pkg/apis/config"
 	"k8s-lx1036/k8s/scheduler/pkg/apis/config/scheme"
+	configv1 "k8s-lx1036/k8s/scheduler/pkg/apis/config/v1"
 	schedulerapiv1 "k8s-lx1036/k8s/scheduler/pkg/apis/config/v1"
 	"k8s-lx1036/k8s/scheduler/pkg/framework"
 	"k8s-lx1036/k8s/scheduler/pkg/framework/parallelize"
-	"k8s-lx1036/k8s/scheduler/pkg/metrics"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -81,7 +80,7 @@ func WithEventRecorder(recorder events.EventRecorder) Option {
 	}
 }
 
-type CaptureProfile func(config.KubeSchedulerProfile)
+type CaptureProfile func(configv1.KubeSchedulerProfile)
 
 func WithCaptureProfile(c CaptureProfile) Option {
 	return func(o *frameworkOptions) {
@@ -114,7 +113,7 @@ func NewRecorderFactory(b events.EventBroadcaster) RecorderFactory {
 }
 
 // FrameworkFactory builds a Framework for a given profile configuration.
-type FrameworkFactory func(config.KubeSchedulerProfile, ...Option) (Framework, error)
+type FrameworkFactory func(configv1.KubeSchedulerProfile, ...Option) (Framework, error)
 
 type Frameworks map[string]*Framework
 
@@ -123,7 +122,7 @@ func (profiles Frameworks) HandlesSchedulerName(name string) bool {
 	return ok
 }
 
-func NewFrameworks(profiles []config.KubeSchedulerProfile, r Registry,
+func NewFrameworks(profiles []configv1.KubeSchedulerProfile, r Registry,
 	recorderFact RecorderFactory, opts ...Option) (Frameworks, error) {
 	frameworks := make(Frameworks)
 	for _, profile := range profiles {
@@ -159,6 +158,7 @@ type Framework struct {
 	postBindPlugins []framework.PostBindPlugin
 	permitPlugins   []framework.PermitPlugin
 
+	kubeConfig      *restclient.Config
 	clientSet       clientset.Interface
 	eventRecorder   events.EventRecorder
 	informerFactory informers.SharedInformerFactory
@@ -167,6 +167,9 @@ type Framework struct {
 	profileName     string
 
 	preemptHandle framework.PreemptHandle
+	framework.PodNominator
+
+	parallelizer parallelize.Parallelizer
 
 	// Indicates that RunFilterPlugins should accumulate all failed statuses and not return
 	// after the first failure.
@@ -180,7 +183,7 @@ var defaultFrameworkOptions = frameworkOptions{
 }
 
 // NewFramework 该函数实例化了一个 profile 包含的所有 plugins
-func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Option) (*Framework, error) {
+func NewFramework(r Registry, profile *configv1.KubeSchedulerProfile, opts ...Option) (*Framework, error) {
 	options := defaultFrameworkOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -201,7 +204,8 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 		scorePluginWeight: make(map[string]int),
 		kubeConfig:        options.kubeConfig,
 		PodNominator:      options.podNominator,
-		parallelizer:      options.parallelizer,
+
+		parallelizer: options.parallelizer,
 	}
 	if profile == nil {
 		return f, nil
@@ -221,12 +225,11 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 	}
 
 	pluginsMap := make(map[string]framework.Plugin)
-	var totalPriority int64
 	neededPlugins := f.pluginsNeeded(profile.Plugins) // get needed plugins from config file
-	outputProfile := config.KubeSchedulerProfile{
+	outputProfile := configv1.KubeSchedulerProfile{
 		SchedulerName: f.profileName,
 		Plugins:       profile.Plugins,
-		PluginConfig:  make([]config.PluginConfig, 0, len(neededPlugins)),
+		PluginConfig:  make([]configv1.PluginConfig, 0, len(neededPlugins)),
 	}
 	for name, pluginFactory := range r { // r 包含所有 in-tree and out-of-tree plugins
 		// initialize only needed plugins.
@@ -236,7 +239,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 
 		args := pluginConfig[name] // merge plugin args
 		if args != nil {
-			outputProfile.PluginConfig = append(outputProfile.PluginConfig, config.PluginConfig{
+			outputProfile.PluginConfig = append(outputProfile.PluginConfig, configv1.PluginConfig{
 				Name: name,
 				Args: args,
 			})
@@ -272,7 +275,15 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 	return f, nil
 }
 
-func (f *Framework) getScoreWeights(pluginsMap map[string]framework.Plugin, plugins []config.Plugin) error {
+func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.ClusterEvent]sets.String) {
+
+}
+
+func (f *Framework) Parallelizer() parallelize.Parallelizer {
+	return f.parallelizer
+}
+
+func (f *Framework) getScoreWeights(pluginsMap map[string]framework.Plugin, plugins []configv1.Plugin) error {
 	var totalPriority int64
 	for _, e := range plugins {
 
@@ -300,13 +311,13 @@ func (f *Framework) getScoreWeights(pluginsMap map[string]framework.Plugin, plug
 	return nil
 }
 
-func (f *Framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
-	pgMap := make(map[string]config.Plugin)
+func (f *Framework) pluginsNeeded(plugins *configv1.Plugins) map[string]configv1.Plugin {
+	pgMap := make(map[string]configv1.Plugin)
 	if plugins == nil {
 		return pgMap
 	}
 
-	find := func(pgs *config.PluginSet) {
+	find := func(pgs *configv1.PluginSet) {
 		if pgs == nil {
 			return
 		}
@@ -323,14 +334,14 @@ func (f *Framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plu
 
 type extensionPoint struct {
 	// the set of plugins to be configured at this extension point.
-	plugins *config.PluginSet
+	plugins *configv1.PluginSet
 	// a pointer to the slice storing plugins implementations that will run at this
 	// extension point.
 	slicePtr interface{}
 }
 
 // INFO: 这里是 framework 的排序的 hook 点
-func (f *Framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint {
+func (f *Framework) getExtensionPoints(plugins *configv1.Plugins) []extensionPoint {
 	return []extensionPoint{
 		{&plugins.QueueSort, &f.queueSortPlugins},
 
@@ -386,6 +397,10 @@ func (f *Framework) PreemptHandle() framework.PreemptHandle {
 	panic("implement me")
 }
 
+func (f *Framework) ListPlugins() map[string][]configv1.Plugin {
+	panic("implement me")
+}
+
 func (f *Framework) QueueSortFunc() framework.LessFunc {
 	if f == nil {
 		// If Framework is nil, simply keep their order unchanged.
@@ -393,19 +408,44 @@ func (f *Framework) QueueSortFunc() framework.LessFunc {
 		return func(_, _ *framework.QueuedPodInfo) bool { return false }
 	}
 
-	if len(f.queueSortPlugins) == 0 {
-		panic("No QueueSort plugin is registered in the Framework.")
-	}
-
 	// Only one QueueSort plugin can be enabled.
 	return f.queueSortPlugins[0].Less
 }
 
-func (f *Framework) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (f *Framework) HasFilterPlugins() bool {
+	panic("implement me")
+}
+
+func (f *Framework) HasPostFilterPlugins() bool {
+	return len(f.postFilterPlugins) > 0
+}
+
+func (f *Framework) RunPreFilterPlugins(ctx context.Context,
+	state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
 	var result *framework.PreFilterResult
+	var pluginsWithNodes []string
 	for _, pl := range f.preFilterPlugins {
 		r, s := f.runPreFilterPlugin(ctx, pl, state, pod)
+		if !s.IsSuccess() {
+			s.SetFailedPlugin(pl.Name())
+			if s.IsUnschedulable() {
+				return nil, s
+			}
+			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), status.AsError())).
+				WithFailedPlugin(pl.Name())
+		}
 
+		if !r.AllNodes() {
+			pluginsWithNodes = append(pluginsWithNodes, pl.Name())
+		}
+		result = result.Merge(r)
+		if !result.AllNodes() && len(result.NodeNames) == 0 {
+			msg := fmt.Sprintf("node(s) didn't satisfy plugin(s) %v simultaneously", pluginsWithNodes)
+			if len(pluginsWithNodes) == 1 {
+				msg = fmt.Sprintf("node(s) didn't satisfy plugin %v", pluginsWithNodes[0])
+			}
+			return nil, framework.NewStatus(framework.Unschedulable, msg)
+		}
 	}
 
 	return result, nil
@@ -413,20 +453,82 @@ func (f *Framework) RunPreFilterPlugins(ctx context.Context, state *framework.Cy
 
 func (f *Framework) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin,
 	state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	return pl.PreFilter(ctx, state, pod)
+}
 
-	result, status := pl.PreFilter(ctx, state, pod)
+func (f *Framework) RunPreFilterExtensionAddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
+	podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) (status *framework.Status) {
+	for _, pl := range f.preFilterPlugins {
+		if pl.PreFilterExtensions() == nil {
+			continue
+		}
+		status = f.runPreFilterExtensionAddPod(ctx, pl, state, podToSchedule, podInfoToAdd, nodeInfo)
+		if !status.IsSuccess() {
+			err := status.AsError()
+			klog.ErrorS(err, "Failed running AddPod on PreFilter plugin", "plugin", pl.Name(), "pod", klog.KObj(podToSchedule))
+			return framework.AsStatus(fmt.Errorf("running AddPod on PreFilter plugin %q: %w", pl.Name(), err))
+		}
+	}
 
+	return nil
+}
+func (f *Framework) runPreFilterExtensionAddPod(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState,
+	podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	return pl.PreFilterExtensions().AddPod(ctx, state, podToSchedule, podInfoToAdd, nodeInfo)
+}
+func (f *Framework) RunPreFilterExtensionRemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
+	podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) (status *framework.Status) {
+	for _, pl := range f.preFilterPlugins {
+		if pl.PreFilterExtensions() == nil {
+			continue
+		}
+		status = f.runPreFilterExtensionRemovePod(ctx, pl, state, podToSchedule, podInfoToRemove, nodeInfo)
+		if !status.IsSuccess() {
+			err := status.AsError()
+			klog.ErrorS(err, "Failed running RemovePod on PreFilter plugin", "plugin", pl.Name(), "pod", klog.KObj(podToSchedule))
+			return framework.AsStatus(fmt.Errorf("running RemovePod on PreFilter plugin %q: %w", pl.Name(), err))
+		}
+	}
+
+	return nil
+}
+func (f *Framework) runPreFilterExtensionRemovePod(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState,
+	podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	return pl.PreFilterExtensions().RemovePod(ctx, state, podToSchedule, podInfoToRemove, nodeInfo)
+}
+
+func (f *Framework) RunFilterPluginsWithNominatedPods(ctx context.Context, state *framework.CycleState, pod *v1.Pod, info *framework.NodeInfo) *framework.Status {
+	panic("")
+	/*var status *framework.Status
+	for i := 0; i < 2; i++ {
+		statusMap := f.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
+
+	}
+
+	return status*/
 }
 
 func (f *Framework) RunFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) framework.PluginToStatus {
-	panic("implement me")
+	statuses := make(framework.PluginToStatus)
+	for _, pl := range f.filterPlugins {
+		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
+		if !pluginStatus.IsSuccess() {
+
+		}
+	}
+
+	return statuses
+}
+
+func (f *Framework) runFilterPlugin(ctx context.Context, pl framework.FilterPlugin, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	return pl.Filter(ctx, state, pod, nodeInfo)
 }
 
 // INFO: pod在当前调度周期 filter extension point 失败时，执行抢占preemption逻辑，但是在下一个调度周期再去执行调度
 func (f *Framework) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
 	filteredNodeStatusMap framework.NodeToStatusMap) (_ *framework.PostFilterResult, status *framework.Status) {
-	startTime := time.Now()
-	defer func() {
+	//startTime := time.Now()
+	/*defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(postFilter, status.Code().String(),
 			f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
@@ -444,25 +546,24 @@ func (f *Framework) RunPostFilterPlugins(ctx context.Context, state *framework.C
 		statuses[pl.Name()] = s
 	}
 
-	return nil, statuses.Merge()
+	return nil, statuses.Merge()*/
+	panic("")
 }
 
-func (f *Framework) runPostFilterPlugin(ctx context.Context, pl framework.PostFilterPlugin, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
-	if !state.ShouldRecordPluginMetrics() { // INFO: 有90%概率不需要record plugin metrics
+func (f *Framework) runPostFilterPlugin(ctx context.Context, pl framework.PostFilterPlugin, state *framework.CycleState,
+	pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+	/*if !state.ShouldRecordPluginMetrics() { // INFO: 有90%概率不需要record plugin metrics
 		return pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
 	}
 
 	startTime := time.Now()
 	r, s := pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
 	f.metricsRecorder.observePluginDurationAsync(postFilter, pl.Name(), s, metrics.SinceInSeconds(startTime))
-	return r, s
+	return r, s*/
+	panic("")
 }
 
-func (f *Framework) RunPreFilterExtensionAddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	panic("implement me")
-}
-
-func (f *Framework) RunPreFilterExtensionRemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (f *Framework) HasScorePlugins() bool {
 	panic("implement me")
 }
 
@@ -502,23 +603,7 @@ func (f *Framework) RunBindPlugins(ctx context.Context, state *framework.CycleSt
 	panic("implement me")
 }
 
-func (f *Framework) HasFilterPlugins() bool {
-	panic("implement me")
-}
-
-func (f *Framework) HasPostFilterPlugins() bool {
-	return len(f.postFilterPlugins) > 0
-}
-
-func (f *Framework) HasScorePlugins() bool {
-	panic("implement me")
-}
-
-func (f *Framework) ListPlugins() map[string][]config.Plugin {
-	panic("implement me")
-}
-
-func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, pluginsMap map[string]framework.Plugin) error {
+func updatePluginList(pluginList interface{}, pluginSet *configv1.PluginSet, pluginsMap map[string]framework.Plugin) error {
 	return nil
 }
 

@@ -2,7 +2,9 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"math"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -76,7 +78,7 @@ type PreemptHandle interface {
 	// PluginsRunner abstracts operations to run some plugins.
 	PluginsRunner
 	// Extenders returns registered scheduler extenders.
-	Extenders() []Extender
+	//Extenders() []Extender
 }
 
 // PodNominator abstracts operations to maintain nominated Pods.
@@ -148,10 +150,38 @@ type QueueSortPlugin interface {
 type PreFilterExtensions interface {
 	// AddPod is called by the framework while trying to evaluate the impact
 	// of adding podToAdd to the node while scheduling podToSchedule.
-	AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *NodeInfo) *Status
+	AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
 	// RemovePod is called by the framework while trying to evaluate the impact
 	// of removing podToRemove from the node while scheduling podToSchedule.
-	RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *NodeInfo) *Status
+	RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
+}
+
+// PreFilterResult wraps needed info for scheduler framework to act upon PreFilter phase.
+type PreFilterResult struct {
+	// The set of nodes that should be considered downstream; if nil then
+	// all nodes are eligible.
+	NodeNames sets.String
+}
+
+func (p *PreFilterResult) AllNodes() bool {
+	return p == nil || p.NodeNames == nil
+}
+
+func (p *PreFilterResult) Merge(in *PreFilterResult) *PreFilterResult {
+	if p.AllNodes() && in.AllNodes() {
+		return nil
+	}
+	r := PreFilterResult{}
+	if p.AllNodes() {
+		r.NodeNames = sets.NewString(in.NodeNames.UnsortedList()...)
+		return &r
+	}
+	if in.AllNodes() {
+		r.NodeNames = sets.NewString(p.NodeNames.UnsortedList()...)
+		return &r
+	}
+	r.NodeNames = p.NodeNames.Intersection(in.NodeNames) // 交集
+	return &r
 }
 
 // PreFilterPlugin is an interface that must be implemented by "prefilter" plugins.
@@ -160,7 +190,7 @@ type PreFilterPlugin interface {
 	Plugin
 	// PreFilter is called at the beginning of the scheduling cycle. All PreFilter
 	// plugins must return success or the pod will be rejected.
-	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) *Status
+	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)
 	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
 	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
 	// modify its pre-processed info. The framework guarantees that the extensions
@@ -343,8 +373,33 @@ const (
 // message. When the status code is not `Success`, the reasons should explain why.
 // NOTE: A nil Status is also considered as Success.
 type Status struct {
-	code    Code
-	reasons []string
+	code         Code
+	reasons      []string
+	err          error
+	failedPlugin string
+}
+
+func NewStatus(code Code, reasons ...string) *Status {
+	return &Status{
+		code:    code,
+		reasons: reasons,
+	}
+}
+func AsStatus(err error) *Status {
+	return &Status{
+		code:    Error,
+		reasons: []string{err.Error()},
+		err:     err,
+	}
+}
+
+func (s *Status) SetFailedPlugin(plugin string) {
+	s.failedPlugin = plugin
+}
+
+func (s *Status) WithFailedPlugin(plugin string) *Status {
+	s.SetFailedPlugin(plugin)
+	return s
 }
 
 // Code returns code of the Status.
@@ -363,12 +418,26 @@ func (s *Status) Reasons() []string {
 	return s.reasons
 }
 
-// NewStatus makes a Status out of the given arguments and returns its pointer.
-func NewStatus(code Code, reasons ...string) *Status {
-	return &Status{
-		code:    code,
-		reasons: reasons,
+func (s *Status) IsUnschedulable() bool {
+	code := s.Code()
+	return code == Unschedulable || code == UnschedulableAndUnresolvable
+}
+
+func (s *Status) AsError() error {
+	if s.IsSuccess() {
+		return nil
 	}
+	if s.err != nil {
+		return s.err
+	}
+	return errors.New(s.Message())
+}
+
+func (s *Status) Message() string {
+	if s == nil {
+		return ""
+	}
+	return strings.Join(s.reasons, ", ")
 }
 
 // NodeToStatusMap declares map from node name to its status.
@@ -390,11 +459,4 @@ type NodeInfoLister interface {
 // SharedLister groups scheduler-specific listers.
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
-}
-
-// PreFilterResult wraps needed info for scheduler framework to act upon PreFilter phase.
-type PreFilterResult struct {
-	// The set of nodes that should be considered downstream; if nil then
-	// all nodes are eligible.
-	NodeNames sets.String
 }

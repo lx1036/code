@@ -3,7 +3,6 @@ package util
 import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -20,13 +19,13 @@ const (
 // GetNonzeroRequests returns the default cpu and memory resource request if none is found or
 // what is provided on the request.
 func GetNonzeroRequests(requests *v1.ResourceList) (int64, int64) {
-	return GetNonzeroRequestForResource(v1.ResourceCPU, requests),
-		GetNonzeroRequestForResource(v1.ResourceMemory, requests)
+	return GetRequestForResource(v1.ResourceCPU, requests),
+		GetRequestForResource(v1.ResourceMemory, requests)
 }
 
-// GetNonzeroRequestForResource returns the default resource request if none is found or
+// GetRequestForResource returns the default resource request if none is found or
 // what is provided on the request.
-func GetNonzeroRequestForResource(resource v1.ResourceName, requests *v1.ResourceList) int64 {
+func GetRequestForResource(resource v1.ResourceName, requests *v1.ResourceList) int64 {
 	switch resource {
 	case v1.ResourceCPU:
 		// Override if un-set, but not if explicitly set to zero
@@ -52,13 +51,10 @@ func GetNonzeroRequestForResource(resource v1.ResourceName, requests *v1.Resourc
 		}
 		return quantity.Value()
 	default:
-		if v1helper.IsScalarResourceName(resource) {
-			quantity, found := (*requests)[resource]
-			if !found {
-				return 0
-			}
-			return quantity.Value()
+		quantity, found := (*requests)[resource]
+		if !found {
+			return 0
 		}
+		return quantity.Value()
 	}
-	return 0
 }

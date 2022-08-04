@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,4 +66,10 @@ func PatchPod(cs kubernetes.Interface, old *v1.Pod, new *v1.Pod) error {
 	}
 	_, err = cs.CoreV1().Pods(old.Namespace).Patch(context.TODO(), old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
+}
+
+// IsScalarResourceName validates the resource for Extended, Hugepages, Native and AttachableVolume resources
+func IsScalarResourceName(name v1.ResourceName) bool {
+	return v1helper.IsExtendedResourceName(name) || v1helper.IsHugePageResourceName(name) ||
+		v1helper.IsPrefixedNativeResource(name) || v1helper.IsAttachableVolumeResourceName(name)
 }

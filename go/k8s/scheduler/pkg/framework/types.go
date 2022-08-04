@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	schedutil "k8s-lx1036/k8s/scheduler/pkg/util"
+	"k8s-lx1036/k8s/scheduler/pkg/util"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,7 +33,7 @@ type WeightedAffinityTerm struct {
 }
 
 func newAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm) (*AffinityTerm, error) {
-	namespaces := schedutil.GetNamespacesFromPodAffinityTerm(pod, term)
+	namespaces := util.GetNamespacesFromPodAffinityTerm(pod, term)
 	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
 		return nil, err
@@ -105,11 +105,11 @@ func NewPodInfo(pod *v1.Pod) *PodInfo {
 
 	// Attempt to parse the affinity terms
 	var parseErr error
-	requiredAffinityTerms, err := getAffinityTerms(pod, schedutil.GetPodAffinityTerms(pod.Spec.Affinity))
+	requiredAffinityTerms, err := getAffinityTerms(pod, util.GetPodAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErr = fmt.Errorf("requiredAffinityTerms: %w", err)
 	}
-	requiredAntiAffinityTerms, err := getAffinityTerms(pod, schedutil.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	requiredAntiAffinityTerms, err := getAffinityTerms(pod, util.GetPodAntiAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErr = fmt.Errorf("requiredAntiAffinityTerms: %w", err)
 	}
@@ -224,7 +224,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 	resPtr := &res
 	for _, c := range pod.Spec.Containers {
 		resPtr.Add(c.Resources.Requests)
-		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&c.Resources.Requests)
+		non0CPUReq, non0MemReq := util.GetNonzeroRequests(&c.Resources.Requests)
 		non0CPU += non0CPUReq
 		non0Mem += non0MemReq
 		// No non-zero resources for GPUs or opaque resources.
@@ -232,7 +232,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 
 	for _, ic := range pod.Spec.InitContainers {
 		resPtr.SetMaxResource(ic.Resources.Requests)
-		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&ic.Resources.Requests)
+		non0CPUReq, non0MemReq := util.GetNonzeroRequests(&ic.Resources.Requests)
 		if non0CPU < non0CPUReq {
 			non0CPU = non0CPUReq
 		}
@@ -366,7 +366,7 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 				}
 			}
 		default:
-			if v1helper.IsScalarResourceName(rName) {
+			if util.IsScalarResourceName(rName) {
 				value := rQuantity.Value()
 				if value > r.ScalarResources[rName] {
 					r.SetScalar(rName, value)
@@ -395,7 +395,7 @@ func (r *Resource) Add(rl v1.ResourceList) {
 				r.EphemeralStorage += rQuant.Value()
 			}
 		default:
-			if v1helper.IsScalarResourceName(rName) {
+			if util.IsScalarResourceName(rName) {
 				r.AddScalar(rName, rQuant.Value())
 			}
 		}
@@ -658,4 +658,19 @@ type ClusterEvent struct {
 	Resource   GVK
 	ActionType ActionType
 	Label      string
+}
+
+// Diagnosis records the details to diagnose a scheduling failure.
+type Diagnosis struct {
+	NodeToStatusMap      NodeToStatusMap
+	UnschedulablePlugins sets.String
+	// PostFilterMsg records the messages returned from PostFilterPlugins.
+	PostFilterMsg string
+}
+
+// FitError describes a fit error of a pod.
+type FitError struct {
+	Pod         *v1.Pod
+	NumAllNodes int
+	Diagnosis   Diagnosis
 }

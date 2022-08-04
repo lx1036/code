@@ -2,13 +2,14 @@ package runtime
 
 import (
 	"fmt"
+
 	"k8s-lx1036/k8s/scheduler/pkg/framework"
 
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // PluginFactory is a function that builds a plugin.
-type PluginFactory = func(configuration runtime.Object, f v1alpha1.FrameworkHandle) (v1alpha1.Plugin, error)
+type PluginFactory = func(configuration runtime.Object, f *Framework) (framework.Plugin, error)
 
 // Registry is a collection of all available plugins. The framework uses a
 // registry to enable and initialize configured plugins.
