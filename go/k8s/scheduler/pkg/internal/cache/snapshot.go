@@ -24,64 +24,12 @@ type Snapshot struct {
 	generation                                   int64
 }
 
-func (s *Snapshot) List() ([]*framework.NodeInfo, error) {
-	panic("implement me")
-}
-
-func (s *Snapshot) HavePodsWithAffinityList() ([]*framework.NodeInfo, error) {
-	panic("implement me")
-}
-
-func (s *Snapshot) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error) {
-	panic("implement me")
-}
-
-func (s *Snapshot) Get(nodeName string) (*framework.NodeInfo, error) {
-	if v, ok := s.nodeInfoMap[nodeName]; ok && v.Node() != nil {
-		return v, nil
-	}
-
-	return nil, fmt.Errorf("nodeinfo not found for node name %q", nodeName)
-}
-
-// NodeInfos returns a NodeInfoLister.
-func (s *Snapshot) NodeInfos() framework.NodeInfoLister {
-	return s
-}
-
-// NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
 		nodeInfoMap: make(map[string]*framework.NodeInfo),
 	}
 }
 
-// createNodeInfoMap obtains a list of pods and pivots that list into a map
-// where the keys are node names and the values are the aggregated information
-// for that node.
-func createNodeInfoMap(pods []*corev1.Pod, nodes []*corev1.Node) map[string]*framework.NodeInfo {
-	nodeNameToInfo := make(map[string]*framework.NodeInfo)
-	for _, pod := range pods {
-		nodeName := pod.Spec.NodeName
-		if _, ok := nodeNameToInfo[nodeName]; !ok {
-			nodeNameToInfo[nodeName] = framework.NewNodeInfo()
-		}
-		nodeNameToInfo[nodeName].AddPod(pod)
-	}
-	imageExistenceMap := createImageExistenceMap(nodes)
-
-	for _, node := range nodes {
-		if _, ok := nodeNameToInfo[node.Name]; !ok {
-			nodeNameToInfo[node.Name] = framework.NewNodeInfo()
-		}
-		nodeInfo := nodeNameToInfo[node.Name]
-		nodeInfo.SetNode(node)
-		nodeInfo.ImageStates = getNodeImageStates(node, imageExistenceMap)
-	}
-	return nodeNameToInfo
-}
-
-// NewSnapshot initializes a Snapshot struct and returns it.
 func NewSnapshot(pods []*corev1.Pod, nodes []*corev1.Node) *Snapshot {
 	nodeInfoMap := createNodeInfoMap(pods, nodes)
 	nodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
@@ -106,7 +54,54 @@ func NewSnapshot(pods []*corev1.Pod, nodes []*corev1.Node) *Snapshot {
 	return s
 }
 
-// getNodeImageStates returns the given node's image states based on the given imageExistence map.
+func (s *Snapshot) List() ([]*framework.NodeInfo, error) {
+	return s.nodeInfoList, nil
+}
+
+func (s *Snapshot) HavePodsWithAffinityList() ([]*framework.NodeInfo, error) {
+	panic("implement me")
+}
+
+func (s *Snapshot) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error) {
+	panic("implement me")
+}
+
+func (s *Snapshot) Get(nodeName string) (*framework.NodeInfo, error) {
+	if v, ok := s.nodeInfoMap[nodeName]; ok && v.Node() != nil {
+		return v, nil
+	}
+
+	return nil, fmt.Errorf("nodeinfo not found for node name %q", nodeName)
+}
+
+// NodeInfos returns a NodeInfoLister.
+func (s *Snapshot) NodeInfos() framework.NodeInfoLister {
+	return s
+}
+
+func createNodeInfoMap(pods []*corev1.Pod, nodes []*corev1.Node) map[string]*framework.NodeInfo {
+	nodeNameToInfo := make(map[string]*framework.NodeInfo)
+	for _, pod := range pods {
+		nodeName := pod.Spec.NodeName
+		if _, ok := nodeNameToInfo[nodeName]; !ok {
+			nodeNameToInfo[nodeName] = framework.NewNodeInfo()
+		}
+		nodeNameToInfo[nodeName].AddPod(pod)
+	}
+	imageExistenceMap := createImageExistenceMap(nodes)
+
+	for _, node := range nodes {
+		if _, ok := nodeNameToInfo[node.Name]; !ok {
+			nodeNameToInfo[node.Name] = framework.NewNodeInfo()
+		}
+		nodeInfo := nodeNameToInfo[node.Name]
+		nodeInfo.SetNode(node)
+		nodeInfo.ImageStates = getNodeImageStates(node, imageExistenceMap)
+	}
+
+	return nodeNameToInfo
+}
+
 func getNodeImageStates(node *corev1.Node, imageExistenceMap map[string]sets.String) map[string]*framework.ImageStateSummary {
 	imageStates := make(map[string]*framework.ImageStateSummary)
 

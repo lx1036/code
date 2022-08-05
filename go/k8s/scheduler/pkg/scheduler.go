@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	configv1 "k8s-lx1036/k8s/scheduler/pkg/apis/config/v1"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -110,7 +111,7 @@ type schedulerOptions struct {
 type Option func(*schedulerOptions)
 
 var defaultSchedulerOptions = schedulerOptions{
-	percentageOfNodesToScore: config.DefaultPercentageOfNodesToScore,
+	percentageOfNodesToScore: configv1.DefaultPercentageOfNodesToScore,
 	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 }
@@ -147,14 +148,14 @@ func New(
 	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 	podLister := informerFactory.Core().V1().Pods().Lister()
 	snapshot := internalcache.NewEmptySnapshot()
-	nominator := internalqueue.NewPodNominator(podLister)
+	podNominator := internalqueue.NewPodNominator(podLister)
 	frameworks, err := frameworkruntime.NewFrameworks(options.profiles, registry, recorderFactory,
 		//frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithKubeConfig(options.kubeConfig),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
-		frameworkruntime.WithPodNominator(nominator),
+		frameworkruntime.WithPodNominator(podNominator),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(options.frameworkCapturer)),
 		frameworkruntime.WithClusterEventMap(clusterEventMap),
 		frameworkruntime.WithParallelism(int(options.parallelism)),
@@ -172,7 +173,7 @@ func New(
 		informerFactory,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(options.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(options.podMaxBackoffSeconds)*time.Second),
-		internalqueue.WithPodNominator(nominator),
+		internalqueue.WithPodNominator(podNominator),
 		internalqueue.WithClusterEventMap(clusterEventMap),
 	)
 	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)

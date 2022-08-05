@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"math/rand"
 	"sync"
+	"sync/atomic"
 
 	configv1 "k8s-lx1036/k8s/scheduler/pkg/apis/config/v1"
 	"k8s-lx1036/k8s/scheduler/pkg/framework"
@@ -13,8 +14,9 @@ import (
 	"k8s-lx1036/k8s/scheduler/pkg/metrics"
 	"k8s-lx1036/k8s/scheduler/pkg/util"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
@@ -54,7 +56,7 @@ func (pl *DefaultPreemption) Name() string {
 	return Name
 }
 
-func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
+func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.CycleState, pod *corev1.Pod,
 	m framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
 	defer func() {
 		metrics.PreemptionAttempts.Inc()
@@ -71,7 +73,7 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 	return &framework.PostFilterResult{NominatedNodeName: nominatedNodeName}, framework.NewStatus(framework.Success)
 }
 
-func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
+func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.CycleState, pod *corev1.Pod,
 	m framework.NodeToStatusMap) (string, error) {
 	nodeLister := pl.framework.SnapshotSharedLister().NodeInfos()
 
@@ -109,10 +111,10 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 }
 
 // PodEligibleToPreemptOthers INFO: @see https://kubernetes.io/zh/docs/concepts/configuration/pod-priority-preemption/#non-preempting-priority-class
-func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) bool {
+func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *corev1.Pod, nominatedNodeStatus *framework.Status) bool {
 	// INFO: 非抢占式的 pod 不需要抢占，返回 false
-	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
-		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, v1.PreemptNever)
+	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == corev1.PreemptNever {
+		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, corev1.PreemptNever)
 		return false
 	}
 
@@ -151,7 +153,7 @@ func (s *Candidate) Victims() *extenderv1.Victims {
 	return s.victims
 }
 
-func (pl *DefaultPreemption) findCandidates(ctx context.Context, pod *v1.Pod,
+func (pl *DefaultPreemption) findCandidates(ctx context.Context, pod *corev1.Pod,
 	m framework.NodeToStatusMap, state *framework.CycleState) ([]*Candidate, framework.NodeToStatusMap, error) {
 	allNodes, err := pl.framework.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
@@ -179,35 +181,54 @@ func (pl *DefaultPreemption) findCandidates(ctx context.Context, pod *v1.Pod,
 	return candidates, nodeStatuses, err
 }
 
-func (pl *DefaultPreemption) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentialNodes []*framework.NodeInfo,
-	offset int32, numCandidates int32, state *framework.CycleState) ([]Candidate, framework.NodeToStatusMap, error) {
-	// INFO: 为了高效率，这里通过多个并发去处理 potentialNodes，而不是一个个去处理 node
+type candidateList struct {
+	idx   int32
+	items []*Candidate
+}
+
+func newCandidateList(size int32) *candidateList {
+	return &candidateList{idx: -1, items: make([]*Candidate, size)}
+}
+func (cl *candidateList) add(c *Candidate) {
+	if idx := atomic.AddInt32(&cl.idx, 1); idx < int32(len(cl.items)) {
+		cl.items[idx] = c
+	}
+}
+func (cl *candidateList) size() int32 {
+	n := atomic.LoadInt32(&cl.idx) + 1
+	if n >= int32(len(cl.items)) {
+		n = int32(len(cl.items))
+	}
+	return n
+}
+func (cl *candidateList) get() []*Candidate {
+	return cl.items[:cl.size()]
+}
+
+func (pl *DefaultPreemption) DryRunPreemption(ctx context.Context, pod *corev1.Pod, potentialNodes []*framework.NodeInfo,
+	offset int32, numCandidates int32, state *framework.CycleState) ([]*Candidate, framework.NodeToStatusMap, error) {
+	// INFO: 为了高效率，这里通过多个并发去处理 potentialNodes，而不是一个个去处理 node。
+	//  即把 potentialNodes 切成多个 piece，然后每一个 piece 里再一个个去 SelectVictimsOnNode(nodeInfo)
 	var statusesLock sync.Mutex
 	var errs []error
 	nodeStatuses := make(framework.NodeToStatusMap)
-	nonViolatingCandidates := newCandidateList(numCandidates)
-	violatingCandidates := newCandidateList(numCandidates)
+	nonViolatingCandidates := newCandidateList(numCandidates) // numCandidates=100
 	parallelCtx, cancel := context.WithCancel(ctx)
 	checkNode := func(i int) {
-		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Clone()
+		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Clone() // potentialNodes 包含所有 nodes
 		stateCopy := state.Clone()
-		pods, numPDBViolations, status := pl.SelectVictimsOnNode(ctx, stateCopy, pod, nodeInfoCopy)
+		pods, status := pl.SelectVictimsOnNode(ctx, stateCopy, pod, nodeInfoCopy)
 		if status.IsSuccess() && len(pods) != 0 {
 			victims := extenderv1.Victims{
-				Pods:             pods,
-				NumPDBViolations: int64(numPDBViolations),
+				Pods: pods,
 			}
 			c := &Candidate{
 				victims: &victims,
 				name:    nodeInfoCopy.Node().Name,
 			}
-			if numPDBViolations == 0 {
-				nonViolatingCandidates.add(c)
-			} else {
-				violatingCandidates.add(c)
-			}
-			nvcSize, vcSize := nonViolatingCandidates.size(), violatingCandidates.size()
-			if nvcSize > 0 && nvcSize+vcSize >= numCandidates {
+			nonViolatingCandidates.add(c)
+			nvcSize := nonViolatingCandidates.size()
+			if nvcSize > 0 && nvcSize >= numCandidates { // INFO: 尽管从 450 nodes 中选取，但是满足了 100 个就跳出
 				cancel()
 			}
 			return
@@ -225,7 +246,76 @@ func (pl *DefaultPreemption) DryRunPreemption(ctx context.Context, pod *v1.Pod, 
 	}
 
 	pl.framework.Parallelizer().Until(parallelCtx, len(potentialNodes), checkNode) // block
-	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses, utilerrors.NewAggregate(errs)
+	return nonViolatingCandidates.get(), nodeStatuses, utilerrors.NewAggregate(errs)
+}
+
+func (pl *DefaultPreemption) SelectVictimsOnNode(
+	ctx context.Context,
+	state *framework.CycleState,
+	pod *corev1.Pod,
+	nodeInfo *framework.NodeInfo) ([]*corev1.Pod, *framework.Status) {
+	removePod := func(rpi *framework.PodInfo) error {
+		if err := nodeInfo.RemovePod(rpi.Pod); err != nil {
+			return err
+		}
+		// 注意：还得去掉 PreFilter RemovePod???
+		status := pl.framework.RunPreFilterExtensionRemovePod(ctx, state, pod, rpi, nodeInfo)
+		if !status.IsSuccess() {
+			return status.AsError()
+		}
+		return nil
+	}
+	addPod := func(api *framework.PodInfo) error {
+		nodeInfo.AddPodInfo(api)
+		status := pl.framework.RunPreFilterExtensionAddPod(ctx, state, pod, api, nodeInfo)
+		if !status.IsSuccess() {
+			return status.AsError()
+		}
+		return nil
+	}
+
+	// INFO: 从当前 nodeInfo 中找出低优的 pod
+	var potentialVictims []*framework.PodInfo
+	podPriority := corev1helpers.PodPriority(pod)
+	for _, pi := range nodeInfo.Pods {
+		if corev1helpers.PodPriority(pi.Pod) < podPriority {
+			potentialVictims = append(potentialVictims, pi)
+			if err := removePod(pi); err != nil { // 从 nodeInfo 中去掉 lowPriority Pod
+				return nil, framework.AsStatus(err)
+			}
+		}
+	}
+	if len(potentialVictims) == 0 {
+		message := fmt.Sprintf("No preemption victims found for incoming pod")
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, message)
+	}
+
+	// INFO: 再次重新检查 pod，尽可能不把当前 pod 作为 victimPod
+	var victims []*corev1.Pod
+	reprievePod := func(pi *framework.PodInfo) (bool, error) {
+		if err := addPod(pi); err != nil {
+			return false, err
+		}
+		// INFO: 这里把这台 nodeInfo 上的优先级更高的 pods 剔除出去
+		status := pl.framework.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
+		success := status.IsSuccess()
+		if !success {
+			if err := removePod(pi); err != nil {
+				return false, err
+			}
+			rpi := pi.Pod
+			victims = append(victims, rpi)
+			klog.V(5).InfoS("Pod is a potential preemption victim on node", "pod", klog.KObj(rpi), "node", klog.KObj(nodeInfo.Node()))
+		}
+		return success, nil
+	}
+	for _, p := range potentialVictims {
+		if _, err := reprievePod(p); err != nil {
+			return nil, framework.AsStatus(err)
+		}
+	}
+
+	return victims, framework.NewStatus(framework.Success)
 }
 
 // SelectCandidate 选择 best-fit candidate
@@ -274,7 +364,7 @@ func pickOneNodeForPreemption(nodesToVictims map[string]*extenderv1.Victims) str
 // - Evict the victim pods
 // - Reject the victim pods if they are in waitingPod map
 // - Clear the low-priority pods' nominatedNodeName status if needed
-func (pl *DefaultPreemption) prepareCandidate(c Candidate, pod *v1.Pod, pluginName string) *framework.Status {
+func (pl *DefaultPreemption) prepareCandidate(c Candidate, pod *corev1.Pod, pluginName string) *framework.Status {
 	for _, victim := range c.Victims().Pods {
 		// If the victim is a WaitingPod, send a reject message to the PermitPlugin.
 		// Otherwise we should delete the victim.
@@ -284,7 +374,7 @@ func (pl *DefaultPreemption) prepareCandidate(c Candidate, pod *v1.Pod, pluginNa
 			klog.ErrorS(err, "Preempting pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
 			return framework.AsStatus(err)
 		}
-		pl.framework.EventRecorder().Eventf(victim, pod, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v",
+		pl.framework.EventRecorder().Eventf(victim, pod, corev1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v",
 			pod.Namespace, pod.Name, c.Name())
 	}
 
@@ -295,4 +385,18 @@ func (pl *DefaultPreemption) prepareCandidate(c Candidate, pod *v1.Pod, pluginNa
 	}
 
 	return nil
+}
+
+func (pl *DefaultPreemption) GetOffsetAndNumCandidates(numNodes int32) (int32, int32) {
+	return rand.Int31n(numNodes), pl.calculateNumCandidates(numNodes)
+}
+func (pl *DefaultPreemption) calculateNumCandidates(numNodes int32) int32 {
+	n := (numNodes * pl.args.MinCandidateNodesPercentage) / 100 // 450 * 10/100
+	if n < pl.args.MinCandidateNodesAbsolute {                  // 最小 100 台
+		n = pl.args.MinCandidateNodesAbsolute
+	}
+	if n > numNodes {
+		n = numNodes
+	}
+	return n
 }

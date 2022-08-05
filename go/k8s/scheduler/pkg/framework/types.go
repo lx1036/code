@@ -90,7 +90,7 @@ type PodInfo struct {
 	ParseError                 error
 }
 
-// INFO: 抽取 pod affinity 相关信息
+// NewPodInfo INFO: 抽取 pod affinity 相关信息
 func NewPodInfo(pod *v1.Pod) *PodInfo {
 	var preferredAffinityTerms []v1.WeightedPodAffinityTerm
 	var preferredAntiAffinityTerms []v1.WeightedPodAffinityTerm
@@ -132,53 +132,42 @@ func NewPodInfo(pod *v1.Pod) *PodInfo {
 	}
 }
 
-// NodeInfo is node level aggregated information.
-type NodeInfo struct {
-	// Overall node information.
-	node *v1.Node
-
-	// Pods running on the node.
-	Pods []*PodInfo
-
-	// The subset of pods with affinity.
-	PodsWithAffinity []*PodInfo
-
-	// The subset of pods with required anti-affinity.
-	PodsWithRequiredAntiAffinity []*PodInfo
-
-	// Ports allocated on the node.
-	UsedPorts HostPortInfo
-
-	// Total requested resources of all pods on this node. This includes assumed
-	// pods, which scheduler has sent for binding, but may not be scheduled yet.
-	Requested *Resource
-
-	// INFO: 这个字段会被 NodeResourcesLeastAllocated plugin 使用，和 Requested 字段意思类似，但是如果 pod request 没有设置值，也需要根据一个默认值去
-	// 统计，所以 (allocatable - NonZeroRequested[cpu]) / allocatable 就表示 sum(request) 占该 node allocatable 资源比率，哪个 node 比率最小分数最高
-	NonZeroRequested *Resource
-	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
-	// as int64, to avoid conversions and accessing map.
-	Allocatable *Resource
-
-	// ImageStates holds the entry of an image if and only if this image is on the node. The entry can be used for
-	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
-	// state information.
-	ImageStates map[string]*ImageStateSummary
-
-	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
-	// scheduling cycle.
-	// INFO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
-	TransientInfo *TransientSchedulerInfo
-
-	// Whenever NodeInfo changes, generation is bumped.
-	// This is used to avoid cloning it if the object didn't change.
-	Generation int64
+func (pi *PodInfo) DeepCopy() *PodInfo {
+	return &PodInfo{
+		Pod:                        pi.Pod.DeepCopy(),
+		RequiredAffinityTerms:      pi.RequiredAffinityTerms,
+		RequiredAntiAffinityTerms:  pi.RequiredAntiAffinityTerms,
+		PreferredAffinityTerms:     pi.PreferredAffinityTerms,
+		PreferredAntiAffinityTerms: pi.PreferredAntiAffinityTerms,
+		ParseError:                 pi.ParseError,
+	}
 }
 
-// INFO: 把 pod 加入当前 node，更新下 nodeInfo 相关信息
+// NodeInfo is node level aggregated information.
+type NodeInfo struct {
+	node                         *v1.Node
+	Pods                         []*PodInfo
+	PodsWithAffinity             []*PodInfo
+	PodsWithRequiredAntiAffinity []*PodInfo
+	UsedPorts                    HostPortInfo
+
+	Requested        *Resource
+	NonZeroRequested *Resource
+	Allocatable      *Resource
+
+	PVCRefCounts map[string]int
+
+	ImageStates   map[string]*ImageStateSummary
+	TransientInfo *TransientSchedulerInfo
+	Generation    int64
+}
+
+// AddPod INFO: 把 pod 加入当前 node，更新下 nodeInfo 相关信息
 func (n *NodeInfo) AddPod(pod *v1.Pod) {
-	podInfo := NewPodInfo(pod)
-	res, non0CPU, non0Mem := calculateResource(pod)
+	n.AddPodInfo(NewPodInfo(pod))
+}
+func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
+	res, non0CPU, non0Mem := calculateResource(podInfo.Pod)
 	n.Requested.MilliCPU += res.MilliCPU
 	n.Requested.Memory += res.Memory
 	n.Requested.EphemeralStorage += res.EphemeralStorage
@@ -194,10 +183,10 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	n.NonZeroRequested.MilliCPU += non0CPU
 	n.NonZeroRequested.Memory += non0Mem
 
-	if podWithAffinity(pod) {
+	if podWithAffinity(podInfo.Pod) {
 		n.PodsWithAffinity = append(n.PodsWithAffinity, podInfo)
 	}
-	if podWithRequiredAntiAffinity(pod) {
+	if podWithRequiredAntiAffinity(podInfo.Pod) {
 		n.PodsWithRequiredAntiAffinity = append(n.PodsWithRequiredAntiAffinity, podInfo)
 	}
 
@@ -207,6 +196,37 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	n.updateUsedPorts(podInfo.Pod, true)
 
 	n.Generation = nextGeneration()
+}
+
+func (n *NodeInfo) Clone() *NodeInfo {
+	clone := &NodeInfo{
+		node:             n.node,
+		Requested:        n.Requested.Clone(),
+		NonZeroRequested: n.NonZeroRequested.Clone(),
+		Allocatable:      n.Allocatable.Clone(),
+		UsedPorts:        make(HostPortInfo),
+		ImageStates:      n.ImageStates,
+		PVCRefCounts:     n.PVCRefCounts,
+		Generation:       n.Generation,
+	}
+	if len(n.Pods) > 0 {
+		clone.Pods = append([]*PodInfo(nil), n.Pods...)
+	}
+	if len(n.UsedPorts) > 0 {
+		for ip, portMap := range n.UsedPorts {
+			clone.UsedPorts[ip] = make(map[ProtocolPort]struct{})
+			for protocolPort, v := range portMap {
+				clone.UsedPorts[ip][protocolPort] = v
+			}
+		}
+	}
+	if len(n.PodsWithAffinity) > 0 {
+		clone.PodsWithAffinity = append([]*PodInfo(nil), n.PodsWithAffinity...)
+	}
+	if len(n.PodsWithRequiredAntiAffinity) > 0 {
+		clone.PodsWithRequiredAntiAffinity = append([]*PodInfo(nil), n.PodsWithRequiredAntiAffinity...)
+	}
+	return clone
 }
 
 func podWithAffinity(p *v1.Pod) bool {
@@ -326,6 +346,12 @@ type Resource struct {
 	ScalarResources map[v1.ResourceName]int64
 }
 
+func NewResource(rl v1.ResourceList) *Resource {
+	r := &Resource{}
+	r.Add(rl)
+	return r
+}
+
 func (r *Resource) ResourceList() v1.ResourceList {
 	result := v1.ResourceList{
 		v1.ResourceCPU:              *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
@@ -416,11 +442,20 @@ func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
 	r.ScalarResources[name] = quantity
 }
 
-// NewResource creates a Resource from ResourceList
-func NewResource(rl v1.ResourceList) *Resource {
-	r := &Resource{}
-	r.Add(rl)
-	return r
+func (r *Resource) Clone() *Resource {
+	res := &Resource{
+		MilliCPU:         r.MilliCPU,
+		Memory:           r.Memory,
+		AllowedPodNumber: r.AllowedPodNumber,
+		EphemeralStorage: r.EphemeralStorage,
+	}
+	if r.ScalarResources != nil {
+		res.ScalarResources = make(map[v1.ResourceName]int64)
+		for k, v := range r.ScalarResources {
+			res.ScalarResources[k] = v
+		}
+	}
+	return res
 }
 
 // ImageStateSummary provides summarized information about the state of an image.

@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s-lx1036/k8s/scheduler/pkg/apis/config"
-	framework "k8s-lx1036/k8s/scheduler/pkg/framework"
+	configv1 "k8s-lx1036/k8s/scheduler/pkg/apis/config/v1"
+	"k8s-lx1036/k8s/scheduler/pkg/framework"
+	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/framework/runtime"
 
 	v1 "k8s.io/api/core/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -19,9 +20,9 @@ import (
 )
 
 const (
-	FitName = "NodeResourcesFit"
+	Name = "NodeResourcesFit"
 
-	preFilterStateKey = "PreFilter" + FitName
+	preFilterStateKey = "PreFilter" + Name
 )
 
 // Fit is a plugin that checks if a node has sufficient resources.
@@ -30,19 +31,35 @@ type Fit struct {
 	ignoredResourceGroups sets.String
 }
 
-func (f *Fit) Name() string {
-	return FitName
+func NewFit(plArgs runtime.Object, _ *frameworkruntime.Framework) (framework.Plugin, error) {
+	args, err := getFitArgs(plArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateFitArgs(args); err != nil {
+		return nil, err
+	}
+
+	return &Fit{
+		ignoredResources:      sets.NewString(args.IgnoredResources...),
+		ignoredResourceGroups: sets.NewString(args.IgnoredResourceGroups...),
+	}, nil
 }
 
-func getFitArgs(obj runtime.Object) (config.NodeResourcesFitArgs, error) {
-	ptr, ok := obj.(*config.NodeResourcesFitArgs)
+func (f *Fit) Name() string {
+	return Name
+}
+
+func getFitArgs(obj runtime.Object) (configv1.NodeResourcesFitArgs, error) {
+	ptr, ok := obj.(*configv1.NodeResourcesFitArgs)
 	if !ok {
-		return config.NodeResourcesFitArgs{}, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", obj)
+		return configv1.NodeResourcesFitArgs{}, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", obj)
 	}
 	return *ptr, nil
 }
 
-func validateFitArgs(args config.NodeResourcesFitArgs) error {
+func validateFitArgs(args configv1.NodeResourcesFitArgs) error {
 	var allErrs field.ErrorList
 	resPath := field.NewPath("ignoredResources")
 	for i, res := range args.IgnoredResources {
@@ -109,22 +126,6 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 	}
 
 	return nil
-}
-
-func NewFit(plArgs runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
-	args, err := getFitArgs(plArgs)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := validateFitArgs(args); err != nil {
-		return nil, err
-	}
-
-	return &Fit{
-		ignoredResources:      sets.NewString(args.IgnoredResources...),
-		ignoredResourceGroups: sets.NewString(args.IgnoredResourceGroups...),
-	}, nil
 }
 
 type preFilterState struct {

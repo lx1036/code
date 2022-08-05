@@ -26,19 +26,23 @@ type StateKey string
 // CycleState does not provide any data protection, as all plugins are assumed to be
 // trusted.
 type CycleState struct {
-	mx      sync.RWMutex
-	storage map[StateKey]StateData
+	storage sync.Map
+
 	// if recordPluginMetrics is true, PluginExecutionDuration will be recorded for this cycle.
 	recordPluginMetrics bool
 }
 
+func NewCycleState() *CycleState {
+	return &CycleState{}
+}
+
 func (c *CycleState) Write(key StateKey, val StateData) {
-	c.storage[key] = val
+	c.storage.Store(key, val)
 }
 
 func (c *CycleState) Read(key StateKey) (StateData, error) {
-	if v, ok := c.storage[key]; ok {
-		return v, nil
+	if v, ok := c.storage.Load(key); ok {
+		return v.(StateData), nil
 	}
 	return nil, errors.New(NotFound)
 }
@@ -59,9 +63,15 @@ func (c *CycleState) SetRecordPluginMetrics(flag bool) {
 	c.recordPluginMetrics = flag
 }
 
-// NewCycleState initializes a new CycleState and returns its pointer.
-func NewCycleState() *CycleState {
-	return &CycleState{
-		storage: make(map[StateKey]StateData),
+func (c *CycleState) Clone() *CycleState {
+	if c == nil {
+		return nil
 	}
+	copyState := NewCycleState()
+	c.storage.Range(func(k, v interface{}) bool {
+		copyState.storage.Store(k, v.(StateData).Clone())
+		return true
+	})
+
+	return copyState
 }

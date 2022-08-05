@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	internalqueue "k8s-lx1036/k8s/scheduler/pkg/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"reflect"
 	"time"
@@ -13,7 +14,7 @@ import (
 	"k8s-lx1036/k8s/scheduler/pkg/framework"
 	"k8s-lx1036/k8s/scheduler/pkg/framework/parallelize"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -21,6 +22,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 )
 
@@ -38,7 +40,7 @@ type frameworkOptions struct {
 	snapshotSharedLister framework.SharedLister
 	metricsRecorder      *metricsRecorder
 	profileName          string
-	podNominator         framework.PodNominator
+	podNominator         *internalqueue.PodNominator
 	runAllFilters        bool
 	captureProfile       CaptureProfile
 	clusterEventMap      map[framework.ClusterEvent]sets.String
@@ -49,7 +51,7 @@ type frameworkOptions struct {
 type Option func(*frameworkOptions)
 
 // WithPodNominator sets podNominator for the scheduling Framework.
-func WithPodNominator(nominator framework.PodNominator) Option {
+func WithPodNominator(nominator *internalqueue.PodNominator) Option {
 	return func(o *frameworkOptions) {
 		o.podNominator = nominator
 	}
@@ -101,11 +103,6 @@ func WithParallelism(parallelism int) Option {
 	return func(o *frameworkOptions) {
 		o.parallelizer = parallelize.NewParallelizer(parallelism)
 	}
-}
-
-type preemptHandle struct {
-	framework.PodNominator
-	framework.PluginsRunner
 }
 
 // RecorderFactory builds an EventRecorder for a given scheduler name.
@@ -172,7 +169,7 @@ type Framework struct {
 	profileName     string
 
 	preemptHandle framework.PreemptHandle
-	framework.PodNominator
+	podNominator  *internalqueue.PodNominator
 
 	parallelizer parallelize.Parallelizer
 
@@ -208,7 +205,7 @@ func NewFramework(r Registry, profile *configv1.KubeSchedulerProfile, opts ...Op
 
 		scorePluginWeight: make(map[string]int),
 		kubeConfig:        options.kubeConfig,
-		PodNominator:      options.podNominator,
+		podNominator:      options.podNominator,
 
 		parallelizer: options.parallelizer,
 	}
@@ -453,7 +450,7 @@ func (f *Framework) HasPostFilterPlugins() bool {
 }
 
 func (f *Framework) RunPreFilterPlugins(ctx context.Context,
-	state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
+	state *framework.CycleState, pod *corev1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
 	var result *framework.PreFilterResult
 	var pluginsWithNodes []string
 	for _, pl := range f.preFilterPlugins {
@@ -484,11 +481,11 @@ func (f *Framework) RunPreFilterPlugins(ctx context.Context,
 }
 
 func (f *Framework) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin,
-	state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	state *framework.CycleState, pod *corev1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	return pl.PreFilter(ctx, state, pod)
 }
 
-func (f *Framework) RunPreFilterExtensionAddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
+func (f *Framework) RunPreFilterExtensionAddPod(ctx context.Context, state *framework.CycleState, podToSchedule *corev1.Pod,
 	podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) (status *framework.Status) {
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil {
@@ -505,10 +502,10 @@ func (f *Framework) RunPreFilterExtensionAddPod(ctx context.Context, state *fram
 	return nil
 }
 func (f *Framework) runPreFilterExtensionAddPod(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState,
-	podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	podToSchedule *corev1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	return pl.PreFilterExtensions().AddPod(ctx, state, podToSchedule, podInfoToAdd, nodeInfo)
 }
-func (f *Framework) RunPreFilterExtensionRemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
+func (f *Framework) RunPreFilterExtensionRemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *corev1.Pod,
 	podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) (status *framework.Status) {
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil {
@@ -525,22 +522,65 @@ func (f *Framework) RunPreFilterExtensionRemovePod(ctx context.Context, state *f
 	return nil
 }
 func (f *Framework) runPreFilterExtensionRemovePod(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState,
-	podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	podToSchedule *corev1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	return pl.PreFilterExtensions().RemovePod(ctx, state, podToSchedule, podInfoToRemove, nodeInfo)
 }
 
-func (f *Framework) RunFilterPluginsWithNominatedPods(ctx context.Context, state *framework.CycleState, pod *v1.Pod, info *framework.NodeInfo) *framework.Status {
-	panic("")
-	/*var status *framework.Status
+// RunFilterPluginsWithNominatedPods 两处会调用: Schedule and Preempt.
+func (f *Framework) RunFilterPluginsWithNominatedPods(ctx context.Context, state *framework.CycleState, pod *corev1.Pod,
+	nodeInfo *framework.NodeInfo) *framework.Status {
+	var status *framework.Status
+	podsAdded := false
 	for i := 0; i < 2; i++ {
-		statusMap := f.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
+		stateToUse := state
+		nodeInfoToUse := nodeInfo
+		if i == 0 {
+			var err error
+			podsAdded, stateToUse, nodeInfoToUse, err = f.addNominatedPods(ctx, pod, state, nodeInfo)
+			if err != nil {
+				return framework.AsStatus(err)
+			}
+		} else if !podsAdded || !status.IsSuccess() {
+			break
+		}
 
+		// 如果 pod 通不过 Filter plugins
+		statusMap := f.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
+		status = statusMap.Merge()
+		if !status.IsSuccess() && !status.IsUnschedulable() {
+			return status
+		}
 	}
 
-	return status*/
+	return status
 }
 
-func (f *Framework) RunFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) framework.PluginToStatus {
+// add pods with equal or greater priority than target pod
+func (f *Framework) addNominatedPods(ctx context.Context, pod *corev1.Pod, state *framework.CycleState,
+	nodeInfo *framework.NodeInfo) (bool, *framework.CycleState, *framework.NodeInfo, error) {
+	nominatedPodInfos := f.podNominator.NominatedPodsForNode(nodeInfo.Node().Name)
+	if len(nominatedPodInfos) == 0 {
+		return false, state, nodeInfo, nil
+	}
+
+	nodeInfoOut := nodeInfo.Clone()
+	stateOut := state.Clone()
+	podsAdded := false
+	for _, pi := range nominatedPodInfos {
+		if corev1helpers.PodPriority(pi.Pod) >= corev1helpers.PodPriority(pod) && pi.Pod.UID != pod.UID {
+			nodeInfoOut.AddPodInfo(pi)
+			status := f.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
+			if !status.IsSuccess() {
+				return false, state, nodeInfo, status.AsError()
+			}
+			podsAdded = true
+		}
+	}
+
+	return podsAdded, stateOut, nodeInfoOut, nil
+}
+
+func (f *Framework) RunFilterPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeInfo *framework.NodeInfo) framework.PluginToStatus {
 	statuses := make(framework.PluginToStatus)
 	for _, pl := range f.filterPlugins {
 		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
@@ -552,12 +592,12 @@ func (f *Framework) RunFilterPlugins(ctx context.Context, state *framework.Cycle
 	return statuses
 }
 
-func (f *Framework) runFilterPlugin(ctx context.Context, pl framework.FilterPlugin, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (f *Framework) runFilterPlugin(ctx context.Context, pl framework.FilterPlugin, state *framework.CycleState, pod *corev1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	return pl.Filter(ctx, state, pod, nodeInfo)
 }
 
 // RunPostFilterPlugins INFO: pod在当前调度周期 filter extension point 失败时，执行抢占preemption逻辑，但是在下一个调度周期再去执行调度
-func (f *Framework) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
+func (f *Framework) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod,
 	filteredNodeStatusMap framework.NodeToStatusMap) (_ *framework.PostFilterResult, status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
@@ -582,7 +622,7 @@ func (f *Framework) RunPostFilterPlugins(ctx context.Context, state *framework.C
 }
 
 func (f *Framework) runPostFilterPlugin(ctx context.Context, pl framework.PostFilterPlugin, state *framework.CycleState,
-	pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+	pod *corev1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
 	return pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
 }
 
@@ -590,39 +630,39 @@ func (f *Framework) HasScorePlugins() bool {
 	panic("implement me")
 }
 
-func (f *Framework) RunPreScorePlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+func (f *Framework) RunPreScorePlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodes []*corev1.Node) *framework.Status {
 	panic("implement me")
 }
 
-func (f *Framework) RunScorePlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) (framework.PluginToNodeScores, *framework.Status) {
+func (f *Framework) RunScorePlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodes []*corev1.Node) (framework.PluginToNodeScores, *framework.Status) {
 	panic("implement me")
 }
 
-func (f *Framework) RunPreBindPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (f *Framework) RunPreBindPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
 	panic("implement me")
 }
 
-func (f *Framework) RunPostBindPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (f *Framework) RunPostBindPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) {
 	panic("implement me")
 }
 
-func (f *Framework) RunReservePluginsReserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (f *Framework) RunReservePluginsReserve(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
 	panic("implement me")
 }
 
-func (f *Framework) RunReservePluginsUnreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (f *Framework) RunReservePluginsUnreserve(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) {
 	panic("implement me")
 }
 
-func (f *Framework) RunPermitPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (f *Framework) RunPermitPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
 	panic("implement me")
 }
 
-func (f *Framework) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framework.Status {
+func (f *Framework) WaitOnPermit(ctx context.Context, pod *corev1.Pod) *framework.Status {
 	panic("implement me")
 }
 
-func (f *Framework) RunBindPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (f *Framework) RunBindPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
 	panic("implement me")
 }
 

@@ -8,54 +8,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/events"
 )
-
-// FrameworkHandle provides data and some tools that plugins can use. It is
-// passed to the plugin factories at the time of plugin initialization. Plugins
-// must store and use this handle to call framework functions.
-type FrameworkHandle interface {
-	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
-	// is taken at the beginning of a scheduling cycle and remains unchanged until
-	// a pod finishes "Permit" point. There is no guarantee that the information
-	// remains unchanged in the binding phase of scheduling, so plugins in the binding
-	// cycle (pre-bind/bind/post-bind/un-reserve plugin) should not use it,
-	// otherwise a concurrent read/write error might occur, they should use scheduler
-	// cache instead.
-	SnapshotSharedLister() SharedLister
-
-	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
-	IterateOverWaitingPods(callback func(WaitingPod))
-
-	// GetWaitingPod returns a waiting pod given its UID.
-	GetWaitingPod(uid types.UID) WaitingPod
-
-	// RejectWaitingPod rejects a waiting pod given its UID.
-	RejectWaitingPod(uid types.UID)
-
-	// ClientSet returns a kubernetes clientSet.
-	ClientSet() clientset.Interface
-
-	// EventRecorder returns an event recorder.
-	EventRecorder() events.EventRecorder
-
-	SharedInformerFactory() informers.SharedInformerFactory
-
-	// INFO: unroll the wrapped interfaces to FrameworkHandle.
-	PreemptHandle() PreemptHandle
-}
-
-// LessFunc is the function to sort pod info
-type LessFunc func(podInfo1, podInfo2 *QueuedPodInfo) bool
-
-// PostFilterResult wraps needed info for scheduler framework to act upon PostFilter phase.
-type PostFilterResult struct {
-	NominatedNodeName string
-}
 
 // WaitingPod represents a pod currently waiting in the permit phase.
 type WaitingPod interface {
@@ -73,25 +27,10 @@ type WaitingPod interface {
 
 // PreemptHandle incorporates all needed logic to run preemption logic.
 type PreemptHandle interface {
-	// PodNominator abstracts operations to maintain nominated Pods.
-	PodNominator
 	// PluginsRunner abstracts operations to run some plugins.
 	PluginsRunner
 	// Extenders returns registered scheduler extenders.
 	//Extenders() []Extender
-}
-
-// PodNominator abstracts operations to maintain nominated Pods.
-type PodNominator interface {
-	// AddNominatedPod adds the given pod to the nominated pod map or
-	// updates it if it already exists.
-	AddNominatedPod(pod *v1.Pod, nodeName string)
-	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache. It's a no-op if it doesn't exist.
-	DeleteNominatedPodIfExists(pod *v1.Pod)
-	// UpdateNominatedPod updates the <oldPod> with <newPod>.
-	UpdateNominatedPod(oldPod, newPod *v1.Pod)
-	// NominatedPodsForNode returns nominatedPods on the given node.
-	NominatedPodsForNode(nodeName string) []*v1.Pod
 }
 
 // PluginsRunner abstracts operations to run some plugins.
@@ -116,6 +55,7 @@ type QueueSortPlugin interface {
 	// Less are used to sort pods in the scheduling queue.
 	Less(*QueuedPodInfo, *QueuedPodInfo) bool
 }
+type LessFunc func(podInfo1, podInfo2 *QueuedPodInfo) bool
 
 type FilterPlugin interface {
 	Plugin
@@ -198,6 +138,10 @@ type PostFilterPlugin interface {
 	// a preemption plugin may choose to return nominatedNodeName, so that framework can reuse that to update the
 	// preemptor pod's .spec.status.nominatedNodeName field.
 	PostFilter(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusMap) (*PostFilterResult, *Status)
+}
+
+type PostFilterResult struct {
+	NominatedNodeName string
 }
 
 // PreScorePlugin is an interface for Pre-score plugin. Pre-score is an

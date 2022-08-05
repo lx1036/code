@@ -14,6 +14,14 @@ func RegisterFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Filter")
 }
 
+func RegisterQueueSortPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "QueueSort")
+}
+
+func RegisterBindPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Bind")
+}
+
 func RegisterPluginAsExtensions(pluginName string, pluginNewFunc runtime.PluginFactory, extensions ...string) RegisterPluginFunc {
 	return RegisterPluginAsExtensionsWithWeight(pluginName, 1, pluginNewFunc, extensions...)
 }
@@ -68,4 +76,17 @@ func getPluginSetByExtension(plugins *configv1.Plugins, extension string) *confi
 	default:
 		return nil
 	}
+}
+
+func NewFramework(pluginFunc []RegisterPluginFunc, profileName string, opts ...runtime.Option) (*runtime.Framework, error) {
+	registry := runtime.Registry{}
+	profile := &configv1.KubeSchedulerProfile{
+		SchedulerName: profileName,
+		Plugins:       &configv1.Plugins{},
+	}
+	for _, f := range pluginFunc {
+		f(&registry, profile)
+	}
+
+	return runtime.NewFramework(registry, profile, opts...)
 }
