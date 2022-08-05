@@ -3,6 +3,7 @@ package noderesources
 import (
 	"context"
 	"fmt"
+	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/framework/runtime"
 	"math"
 
 	framework "k8s-lx1036/k8s/scheduler/pkg/framework"
@@ -17,11 +18,22 @@ import (
 // BalancedAllocation is a score plugin that calculates the difference between the cpu and memory fraction
 // of capacity, and prioritizes the host based on how close the two metrics are to each other.
 type BalancedAllocation struct {
-	handle framework.FrameworkHandle
+	framework *frameworkruntime.Framework
 	resourceAllocationScorer
 }
 
 const BalancedAllocationName = "NodeResourcesBalancedAllocation"
+
+func NewBalancedAllocation(_ runtime.Object, framework *frameworkruntime.Framework) (framework.Plugin, error) {
+	return &BalancedAllocation{
+		framework: framework,
+		resourceAllocationScorer: resourceAllocationScorer{
+			Name:                BalancedAllocationName,
+			scorer:              balancedResourceScorer,
+			resourceToWeightMap: defaultRequestedRatioResources, // TODO: resource weight 还没使用
+		},
+	}, nil
+}
 
 // defaultRequestedRatioResources is used to set default requestToWeight map for CPU and memory
 var defaultRequestedRatioResources = resourceToWeightMap{v1.ResourceMemory: 1, v1.ResourceCPU: 1}
@@ -37,7 +49,7 @@ func (ba *BalancedAllocation) ScoreExtensions() framework.ScoreExtensions {
 
 func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
 	nodeName string) (int64, *framework.Status) {
-	nodeInfo, err := ba.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	nodeInfo, err := ba.framework.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
@@ -45,17 +57,6 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleS
 	// 来源于算法：**[An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization](https://ieeexplore.ieee.org/document/6603690)**
 	// 主要来源于需求：计算资源分配越平衡越好。只是，算法为何是 cpu_ratio 和 memory_ratio 计算差值？
 	return ba.score(pod, nodeInfo)
-}
-
-func NewBalancedAllocation(_ runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
-	return &BalancedAllocation{
-		handle: h,
-		resourceAllocationScorer: resourceAllocationScorer{
-			Name:                BalancedAllocationName,
-			scorer:              balancedResourceScorer,
-			resourceToWeightMap: defaultRequestedRatioResources, // TODO: resource weight 还没使用
-		},
-	}, nil
 }
 
 // todo: use resource weights in the scorer function

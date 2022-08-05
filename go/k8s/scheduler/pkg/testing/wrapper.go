@@ -15,6 +15,10 @@ func (p *PodWrapper) Name(s string) *PodWrapper {
 	p.SetName(s)
 	return p
 }
+func (p *PodWrapper) Namespace(s string) *PodWrapper {
+	p.SetNamespace(s)
+	return p
+}
 func (p *PodWrapper) UID(s string) *PodWrapper {
 	p.SetUID(types.UID(s))
 	return p

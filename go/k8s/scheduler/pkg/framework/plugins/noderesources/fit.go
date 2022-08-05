@@ -32,12 +32,12 @@ type Fit struct {
 }
 
 func NewFit(plArgs runtime.Object, _ *frameworkruntime.Framework) (framework.Plugin, error) {
-	args, err := getFitArgs(plArgs)
-	if err != nil {
-		return nil, err
+	args, ok := plArgs.(*configv1.NodeResourcesFitArgs)
+	if !ok {
+		return nil, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", plArgs)
 	}
 
-	if err := validateFitArgs(args); err != nil {
+	if err := validateFitArgs(*args); err != nil {
 		return nil, err
 	}
 
@@ -49,14 +49,6 @@ func NewFit(plArgs runtime.Object, _ *frameworkruntime.Framework) (framework.Plu
 
 func (f *Fit) Name() string {
 	return Name
-}
-
-func getFitArgs(obj runtime.Object) (configv1.NodeResourcesFitArgs, error) {
-	ptr, ok := obj.(*configv1.NodeResourcesFitArgs)
-	if !ok {
-		return configv1.NodeResourcesFitArgs{}, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", obj)
-	}
-	return *ptr, nil
 }
 
 func validateFitArgs(args configv1.NodeResourcesFitArgs) error {
@@ -86,9 +78,9 @@ func validateFitArgs(args configv1.NodeResourcesFitArgs) error {
 	return allErrs.ToAggregate()
 }
 
-func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	cycleState.Write(preFilterStateKey, computePodResourceRequest(pod))
-	return nil
+	return nil, nil
 }
 
 func (f *Fit) PreFilterExtensions() framework.PreFilterExtensions {

@@ -2,7 +2,6 @@ package defaultpreemption
 
 import (
 	"context"
-	"k8s.io/client-go/tools/events"
 	"sort"
 	"strings"
 	"testing"
@@ -23,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/events"
 )
 
 var (
@@ -184,10 +185,46 @@ func TestDryRunPreemption(test *testing.T) {
 }
 
 func TestPostFilter(test *testing.T) {
-
+	onePodRes := map[corev1.ResourceName]string{corev1.ResourcePods: "1"}
+	fixtures := []struct {
+		name                  string
+		pod                   *corev1.Pod // 被调度的 pod
+		pods                  []*corev1.Pod
+		nodes                 []*corev1.Node
+		filteredNodesStatuses framework.NodeToStatusMap
+		wantResult            *framework.PostFilterResult
+		wantStatus            *framework.Status
+	}{
+		{
+			name: "pod with higher priority can be made schedulable",
+			pod:  schedulertesting.MakePod().Name("p0").UID("p").Namespace(corev1.NamespaceDefault).Priority(highPriority).Obj(),
+			pods: []*corev1.Pod{
+				schedulertesting.MakePod().Name("p1").UID("p1").Namespace(corev1.NamespaceDefault).Node("node1").Obj(),
+			},
+			nodes: []*corev1.Node{
+				schedulertesting.MakeNode().Name("node1").Capacity(onePodRes).Obj(), // node1 不可调度且只能调度 1 个 pod
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"node1": framework.NewStatus(framework.Unschedulable), // node1 is Unschedulable
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
+			wantStatus: framework.NewStatus(framework.Success), // pod p0 抢占成功，抢占 [node1][p1] p1 pod
+		},
+	}
 	for _, fixture := range fixtures {
 		test.Run(fixture.name, func(t *testing.T) {
-			cs := clientsetfake.NewSimpleClientset()
+			clientSet := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(clientSet, 0) // INFO: 注意这里是空的，和上面的不一样
+			podInformer := informerFactory.Core().V1().Pods().Informer()
+			podInformer.GetStore().Add(fixture.pod)
+			for i := range fixture.pods {
+				podInformer.GetStore().Add(fixture.pods[i])
+			}
+			// As we use a bare clientset above, it's needed to add a reactor here
+			// to not fail Victims deletion logic.
+			clientSet.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, nil
+			})
 
 			registeredPlugins := []schedulertesting.RegisterPluginFunc{
 				schedulertesting.RegisterPluginAsExtensions(noderesources.Name, noderesources.NewFit, "Filter", "PreFilter"),
@@ -195,9 +232,9 @@ func TestPostFilter(test *testing.T) {
 				schedulertesting.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				schedulertesting.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(), 0) // INFO: 注意这里是空的，和上面的不一样
+			snapshot := internalcache.NewSnapshot(fixture.pods, fixture.nodes)
 			fwk, err := schedulertesting.NewFramework(registeredPlugins, "",
-				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithClientSet(clientSet),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -213,7 +250,25 @@ func TestPostFilter(test *testing.T) {
 				args:      *getDefaultDefaultPreemptionArgs(),
 				podLister: informerFactory.Core().V1().Pods().Lister(),
 			}
-
+			cycleState := framework.NewCycleState()
+			// Some tests rely on PreFilter plugin to compute its CycleState.
+			if _, status := fwk.RunPreFilterPlugins(context.Background(), cycleState, fixture.pod); !status.IsSuccess() {
+				t.Errorf("Unexpected PreFilter Status: %v", status)
+			}
+			// pod 抢占 filteredNodesStatuses 里的 node 上的 pods
+			gotResult, gotStatus := preemption.PostFilter(context.TODO(), cycleState, fixture.pod, fixture.filteredNodesStatuses)
+			if gotStatus.Code() == framework.Error {
+				if diff := cmp.Diff(fixture.wantStatus.Reasons(), gotStatus.Reasons()); diff != "" {
+					t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+				}
+			} else {
+				if diff := cmp.Diff(fixture.wantStatus, gotStatus); diff != "" {
+					t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+				}
+			}
+			if diff := cmp.Diff(fixture.wantResult, gotResult); diff != "" {
+				t.Errorf("Unexpected postFilterResult (-want, +got):\n%s", diff)
+			}
 		})
 	}
 }

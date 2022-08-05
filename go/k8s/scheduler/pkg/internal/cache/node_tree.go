@@ -2,8 +2,8 @@ package cache
 
 import (
 	"k8s.io/api/core/v1"
+	utilnode "k8s.io/component-helpers/node/topology"
 	"k8s.io/klog/v2"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
 // nodeTree is a tree-like data structure that holds node names in each zone. Zone names are

@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -20,13 +21,17 @@ type podState struct {
 	bindingFinished bool
 }
 
-// nodeInfoListItem holds a NodeInfo pointer and acts as an item in a doubly
-// linked list. When a NodeInfo is updated, it goes to the head of the list.
-// The items closer to the head are the most recently updated items.
+// 双链表
 type nodeInfoListItem struct {
 	info *framework.NodeInfo
 	next *nodeInfoListItem
 	prev *nodeInfoListItem
+}
+
+func newNodeInfoListItem(ni *framework.NodeInfo) *nodeInfoListItem {
+	return &nodeInfoListItem{
+		info: ni,
+	}
 }
 
 type imageState struct {
@@ -54,7 +59,7 @@ type Cache struct {
 	mu sync.RWMutex
 	// a set of assumed pod keys.
 	// The key could further be used to get an entry in podStates.
-	assumedPods map[string]bool
+	assumedPods sets.String
 	// a map from pod key to podState.
 	podStates map[string]*podState
 	nodes     map[string]*nodeInfoListItem
@@ -82,7 +87,7 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *Cache {
 
 		nodes:       make(map[string]*nodeInfoListItem),
 		nodeTree:    newNodeTree(nil),
-		assumedPods: make(map[string]bool),
+		assumedPods: sets.NewString(),
 		podStates:   make(map[string]*podState),
 		imageStates: make(map[string]*imageState),
 	}
@@ -97,74 +102,6 @@ func New(ttl time.Duration, stop <-chan struct{}) *Cache {
 
 func (cache *Cache) run() {
 	go wait.Until(cache.cleanupExpiredAssumedPods, cache.period, cache.stop)
-}
-
-func (cache *Cache) PodCount() (int, error) {
-	panic("implement me")
-}
-
-func (cache *Cache) AssumePod(pod *v1.Pod) error {
-	key, err := framework.GetPodKey(pod)
-	if err != nil {
-		return err
-	}
-
-}
-
-func (cache *Cache) FinishBinding(pod *v1.Pod) error {
-	panic("implement me")
-}
-
-func (cache *Cache) ForgetPod(pod *v1.Pod) error {
-	panic("implement me")
-}
-
-func (cache *Cache) AddPod(pod *v1.Pod) error {
-
-}
-
-func (cache *Cache) UpdatePod(oldPod, newPod *v1.Pod) error {
-	panic("implement me")
-}
-
-func (cache *Cache) RemovePod(pod *v1.Pod) error {
-	panic("implement me")
-}
-
-func (cache *Cache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
-	panic("implement me")
-}
-
-func (cache *Cache) IsAssumedPod(pod *v1.Pod) (bool, error) {
-	key, err := framework.GetPodKey(pod)
-	if err != nil {
-		return false, err
-	}
-
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-
-	return cache.assumedPods.Has(key), nil
-}
-
-func (cache *Cache) AddNode(node *v1.Node) *framework.NodeInfo {
-	panic("implement me")
-}
-
-func (cache *Cache) UpdateNode(oldNode, newNode *v1.Node) error {
-	panic("implement me")
-}
-
-func (cache *Cache) RemoveNode(node *v1.Node) error {
-	panic("implement me")
-}
-
-func (cache *Cache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
-	panic("implement me")
-}
-
-func (cache *Cache) Dump() *Dump {
-	panic("implement me")
 }
 
 func (cache *Cache) cleanupExpiredAssumedPods() {
@@ -279,4 +216,138 @@ func (cache *Cache) moveNodeInfoToHead(name string) {
 	ni.next = cache.headNode
 	ni.prev = nil
 	cache.headNode = ni
+}
+
+func (cache *Cache) PodCount() (int, error) {
+	panic("implement me")
+}
+
+func (cache *Cache) AssumePod(pod *v1.Pod) error {
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if _, ok := cache.podStates[key]; ok {
+		return fmt.Errorf("pod %v is in the cache, so can't be assumed", key)
+	}
+
+	return cache.addPod(pod, true)
+}
+
+func (cache *Cache) addPod(pod *v1.Pod, assumePod bool) error {
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return err
+	}
+	n, ok := cache.nodes[pod.Spec.NodeName]
+	if !ok {
+		n = newNodeInfoListItem(framework.NewNodeInfo())
+		cache.nodes[pod.Spec.NodeName] = n
+	}
+	n.info.AddPod(pod)
+	cache.moveNodeInfoToHead(pod.Spec.NodeName)
+	ps := &podState{
+		pod: pod,
+	}
+	cache.podStates[key] = ps
+	if assumePod {
+		cache.assumedPods.Insert(key)
+	}
+	return nil
+}
+
+func (cache *Cache) FinishBinding(pod *v1.Pod) error {
+	panic("implement me")
+}
+
+func (cache *Cache) ForgetPod(pod *v1.Pod) error {
+	panic("implement me")
+}
+
+func (cache *Cache) AddPod(pod *v1.Pod) error {
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	currState, ok := cache.podStates[key]
+	switch {
+	case ok && cache.assumedPods.Has(key):
+		if currState.pod.Spec.NodeName != pod.Spec.NodeName {
+			// The pod was added to a different node than it was assumed to.
+			klog.InfoS("Pod was added to a different node than it was assumed", "pod", klog.KObj(pod), "assumedNode", klog.KRef("", pod.Spec.NodeName), "currentNode", klog.KRef("", currState.pod.Spec.NodeName))
+			if err = cache.updatePod(currState.pod, pod); err != nil {
+				klog.ErrorS(err, "Error occurred while updating pod")
+			}
+		} else {
+			delete(cache.assumedPods, key)
+			cache.podStates[key].deadline = nil
+			cache.podStates[key].pod = pod
+		}
+	case !ok:
+		// Pod was expired. We should add it back.
+		if err = cache.addPod(pod, false); err != nil {
+			klog.ErrorS(err, "Error occurred while adding pod")
+		}
+	default:
+		return fmt.Errorf("pod %v was already in added state", key)
+	}
+	return nil
+}
+
+func (cache *Cache) updatePod(oldPod, newPod *v1.Pod) error {
+	if err := cache.removePod(oldPod); err != nil {
+		return err
+	}
+	return cache.addPod(newPod, false)
+}
+
+func (cache *Cache) UpdatePod(oldPod, newPod *v1.Pod) error {
+	panic("implement me")
+}
+
+func (cache *Cache) RemovePod(pod *v1.Pod) error {
+	panic("implement me")
+}
+
+func (cache *Cache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
+	panic("implement me")
+}
+
+func (cache *Cache) IsAssumedPod(pod *v1.Pod) (bool, error) {
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return false, err
+	}
+
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	return cache.assumedPods.Has(key), nil
+}
+
+func (cache *Cache) AddNode(node *v1.Node) *framework.NodeInfo {
+	panic("implement me")
+}
+
+func (cache *Cache) UpdateNode(oldNode, newNode *v1.Node) error {
+	panic("implement me")
+}
+
+func (cache *Cache) RemoveNode(node *v1.Node) error {
+	panic("implement me")
+}
+
+func (cache *Cache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
+	panic("implement me")
+}
+
+func (cache *Cache) Dump() *Dump {
+	panic("implement me")
 }

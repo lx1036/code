@@ -10,7 +10,6 @@ import (
 
 	"k8s-lx1036/k8s/scheduler/pkg/apis/config/scheme"
 	configv1 "k8s-lx1036/k8s/scheduler/pkg/apis/config/v1"
-	schedulerapiv1 "k8s-lx1036/k8s/scheduler/pkg/apis/config/v1"
 	"k8s-lx1036/k8s/scheduler/pkg/framework"
 	"k8s-lx1036/k8s/scheduler/pkg/framework/parallelize"
 
@@ -143,7 +142,7 @@ func NewFrameworks(profiles []configv1.KubeSchedulerProfile, r Registry,
 type Framework struct {
 	registry              Registry
 	snapshotSharedLister  framework.SharedLister
-	waitingPods           *waitingPodsMap
+	waitingPods           *WaitingPodsMap
 	pluginNameToWeightMap map[string]int
 	queueSortPlugins      []framework.QueueSortPlugin
 	preFilterPlugins      []framework.PreFilterPlugin
@@ -169,7 +168,7 @@ type Framework struct {
 	profileName     string
 
 	preemptHandle framework.PreemptHandle
-	podNominator  *internalqueue.PodNominator
+	PodNominator  *internalqueue.PodNominator
 
 	parallelizer parallelize.Parallelizer
 
@@ -205,7 +204,7 @@ func NewFramework(r Registry, profile *configv1.KubeSchedulerProfile, opts ...Op
 
 		scorePluginWeight: make(map[string]int),
 		kubeConfig:        options.kubeConfig,
-		podNominator:      options.podNominator,
+		PodNominator:      options.podNominator,
 
 		parallelizer: options.parallelizer,
 	}
@@ -398,12 +397,15 @@ func (f *Framework) SnapshotSharedLister() framework.SharedLister {
 	return f.snapshotSharedLister
 }
 
-func (f *Framework) IterateOverWaitingPods(callback func(framework.WaitingPod)) {
+func (f *Framework) IterateOverWaitingPods(callback func(*WaitingPod)) {
 	panic("implement me")
 }
 
-func (f *Framework) GetWaitingPod(uid types.UID) framework.WaitingPod {
-	panic("implement me")
+func (f *Framework) GetWaitingPod(uid types.UID) *WaitingPod {
+	if wp := f.waitingPods.get(uid); wp != nil {
+		return wp
+	}
+	return nil // Returning nil instead of *waitingPod(nil).
 }
 
 func (f *Framework) RejectWaitingPod(uid types.UID) {
@@ -558,7 +560,7 @@ func (f *Framework) RunFilterPluginsWithNominatedPods(ctx context.Context, state
 // add pods with equal or greater priority than target pod
 func (f *Framework) addNominatedPods(ctx context.Context, pod *corev1.Pod, state *framework.CycleState,
 	nodeInfo *framework.NodeInfo) (bool, *framework.CycleState, *framework.NodeInfo, error) {
-	nominatedPodInfos := f.podNominator.NominatedPodsForNode(nodeInfo.Node().Name)
+	nominatedPodInfos := f.PodNominator.NominatedPodsForNode(nodeInfo.Node().Name)
 	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
@@ -664,25 +666,4 @@ func (f *Framework) WaitOnPermit(ctx context.Context, pod *corev1.Pod) *framewor
 
 func (f *Framework) RunBindPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
 	panic("implement me")
-}
-
-var configDecoder = scheme.Codecs.UniversalDecoder()
-
-// getPluginArgsOrDefault returns a configuration provided by the user or builds
-// a default from the scheme. Returns `nil, nil` if the plugin does not have a
-// defined arg types, such as in-tree plugins that don't require configuration
-// or out-of-tree plugins.
-func getPluginArgsOrDefault(pluginConfig map[string]runtime.Object, name string) (runtime.Object, error) {
-	res, ok := pluginConfig[name]
-	if ok {
-		return res, nil
-	}
-	// Use defaults from latest config API version.
-	gvk := schedulerapiv1.SchemeGroupVersion.WithKind(name + "Args")
-	obj, _, err := configDecoder.Decode(nil, &gvk, nil)
-	if runtime.IsNotRegisteredError(err) {
-		// This plugin is out-of-tree or doesn't require configuration.
-		return nil, nil
-	}
-	return obj, err
 }

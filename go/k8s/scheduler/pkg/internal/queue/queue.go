@@ -302,6 +302,44 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 	p.cond.Broadcast()
 }
 
+// Checks if the Pod may become schedulable upon the event.
+// This is achieved by looking up the global clusterEventMap registry.
+func (p *PriorityQueue) podMatchesEvent(podInfo *framework.QueuedPodInfo, clusterEvent framework.ClusterEvent) bool {
+	if clusterEvent.IsWildCard() {
+		return true
+	}
+
+	for evt, nameSet := range p.clusterEventMap {
+		// Firstly verify if the two ClusterEvents match:
+		// - either the registered event from plugin side is a WildCardEvent,
+		// - or the two events have identical Resource fields and *compatible* ActionType.
+		//   Note the ActionTypes don't need to be *identical*. We check if the ANDed value
+		//   is zero or not. In this way, it's easy to tell Update&Delete is not compatible,
+		//   but Update&All is.
+		evtMatch := evt.IsWildCard() ||
+			(evt.Resource == clusterEvent.Resource && evt.ActionType&clusterEvent.ActionType != 0)
+
+		// Secondly verify the plugin name matches.
+		// Note that if it doesn't match, we shouldn't continue to search.
+		if evtMatch && intersect(nameSet, podInfo.UnschedulablePlugins) {
+			return true
+		}
+	}
+
+	return false
+}
+func intersect(x, y sets.String) bool {
+	if len(x) > len(y) {
+		x, y = y, x
+	}
+	for v := range x {
+		if y.Has(v) {
+			return true
+		}
+	}
+	return false
+}
+
 // 判断是不是 podBackoff pod
 func (p *PriorityQueue) isPodBackoff(podInfo *framework.QueuedPodInfo) bool {
 	return p.getBackoffTime(podInfo).After(p.clock.Now())
@@ -347,14 +385,14 @@ func (p *PriorityQueue) NumUnschedulablePods() int {
 func (p *PriorityQueue) newQueuedPodInfo(pod *corev1.Pod) *framework.QueuedPodInfo {
 	now := p.clock.Now()
 	return &framework.QueuedPodInfo{
-		Pod:                     pod,
+		PodInfo:                 framework.NewPodInfo(pod),
 		Timestamp:               now,
 		InitialAttemptTimestamp: now,
 	}
 }
 func newQueuedPodInfoNoTimestamp(pod *corev1.Pod) *framework.QueuedPodInfo {
 	return &framework.QueuedPodInfo{
-		Pod: pod,
+		PodInfo: framework.NewPodInfo(pod),
 	}
 }
 
@@ -377,7 +415,7 @@ func (p *PriorityQueue) Add(pod *corev1.Pod) error {
 		klog.Errorf("Error: pod %s/%s is already in the podBackoff queue.", pod.Namespace, pod.Name)
 	}
 
-	p.PodNominator.AddNominatedPod(pod, "")
+	p.PodNominator.AddNominatedPod(podInfo.PodInfo, "")
 	p.cond.Broadcast()
 
 	return nil
@@ -409,7 +447,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 		p.unschedulablePods.addOrUpdate(pInfo)
 	}
 
-	p.PodNominator.AddNominatedPod(pod, "")
+	p.PodNominator.AddNominatedPod(pInfo.PodInfo, "")
 	return nil
 }
 

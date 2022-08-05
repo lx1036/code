@@ -59,3 +59,21 @@ func (pl *TestPlugin) Name() string {
 func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *corev1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	return nil, nil
 }
+
+func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
+	return pl
+}
+
+func (pl *TestPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *corev1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	if value, ok := nodeInfo.Node().GetLabels()["error"]; ok && value == "true" {
+		return framework.AsStatus(fmt.Errorf("failed to add pod: %v", podToSchedule.Name))
+	}
+	return nil
+}
+
+func (pl *TestPlugin) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *corev1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	if value, ok := nodeInfo.Node().GetLabels()["error"]; ok && value == "true" {
+		return framework.AsStatus(fmt.Errorf("failed to remove pod: %v", podToSchedule.Name))
+	}
+	return nil
+}

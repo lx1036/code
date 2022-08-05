@@ -11,20 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// WaitingPod represents a pod currently waiting in the permit phase.
-type WaitingPod interface {
-	// GetPod returns a reference to the waiting pod.
-	GetPod() *v1.Pod
-	// GetPendingPlugins returns a list of pending permit plugin's name.
-	GetPendingPlugins() []string
-	// Allow declares the waiting pod is allowed to be scheduled by plugin pluginName.
-	// If this is the last remaining plugin to allow, then a success signal is delivered
-	// to unblock the pod.
-	Allow(pluginName string)
-	// Reject declares the waiting pod unschedulable.
-	Reject(msg string)
-}
-
 // PreemptHandle incorporates all needed logic to run preemption logic.
 type PreemptHandle interface {
 	// PluginsRunner abstracts operations to run some plugins.
@@ -74,6 +60,22 @@ type FilterPlugin interface {
 	Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *Status
 }
 
+// PreFilterPlugin is an interface that must be implemented by "prefilter" plugins.
+// These plugins are called at the beginning of the scheduling cycle.
+type PreFilterPlugin interface {
+	Plugin
+	// PreFilter is called at the beginning of the scheduling cycle. All PreFilter
+	// plugins must return success or the pod will be rejected.
+	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)
+	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
+	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
+	// modify its pre-processed info. The framework guarantees that the extensions
+	// AddPod/RemovePod will only be called after PreFilter, possibly on a cloned
+	// CycleState, and may call those functions more than once before calling
+	// Filter again on a specific node.
+	PreFilterExtensions() PreFilterExtensions
+}
+
 type PreFilterExtensions interface {
 	AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
 	RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
@@ -107,22 +109,6 @@ func (p *PreFilterResult) Merge(in *PreFilterResult) *PreFilterResult {
 	return &r
 }
 
-// PreFilterPlugin is an interface that must be implemented by "prefilter" plugins.
-// These plugins are called at the beginning of the scheduling cycle.
-type PreFilterPlugin interface {
-	Plugin
-	// PreFilter is called at the beginning of the scheduling cycle. All PreFilter
-	// plugins must return success or the pod will be rejected.
-	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)
-	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
-	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
-	// modify its pre-processed info. The framework guarantees that the extensions
-	// AddPod/RemovePod will only be called after PreFilter, possibly on a cloned
-	// CycleState, and may call those functions more than once before calling
-	// Filter again on a specific node.
-	PreFilterExtensions() PreFilterExtensions
-}
-
 // PostFilterPlugin is an interface for PostFilter plugins. These plugins are called
 // after a pod cannot be scheduled.
 type PostFilterPlugin interface {
@@ -140,8 +126,28 @@ type PostFilterPlugin interface {
 	PostFilter(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusMap) (*PostFilterResult, *Status)
 }
 
-type PostFilterResult struct {
+type NominatingMode int
+
+const (
+	ModeNoop NominatingMode = iota
+	ModeOverride
+)
+
+type NominatingInfo struct {
 	NominatedNodeName string
+	NominatingMode    NominatingMode
+}
+type PostFilterResult struct {
+	*NominatingInfo
+}
+
+func NewPostFilterResultWithNominatedNode(name string) *PostFilterResult {
+	return &PostFilterResult{
+		NominatingInfo: &NominatingInfo{
+			NominatedNodeName: name,
+			NominatingMode:    ModeOverride,
+		},
+	}
 }
 
 // PreScorePlugin is an interface for Pre-score plugin. Pre-score is an

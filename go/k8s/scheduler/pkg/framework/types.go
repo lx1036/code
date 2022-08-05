@@ -513,7 +513,8 @@ func nextGeneration() int64 {
 // the pod's status in the scheduling queue, such as the timestamp when
 // it's added to the queue.
 type QueuedPodInfo struct {
-	Pod *v1.Pod
+	*PodInfo
+
 	// The time pod added to the scheduling queue.
 	Timestamp time.Time
 	// Number of schedule attempts before successfully scheduled.
@@ -532,7 +533,7 @@ type QueuedPodInfo struct {
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
 func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 	return &QueuedPodInfo{
-		Pod:                     pqi.Pod.DeepCopy(),
+		PodInfo:                 pqi.PodInfo.DeepCopy(),
 		Timestamp:               pqi.Timestamp,
 		Attempts:                pqi.Attempts,
 		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
@@ -693,6 +694,10 @@ type ClusterEvent struct {
 	Resource   GVK
 	ActionType ActionType
 	Label      string
+}
+
+func (ce ClusterEvent) IsWildCard() bool {
+	return ce.Resource == WildCard && ce.ActionType == All
 }
 
 // Diagnosis records the details to diagnose a scheduling failure.

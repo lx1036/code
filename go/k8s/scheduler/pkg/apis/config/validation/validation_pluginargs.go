@@ -3,11 +3,11 @@ package validation
 import (
 	"fmt"
 
-	"k8s-lx1036/k8s/scheduler/pkg/apis/config"
+	configv1 "k8s-lx1036/k8s/scheduler/pkg/apis/config/v1"
 )
 
 // ValidateNodeLabelArgs validates that NodeLabelArgs are correct.
-func ValidateNodeLabelArgs(args config.NodeLabelArgs) error {
+func ValidateNodeLabelArgs(args configv1.NodeLabelArgs) error {
 	if err := validateNoConflict(args.PresentLabels, args.AbsentLabels); err != nil {
 		return err
 	}
@@ -32,11 +32,11 @@ func validateNoConflict(presentLabels []string, absentLabels []string) error {
 	return nil
 }
 
-func ValidateNodeResourcesLeastAllocatedArgs(args *config.NodeResourcesLeastAllocatedArgs) error {
+func ValidateNodeResourcesLeastAllocatedArgs(args *configv1.NodeResourcesLeastAllocatedArgs) error {
 	return validateResources(args.Resources)
 }
 
-func validateResources(resources []config.ResourceSpec) error {
+func validateResources(resources []configv1.ResourceSpec) error {
 	for _, resource := range resources {
 		if resource.Weight <= 0 {
 			return fmt.Errorf("resource Weight of %v should be a positive value, got %v", resource.Name, resource.Weight)

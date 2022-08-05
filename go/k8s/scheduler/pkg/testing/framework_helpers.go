@@ -40,8 +40,8 @@ func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, plugi
 			pluginSet.Enabled = append(pluginSet.Enabled, configv1.Plugin{Name: pluginName, Weight: weight})
 		}
 
-		// INFO: 这里还得琢磨下???
-		gvk := configv1.SchemeGroupVersion.WithKind(pluginName + "Args") // Kind = pluginName+"Args" ???
+		// INFO: 这里还得琢磨下, 这里注意，&NodeResourcesFitArgs{} 必须注册到 scheme.AddKnownTypes 里，否则会 error 导致没有 PluginConfig
+		gvk := configv1.SchemeGroupVersion.WithKind(pluginName + "Args") // Kind = pluginName+"Args", @see configv1.XXXArgs
 		if args, _, err := configDecoder.Decode(nil, &gvk, nil); err == nil {
 			profile.PluginConfig = append(profile.PluginConfig, configv1.PluginConfig{
 				Name: pluginName,

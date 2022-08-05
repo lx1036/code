@@ -3,6 +3,7 @@ package queue
 import (
 	"k8s-lx1036/k8s/scheduler/pkg/framework"
 	"k8s-lx1036/k8s/scheduler/pkg/metrics"
+	"k8s-lx1036/k8s/scheduler/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
 )
