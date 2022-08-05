@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// PluginFactory is a function that builds a plugin.
+// PluginFactory 这里 configuration 就是每一个 plugin args
 type PluginFactory = func(configuration runtime.Object, f *Framework) (framework.Plugin, error)
 
 // Registry is a collection of all available plugins. The framework uses a

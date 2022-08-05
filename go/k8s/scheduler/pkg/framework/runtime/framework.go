@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"reflect"
 	"time"
 
@@ -22,6 +23,8 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 )
+
+// TODO: record plugin metrics
 
 const (
 	postFilter = "PostFilter"
@@ -553,11 +556,11 @@ func (f *Framework) runFilterPlugin(ctx context.Context, pl framework.FilterPlug
 	return pl.Filter(ctx, state, pod, nodeInfo)
 }
 
-// INFO: pod在当前调度周期 filter extension point 失败时，执行抢占preemption逻辑，但是在下一个调度周期再去执行调度
+// RunPostFilterPlugins INFO: pod在当前调度周期 filter extension point 失败时，执行抢占preemption逻辑，但是在下一个调度周期再去执行调度
 func (f *Framework) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
 	filteredNodeStatusMap framework.NodeToStatusMap) (_ *framework.PostFilterResult, status *framework.Status) {
-	//startTime := time.Now()
-	/*defer func() {
+	startTime := time.Now()
+	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(postFilter, status.Code().String(),
 			f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
@@ -575,21 +578,12 @@ func (f *Framework) RunPostFilterPlugins(ctx context.Context, state *framework.C
 		statuses[pl.Name()] = s
 	}
 
-	return nil, statuses.Merge()*/
-	panic("")
+	return nil, statuses.Merge()
 }
 
 func (f *Framework) runPostFilterPlugin(ctx context.Context, pl framework.PostFilterPlugin, state *framework.CycleState,
 	pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
-	/*if !state.ShouldRecordPluginMetrics() { // INFO: 有90%概率不需要record plugin metrics
-		return pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
-	}
-
-	startTime := time.Now()
-	r, s := pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
-	f.metricsRecorder.observePluginDurationAsync(postFilter, pl.Name(), s, metrics.SinceInSeconds(startTime))
-	return r, s*/
-	panic("")
+	return pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
 }
 
 func (f *Framework) HasScorePlugins() bool {

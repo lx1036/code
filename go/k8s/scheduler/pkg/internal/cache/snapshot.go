@@ -2,9 +2,10 @@ package cache
 
 import (
 	"fmt"
+
 	framework "k8s-lx1036/k8s/scheduler/pkg/framework"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -58,7 +59,7 @@ func NewEmptySnapshot() *Snapshot {
 // createNodeInfoMap obtains a list of pods and pivots that list into a map
 // where the keys are node names and the values are the aggregated information
 // for that node.
-func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.NodeInfo {
+func createNodeInfoMap(pods []*corev1.Pod, nodes []*corev1.Node) map[string]*framework.NodeInfo {
 	nodeNameToInfo := make(map[string]*framework.NodeInfo)
 	for _, pod := range pods {
 		nodeName := pod.Spec.NodeName
@@ -81,7 +82,7 @@ func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.N
 }
 
 // NewSnapshot initializes a Snapshot struct and returns it.
-func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
+func NewSnapshot(pods []*corev1.Pod, nodes []*corev1.Node) *Snapshot {
 	nodeInfoMap := createNodeInfoMap(pods, nodes)
 	nodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithAffinityNodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
@@ -106,7 +107,7 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 }
 
 // getNodeImageStates returns the given node's image states based on the given imageExistence map.
-func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String) map[string]*framework.ImageStateSummary {
+func getNodeImageStates(node *corev1.Node, imageExistenceMap map[string]sets.String) map[string]*framework.ImageStateSummary {
 	imageStates := make(map[string]*framework.ImageStateSummary)
 
 	for _, image := range node.Status.Images {
@@ -122,7 +123,7 @@ func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String)
 }
 
 // createImageExistenceMap returns a map recording on which nodes the images exist, keyed by the images' names.
-func createImageExistenceMap(nodes []*v1.Node) map[string]sets.String {
+func createImageExistenceMap(nodes []*corev1.Node) map[string]sets.String {
 	imageExistenceMap := make(map[string]sets.String)
 	for _, node := range nodes {
 		for _, image := range node.Status.Images {

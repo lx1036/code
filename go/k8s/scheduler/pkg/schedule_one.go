@@ -55,11 +55,11 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 	if err != nil { // INFO: 如果pod调度失败，则调用 PostFilter plugin 进行抢占
 		nominatedNode := ""
 		if fitError, ok := err.(framework.FitError); ok {
-			if !framework.HasPostFilterPlugins() {
+			if !fwk.HasPostFilterPlugins() {
 				klog.V(3).Infof("No PostFilter plugins are registered, so no preemption will be performed.")
 			} else {
 				// INFO: PostFilter plugin 其实就是 defaultpreemption.Name plugin，运行 preemption plugin
-				result, status := framework.RunPostFilterPlugins(ctx, state, pod, fitError.FilteredNodesStatuses)
+				result, status := fwk.RunPostFilterPlugins(ctx, state, pod, fitError.FilteredNodesStatuses)
 				if status.Code() == framework.Error {
 					klog.Errorf("Status after running PostFilter plugins for pod %v/%v: %v", pod.Namespace, pod.Name, status)
 				} else {

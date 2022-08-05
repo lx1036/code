@@ -293,9 +293,39 @@ type PermitPlugin interface {
 	Permit(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (*Status, time.Duration)
 }
 
-// PluginToStatus maps plugin name to status. Currently used to identify which Filter plugin
-// returned which status.
+var statusPrecedence = map[Code]int{
+	Error:                        3,
+	UnschedulableAndUnresolvable: 2,
+	Unschedulable:                1,
+	// Any other statuses we know today, `Skip` or `Wait`, will take precedence over `Success`.
+	Success: -1,
+}
+
 type PluginToStatus map[string]*Status
+
+func (p PluginToStatus) Merge() *Status {
+	if len(p) == 0 {
+		return nil
+	}
+
+	finalStatus := NewStatus(Success)
+	for _, s := range p {
+		if s.Code() == Error {
+			finalStatus.err = s.AsError()
+		}
+		if statusPrecedence[s.Code()] > statusPrecedence[finalStatus.code] {
+			finalStatus.code = s.Code()
+			// Same as code, we keep the most relevant failedPlugin in the returned Status.
+			finalStatus.failedPlugin = s.FailedPlugin()
+		}
+
+		for _, r := range s.reasons {
+			finalStatus.AppendReason(r)
+		}
+	}
+
+	return finalStatus
+}
 
 // PluginToNodeScores declares a map from plugin name to its NodeScoreList.
 type PluginToNodeScores map[string]NodeScoreList
@@ -311,6 +341,12 @@ type NodeScore struct {
 
 // Code is the Status code/type which is returned from plugins.
 type Code int
+
+var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip"}
+
+func (c Code) String() string {
+	return codes[c]
+}
 
 // These are predefined codes used in a Status.
 const (
@@ -369,37 +405,35 @@ func AsStatus(err error) *Status {
 		err:     err,
 	}
 }
-
 func (s *Status) SetFailedPlugin(plugin string) {
 	s.failedPlugin = plugin
 }
-
 func (s *Status) WithFailedPlugin(plugin string) *Status {
 	s.SetFailedPlugin(plugin)
 	return s
 }
-
-// Code returns code of the Status.
+func (s *Status) FailedPlugin() string {
+	return s.failedPlugin
+}
 func (s *Status) Code() Code {
 	if s == nil {
 		return Success
 	}
 	return s.code
 }
-
 func (s *Status) IsSuccess() bool {
 	return s.Code() == Success
 }
-
 func (s *Status) Reasons() []string {
 	return s.reasons
 }
-
+func (s *Status) AppendReason(reason string) {
+	s.reasons = append(s.reasons, reason)
+}
 func (s *Status) IsUnschedulable() bool {
 	code := s.Code()
 	return code == Unschedulable || code == UnschedulableAndUnresolvable
 }
-
 func (s *Status) AsError() error {
 	if s.IsSuccess() {
 		return nil
@@ -409,7 +443,6 @@ func (s *Status) AsError() error {
 	}
 	return errors.New(s.Message())
 }
-
 func (s *Status) Message() string {
 	if s == nil {
 		return ""
