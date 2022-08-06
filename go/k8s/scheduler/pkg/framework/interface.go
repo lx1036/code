@@ -140,6 +140,14 @@ type NominatingInfo struct {
 	NominatedNodeName string
 	NominatingMode    NominatingMode
 }
+
+func (ni *NominatingInfo) Mode() NominatingMode {
+	if ni == nil {
+		return ModeNoop
+	}
+	return ni.NominatingMode
+}
+
 type PostFilterResult struct {
 	*NominatingInfo
 }

@@ -42,6 +42,7 @@ const (
 	ScheduleAttemptFailure = "ScheduleAttemptFailure"
 	// BackoffComplete is the event when a pod finishes backoff.
 	BackoffComplete = "BackoffComplete"
+	ForceActivate   = "ForceActivate"
 
 	// NodeSpecUnschedulableChange is the event when unschedulable node spec is changed.
 	NodeSpecUnschedulableChange = "NodeSpecUnschedulableChange"
@@ -133,7 +134,7 @@ type PriorityQueue struct {
 	// when we received move request.
 	moveRequestCycle int64
 
-	PodNominator *PodNominator
+	*PodNominator
 
 	clusterEventMap map[framework.ClusterEvent]sets.String
 
@@ -345,10 +346,6 @@ func (p *PriorityQueue) isPodBackoff(podInfo *framework.QueuedPodInfo) bool {
 	return p.getBackoffTime(podInfo).After(p.clock.Now())
 }
 
-func (p *PriorityQueue) AddNominatedPod(pod *corev1.Pod, nodeName string) {
-	panic("implement me")
-}
-
 func (p *PriorityQueue) DeleteNominatedPodIfExists(pod *corev1.Pod) {
 	panic("implement me")
 }
@@ -415,12 +412,13 @@ func (p *PriorityQueue) Add(pod *corev1.Pod) error {
 		klog.Errorf("Error: pod %s/%s is already in the podBackoff queue.", pod.Namespace, pod.Name)
 	}
 
-	p.PodNominator.AddNominatedPod(podInfo.PodInfo, "")
+	p.PodNominator.AddNominatedPod(podInfo.PodInfo, nil)
 	p.cond.Broadcast()
 
 	return nil
 }
 
+// AddUnschedulableIfNotPresent INFO: 重新加回 unschedulablePods 或 backoffQ
 func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -447,8 +445,61 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 		p.unschedulablePods.addOrUpdate(pInfo)
 	}
 
-	p.PodNominator.AddNominatedPod(pInfo.PodInfo, "")
+	p.PodNominator.AddNominatedPod(pInfo.PodInfo, nil)
 	return nil
+}
+
+// Activate moves the given pods to activeQ if they're in unschedulablePods or backoffQ.
+func (p *PriorityQueue) Activate(pods map[string]*corev1.Pod) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	activated := false
+	for _, pod := range pods {
+		if p.activate(pod) {
+			activated = true
+		}
+	}
+
+	if activated {
+		p.cond.Broadcast()
+	}
+}
+func (p *PriorityQueue) activate(pod *corev1.Pod) bool {
+	// Verify if the pod is present in activeQ.
+	if _, exists, _ := p.activeQ.Get(newQueuedPodInfoForLookup(pod)); exists {
+		// No need to activate if it's already present in activeQ.
+		return false
+	}
+	var pInfo *framework.QueuedPodInfo
+	// Verify if the pod is present in unschedulablePods or backoffQ.
+	if pInfo = p.unschedulablePods.get(pod); pInfo == nil {
+		// If the pod doesn't belong to unschedulablePods or backoffQ, don't activate it.
+		if obj, exists, _ := p.podBackoffQ.Get(newQueuedPodInfoForLookup(pod)); !exists {
+			klog.ErrorS(nil, "To-activate pod does not exist in unschedulablePods or backoffQ", "pod", klog.KObj(pod))
+			return false
+		} else {
+			pInfo = obj.(*framework.QueuedPodInfo)
+		}
+	}
+
+	if err := p.activeQ.Add(pInfo); err != nil {
+		klog.ErrorS(err, "Error adding pod to the scheduling queue", "pod", klog.KObj(pod))
+		return false
+	}
+	p.unschedulablePods.delete(pod)
+	p.podBackoffQ.Delete(pInfo)
+	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", ForceActivate).Inc()
+	p.PodNominator.AddNominatedPod(pInfo.PodInfo, nil)
+	return true
+}
+func newQueuedPodInfoForLookup(pod *corev1.Pod, plugins ...string) *framework.QueuedPodInfo {
+	// Since this is only used for a lookup in the queue, we only need to set the Pod,
+	// and so we avoid creating a full PodInfo, which is expensive to instantiate frequently.
+	return &framework.QueuedPodInfo{
+		PodInfo:              &framework.PodInfo{Pod: pod},
+		UnschedulablePlugins: sets.NewString(plugins...),
+	}
 }
 
 const queueClosed = "scheduling queue is closed"

@@ -79,6 +79,10 @@ func (s *Snapshot) NodeInfos() framework.NodeInfoLister {
 	return s
 }
 
+func (s *Snapshot) NumNodes() int {
+	return len(s.nodeInfoList)
+}
+
 func createNodeInfoMap(pods []*corev1.Pod, nodes []*corev1.Node) map[string]*framework.NodeInfo {
 	nodeNameToInfo := make(map[string]*framework.NodeInfo)
 	for _, pod := range pods {

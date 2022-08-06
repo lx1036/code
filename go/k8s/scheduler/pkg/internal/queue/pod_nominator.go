@@ -31,30 +31,47 @@ func NewPodNominator(podLister listersv1.PodLister) *PodNominator {
 }
 
 // AddNominatedPod INFO: @see Scheduler.handleSchedulingFailure()
-func (nominator *PodNominator) AddNominatedPod(pod *framework.PodInfo, nodeName string) {
+func (nominator *PodNominator) AddNominatedPod(pod *framework.PodInfo, nominatingInfo *framework.NominatingInfo) {
 	nominator.Lock()
 	defer nominator.Unlock()
-	nominator.add(pod, nodeName)
+	nominator.add(pod, nominatingInfo)
 }
 
-func (nominator *PodNominator) add(podInfo *framework.PodInfo, nodeName string) {
+func (nominator *PodNominator) add(podInfo *framework.PodInfo, nominatingInfo *framework.NominatingInfo) {
 	nominator.delete(podInfo.Pod)
 
-	nnn := nodeName
-	if len(nnn) == 0 {
-		nnn = podInfo.Pod.Status.NominatedNodeName
-		if len(nnn) == 0 {
+	var nodeName string
+	if nominatingInfo.Mode() == framework.ModeOverride {
+		nodeName = nominatingInfo.NominatedNodeName
+	} else if nominatingInfo.Mode() == framework.ModeNoop {
+		if podInfo.Pod.Status.NominatedNodeName == "" {
+			return
+		}
+		nodeName = podInfo.Pod.Status.NominatedNodeName
+	}
+
+	if nominator.podLister != nil {
+		// If the pod was removed or if it was already scheduled, don't nominate it.
+		updatedPod, err := nominator.podLister.Pods(podInfo.Pod.Namespace).Get(podInfo.Pod.Name)
+		if err != nil {
+			klog.V(4).InfoS("Pod doesn't exist in podLister, aborted adding it to the nominator", "pod", klog.KObj(podInfo.Pod))
+			return
+		}
+		if updatedPod.Spec.NodeName != "" {
+			klog.V(4).InfoS("Pod is already scheduled to a node, aborted adding it to the nominator", "pod",
+				klog.KObj(podInfo.Pod), "node", updatedPod.Spec.NodeName)
 			return
 		}
 	}
-	nominator.nominatedPodToNode[podInfo.Pod.UID] = nnn
-	for _, np := range nominator.nominatedPods[nnn] {
-		if np.Pod.UID == podInfo.Pod.UID {
-			klog.V(4).Infof("Pod %v/%v already exists in the nominated map!", podInfo.Pod.Namespace, podInfo.Pod.Name)
+
+	nominator.nominatedPodToNode[podInfo.Pod.UID] = nodeName
+	for _, npi := range nominator.nominatedPods[nodeName] {
+		if npi.Pod.UID == podInfo.Pod.UID {
+			klog.V(4).InfoS("Pod already exists in the nominator", "pod", klog.KObj(npi.Pod))
 			return
 		}
 	}
-	nominator.nominatedPods[nnn] = append(nominator.nominatedPods[nnn], podInfo)
+	nominator.nominatedPods[nodeName] = append(nominator.nominatedPods[nodeName], podInfo)
 }
 func (nominator *PodNominator) delete(pod *corev1.Pod) {
 	nnn, ok := nominator.nominatedPodToNode[pod.UID]

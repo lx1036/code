@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	configv1 "k8s-lx1036/k8s/scheduler/pkg/apis/config/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/framework"
@@ -16,16 +19,12 @@ import (
 	internalcache "k8s-lx1036/k8s/scheduler/pkg/internal/cache"
 	internalqueue "k8s-lx1036/k8s/scheduler/pkg/internal/queue"
 	"k8s-lx1036/k8s/scheduler/pkg/metrics"
-	"k8s-lx1036/k8s/scheduler/pkg/util"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 const (
@@ -54,8 +53,6 @@ type Scheduler struct {
 
 	NextPod func() *framework.QueuedPodInfo
 
-	// Error is called if there is an error. It is passed the pod in
-	// question, and the error
 	Error func(*framework.QueuedPodInfo, error)
 
 	// Close this to shut down the scheduler.
@@ -81,6 +78,8 @@ type Scheduler struct {
 	registry                 frameworkruntime.Registry
 	nodeInfoSnapshot         *internalcache.Snapshot
 	frameworkCapturer        FrameworkCapturer
+
+	nextStartNodeIndex int
 }
 
 type schedulerOptions struct {
@@ -109,7 +108,46 @@ var defaultSchedulerOptions = schedulerOptions{
 func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodLister,
 	podQueue *internalqueue.PriorityQueue, schedulerCache *internalcache.Cache) func(*framework.QueuedPodInfo, error) {
 	return func(podInfo *framework.QueuedPodInfo, err error) {
+		pod := podInfo.Pod
+		if err == ErrNoNodesAvailable {
+			klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
+		} else if fitError, ok := err.(*framework.FitError); ok {
+			// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
+			podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
+			klog.V(2).InfoS("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", err)
+		} else if apierrors.IsNotFound(err) {
+			klog.V(2).InfoS("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", err)
+			if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
+				nodeName := errStatus.Status().Details.Name
+				// when node is not found, We do not remove the node right away. Trying again to get
+				// the node and if the node is still not found, then remove it from the scheduler cache.
+				_, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+				if err != nil && apierrors.IsNotFound(err) {
+					node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+					if err := schedulerCache.RemoveNode(&node); err != nil {
+						klog.V(4).InfoS("Node is not found; failed to remove it from the cache", "node", node.Name)
+					}
+				}
+			}
+		} else {
+			klog.ErrorS(err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
+		}
 
+		// Check if the Pod exists in informer cache.
+		cachedPod, err := podLister.Pods(pod.Namespace).Get(pod.Name)
+		if err != nil {
+			klog.InfoS("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", err)
+			return
+		}
+		if len(cachedPod.Spec.NodeName) != 0 {
+			klog.InfoS("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
+			return
+		}
+		// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
+		podInfo.PodInfo = framework.NewPodInfo(cachedPod.DeepCopy())
+		if err := podQueue.AddUnschedulableIfNotPresent(podInfo, podQueue.SchedulingCycle()); err != nil {
+			klog.ErrorS(err, "Error occurred")
+		}
 	}
 }
 func WithProfiles(p ...configv1.KubeSchedulerProfile) Option {
@@ -250,47 +288,6 @@ func (scheduler *Scheduler) Run(ctx context.Context) {
 	scheduler.PriorityQueue.Run()
 	wait.UntilWithContext(ctx, scheduler.scheduleOne, 0) // block
 	scheduler.PriorityQueue.Close()
-}
-
-func (scheduler *Scheduler) recordSchedulingFailure(fwk *frameworkruntime.Framework, podInfo *framework.QueuedPodInfo,
-	err error, reason string, nominatedNode string) {
-	scheduler.Error(podInfo, err)
-
-	// Update the scheduling queue with the nominated pod information. Without
-	// this, there would be a race condition between the next scheduling cycle
-	// and the time the scheduler receives a Pod Update for the nominated pod.
-	// Here we check for nil only for tests.
-	if scheduler.PriorityQueue != nil {
-		scheduler.PriorityQueue.AddNominatedPod(podInfo.Pod, nominatedNode)
-	}
-
-	pod := podInfo.Pod
-	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", err.Error())
-	if err := updatePod(scheduler.client, pod, &v1.PodCondition{
-		Type:    v1.PodScheduled,
-		Status:  v1.ConditionFalse,
-		Reason:  reason,
-		Message: err.Error(),
-	}, nominatedNode); err != nil {
-		klog.Errorf("Error updating pod %s/%s: %v", pod.Namespace, pod.Name, err)
-	}
-}
-
-func updatePod(client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatedNode string) error {
-	klog.V(3).Infof("Updating pod condition for %s/%s to (%s==%s, Reason=%s)",
-		pod.Namespace, pod.Name, condition.Type, condition.Status, condition.Reason)
-	podCopy := pod.DeepCopy()
-	// NominatedNodeName is updated only if we are trying to set it, and the value is
-	// different from the existing one.
-	if !podutil.UpdatePodCondition(&podCopy.Status, condition) &&
-		(len(nominatedNode) == 0 || pod.Status.NominatedNodeName == nominatedNode) {
-		return nil
-	}
-	if nominatedNode != "" {
-		podCopy.Status.NominatedNodeName = nominatedNode
-	}
-
-	return util.PatchPod(client, pod, podCopy)
 }
 
 func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]framework.ActionType {

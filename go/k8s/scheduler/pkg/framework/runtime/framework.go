@@ -654,15 +654,231 @@ func (f *Framework) HasScorePlugins() bool {
 }
 
 func (f *Framework) RunPreScorePlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodes []*corev1.Node) *framework.Status {
-	panic("implement me")
+	var status *framework.Status
+	for _, pl := range f.preScorePlugins {
+		status = f.runPreScorePlugin(ctx, pl, state, pod, nodes)
+		if !status.IsSuccess() {
+			return framework.AsStatus(fmt.Errorf("running PreScore plugin %q: %w", pl.Name(), status.AsError()))
+		}
+	}
+
+	return nil
+}
+func (f *Framework) runPreScorePlugin(ctx context.Context, pl framework.PreScorePlugin, state *framework.CycleState, pod *corev1.Pod, nodes []*corev1.Node) *framework.Status {
+	return pl.PreScore(ctx, state, pod, nodes)
 }
 
 func (f *Framework) RunScorePlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodes []*corev1.Node) (framework.PluginToNodeScores, *framework.Status) {
-	panic("implement me")
+	pluginToNodeScores := make(framework.PluginToNodeScores, len(f.scorePlugins))
+	for _, pl := range f.scorePlugins {
+		pluginToNodeScores[pl.Name()] = make(framework.NodeScoreList, len(nodes))
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	errCh := parallelize.NewErrorChannel()
+	// Run Score method for each node in parallel.
+	f.Parallelizer().Until(ctx, len(nodes), func(index int) { // 总共有 16 个 worker
+		for _, pl := range f.scorePlugins {
+			nodeName := nodes[index].Name
+			s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
+			if !status.IsSuccess() {
+				err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
+				errCh.SendErrorWithCancel(err, cancel)
+				return
+			}
+			pluginToNodeScores[pl.Name()][index] = framework.NodeScore{
+				Name:  nodeName,
+				Score: s,
+			}
+		}
+	})
+	if err := errCh.ReceiveError(); err != nil {
+		return nil, framework.AsStatus(fmt.Errorf("running Score plugins: %w", err))
+	}
+
+	// Run NormalizeScore method for each ScorePlugin in parallel.
+	f.Parallelizer().Until(ctx, len(f.scorePlugins), func(index int) {
+		pl := f.scorePlugins[index]
+		nodeScoreList := pluginToNodeScores[pl.Name()]
+		if pl.ScoreExtensions() == nil {
+			return
+		}
+		status := f.runScoreExtension(ctx, pl, state, pod, nodeScoreList)
+		if !status.IsSuccess() {
+			err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
+			errCh.SendErrorWithCancel(err, cancel)
+			return
+		}
+	})
+	if err := errCh.ReceiveError(); err != nil {
+		return nil, framework.AsStatus(fmt.Errorf("running Normalize on Score plugins: %w", err))
+	}
+
+	// Apply score defaultWeights for each ScorePlugin in parallel.
+	f.Parallelizer().Until(ctx, len(f.scorePlugins), func(index int) {
+		pl := f.scorePlugins[index]
+		// Score plugins' weight has been checked when they are initialized.
+		weight := f.scorePluginWeight[pl.Name()]
+		nodeScoreList := pluginToNodeScores[pl.Name()]
+
+		for i, nodeScore := range nodeScoreList {
+			// return error if score plugin returns invalid score.
+			if nodeScore.Score > framework.MaxNodeScore || nodeScore.Score < framework.MinNodeScore {
+				err := fmt.Errorf("plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing", pl.Name(), nodeScore.Score, framework.MinNodeScore, framework.MaxNodeScore)
+				errCh.SendErrorWithCancel(err, cancel)
+				return
+			}
+			nodeScoreList[i].Score = nodeScore.Score * int64(weight)
+		}
+	})
+	if err := errCh.ReceiveError(); err != nil {
+		return nil, framework.AsStatus(fmt.Errorf("applying score defaultWeights on Score plugins: %w", err))
+	}
+
+	return pluginToNodeScores, nil
+}
+func (f *Framework) runScorePlugin(ctx context.Context, pl framework.ScorePlugin, state *framework.CycleState,
+	pod *corev1.Pod, nodeName string) (int64, *framework.Status) {
+	return pl.Score(ctx, state, pod, nodeName)
+}
+func (f *Framework) runScoreExtension(ctx context.Context, pl framework.ScorePlugin, state *framework.CycleState,
+	pod *corev1.Pod, nodeScoreList framework.NodeScoreList) *framework.Status {
+	return pl.ScoreExtensions().NormalizeScore(ctx, state, pod, nodeScoreList)
+}
+
+func (f *Framework) RunReservePluginsReserve(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
+	var status *framework.Status
+	for _, pl := range f.reservePlugins {
+		status = f.runReservePluginReserve(ctx, pl, state, pod, nodeName)
+		if !status.IsSuccess() {
+			err := status.AsError()
+			klog.ErrorS(err, "Failed running Reserve plugin", "plugin", pl.Name(), "pod", klog.KObj(pod))
+			return framework.AsStatus(fmt.Errorf("running Reserve plugin %q: %w", pl.Name(), err))
+		}
+	}
+	return nil
+}
+func (f *Framework) runReservePluginReserve(ctx context.Context, pl framework.ReservePlugin, state *framework.CycleState,
+	pod *corev1.Pod, nodeName string) *framework.Status {
+	return pl.Reserve(ctx, state, pod, nodeName)
+}
+
+func (f *Framework) RunReservePluginsUnreserve(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) {
+	// Execute the Unreserve operation of each reserve plugin in the
+	// *reverse* order in which the Reserve operation was executed.
+	for i := len(f.reservePlugins) - 1; i >= 0; i-- {
+		f.runReservePluginUnreserve(ctx, f.reservePlugins[i], state, pod, nodeName)
+	}
+}
+func (f *Framework) runReservePluginUnreserve(ctx context.Context, pl framework.ReservePlugin, state *framework.CycleState,
+	pod *corev1.Pod, nodeName string) {
+	pl.Unreserve(ctx, state, pod, nodeName)
+}
+
+const (
+	maxTimeout = 15 * time.Minute
+)
+
+func (f *Framework) RunPermitPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
+	pluginsWaitTime := make(map[string]time.Duration)
+	statusCode := framework.Success
+	for _, pl := range f.permitPlugins {
+		status, timeout := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
+		if !status.IsSuccess() {
+			if status.IsUnschedulable() {
+				klog.V(4).InfoS("Pod rejected by permit plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
+				status.SetFailedPlugin(pl.Name())
+				return status
+			}
+			if status.Code() == framework.Wait {
+				// Not allowed to be greater than maxTimeout.
+				if timeout > maxTimeout {
+					timeout = maxTimeout
+				}
+				pluginsWaitTime[pl.Name()] = timeout
+				statusCode = framework.Wait
+			} else {
+				err := status.AsError()
+				klog.ErrorS(err, "Failed running Permit plugin", "plugin", pl.Name(), "pod", klog.KObj(pod))
+				return framework.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err)).WithFailedPlugin(pl.Name())
+			}
+		}
+	}
+
+	if statusCode == framework.Wait {
+		waitingPod := newWaitingPod(pod, pluginsWaitTime)
+		f.waitingPods.add(waitingPod)
+		msg := fmt.Sprintf("one or more plugins asked to wait and no plugin rejected pod %q", pod.Name)
+		klog.V(4).InfoS("One or more plugins asked to wait and no plugin rejected pod", "pod", klog.KObj(pod))
+		return framework.NewStatus(framework.Wait, msg)
+	}
+	return nil
+}
+func (f *Framework) runPermitPlugin(ctx context.Context, pl framework.PermitPlugin, state *framework.CycleState,
+	pod *corev1.Pod, nodeName string) (*framework.Status, time.Duration) {
+	return pl.Permit(ctx, state, pod, nodeName)
+}
+
+// WaitOnPermit will block, if the pod is a waiting pod, until the waiting pod is rejected or allowed.
+func (f *Framework) WaitOnPermit(ctx context.Context, pod *corev1.Pod) *framework.Status {
+	waitingPod := f.waitingPods.get(pod.UID)
+	if waitingPod == nil {
+		return nil
+	}
+	defer f.waitingPods.remove(pod.UID)
+
+	status := <-waitingPod.status
+	if !status.IsSuccess() {
+		if status.IsUnschedulable() {
+			klog.V(4).InfoS("Pod rejected while waiting on permit", "pod", klog.KObj(pod), "status", status.Message())
+			status.SetFailedPlugin(status.FailedPlugin())
+			return status
+		}
+		err := status.AsError()
+		klog.ErrorS(err, "Failed waiting on permit for pod", "pod", klog.KObj(pod))
+		return framework.AsStatus(fmt.Errorf("waiting on permit for pod: %w", err)).WithFailedPlugin(status.FailedPlugin())
+	}
+	return nil
 }
 
 func (f *Framework) RunPreBindPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
-	panic("implement me")
+	var status *framework.Status
+	for _, pl := range f.preBindPlugins {
+		status = f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
+		if !status.IsSuccess() {
+			err := status.AsError()
+			klog.ErrorS(err, "Failed running PreBind plugin", "plugin", pl.Name(), "pod", klog.KObj(pod))
+			return framework.AsStatus(fmt.Errorf("running PreBind plugin %q: %w", pl.Name(), err))
+		}
+	}
+	return nil
+}
+func (f *Framework) runPreBindPlugin(ctx context.Context, pl framework.PreBindPlugin, state *framework.CycleState,
+	pod *corev1.Pod, nodeName string) *framework.Status {
+	return pl.PreBind(ctx, state, pod, nodeName)
+}
+
+func (f *Framework) RunBindPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
+	var status *framework.Status
+	if len(f.bindPlugins) == 0 {
+		return framework.NewStatus(framework.Skip, "")
+	}
+	for _, bp := range f.bindPlugins {
+		status = f.runBindPlugin(ctx, bp, state, pod, nodeName)
+		if status != nil && status.Code() == framework.Skip {
+			continue
+		}
+		if !status.IsSuccess() {
+			err := status.AsError()
+			klog.ErrorS(err, "Failed running Bind plugin", "plugin", bp.Name(), "pod", klog.KObj(pod))
+			return framework.AsStatus(fmt.Errorf("running Bind plugin %q: %w", bp.Name(), err))
+		}
+		return status
+	}
+	return status
+}
+func (f *Framework) runBindPlugin(ctx context.Context, pl framework.BindPlugin, state *framework.CycleState,
+	pod *corev1.Pod, nodeName string) *framework.Status {
+	return pl.Bind(ctx, state, pod, nodeName)
 }
 
 func (f *Framework) RunPostBindPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) {
@@ -672,24 +888,4 @@ func (f *Framework) RunPostBindPlugins(ctx context.Context, state *framework.Cyc
 }
 func (f *Framework) runPostBindPlugin(ctx context.Context, pl framework.PostBindPlugin, state *framework.CycleState, pod *corev1.Pod, nodeName string) {
 	pl.PostBind(ctx, state, pod, nodeName)
-}
-
-func (f *Framework) RunReservePluginsReserve(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
-	panic("implement me")
-}
-
-func (f *Framework) RunReservePluginsUnreserve(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) {
-	panic("implement me")
-}
-
-func (f *Framework) RunPermitPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
-	panic("implement me")
-}
-
-func (f *Framework) WaitOnPermit(ctx context.Context, pod *corev1.Pod) *framework.Status {
-	panic("implement me")
-}
-
-func (f *Framework) RunBindPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
-	panic("implement me")
 }
