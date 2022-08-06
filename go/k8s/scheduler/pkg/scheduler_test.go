@@ -1,18 +1,18 @@
 package pkg
 
 import (
-	"github.com/google/go-cmp/cmp"
-	schedulerapi "k8s-lx1036/k8s/scheduler/pkg/apis/config"
-	"k8s.io/client-go/tools/events"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"sort"
 	"strings"
 	"testing"
 
+	configv1 "k8s-lx1036/k8s/scheduler/pkg/apis/config/v1"
+	"k8s-lx1036/k8s/scheduler/pkg/framework/plugins/defaultbinder"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/framework/runtime"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/events"
 )
 
 func TestSchedulerNew(test *testing.T) {
@@ -33,14 +33,14 @@ func TestSchedulerNew(test *testing.T) {
 			opts: []Option{
 				WithFrameworkOutOfTreeRegistry(validRegistry),
 				WithProfiles(
-					schedulerapi.KubeSchedulerProfile{
+					configv1.KubeSchedulerProfile{
 						SchedulerName: "default-scheduler",
-						Plugins: &schedulerapi.Plugins{
-							QueueSort: schedulerapi.PluginSet{
-								Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}},
+						Plugins: &configv1.Plugins{
+							QueueSort: configv1.PluginSet{
+								Enabled: []configv1.Plugin{{Name: "PrioritySort"}},
 							},
-							Bind: schedulerapi.PluginSet{
-								Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}},
+							Bind: configv1.PluginSet{
+								Enabled: []configv1.Plugin{{Name: "DefaultBinder"}},
 							},
 						},
 					},
@@ -52,11 +52,11 @@ func TestSchedulerNew(test *testing.T) {
 			opts: []Option{
 				WithFrameworkOutOfTreeRegistry(invalidRegistry),
 				WithProfiles(
-					schedulerapi.KubeSchedulerProfile{
+					configv1.KubeSchedulerProfile{
 						SchedulerName: "default-scheduler",
-						Plugins: &schedulerapi.Plugins{
-							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
-							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						Plugins: &configv1.Plugins{
+							QueueSort: configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "PrioritySort"}}},
+							Bind:      configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "DefaultBinder"}}},
 						},
 					},
 				)},
@@ -67,18 +67,18 @@ func TestSchedulerNew(test *testing.T) {
 			name: "multiple profiles",
 			opts: []Option{
 				WithProfiles(
-					schedulerapi.KubeSchedulerProfile{
+					configv1.KubeSchedulerProfile{
 						SchedulerName: "foo",
-						Plugins: &schedulerapi.Plugins{
-							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
-							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						Plugins: &configv1.Plugins{
+							QueueSort: configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "PrioritySort"}}},
+							Bind:      configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "DefaultBinder"}}},
 						},
 					},
-					schedulerapi.KubeSchedulerProfile{
+					configv1.KubeSchedulerProfile{
 						SchedulerName: "bar",
-						Plugins: &schedulerapi.Plugins{
-							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
-							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						Plugins: &configv1.Plugins{
+							QueueSort: configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "PrioritySort"}}},
+							Bind:      configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "DefaultBinder"}}},
 						},
 					},
 				)},
@@ -88,25 +88,25 @@ func TestSchedulerNew(test *testing.T) {
 			name: "Repeated profiles",
 			opts: []Option{
 				WithProfiles(
-					schedulerapi.KubeSchedulerProfile{
+					configv1.KubeSchedulerProfile{
 						SchedulerName: "foo",
-						Plugins: &schedulerapi.Plugins{
-							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
-							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						Plugins: &configv1.Plugins{
+							QueueSort: configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "PrioritySort"}}},
+							Bind:      configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "DefaultBinder"}}},
 						},
 					},
-					schedulerapi.KubeSchedulerProfile{
+					configv1.KubeSchedulerProfile{
 						SchedulerName: "bar",
-						Plugins: &schedulerapi.Plugins{
-							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
-							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						Plugins: &configv1.Plugins{
+							QueueSort: configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "PrioritySort"}}},
+							Bind:      configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "DefaultBinder"}}},
 						},
 					},
-					schedulerapi.KubeSchedulerProfile{
+					configv1.KubeSchedulerProfile{
 						SchedulerName: "foo",
-						Plugins: &schedulerapi.Plugins{
-							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
-							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						Plugins: &configv1.Plugins{
+							QueueSort: configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "PrioritySort"}}},
+							Bind:      configv1.PluginSet{Enabled: []configv1.Plugin{{Name: "DefaultBinder"}}},
 						},
 					},
 				)},

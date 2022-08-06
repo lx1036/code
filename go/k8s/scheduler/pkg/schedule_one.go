@@ -51,8 +51,8 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	scheduleResult, err := scheduler.schedulePod(schedulingCycleCtx, fwk, state, pod)
-	if err != nil { // INFO: 如果pod调度失败，则调用 PostFilter plugin 进行抢占
+	scheduleResult, err := scheduler.SchedulePod(schedulingCycleCtx, fwk, state, pod) // for test case
+	if err != nil {                                                                   // INFO: 如果pod调度失败，则调用 PostFilter plugin 进行抢占
 		nominatedNode := ""
 		if fitError, ok := err.(framework.FitError); ok {
 			if !fwk.HasPostFilterPlugins() {

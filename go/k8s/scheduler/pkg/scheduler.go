@@ -10,8 +10,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"time"
 
-	"k8s-lx1036/k8s/scheduler/pkg/apis/config"
-	"k8s-lx1036/k8s/scheduler/pkg/core"
 	"k8s-lx1036/k8s/scheduler/pkg/framework"
 	frameworkplugins "k8s-lx1036/k8s/scheduler/pkg/framework/plugins"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/framework/runtime"
@@ -28,7 +26,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 const (
@@ -44,7 +41,7 @@ func init() {
 }
 
 // FrameworkCapturer is used for registering a notify function in building framework.
-type FrameworkCapturer func(config.KubeSchedulerProfile)
+type FrameworkCapturer func(configv1.KubeSchedulerProfile)
 
 type Scheduler struct {
 	Frameworks frameworkruntime.Frameworks
@@ -52,16 +49,9 @@ type Scheduler struct {
 	SchedulerCache *internalcache.Cache
 	PriorityQueue  *internalqueue.PriorityQueue
 
-	SchedulePod func(ctx context.Context, fwk framework.Framework,
+	SchedulePod func(ctx context.Context, fwk *frameworkruntime.Framework,
 		state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error)
 
-	// INFO: 类似 iptables，把各个hooks串起来
-	Algorithm core.ScheduleAlgorithm
-
-	// NextPod should be a function that blocks until the next pod
-	// is available. We don't use a channel for this, because scheduling
-	// a pod may take some amount of time and we don't want pods to get
-	// stale while they sit in a channel.
 	NextPod func() *framework.QueuedPodInfo
 
 	// Error is called if there is an error. It is passed the pod in
@@ -75,7 +65,7 @@ type Scheduler struct {
 
 	client clientset.Interface
 
-	profiles                 []config.KubeSchedulerProfile
+	profiles                 []configv1.KubeSchedulerProfile
 	podInitialBackoffSeconds int64
 	podMaxBackoffSeconds     int64
 	//recorderFactory profile.RecorderFactory
@@ -95,14 +85,14 @@ type Scheduler struct {
 
 type schedulerOptions struct {
 	kubeConfig               *restclient.Config
-	schedulerAlgorithmSource config.SchedulerAlgorithmSource
+	schedulerAlgorithmSource configv1.SchedulerAlgorithmSource
 	percentageOfNodesToScore int32
 	podInitialBackoffSeconds int64
 	podMaxBackoffSeconds     int64
 	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry frameworkruntime.Registry
-	profiles                   []config.KubeSchedulerProfile
-	extenders                  []config.Extender
+	profiles                   []configv1.KubeSchedulerProfile
+	extenders                  []configv1.Extender
 	frameworkCapturer          FrameworkCapturer
 	parallelism                int32 // sets the parallelism for all scheduler algorithms. Default is 16.
 }
@@ -122,6 +112,42 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 
 	}
 }
+func WithProfiles(p ...configv1.KubeSchedulerProfile) Option {
+	return func(o *schedulerOptions) {
+		o.profiles = p
+	}
+}
+
+func WithPercentageOfNodesToScore(percentageOfNodesToScore int32) Option {
+	return func(o *schedulerOptions) {
+		o.percentageOfNodesToScore = percentageOfNodesToScore
+	}
+}
+
+func WithFrameworkOutOfTreeRegistry(registry frameworkruntime.Registry) Option {
+	return func(o *schedulerOptions) {
+		o.frameworkOutOfTreeRegistry = registry
+	}
+}
+
+func WithPodInitialBackoffSeconds(podInitialBackoffSeconds int64) Option {
+	return func(o *schedulerOptions) {
+		o.podInitialBackoffSeconds = podInitialBackoffSeconds
+	}
+}
+
+func WithPodMaxBackoffSeconds(podMaxBackoffSeconds int64) Option {
+	return func(o *schedulerOptions) {
+		o.podMaxBackoffSeconds = podMaxBackoffSeconds
+	}
+}
+
+// WithParallelism sets the parallelism for all scheduler algorithms. Default is 16.
+func WithParallelism(threads int32) Option {
+	return func(o *schedulerOptions) {
+		o.parallelism = threads
+	}
+}
 
 func New(
 	client clientset.Interface,
@@ -129,8 +155,7 @@ func New(
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	recorderFactory frameworkruntime.RecorderFactory,
 	stopCh <-chan struct{}, opts ...Option) (*Scheduler, error) {
-	// INFO: scheduler提供了一套扩展机制 scheduler-framework，用来可以合并 out-of-tree registry plugins，其实也比较简单!!!
-	//  (1)merge registry plugin
+	// INFO: (1)merge registry plugin, scheduler提供了一套扩展机制 scheduler-framework，用来可以合并 out-of-tree registry plugins，其实也比较简单!!!
 	stopEverything := stopCh
 	if stopEverything == nil {
 		stopEverything = wait.NeverStop
@@ -217,19 +242,17 @@ func newScheduler(
 		nodeInfoSnapshot:         nodeInfoSnapshot,
 		percentageOfNodesToScore: percentageOfNodesToScore,
 	}
-	sched.SchedulePod = sched.schedulePod
+	sched.SchedulePod = sched.schedulePod // for test case
 	return &sched
 }
 
 func (scheduler *Scheduler) Run(ctx context.Context) {
 	scheduler.PriorityQueue.Run()
-	wait.UntilWithContext(ctx, scheduler.scheduleOne, 0)
+	wait.UntilWithContext(ctx, scheduler.scheduleOne, 0) // block
 	scheduler.PriorityQueue.Close()
 }
 
-// recordSchedulingFailure records an event for the pod that indicates the
-// pod has failed to schedule. Also, update the pod condition and nominated node name if set.
-func (scheduler *Scheduler) recordSchedulingFailure(prof *frameworkruntime.Framework, podInfo *framework.QueuedPodInfo,
+func (scheduler *Scheduler) recordSchedulingFailure(fwk *frameworkruntime.Framework, podInfo *framework.QueuedPodInfo,
 	err error, reason string, nominatedNode string) {
 	scheduler.Error(podInfo, err)
 
@@ -242,8 +265,7 @@ func (scheduler *Scheduler) recordSchedulingFailure(prof *frameworkruntime.Frame
 	}
 
 	pod := podInfo.Pod
-	//msg := truncateMessage(err.Error())
-	//prof.Recorder.Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", err.Error())
 	if err := updatePod(scheduler.client, pod, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
@@ -252,16 +274,6 @@ func (scheduler *Scheduler) recordSchedulingFailure(prof *frameworkruntime.Frame
 	}, nominatedNode); err != nil {
 		klog.Errorf("Error updating pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
-}
-
-// truncateMessage truncates a message if it hits the NoteLengthLimit.
-func truncateMessage(message string) string {
-	max := validation.NoteLengthLimit
-	if len(message) <= max {
-		return message
-	}
-	suffix := " ..."
-	return message[:max-len(suffix)] + suffix
 }
 
 func updatePod(client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatedNode string) error {
@@ -279,43 +291,6 @@ func updatePod(client clientset.Interface, pod *v1.Pod, condition *v1.PodConditi
 	}
 
 	return util.PatchPod(client, pod, podCopy)
-}
-
-func WithProfiles(p ...config.KubeSchedulerProfile) Option {
-	return func(o *schedulerOptions) {
-		o.profiles = p
-	}
-}
-
-func WithPercentageOfNodesToScore(percentageOfNodesToScore int32) Option {
-	return func(o *schedulerOptions) {
-		o.percentageOfNodesToScore = percentageOfNodesToScore
-	}
-}
-
-func WithFrameworkOutOfTreeRegistry(registry frameworkruntime.Registry) Option {
-	return func(o *schedulerOptions) {
-		o.frameworkOutOfTreeRegistry = registry
-	}
-}
-
-func WithPodInitialBackoffSeconds(podInitialBackoffSeconds int64) Option {
-	return func(o *schedulerOptions) {
-		o.podInitialBackoffSeconds = podInitialBackoffSeconds
-	}
-}
-
-func WithPodMaxBackoffSeconds(podMaxBackoffSeconds int64) Option {
-	return func(o *schedulerOptions) {
-		o.podMaxBackoffSeconds = podMaxBackoffSeconds
-	}
-}
-
-// WithParallelism sets the parallelism for all scheduler algorithms. Default is 16.
-func WithParallelism(threads int32) Option {
-	return func(o *schedulerOptions) {
-		o.parallelism = threads
-	}
 }
 
 func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]framework.ActionType {
