@@ -389,10 +389,6 @@ func (f *Framework) getExtensionPoints(plugins *configv1.Plugins) []extensionPoi
 	}
 }
 
-// SnapshotSharedLister returns the scheduler's SharedLister of the latest NodeInfo
-// snapshot. The snapshot is taken at the beginning of a scheduling cycle and remains
-// unchanged until a pod finishes "Reserve". There is no guarantee that the information
-// remains unchanged after "Reserve".
 func (f *Framework) SnapshotSharedLister() framework.SharedLister {
 	return f.snapshotSharedLister
 }
@@ -413,23 +409,37 @@ func (f *Framework) RejectWaitingPod(uid types.UID) {
 }
 
 func (f *Framework) ClientSet() clientset.Interface {
-	panic("implement me")
+	return f.clientSet
 }
 
 func (f *Framework) EventRecorder() events.EventRecorder {
-	panic("implement me")
+	return f.eventRecorder
 }
 
 func (f *Framework) SharedInformerFactory() informers.SharedInformerFactory {
-	panic("implement me")
+	return f.informerFactory
 }
 
-func (f *Framework) PreemptHandle() framework.PreemptHandle {
-	panic("implement me")
-}
-
-func (f *Framework) ListPlugins() map[string][]configv1.Plugin {
-	panic("implement me")
+func (f *Framework) ListPlugins() *configv1.Plugins {
+	m := configv1.Plugins{}
+	for _, e := range f.getExtensionPoints(&m) {
+		plugins := reflect.ValueOf(e.slicePtr).Elem()
+		extName := plugins.Type().Elem().Name()
+		var cfgs []configv1.Plugin
+		for i := 0; i < plugins.Len(); i++ {
+			name := plugins.Index(i).Interface().(framework.Plugin).Name()
+			p := configv1.Plugin{Name: name}
+			if extName == "ScorePlugin" {
+				// Weights apply only to score plugins.
+				p.Weight = int32(f.scorePluginWeight[name])
+			}
+			cfgs = append(cfgs, p)
+		}
+		if len(cfgs) > 0 {
+			e.plugins.Enabled = cfgs
+		}
+	}
+	return &m
 }
 
 func (f *Framework) QueueSortFunc() framework.LessFunc {
@@ -444,7 +454,7 @@ func (f *Framework) QueueSortFunc() framework.LessFunc {
 }
 
 func (f *Framework) HasFilterPlugins() bool {
-	panic("implement me")
+	return len(f.filterPlugins) != 0
 }
 
 func (f *Framework) HasPostFilterPlugins() bool {
@@ -587,7 +597,14 @@ func (f *Framework) RunFilterPlugins(ctx context.Context, state *framework.Cycle
 	for _, pl := range f.filterPlugins {
 		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
 		if !pluginStatus.IsSuccess() {
-
+			if !pluginStatus.IsUnschedulable() {
+				// Filter plugins are not supposed to return any status other than
+				// Success or Unschedulable.
+				errStatus := framework.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), pluginStatus.AsError())).WithFailedPlugin(pl.Name())
+				return map[string]*framework.Status{pl.Name(): errStatus}
+			}
+			pluginStatus.SetFailedPlugin(pl.Name())
+			statuses[pl.Name()] = pluginStatus
 		}
 	}
 
@@ -629,7 +646,7 @@ func (f *Framework) runPostFilterPlugin(ctx context.Context, pl framework.PostFi
 }
 
 func (f *Framework) HasScorePlugins() bool {
-	panic("implement me")
+	return len(f.scorePlugins) != 0
 }
 
 func (f *Framework) RunPreScorePlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodes []*corev1.Node) *framework.Status {

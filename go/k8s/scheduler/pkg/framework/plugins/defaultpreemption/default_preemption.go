@@ -69,7 +69,7 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 		return nil, framework.NewStatus(framework.Error, err.Error())
 	}
 	if bestCandidate == "" {
-		return nil, framework.NewStatus(framework.Unschedulable)
+		return framework.NewPostFilterResultWithNominatedNode(""), framework.NewStatus(framework.Unschedulable)
 	}
 
 	return framework.NewPostFilterResultWithNominatedNode(bestCandidate), framework.NewStatus(framework.Success)
@@ -89,7 +89,7 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 
 	// INFO:(2) Find all preemption candidates.
 	candidates, _, err := pl.findCandidates(ctx, pod, nodeStatus, state)
-	if err != nil && len(candidates) == 0 {
+	if err != nil || len(candidates) == 0 {
 		return "", err
 	}
 

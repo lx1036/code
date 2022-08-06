@@ -3,6 +3,7 @@ package framework
 import (
 	"errors"
 	"fmt"
+	"k8s.io/klog/v2"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -292,10 +293,100 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 	}
 }
 
-// RemovePod subtracts pod information from this NodeInfo.
+func removeFromSlice(s []*PodInfo, k string) []*PodInfo {
+	for i := range s {
+		k2, err := GetPodKey(s[i].Pod)
+		if err != nil {
+			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod))
+			continue
+		}
+		if k == k2 {
+			// delete the element
+			s[i] = s[len(s)-1]
+			s = s[:len(s)-1]
+			break
+		}
+	}
+	return s
+}
+
 func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
-	// TODO:
-	return nil
+	k, err := GetPodKey(pod)
+	if err != nil {
+		return err
+	}
+	if podWithAffinity(pod) {
+		n.PodsWithAffinity = removeFromSlice(n.PodsWithAffinity, k)
+	}
+	if podWithRequiredAntiAffinity(pod) {
+		n.PodsWithRequiredAntiAffinity = removeFromSlice(n.PodsWithRequiredAntiAffinity, k)
+	}
+
+	for i := range n.Pods {
+		k2, err := GetPodKey(n.Pods[i].Pod)
+		if err != nil {
+			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(n.Pods[i].Pod))
+			continue
+		}
+		if k == k2 {
+			// delete the element
+			n.Pods[i] = n.Pods[len(n.Pods)-1]
+			n.Pods = n.Pods[:len(n.Pods)-1]
+			// reduce the resource data
+			res, non0CPU, non0Mem := calculateResource(pod)
+			n.Requested.MilliCPU -= res.MilliCPU
+			n.Requested.Memory -= res.Memory
+			n.Requested.EphemeralStorage -= res.EphemeralStorage
+			if len(res.ScalarResources) > 0 && n.Requested.ScalarResources == nil {
+				n.Requested.ScalarResources = map[v1.ResourceName]int64{}
+			}
+			for rName, rQuant := range res.ScalarResources {
+				n.Requested.ScalarResources[rName] -= rQuant
+			}
+			n.NonZeroRequested.MilliCPU -= non0CPU
+			n.NonZeroRequested.Memory -= non0Mem
+
+			// Release ports when remove Pods.
+			n.updateUsedPorts(pod, false)
+			n.updatePVCRefCounts(pod, false)
+
+			n.Generation = nextGeneration()
+			n.resetSlicesIfEmpty()
+			return nil
+		}
+	}
+	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
+}
+
+func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
+	for _, v := range pod.Spec.Volumes {
+		if v.PersistentVolumeClaim == nil {
+			continue
+		}
+
+		key := pod.Namespace + "/" + v.PersistentVolumeClaim.ClaimName
+		if add {
+			n.PVCRefCounts[key] += 1
+		} else {
+			n.PVCRefCounts[key] -= 1
+			if n.PVCRefCounts[key] <= 0 {
+				delete(n.PVCRefCounts, key)
+			}
+		}
+	}
+}
+
+// resets the slices to nil so that we can do DeepEqual in unit tests.
+func (n *NodeInfo) resetSlicesIfEmpty() {
+	if len(n.PodsWithAffinity) == 0 {
+		n.PodsWithAffinity = nil
+	}
+	if len(n.PodsWithRequiredAntiAffinity) == 0 {
+		n.PodsWithRequiredAntiAffinity = nil
+	}
+	if len(n.Pods) == 0 {
+		n.Pods = nil
+	}
 }
 
 // SetNode sets the overall node information.

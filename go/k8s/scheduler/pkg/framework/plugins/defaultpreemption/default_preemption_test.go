@@ -62,7 +62,7 @@ func TestDryRunPreemption(test *testing.T) {
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*corev1.Pod{
-				schedulertesting.MakePod().Name("p").UID("p").Priority(highPriority).Obj(),
+				schedulertesting.MakePod().Name("p0").UID("p0").Priority(highPriority).Obj(),
 			},
 			initPods: []*corev1.Pod{
 				schedulertesting.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj(),
@@ -196,7 +196,7 @@ func TestPostFilter(test *testing.T) {
 		wantStatus            *framework.Status
 	}{
 		{
-			name: "pod with higher priority can be made schedulable",
+			name: "pod with higher priority can preempt", // INFO: node1 不可调度，p0 pod 高优先级，抢占 p1 pod
 			pod:  schedulertesting.MakePod().Name("p0").UID("p").Namespace(corev1.NamespaceDefault).Priority(highPriority).Obj(),
 			pods: []*corev1.Pod{
 				schedulertesting.MakePod().Name("p1").UID("p1").Namespace(corev1.NamespaceDefault).Node("node1").Obj(),
@@ -210,6 +210,54 @@ func TestPostFilter(test *testing.T) {
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
 			wantStatus: framework.NewStatus(framework.Success), // pod p0 抢占成功，抢占 [node1][p1] p1 pod
 		},
+		{
+			name: "pod with low priority can not preempt", // INFO: node1 不可调度，p0 pod 低优先级，不能抢占 p1 pod
+			pod:  schedulertesting.MakePod().Name("p0").UID("p0").Namespace(corev1.NamespaceDefault).Obj(),
+			pods: []*corev1.Pod{
+				schedulertesting.MakePod().Name("p1").UID("p1").Namespace(corev1.NamespaceDefault).Node("node1").Obj(),
+			},
+			nodes: []*corev1.Node{
+				schedulertesting.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"node1": framework.NewStatus(framework.Unschedulable),
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
+			wantStatus: framework.NewStatus(framework.Unschedulable),
+		},
+		{
+			name: "filteredNodesStatuses is UnschedulableAndUnresolvable, can not preempt", // INFO: node1 不可调度且 Unresolvable, 尽管 p0 pod 高优先级，但是不可抢占 p1 pod
+			pod:  schedulertesting.MakePod().Name("p0").UID("p0").Namespace(corev1.NamespaceDefault).Priority(highPriority).Obj(),
+			pods: []*corev1.Pod{
+				schedulertesting.MakePod().Name("p1").UID("p1").Namespace(corev1.NamespaceDefault).Node("node1").Obj(),
+			},
+			nodes: []*corev1.Node{
+				schedulertesting.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable),
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
+			wantStatus: framework.NewStatus(framework.Unschedulable),
+		},
+		{
+			name: "pod can be made schedulable on one node", // INFO: 中优先级 p0, 可以抢占 p2 in node2
+			pod:  schedulertesting.MakePod().Name("p0").UID("p0").Namespace(corev1.NamespaceDefault).Priority(midPriority).Obj(),
+			pods: []*corev1.Pod{
+				schedulertesting.MakePod().Name("p1").UID("p1").Namespace(corev1.NamespaceDefault).Priority(highPriority).Node("node1").Obj(),
+				schedulertesting.MakePod().Name("p2").UID("p2").Namespace(corev1.NamespaceDefault).Priority(lowPriority).Node("node2").Obj(),
+			},
+			nodes: []*corev1.Node{
+				schedulertesting.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+				schedulertesting.MakeNode().Name("node2").Capacity(onePodRes).Obj(),
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"node1": framework.NewStatus(framework.Unschedulable),
+				"node2": framework.NewStatus(framework.Unschedulable),
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
+			wantStatus: framework.NewStatus(framework.Success),
+		},
 	}
 	for _, fixture := range fixtures {
 		test.Run(fixture.name, func(t *testing.T) {
@@ -220,8 +268,7 @@ func TestPostFilter(test *testing.T) {
 			for i := range fixture.pods {
 				podInformer.GetStore().Add(fixture.pods[i])
 			}
-			// As we use a bare clientset above, it's needed to add a reactor here
-			// to not fail Victims deletion logic.
+			// INFO: 抢占成功，会 delete victim pod，这里 mock 掉
 			clientSet.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				return true, nil, nil
 			})

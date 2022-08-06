@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -243,14 +245,6 @@ type PermitPlugin interface {
 	Permit(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (*Status, time.Duration)
 }
 
-var statusPrecedence = map[Code]int{
-	Error:                        3,
-	UnschedulableAndUnresolvable: 2,
-	Unschedulable:                1,
-	// Any other statuses we know today, `Skip` or `Wait`, will take precedence over `Success`.
-	Success: -1,
-}
-
 type PluginToStatus map[string]*Status
 
 func (p PluginToStatus) Merge() *Status {
@@ -283,6 +277,17 @@ type PluginToNodeScores map[string]NodeScoreList
 // NodeScoreList declares a list of nodes and their scores.
 type NodeScoreList []NodeScore
 
+const (
+	// MaxNodeScore is the maximum score a Score plugin is expected to return.
+	MaxNodeScore int64 = 100
+
+	// MinNodeScore is the minimum score a Score plugin is expected to return.
+	MinNodeScore int64 = 0
+
+	// MaxTotalScore is the maximum total score.
+	MaxTotalScore int64 = math.MaxInt64
+)
+
 // NodeScore is a struct with node name and score.
 type NodeScore struct {
 	Name  string
@@ -292,13 +297,6 @@ type NodeScore struct {
 // Code is the Status code/type which is returned from plugins.
 type Code int
 
-var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip"}
-
-func (c Code) String() string {
-	return codes[c]
-}
-
-// These are predefined codes used in a Status.
 const (
 	// Success means that plugin ran correctly and found pod schedulable.
 	// NOTE: A nil status is also considered as "Success".
@@ -321,20 +319,19 @@ const (
 	Skip
 )
 
-const (
-	// MaxNodeScore is the maximum score a Score plugin is expected to return.
-	MaxNodeScore int64 = 100
+var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip"}
+var statusPrecedence = map[Code]int{
+	Error:                        3,
+	UnschedulableAndUnresolvable: 2,
+	Unschedulable:                1,
+	// Any other statuses we know today, `Skip` or `Wait`, will take precedence over `Success`.
+	Success: -1,
+}
 
-	// MinNodeScore is the minimum score a Score plugin is expected to return.
-	MinNodeScore int64 = 0
+func (c Code) String() string {
+	return codes[c]
+}
 
-	// MaxTotalScore is the maximum total score.
-	MaxTotalScore int64 = math.MaxInt64
-)
-
-// Status indicates the result of running a plugin. It consists of a code and a
-// message. When the status code is not `Success`, the reasons should explain why.
-// NOTE: A nil Status is also considered as Success.
 type Status struct {
 	code         Code
 	reasons      []string
@@ -354,6 +351,18 @@ func AsStatus(err error) *Status {
 		reasons: []string{err.Error()},
 		err:     err,
 	}
+}
+func (s *Status) Equal(x *Status) bool { // INFO: 必须实现 Equal() 接口函数，才能使用 cmp.Diff(fixture.wantStatus, gotStatus)
+	if s == nil || x == nil {
+		return s.IsSuccess() && x.IsSuccess()
+	}
+	if s.code != x.code {
+		return false
+	}
+	if s.code == Error {
+		return cmp.Equal(s.err, x.err, cmpopts.EquateErrors())
+	}
+	return cmp.Equal(s.reasons, x.reasons)
 }
 func (s *Status) SetFailedPlugin(plugin string) {
 	s.failedPlugin = plugin
