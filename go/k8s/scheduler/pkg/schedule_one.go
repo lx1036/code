@@ -3,14 +3,27 @@ package pkg
 import (
 	"context"
 	"fmt"
+	v1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
+	internalqueue "k8s-lx1036/k8s/scheduler/pkg/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"math/rand"
+	"time"
 
 	"k8s-lx1036/k8s/scheduler/pkg/framework"
 	frameworkruntime "k8s-lx1036/k8s/scheduler/pkg/framework/runtime"
 
 	corev1 "k8s.io/api/core/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
+)
+
+const (
+	SchedulerError = "SchedulerError"
+)
+
+var (
+	ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
+	clearNominatedNode  = &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: ""}
 )
 
 // ScheduleResult represents the result of scheduling a pod.
@@ -26,17 +39,14 @@ type ScheduleResult struct {
 
 func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 	podInfo := scheduler.NextPod()
-	// pod could be nil when schedulerQueue is closed
 	if podInfo == nil || podInfo.Pod == nil {
 		return
 	}
 	pod := podInfo.Pod
 	fwk, err := scheduler.frameworkForPod(pod)
 	if err != nil {
-		// This shouldn't happen, because we only accept for scheduling the pods
-		// which specify a scheduler name that matches one of the profiles.
 		klog.Error(err)
-		return
+		return // skip to schedule this pod
 	}
 	if scheduler.skipPodSchedule(fwk, pod) {
 		return
@@ -44,108 +54,197 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 
 	klog.Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 
-	// INFO: 由 schedule algo 来串起来并实际执行各个plugins
-	//start := time.Now()
+	// INFO: (1) PreFilter/Filter
+	//  (2) PreScore/Score
 	state := framework.NewCycleState()
-	// INFO: 这里逻辑只有10%概率记录 plugin metrics
-	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
+	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent) // INFO: 这里逻辑只有10%概率记录 plugin metrics
+	podsToActivate := framework.NewPodsToActivate()
+	state.Write(framework.PodsToActivateKey, podsToActivate)
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	scheduleResult, err := scheduler.SchedulePod(schedulingCycleCtx, fwk, state, pod) // for test case
-	if err != nil {                                                                   // INFO: 如果pod调度失败，则调用 PostFilter plugin 进行抢占
-		nominatedNode := ""
-		if fitError, ok := err.(framework.FitError); ok {
+	if err != nil {
+		// INFO: (3) 如果pod调度失败，则调用 PostFilter plugin 进行抢占
+		var nominatingInfo *framework.NominatingInfo
+		if fitError, ok := err.(*framework.FitError); ok {
 			if !fwk.HasPostFilterPlugins() {
 				klog.V(3).Infof("No PostFilter plugins are registered, so no preemption will be performed.")
 			} else {
 				// INFO: PostFilter plugin 其实就是 defaultpreemption.Name plugin，运行 preemption plugin
-				result, status := fwk.RunPostFilterPlugins(ctx, state, pod, fitError.FilteredNodesStatuses)
+				result, status := fwk.RunPostFilterPlugins(ctx, state, pod, fitError.Diagnosis.NodeToStatusMap)
 				if status.Code() == framework.Error {
 					klog.Errorf("Status after running PostFilter plugins for pod %v/%v: %v", pod.Namespace, pod.Name, status)
 				} else {
+					fitError.Diagnosis.PostFilterMsg = status.Message()
 					klog.V(5).Infof("Status after running PostFilter plugins for pod %v/%v: %v", pod.Namespace, pod.Name, status)
 				}
 				if status.IsSuccess() && result != nil {
 					// INFO: 如果抢占成功，则去更新 pod.Status.NominatedNodeName，但是这次调度周期不会立刻更新 pod.Spec.nodeName，
 					// 等待下次调度周期去调度。同时，下次调度周期时 pod.Spec.nodeName 未必就是 pod.Status.NominatedNodeName 这个 node
 					// 可以去看 k8s.io/api/core/v1/types.go::NominatedNodeName 字段定义描述
-					nominatedNode = result.NominatedNodeName
+					nominatingInfo = result.NominatingInfo
 				}
 			}
 			// metrics
-		} else if err == framework.ErrNoNodesAvailable {
-
+		} else if err == ErrNoNodesAvailable {
+			nominatingInfo = clearNominatedNode
 		} else {
+			nominatingInfo = clearNominatedNode
 			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))
+			//metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
 		}
 
 		// INFO: 更新 pod.Status.NominatedNodeName，以及更新 pod.Status.Conditions 便于展示信息
-		scheduler.recordSchedulingFailure(framework, podInfo, err, corev1.PodReasonUnschedulable, nominatedNode)
-
+		scheduler.handleSchedulingFailure(fwk, podInfo, err, corev1.PodReasonUnschedulable, nominatingInfo)
 		return
 	}
 
-	// Run the Reserve method of reserve plugins.
+	// INFO: 已经经过预选和优选，在下一步进入 bind(异步的) 之前，预先假定认为 assume 该 pod 已经 bind 了，防止出现问题，这么做的原因是 bind 是异步的
+	//  设置 pod.Spec.NodeName = scheduleResult.SuggestedHost
+	assumedPodInfo := podInfo.DeepCopy()
+	assumedPod := assumedPodInfo.Pod
+	err = scheduler.assume(assumedPod, scheduleResult.SuggestedHost)
+	if err != nil {
+		//metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
+		scheduler.handleSchedulingFailure(fwk, assumedPodInfo, err, SchedulerError, clearNominatedNode)
+		return
+	}
+
+	// INFO: (4) Reserve(目前只有 VolumeBinding plugin)
 	if sts := fwk.RunReservePluginsReserve(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost); !sts.IsSuccess() {
-		metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
-		// trigger un-reserve to clean up state associated with the reserved Pod
+		//metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
 		fwk.RunReservePluginsUnreserve(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-		if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
+		if forgetErr := scheduler.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
 			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
 		}
-		sched.handleSchedulingFailure(fwk, assumedPodInfo, sts.AsError(), SchedulerError, clearNominatedNode)
+		scheduler.handleSchedulingFailure(fwk, assumedPodInfo, sts.AsError(), SchedulerError, clearNominatedNode)
 		return
 	}
 
-	// Run "permit" plugins.
+	// INFO: (5) Permit(目前还没有对应的 plugin)
 	runPermitStatus := fwk.RunPermitPlugins(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 	if runPermitStatus.Code() != framework.Wait && !runPermitStatus.IsSuccess() {
-
+		var reason string
+		if runPermitStatus.IsUnschedulable() {
+			//metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
+			reason = corev1.PodReasonUnschedulable
+		} else {
+			//metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
+			reason = SchedulerError
+		}
+		fwk.RunReservePluginsUnreserve(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+		if forgetErr := scheduler.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
+			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
+		}
+		scheduler.handleSchedulingFailure(fwk, assumedPodInfo, runPermitStatus.AsError(), reason, clearNominatedNode)
+		return
 	}
 
-	// 启动goroutine执行bind操作
+	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
+	if len(podsToActivate.Map) != 0 {
+		scheduler.PriorityQueue.Activate(podsToActivate.Map)
+		// Clear the entries after activation.
+		podsToActivate.Map = make(map[string]*corev1.Pod)
+	}
+
+	// INFO: (6) PreBind(有 VolumeBinding)/Bind(只有 DefaultBind)/PostBind(暂无)
 	go func() {
 		bindingCycleCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		waitOnPermitStatus := fwk.WaitOnPermit(bindingCycleCtx, assumedPod)
 		if !waitOnPermitStatus.IsSuccess() {
-
+			var reason string
+			if waitOnPermitStatus.IsUnschedulable() {
+				reason = corev1.PodReasonUnschedulable
+			} else {
+				reason = SchedulerError
+			}
+			// trigger un-reserve plugins to clean up state associated with the reserved Pod
+			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+			if forgetErr := scheduler.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
+				klog.ErrorS(forgetErr, "scheduler cache ForgetPod failed")
+			} else {
+				defer scheduler.PriorityQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, func(pod *corev1.Pod) bool {
+					return assumedPod.UID != pod.UID
+				})
+			}
+			scheduler.handleSchedulingFailure(fwk, assumedPodInfo, waitOnPermitStatus.AsError(), reason, clearNominatedNode)
+			return
 		}
-		// Run "prebind" plugins.
 		preBindStatus := fwk.RunPreBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 		if !preBindStatus.IsSuccess() {
-
+			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+			if forgetErr := scheduler.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
+				klog.ErrorS(forgetErr, "scheduler cache ForgetPod failed")
+			} else {
+				scheduler.PriorityQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
+			}
+			scheduler.handleSchedulingFailure(fwk, assumedPodInfo, preBindStatus.AsError(), SchedulerError, clearNominatedNode)
+			return
 		}
 
-		err := scheduler.bind(bindingCycleCtx, prof, assumedPod, scheduleResult.SuggestedHost, state)
+		err := scheduler.bind(bindingCycleCtx, fwk, assumedPod, scheduleResult.SuggestedHost, state)
 		if err != nil {
+			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+			if err := scheduler.SchedulerCache.ForgetPod(assumedPod); err != nil {
+				klog.ErrorS(err, "scheduler cache ForgetPod failed")
+			} else {
+				scheduler.PriorityQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
+			}
+			scheduler.handleSchedulingFailure(fwk, assumedPodInfo, fmt.Errorf("binding rejected: %w", err), SchedulerError, clearNominatedNode)
+			return
+		}
 
-		} else {
-
-			// Run "postbind" plugins.
-			fwk.RunPostBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+		fwk.RunPostBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+		// At the end of a successful binding cycle, move up Pods if needed.
+		if len(podsToActivate.Map) != 0 {
+			scheduler.PriorityQueue.Activate(podsToActivate.Map)
 		}
 	}()
 }
 
 // skipPodSchedule returns true if we could skip scheduling the pod for specified cases.
 func (scheduler *Scheduler) skipPodSchedule(prof *frameworkruntime.Framework, pod *corev1.Pod) bool {
-	// ...
-	return false
-	// 存入PriorityQueue
-	scheduler.PriorityQueue.AssignedPodAdded(pod)
-	return false
+	// Case 1: pod is being deleted.
+	if pod.DeletionTimestamp != nil {
+		return true
+	}
+
+	// Case 2: pod that has been assumed could be skipped.
+	isAssumed, err := scheduler.SchedulerCache.IsAssumedPod(pod)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", pod.Namespace, pod.Name, err))
+		return false
+	}
+	return isAssumed
 }
 
 func (scheduler *Scheduler) frameworkForPod(pod *corev1.Pod) (*frameworkruntime.Framework, error) {
-	framework, ok := scheduler.Frameworks[pod.Spec.SchedulerName]
+	fwk, ok := scheduler.Frameworks[pod.Spec.SchedulerName]
 	if !ok {
 		return nil, fmt.Errorf("profile not found for scheduler name %q", pod.Spec.SchedulerName)
 	}
-	return framework, nil
+	return fwk, nil
+}
+
+// INFO:
+func (scheduler *Scheduler) assume(assumed *corev1.Pod, host string) error {
+	assumed.Spec.NodeName = host
+	if err := scheduler.SchedulerCache.AssumePod(assumed); err != nil {
+		klog.ErrorS(err, "Scheduler cache AssumePod failed")
+		return err
+	}
+	// if "assumed" is a nominated pod, we should remove it from internal cache
+	if scheduler.PriorityQueue != nil {
+		scheduler.PriorityQueue.DeleteNominatedPodIfExists(assumed)
+	}
+
+	return nil
 }
 
 // INFO: filter 预选 and score 优选
+//  (1) PreFilter/Filter
+//  (2) PreScore/Score
 func (scheduler *Scheduler) schedulePod(ctx context.Context, fwk *frameworkruntime.Framework,
 	state *framework.CycleState, pod *corev1.Pod) (result ScheduleResult, err error) {
 
@@ -156,7 +255,7 @@ func (scheduler *Scheduler) schedulePod(ctx context.Context, fwk *frameworkrunti
 	if len(feasibleNodes) == 0 {
 		return result, &framework.FitError{
 			Pod:         pod,
-			NumAllNodes: sched.nodeInfoSnapshot.NumNodes(),
+			NumAllNodes: scheduler.nodeInfoSnapshot.NumNodes(),
 			Diagnosis:   diagnosis,
 		}
 	}
@@ -228,7 +327,7 @@ func prioritizeNodes(
 
 }
 
-func (scheduler *Scheduler) bind(ctx context.Context, fwk frameworkruntime.Framework,
+func (scheduler *Scheduler) bind(ctx context.Context, fwk *frameworkruntime.Framework,
 	assumed *corev1.Pod, targetNode string, state *framework.CycleState) (err error) {
 
 	bindStatus := fwk.RunBindPlugins(ctx, state, assumed, targetNode)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -428,4 +429,19 @@ type NodeInfoLister interface {
 // SharedLister groups scheduler-specific listers.
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
+}
+
+var PodsToActivateKey StateKey = "kubernetes.io/pods-to-activate"
+
+type PodsToActivate struct {
+	sync.Mutex
+	// Map is keyed with namespaced pod name, and valued with the pod.
+	Map map[string]*v1.Pod
+}
+
+func NewPodsToActivate() *PodsToActivate {
+	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
+}
+func (s *PodsToActivate) Clone() StateData {
+	return s
 }

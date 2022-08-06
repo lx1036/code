@@ -408,6 +408,10 @@ func (f *Framework) RejectWaitingPod(uid types.UID) {
 	panic("implement me")
 }
 
+func (f *Framework) ProfileName() string {
+	return f.profileName
+}
+
 func (f *Framework) ClientSet() clientset.Interface {
 	return f.clientSet
 }
@@ -662,7 +666,12 @@ func (f *Framework) RunPreBindPlugins(ctx context.Context, state *framework.Cycl
 }
 
 func (f *Framework) RunPostBindPlugins(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) {
-	panic("implement me")
+	for _, pl := range f.postBindPlugins {
+		f.runPostBindPlugin(ctx, pl, state, pod, nodeName)
+	}
+}
+func (f *Framework) runPostBindPlugin(ctx context.Context, pl framework.PostBindPlugin, state *framework.CycleState, pod *corev1.Pod, nodeName string) {
+	pl.PostBind(ctx, state, pod, nodeName)
 }
 
 func (f *Framework) RunReservePluginsReserve(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {

@@ -30,6 +30,8 @@ Score: ["NodeResourcesBalancedAllocation", "ImageLocality", "InterPodAffinity", 
 
 Reserve: ["VolumeBinding"]
 
+Permit(目前还没有对应的 plugin)
+
 PreBind: ["VolumeBinding"]
 
 Bind: ["DefaultBinder"]

@@ -3,7 +3,8 @@ package framework
 import (
 	"errors"
 	"fmt"
-	"k8s.io/klog/v2"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -198,7 +200,10 @@ func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
 
 	n.Generation = nextGeneration()
 }
-
+func (n *NodeInfo) RemoveNode() {
+	n.node = nil
+	n.Generation = nextGeneration()
+}
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
 		node:             n.node,
@@ -799,9 +804,38 @@ type Diagnosis struct {
 	PostFilterMsg string
 }
 
+const (
+	// NoNodeAvailableMsg is used to format message when no nodes available.
+	NoNodeAvailableMsg = "0/%v nodes are available"
+)
+
 // FitError describes a fit error of a pod.
 type FitError struct {
 	Pod         *v1.Pod
 	NumAllNodes int
 	Diagnosis   Diagnosis
+}
+
+func (f *FitError) Error() string {
+	reasons := make(map[string]int)
+	for _, status := range f.Diagnosis.NodeToStatusMap {
+		for _, reason := range status.Reasons() {
+			reasons[reason]++
+		}
+	}
+
+	sortReasonsHistogram := func() []string {
+		var reasonStrings []string
+		for k, v := range reasons {
+			reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
+		}
+		sort.Strings(reasonStrings)
+		return reasonStrings
+	}
+	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
+	postFilterMsg := f.Diagnosis.PostFilterMsg
+	if postFilterMsg != "" {
+		reasonMsg += " " + postFilterMsg
+	}
+	return reasonMsg
 }
