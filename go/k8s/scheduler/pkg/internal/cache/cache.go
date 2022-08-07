@@ -24,14 +24,14 @@ type podState struct {
 
 // 双链表
 type nodeInfoListItem struct {
-	info *framework.NodeInfo
-	next *nodeInfoListItem
-	prev *nodeInfoListItem
+	nodeInfo *framework.NodeInfo
+	next     *nodeInfoListItem
+	prev     *nodeInfoListItem
 }
 
-func newNodeInfoListItem(ni *framework.NodeInfo) *nodeInfoListItem {
+func newNodeInfoListItem(nodeInfo *framework.NodeInfo) *nodeInfoListItem {
 	return &nodeInfoListItem{
-		info: ni,
+		nodeInfo: nodeInfo,
 	}
 }
 
@@ -53,6 +53,7 @@ type Cache struct {
 	// schedulerCache会被多个goroutine读写，所以需要读写锁
 	mu sync.RWMutex
 
+	// INFO: 这里有个双链表的设计，目的是什么???
 	nodes    map[string]*nodeInfoListItem
 	headNode *nodeInfoListItem
 	nodeTree *nodeTree
@@ -150,14 +151,14 @@ func (cache *Cache) AddNode(node *corev1.Node) *framework.NodeInfo {
 		n = newNodeInfoListItem(framework.NewNodeInfo())
 		cache.nodes[node.Name] = n
 	} else {
-		cache.removeNodeImageStates(n.info.Node())
+		cache.removeNodeImageStates(n.nodeInfo.Node())
 	}
 
 	cache.moveNodeInfoToHead(node.Name)
 	cache.nodeTree.addNode(node)
-	cache.addNodeImageStates(node, n.info)
-	n.info.SetNode(node)
-	return n.info.Clone()
+	cache.addNodeImageStates(node, n.nodeInfo)
+	n.nodeInfo.SetNode(node)
+	return n.nodeInfo.Clone()
 }
 func (cache *Cache) addNodeImageStates(node *corev1.Node, nodeInfo *framework.NodeInfo) {
 	newSum := make(map[string]*framework.ImageStateSummary)
@@ -215,14 +216,14 @@ func (cache *Cache) UpdateNode(oldNode, newNode *corev1.Node) *framework.NodeInf
 		cache.nodes[newNode.Name] = n
 		cache.nodeTree.addNode(newNode)
 	} else {
-		cache.removeNodeImageStates(n.info.Node())
+		cache.removeNodeImageStates(n.nodeInfo.Node())
 	}
 
 	cache.moveNodeInfoToHead(newNode.Name)
 	cache.nodeTree.updateNode(oldNode, newNode)
-	cache.addNodeImageStates(newNode, n.info)
-	n.info.SetNode(newNode)
-	return n.info.Clone()
+	cache.addNodeImageStates(newNode, n.nodeInfo)
+	n.nodeInfo.SetNode(newNode)
+	return n.nodeInfo.Clone()
 }
 
 func (cache *Cache) RemoveNode(node *corev1.Node) error {
@@ -234,8 +235,8 @@ func (cache *Cache) RemoveNode(node *corev1.Node) error {
 		return fmt.Errorf("node %v is not found", node.Name)
 	}
 
-	n.info.RemoveNode()
-	if len(n.info.Pods) == 0 {
+	n.nodeInfo.RemoveNode()
+	if len(n.nodeInfo.Pods) == 0 {
 		cache.removeNodeInfoFromList(node.Name)
 	} else {
 		cache.moveNodeInfoToHead(node.Name)
@@ -351,7 +352,7 @@ func (cache *Cache) addPod(pod *corev1.Pod, assumePod bool) error {
 		n = newNodeInfoListItem(framework.NewNodeInfo())
 		cache.nodes[pod.Spec.NodeName] = n
 	}
-	n.info.AddPod(pod)
+	n.nodeInfo.AddPod(pod)
 	cache.moveNodeInfoToHead(pod.Spec.NodeName)
 	ps := &podState{
 		pod: pod,
@@ -374,10 +375,10 @@ func (cache *Cache) removePod(pod *corev1.Pod) error {
 		klog.Errorf("node %v not found when trying to remove pod %v", pod.Spec.NodeName, pod.Name)
 		return nil
 	}
-	if err := n.info.RemovePod(pod); err != nil {
+	if err := n.nodeInfo.RemovePod(pod); err != nil {
 		return err
 	}
-	if len(n.info.Pods) == 0 && n.info.Node() == nil {
+	if len(n.nodeInfo.Pods) == 0 && n.nodeInfo.Node() == nil {
 		cache.removeNodeInfoFromList(pod.Spec.NodeName)
 	} else {
 		cache.moveNodeInfoToHead(pod.Spec.NodeName)
