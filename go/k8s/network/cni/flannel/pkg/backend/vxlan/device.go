@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/cilium/cilium/pkg/mac"
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
+	"k8s-lx1036/k8s/network/cni/flannel/pkg/ip"
+	"k8s.io/klog/v2"
 	"net"
 	"syscall"
 
@@ -59,6 +61,40 @@ func (dev *vxlanDevice) MACAddr() net.HardwareAddr {
 	return dev.link.HardwareAddr
 }
 
+// Configure ensures that there is only one v4 Addr on `link` within the `ipn` address space and it equals `ipa`.
+func (dev *vxlanDevice) Configure(flannelIP ip.IP4Net, flannelNet ip.IP4Net) error {
+	existingAddrs, err := netlink.AddrList(dev.link, netlink.FAMILY_V4)
+	if err != nil {
+		return err
+	}
+
+	var hasAddr bool
+	addr := netlink.Addr{IPNet: flannelIP.ToIPNet()}
+	for _, existingAddr := range existingAddrs {
+		if existingAddr.Equal(addr) {
+			hasAddr = true
+			continue
+		}
+
+		if flannelNet.Contains(ip.FromIP(existingAddr.IP)) {
+			if err := netlink.AddrDel(dev.link, &existingAddr); err != nil {
+				return fmt.Errorf("failed to remove IP address %s from %s: %s",
+					existingAddr.String(), dev.link.Attrs().Name, err)
+			}
+			klog.Infof("removed IP address %s from %s", existingAddr.String(), dev.link.Attrs().Name)
+		}
+	}
+
+	// Actually add the desired address to the interface if needed.
+	if !hasAddr {
+		if err := netlink.AddrAdd(dev.link, &addr); err != nil {
+			return fmt.Errorf("failed to add IP address %s to %s: %s", addr.String(), dev.link.Attrs().Name, err)
+		}
+	}
+
+	return nil
+}
+
 // 创建一个 vxlan 网卡
 func ensureLink(vxlan *netlink.Vxlan) (*netlink.Vxlan, error) {
 	err := netlink.LinkAdd(vxlan)
@@ -105,4 +141,59 @@ func checkVxlanLink(l1, l2 netlink.Link) bool {
 	}
 
 	return true
+}
+
+// ARP
+type neighbor struct {
+	MAC net.HardwareAddr
+	IP  ip.IP4
+}
+
+// AddARP 给新建的 vxlan 网卡添加 ARP
+func (dev *vxlanDevice) AddARP(n neighbor) error {
+	klog.Infof(fmt.Sprintf("calling AddARP: %v, %v", n.IP, n.MAC))
+	return netlink.NeighSet(&netlink.Neigh{
+		LinkIndex:    dev.link.Index,
+		State:        netlink.NUD_PERMANENT,
+		Type:         syscall.RTN_UNICAST,
+		IP:           n.IP.ToIP(),
+		HardwareAddr: n.MAC,
+	})
+}
+
+func (dev *vxlanDevice) DelARP(n neighbor) error {
+	klog.Infof("calling DelARP: %v, %v", n.IP, n.MAC)
+	return netlink.NeighDel(&netlink.Neigh{
+		LinkIndex:    dev.link.Index,
+		State:        netlink.NUD_PERMANENT,
+		Type:         syscall.RTN_UNICAST,
+		IP:           n.IP.ToIP(),
+		HardwareAddr: n.MAC,
+	})
+}
+
+// FDB: Forwarding Database
+// VXLAN FDB 格式：<MAC> <VNI> <REMOTE IP>, VXLAN设备根据MAC地址来查找相应的VTEP IP地址，继而将二层数据帧封装发送至相应VTEP
+
+func (dev *vxlanDevice) AddFDB(n neighbor) error {
+	klog.Infof(fmt.Sprintf("calling AddFDB: %v, %v", n.IP, n.MAC))
+	return netlink.NeighSet(&netlink.Neigh{
+		LinkIndex:    dev.link.Index,
+		State:        netlink.NUD_PERMANENT,
+		Family:       syscall.AF_BRIDGE,
+		Flags:        netlink.NTF_SELF,
+		IP:           n.IP.ToIP(),
+		HardwareAddr: n.MAC,
+	})
+}
+
+func (dev *vxlanDevice) DelFDB(n neighbor) error {
+	klog.Infof("calling DelFDB: %v, %v", n.IP, n.MAC)
+	return netlink.NeighDel(&netlink.Neigh{
+		LinkIndex:    dev.link.Index,
+		Family:       syscall.AF_BRIDGE,
+		Flags:        netlink.NTF_SELF,
+		IP:           n.IP.ToIP(),
+		HardwareAddr: n.MAC,
+	})
 }

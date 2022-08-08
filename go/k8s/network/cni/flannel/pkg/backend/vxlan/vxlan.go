@@ -4,13 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/klog/v2"
-	"net"
-	"sync"
-
 	"k8s-lx1036/k8s/network/cni/flannel/pkg/backend"
 	"k8s-lx1036/k8s/network/cni/flannel/pkg/ip"
 	"k8s-lx1036/k8s/network/cni/flannel/pkg/subnet"
+	"k8s.io/klog/v2"
+	"net"
 )
 
 func init() {
@@ -42,14 +40,15 @@ func (backend *VxlanBackend) RegisterNetwork(ctx context.Context, config *subnet
 		      }
 		    }
 	*/
+	// @see vxlan config https://github.com/flannel-io/flannel/blob/master/Documentation/backends.md#vxlan
 	cfg := struct {
 		VNI           int
-		Port          int
-		GBP           bool
+		Port          int  //  UDP port to use for sending encapsulated packets. On Linux, defaults to kernel default, currently 8472
+		GBP           bool // Enable VXLAN Group Based Policy. Defaults to false.
 		Learning      bool
-		DirectRouting bool
+		DirectRouting bool //  Enable direct routes (like host-gw) when the hosts are on the same subnet. VXLAN will only be used to encapsulate packets to hosts on different subnets. Defaults to false
 	}{
-		VNI: defaultVNI,
+		VNI: defaultVNI, // VXLAN Identifier (VNI) to be used. On Linux, defaults to 1
 	}
 	if len(config.Backend) > 0 {
 		if err := json.Unmarshal(config.Backend, &cfg); err != nil {
@@ -66,12 +65,14 @@ func (backend *VxlanBackend) RegisterNetwork(ctx context.Context, config *subnet
 			vni:       uint32(cfg.VNI),
 			name:      fmt.Sprintf("flannel.%v", cfg.VNI),
 			vtepIndex: backend.extIface.Iface.Index,
-			vtepAddr:  backend.extIface.IfaceAddr,
+			vtepAddr:  backend.extIface.IfaceAddr, // 这里是 nodeIP 地址，是这块的参数 local 10.206.67.15
 			vtepPort:  cfg.Port,
 			gbp:       cfg.GBP,
-			learning:  cfg.Learning,
+			learning:  cfg.Learning, // nolearning
 		}
 
+		// (1)创建了一个 vxlan 网卡
+		// 等于命令 `ip link add vxlan100 type vxlan id 100 dstport 4789 local 10.206.67.15 nolearning`
 		dev, err = newVXLANDevice(&devAttrs)
 		if err != nil {
 			return nil, err
@@ -89,14 +90,16 @@ func (backend *VxlanBackend) RegisterNetwork(ctx context.Context, config *subnet
 	// This IP is just used as a source address for host to workload traffic (so
 	// the return path for the traffic has an address on the flannel network to use as the destination)
 	if config.EnableIPv4 {
+		// (2)并配置了一个 subnetIP/32 地址，这个 subnet 其实来自于 newNode.Spec.PodCIDR
 		if err := dev.Configure(ip.IP4Net{IP: lease.Subnet.IP, PrefixLen: 32}, config.Network); err != nil {
 			return nil, fmt.Errorf("failed to configure interface %s: %w", dev.link.Attrs().Name, err)
 		}
 	}
 
-	return newNetwork(backend.subnetMgr, backend.extIface, dev, ip.IP4Net{}, lease)
+	return newNetwork(backend.subnetMgr, backend.extIface, dev, lease)
 }
 
+// 这里的 publicIP 就是 nodeIP
 func newSubnetAttrs(publicIP net.IP, vxlanID uint16, dev *vxlanDevice) (*subnet.LeaseAttrs, error) {
 	leaseAttrs := &subnet.LeaseAttrs{
 		BackendType: "vxlan",

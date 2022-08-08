@@ -25,7 +25,7 @@ type Manager interface {
 	AcquireLease(ctx context.Context, attrs *LeaseAttrs) (*Lease, error)
 	RenewLease(ctx context.Context, lease *Lease) error
 	WatchLease(ctx context.Context, sn ip.IP4Net, cursor interface{}) (LeaseWatchResult, error)
-	WatchLeases(ctx context.Context, cursor interface{}) (LeaseWatchResult, error)
+	WatchLeases(ctx context.Context) (LeaseWatchResult, error)
 
 	Name() string
 }
@@ -237,40 +237,28 @@ func (subnetMgr *kubeSubnetManager) GetNetworkConfig(ctx context.Context) (*Conf
 	return subnetMgr.subnetConf, nil
 }
 
-func (subnetMgr *kubeSubnetManager) AcquireLease(ctx context.Context, attrs *LeaseAttrs) (*Lease, error) {
-	cachedNode, err := subnetMgr.nodeStore.Get(subnetMgr.nodeName)
-	if err != nil {
-		return nil, err
-	}
-	node := cachedNode.DeepCopy()
-	if node.Spec.PodCIDR == "" {
-		return nil, fmt.Errorf("node %q pod cidr not assigned", subnetMgr.nodeName)
-	}
-
-	data, err := attrs.BackendData.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-
-}
-
-func (subnetMgr *kubeSubnetManager) RenewLease(ctx context.Context, lease *Lease) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (subnetMgr *kubeSubnetManager) WatchLease(ctx context.Context, sn ip.IP4Net, cursor interface{}) (LeaseWatchResult, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (subnetMgr *kubeSubnetManager) WatchLeases(ctx context.Context, cursor interface{}) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (subnetMgr *kubeSubnetManager) Name() string {
 	return fmt.Sprintf("Kubernetes Subnet Manager - %s", subnetMgr.nodeName)
+}
+
+func (subnetMgr *kubeSubnetManager) patchNodeNetworkUnavailable(ctx context.Context) error {
+	conditions := []corev1.NodeCondition{
+		{
+			Type:               corev1.NodeNetworkUnavailable,
+			Status:             corev1.ConditionFalse,
+			Reason:             "FlannelIsUp",
+			Message:            "Flannel is running on this node",
+			LastTransitionTime: metav1.Now(),
+			LastHeartbeatTime:  metav1.Now(),
+		},
+	}
+	raw, err := json.Marshal(&conditions)
+	if err != nil {
+		return err
+	}
+	patch := []byte(fmt.Sprintf(`{"status":{"conditions":%s}}`, raw))
+	_, err = subnetMgr.kubeClient.CoreV1().Nodes().PatchStatus(ctx, subnetMgr.nodeName, patch)
+	return err
 }
 
 func getNodeName(kubeClient *kubernetes.Clientset) (string, error) {
@@ -293,4 +281,11 @@ func getNodeName(kubeClient *kubernetes.Clientset) (string, error) {
 	}
 
 	return nodeName, nil
+}
+
+// ipnet1 网段包含 ipnet2
+func containsCIDR(ipnet1, ipnet2 *net.IPNet) bool {
+	ones1, _ := ipnet1.Mask.Size()
+	ones2, _ := ipnet2.Mask.Size()
+	return ones1 <= ones2 && ipnet1.Contains(ipnet2.IP)
 }

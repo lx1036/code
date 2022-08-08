@@ -7,65 +7,69 @@ import (
 
 // https://leetcode-cn.com/problems/add-two-numbers/
 
-func AddTwoNumbers(l1 *ListNode, l2 *ListNode) *ListNode {
-	var head, tail *ListNode
+type ListNode002 struct {
+	Val  int
+	Next *ListNode002
+}
+
+func AddTwoNumbers(l1 *ListNode002, l2 *ListNode002) *ListNode002 {
+	var head, tail *ListNode002
 	carry := 0
 	for l1 != nil || l2 != nil {
 		n1, n2 := 0, 0
-
 		if l1 != nil {
-			n1 = l1.value
-			l1 = l1.next
+			n1 = l1.Val
+			l1 = l1.Next
 		}
 		if l2 != nil {
-			n2 = l2.value
-			l2 = l2.next
+			n2 = l2.Val
+			l2 = l2.Next
 		}
 
 		sum := n1 + n2 + carry
 		sum, carry = sum%10, sum/10
 		if head == nil {
-			head = &ListNode{value: sum}
+			head = &ListNode002{Val: sum}
 			tail = head
 		} else {
-			tail.next = &ListNode{value: sum}
-			tail = tail.next
+			tail.Next = &ListNode002{Val: sum}
+			tail = tail.Next
 		}
 	}
 
 	if carry > 0 {
-		tail.next = &ListNode{value: carry}
+		tail.Next = &ListNode002{Val: carry}
 	}
 
 	return head
 }
 
 func TestAddTwoNumbers(test *testing.T) {
-	a1 := &ListNode{value: 3, next: nil}
-	a2 := &ListNode{value: 4, next: a1}
-	a3 := &ListNode{value: 2, next: a2}
+	a1 := &ListNode002{Val: 3, Next: nil}
+	a2 := &ListNode002{Val: 4, Next: a1}
+	a3 := &ListNode002{Val: 2, Next: a2}
 
-	b1 := &ListNode{value: 4, next: nil}
-	b2 := &ListNode{value: 6, next: b1}
-	b3 := &ListNode{value: 5, next: b2}
+	b1 := &ListNode002{Val: 4, Next: nil}
+	b2 := &ListNode002{Val: 6, Next: b1}
+	b3 := &ListNode002{Val: 5, Next: b2}
 
 	c := AddTwoNumbers(a3, b3)
 	for c != nil {
-		fmt.Println(c.value)
-		c = c.next
+		fmt.Println(c.Val)
+		c = c.Next
 	}
 
-	A1 := &ListNode{value: 3, next: nil}
-	A2 := &ListNode{value: 4, next: A1}
-	A3 := &ListNode{value: 2, next: A2}
+	A1 := &ListNode002{Val: 3, Next: nil}
+	A2 := &ListNode002{Val: 4, Next: A1}
+	A3 := &ListNode002{Val: 2, Next: A2}
 
-	B1 := &ListNode{value: 6, next: nil}
-	B2 := &ListNode{value: 6, next: B1}
-	B3 := &ListNode{value: 7, next: B2}
+	B1 := &ListNode002{Val: 6, Next: nil}
+	B2 := &ListNode002{Val: 6, Next: B1}
+	B3 := &ListNode002{Val: 7, Next: B2}
 
 	C := AddTwoNumbers(A3, B3)
 	for C != nil {
-		fmt.Println(C.value)
-		C = C.next
+		fmt.Println(C.Val)
+		C = C.Next
 	}
 }

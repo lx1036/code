@@ -2,7 +2,7 @@
 
 # OpenLB
 https://porterlb.io/
-https://github.com/kubesphere/openelb
+https://github.com/openelb/openelb
 https://github.com/metallb/metallb
 
 OpenLB: 类似于 MetalLB(https://github.com/metallb/metallb)，使用 gobgp(https://github.com/osrg/gobgp) 库走 bgp 协议来宣告路由到交换机对端，

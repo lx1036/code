@@ -18,6 +18,7 @@ type DatapathConfiguration struct {
 type linuxDatapath struct {
 	datapath.ConfigWriter
 
+	node   datapath.NodeHandler
 	loader *loader.Loader
 
 	nodeAddressing datapath.NodeAddressing
@@ -32,6 +33,14 @@ func NewDatapath(cfg DatapathConfiguration, ruleManager datapath.IptablesManager
 		nodeAddressing: NewNodeAddressing(),
 	}
 
+	dp.node = NewNodeHandler(cfg, dp.nodeAddressing)
+
+	return dp
+}
+
+// Node returns the handler for node events
+func (l *linuxDatapath) Node() datapath.NodeHandler {
+	return l.node
 }
 
 func (l *linuxDatapath) Loader() datapath.Loader {

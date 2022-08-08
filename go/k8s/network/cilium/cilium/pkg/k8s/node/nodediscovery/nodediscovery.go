@@ -36,5 +36,5 @@ func NewNodeDiscovery(manager *nodemanager.Manager, mtuConfig mtu.Configuration,
 }
 
 func enableLocalNodeRoute() bool {
-	return option.Config.EnableLocalNodeRoute && !option.Config.IsFlannelMasterDeviceSet() && option.Config.IPAM != ipamOption.IPAMENI
+	return option.Config.EnableLocalNodeRoute && option.Config.IPAM != ipamOption.IPAMENI
 }

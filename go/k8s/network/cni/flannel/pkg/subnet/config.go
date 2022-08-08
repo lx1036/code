@@ -10,15 +10,13 @@ import (
 )
 
 type Config struct {
-	EnableIPv4    bool
-	EnableIPv6    bool
-	Network       ip.IP4Net
-	SubnetMin     ip.IP4
-	SubnetMax     ip.IP4
-	SubnetLen     uint
-	IPv6SubnetLen uint
-	BackendType   string          `json:"-"`
-	Backend       json.RawMessage `json:",omitempty"`
+	EnableIPv4  bool            // 默认 true
+	Network     ip.IP4Net       // Network (string): IPv4 network in CIDR format to use for the entire flannel network
+	SubnetMin   ip.IP4          // 默认取第二个IP.The beginning of IP range which the subnet allocation should start with. Defaults to the second subnet of Network
+	SubnetMax   ip.IP4          // The end of the IP range at which the subnet allocation should end with. Defaults to the last subnet of Network
+	SubnetLen   uint            // 就是 blockSize, 默认 /24，给每一个 node 分配的子网段的掩码
+	BackendType string          `json:"-"` // 默认 vxlan
+	Backend     json.RawMessage `json:",omitempty"`
 }
 
 /*

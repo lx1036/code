@@ -62,6 +62,7 @@ require (
 	github.com/jacobsa/syncutil v0.0.0-20180201203307-228ac8e5a6c3
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/jinzhu/gorm v1.9.11
+	github.com/joho/godotenv v1.4.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/k-sone/critbitgo v1.4.0
 	github.com/klauspost/cpuid v1.2.1
@@ -160,14 +161,23 @@ require (
 )
 
 require (
+	github.com/cilium/proxy v0.0.0-20220202185058-28b3c32edfee // indirect
+	github.com/cncf/xds/go v0.0.0-20211130200136-a8f946100490 // indirect
+	github.com/envoyproxy/protoc-gen-validate v0.6.2 // indirect
 	github.com/go-kit/kit v0.12.0 // indirect
 	github.com/go-kit/log v0.2.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-logr/logr v1.2.0 // indirect
+	github.com/hashicorp/consul/api v1.12.0 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
+	github.com/hashicorp/serf v0.9.6 // indirect
+	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/mdlayher/arp v0.0.0-20191213142603-f72070a231fc // indirect
 	github.com/mdlayher/ethernet v0.0.0-20190606142754-0394541c37b7 // indirect
 	github.com/mdlayher/ndp v0.0.0-20200602162440-17ab9e3e5567 // indirect
 	github.com/mdlayher/raw v0.0.0-20210412142147-51b895745faf // indirect
+	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f // indirect

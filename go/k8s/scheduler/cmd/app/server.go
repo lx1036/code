@@ -6,9 +6,9 @@ import (
 
 	"k8s-lx1036/k8s/scheduler/cmd/app/config"
 	"k8s-lx1036/k8s/scheduler/cmd/app/options"
-	"k8s-lx1036/k8s/scheduler/pkg/scheduler"
-	"k8s-lx1036/k8s/scheduler/pkg/scheduler/framework/runtime"
-	"k8s-lx1036/k8s/scheduler/pkg/scheduler/profile"
+	scheduler "k8s-lx1036/k8s/scheduler/pkg"
+	"k8s-lx1036/k8s/scheduler/pkg/framework/runtime"
+	"k8s-lx1036/k8s/scheduler/pkg/profile"
 
 	"github.com/spf13/cobra"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -25,15 +25,12 @@ import (
 // Option configures a framework.Registry.
 type Option func(runtime.Registry) error
 
-// NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
+// NewSchedulerCommand dynamic-scheduler --config=./scheduler-config.yaml
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
-	opts, err := options.NewOptions()
-	if err != nil {
-		klog.Fatalf("unable to initialize command options: %v", err)
-	}
-
+	opts := options.NewOptions()
 	cmd := &cobra.Command{
-		Use: "dynamic-scheduler",
+		Use:  "kube-scheduler",
+		Long: "k8s scheduler for online and offline pods",
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
 				if len(arg) > 0 {
@@ -57,19 +54,12 @@ func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
 		fs.AddFlagSet(f)
 	}
 
-	usageFmt := "Usage:\n  %s\n"
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
-	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
-		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
-		cliflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
-		return nil
-	})
-	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
-		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
-	})
-	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
-	_ = cmd.MarkFlagFilename("config", "yaml", "yml", "json")
+	cliflag.SetUsageAndHelpFunc(cmd, namedFlagSets, cols)
+
+	if err := cmd.MarkFlagFilename("config", "yaml", "yml", "json"); err != nil {
+		klog.ErrorS(err, "Failed to mark flag filename")
+	}
 
 	return cmd
 }
@@ -132,7 +122,6 @@ func Run(ctx context.Context, cc *config.Config, sched *scheduler.Scheduler) err
 	cc.EventBroadcaster.StartRecordingToSink(ctx.Done())
 
 	// Start all informers.
-	go cc.PodInformer.Informer().Run(ctx.Done())
 	cc.InformerFactory.Start(ctx.Done())
 
 	// Wait for all caches to sync before scheduling.

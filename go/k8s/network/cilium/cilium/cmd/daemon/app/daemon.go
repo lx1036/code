@@ -23,6 +23,8 @@ import (
 )
 
 type Daemon struct {
+	ctx context.Context
+
 	k8sWatcher      *watchers.K8sWatcher
 	k8sCachesSynced <-chan struct{}
 
