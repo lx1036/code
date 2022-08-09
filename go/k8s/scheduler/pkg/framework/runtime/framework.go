@@ -394,7 +394,7 @@ func (f *Framework) SnapshotSharedLister() framework.SharedLister {
 }
 
 func (f *Framework) IterateOverWaitingPods(callback func(*WaitingPod)) {
-	panic("implement me")
+	f.waitingPods.iterate(callback)
 }
 
 func (f *Framework) GetWaitingPod(uid types.UID) *WaitingPod {
@@ -414,6 +414,10 @@ func (f *Framework) ProfileName() string {
 
 func (f *Framework) ClientSet() clientset.Interface {
 	return f.clientSet
+}
+
+func (f *Framework) KubeConfig() *restclient.Config {
+	return f.kubeConfig
 }
 
 func (f *Framework) EventRecorder() events.EventRecorder {

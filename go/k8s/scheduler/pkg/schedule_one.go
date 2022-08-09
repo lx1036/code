@@ -155,8 +155,10 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 	go func() {
 		bindingCycleCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
+		// WaitOnPermit() 参考 PodGroup plugin，如果一组 pod 内，有一个 pod 调度失败了，
+		// 会在 PostFilter 里逐个把其他 pod 给 reject 掉，因为其他 pod 这时已经在 WaitOnPermit()
 		waitOnPermitStatus := fwk.WaitOnPermit(bindingCycleCtx, assumedPod)
-		if !waitOnPermitStatus.IsSuccess() {
+		if !waitOnPermitStatus.IsSuccess() { // PodGroup plugin PostFilter 会
 			var reason string
 			if waitOnPermitStatus.IsUnschedulable() {
 				reason = corev1.PodReasonUnschedulable

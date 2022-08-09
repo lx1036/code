@@ -148,13 +148,13 @@ func (pi *PodInfo) DeepCopy() *PodInfo {
 
 // NodeInfo is node level aggregated information.
 type NodeInfo struct {
-	node                         *v1.Node
-	Pods                         []*PodInfo
+	node                         *v1.Node   // 当前 node
+	Pods                         []*PodInfo // 当前 node 上所有 pods 的总和
 	PodsWithAffinity             []*PodInfo
 	PodsWithRequiredAntiAffinity []*PodInfo
 	UsedPorts                    HostPortInfo
 
-	Requested        *Resource
+	Requested        *Resource // 当前 node 上所有 pods 的 request 总和
 	NonZeroRequested *Resource
 	Allocatable      *Resource
 

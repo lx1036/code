@@ -40,6 +40,15 @@ func (m *WaitingPodsMap) remove(uid types.UID) {
 	delete(m.pods, uid)
 }
 
+// iterate acquires a read lock and iterates over the WaitingPods map.
+func (m *WaitingPodsMap) iterate(callback func(*WaitingPod)) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, v := range m.pods {
+		callback(v)
+	}
+}
+
 // WaitingPod represents a pod waiting in the permit phase.
 type WaitingPod struct {
 	mu             sync.RWMutex
