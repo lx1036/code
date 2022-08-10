@@ -145,6 +145,7 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 	}
 
 	// At the end of a successful scheduling cycle, move pods from unschedulePods/backoffQ to activeQ
+	// @see pod-group plugin Permit()
 	if len(podsToActivate.Map) != 0 {
 		scheduler.PriorityQueue.Activate(podsToActivate.Map)
 		// Clear the entries after activation.
@@ -158,7 +159,7 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 		// WaitOnPermit() 参考 PodGroup plugin，如果一组 pod 内，有一个 pod 调度失败了，
 		// 会在 PostFilter 里逐个把其他 pod 给 reject 掉，因为其他 pod 这时已经在 WaitOnPermit()
 		waitOnPermitStatus := fwk.WaitOnPermit(bindingCycleCtx, assumedPod)
-		if !waitOnPermitStatus.IsSuccess() { // PodGroup plugin PostFilter 会
+		if !waitOnPermitStatus.IsSuccess() {
 			var reason string
 			if waitOnPermitStatus.IsUnschedulable() {
 				reason = corev1.PodReasonUnschedulable
@@ -202,9 +203,13 @@ func (scheduler *Scheduler) scheduleOne(ctx context.Context) {
 		}
 
 		fwk.RunPostBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+
 		// At the end of a successful binding cycle, move up Pods if needed.
+		// @see pod-group plugin Permit()
 		if len(podsToActivate.Map) != 0 {
 			scheduler.PriorityQueue.Activate(podsToActivate.Map)
+			// Unlike the logic in scheduling cycle, we don't bother deleting the entries
+			// as `podsToActivate.Map` is no longer consumed.
 		}
 	}()
 }

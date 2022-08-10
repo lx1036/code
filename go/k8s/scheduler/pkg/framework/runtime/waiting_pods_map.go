@@ -85,6 +85,25 @@ func (w *WaitingPod) GetPod() *v1.Pod {
 	return w.pod
 }
 
+func (w *WaitingPod) Allow(pluginName string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if timer, exist := w.pendingPlugins[pluginName]; exist {
+		timer.Stop()
+		delete(w.pendingPlugins, pluginName)
+	}
+
+	// Only signal success status after all plugins have allowed
+	if len(w.pendingPlugins) != 0 {
+		return
+	}
+
+	select {
+	case w.status <- framework.NewStatus(framework.Success, ""):
+	default:
+	}
+}
+
 // Reject declares the waiting pod unschedulable.
 func (w *WaitingPod) Reject(pluginName, msg string) {
 	w.mu.RLock()

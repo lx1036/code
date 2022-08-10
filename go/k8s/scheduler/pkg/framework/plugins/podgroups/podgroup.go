@@ -23,7 +23,7 @@ const (
 	Name = "PodGroup"
 )
 
-type Coscheduling struct { // schedule pods in group
+type PodGroup struct { // schedule pods in group
 	framework       *frameworkruntime.Framework
 	podGroupManager *PodGroupManager
 	scheduleTimeout time.Duration
@@ -49,7 +49,7 @@ func New(args runtime.Object, framework *frameworkruntime.Framework) (framework.
 
 	scheduleTimeDuration := time.Duration(coschedulingArgs.PermitWaitingTimeSeconds) * time.Second
 	pgMgr := NewPodGroupManager(pgClient, framework.SnapshotSharedLister(), scheduleTimeDuration, pgInformer, podInformer)
-	plugin := &Coscheduling{
+	plugin := &PodGroup{
 		framework:       framework,
 		podGroupManager: pgMgr,
 		scheduleTimeout: scheduleTimeDuration,
@@ -58,11 +58,11 @@ func New(args runtime.Object, framework *frameworkruntime.Framework) (framework.
 	return plugin, nil
 }
 
-func (pl *Coscheduling) Name() string {
+func (pl *PodGroup) Name() string {
 	return Name
 }
 
-func (pl *Coscheduling) Less(podInfo1, podInfo2 *framework.QueuedPodInfo) bool {
+func (pl *PodGroup) Less(podInfo1, podInfo2 *framework.QueuedPodInfo) bool {
 	prio1 := corev1helpers.PodPriority(podInfo1.Pod)
 	prio2 := corev1helpers.PodPriority(podInfo2.Pod)
 	if prio1 != prio2 {
@@ -86,7 +86,7 @@ func GetNamespacedName(obj metav1.Object) string {
 // 1. pod 不属于 pod-group，过滤掉
 // 2. pods 不满足 pod-group MinMember 或者 MinResources，过滤掉
 // @see https://github.com/kubernetes-sigs/scheduler-plugins/blob/master/kep/42-podgroup-coscheduling/README.md#prefilter
-func (pl *Coscheduling) PreFilter(ctx context.Context, state *framework.CycleState,
+func (pl *PodGroup) PreFilter(ctx context.Context, state *framework.CycleState,
 	pod *corev1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	// If PreFilter fails, return framework.UnschedulableAndUnresolvable to avoid
 	// any preemption attempts.
@@ -97,12 +97,12 @@ func (pl *Coscheduling) PreFilter(ctx context.Context, state *framework.CycleSta
 	return nil, framework.NewStatus(framework.Success, "")
 }
 
-func (pl *Coscheduling) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *PodGroup) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 
 // PostFilter is used to reject a group of pods if a pod does not pass PreFilter or Filter.
-func (pl *Coscheduling) PostFilter(ctx context.Context, state *framework.CycleState, pod *corev1.Pod,
+func (pl *PodGroup) PostFilter(ctx context.Context, state *framework.CycleState, pod *corev1.Pod,
 	filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
 	pgName, pg := pl.podGroupManager.GetPodGroup(pod)
 	if pg == nil {
@@ -127,7 +127,7 @@ func (pl *Coscheduling) PostFilter(ctx context.Context, state *framework.CycleSt
 	//  WaitOnPermit() 参考 PodGroup plugin，如果一组 pod 内，有一个 pod 调度失败了，
 	//  会在 PostFilter 里逐个把其他 pod 给 reject 掉，因为其他 pod 这时已经在 WaitOnPermit()
 	pl.framework.IterateOverWaitingPods(func(waitingPod *frameworkruntime.WaitingPod) {
-		if waitingPod.GetPod().Namespace == pod.Namespace && waitingPod.GetPod().Labels[podgroupv1.PodGroupLabel] == pg.Name {
+		if GetPodGroupName(waitingPod.GetPod()) == pg.Name {
 			klog.V(3).InfoS("PostFilter rejects the pod", "podGroup", klog.KObj(pg), "pod", klog.KObj(waitingPod.GetPod()))
 			waitingPod.Reject(pl.Name(), "optimistic rejection in PostFilter")
 		}
@@ -139,23 +139,59 @@ func (pl *Coscheduling) PostFilter(ctx context.Context, state *framework.CycleSt
 		fmt.Sprintf("PodGroup %v gets rejected due to Pod %v is unschedulable even after PostFilter", pgName, pod.Name))
 }
 
-func (pl *Coscheduling) Reserve(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
+func (pl *PodGroup) Reserve(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) *framework.Status {
 	return nil
 }
 
-// Unreserve rejects all other Pods in the PodGroup when one of the pods in the group times out.
-func (pl *Coscheduling) Unreserve(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) {
+// Unreserve 清理工作：rejects all other Pods in the PodGroup when one of the pods in the group times out.
+func (pl *PodGroup) Unreserve(ctx context.Context, state *framework.CycleState, pod *corev1.Pod, nodeName string) {
+	pgName, pg := pl.podGroupManager.GetPodGroup(pod)
+	if pg == nil {
+		return
+	}
 
+	pl.framework.IterateOverWaitingPods(func(waitingPod *frameworkruntime.WaitingPod) {
+		if GetPodGroupName(waitingPod.GetPod()) == pg.Name {
+			klog.V(3).InfoS("PostFilter rejects the pod", "podGroup", klog.KObj(pg), "pod", klog.KObj(waitingPod.GetPod()))
+			waitingPod.Reject(pl.Name(), "optimistic rejection in PostFilter")
+		}
+	})
+
+	pl.podGroupManager.DeletePermittedPodGroup(pgName)
 }
 
-func (pl *Coscheduling) Permit(ctx context.Context, state *framework.CycleState,
+func (pl *PodGroup) Permit(ctx context.Context, state *framework.CycleState,
 	pod *corev1.Pod, nodeName string) (*framework.Status, time.Duration) {
+	var resultStatus *framework.Status
+	waitTime := pl.scheduleTimeout
+	status := pl.podGroupManager.Permit(ctx, pod)
+	switch status {
+	case PodGroupNotSpecified:
+		return framework.NewStatus(framework.Success, ""), 0
+	case PodGroupNotFound:
+		return framework.NewStatus(framework.Unschedulable, "PodGroup not found"), 0
+	case Wait:
+		_, pg := pl.podGroupManager.GetPodGroup(pod)
+		waitTime = GetWaitTimeDuration(pg, waitTime)
+		resultStatus = framework.NewStatus(framework.Wait)
+		// We will also request to move the sibling pods back to activeQ.
+		pl.podGroupManager.ActivateSiblings(pod, state)
+	case Success:
+		// INFO: sibling pod 在 WaitOnPermit() 阻塞，status 是 Success 的，signal the status channel, 然后依次容许 sibling pod 继续走 Bind 逻辑
+		pl.framework.IterateOverWaitingPods(func(waitingPod *frameworkruntime.WaitingPod) {
+			if GetPodGroupName(waitingPod.GetPod()) == GetPodGroupName(pod) {
+				klog.V(3).InfoS("Permit allows", "pod", klog.KObj(waitingPod.GetPod()))
+				waitingPod.Allow(pl.Name()) // INFO: 参考如果 minNumber 不满足，则 waitingPod.Reject()
+			}
+		})
+		resultStatus = framework.NewStatus(framework.Success)
+		waitTime = 0
+	}
 
-	s := pl.podGroupManager.Permit(ctx, pod)
-
+	return resultStatus, waitTime
 }
 
 // PostBind is called after a pod is successfully bound. These plugins are used update PodGroup when pod is bound.
-func (pl *Coscheduling) PostBind(ctx context.Context, _ *framework.CycleState, pod *corev1.Pod, nodeName string) {
-
+func (pl *PodGroup) PostBind(ctx context.Context, _ *framework.CycleState, pod *corev1.Pod, nodeName string) {
+	pl.podGroupManager.PostBind(ctx, pod, nodeName)
 }

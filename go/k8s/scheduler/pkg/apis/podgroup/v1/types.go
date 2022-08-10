@@ -5,21 +5,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	GroupName     = "PodGroup"
-	PodGroupLabel = "pod-group." + GroupName
-)
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CoschedulingArgs defines the parameters for Coscheduling plugin.
 type CoschedulingArgs struct {
 	metav1.TypeMeta
 
-	// PermitWaitingTime is the wait timeout in seconds.
+	// 自定义 pod 可以 wait 最大时间
 	PermitWaitingTimeSeconds int64
+
 	// DeniedPGExpirationTimeSeconds is the expiration time of the denied podgroup store.
 	DeniedPGExpirationTimeSeconds int64
+
 	// KubeConfigPath for scheduler
 	KubeConfigPath string
 }
