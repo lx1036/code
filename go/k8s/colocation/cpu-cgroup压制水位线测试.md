@@ -32,7 +32,9 @@ mkdir online
 mkdir offline
 
 # 这时没设置压制水位线，所有 cpu 都是消费 100%
-docker run -it --cgroup-parent=/offline.slice lx1036/ubuntu:stress-ng bash
+docker run -it --cgroup-parent=/offline lx1036/ubuntu:stress-ng bash
+stress-ng -c 24 # 打满 24 个 cpu
+
 # 压制水位线设置成 20%
 cd /sys/fs/cgroup/cpu/offline
 echo 480000 > cpu.cfs_quota_us
@@ -42,3 +44,7 @@ echo 240000 > cpu.cfs_quota_us
 
 ![cpu-suppress](./imgs/cpu-suppress.png)
 
+
+## 结论
+使用阿里内核，整机水位线压制只需要动态设置 cpu.cfs_quota_us cgroup，就可以使得离线所有 pod 的 cpu 资源总和不会超过设定值。
+在混部时，cpu.cfs_quota_us = node.Total * SLOPercent - pod(LS).Used - system.Used, LS 表示在线 pod 实际使用 cpu 资源

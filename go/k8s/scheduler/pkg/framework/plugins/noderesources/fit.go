@@ -236,7 +236,10 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 		})
 	}
 
-	// INFO: 自定义资源不足
+	// INFO: 调度器实现了调度自定义资源，需要给 node.Status().Update() 先更新 node 的 Allocatable 里的自定义资源，比如
+	//  colocation/reclaim-cpu:10, 然后 pod request 里写 colocation/reclaim-cpu:5，就会在这里判断是否满足资源可被调度。
+	//  更新 node Allocatable 自定义资源值，可以通过一个 controller watch CRD 来动态更新；如果不是自定义资源，而是 cpu/memory 等资源。
+	//  就需要使用 webhook 去拦截 kubelet 上报 node status 时的数据去修改 cpu/memory。
 	for rName, rQuant := range podRequest.ScalarResources {
 		if v1helper.IsExtendedResourceName(rName) {
 			// If this resource is one of the extended resources that should be ignored, we will skip checking it.
