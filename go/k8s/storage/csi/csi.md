@@ -143,3 +143,10 @@ spec:
 ## 面试题
 重点调查下 VolumeAttachment 资源对象是怎么被创建的完整过程？？
 为何 CSIDriver spec.attachRequired=false 就可以控制 k8s 跳过 attach/detach 操作步骤？
+
+
+## 参考文献
+**[一文读懂 K8s 持久化存储流程](https://mp.weixin.qq.com/s/jpopq16BOA_vrnLmejwEdQ)**
+
+**[一文读懂容器存储接口 CSI](https://mp.weixin.qq.com/s/A9xWKMmrxPyOEiCs_sicYQ)**
+
