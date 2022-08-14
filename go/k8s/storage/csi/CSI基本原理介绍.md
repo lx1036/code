@@ -8,14 +8,15 @@
 因为 PVController 无法直接操作我们部署的 CSI Deployment，需要借助该 sidecar 容器 grpc 调用 CSI ControllerServer service 来创建删除卷。
 
 * ADController in kube-controller-manager：借助 external-attacher sidecar 容器，负责处理 volume 的 attach/detach 操作，将设备挂载/卸载到目标节点，为块存储设计的。
-ADController 观察到使用 CSI PV 的 pod 被调度到节点后，调用 in-tree csi plugin 的 Attach() 函数去创建对应的 VolumeAttachment 对象，该对象被 external-attacher sidecar 容器使用来处理 attach/detach 操作。
-早期这个操作默认在 kubelet VolumeManager 里实现，后期移动到 kube-controller-manager 中心化处理。
-因为 ADController 无法直接操作我们部署的 CSI Deamonset，需要借助该 sidecar 容器 grpc 调用 CSI NodeServer service 的 NodeStageVolume/NodeUnstageVolume 来挂载卸载卷。
+ADController 观察到使用 CSI PV 的 pod 被调度到节点后，调用 in-tree csi plugin 的 Attach() 函数去创建对应的 VolumeAttachment 对象，
+该对象被 external-attacher sidecar 容器使用来处理 attach/detach 操作，其实调用 csi 的 ControllerServer service 的 ControllerPublishVolume/ControllerUnpublishVolume，我们自己写的 csi 这两个函数没有实现。
+早期这个操作默认在 kubelet VolumeManager 里实现，后期移动到 kube-controller-manager 中心化处理。因为 ADController 无法直接操作我们部署的 CSI Deamonset，
+需要借助该 sidecar 容器 grpc 调用 CSI NodeServer service 的 NodeStageVolume/NodeUnstageVolume 来挂载卸载卷。
 
 * PluginManager in kubelet(除了处理 CSI，还有 DevicePlugin): 负责注册 CSI plugin，kubelet watch 指定目录，CSI 在该目录下创建对用的 socket 实现 CSI IdentityServer service，从而被 kubelet 识别注册。 
 
-* VolumeManager in kubelet: 负责处理 volume 的 Mount/Umount 操作，以及volume 的格式化等操作。Mount/Umount 操作是 kubelet 直接调用 CSI NodeServer service 
-的 NodePublishVolume/NodeUnpublishVolume 接口实现。Attach/Detach 操作默认关闭，并逐渐废弃。
+* VolumeManager in kubelet: 负责处理 volume 的 Mount/Umount 操作，以及 volume 的格式化等操作。Mount/Umount 操作是 kubelet 直接调用 CSI NodeServer service 
+的 NodeStageVolume/NodeUnstageVolume/NodePublishVolume/NodeUnpublishVolume 接口实现。Attach/Detach 操作默认关闭，并逐渐废弃。
 
 * in-tree plugins in kubelet: kubelet 组件内置了很多 volume，比如 csi 框架、ceph rbd、hostPath 等。
 
