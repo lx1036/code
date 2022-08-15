@@ -114,7 +114,7 @@ spec:
 
 ## 面试题
 (1)重点调查下 VolumeAttachment 资源对象是怎么被创建的完整过程？为何 CSIDriver spec.attachRequired=false 就可以控制 k8s 跳过 attach/detach 操作步骤？
-ADController in kube-controller-manager 创建的，可以参考上文的该组件介绍。CSIDriver spec.attachRequired=false 会在 ADController 去判断是否 csiPlugin.CanAttach()。
+ADController in kube-controller-manager 创建的，可以参考上文的该组件介绍。CSIDriver spec.attachRequired=false 会在 ADController 去判断是否 csiPlugin.CanAttach()。attachRequired=true ADController 才会创建 VolumeAttachment 对象，被我们自研的 CSI 使用。
 
 
 ## 参考文献

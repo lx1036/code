@@ -356,8 +356,8 @@ func (metaClient *MetaClient) CreateInodeAndDentry(parentID fuseops.InodeID, fil
 	rwPartitions := metaClient.getRWPartitions()
 	epoch := atomic.AddUint64(&metaClient.epoch, 1)
 	length := len(rwPartitions)
-	for i := 0; i < length; i++ {
-		rwPartition := rwPartitions[(int(epoch)+i)%length] // ???
+	for i := 0; i < length; i++ { // 只写一个 rwPartition，但是这里有挑选机制
+		rwPartition := rwPartitions[(int(epoch)+i)%length] // 这里算是随机选择
 		if len(rwPartition.LeaderAddr) == 0 {
 			klog.Infof(fmt.Sprintf("[CreateInodeAndDentry]partitionID %d has no leader address", rwPartition.PartitionID))
 			continue
