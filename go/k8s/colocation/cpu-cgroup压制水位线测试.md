@@ -10,10 +10,13 @@
 ```shell
 # 假定机器有 0-23 共 24 个 cpu
 # 比如压制水位线为整机 cpu 20% 就开始压制，但是只会压制 offline cgroup，不会压制 online cgroup，即不会设置 online 的 cpu.cfs_quota_us
-cpu.cfs_quota_us = 20% * 24 * cpu.cfs_period_us = 480000
+cpu.cfs_quota_us = 20% * 24 * cpu.cfs_period_us(100000) = 480000
 ```
 
-这样所有在 offline cgroup 的 pods 锁使用的资源不会超过整机的 20%。
+> 注意，cpu.cfs_quota_us 是 linux 社区内核自带的 cpu cgroup，如果 cpuset.cpus=32,cpu.cfs_period_us=100000,cpu.cfs_quota_us=100000，
+> 表示该容器完全独占了 cpu32。
+
+这样所有在 offline cgroup 的 pods 使用的资源不会超过整机的 20%。
 同时还可以动态设置，比如现在动态设置成 10%，然后就会立刻被压制成只能消费 10% cpu 资源。
 
 ## 验证
