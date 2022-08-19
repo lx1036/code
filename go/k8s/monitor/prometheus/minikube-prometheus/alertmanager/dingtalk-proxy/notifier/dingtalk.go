@@ -1,10 +1,12 @@
 package notifier
 
 import (
-	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"k8s-lx1036/k8s/monitor/prometheus/minikube-prometheus/alertmanager/dingtalk-proxy/model"
+	"k8s-lx1036/k8s/monitor/prometheus/minikube-prometheus/alertmanager/dingtalk-proxy/transformer"
 	"net/http"
+	"strings"
 )
 
 type Notifier interface {
@@ -32,7 +34,7 @@ func (dingTalk *DingTalk) Send() (dingTalkResponse Response, err error) {
 		return dingTalkResponse, err
 	}
 
-	req, _ := http.NewRequest("POST", dingTalk.Url, bytes.NewBuffer(data))
+	req, _ := http.NewRequest("POST", dingTalk.Url, strings.NewReader(string(data)))
 	req.Header.Set("Content-Type", "application/json")
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
