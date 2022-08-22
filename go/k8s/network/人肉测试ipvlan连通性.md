@@ -50,6 +50,26 @@ ipvlan 有两种不同的模式：L2(二层交换机)和 L3(三层交换机)。
 
 ## L2 模式
 
+
+```shell
+# 在 host net ns 下 ping 通容器 ip
+ip link add dummy3-ipvlan type dummy
+ip link set dummy3-ipvlan up
+ip netns add net-ipvlan-3
+ip link add ipv1 link dummy3-ipvlan type ipvlan mode l2
+ip link set ipv1 netns net-ipvlan-3
+ip netns exec net-ipvlan-3 ip link set ipv1 up
+ip netns exec net-ipvlan-3 ip addr add 200.20.2.10/24 dev ipv1
+ip netns exec net-ipvlan-3 ip route add default dev ipv1
+
+ip link add ipvl_ipv3 link dummy3-ipvlan type ipvlan mode l2
+ip link set ipvl_ipv3 up
+ip addr add 10.208.40.114 dev ipvl_ipv3 # 10.208.40.114 是宿主机 nodeIP，即 eth0 地址，必须有 ip 地址否则不通
+ip route add 200.20.2.10 dev ipvl_ipv3
+ping -c 3 200.20.2.10
+
+```
+
 ```shell
 ip link add dummy-ipvlan-l2 type dummy
 ip link set dummy-ipvlan-l2 up
@@ -72,7 +92,24 @@ ip netns exec net-ipvlan-l2-2 ip route add default dev ipv2
 ip netns exec net-ipvlan-l2-1 ping -c 3 200.1.2.10
 ip netns exec net-ipvlan-l2-2 ping -c 3 200.1.1.10
 ip netns exec net-ipvlan-l2-2 ping -c 3 200.2.1.10
+
+# 现在需要在 host namespace 里能 ping 通 200.1.2.10
+ip link add ipvl_ipv2 link dummy-ipvlan-l2 type ipvlan mode l2
+ip link set ipvl_ipv2 up
+ip addr add 10.208.40.114 dev ipvl_ipv2 # 10.208.40.114 是宿主机 nodeIP，即 eth0 地址
+ip route add 200.1.2.10 dev ipvl_ipv2
+ip route add 200.1.1.10 dev ipvl_ipv2
+ip route add 200.2.1.10 dev ipvl_ipv2
+ping -c 3 200.1.2.10
+ping -c 3 200.1.1.10
+ping -c 3 200.2.1.10
+
+# 现在需要在 net ns 里 curl 通 serviceIP
+
 ```
+
+
+TODO: 现在问题是，两个不同的弹性网卡下，容器之间的互通？？？
 
 ## L3 模式
 
