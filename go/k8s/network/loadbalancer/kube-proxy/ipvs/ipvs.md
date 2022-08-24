@@ -101,7 +101,7 @@ rs2=192.168.64.5
 sudo ipvsadm -C
 sudo ipvsadm -A -t 192.168.64.6:8080 -s rr
 sudo ipvsadm -a -t 192.168.64.6:8080 -r 192.168.64.4:80 -g
-sudo ipvsadm -a -t 192.168.64.6:8080 -r 192.168.64.5:80 -g
+sudo ipvsadm -a -t 192.168.64.6:8080 -r 192.168.64.5:80 -g # 或者 -m 表示 ip masq
 
 sudo ipvsadm -ln -t 192.168.64.6:8080
 
