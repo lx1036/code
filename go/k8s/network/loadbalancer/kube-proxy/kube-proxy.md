@@ -81,3 +81,16 @@ DaemonSet 形式跑在每一个 Node 节点上，当然也可以只跑在一小�
 
 
 
+# troubleshoot
+(1) ipvs 模式为何必须把 vip 绑定到 kube-ipvs0 网卡上？
+https://github.com/kubernetes/kubernetes/issues/107662#issuecomment-1017894646
+https://blog.51cto.com/u_12790562/3799631
+https://blog.csdn.net/yujia_666/article/details/111053291
+
+ipvs DR 模式就必须要绑定 vip 到网卡上，这样 client 才可以外部 curl 一个 vip。而且：
+> kube-ipvs0 should be down and noarp. This is intentional and not a bug. 
+> kube-ipvs0 only purpose is to hold addresses that should be directed to ipvs. 
+> Compare with proxy-mode=iptables where the vip addresses are on no interface at all. 
+> Unfortunately there is no easy way to do that with ipvs, if it were, it would have been used and no kube-ipvs0 interface 
+> would have been defined.
+
