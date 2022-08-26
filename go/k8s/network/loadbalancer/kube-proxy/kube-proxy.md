@@ -94,3 +94,41 @@ ipvs DR 模式就必须要绑定 vip 到网卡上，这样 client 才可以外�
 > Unfortunately there is no easy way to do that with ipvs, if it were, it would have been used and no kube-ipvs0 interface 
 > would have been defined.
 
+ipvs 是把 DNAT 放在 INPUT chain 上，而不是常用的 PREROUTING 上，所以必须把 vip 绑定在 kube-ipvs0 网卡上，让包进入 INPUT chain 上。
+同时，kube-proxy 会增加一些 serviceIP -> kube-ipvs0 的路由。这样在 host 或在容器内 `curl -k https://192.168.0.1:443`，内核认为这个包访问自己，
+会给 INPUT chain，ipvs 会在 INPUT chain 上做 DNAT serviceIP -> podIP，然后经过路由表判断从 eth0 出去。包会从 kube-ipvs0 网卡：
+
+```shell
+ip route list table local
+local 192.168.0.1 dev kube-ipvs0 proto kernel scope host src 192.168.0.1
+local 192.168.0.2 dev kube-ipvs0 proto kernel scope host src 192.168.0.2
+local 192.168.0.2 dev nodelocaldns proto kernel scope host src 192.168.0.2
+broadcast 192.168.0.2 dev nodelocaldns proto kernel scope link src 192.168.0.2
+local 192.168.13.241 dev kube-ipvs0 proto kernel scope host src 192.168.13.241
+local 192.168.17.214 dev kube-ipvs0 proto kernel scope host src 192.168.17.214
+local 192.168.23.159 dev kube-ipvs0 proto kernel scope host src 192.168.23.159
+local 192.168.62.122 dev kube-ipvs0 proto kernel scope host src 192.168.62.122
+local 192.168.93.34 dev kube-ipvs0 proto kernel scope host src 192.168.93.34
+local 192.168.115.35 dev kube-ipvs0 proto kernel scope host src 192.168.115.35
+local 192.168.158.10 dev kube-ipvs0 proto kernel scope host src 192.168.158.10
+local 192.168.212.236 dev kube-ipvs0 proto kernel scope host src 192.168.212.236
+```
+
+ipvs 不支持 SNAT，所以需要 iptables 来做 SNAT，主要就是 (通过 `iptables -t nat -S` 查看):
+
+```shell
+-N KUBE-MARK-MASQ
+-A KUBE-SERVICES ! -s 20.225.0.0/16 -m comment --comment "Kubernetes service cluster ip + port for masquerade purpose" -m set --match-set KUBE-CLUSTER-IP dst,dst -j KUBE-MARK-MASQ
+-A KUBE-LOAD-BALANCER -j KUBE-MARK-MASQ
+-A KUBE-NODE-PORT -p tcp -m comment --comment "Kubernetes nodeport TCP port for masquerade purpose" -m set --match-set KUBE-NODE-PORT-TCP dst -j KUBE-MARK-MASQ
+-A KUBE-MARK-MASQ -j MARK --set-xmark 0x4000/0x4000 # KUBE-MARK-MASQ 给包打个 mark
+
+
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --set-xmark 0x4000/0x0
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE # POSTROUTING chain 上做 SNAT，DNAT 一般在 PREROUTING 上做
+```
+
+参考资料
+**[kubernetes service 和 kube-proxy详解](https://plantegg.github.io/2020/09/22/kubernetes%20service%20%E5%92%8C%20kube-proxy%E8%AF%A6%E8%A7%A3/)**
+
