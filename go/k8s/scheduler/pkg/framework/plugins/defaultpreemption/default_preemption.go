@@ -25,6 +25,11 @@ import (
 )
 
 // INFO: 抢占preemption plugin
+//  (1)判断该 pod 是否可以抢占，比如该 pod 抢占策略是不可抢占的，就不抢占
+//  (2)找出所有可以被抢占的节点，但最多100台节点，只要改节点上有 Pod 优先级比当前 Pod 优先级低，该节点就是可以被抢占的节点。
+//  当然，该 Pod 得经过针对这个 Node 的 Filter 走一遍，比如该 Node 资源还够不够。
+//  (3)根据规则找出最优的可被抢占的节点，比如可以被驱逐的 victims 数量最少，优先级总和最小，node 上高优先级 Pod 数量最少等等
+//  (4)驱逐 victim pod
 
 const (
 	// Name of the plugin used in the plugin registry and configurations.
