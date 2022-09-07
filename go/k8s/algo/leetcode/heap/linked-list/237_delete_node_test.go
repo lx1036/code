@@ -81,3 +81,26 @@ func TestDeleteNode(test *testing.T) {
 		l2 = l2.Next
 	}
 }
+
+// https://leetcode.cn/problems/shan-chu-lian-biao-de-jie-dian-lcof/
+
+// 删除节点
+
+func deleteNode2(head *ListNode, val int) *ListNode {
+	cur := head
+	var prev *ListNode
+	for cur != nil {
+		if cur.Val == val {
+			if cur.Next == nil {
+				prev.Next = nil
+			} else {
+				cur.Next = cur.Next.Next
+			}
+		}
+
+		prev = cur
+		cur = cur.Next
+	}
+
+	return head
+}

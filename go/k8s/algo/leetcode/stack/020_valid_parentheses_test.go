@@ -73,3 +73,32 @@ func valid(queue []int) bool {
 	}
 	return true
 }
+
+func isValid2(s string) bool {
+	l := len(s)
+	if l%2 != 0 {
+		return false
+	}
+
+	for i := 0; i < l-1; i++ {
+		if s[i] == '(' {
+			if s[i+1] != ')' {
+				return false
+			}
+		}
+
+		if s[i] == '[' {
+			if s[i+1] != ']' {
+				return false
+			}
+		}
+
+		if s[i] == '{' {
+			if s[i+1] != '}' {
+				return false
+			}
+		}
+	}
+
+	return true
+}
