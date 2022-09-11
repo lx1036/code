@@ -2,7 +2,7 @@ package dfs_bfs_bs
 
 import (
 	"github.com/stretchr/testify/assert"
-	"k8s-lx1036/k8s/concepts/algorithm/leetcode/tree/binary_search_tree"
+	"k8s-lx1036/k8s/algo/leetcode/tree/binary_search_tree"
 	"math"
 	"testing"
 )

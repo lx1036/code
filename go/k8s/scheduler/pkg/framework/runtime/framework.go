@@ -394,7 +394,7 @@ func (f *Framework) SnapshotSharedLister() framework.SharedLister {
 }
 
 func (f *Framework) IterateOverWaitingPods(callback func(*WaitingPod)) {
-	panic("implement me")
+	f.waitingPods.iterate(callback)
 }
 
 func (f *Framework) GetWaitingPod(uid types.UID) *WaitingPod {
@@ -414,6 +414,10 @@ func (f *Framework) ProfileName() string {
 
 func (f *Framework) ClientSet() clientset.Interface {
 	return f.clientSet
+}
+
+func (f *Framework) KubeConfig() *restclient.Config {
+	return f.kubeConfig
 }
 
 func (f *Framework) EventRecorder() events.EventRecorder {
@@ -784,7 +788,7 @@ func (f *Framework) RunPermitPlugins(ctx context.Context, state *framework.Cycle
 	for _, pl := range f.permitPlugins {
 		status, timeout := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
-			if status.IsUnschedulable() {
+			if status.IsUnschedulable() { // INFO: 比如 pod-group plugin Permit() 里如果该 pod PodGroupNotFound，则这个 pod 就是 framework.NewStatus(framework.Unschedulable, "PodGroup not found")
 				klog.V(4).InfoS("Pod rejected by permit plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
 				status.SetFailedPlugin(pl.Name())
 				return status
@@ -804,7 +808,7 @@ func (f *Framework) RunPermitPlugins(ctx context.Context, state *framework.Cycle
 		}
 	}
 
-	if statusCode == framework.Wait {
+	if statusCode == framework.Wait { // INFO: 比如 pod-group plugin Permit() 当前 pod 等待其他兄弟 pod，最后满足 minNumber
 		waitingPod := newWaitingPod(pod, pluginsWaitTime)
 		f.waitingPods.add(waitingPod)
 		msg := fmt.Sprintf("one or more plugins asked to wait and no plugin rejected pod %q", pod.Name)

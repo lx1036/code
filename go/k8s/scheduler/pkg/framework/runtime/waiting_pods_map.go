@@ -40,6 +40,15 @@ func (m *WaitingPodsMap) remove(uid types.UID) {
 	delete(m.pods, uid)
 }
 
+// iterate acquires a read lock and iterates over the WaitingPods map.
+func (m *WaitingPodsMap) iterate(callback func(*WaitingPod)) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, v := range m.pods {
+		callback(v)
+	}
+}
+
 // WaitingPod represents a pod waiting in the permit phase.
 type WaitingPod struct {
 	mu             sync.RWMutex
@@ -74,6 +83,25 @@ func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *Wa
 
 func (w *WaitingPod) GetPod() *v1.Pod {
 	return w.pod
+}
+
+func (w *WaitingPod) Allow(pluginName string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if timer, exist := w.pendingPlugins[pluginName]; exist {
+		timer.Stop()
+		delete(w.pendingPlugins, pluginName)
+	}
+
+	// Only signal success status after all plugins have allowed
+	if len(w.pendingPlugins) != 0 {
+		return
+	}
+
+	select {
+	case w.status <- framework.NewStatus(framework.Success, ""):
+	default:
+	}
 }
 
 // Reject declares the waiting pod unschedulable.

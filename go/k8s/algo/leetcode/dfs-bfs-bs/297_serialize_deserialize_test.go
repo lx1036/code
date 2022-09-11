@@ -1,6 +1,6 @@
 package dfs_bfs_bs
 
-import "k8s-lx1036/k8s/concepts/algorithm/leetcode/tree/binary_search_tree"
+import "k8s-lx1036/k8s/algo/leetcode/tree/binary_search_tree"
 
 // https://leetcode-cn.com/problems/serialize-and-deserialize-binary-tree/
 

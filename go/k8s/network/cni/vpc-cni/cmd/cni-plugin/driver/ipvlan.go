@@ -245,7 +245,7 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 			break
 		}
 	}
-	clsact := &netlink.GenericQdisc{ // `tc qdisc add dev eth0 handle ffff0000: clsact`
+	clsact := &netlink.GenericQdisc{ // `tc qdisc add dev eth0 handle ffff: clsact` 等于 `tc qdisc add dev dummy-ipvlan-l2 handle ffff: parent ffff:fff1`
 		QdiscAttrs: netlink.QdiscAttrs{
 			LinkIndex: parentLink.Attrs().Index,
 			Parent:    netlink.HANDLE_CLSACT,
@@ -260,7 +260,7 @@ func (ipvlan *IPvlanDriver) Setup(cfg *types.SetupConfig, netNS ns.NetNS) error 
 	// INFO: 只有 serviceCIDR/hostStackCIDR 网段才会重定向到 slaveLink ipvlan interface
 	cidrs := append(cfg.HostStackCIDRs, cfg.ServiceCIDR.IPv4)
 	ptype := uint16(unix.PACKET_HOST)
-	for _, cidr := range cidrs { // `tc filter add dev eth0 parent ffff0000: protocol ip u32 match ip src 192.168.0.0/16 action mirred ingress redirect dev slaveLink`
+	for _, cidr := range cidrs { // `tc filter add dev eth0 parent ffff0000: protocol ip u32 match ip dst 192.168.0.0/16 action mirred ingress redirect dev slaveLink`
 		err = netlink.FilterAdd(&netlink.U32{
 			FilterAttrs: netlink.FilterAttrs{
 				LinkIndex: parentLink.Attrs().Index,

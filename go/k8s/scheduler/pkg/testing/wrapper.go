@@ -23,6 +23,13 @@ func (p *PodWrapper) UID(s string) *PodWrapper {
 	p.SetUID(types.UID(s))
 	return p
 }
+func (p *PodWrapper) Label(k, v string) *PodWrapper {
+	if p.Labels == nil {
+		p.Labels = make(map[string]string)
+	}
+	p.Labels[k] = v
+	return p
+}
 func (p *PodWrapper) Priority(val int32) *PodWrapper {
 	p.Spec.Priority = &val
 	return p
