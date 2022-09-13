@@ -7,6 +7,8 @@ import (
 
 // https://leetcode-cn.com/problems/binary-search/
 
+// 二分查找
+
 // 时间复杂度O(logN)，空间复杂度O(1)
 func search(nums []int, target int) int {
 	return searchRecursive(nums, 0, len(nums)-1, target)
