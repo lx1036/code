@@ -103,3 +103,27 @@ func TestThreadPool(test *testing.T) {
 
 	<-stopCh
 }
+
+type Pool struct {
+	taskCh chan func()
+}
+
+func NewPool(size int) *Pool {
+	p := &Pool{
+		taskCh: make(chan func(), 100),
+	}
+	
+	for i := 0; i < size; i++ {
+		go func() {
+			for task := range p.taskCh {
+				task()
+			}
+		}()
+	}
+	
+	return p
+}
+
+func (p *Pool) Add(task func())  {
+	p.taskCh <- task
+}
