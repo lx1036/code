@@ -112,7 +112,7 @@ func NewPool(size int) *Pool {
 	p := &Pool{
 		taskCh: make(chan func(), 100),
 	}
-	
+
 	for i := 0; i < size; i++ {
 		go func() {
 			for task := range p.taskCh {
@@ -120,10 +120,10 @@ func NewPool(size int) *Pool {
 			}
 		}()
 	}
-	
+
 	return p
 }
 
-func (p *Pool) Add(task func())  {
+func (p *Pool) Add(task func()) {
 	p.taskCh <- task
 }
