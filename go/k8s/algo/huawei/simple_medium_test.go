@@ -2937,7 +2937,6 @@ func hj71() {
 		fmt.Println(dp[length1][length2])
 	}
 }
-
 //判断是否为给定字符类型
 func match(r byte) bool {
 	if r >= '0' && r <= '9' {
@@ -3000,3 +2999,6 @@ func hj75() {
 
 // https://www.nowcoder.com/practice/97ba57c35e9f4749826dc3befaeae109?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ77 火车进站
+
+// https://www.nowcoder.com/practice/e0480b2c6aa24bfba0935ffcca3ccb7b?tpId=37&tqId=21305&rp=1&ru=/exam/oj/ta&qru=/exam/oj/ta&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37&difficulty=3&judgeStatus=undefined&tags=&title=
+// HJ82 将真分数分解为埃及分数
