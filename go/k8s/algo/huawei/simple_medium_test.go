@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"math"
+	"math/big"
 	"os"
 	"sort"
 	"strconv"
@@ -1428,9 +1430,7 @@ func hj16() {
 			nil,
 			nil,
 		}
-
 	}
-
 	for j, k := range items { //构造主物品
 		if k.q != 0 {
 			if items[k.q-1].acc1 == nil {
@@ -1495,11 +1495,9 @@ func hj16() {
 			}
 
 		}
-
 		cnt++
 	}
 	fmt.Println(matrix[cnt-1][money])
-
 }
 
 type item struct {
@@ -1783,3 +1781,1222 @@ func hj26() {
 		}
 	}
 }
+
+// https://www.nowcoder.com/practice/03ba8aeeef73400ca7a37a5f3370fe68?tpId=37&tqId=21250&rp=1&ru=/exam/oj/ta&qru=/exam/oj/ta&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37&difficulty=3&judgeStatus=undefined&tags=&title=
+// HJ27 查找兄弟单词
+// 输入描述：
+//输入只有一行。 先输入字典中单词的个数n，再输入n个单词作为字典单词。 然后输入一个单词x 最后后输入一个整数k
+//输出描述：
+//第一行输出查找到x的兄弟单词的个数m 第二行输出查找到的按照字典顺序排序后的第k个兄弟单词，没有符合第k个的话则不用输出。
+func hj27() {
+	input := bufio.NewScanner(os.Stdin)
+	input.Scan()
+	inputs := strings.Split(input.Text(), " ")
+	n, _ := strconv.Atoi(inputs[0])       // 有多少组数据
+	index, _ := strconv.Atoi(inputs[n+2]) // 输出结果的第几项
+	tag := inputs[n+1]                    // 以tag字符串为基准
+	inputs = inputs[1 : n+1]              // 需要处理的字符串
+
+	map1 := make(map[string]int) // 基准字符每个字母出现的次数
+	res := make([]string, 0)     // 符合条件字符串
+	for _, v := range tag {
+		map1[string(v)]++
+	}
+
+	for _, v := range inputs { // 遍历每一项
+		map2 := make(map[string]int)
+		// 只有长度相同且不全等的字符串才进入循环
+		if len(v) == len(tag) && v != tag {
+			ta := 0
+			for _, v := range v { // 当前字符生成map
+				map2[string(v)]++
+			}
+			for _, v := range tag { // 两个map作比较
+				if map1[string(v)] != map2[string(v)] {
+					ta = 1
+				}
+			}
+			if ta == 0 {
+				res = append(res, v)
+			}
+		}
+	}
+	sort.Strings(res)
+	fmt.Println(len(res))
+	if len(res) < index {
+		return
+	}
+	fmt.Print(res[index-1])
+}
+
+// https://www.nowcoder.com/practice/2aa32b378a024755a3f251e75cbf233a?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ29 字符串加解密
+// 对输入的字符串进行加解密，并输出。
+//加密方法为：
+//当内容是英文字母时则用该英文字母的后一个字母替换，同时字母变换大小写,如字母a时则替换为B；字母Z时则替换为a；
+//当内容是数字时则把该数字加1，如0替换1，1替换2，9替换0；
+//其他字符不做变化。
+//解密方法为加密的逆过程。
+func hj29() {
+	input := bufio.NewScanner(os.Stdin)
+	for input.Scan() {
+		s := input.Text()
+		li := make([]byte, 0)
+		for i := 0; i < len(s); i++ {
+			if s[i] == 'Z' {
+				li = append(li, 'a')
+			} else if s[i] == 'z' {
+				li = append(li, 'A')
+			} else if s[i] == '9' {
+				li = append(li, '0')
+			} else if s[i] >= 'a' && s[i] < 'z' {
+				li = append(li, s[i]-32+1)
+			} else if s[i] >= 'A' && s[i] < 'Z' {
+				li = append(li, s[i]+32+1)
+			} else if s[i] >= '0' && s[i] < '9' {
+				li = append(li, s[i]+1)
+			} else {
+				li = append(li, s[i])
+			}
+		}
+		fmt.Println(string(li))
+
+		input.Scan()
+		s = input.Text()
+		li = make([]byte, 0)
+		for i := 0; i < len(s); i++ {
+			if s[i] == 'a' {
+				li = append(li, 'Z')
+			} else if s[i] == 'A' {
+				li = append(li, 'z')
+			} else if s[i] == '0' {
+				li = append(li, '9')
+			} else if s[i] > 'a' && s[i] <= 'z' {
+				li = append(li, s[i]-32-1)
+			} else if s[i] > 'A' && s[i] <= 'Z' {
+				li = append(li, s[i]+32-1)
+			} else if s[i] > '0' && s[i] <= '9' {
+				li = append(li, s[i]-1)
+			} else {
+				li = append(li, s[i])
+			}
+
+		}
+
+		fmt.Println(string(li))
+	}
+}
+
+// https://leetcode.cn/problems/permutations-ii/
+// 考古碎片或者全排列问题 47. 全排列 II
+// 给定一个可包含重复数字的序列 nums ，按任意顺序 返回所有不重复的全排列。
+func permuteUnique(nums []int) (ans [][]int) {
+	sort.Ints(nums)
+	n := len(nums)
+	var perm []int
+	vis := make([]bool, n)
+	var backtrack func(int)
+	backtrack = func(idx int) {
+		if idx == n {
+			ans = append(ans, append([]int(nil), perm...))
+			return
+		}
+		for i, v := range nums {
+			if vis[i] || i > 0 && !vis[i-1] && v == nums[i-1] {
+				continue
+			}
+			perm = append(perm, v)
+			vis[i] = true
+			backtrack(idx + 1)
+			vis[i] = false
+			perm = perm[:len(perm)-1]
+		}
+	}
+	backtrack(0)
+	return
+}
+
+// https://leetcode.cn/problems/nge-tou-zi-de-dian-shu-lcof/
+// 剑指 Offer 60. n个骰子的点数
+// 把n个骰子扔在地上，所有骰子朝上一面的点数之和为s。输入n，打印出s的所有可能的值出现的概率。
+//你需要用一个浮点数数组返回答案，其中第 i 个元素代表这 n 个骰子所能掷出的点数集合中第 i 小的那个的概率。
+func twoSum(n int) []float64 {
+	dp := make([][]int, n+1)
+	for i := 0; i <= n; i++ {
+		dp[i] = make([]int, 6*n+1)
+	}
+	for i := 1; i <= 6; i++ {
+		dp[1][i] = 1
+	}
+
+	for i := 1; i <= n; i++ {
+		dp[i][i] = 1
+	}
+
+	for i := 2; i <= n; i++ {
+		for j := i + 1; j <= 6*i; j++ {
+			for k := 1; k <= 6; k++ {
+				if j-k >= i-1 {
+					dp[i][j] += dp[i-1][j-k]
+				}
+			}
+		}
+	}
+
+	result := make([]float64, 6*n)
+	for i := n; i <= 6*n; i++ {
+		result[i-1] = float64(dp[n][i]) / math.Pow(6, float64(n))
+	}
+	return result[n-1:]
+}
+
+// https://www.nowcoder.com/practice/3cd4621963e8454594f00199f4536bb1?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ32 密码截取
+// 输入描述：
+//输入一个字符串（字符串的长度不超过2500）
+//输出描述：
+//返回有效密码串的最大长度
+// 和 HJ85 最长回文子串一样
+func hj32() {
+	var s string
+	for {
+		_, err := fmt.Scan(&s)
+		if err != nil {
+			break
+		}
+		fmt.Println(longestPalindromehj32(s))
+	}
+}
+func longestPalindromehj32(s string) int {
+	dp := make([][]int, len(s))
+	for i := 0; i < len(s); i++ {
+		dp[i] = make([]int, len(s))
+		dp[i][i] = 1
+	}
+	//初始化
+	max := 1
+	for i := len(s) - 2; i >= 0; i-- {
+		for j := i + 1; j < len(s); j++ {
+			if s[i] == s[j] {
+				if dp[i+1][j-1] == 1 {
+					dp[i][j] = 1
+				} else if j-i <= 1 {
+					dp[i][j] = 1
+				}
+				if dp[i][j] == 1 && max < j-i+1 {
+					max = j - i + 1
+				}
+			}
+		}
+	}
+	return max
+}
+
+// https://www.nowcoder.com/practice/66ca0e28f90c42a196afd78cc9c496ea?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ33 整数与IP地址间的转换
+// 输入描述：
+//输入
+//1 输入IP地址
+//2 输入10进制型的IP地址
+//输出描述：
+//输出
+//1 输出转换成10进制的IP地址
+//2 输出转换后的IP地址
+func hj33() {
+	var ip string
+	fmt.Scan(&ip)
+	fmt.Println(IptoIn(ip))
+	var num int
+	fmt.Scan(&num)
+	fmt.Println(IntoIp(num))
+}
+func IptoIn(ip string) int {
+	ipS := strings.Split(ip, ".")
+	res := 0
+	for i := 0; i < len(ipS); i++ {
+		num, _ := strconv.Atoi(ipS[i])
+		res = res*256 + num
+	}
+	return res
+}
+func IntoIp(num int) string {
+	i := 1
+	nums := make([]int, 0)
+	var temp int
+	for num > 0 {
+		temp += (num % 2) * i
+		num /= 2
+		i *= 2
+		if i == 256 {
+			i = 1
+			nums = append(nums, temp)
+			temp = 0
+		}
+	}
+	if temp != 0 {
+		nums = append(nums, temp)
+	}
+	for len(nums) < 4 {
+		nums = append(nums, 0)
+	}
+	var s string
+	for _, v := range nums {
+		s = fmt.Sprintf("%s.%s", strconv.Itoa(v), s)
+	}
+	return s[:len(s)-1]
+}
+
+// https://www.nowcoder.com/practice/e4af1fe682b54459b2a211df91a91cf3?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ36 字符串加密
+// 首先，选择一个单词作为密匙，如TRAILBLAZERS。如果单词中包含有重复的字母，只保留第1个，将所得结果作为新字母表开头，并将新建立的字母表中未出现的字母按照正常字母表顺序加入新字母表
+// 生成字母表
+func getTable(key []byte, tableMap map[byte]byte) {
+	tmpMap := make(map[byte]int)
+	k := 0
+	for _, ch := range key {
+		if _, ok := tmpMap[ch]; !ok {
+			tableMap[byte('a'+k)] = ch
+			//fmt.Println(string(byte('a'+k)),string(ch))
+			tmpMap[ch] = 1
+			k++
+		}
+	}
+	// 判断26个字母，没出现在temMap里面的还有哪些
+	tmpMap2 := make(map[int]byte)
+	k = 0
+	for i := 0; i < 26; i++ {
+		if _, ok := tmpMap[byte('a'+i)]; !ok {
+			tmpMap2[k] = byte('a' + i)
+			k++
+		}
+	}
+	// 依次将tmpMap2 赋值给tableMap
+	k = 0
+	for i := 'a' + len(tmpMap); i <= 'z'; i++ {
+		tableMap[byte(i)] = tmpMap2[k]
+		//fmt.Println(string(i),string(tmpMap2[k]))
+		k++
+	}
+}
+func getRes(chs []byte, tableMap map[byte]byte) {
+	for _, ch := range chs {
+		fmt.Print(string(tableMap[ch]))
+	}
+	fmt.Print("\n")
+}
+
+// 输入单词，去除重复的字母，按顺序输出，26个字母没出现的再接着输出，对于a~z生成字母转换表
+// 多组数据，输入仅含小写
+func hj36() {
+	scanner := bufio.NewScanner(os.Stdin)
+	i := 0
+	tableMap := make(map[byte]byte)
+	for scanner.Scan() {
+		i++
+		str := scanner.Text()
+		if i%2 == 1 { // 密钥
+			getTable([]byte(str), tableMap)
+		} else {
+			getRes([]byte(str), tableMap)
+		}
+	}
+}
+
+// https://www.nowcoder.com/practice/2f6f9339d151410583459847ecc98446?tpId=37&tqId=21261&rp=1&ru=/exam/oj/ta&qru=/exam/oj/ta&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37&difficulty=3&judgeStatus=undefined&tags=&title=
+// HJ38 求小球落地5次后所经历的路程和第5次反弹的高度
+// 假设一个球从任意高度自由落下，每次落地后反跳回原高度的一半; 再落下, 求它在第5次落地时，共经历多少米?第5次反弹多高？
+func hj38() {
+	var height, all float32
+	fmt.Scanf("%f", &height)
+	for i := 0; i < 5; i++ {
+		if i < 1 {
+			all += height
+		} else {
+			all += height * 2
+		}
+		height = height / 2
+	}
+	fmt.Printf("%.6f \n", all)
+	fmt.Printf("%.6f \n", height)
+}
+
+// https://www.nowcoder.com/practice/f9a4c19050fc477e9e27eb75f3bfd49c?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ41 称砝码
+// 输入描述：
+//对于每组测试数据：
+//第一行：n --- 砝码的种数(范围[1,10])
+//第二行：m1 m2 m3 ... mn --- 每种砝码的重量(范围[1,2000])
+//第三行：x1 x2 x3 .... xn --- 每种砝码对应的数量(范围[1,10])
+func hj41() {
+	var n int
+	fmt.Scan(&n)
+	weights := make([]int, n)
+	for i := 0; i < n; i++ {
+		var w int
+		fmt.Scan(&w)
+		weights[i] = w
+	}
+	all := []int{} // 所有元素装到一个切片里
+	for i := 0; i < n; i++ {
+		var num int
+		fmt.Scan(&num)
+		for j := 0; j < num; j++ {
+			all = append(all, weights[i])
+		}
+	}
+
+	set := map[int]struct{}{0: struct{}{}} // 用map当作set用
+	for _, v := range all {
+		temp := []int{}
+		for k, _ := range set { // map是引用类型，要先深度拷贝，不然后面的循环会循环到新增元素
+			temp = append(temp, k)
+		}
+		for _, k := range temp {
+			set[k+v] = struct{}{}
+		}
+	}
+	fmt.Println(len(set))
+}
+
+// https://www.nowcoder.com/practice/cf24906056f4488c9ddb132f317e03bc?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ43 迷宫问题
+// 定义一个二维数组 N*M ，如 5 × 5 数组下所示：
+//int maze[5][5] = {
+//0, 1, 0, 0, 0,
+//0, 1, 1, 1, 0,
+//0, 0, 0, 0, 0,
+//0, 1, 1, 1, 0,
+//0, 0, 0, 1, 0,
+//};
+//它表示一个迷宫，其中的1表示墙壁，0表示可以走的路，只能横着走或竖着走，不能斜着走，要求编程序找出从左上角到右下角的路线。入口点为[0,0],既第一格是可以走的路。
+func dfs(flag [1000][1000]bool, input [][]int, ret *[][]int, i, j, m, n int) { // INFO: 深度优先搜索
+	if i < 0 || j < 0 || i >= m || j >= n {
+		return
+	}
+	if i == m-1 && j == n-1 {
+		for i := range *ret {
+			fmt.Printf("(%d,%d)\n", (*ret)[i][0], (*ret)[i][1])
+		}
+		fmt.Printf("(%d,%d)\n", m-1, n-1)
+		return
+	}
+	if input[i][j] == 1 {
+		return
+	}
+	if flag[i][j] {
+		return
+	}
+	flag[i][j] = true
+	*ret = append(*ret, []int{i, j})
+	dfs(flag, input, ret, i-1, j, m, n)
+	dfs(flag, input, ret, i+1, j, m, n)
+	dfs(flag, input, ret, i, j-1, m, n)
+	dfs(flag, input, ret, i, j+1, m, n)
+	*ret = (*ret)[:len(*ret)-1]
+	flag[i][j] = false
+}
+func hj43() {
+	for {
+		var (
+			m, n int
+		)
+		var flag [1000][1000]bool
+		_, err := fmt.Scanf("%d %d", &m, &n)
+		if err == io.EOF {
+			return
+		}
+		r := make([][]int, m)
+		for i := range r {
+			r[i] = make([]int, n)
+		}
+		for i := 0; i < m; i++ {
+			for j := 0; j < n; j++ {
+				fmt.Scan(&r[i][j])
+			}
+		}
+		var ret [][]int
+		dfs(flag, r, &ret, 0, 0, m, n)
+	}
+}
+
+// https://www.nowcoder.com/practice/02cb8d3597cf416d9f6ae1b9ddc4fde3?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ45 名字的漂亮度
+// 给出一个字符串，该字符串仅由小写字母组成，定义这个字符串的“漂亮度”是其所有字母“漂亮度”的总和。
+//每个字母都有一个“漂亮度”，范围在1到26之间。没有任何两个不同字母拥有相同的“漂亮度”。字母忽略大小写。
+//给出多个字符串，计算每个字符串最大可能的“漂亮度”。
+func hj45() {
+	n := 0
+	fmt.Scan(&n)
+	for i := 0; i < n; i++ {
+		name := ""
+		fmt.Scan(&name)
+		map1 := make(map[byte]int)
+		for j := 0; j < len(name); j++ {
+			map1[name[j]]++
+		}
+		li := make([]int, 0)
+		for _, v := range map1 {
+			li = append(li, v)
+		}
+		sort.Ints(li)
+		k := 26
+		sum := 0
+		for x := 0; x < len(li); x++ {
+			num := li[len(li)-1-x]
+			sum += num * k
+			k--
+		}
+		fmt.Println(sum)
+	}
+}
+
+// https://www.nowcoder.com/practice/f96cd47e812842269058d483a11ced4f?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ48 从单向链表中删除指定值的节点
+func hj48() {
+	n := 0
+	fmt.Scan(&n)
+	li := make([]int, 0)
+	n1 := 0
+	fmt.Scan(&n1)
+	li = append(li, n1)
+	for i := 0; i < n-1; i++ { // 这里 []int 顺序和链表顺序一致
+		c, q := 0, 0
+		fmt.Scan(&c, &q)
+		l := len(li)
+		for j := 0; j < len(li); j++ {
+			if li[j] == q {
+				if j == len(li)-1 {
+					li = append(li, c)
+				} else {
+					li = append(li, 0)
+					copy(li[j+2:], li[j+1:l])
+					li[j+1] = c
+				}
+			}
+		}
+	}
+
+	w := 0
+	fmt.Scan(&w)
+	for y := 0; y < len(li); y++ {
+		if li[y] != w {
+			fmt.Printf("%d ", li[y])
+		}
+	}
+}
+
+// https://www.nowcoder.com/practice/9999764a61484d819056f807d2a91f1e?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ50 四则运算
+// 输入一个表达式（用字符串表示），求这个表达式的值
+func hj50() {
+	input := bufio.NewScanner(os.Stdin)
+	input.Scan()
+	data := input.Text()
+	a := strings.Replace(data, "{", "(", -1)
+	b := strings.Replace(a, "}", ")", -1)
+	c := strings.Replace(b, "[", "(", -1)
+	d := strings.Replace(c, "]", ")", -1)
+	fmt.Println(cal(d))
+}
+func cal(s string) int {
+	num := 0
+	res := 0
+	sign := byte('+')
+	if s[0] == '-' {
+		sign = byte('-')
+	}
+	// INFO: 使用 栈stack 来做
+	var stack []int
+	for i := 0; i < len(s); i++ {
+		if isDigit(s[i]) {
+			num = num*10 + int(s[i]-'0')
+		}
+		if s[i] == '(' {
+			count := 1
+			j := i + 1
+			for count > 0 {
+				if s[j] == '(' {
+					count++
+				} else if s[j] == ')' {
+					count--
+				}
+				j++
+			}
+			num = cal(s[i+1 : j-1])
+			i = j - 1
+		}
+		if !isDigit(s[i]) || i == len(s)-1 {
+			if sign == '+' {
+				stack = append(stack, num)
+			} else if sign == '-' {
+				stack = append(stack, -num)
+			} else if sign == '*' {
+				stack[len(stack)-1] *= num
+			} else if sign == '/' {
+				stack[len(stack)-1] /= num
+			}
+			sign = s[i]
+			num = 0
+		}
+		if s[i] == ')' {
+			continue
+		}
+	}
+	for _, i := range stack {
+		res += i
+	}
+	return res
+}
+func isDigit(n byte) bool {
+	if n >= '0' && n <= '9' {
+		return true
+	} else {
+		return false
+	}
+}
+
+// https://www.nowcoder.com/practice/3959837097c7413a961a135d7104c314?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ52 计算字符串的编辑距离
+// 字符串A: abcdefg
+//字符串B: abcdef
+//通过增加或是删掉字符 ”g” 的方式达到目的。这两种方案都需要一次操作。把这个操作所需要的次数定义为两个字符串的距离。
+//不看答案想不出系列 动态规划 dp[i][j] = min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+1 {是否加1视情况而定})
+func hj52() {
+	for {
+		var word1, word2 string
+		if _, err := fmt.Scan(&word1, &word2); err != nil {
+			break
+		}
+		m, n := len(word1), len(word2)
+		// n+1 m+1 很重要
+		dp := make([][]int, m+1)
+		for i := range dp {
+			dp[i] = make([]int, n+1)
+		}
+		//边界条件初始化 很重要
+		for i := 0; i < m+1; i++ {
+			dp[i][0] = i // word1[i] 变成 word2[0], 删掉 word1[i], 需要 i 部操作
+		}
+		for j := 0; j < n+1; j++ {
+			dp[0][j] = j // word1[0] 变成 word2[j], 插入 word1[j]，需要 j 部操作
+		}
+		// 对双重循环的理解
+		for i := 1; i < m+1; i++ {
+			for j := 1; j < n+1; j++ {
+				if word1[i-1] == word2[j-1] {
+					dp[i][j] = dp[i-1][j-1]
+				} else { // Min(插入，删除，替换)
+					dp[i][j] = Min(dp[i][j-1], dp[i-1][j], dp[i-1][j-1]) + 1
+				}
+			}
+		}
+		fmt.Println(dp[m][n])
+	}
+}
+func Min(args ...int) int {
+	min := args[0]
+	for _, item := range args {
+		if item < min {
+			min = item
+		}
+	}
+	return min
+}
+
+// https://www.nowcoder.com/practice/ba241b85371c409ea01ac0aa1a8d957b?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ55 挑7
+// 输出 1到n之间 的与 7 有关数字的个数。
+//一个数与7有关是指这个数是 7 的倍数，或者是包含 7 的数字（如 17 ，27 ，37 ... 70 ，71 ，72 ，73...）
+func hj55() {
+	bs := bufio.NewScanner(os.Stdin)
+	for bs.Scan() {
+		input := bs.Text()
+		ret := 0
+		inputInt, _ := strconv.Atoi(input)
+		for i := 1; i <= inputInt; i++ {
+			if i%7 == 0 {
+				ret++
+			} else {
+				str := strconv.Itoa(i)
+			loop:
+				for _, stri := range str {
+					switch stri {
+					case '7':
+						ret++
+						break loop
+					}
+				}
+			}
+		}
+		fmt.Println(ret)
+	}
+}
+
+// https://www.nowcoder.com/practice/49e772ab08994a96980f9618892e55b6?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+//输入描述：
+//输入两个字符串。保证字符串只含有'0'~'9'字符
+//输出描述：
+//输出求和后的结果
+// HJ57 高精度整数加法
+func hj57() {
+	bs := bufio.NewScanner(os.Stdin)
+	flag := true
+	l1 := new(big.Int)
+	l2 := new(big.Int)
+	for bs.Scan() {
+		input := bs.Text()
+		if flag {
+			l1.SetString(input, 10)
+			flag = false
+			continue
+		}
+		l2.SetString(input, 10)
+		s := l1.Add(l1, l2)
+		fmt.Println(s.String())
+		flag = true
+		l1 = new(big.Int)
+		l2 = new(big.Int)
+	}
+}
+
+// https://www.nowcoder.com/practice/e896d0f82f1246a3aa7b232ce38029d4?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ59 找出字符串中第一个只出现一次的字符
+func hj59() {
+	for {
+		var s string
+		ans := "-1"
+		if _, err := fmt.Scan(&s); err != nil {
+			break
+		}
+		str := []byte(s)
+		keep := make(map[byte]int)
+		for _, v := range str {
+			//第一次出现
+			if _, ok := keep[v]; !ok {
+				keep[v] = 1
+			} else {
+				keep[v]++
+			}
+		}
+		for _, v := range str {
+			if value, _ := keep[v]; value == 1 {
+				ans = string(v)
+				break
+			}
+		}
+		fmt.Println(ans)
+	}
+}
+
+// https://www.nowcoder.com/practice/e8480ed7501640709354db1cc4ffd42a?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ63 DNA序列
+func hj63() {
+	var str string
+	var n int
+	fmt.Scan(&str, &n)
+	left, right := 0, 0
+	start, length := 0, math.MaxInt32
+	var maxRatio float64
+	c, g := 0, 0
+	for {
+		if str[right] == 'C' {
+			c++
+		}
+		if str[right] == 'G' {
+			g++
+		}
+		right++
+		if right-left == n {
+			break
+		}
+	}
+
+	for {
+		if c*g > 0 {
+			ratio := float64(c+g) / float64(n)
+			if ratio == 1 {
+				start, length = left, right-left
+				break
+			}
+			if ratio > maxRatio {
+				start, length = left, right-left
+				maxRatio = ratio
+			}
+		}
+		if right == len(str) {
+			break
+		}
+		if str[left] == 'C' {
+			c--
+		} else if str[left] == 'G' {
+			g--
+		}
+		if str[right] == 'C' {
+			c++
+		} else if str[right] == 'G' {
+			g++
+		}
+		left++
+		right++
+	}
+
+	fmt.Print(str[start : start+length])
+}
+
+// https://www.nowcoder.com/practice/eaf5b886bd6645dd9cfb5406f3753e15?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ64 MP3光标位置
+func hj64() {
+	for {
+		num := 0
+		str := ""
+		_, e := fmt.Scanf("%d", &num)
+		fmt.Scanf("%s", &str)
+		if e != nil || num == 0 {
+			break
+		}
+		Nslice := make([]int, num)
+		Tslice := []int{}
+		for i := 0; i < num; i++ {
+			Nslice[i] = i + 1
+			if i < 4 {
+				Tslice = append(Tslice, i+1)
+			}
+		}
+		key := 0
+		kt := 0
+		screenLen := len(Tslice)
+		for _, v := range str {
+			if v == 'U' {
+				if key == 0 {
+					key = num - 1
+					//Tslice = Nslice[num-screenLen:]
+					//go的切片是按照引用传递
+					copy(Tslice, Nslice[num-screenLen:])
+					kt = screenLen - 1
+				} else {
+					key = key - 1
+					if kt == 0 {
+						for j := 0; j < screenLen; j++ {
+							Tslice[j] = Tslice[j] - 1
+						}
+					} else {
+						kt = kt - 1
+					}
+				}
+			} else {
+				if key == num-1 {
+					key = 0
+					//Tslice = Nslice[:screenLen]
+					//go的切片是按照引用传递
+					copy(Tslice, Nslice[:screenLen])
+					kt = 0
+				} else {
+					key = key + 1
+					if kt == screenLen-1 {
+						for j := 0; j < screenLen; j++ {
+							Tslice[j] = Tslice[j] + 1
+						}
+					} else {
+						kt = kt + 1
+					}
+				}
+			}
+		}
+		for _, v := range Tslice {
+			fmt.Printf("%d ", v)
+		}
+		fmt.Println()
+		fmt.Println(Nslice[key])
+	}
+}
+
+// https://www.nowcoder.com/practice/181a1a71c7574266ad07f9739f791506?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ65 查找两个字符串a,b中的最长公共子串
+func hj65() {
+	for {
+		str1, str2 := "", ""
+		_, e := fmt.Scanf("%s", &str1)
+		if e != nil || str1 == "" {
+			break
+		}
+		fmt.Scanf("%s", &str2)
+		if len(str1) > len(str2) {
+			str1, str2 = str2, str1
+		}
+		fmt.Println(sonLongest(str1, str2))
+	}
+}
+func sonLongest(str1, str2 string) string {
+	L := len(str1)
+	for i := 0; i < L; i++ {
+		for j := 0; j <= i; j++ {
+			newstr := string(str1[j : L-i+j])
+			if strings.Index(str2, newstr) != -1 {
+				return newstr
+			}
+		}
+	}
+	return ""
+}
+
+// https://www.nowcoder.com/practice/ca6ac6ef9538419abf6f883f7d6f6ee5?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ66 配置文件恢复
+func hj66() {
+	input := bufio.NewScanner(os.Stdin)
+	for input.Scan() {
+		s := input.Text()
+		solutionhj66(s)
+	}
+}
+func solutionhj66(s string) {
+	bs := strings.Split(s, " ")
+	if len(bs) == 1 {
+		if strings.HasPrefix("reset", bs[0]) {
+			fmt.Println("reset what")
+		} else {
+			fmt.Println("unknown command")
+		}
+	} else {
+		switch {
+		case strings.HasPrefix("reset", bs[0]) || strings.HasPrefix("reboot", bs[0]):
+			if strings.HasPrefix("reset", bs[0]) && !strings.HasPrefix("reboot", bs[0]) {
+				if strings.HasPrefix("board", bs[1]) {
+					fmt.Println("board fault")
+				} else {
+					fmt.Println("unknown command")
+				}
+			} else if !strings.HasPrefix("reset", bs[0]) && strings.HasPrefix("reboot", bs[0]) {
+				if strings.HasPrefix("backplane", bs[1]) {
+					fmt.Println("impossible")
+				} else {
+					fmt.Println("unknown command")
+				}
+			} else {
+				if strings.HasPrefix("board", bs[1]) && strings.HasPrefix("backplane", bs[1]) {
+					fmt.Println("unknown command")
+				} else if strings.HasPrefix("board", bs[1]) {
+					fmt.Println("board fault")
+				} else {
+					fmt.Println("impossible")
+				}
+			}
+
+		case strings.HasPrefix("board", bs[0]) || strings.HasPrefix("backplane", bs[0]):
+			if strings.HasPrefix("board", bs[0]) && !strings.HasPrefix("backplane", bs[0]) {
+				if strings.HasPrefix("add", bs[1]) && strings.HasPrefix("delete", bs[1]) {
+					fmt.Println("unknown command")
+
+				} else if strings.HasPrefix("add", bs[1]) {
+					fmt.Println("where to add")
+				} else if strings.HasPrefix("delete", bs[1]) {
+					fmt.Println("no board at all")
+				} else {
+					fmt.Println("unknown command")
+				}
+			} else if !strings.HasPrefix("board", bs[0]) && strings.HasPrefix("backplane", bs[0]) {
+				if strings.HasPrefix("abort", bs[1]) {
+					fmt.Println("install first")
+				} else {
+					fmt.Println("unknown command")
+				}
+			} else {
+				if strings.HasPrefix("add", bs[1]) && strings.HasPrefix("delete", bs[1]) ||
+					(strings.HasPrefix("add", bs[1]) && strings.HasPrefix("abort", bs[1])) ||
+					(strings.HasPrefix("abort", bs[1]) && strings.HasPrefix("delete", bs[1])) {
+					fmt.Println("unknown command")
+				} else if strings.HasPrefix("add", bs[1]) {
+					fmt.Println("where to add")
+				} else if strings.HasPrefix("delete", bs[1]) {
+					fmt.Println("no board at all")
+				} else if strings.HasPrefix("abort", bs[1]) {
+					fmt.Println("install first")
+				} else {
+					fmt.Println("impossible")
+				}
+			}
+		default:
+			fmt.Println("unknown command")
+		}
+	}
+}
+
+// https://www.nowcoder.com/practice/fbc417f314f745b1978fc751a54ac8cb?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ67 24点游戏算法
+// 给出4个1-10的数字，通过加减乘除运算，得到数字为24就算胜利,除法指实数除法运算,运算符仅允许出现在两个数字之间,本题对数字选取顺序无要求，但每个数字仅允许使用一次，且需考虑括号运算
+//此题允许数字重复，如3 3 4 4为合法输入，此输入一共有两个3，但是每个数字只允许使用一次，则运算过程中两个3都被选取并进行对应的计算操作。
+var visited []bool
+var li []float64
+
+func hj67() {
+	a, b, c, d := 0.0, 0.0, 0.0, 0.0
+	for true {
+		if _, err := fmt.Scan(&a, &b, &c, &d); err == nil {
+			li = []float64{a, b, c, d}
+			visited = []bool{false, false, false, false}
+			flag := counthj67(0, 0)
+
+			fmt.Println(flag)
+		} else {
+			break
+		}
+	}
+}
+func counthj67(num, sum float64) bool {
+	if num == 4 && sum == 24.0 {
+		return true
+	}
+	for i := 0; i < 4; i++ {
+		if !visited[i] {
+			visited[i] = true
+			if counthj67(num+1, sum+li[i]) || counthj67(num+1, sum/li[i]) || counthj67(num+1, sum*li[i]) || counthj67(num+1, sum-li[i]) {
+				return true
+			}
+			visited[i] = false
+		}
+	}
+	return false
+}
+
+// https://www.nowcoder.com/practice/ebe941260f8c4210aa8c17e99cbc663b?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ69 矩阵乘法
+// 如果A是个x行y列的矩阵，B是个y行z列的矩阵，把A和B相乘，其结果将是另一个x行z列的矩阵C。这个矩阵的每个元素是由下面的公式决定的
+// 输入描述：
+//第一行包含一个正整数x，代表第一个矩阵的行数
+//第二行包含一个正整数y，代表第一个矩阵的列数和第二个矩阵的行数
+//第三行包含一个正整数z，代表第二个矩阵的列数
+//之后x行，每行y个整数，代表第一个矩阵的值
+//之后y行，每行z个整数，代表第二个矩阵的值
+// 输出描述：
+//对于每组输入数据，输出x行，每行z个整数，代表两个矩阵相乘的结果
+func hj69() {
+	for true {
+		var a, b, c int
+		if _, err := fmt.Scan(&a, &b, &c); err != nil {
+			break
+		}
+		//初始化矩阵
+		n := make([][]int, a)
+		for i := 0; i < a; i++ {
+			n[i] = make([]int, b, b)
+		}
+		m := make([][]int, b)
+		for i := 0; i < b; i++ {
+			m[i] = make([]int, c, c)
+		}
+		ans := make([][]int, a)
+		for i := 0; i < a; i++ {
+			ans[i] = make([]int, c, c)
+		}
+		for i := 0; i < a; i++ {
+			for j := 0; j < b; j++ {
+				fmt.Scan(&n[i][j])
+			}
+		}
+		for i := 0; i < b; i++ {
+			for j := 0; j < c; j++ {
+				fmt.Scan(&m[i][j])
+			}
+		}
+		//矩阵计算, i表示行 j表示列 k表示n所在行的列数
+		//明确矩阵计算方法 行列交错相乘
+		for i := 0; i < a; i++ {
+			for j := 0; j < c; j++ {
+				for k := 0; k < b; k++ {
+					ans[i][j] += n[i][k] * m[k][j]
+				}
+			}
+		}
+		for i := 0; i < a; i++ {
+			for j := 0; j < c; j++ {
+				fmt.Printf("%d ", ans[i][j])
+			}
+			fmt.Print("\n")
+		}
+	}
+}
+
+// https://www.nowcoder.com/practice/15e41630514445719a942e004edc0a5b?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ70 矩阵乘法计算量估算
+//矩阵乘法的运算量与矩阵乘法的顺序强相关。
+//例如：
+//A是一个50×10的矩阵，B是10×20的矩阵，C是20×5的矩阵
+//计算A*B*C有两种顺序：((AB)C)或者(A(BC))，前者需要计算15000次乘法，后者只需要3500次。
+//编写程序计算不同的计算顺序需要进行的乘法次数。
+func hj70() {
+	var n int
+	fmt.Scan(&n)
+	arr := make([][]int, n)
+	for i := range arr {
+		row := make([]int, 2)
+		fmt.Scan(&row[0])
+		fmt.Scan(&row[1])
+		arr[i] = row
+	}
+	var str string
+	fmt.Scan(&str)
+	chars := []rune(str)
+	var stack []rune
+	count := 0
+	newMatrixs := [][]int{}
+	for _, c := range chars {
+		if c == ')' {
+			var x, y []int
+			i := stack[len(stack)-2]
+			if i <= 'Z' {
+				x = arr[i-'A']
+			} else {
+				x = newMatrixs[i-'a']
+			}
+			j := stack[len(stack)-1]
+			if j <= 'Z' {
+				y = arr[j-'A']
+			} else {
+				y = newMatrixs[j-'a']
+			}
+			stack = stack[:len(stack)-3]
+			// multi
+			cell, s := multi(x, y)
+			count += s
+			newMatrixs = append(newMatrixs, cell)
+			stack = append(stack, rune(len(newMatrixs)-1+'a'))
+		} else {
+			stack = append(stack, c)
+		}
+	}
+	fmt.Print(count)
+}
+func multi(x, y []int) ([]int, int) {
+	return []int{x[0], y[1]}, x[0] * y[1] * x[1]
+}
+
+// https://www.nowcoder.com/practice/43072d50a6eb44d2a6c816a283b02036?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ71 字符串通配符
+// 问题描述：在计算机中，通配符一种特殊语法，广泛应用于文件搜索、数据库、正则表达式等领域。现要求各位实现字符串通配符的算法。
+//要求：
+//实现如下2个通配符：
+//*：匹配0个或以上的字符（注：能被*和?匹配的字符仅由英文字母和数字0到9组成，下同）
+//？：匹配1个字符
+//注意：匹配时不区分大小写。
+//考虑暴力递归过于复杂，可考虑动态规划计dp[i][j]为以s1[i],s2[j]结尾的字符串能否匹配,状态满足无后效性前提，
+// 可尝试进行递推动态转移方程
+// 则 dp[i][j] =
+// 若 s2[j] 为给定字符类型（数字和字母） 分五种情况讨论
+// 若 s1[i] = s2[j] 或者 若s1[i] = '?'，dp[i][j] = dp[i-1][j-1]
+// 若s1[i] = '*' dp[i][j] = (dp[i-1][j] ||dp[i][j-1] || dp[i][j]) 若s1[i] != s2[j] s1[i]不为*或？ false
+// 若s2[j] 为非给定字符类型 若s1[i] = s2[j] true 其他情况false
+func hj71() {
+	for true {
+		var str1, str2 string
+		if _, err := fmt.Scan(&str1, &str2); err != nil {
+			break
+		}
+		// 匹配赛不分大小写 全部大写
+		s1, s2 := strings.ToUpper(str1), strings.ToUpper(str2)
+		length1, length2 := len(s1), len(s2)
+		dp := make([][]bool, length1+1)
+		for i := 0; i < length1+1; i++ {
+			dp[i] = make([]bool, length2+1, length2+1)
+		}
+		//初始化 若s1长度为零 s2长度为大于零 为false; 若s1长度大于零 s2长度为零 只有s1全为* 才为true
+		dp[0][0] = true
+		n := 0
+		for i := 0; i < length1; i++ {
+			if s1[i] == '*' {
+				n++
+			} else {
+				break
+			}
+		}
+		if n == length1-1 {
+			for i := 1; i < length1+1; i++ {
+				dp[i][0] = true
+			}
+		}
+		//动态转移过程
+		for i := 0; i < length1; i++ {
+			for j := 0; j < length2; j++ {
+				//为给定字符类型
+				if match(s2[j]) {
+					if s1[i] == s2[j] || s1[i] == '?' {
+						dp[i+1][j+1] = dp[i][j]
+					} else if s1[i] == '*' {
+						dp[i+1][j+1] = (dp[i][j+1] || dp[i+1][j] || dp[i][j])
+					}
+					if s1[i] != s2[j] && s1[i] != '?' && s1[i] != '*' {
+						dp[i+1][j+1] = false
+					}
+				} else { //非给定类型
+					if s1[i] == s2[j] {
+						dp[i+1][j+1] = dp[i][j]
+					} else {
+						dp[i+1][j+1] = false
+					}
+				}
+			}
+		}
+		fmt.Println(dp[length1][length2])
+	}
+}
+
+//判断是否为给定字符类型
+func match(r byte) bool {
+	if r >= '0' && r <= '9' {
+		return true
+	}
+	if r >= 'A' && r <= 'Z' {
+		return true
+	}
+	return false
+}
+
+// https://www.nowcoder.com/practice/668603dc307e4ef4bb07bcd0615ea677?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ74 参数解析
+
+// https://www.nowcoder.com/practice/98dc82c094e043ccb7e0570e5342dd1b?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// 给定两个只包含小写字母的字符串，计算两个字符串的最大公共子串的长度。
+func MaxLength(str1, str2 string) int {
+	m, n := len(str1), len(str2)
+
+	//方法一：初始化一个二维切片
+	//var dp [][]int
+	//for i := 0; i < m+1; i++ {
+	//  ar := make([]int, n+1)
+	//  dp = append(dp, ar)
+	//}
+
+	//方法二：初始化一个二维切片
+	dp := make([][]int, m+1)
+	for i := range dp {
+		dp[i] = make([]int, n+1)
+	}
+
+	var maxLen int
+	for i := 0; i <= m; i++ {
+		dp[i][0] = 0
+	}
+	for i := 0; i <= n; i++ {
+		dp[0][i] = 0
+	}
+	for i := 1; i <= m; i++ {
+		for j := 1; j <= n; j++ {
+			if str1[i-1] == str2[j-1] {
+				dp[i][j] = dp[i-1][j-1] + 1
+			} else {
+				dp[i][j] = 0
+			}
+			if dp[i][j] > maxLen {
+				maxLen = dp[i][j]
+			}
+		}
+	}
+	return maxLen
+}
+func hj75() {
+	var s1, s2 string
+	fmt.Scanln(&s1)
+	fmt.Scanln(&s2)
+	fmt.Println(MaxLength(s1, s2))
+}
+
+// https://www.nowcoder.com/practice/97ba57c35e9f4749826dc3befaeae109?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ77 火车进站
