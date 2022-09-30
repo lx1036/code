@@ -2937,6 +2937,7 @@ func hj71() {
 		fmt.Println(dp[length1][length2])
 	}
 }
+
 //判断是否为给定字符类型
 func match(r byte) bool {
 	if r >= '0' && r <= '9' {
@@ -2953,6 +2954,12 @@ func match(r byte) bool {
 
 // https://www.nowcoder.com/practice/98dc82c094e043ccb7e0570e5342dd1b?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // 给定两个只包含小写字母的字符串，计算两个字符串的最大公共子串的长度。
+func hj75() {
+	var s1, s2 string
+	fmt.Scanln(&s1)
+	fmt.Scanln(&s2)
+	fmt.Println(MaxLength(s1, s2))
+}
 func MaxLength(str1, str2 string) int {
 	m, n := len(str1), len(str2)
 
@@ -2990,15 +2997,163 @@ func MaxLength(str1, str2 string) int {
 	}
 	return maxLen
 }
-func hj75() {
-	var s1, s2 string
-	fmt.Scanln(&s1)
-	fmt.Scanln(&s2)
-	fmt.Println(MaxLength(s1, s2))
-}
 
 // https://www.nowcoder.com/practice/97ba57c35e9f4749826dc3befaeae109?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ77 火车进站
 
 // https://www.nowcoder.com/practice/e0480b2c6aa24bfba0935ffcca3ccb7b?tpId=37&tqId=21305&rp=1&ru=/exam/oj/ta&qru=/exam/oj/ta&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37&difficulty=3&judgeStatus=undefined&tags=&title=
 // HJ82 将真分数分解为埃及分数
+// 分子为1的分数称为埃及分数。现输入一个真分数(分子比分母小的分数，叫做真分数)，请将该分数分解为埃及分数。如：8/11 = 1/2+1/5+1/55+1/110。
+func hj82() {
+	var a, b int
+	for {
+		_, err := fmt.Scanf("%d/%d", &a, &b)
+		if err != nil {
+			break
+		}
+		for a != 1 {
+			if b%a == 0 {
+				b /= a
+				a = 1
+				break
+			}
+			q := b / a
+			r := b % a
+			fmt.Printf("%d/%d+", 1, 1+q)
+			a -= r
+			b *= (1 + q)
+		}
+		fmt.Printf("%d/%d\n", a, b)
+	}
+}
+
+// https://www.nowcoder.com/practice/995b8a548827494699dc38c3e2a54ee9?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ90 合法IP
+// IPV4地址可以用一个32位无符号整数来表示，一般用点分方式来显示，点将IP地址分成4个部分，每个部分为8位，表示成一个无符号整数（因此正号不需要出现），如10.137.17.1，是我们非常熟悉的IP地址，一个IP地址串中没有空格出现（因为要表示成一个32数字）。
+//现在需要你用程序来判断IP是否合法。
+func hj90() {
+	for {
+		var (
+			s string
+		)
+		_, err := fmt.Scan(&s)
+		if err == io.EOF {
+			return
+		}
+		ips := strings.Split(s, ".")
+		if len(ips) != 4 {
+			fmt.Println("NO")
+			return
+		}
+		var flag bool
+		for i := range ips {
+			if len(strings.TrimSpace(ips[i])) == 0 {
+				flag = true
+				break
+			}
+			if len(ips[i]) > 1 && ips[i][0] == '0' {
+				flag = true
+				break
+			}
+			if ips[i][0] > '9' || ips[i][0] < '0' {
+				flag = true
+				break
+			}
+			num, _ := strconv.Atoi(ips[i])
+			if num < 0 || num > 255 {
+				flag = true
+				break
+			}
+		}
+		if !flag {
+			fmt.Println("YES")
+		} else {
+			fmt.Println("NO")
+		}
+	}
+}
+
+// https://www.nowcoder.com/practice/2c81f88ecd5a4cc395b5308a99afbbec?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
+// HJ92 在字符串中找出连续最长的数字串
+// 输入一个字符串，返回其最长的数字子串，以及其长度。若有多个最长的数字子串，则将它们全部输出（按原字符串的相对位置）
+//本题含有多组样例输入。
+func hj92() {
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	str1 := scanner.Text()
+	//str1 := "o0593"
+	//str2 := "a8a72a6a5yy98y65ee1r2"
+	maxStr, maxLen := getReshj92(str1)
+	fmt.Printf("%s,%d\n", maxStr, maxLen)
+}
+func getReshj92(str string) (string, int) {
+	strArr := []byte(str)
+	n := len(str)
+	dp := make([]int, n+1)
+	if _, err := strconv.Atoi(string(strArr[0])); err == nil {
+		dp[0] = 1
+	}
+	maxLen := 0
+	//endIndex := 0
+	for i := 1; i < n; i++ {
+		if _, err := strconv.Atoi(string(strArr[i])); err == nil {
+			dp[i] = dp[i-1] + 1
+			if dp[i] > maxLen {
+				maxLen = dp[i]
+				//endIndex = i
+			}
+		}
+	}
+	subStr := ""
+	for k, v := range dp {
+		if v == maxLen {
+			subStr += str[k-maxLen+1 : k+1]
+		}
+	}
+
+	return subStr, maxLen
+}
+
+// https://www.nowcoder.com/practice/caf35ae421194a1090c22fe223357dca?tpId=37&tqId=21330&rp=1&ru=/exam/oj/ta&qru=/exam/oj/ta&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37&difficulty=3&judgeStatus=undefined&tags=&title=
+// HJ107 求解立方根
+// 计算一个浮点数的立方根，不使用库函数。
+//保留一位小数。
+func hj107() {
+	var (
+		input float64
+	)
+	fmt.Scan(&input)
+	if input == 0 || input == 1 {
+		fmt.Println(input)
+		return
+	}
+	var (
+		l    float64
+		r    float64
+		flag = 1.0
+	)
+	//负数的情况
+	if input < 0 {
+		flag = -1.0
+	}
+	input = math.Abs(float64(input))
+	//考虑小于1的情况
+	if input > 1 {
+		l = 0
+		r = input
+	} else {
+		l = input
+		r = 1
+	}
+	//二分查找
+	mid := l + (r-l)/2
+	for math.Abs(mid*mid*mid-input) > 0.001 {
+		if mid*mid*mid > input {
+			r = mid
+		} else {
+			l = mid
+		}
+		mid = l + (r-l)/2
+	}
+	fmt.Printf("%0.1f", mid*flag)
+}
