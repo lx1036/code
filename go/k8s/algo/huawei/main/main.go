@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -184,7 +185,7 @@ func main() {
 		fmt.Printf("%s", strings.Join(result, ""))
 	}*/
 
-	input := bufio.NewScanner(os.Stdin)
+	/*input := bufio.NewScanner(os.Stdin)
 	for input.Scan() {
 		s := input.Text()
 		l1 := make([]byte, 0)
@@ -204,7 +205,92 @@ func main() {
 			fmt.Printf("%s ", li[l-i-1])
 		}
 		fmt.Printf("\n")
+	}*/
+
+	/*input := bufio.NewScanner(os.Stdin)
+	input.Scan()
+	size := input.Text()
+	l , _ := strconv.Atoi(size)
+	if l < 4 {
+		fmt.Printf("%d\n", 0)
+		return
 	}
+	var points [][]int
+	for i := 0; i < l; i++ {
+		input.Scan()
+		data := strings.Split(input.Text(), " ")
+		if len(data) != 2 {
+			continue
+		}
+		x, _ := strconv.Atoi(data[0])
+		y, _ := strconv.Atoi(data[1])
+		points = append(points, []int{x,y})
+	}
+	result := 0
+	for i := 0; i < l-3; i++ {
+		for j := i+1; j < l-2; j++ {
+			for k := j+1; k < l-1; k++ {
+				for m := k+1; m < l; m++ {
+					if isSquare(points[i],points[j],points[k],points[m]) {
+						result++
+					}
+				}
+			}
+		}
+	}
+	fmt.Printf("%d\n", result)*/
+
+	input := bufio.NewScanner(os.Stdin)
+	input.Scan()
+	data := input.Text()
+	//result := make(map[string]int)
+	var result []string
+	for i := 0; i < len(data); i++ {
+		if !isValid(data[i]) {
+			fmt.Print("!error")
+			return
+		}
+		if isNumber(data[i]) && data[i] < '3' {
+			fmt.Print("!error")
+			return
+		}
+		if i == len(data) && isNumber(data[i]) {
+			fmt.Print("!error")
+			return
+		}
+
+		if isNumber(data[i]) {
+			l, _ := strconv.Atoi(string(data[i]))
+			for j := 0; j < l; j++ {
+				result = append(result, string(data[i+1]))
+			}
+			i++
+		} else {
+			result = append(result, string(data[i]))
+		}
+	}
+
+	//for i := 0; i < len(data)-1; i++ {
+	//
+	//}
+
+	tmp := strings.Join(result, "")
+	fmt.Printf("%s", tmp)
+}
+func isValid(b byte) bool {
+	return (b < '9' && b > '1') || (b < 'z' && b > 'a')
+}
+func isNumber(b byte) bool {
+	return b < '9' && b > '1'
+}
+
+func isSquare(i, j, k, m []int) bool {
+	return isZeroVector([]int{i[0] - j[0], i[1] - j[1]}, []int{k[0] - m[0], k[1] - m[1]}) ||
+		isZeroVector([]int{i[0] - k[0], i[1] - k[1]}, []int{j[0] - m[0], j[1] - m[1]}) ||
+		isZeroVector([]int{i[0] - m[0], i[1] - m[1]}, []int{j[0] - k[0], j[1] - k[1]})
+}
+func isZeroVector(l1, l2 []int) bool { // 内积为0且长度相等
+	return (l1[0]*l2[0]+l1[1]*l2[1]) == 0 && (l1[0]*l1[0]+l1[1]*l1[1] == l2[0]*l2[0]+l2[1]*l2[1])
 }
 
 func isWord(data byte) bool {
