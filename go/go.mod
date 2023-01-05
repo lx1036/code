@@ -21,7 +21,7 @@ require (
 	github.com/cilium/ipam v0.0.0-20211026130907-54a76012817c
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/containerd/cgroups v1.0.3
-	github.com/containerd/containerd v1.5.13
+	github.com/containerd/containerd v1.5.16
 	github.com/containerd/go-cni v1.1.3
 	github.com/containernetworking/cni v1.1.0
 	github.com/containernetworking/plugins v1.1.1
@@ -37,7 +37,7 @@ require (
 	github.com/emicklei/go-restful v2.14.3+incompatible
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/getsentry/sentry-go v0.3.0
-	github.com/gin-gonic/gin v1.5.0
+	github.com/gin-gonic/gin v1.7.0
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/go-test/deep v1.0.7
@@ -124,7 +124,7 @@ require (
 	golang.org/x/build v0.0.0-20190927031335-2835ba2e683f
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad
+	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
@@ -168,6 +168,7 @@ require (
 	github.com/go-kit/log v0.2.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-logr/logr v1.2.0 // indirect
+	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/hashicorp/consul/api v1.12.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
@@ -189,7 +190,7 @@ require (
 	cloud.google.com/go v0.99.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab // indirect
-	github.com/Microsoft/go-winio v0.5.1 // indirect
+	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/Microsoft/hcsshim v0.8.24 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
@@ -213,7 +214,7 @@ require (
 	github.com/cockroachdb/redact v1.0.6 // indirect
 	github.com/cockroachdb/sentry-go v0.6.1-cockroachdb.2 // indirect
 	github.com/containerd/console v1.0.3 // indirect
-	github.com/containerd/continuity v0.1.0 // indirect
+	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/containerd/fifo v1.0.0 // indirect
 	github.com/containerd/ttrpc v1.1.0 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
@@ -249,8 +250,8 @@ require (
 	github.com/go-openapi/strfmt v0.21.2 // indirect
 	github.com/go-openapi/swag v0.21.1 // indirect
 	github.com/go-openapi/validate v0.21.0 // indirect
-	github.com/go-playground/locales v0.12.1 // indirect
-	github.com/go-playground/universal-translator v0.16.0 // indirect
+	github.com/go-playground/locales v0.13.0 // indirect
+	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/go-redis/redis v6.14.2+incompatible // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
@@ -260,7 +261,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/go-cmp v0.5.7 // indirect
+	github.com/google/go-cmp v0.5.7
 	github.com/googleapis/gnostic v0.5.5 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/h2non/parth v0.0.0-20190131123155-b4df798d6542 // indirect
@@ -288,7 +289,7 @@ require (
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
-	github.com/leodido/go-urn v1.1.0 // indirect
+	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/lithammer/dedent v1.1.0 // indirect
 	github.com/lucas-clemente/quic-go v0.13.1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
@@ -299,7 +300,7 @@ require (
 	github.com/marten-seemann/qtls v0.4.1 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989 // indirect
 	github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible // indirect
 	github.com/moby/locker v1.0.1 // indirect
@@ -376,7 +377,6 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.0.1 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa // indirect
-	gopkg.in/go-playground/validator.v9 v9.29.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
