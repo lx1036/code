@@ -37,7 +37,7 @@ require (
 	github.com/emicklei/go-restful v2.14.3+incompatible
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/getsentry/sentry-go v0.3.0
-	github.com/gin-gonic/gin v1.7.0
+	github.com/gin-gonic/gin v1.7.7
 	github.com/go-redis/redis/v7 v7.0.0-beta.4
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/go-test/deep v1.0.7
