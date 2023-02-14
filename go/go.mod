@@ -13,7 +13,7 @@ require (
 	github.com/Shopify/sarama v1.19.0
 	github.com/alexflint/go-filemutex v1.1.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1501
-	github.com/astaxie/beego v1.12.1
+	github.com/astaxie/beego v1.12.2
 	github.com/aws/aws-sdk-go v1.40.45
 	github.com/bep/debounce v1.2.0
 	github.com/caddyserver/caddy v1.0.4
