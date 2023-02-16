@@ -21,7 +21,7 @@ require (
 	github.com/cilium/ipam v0.0.0-20211026130907-54a76012817c
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/containerd/cgroups v1.0.3
-	github.com/containerd/containerd v1.5.16
+	github.com/containerd/containerd v1.5.18
 	github.com/containerd/go-cni v1.1.3
 	github.com/containernetworking/cni v1.1.0
 	github.com/containernetworking/plugins v1.1.1
@@ -192,7 +192,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
-	github.com/Microsoft/hcsshim v0.8.24 // indirect
+	github.com/Microsoft/hcsshim v0.8.25 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
