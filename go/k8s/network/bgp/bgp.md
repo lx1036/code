@@ -15,8 +15,8 @@ BGP 基于路径矢量(Path Vector)的算法,即每个路由条目更新通过�
 ## GoBGP
 ```shell
 # mac本地安装
-go get github.com/osrg/gobgp/v3/cmd/gobgp@v3.0.0
-go get github.com/osrg/gobgp/v3/cmd/gobgpd@v3.0.0
+go install github.com/osrg/gobgp/v3/cmd/gobgp@v3.16.0
+go install github.com/osrg/gobgp/v3/cmd/gobgpd@v3.16.0
 ```
 
 https://github.com/osrg/gobgp

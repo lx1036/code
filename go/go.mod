@@ -90,6 +90,7 @@ require (
 	github.com/operator-framework/operator-sdk v0.17.1
 	github.com/osrg/gobgp/v3 v3.0.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/pires/go-proxyproto v0.7.0
 	github.com/pkg/errors v0.9.1
 	github.com/projectcalico/api v0.0.0-20211102181812-edfaf495a5c8
 	github.com/projectcalico/calico v0.0.0-20220128225346-a86e41d021c4
