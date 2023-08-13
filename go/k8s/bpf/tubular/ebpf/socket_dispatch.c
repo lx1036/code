@@ -12,6 +12,13 @@
 #define MAX_SOCKETS (1024)
 #define MAX_BINDINGS (1000000)
 
+enum {
+	AF_INET  = 2,
+	AF_INET6 = 10,
+};
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 typedef __u32 destination_id_t;
 
 struct addr {
@@ -67,6 +74,14 @@ struct {
 	__uint(pinning, LIBBPF_PIN_BY_NAME);
 } destination_metrics SEC(".maps");
 
+static inline void cleanup_sk(struct bpf_sock **sk)
+{
+	if (*sk != NULL) {
+		bpf_sk_release(*sk);
+	}
+}
+
+#define __cleanup_sk __attribute__((cleanup(cleanup_sk)))
 
 // 这里如果 10.20.30.40/32:0 和 10.20.30.0/24:80, 因为 /32 更精确，选择 10.20.30.40/32:0
 static inline const struct binding *select_binding(const struct binding *bind, const struct binding *wildcard_bind)
