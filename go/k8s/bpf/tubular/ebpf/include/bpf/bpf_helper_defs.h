@@ -2289,6 +2289,11 @@ static long (*bpf_msg_pop_data)(struct sk_msg_md *msg, __u32 start, __u32 len, _
  */
 static long (*bpf_rc_pointer_rel)(void *ctx, __s32 rel_x, __s32 rel_y) = (void *) 92;
 
+
+static long (*bpf_load_hdr_opt)(struct bpf_sock_ops *skops, void *searchby_res, __u32 len, __u64 flags) = (void *) 93;
+static long (*bpf_store_hdr_opt)(struct bpf_sock_ops *skops, const void *from, __u32 len, __u64 flags) = (void *) 93;
+
+
 /*
  * bpf_spin_lock
  *

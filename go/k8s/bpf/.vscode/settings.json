@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "test_tcp_hdr_options.h": "c",
+        "bpf_helpers.h": "c",
+        "bpf_helper_defs.h": "c"
+    }
+}
