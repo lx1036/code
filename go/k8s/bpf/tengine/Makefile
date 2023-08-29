@@ -6,7 +6,7 @@ CFLAGS = -I/usr/local/Cellar/openresty/1.21.4.2_1/luajit/include/luajit-2.1 \
 	-I/usr/local/Cellar/openresty/1.21.4.2_1/luajit/include/luajit-2.1 \
 	-pipe -O -Wall -Wextra -Wpointer-arith -Wconditional-uninitialized \
 	-Wno-unused-parameter -Wno-deprecated-declarations -Werror -g -DNDK_SET_VAR \
-	-Wno-unused-function -Wno-unused-variable -Wno-undefined-internal
+	-Wno-unused-function -Wno-unused-variable -Wno-undefined-internal -Wno-unused-but-set-variable
 CPP =	cc -E
 LINK =	$(CC)
 
@@ -93,6 +93,9 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/core/ngx_slab.o \
 	objs/src/core/ngx_inet.o \
 	objs/src/core/ngx_modules.o \
+	objs/src/event/ngx_event.o \
+	objs/src/event/ngx_event_timer.o \
+	objs/src/event/ngx_event_posted.o \
 	objs/src/os/unix/ngx_alloc.o \
 	objs/src/os/unix/ngx_process.o \
 	objs/src/os/unix/ngx_dlopen.o \
@@ -110,8 +113,10 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/os/unix/ngx_writev_chain.o \
 	objs/src/os/unix/ngx_readv_chain.o \
 	objs/src/os/unix/ngx_process_cycle.o \
-	objs/src/event/ngx_event.o \
-	objs/src/event/ngx_event_timer.o \
+	objs/src/os/unix/ngx_channel.o \
+	objs/src/os/unix/ngx_socket.o \
+	objs/src/os/unix/ngx_shmem.o \
+	objs/src/os/unix/ngx_pipe.o \
 
 	$(LINK) -o objs/nginx \
 	objs/src/core/nginx.o \
@@ -134,6 +139,9 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/core/ngx_slab.o \
 	objs/src/core/ngx_inet.o \
 	objs/src/core/ngx_modules.o \
+	objs/src/event/ngx_event.o \
+	objs/src/event/ngx_event_timer.o \
+	objs/src/event/ngx_event_posted.o \
 	objs/src/os/unix/ngx_alloc.o \
 	objs/src/os/unix/ngx_process.o \
 	objs/src/os/unix/ngx_dlopen.o \
@@ -151,8 +159,10 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/os/unix/ngx_writev_chain.o \
 	objs/src/os/unix/ngx_readv_chain.o \
 	objs/src/os/unix/ngx_process_cycle.o \
-	objs/src/event/ngx_event.o \
-	objs/src/event/ngx_event_timer.o \
+	objs/src/os/unix/ngx_channel.o \
+	objs/src/os/unix/ngx_socket.o \
+	objs/src/os/unix/ngx_shmem.o \
+	objs/src/os/unix/ngx_pipe.o \
 	-L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -Wl,-u,_pcre_version -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -L/usr/local/Cellar/pcre/8.45/lib -lpcre -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -lpcre2-8 -lssl -lcrypto -lz
 
 # objs/src/event/ngx_event_openssl.o
@@ -160,7 +170,7 @@ objs/nginx: objs/src/core/nginx.o \
 test:
 	
 	
-	objs/src/event/ngx_event_posted.o \
+	
 	objs/src/event/ngx_event_accept.o \
 	objs/src/event/ngx_event_udp.o \
 	objs/src/event/ngx_event_connect.o \
@@ -169,12 +179,10 @@ test:
 	
 	
 	objs/src/os/unix/ngx_files.o \
-	objs/src/os/unix/ngx_socket.o \
 	
 	objs/src/os/unix/ngx_send.o \
 	
-	objs/src/os/unix/ngx_channel.o \
-	objs/src/os/unix/ngx_shmem.o \
+	
 	
 	objs/src/os/unix/ngx_daemon.o \
 	objs/src/os/unix/ngx_setaffinity.o \
@@ -182,7 +190,7 @@ test:
 	
 	objs/src/os/unix/ngx_user.o \
 	
-	objs/src/os/unix/ngx_pipe.o \
+	
 	objs/src/os/unix/ngx_sysinfo.o \
 	
 	
@@ -192,24 +200,17 @@ test:
 	objs/src/event/ngx_event_openssl.o \
 	objs/src/event/ngx_event_openssl_stapling.o
 	
-	objs/src/event/ngx_event_posted.o \
 	objs/src/event/ngx_event_accept.o \
 	objs/src/event/ngx_event_udp.o \
 	objs/src/event/ngx_event_connect.o \
 	objs/src/event/ngx_event_udpv2.o \
 	
 	objs/src/os/unix/ngx_files.o \
-	objs/src/os/unix/ngx_socket.o \
-	
-	
-	objs/src/os/unix/ngx_channel.o \
-	objs/src/os/unix/ngx_shmem.o \
 	
 	objs/src/os/unix/ngx_daemon.o \
 	objs/src/os/unix/ngx_setaffinity.o \
 	objs/src/os/unix/ngx_user.o \
 	
-	objs/src/os/unix/ngx_pipe.o \
 	objs/src/os/unix/ngx_sysinfo.o \
 	
 	objs/src/event/modules/ngx_kqueue_module.o \

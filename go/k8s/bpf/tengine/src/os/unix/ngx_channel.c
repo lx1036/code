@@ -179,3 +179,50 @@ ngx_int_t ngx_read_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size, ngx_l
 
     return n;
 }
+
+// 设置 read/write event 对应 handler
+// read: ngx_channel_handler()
+ngx_int_t ngx_add_channel_event(ngx_cycle_t *cycle, ngx_fd_t fd, ngx_int_t event, ngx_event_handler_pt handler){
+    ngx_event_t       *ev, *rev, *wev;
+    ngx_connection_t  *c;
+
+    c = ngx_get_connection(fd, cycle->log);
+    if (c == NULL) {
+        return NGX_ERROR;
+    }
+
+    c->pool = cycle->pool;
+    rev = c->read;
+    wev = c->write;
+    rev->log = cycle->log;
+    wev->log = cycle->log;
+    rev->channel = 1;
+    wev->channel = 1;
+
+    ev = (event == NGX_READ_EVENT) ? rev : wev;
+    ev->handler = handler;
+    if (ngx_add_conn && (ngx_event_flags & NGX_USE_EPOLL_EVENT) == 0) {
+        if (ngx_add_conn(c) == NGX_ERROR) {
+            ngx_free_connection(c);
+            return NGX_ERROR;
+        }
+    } else {
+        if (ngx_add_event(ev, event, 0) == NGX_ERROR) {
+            ngx_free_connection(c);
+            return NGX_ERROR;
+        }
+    }
+
+    return NGX_OK;
+}
+
+// close fd[0] 和 fd[1]，是 socketpair 创建的
+void ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log) {
+    if (close(fd[0]) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno, "close() channel failed");
+    }
+
+    if (close(fd[1]) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno, "close() channel failed");
+    }
+}

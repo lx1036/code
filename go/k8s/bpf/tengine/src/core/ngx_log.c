@@ -201,29 +201,24 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
     (void) ngx_write_console(ngx_stderr, msg, p - msg);
 }
 
-ngx_log_t *
-ngx_log_init(u_char *prefix, u_char *error_log)
-{
+ngx_log_t * ngx_log_init(u_char *prefix, u_char *error_log) {
     u_char  *p, *name;
     size_t   nlen, plen;
 
     ngx_log.file = &ngx_log_file;
     ngx_log.log_level = NGX_LOG_NOTICE;
-
     if (error_log == NULL) {
         error_log = (u_char *) NGX_ERROR_LOG_PATH;
     }
 
     name = error_log;
     nlen = ngx_strlen(name);
-
     if (nlen == 0) {
         ngx_log_file.fd = ngx_stderr;
         return &ngx_log;
     }
 
     p = NULL;
-
     if (name[0] != '/') {
         if (prefix) {
             plen = ngx_strlen(prefix);
@@ -255,14 +250,9 @@ ngx_log_init(u_char *prefix, u_char *error_log)
         }
     }
 
-    ngx_log_file.fd = ngx_open_file(name, NGX_FILE_APPEND,
-                                    NGX_FILE_CREATE_OR_OPEN,
-                                    NGX_FILE_DEFAULT_ACCESS);
-
+    ngx_log_file.fd = ngx_open_file(name, NGX_FILE_APPEND, NGX_FILE_CREATE_OR_OPEN,NGX_FILE_DEFAULT_ACCESS);
     if (ngx_log_file.fd == NGX_INVALID_FILE) {
-        ngx_log_stderr(ngx_errno,
-                       "[alert] could not open error log file: "
-                       ngx_open_file_n " \"%s\" failed", name);
+        ngx_log_stderr(ngx_errno, "[alert] could not open error log file: " ngx_open_file_n " \"%s\" failed", name);
         ngx_log_file.fd = ngx_stderr;
     }
 
@@ -272,3 +262,33 @@ ngx_log_init(u_char *prefix, u_char *error_log)
 
     return &ngx_log;
 }
+
+ngx_int_t ngx_log_redirect_stderr(ngx_cycle_t *cycle) {
+    ngx_fd_t  fd;
+    if (cycle->log_use_stderr) {
+        return NGX_OK;
+    }
+
+    /* file log always exists when we are called */
+    fd = ngx_log_get_file_log(cycle->log)->file->fd;
+    if (fd != ngx_stderr) {
+        if (ngx_set_stderr(fd) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno, ngx_set_stderr_n " failed");
+            return NGX_ERROR;
+        }
+    }
+
+    return NGX_OK;
+}
+
+ngx_log_t * ngx_log_get_file_log(ngx_log_t *head) {
+    ngx_log_t  *log;
+    for (log = head; log; log = log->next) {
+        if (log->file != NULL) {
+            return log;
+        }
+    }
+
+    return NULL;
+}
+

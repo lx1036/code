@@ -1,12 +1,6 @@
 
-/*
- * Copyright (C) Igor Sysoev
- * Copyright (C) Nginx, Inc.
- */
 
 
-#ifndef _NGX_EVENT_TIMER_H_INCLUDED_
-#define _NGX_EVENT_TIMER_H_INCLUDED_
 
 
 #include <ngx_config.h>
@@ -87,4 +81,3 @@ ngx_event_add_timer(ngx_event_t *ev, ngx_msec_t timer)
 }
 
 
-#endif /* _NGX_EVENT_TIMER_H_INCLUDED_ */

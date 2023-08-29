@@ -69,3 +69,15 @@ ngx_init_setproctitle(ngx_log_t *log)
 
     return NGX_OK;
 }
+
+void ngx_setproctitle(char *title) {
+    u_char     *p;
+    ngx_os_argv[1] = NULL;
+    p = ngx_cpystrn((u_char *) ngx_os_argv[0], (u_char *) "nginx: ", ngx_os_argv_last - ngx_os_argv[0]);
+    p = ngx_cpystrn(p, (u_char *) title, ngx_os_argv_last - (char *) p);
+    if (ngx_os_argv_last - (char *) p) {
+        ngx_memset(p, NGX_SETPROCTITLE_PAD, ngx_os_argv_last - (char *) p);
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0, "setproctitle: \"%s\"", ngx_os_argv[0]);
+}

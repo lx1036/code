@@ -306,7 +306,7 @@ int main(int argc, char *const *argv) {
     if (ngx_preinit_modules() != NGX_OK) {
         return 1;
     }
-    cycle = ngx_init_cycle(&init_cycle);
+    cycle = ngx_init_cycle(&init_cycle); // 初始化 cycle 对象
     if (cycle == NULL) {
         if (ngx_test_config) {
             ngx_log_stderr(0, "configuration file %s test failed",
@@ -316,13 +316,11 @@ int main(int argc, char *const *argv) {
         return 1;
     }
 
-
     ngx_cycle = cycle;
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
     if (ccf->master && ngx_process == NGX_PROCESS_SINGLE) {
         ngx_process = NGX_PROCESS_MASTER;
     }
-
 
     if (ngx_process == NGX_PROCESS_SINGLE) {
         // ngx_single_process_cycle(cycle);
@@ -490,10 +488,8 @@ ngx_get_options(int argc, char *const *argv) {
             case 'e':
                 if (*p) {
                     ngx_error_log = p;
-
                 } else if (argv[++i]) {
                     ngx_error_log = (u_char *) argv[i];
-
                 } else {
                     ngx_log_stderr(0, "option \"-e\" requires file name");
                     return NGX_ERROR;

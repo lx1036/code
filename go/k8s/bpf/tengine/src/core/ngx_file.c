@@ -49,3 +49,50 @@ ngx_test_full_name(ngx_str_t *name)
 
     return NGX_DECLINED;
 }
+
+ngx_int_t ngx_create_paths(ngx_cycle_t *cycle, ngx_uid_t user) {
+    ngx_err_t         err;
+    ngx_uint_t        i;
+    ngx_path_t      **path;
+
+    path = cycle->paths.elts;
+    for (i = 0; i < cycle->paths.nelts; i++) {
+        if (ngx_create_dir(path[i]->name.data, 0700) == NGX_FILE_ERROR) {
+            err = ngx_errno;
+            if (err != NGX_EEXIST) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, err, ngx_create_dir_n " \"%s\" failed", path[i]->name.data);
+                return NGX_ERROR;
+            }
+        }
+
+        if (user == (ngx_uid_t) NGX_CONF_UNSET_UINT) {
+            continue;
+        }
+
+        ngx_file_info_t   fi;
+        if (ngx_file_info(path[i]->name.data, &fi) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno, ngx_file_info_n " \"%s\" failed", path[i]->name.data);
+            return NGX_ERROR;
+        }
+
+        if (fi.st_uid != user) {
+            if (chown((const char *) path[i]->name.data, user, -1) == -1) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno, "chown(\"%s\", %d) failed", path[i]->name.data, user);
+                return NGX_ERROR;
+            }
+        }
+
+        if ((fi.st_mode & (S_IRUSR|S_IWUSR|S_IXUSR)) != (S_IRUSR|S_IWUSR|S_IXUSR)) {
+            fi.st_mode |= (S_IRUSR|S_IWUSR|S_IXUSR);
+            if (chmod((const char *) path[i]->name.data, fi.st_mode) == -1) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                              "chmod() \"%s\" failed", path[i]->name.data);
+                return NGX_ERROR;
+            }
+        }
+    }
+
+    return NGX_OK;
+}
+
+

@@ -106,3 +106,16 @@ ngx_array_push_n(ngx_array_t *a, ngx_uint_t n)
     return elt;
 }
 
+ngx_array_t * ngx_array_create(ngx_pool_t *p, ngx_uint_t n, size_t size) {
+    ngx_array_t *a;
+    a = ngx_palloc(p, sizeof(ngx_array_t));
+    if (a == NULL) {
+        return NULL;
+    }
+
+    if (ngx_array_init(a, p, n, size) != NGX_OK) {
+        return NULL;
+    }
+
+    return a;
+}
