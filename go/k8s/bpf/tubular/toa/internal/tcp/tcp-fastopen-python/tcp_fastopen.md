@@ -17,6 +17,7 @@ net.ipv4.tcp_fastopen = 3
 
 
 ## nginx 演示
+HTTP 开启 TFO
 
 ```
 server {
