@@ -1071,3 +1071,72 @@ void ngx_configure_listening_sockets(ngx_cycle_t *cycle) {
     return;
 }
 
+void ngx_close_listening_sockets(ngx_cycle_t *cycle) {
+    ngx_uint_t         i;
+    ngx_listening_t   *ls;
+    ngx_connection_t  *c;
+    if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
+        return;
+    }
+
+    ngx_accept_mutex_held = 0;
+    ngx_use_accept_mutex = 0;
+    ls = cycle->listening.elts;
+    for (i = 0; i < cycle->listening.nelts; i++) {
+        c = ls[i].connection;
+        if (c) {
+            if (c->read->active) {
+                if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
+
+                    /*
+                     * it seems that Linux-2.6.x OpenVZ sends events
+                     * for closed shared listening sockets unless
+                     * the events was explicitly deleted
+                     */
+#if (NGX_SSL && NGX_SSL_ASYNC)
+                    if (c->async_enable && ngx_del_async_conn) {
+                        if (c->num_async_fds) {
+                            ngx_del_async_conn(c, NGX_DISABLE_EVENT);
+                            c->num_async_fds--;
+                        }
+                    }
+#endif
+                    ngx_del_event(c->read, NGX_READ_EVENT, 0);
+                } else {
+                    ngx_del_event(c->read, NGX_READ_EVENT, NGX_CLOSE_EVENT);
+                }
+            }
+
+            ngx_free_connection(c);
+
+            c->fd = (ngx_socket_t) -1;
+        }
+
+        ngx_log_debug2(NGX_LOG_DEBUG_CORE, cycle->log, 0,
+                       "close listening %V #%d ", &ls[i].addr_text, ls[i].fd);
+
+        if (ngx_close_socket(ls[i].fd) == -1) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
+                          ngx_close_socket_n " %V failed", &ls[i].addr_text);
+        }
+
+#if (NGX_HAVE_UNIX_DOMAIN)
+        if (ls[i].sockaddr->sa_family == AF_UNIX
+            && ngx_process <= NGX_PROCESS_MASTER
+            && ngx_new_binary == 0
+            && (!ls[i].inherited || ngx_getppid() != ngx_parent))
+        {
+            u_char *name = ls[i].addr_text.data + sizeof("unix:") - 1;
+
+            if (ngx_delete_file(name) == NGX_FILE_ERROR) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
+                              ngx_delete_file_n " %s failed", name);
+            }
+        }
+#endif
+
+        ls[i].fd = (ngx_socket_t) -1;
+    }
+
+    cycle->listening.nelts = 0;
+}

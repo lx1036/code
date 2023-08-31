@@ -203,11 +203,6 @@ typedef struct {
 
     ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer);
     void       (*done)(ngx_cycle_t *cycle);
-
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    ngx_int_t  (*add_async_conn)(ngx_connection_t *c);
-    ngx_int_t  (*del_async_conn)(ngx_connection_t *c, ngx_uint_t flags);
-#endif
 } ngx_event_actions_t;
 
 

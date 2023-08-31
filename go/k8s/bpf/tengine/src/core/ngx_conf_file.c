@@ -533,7 +533,7 @@ static ngx_int_t ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last) {
     name = cf->args->elts;
     found = 0;
     for (i = 0; cf->cycle->modules[i]; i++) {
-        cmd = cf->cycle->modules[i]->commands;
+        cmd = cf->cycle->modules[i]->commands; // ngx_core_commands
         if (cmd == NULL) {
             continue;
         }
@@ -617,7 +617,7 @@ static ngx_int_t ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last) {
                 }
             }
 
-            rv = cmd->set(cf, cmd, conf);
+            rv = cmd->set(cf, cmd, conf); // 每一个指令，如 "daemon off" 的 daemon, set 为 ngx_conf_set_flag_slot()，在 nginx.c 里定义
 
             if (rv == NGX_CONF_OK) {
                 return NGX_OK;
@@ -962,5 +962,65 @@ static ngx_int_t ngx_conf_read_token(ngx_conf_t *cf) {
             }
         }
     }
+}
+
+ngx_open_file_t * ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name){
+    ngx_str_t         full;
+    ngx_uint_t        i;
+    ngx_list_part_t  *part;
+    ngx_open_file_t  *file;
+
+#if (NGX_SUPPRESS_WARN)
+    ngx_str_null(&full);
+#endif
+
+    if (name->len) {
+        full = *name;
+
+        if (ngx_conf_full_name(cycle, &full, 0) != NGX_OK) {
+            return NULL;
+        }
+
+        part = &cycle->open_files.part;
+        file = part->elts;
+
+        for (i = 0; /* void */ ; i++) {
+            if (i >= part->nelts) {
+                if (part->next == NULL) {
+                    break;
+                }
+                part = part->next;
+                file = part->elts;
+                i = 0;
+            }
+
+            if (full.len != file[i].name.len) {
+                continue;
+            }
+
+            if (ngx_strcmp(full.data, file[i].name.data) == 0) {
+                return &file[i];
+            }
+        }
+    }
+
+    file = ngx_list_push(&cycle->open_files);
+    if (file == NULL) {
+        return NULL;
+    }
+
+    if (name->len) {
+        file->fd = NGX_INVALID_FILE;
+        file->name = full;
+
+    } else {
+        file->fd = ngx_stderr;
+        file->name = *name;
+    }
+
+    file->flush = NULL;
+    file->data = NULL;
+
+    return file;
 }
 

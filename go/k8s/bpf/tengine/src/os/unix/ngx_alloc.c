@@ -27,6 +27,17 @@ ngx_alloc(size_t size, ngx_log_t *log)
     return p;
 }
 
+void * ngx_calloc(size_t size, ngx_log_t *log) {
+    void  *p;
+
+    p = ngx_alloc(size, log);
+    if (p) {
+        ngx_memzero(p, size);
+    }
+
+    return p;
+}
+
 #if (NGX_HAVE_POSIX_MEMALIGN)
 
 void *

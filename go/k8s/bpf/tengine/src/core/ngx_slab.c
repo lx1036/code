@@ -92,5 +92,69 @@ ngx_slab_sizes_init(void)
     }
 }
 
+void ngx_slab_init(ngx_slab_pool_t *pool) {
+    u_char           *p;
+    size_t            size;
+    ngx_int_t         m;
+    ngx_uint_t        i, n, pages;
+    ngx_slab_page_t  *slots, *page;
 
+    pool->min_size = (size_t) 1 << pool->min_shift;
 
+    slots = ngx_slab_slots(pool);
+
+    p = (u_char *) slots;
+    size = pool->end - p;
+
+    ngx_slab_junk(p, size);
+
+    n = ngx_pagesize_shift - pool->min_shift;
+
+    for (i = 0; i < n; i++) {
+        /* only "next" is used in list head */
+        slots[i].slab = 0;
+        slots[i].next = &slots[i];
+        slots[i].prev = 0;
+    }
+
+    p += n * sizeof(ngx_slab_page_t);
+
+    pool->stats = (ngx_slab_stat_t *) p;
+    ngx_memzero(pool->stats, n * sizeof(ngx_slab_stat_t));
+
+    p += n * sizeof(ngx_slab_stat_t);
+
+    size -= n * (sizeof(ngx_slab_page_t) + sizeof(ngx_slab_stat_t));
+
+    pages = (ngx_uint_t) (size / (ngx_pagesize + sizeof(ngx_slab_page_t)));
+
+    pool->pages = (ngx_slab_page_t *) p;
+    ngx_memzero(pool->pages, pages * sizeof(ngx_slab_page_t));
+
+    page = pool->pages;
+
+    /* only "next" is used in list head */
+    pool->free.slab = 0;
+    pool->free.next = page;
+    pool->free.prev = 0;
+
+    page->slab = pages;
+    page->next = &pool->free;
+    page->prev = (uintptr_t) &pool->free;
+
+    pool->start = ngx_align_ptr(p + pages * sizeof(ngx_slab_page_t),
+                                ngx_pagesize);
+
+    m = pages - (pool->end - pool->start) / ngx_pagesize;
+    if (m > 0) {
+        pages -= m;
+        page->slab = pages;
+    }
+
+    pool->last = pool->pages + pages;
+    pool->pfree = pages;
+
+    pool->log_nomem = 1;
+    pool->log_ctx = &pool->zero;
+    pool->zero = '\0';
+}

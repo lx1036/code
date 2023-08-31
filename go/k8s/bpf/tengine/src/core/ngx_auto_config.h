@@ -1,3 +1,6 @@
+
+// 这里是在 mac 本地编译生成的 ngx_auto_config.h 文件，如果在 linux 编译，一些参数值会变化
+
 #define NGX_CONFIGURE " --prefix=./bin --with-stream --with-stream_ssl_module --with-debug --with-pcre --add-module=./modules/ngx_http_echo_module --add-module=./modules/ngx_stream_lua_module_0.0.13 --add-module=./modules/ngx_http_upstream_dyups_module --with-http_lua_module --with-luajit-inc=/usr/local/Cellar/openresty/1.21.4.2_1/luajit/include/luajit-2.1 --with-luajit-lib=/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib --with-lua-inc=/usr/local/Cellar/lua@5.1/5.1.5_8/include/lua-5.1 --with-lua-lib=/usr/local/Cellar/lua@5.1/5.1.5_8/lib"
 
 #ifndef NGX_DEBUG

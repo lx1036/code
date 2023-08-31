@@ -325,7 +325,7 @@ int main(int argc, char *const *argv) {
     if (ngx_process == NGX_PROCESS_SINGLE) {
         // ngx_single_process_cycle(cycle);
     } else {
-        ngx_master_process_cycle(cycle);
+        ngx_master_process_cycle(cycle); // NGX_PROCESS_MASTER
     }
 
     return 0;
@@ -579,68 +579,31 @@ ngx_process_options(ngx_cycle_t *cycle)
     u_char  *p;
     size_t   len;
 
-    if (ngx_prefix) {
-        len = ngx_strlen(ngx_prefix);
-        p = ngx_prefix;
+    if (!ngx_prefix || !ngx_conf_file) { // 为了简化，必须加上参数 -c nginx.conf -p .
+        return NGX_ERROR;
+    }
 
-        if (len && !ngx_path_separator(p[len - 1])) {
-            p = ngx_pnalloc(cycle->pool, len + 1);
-            if (p == NULL) {
-                return NGX_ERROR;
-            }
-
-            ngx_memcpy(p, ngx_prefix, len);
-            p[len++] = '/';
-        }
-
-        cycle->conf_prefix.len = len;
-        cycle->conf_prefix.data = p;
-        cycle->prefix.len = len;
-        cycle->prefix.data = p;
-
-    } else {
-
-#ifndef NGX_PREFIX
-
-        p = ngx_pnalloc(cycle->pool, NGX_MAX_PATH);
+    len = ngx_strlen(ngx_prefix);
+    p = ngx_prefix;
+    if (len && !ngx_path_separator(p[len - 1])) {
+        p = ngx_pnalloc(cycle->pool, len + 1);
         if (p == NULL) {
             return NGX_ERROR;
         }
 
-        if (ngx_getcwd(p, NGX_MAX_PATH) == 0) {
-            ngx_log_stderr(ngx_errno, "[emerg]: " ngx_getcwd_n " failed");
-            return NGX_ERROR;
-        }
-
-        len = ngx_strlen(p);
-
+        ngx_memcpy(p, ngx_prefix, len);
         p[len++] = '/';
-
-        cycle->conf_prefix.len = len;
-        cycle->conf_prefix.data = p;
-        cycle->prefix.len = len;
-        cycle->prefix.data = p;
-
-#else
-
-#ifdef NGX_CONF_PREFIX
-        ngx_str_set(&cycle->conf_prefix, NGX_CONF_PREFIX);
-#else
-        ngx_str_set(&cycle->conf_prefix, NGX_PREFIX);
-#endif
-        ngx_str_set(&cycle->prefix, NGX_PREFIX);
-
-#endif
     }
 
-    if (ngx_conf_file) {
-        cycle->conf_file.len = ngx_strlen(ngx_conf_file);
-        cycle->conf_file.data = ngx_conf_file;
-    } else {
-        ngx_str_set(&cycle->conf_file, NGX_CONF_PATH);
-    }
+    cycle->conf_prefix.len = len;
+    cycle->conf_prefix.data = p;
+    cycle->prefix.len = len;
+    cycle->prefix.data = p;
+    cycle->conf_file.len = ngx_strlen(ngx_conf_file);
+    cycle->conf_file.data = ngx_conf_file;
+    // ngx_str_set(&cycle->conf_file, NGX_CONF_PATH);
 
-    if (ngx_conf_full_name(cycle, &cycle->conf_file, 0) != NGX_OK) {
+    if (ngx_conf_full_name(cycle, &cycle->conf_file, 0) != NGX_OK) { // 获取 abs 路径
         return NGX_ERROR;
     }
 
@@ -1260,7 +1223,7 @@ ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_OK;
     }
 
-    ccf->worker_processes = ngx_atoi(value[1].data, value[1].len);
+    ccf->worker_processes = ngx_atoi(value[1].data, value[1].len); // value=[worker_processes, 1]
 
     if (ccf->worker_processes == NGX_ERROR) {
         return "invalid value";

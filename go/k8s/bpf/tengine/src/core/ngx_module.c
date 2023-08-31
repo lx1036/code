@@ -220,3 +220,67 @@ ngx_int_t ngx_cycle_modules(ngx_cycle_t *cycle) {
 
     return NGX_OK;
 }
+
+ngx_int_t ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type) {
+    ngx_uint_t     i, next, max;
+    ngx_module_t  *module;
+    next = 0;
+    max = 0;
+
+    /* count appropriate modules, set up their indices */
+    for (i = 0; cycle->modules[i]; i++) {
+        module = cycle->modules[i];
+        if (module->type != type) {
+            continue;
+        }
+
+        if (module->ctx_index != NGX_MODULE_UNSET_INDEX) {
+            /* if ctx_index was assigned, preserve it */
+
+            if (module->ctx_index > max) {
+                max = module->ctx_index;
+            }
+
+            if (module->ctx_index == next) {
+                next++;
+            }
+
+            continue;
+        }
+
+        /* search for some free index */
+        module->ctx_index = ngx_module_ctx_index(cycle, type, next);
+
+        if (module->ctx_index > max) {
+            max = module->ctx_index;
+        }
+
+        next = module->ctx_index + 1;
+    }
+
+    /*
+     * make sure the number returned is big enough for previous
+     * cycle as well, else there will be problems if the number
+     * will be stored in a global variable (as it's used to be)
+     * and we'll have to roll back to the previous cycle
+     */
+
+    if (cycle->old_cycle && cycle->old_cycle->modules) {
+        for (i = 0; cycle->old_cycle->modules[i]; i++) {
+            module = cycle->old_cycle->modules[i];
+
+            if (module->type != type) {
+                continue;
+            }
+
+            if (module->ctx_index > max) {
+                max = module->ctx_index;
+            }
+        }
+    }
+
+    /* prevent loading of additional modules */
+    cycle->modules_used = 1;
+
+    return max + 1;
+}

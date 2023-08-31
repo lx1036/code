@@ -64,7 +64,7 @@ ngx_pid_t ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *da
     // info: 新建进程模板代码
     if (respawn != NGX_PROCESS_DETACHED) {
         /* Solaris 9 still has no AF_LOCAL */
-        if (socketpair(AF_UNIX, SOCK_STREAM, 0, ngx_processes[s].channel) == -1){
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, ngx_processes[s].channel) == -1){ // socketpair 创建两个 socket, channel[2]: [3,4], 3 和 4 是 socketfd
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           "socketpair() failed while spawning \"%s\"", name);
             return NGX_INVALID_PID;
@@ -75,7 +75,7 @@ ngx_pid_t ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *da
                        ngx_processes[s].channel[0],
                        ngx_processes[s].channel[1]);
 
-        if (ngx_nonblocking(ngx_processes[s].channel[0]) == -1) {
+        if (ngx_nonblocking(ngx_processes[s].channel[0]) == -1) { // 
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           ngx_nonblocking_n " failed while spawning \"%s\"",
                           name);
@@ -122,7 +122,7 @@ ngx_pid_t ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *da
             return NGX_INVALID_PID;
         }
 
-        ngx_channel = ngx_processes[s].channel[1];
+        ngx_channel = ngx_processes[s].channel[1]; // 这里用 channel[1] 作为 ngx_channel
     } else {
         ngx_processes[s].channel[0] = -1;
         ngx_processes[s].channel[1] = -1;
@@ -130,7 +130,7 @@ ngx_pid_t ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *da
 
     ngx_process_slot = s;
     pid = fork();
-    switch (pid) {
+    switch (pid) { // 67396
     case -1:
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "fork() failed while spawning \"%s\"", name);
@@ -148,13 +148,13 @@ ngx_pid_t ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *da
     }
 
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "start %s %P", name, pid);
-    ngx_processes[s].pid = pid;
+    ngx_processes[s].pid = pid; // 67396, `ps aux | grep 67396`, `ps aux | grep nginx`
     ngx_processes[s].exited = 0;
     if (respawn >= 0) {
         return pid;
     }
 
-    switch (respawn) {
+    switch (respawn) { // NGX_PROCESS_RESPAWN
     case NGX_PROCESS_NORESPAWN:
         ngx_processes[s].respawn = 0;
         ngx_processes[s].just_spawn = 0;

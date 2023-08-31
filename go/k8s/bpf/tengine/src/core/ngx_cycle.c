@@ -77,7 +77,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
     cycle->no_ssl_init = old_cycle->no_ssl_init;
 #endif
     cycle->conf_prefix.len = old_cycle->conf_prefix.len;
-    cycle->conf_prefix.data = ngx_pstrdup(pool, &old_cycle->conf_prefix);
+    cycle->conf_prefix.data = ngx_pstrdup(pool, &old_cycle->conf_prefix); // copy(dst, src)
     if (cycle->conf_prefix.data == NULL) {
         ngx_destroy_pool(pool);
         return NULL;
@@ -183,7 +183,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
 
         module = cycle->modules[i]->ctx;
         if (module->create_conf) {
-            rv = module->create_conf(cycle);
+            rv = module->create_conf(cycle); // ngx_core_module_t.create_conf() -> ngx_core_module_ctx.ngx_core_module_create_conf()
             if (rv == NULL) {
                 ngx_destroy_pool(pool);
                 return NULL;
@@ -231,7 +231,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
             continue;
         }
         module = cycle->modules[i]->ctx;
-        if (module->init_conf) {
+        if (module->init_conf) { // core module init
             if (module->init_conf(cycle, cycle->conf_ctx[cycle->modules[i]->index]) == NGX_CONF_ERROR) {
                 environ = senv;
                 ngx_destroy_cycle_pools(&conf);
@@ -240,7 +240,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
         }
     }
 
-    if (ngx_process == NGX_PROCESS_SIGNALLER) {
+    if (ngx_process == NGX_PROCESS_SIGNALLER) { // NGX_PROCESS_SINGLE
         return cycle;
     }
 
@@ -613,7 +613,7 @@ old_shm_zone_done:
         }
     }
     ngx_destroy_pool(conf.temp_pool);
-    if (ngx_process == NGX_PROCESS_MASTER || ngx_is_init_cycle(old_cycle)) {
+    if (ngx_process == NGX_PROCESS_MASTER || ngx_is_init_cycle(old_cycle)) { // NGX_PROCESS_SINGLE
         ngx_destroy_pool(old_cycle->pool);
         cycle->old_cycle = NULL;
         return cycle;
@@ -751,6 +751,49 @@ failed:
     return NULL;
 }
 
+static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle, ngx_shm_zone_t *zn) {
+    u_char           *file;
+    ngx_slab_pool_t  *sp;
+
+    sp = (ngx_slab_pool_t *) zn->shm.addr;
+    if (zn->shm.exists) {
+        if (sp == sp->addr) {
+            return NGX_OK;
+        }
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                      "shared zone \"%V\" has no equal addresses: %p vs %p",
+                      &zn->shm.name, sp->addr, sp);
+        return NGX_ERROR;
+    }
+
+    sp->end = zn->shm.addr + zn->shm.size;
+    sp->min_shift = 3;
+    sp->addr = zn->shm.addr;
+
+#if (NGX_HAVE_ATOMIC_OPS)
+
+    file = NULL;
+
+#else
+
+    file = ngx_pnalloc(cycle->pool, cycle->lock_file.len + zn->shm.name.len + 1);
+    if (file == NULL) {
+        return NGX_ERROR;
+    }
+
+    (void) ngx_sprintf(file, "%V%V%Z", &cycle->lock_file, &zn->shm.name);
+
+#endif
+
+    if (ngx_shmtx_create(&sp->mutex, &sp->lock, file) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    ngx_slab_init(sp);
+
+    return NGX_OK;
+}
+
 static void ngx_clean_old_cycles(ngx_event_t *ev) {
     ngx_uint_t     i, n, found, live;
     ngx_log_t     *log;
@@ -851,3 +894,109 @@ ngx_destroy_cycle_pools(ngx_conf_t *conf)
     ngx_destroy_pool(conf->temp_pool);
     ngx_destroy_pool(conf->pool);
 }
+
+static ngx_int_t ngx_test_lockfile(u_char *file, ngx_log_t *log) {
+#if !(NGX_HAVE_ATOMIC_OPS)
+    ngx_fd_t  fd;
+
+    fd = ngx_open_file(file, NGX_FILE_RDWR, NGX_FILE_CREATE_OR_OPEN,
+                       NGX_FILE_DEFAULT_ACCESS);
+
+    if (fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+                      ngx_open_file_n " \"%s\" failed", file);
+        return NGX_ERROR;
+    }
+
+    if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
+                      ngx_close_file_n " \"%s\" failed", file);
+    }
+
+    if (ngx_delete_file(file) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
+                      ngx_delete_file_n " \"%s\" failed", file);
+    }
+
+#endif
+
+    return NGX_OK;
+}
+
+ssize_t
+ngx_write_file(ngx_file_t *file, u_char *buf, size_t size, off_t offset)
+{
+    ssize_t    n, written;
+    ngx_err_t  err;
+
+    ngx_log_debug4(NGX_LOG_DEBUG_CORE, file->log, 0, "write: %d, %p, %uz, %O", file->fd, buf, size, offset);
+    written = 0;
+
+#if (NGX_HAVE_PWRITE)
+    for ( ;; ) {
+        n = pwrite(file->fd, buf + written, size, offset);
+
+        if (n == -1) {
+            err = ngx_errno;
+
+            if (err == NGX_EINTR) {
+                ngx_log_debug0(NGX_LOG_DEBUG_CORE, file->log, err,
+                               "pwrite() was interrupted");
+                continue;
+            }
+
+            ngx_log_error(NGX_LOG_CRIT, file->log, err,
+                          "pwrite() \"%s\" failed", file->name.data);
+            return NGX_ERROR;
+        }
+
+        file->offset += n;
+        written += n;
+
+        if ((size_t) n == size) {
+            return written;
+        }
+
+        offset += n;
+        size -= n;
+    }
+
+#else
+
+    if (file->sys_offset != offset) {
+        if (lseek(file->fd, offset, SEEK_SET) == -1) {
+            ngx_log_error(NGX_LOG_CRIT, file->log, ngx_errno,
+                          "lseek() \"%s\" failed", file->name.data);
+            return NGX_ERROR;
+        }
+
+        file->sys_offset = offset;
+    }
+
+    for ( ;; ) {
+        n = write(file->fd, buf + written, size);
+
+        if (n == -1) {
+            err = ngx_errno;
+            if (err == NGX_EINTR) {
+                ngx_log_debug0(NGX_LOG_DEBUG_CORE, file->log, err,
+                               "write() was interrupted");
+                continue;
+            }
+
+            ngx_log_error(NGX_LOG_CRIT, file->log, err, "write() \"%s\" failed", file->name.data);
+            return NGX_ERROR;
+        }
+
+        file->sys_offset += n;
+        file->offset += n;
+        written += n;
+        if ((size_t) n == size) {
+            return written;
+        }
+
+        size -= n;
+    }
+#endif
+}
+

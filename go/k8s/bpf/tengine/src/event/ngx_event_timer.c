@@ -15,6 +15,12 @@ static ngx_rbtree_node_t  ngx_event_timer_sentinel;
  * a minimum timer value only
  */
 
+ngx_int_t ngx_event_timer_init(ngx_log_t *log) {
+    ngx_rbtree_init(&ngx_event_timer_rbtree, &ngx_event_timer_sentinel,
+                    ngx_rbtree_insert_timer_value);
+
+    return NGX_OK;
+}
 
 void ngx_event_expire_timers(void) {
     ngx_event_t        *ev;

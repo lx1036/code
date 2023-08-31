@@ -14,8 +14,8 @@
 
 
 typedef struct {
-    void        *elts;
-    ngx_uint_t   nelts;
+    void        *elts; // elements
+    ngx_uint_t   nelts; // number of elements
     size_t       size;
     ngx_uint_t   nalloc;
     ngx_pool_t  *pool;

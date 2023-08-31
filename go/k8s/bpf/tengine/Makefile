@@ -29,6 +29,8 @@ CORE_DEPS = src/core/nginx.h \
 	src/core/ngx_crc32.h \
 	src/core/ngx_slab.h \
 	src/core/ngx_inet.h \
+	src/core/ngx_shmtx.h \
+	src/core/ngx_list.h \
 	src/event/ngx_event.h \
 	src/event/ngx_event_timer.h \
 	src/event/ngx_event_posted.h \
@@ -93,9 +95,12 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/core/ngx_slab.o \
 	objs/src/core/ngx_inet.o \
 	objs/src/core/ngx_modules.o \
+	objs/src/core/ngx_list.o \
 	objs/src/event/ngx_event.o \
 	objs/src/event/ngx_event_timer.o \
 	objs/src/event/ngx_event_posted.o \
+	objs/src/event/ngx_event_accept.o \
+	objs/src/event/ngx_event_udp.o \
 	objs/src/os/unix/ngx_alloc.o \
 	objs/src/os/unix/ngx_process.o \
 	objs/src/os/unix/ngx_dlopen.o \
@@ -117,6 +122,8 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/os/unix/ngx_socket.o \
 	objs/src/os/unix/ngx_shmem.o \
 	objs/src/os/unix/ngx_pipe.o \
+	objs/src/os/unix/ngx_files.o \
+	objs/src/core/ngx_shmtx.o \
 
 	$(LINK) -o objs/nginx \
 	objs/src/core/nginx.o \
@@ -139,9 +146,12 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/core/ngx_slab.o \
 	objs/src/core/ngx_inet.o \
 	objs/src/core/ngx_modules.o \
+	objs/src/core/ngx_list.o \
 	objs/src/event/ngx_event.o \
 	objs/src/event/ngx_event_timer.o \
 	objs/src/event/ngx_event_posted.o \
+	objs/src/event/ngx_event_accept.o \
+	objs/src/event/ngx_event_udp.o \
 	objs/src/os/unix/ngx_alloc.o \
 	objs/src/os/unix/ngx_process.o \
 	objs/src/os/unix/ngx_dlopen.o \
@@ -163,26 +173,19 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/os/unix/ngx_socket.o \
 	objs/src/os/unix/ngx_shmem.o \
 	objs/src/os/unix/ngx_pipe.o \
+	objs/src/os/unix/ngx_files.o \
+	objs/src/core/ngx_shmtx.o \
 	-L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -Wl,-u,_pcre_version -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -L/usr/local/Cellar/pcre/8.45/lib -lpcre -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -lpcre2-8 -lssl -lcrypto -lz
 
 # objs/src/event/ngx_event_openssl.o
 # objs/src/event/ngx_event_pipe.o
 test:
 	
-	
-	
-	objs/src/event/ngx_event_accept.o \
-	objs/src/event/ngx_event_udp.o \
 	objs/src/event/ngx_event_connect.o \
 	objs/src/event/ngx_event_pipe.o \
 	objs/src/event/ngx_event_udpv2.o \
 	
-	
-	objs/src/os/unix/ngx_files.o \
-	
 	objs/src/os/unix/ngx_send.o \
-	
-	
 	
 	objs/src/os/unix/ngx_daemon.o \
 	objs/src/os/unix/ngx_setaffinity.o \
@@ -200,12 +203,9 @@ test:
 	objs/src/event/ngx_event_openssl.o \
 	objs/src/event/ngx_event_openssl_stapling.o
 	
-	objs/src/event/ngx_event_accept.o \
-	objs/src/event/ngx_event_udp.o \
+	
 	objs/src/event/ngx_event_connect.o \
 	objs/src/event/ngx_event_udpv2.o \
-	
-	objs/src/os/unix/ngx_files.o \
 	
 	objs/src/os/unix/ngx_daemon.o \
 	objs/src/os/unix/ngx_setaffinity.o \
@@ -340,6 +340,19 @@ objs/src/core/ngx_modules.o:	$(CORE_DEPS) \
 		-o objs/src/core/ngx_modules.o \
 		src/core/ngx_modules.c
 
+objs/src/core/ngx_shmtx.o:	$(CORE_DEPS) \
+	src/core/ngx_shmtx.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) \
+		-o objs/src/core/ngx_shmtx.o \
+		src/core/ngx_shmtx.c
+
+objs/src/core/ngx_list.o:	$(CORE_DEPS) \
+	src/core/ngx_list.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) \
+		-o objs/src/core/ngx_list.o \
+		src/core/ngx_list.c
+
+		
 ################################os/event############################################
 # 以下是每一个 c -> o 文件编译, 主要使用 nginx 原有的 event/os/proc c 文件，路径 
 objs/src/event/ngx_event.o:	$(CORE_DEPS) \
@@ -606,7 +619,6 @@ objs/src/event/ngx_event_openssl_stapling.o:	$(CORE_DEPS) \
 	$(CC) -c $(CFLAGS) $(CORE_INCS) \
 		-o objs/src/event/ngx_event_openssl_stapling.o \
 		src/event/ngx_event_openssl_stapling.c
-
 
 ################################################################
 run:

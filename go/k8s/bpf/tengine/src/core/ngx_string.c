@@ -621,7 +621,7 @@ ngx_strcasecmp(u_char *s1, u_char *s2)
 }
 
 u_char *
-ngx_pstrdup(ngx_pool_t *pool, ngx_str_t *src)
+ngx_pstrdup(ngx_pool_t *pool, ngx_str_t *src) // copy string into dst
 {
     u_char  *dst;
 
@@ -744,5 +744,50 @@ void ngx_str_rbtree_insert_value(ngx_rbtree_node_t *temp,
     node->left = sentinel;
     node->right = sentinel;
     ngx_rbt_red(node);
+}
+
+ngx_str_node_t * ngx_str_rbtree_lookup(ngx_rbtree_t *rbtree, ngx_str_t *val, uint32_t hash) {
+    ngx_int_t           rc;
+    ngx_str_node_t     *n;
+    ngx_rbtree_node_t  *node, *sentinel;
+
+    node = rbtree->root;
+    sentinel = rbtree->sentinel;
+
+    while (node != sentinel) {
+        n = (ngx_str_node_t *) node;
+        if (hash != node->key) {
+            node = (hash < node->key) ? node->left : node->right;
+            continue;
+        }
+
+        if (val->len != n->str.len) {
+            node = (val->len < n->str.len) ? node->left : node->right;
+            continue;
+        }
+
+        rc = ngx_memcmp(val->data, n->str.data, val->len);
+        if (rc < 0) {
+            node = node->left;
+            continue;
+        }
+        if (rc > 0) {
+            node = node->right;
+            continue;
+        }
+
+        return n;
+    }
+
+    return NULL;
+}
+
+void ngx_strlow(u_char *dst, u_char *src, size_t n) {
+    while (n) {
+        *dst = ngx_tolower(*src);
+        dst++;
+        src++;
+        n--;
+    }
 }
 
