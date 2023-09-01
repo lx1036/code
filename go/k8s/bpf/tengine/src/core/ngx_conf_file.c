@@ -1024,3 +1024,29 @@ ngx_open_file_t * ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name){
     return file;
 }
 
+char * ngx_conf_set_size_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+    char  *p = conf;
+    size_t           *sp;
+    ngx_str_t        *value;
+    ngx_conf_post_t  *post;
+
+
+    sp = (size_t *) (p + cmd->offset);
+    if (*sp != NGX_CONF_UNSET_SIZE) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+    *sp = ngx_parse_size(&value[1]);
+    if (*sp == (size_t) NGX_ERROR) {
+        return "invalid value";
+    }
+
+    if (cmd->post) {
+        post = cmd->post;
+        return post->post_handler(cf, post, sp);
+    }
+
+    return NGX_CONF_OK;
+}
+

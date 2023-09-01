@@ -442,7 +442,7 @@ extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 #define ngx_add_timer        ngx_event_add_timer
 #define ngx_del_timer        ngx_event_del_timer
 
-
+// extern 表明该变量或函数的定义将在其他源代码文件中提供，在 ngx_connection.c 里定义
 extern ngx_os_io_t  ngx_io;
 
 #define ngx_recv             ngx_io.recv

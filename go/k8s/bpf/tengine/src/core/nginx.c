@@ -9,10 +9,6 @@
 #include <nginx.h>
 
 
-ngx_uint_t    ngx_process; // tengine/src/os/unix/ngx_process_cycle.c
-ngx_pid_t     ngx_pid; // tengine/src/os/unix/ngx_process_cycle.c
-ngx_pid_t     ngx_parent; // tengine/src/os/unix/ngx_process_cycle.c
-
 static void ngx_show_version_info(void);
 static ngx_int_t ngx_add_inherited_sockets(ngx_cycle_t *cycle);
 static void ngx_cleanup_environment(void *data);

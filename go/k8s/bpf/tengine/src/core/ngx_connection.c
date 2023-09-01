@@ -6,6 +6,7 @@
 #include <ngx_event.h>
 
 
+ngx_os_io_t  ngx_io;
 
 static void ngx_drain_connections(ngx_cycle_t *cycle);
 
@@ -15,7 +16,6 @@ ngx_int_t
 ngx_clone_listening(ngx_cycle_t *cycle, ngx_listening_t *ls)
 {
 #if (NGX_HAVE_REUSEPORT)
-
     ngx_int_t         n;
     ngx_core_conf_t  *ccf;
     ngx_listening_t   ols;
@@ -25,13 +25,9 @@ ngx_clone_listening(ngx_cycle_t *cycle, ngx_listening_t *ls)
     }
 
     ols = *ls;
-
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
-
     for (n = 1; n < ccf->worker_processes; n++) {
-
         /* create a socket for each worker process */
-
         ls = ngx_array_push(&cycle->listening);
         if (ls == NULL) {
             return NGX_ERROR;
@@ -40,15 +36,12 @@ ngx_clone_listening(ngx_cycle_t *cycle, ngx_listening_t *ls)
         *ls = ols;
         ls->worker = n;
     }
-
 #endif
 
     return NGX_OK;
 }
 
-void
-ngx_free_connection(ngx_connection_t *c)
-{
+void ngx_free_connection(ngx_connection_t *c) {
     c->data = ngx_cycle->free_connections;
     ngx_cycle->free_connections = c;
     ngx_cycle->free_connection_n++;
@@ -58,9 +51,7 @@ ngx_free_connection(ngx_connection_t *c)
     }
 }
 
-void
-ngx_close_connection(ngx_connection_t *c)
-{
+void ngx_close_connection(ngx_connection_t *c) {
     ngx_err_t     err;
     ngx_uint_t    log_error, level;
     ngx_socket_t  fd;
@@ -78,32 +69,10 @@ ngx_close_connection(ngx_connection_t *c)
         ngx_del_timer(c->write);
     }
 
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    if (c->async->timer_set) {
-        ngx_del_timer(c->async);
-    }
-
-    if (c->async_enable && ngx_del_async_conn) {
-        if (c->num_async_fds) {
-            ngx_del_async_conn(c, NGX_DISABLE_EVENT);
-            c->num_async_fds--;
-        }
-    }
-#endif
-
     if (!c->shared) {
         if (ngx_del_conn) {
             ngx_del_conn(c, NGX_CLOSE_EVENT);
-
         } else {
-#if (NGX_SSL && NGX_SSL_ASYNC)
-            if (c->async_enable && ngx_del_async_conn) {
-                if (c->num_async_fds) {
-                    ngx_del_async_conn(c, NGX_DISABLE_EVENT);
-                    c->num_async_fds--;
-                }
-            }
-#endif
             if (c->read->active || c->read->disabled) {
                 ngx_del_event(c->read, NGX_READ_EVENT, NGX_CLOSE_EVENT);
             }
@@ -122,30 +91,13 @@ ngx_close_connection(ngx_connection_t *c)
         ngx_delete_posted_event(c->write);
     }
 
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    if (c->async->posted) {
-        ngx_delete_posted_event(c->async);
-    }
-#endif
-
     c->read->closed = 1;
     c->write->closed = 1;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    c->async->closed = 1;
-#endif
-
     ngx_reusable_connection(c, 0);
-
     log_error = c->log_error;
-
     ngx_free_connection(c);
-
     fd = c->fd;
     c->fd = (ngx_socket_t) -1;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    c->async_fd = (ngx_socket_t) -1;
-#endif
-
     if (c->shared) {
         return;
     }
@@ -1140,3 +1092,143 @@ void ngx_close_listening_sockets(ngx_cycle_t *cycle) {
 
     cycle->listening.nelts = 0;
 }
+
+
+ngx_int_t
+ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
+    ngx_uint_t port)
+{
+    socklen_t             len;
+    ngx_uint_t            addr;
+    ngx_sockaddr_t        sa;
+    struct sockaddr_in   *sin;
+    addr = 0;
+
+    if (c->local_socklen) {
+        switch (c->local_sockaddr->sa_family) {
+#if (NGX_HAVE_UNIX_DOMAIN)
+        case AF_UNIX:
+            addr = 1;
+            break;
+#endif
+
+        default: /* AF_INET */
+            sin = (struct sockaddr_in *) c->local_sockaddr;
+            addr = sin->sin_addr.s_addr;
+            break;
+        }
+    }
+
+    if (addr == 0) {
+        len = sizeof(ngx_sockaddr_t);
+        if (getsockname(c->fd, &sa.sockaddr, &len) == -1) {
+            ngx_connection_error(c, ngx_socket_errno, "getsockname() failed");
+            return NGX_ERROR;
+        }
+
+        c->local_sockaddr = ngx_palloc(c->pool, len);
+        if (c->local_sockaddr == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_memcpy(c->local_sockaddr, &sa, len);
+        c->local_socklen = len;
+    }
+
+    if (s == NULL) {
+        return NGX_OK;
+    }
+
+    s->len = ngx_sock_ntop(c->local_sockaddr, c->local_socklen,
+                           s->data, s->len, port);
+
+    return NGX_OK;
+}
+
+ngx_listening_t *
+ngx_create_listening(ngx_conf_t *cf, struct sockaddr *sockaddr,
+    socklen_t socklen)
+{
+    size_t            len;
+    ngx_listening_t  *ls;
+    struct sockaddr  *sa;
+    u_char            text[NGX_SOCKADDR_STRLEN];
+
+    ls = ngx_array_push(&cf->cycle->listening);
+    if (ls == NULL) {
+        return NULL;
+    }
+
+    ngx_memzero(ls, sizeof(ngx_listening_t));
+    sa = ngx_palloc(cf->pool, socklen);
+    if (sa == NULL) {
+        return NULL;
+    }
+
+    ngx_memcpy(sa, sockaddr, socklen);
+
+    ls->sockaddr = sa;
+    ls->socklen = socklen;
+
+    len = ngx_sock_ntop(sa, socklen, text, NGX_SOCKADDR_STRLEN, 1);
+    ls->addr_text.len = len;
+
+    switch (ls->sockaddr->sa_family) {
+#if (NGX_HAVE_UNIX_DOMAIN)
+    case AF_UNIX:
+        ls->addr_text_max_len = NGX_UNIX_ADDRSTRLEN;
+        len++;
+        break;
+#endif
+    case AF_INET:
+        ls->addr_text_max_len = NGX_INET_ADDRSTRLEN;
+        break;
+    default:
+        ls->addr_text_max_len = NGX_SOCKADDR_STRLEN;
+        break;
+    }
+
+    ls->addr_text.data = ngx_pnalloc(cf->pool, len);
+    if (ls->addr_text.data == NULL) {
+        return NULL;
+    }
+
+    ngx_memcpy(ls->addr_text.data, text, len);
+    ngx_rbtree_init(&ls->rbtree, &ls->sentinel, ngx_udp_rbtree_insert_value);
+    ls->fd = (ngx_socket_t) -1;
+    ls->type = SOCK_STREAM;
+
+    ls->backlog = NGX_LISTEN_BACKLOG;
+    ls->rcvbuf = -1;
+    ls->sndbuf = -1;
+
+#if (NGX_HAVE_SETFIB)
+    ls->setfib = -1;
+#endif
+
+#if (NGX_HAVE_TCP_FASTOPEN)
+    ls->fastopen = -1;
+#endif
+
+    return ls;
+}
+
+ngx_int_t ngx_tcp_nodelay(ngx_connection_t *c) {
+    int  tcp_nodelay;
+    if (c->tcp_nodelay != NGX_TCP_NODELAY_UNSET) {
+        return NGX_OK;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_CORE, c->log, 0, "tcp_nodelay");
+    tcp_nodelay = 1;
+    if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY, (const void *) &tcp_nodelay, sizeof(int)) == -1) {
+        ngx_connection_error(c, ngx_socket_errno, "setsockopt(TCP_NODELAY) failed");
+        return NGX_ERROR;
+    }
+
+    c->tcp_nodelay = NGX_TCP_NODELAY_SET;
+
+    return NGX_OK;
+}
+
+

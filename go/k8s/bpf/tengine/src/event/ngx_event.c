@@ -247,6 +247,57 @@ static char * ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     return NGX_CONF_OK;
 }
 
+static char *
+ngx_event_init_conf(ngx_cycle_t *cycle, void *conf)
+{
+#if (NGX_HAVE_REUSEPORT)
+    ngx_uint_t        i;
+    ngx_core_conf_t  *ccf;
+    ngx_listening_t  *ls;
+#endif
+
+    if (ngx_get_conf(cycle->conf_ctx, ngx_events_module) == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                      "no \"events\" section in configuration");
+        return NGX_CONF_ERROR;
+    }
+
+    if (cycle->connection_n < cycle->listening.nelts + 1) {
+
+        /*
+         * there should be at least one connection for each listening
+         * socket, plus an additional connection for channel
+         */
+
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                      "%ui worker_connections are not enough "
+                      "for %ui listening sockets",
+                      cycle->connection_n, cycle->listening.nelts);
+
+        return NGX_CONF_ERROR;
+    }
+
+#if (NGX_HAVE_REUSEPORT)
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+    if (!ngx_test_config && ccf->master) {
+        ls = cycle->listening.elts;
+        for (i = 0; i < cycle->listening.nelts; i++) {
+            if (!ls[i].reuseport || ls[i].worker != 0) {
+                continue;
+            }
+
+            if (ngx_clone_listening(cycle, &ls[i]) != NGX_OK) {
+                return NGX_CONF_ERROR;
+            }
+
+            /* cloning may change cycle->listening.elts */
+            ls = cycle->listening.elts;
+        }
+    }
+#endif
+
+    return NGX_CONF_OK;
+}
 
 static ngx_int_t
 ngx_event_module_init(ngx_cycle_t *cycle)
@@ -817,4 +868,182 @@ ngx_event_dummy_accept_filter(ngx_connection_t *c)
     return NGX_OK;
 }
 #endif
+
+ngx_int_t
+ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags)
+{
+    if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
+
+        /* kqueue, epoll */
+
+        if (!rev->active && !rev->ready) {
+            if (ngx_add_event(rev, NGX_READ_EVENT, NGX_CLEAR_EVENT)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+        }
+
+        return NGX_OK;
+
+    } else if (ngx_event_flags & NGX_USE_LEVEL_EVENT) {
+
+        /* select, poll, /dev/poll */
+
+        if (!rev->active && !rev->ready) {
+            if (ngx_add_event(rev, NGX_READ_EVENT, NGX_LEVEL_EVENT)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+        if (rev->active && (rev->ready || (flags & NGX_CLOSE_EVENT))) {
+            if (ngx_del_event(rev, NGX_READ_EVENT, NGX_LEVEL_EVENT | flags)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+    } else if (ngx_event_flags & NGX_USE_EVENTPORT_EVENT) {
+
+        /* event ports */
+
+        if (!rev->active && !rev->ready) {
+            if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+        if (rev->oneshot && rev->ready) {
+            if (ngx_del_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+    }
+
+    /* iocp */
+
+    return NGX_OK;
+}
+
+
+ngx_int_t
+ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
+{
+    ngx_connection_t  *c;
+
+    if (lowat) {
+        c = wev->data;
+
+        if (ngx_send_lowat(c, lowat) == NGX_ERROR) {
+            return NGX_ERROR;
+        }
+    }
+
+    if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
+
+        /* kqueue, epoll */
+
+        if (!wev->active && !wev->ready) {
+            if (ngx_add_event(wev, NGX_WRITE_EVENT,
+                              NGX_CLEAR_EVENT | (lowat ? NGX_LOWAT_EVENT : 0))
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+        }
+
+        return NGX_OK;
+
+    } else if (ngx_event_flags & NGX_USE_LEVEL_EVENT) {
+
+        /* select, poll, /dev/poll */
+
+        if (!wev->active && !wev->ready) {
+            if (ngx_add_event(wev, NGX_WRITE_EVENT, NGX_LEVEL_EVENT)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+        if (wev->active && wev->ready) {
+            if (ngx_del_event(wev, NGX_WRITE_EVENT, NGX_LEVEL_EVENT)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+    } else if (ngx_event_flags & NGX_USE_EVENTPORT_EVENT) {
+
+        /* event ports */
+
+        if (!wev->active && !wev->ready) {
+            if (ngx_add_event(wev, NGX_WRITE_EVENT, 0) == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+        if (wev->oneshot && wev->ready) {
+            if (ngx_del_event(wev, NGX_WRITE_EVENT, 0) == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+    }
+
+    /* iocp */
+
+    return NGX_OK;
+}
+
+ngx_int_t
+ngx_send_lowat(ngx_connection_t *c, size_t lowat)
+{
+    int  sndlowat;
+
+#if (NGX_HAVE_LOWAT_EVENT)
+    if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
+        c->write->available = lowat;
+        return NGX_OK;
+    }
+#endif
+
+    if (lowat == 0 || c->sndlowat) {
+        return NGX_OK;
+    }
+
+    sndlowat = (int) lowat;
+
+    if (setsockopt(c->fd, SOL_SOCKET, SO_SNDLOWAT,
+                   (const void *) &sndlowat, sizeof(int))
+        == -1)
+    {
+        ngx_connection_error(c, ngx_socket_errno,
+                             "setsockopt(SO_SNDLOWAT) failed");
+        return NGX_ERROR;
+    }
+
+    c->sndlowat = 1;
+
+    return NGX_OK;
+}
 

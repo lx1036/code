@@ -76,9 +76,7 @@ char * ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head) {
 
     if (*head != NULL && (*head)->log_level == 0) {
         new_log = *head;
-
     } else {
-
         new_log = ngx_pcalloc(cf->pool, sizeof(ngx_log_t));
         if (new_log == NULL) {
             return NGX_CONF_ERROR;
@@ -90,16 +88,13 @@ char * ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head) {
     }
 
     value = cf->args->elts;
-
     if (ngx_strcmp(value[1].data, "stderr") == 0) {
         ngx_str_null(&name);
         cf->cycle->log_use_stderr = 1;
-
         new_log->file = ngx_conf_open_file(cf->cycle, &name);
         if (new_log->file == NULL) {
             return NGX_CONF_ERROR;
         }
-
     } else {
         new_log->file = ngx_conf_open_file(cf->cycle, &value[1]);
         if (new_log->file == NULL) {
@@ -118,6 +113,63 @@ char * ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head) {
     return NGX_CONF_OK;
 }
 
+static char * ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log) {
+    ngx_uint_t   i, n, d, found;
+    ngx_str_t   *value;
+
+    if (cf->args->nelts == 2) {
+        log->log_level = NGX_LOG_ERR;
+        return NGX_CONF_OK;
+    }
+
+    value = cf->args->elts;
+    for (i = 2; i < cf->args->nelts; i++) {
+        found = 0;
+        for (n = 1; n <= NGX_LOG_DEBUG; n++) {
+            if (ngx_strcmp(value[i].data, err_levels[n].data) == 0) {
+
+                if (log->log_level != 0) {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                       "duplicate log level \"%V\"",
+                                       &value[i]);
+                    return NGX_CONF_ERROR;
+                }
+
+                log->log_level = n;
+                found = 1;
+                break;
+            }
+        }
+
+        for (n = 0, d = NGX_LOG_DEBUG_FIRST; d <= NGX_LOG_DEBUG_LAST; d <<= 1) {
+            if (ngx_strcmp(value[i].data, debug_levels[n++]) == 0) {
+                if (log->log_level & ~NGX_LOG_DEBUG_ALL) {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                       "invalid log level \"%V\"",
+                                       &value[i]);
+                    return NGX_CONF_ERROR;
+                }
+
+                log->log_level |= d;
+                found = 1;
+                break;
+            }
+        }
+
+
+        if (!found) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "invalid log level \"%V\"", &value[i]);
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    if (log->log_level == NGX_LOG_DEBUG) {
+        log->log_level = NGX_LOG_DEBUG_ALL;
+    }
+
+    return NGX_CONF_OK;
+}
 
 void ngx_cdecl
 ngx_log_stderr(ngx_err_t err, const char *fmt, ...)

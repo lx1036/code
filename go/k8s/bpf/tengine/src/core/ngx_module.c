@@ -284,3 +284,42 @@ ngx_int_t ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type) {
 
     return max + 1;
 }
+
+static ngx_uint_t
+ngx_module_ctx_index(ngx_cycle_t *cycle, ngx_uint_t type, ngx_uint_t index)
+{
+    ngx_uint_t     i;
+    ngx_module_t  *module;
+
+again:
+    /* find an unused ctx_index */
+    for (i = 0; cycle->modules[i]; i++) {
+        module = cycle->modules[i];
+
+        if (module->type != type) {
+            continue;
+        }
+
+        if (module->ctx_index == index) {
+            index++;
+            goto again;
+        }
+    }
+
+    /* check previous cycle */
+    if (cycle->old_cycle && cycle->old_cycle->modules) {
+        for (i = 0; cycle->old_cycle->modules[i]; i++) {
+            module = cycle->old_cycle->modules[i];
+            if (module->type != type) {
+                continue;
+            }
+
+            if (module->ctx_index == index) {
+                index++;
+                goto again;
+            }
+        }
+    }
+
+    return index;
+}

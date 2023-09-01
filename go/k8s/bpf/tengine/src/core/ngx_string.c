@@ -620,6 +620,35 @@ ngx_strcasecmp(u_char *s1, u_char *s2)
     }
 }
 
+ngx_int_t
+ngx_strncasecmp(u_char *s1, u_char *s2, size_t n)
+{
+    ngx_uint_t  c1, c2;
+
+    while (n) {
+        c1 = (ngx_uint_t) *s1++;
+        c2 = (ngx_uint_t) *s2++;
+
+        c1 = (c1 >= 'A' && c1 <= 'Z') ? (c1 | 0x20) : c1;
+        c2 = (c2 >= 'A' && c2 <= 'Z') ? (c2 | 0x20) : c2;
+
+        if (c1 == c2) {
+
+            if (c1) {
+                n--;
+                continue;
+            }
+
+            return 0;
+        }
+
+        return c1 - c2;
+    }
+
+    return 0;
+}
+
+
 u_char *
 ngx_pstrdup(ngx_pool_t *pool, ngx_str_t *src) // copy string into dst
 {
@@ -790,4 +819,89 @@ void ngx_strlow(u_char *dst, u_char *src, size_t n) {
         n--;
     }
 }
+
+ngx_int_t ngx_hextoi(u_char *line, size_t n) {
+    u_char     c, ch;
+    ngx_int_t  value, cutoff;
+
+    if (n == 0) {
+        return NGX_ERROR;
+    }
+
+    cutoff = NGX_MAX_INT_T_VALUE / 16;
+    for (value = 0; n--; line++) {
+        if (value > cutoff) {
+            return NGX_ERROR;
+        }
+
+        ch = *line;
+
+        if (ch >= '0' && ch <= '9') {
+            value = value * 16 + (ch - '0');
+            continue;
+        }
+
+        c = (u_char) (ch | 0x20);
+        if (c >= 'a' && c <= 'f') {
+            value = value * 16 + (c - 'a' + 10);
+            continue;
+        }
+
+        return NGX_ERROR;
+    }
+
+    return value;
+}
+
+ngx_int_t ngx_memn2cmp(u_char *s1, u_char *s2, size_t n1, size_t n2) {
+    size_t     n;
+    ngx_int_t  m, z;
+
+    if (n1 <= n2) {
+        n = n1;
+        z = -1;
+    } else {
+        n = n2;
+        z = 1;
+    }
+
+    m = ngx_memcmp(s1, s2, n);
+    if (m || n1 == n2) {
+        return m;
+    }
+
+    return z;
+}
+
+/* ngx_sort() is implemented as insertion sort because we need stable sort */
+void
+ngx_sort(void *base, size_t n, size_t size,
+    ngx_int_t (*cmp)(const void *, const void *))
+{
+    u_char  *p1, *p2, *p;
+
+    p = ngx_alloc(size, ngx_cycle->log);
+    if (p == NULL) {
+        return;
+    }
+
+    for (p1 = (u_char *) base + size;
+         p1 < (u_char *) base + n * size;
+         p1 += size)
+    {
+        ngx_memcpy(p, p1, size);
+
+        for (p2 = p1;
+             p2 > (u_char *) base && cmp(p2 - size, p) > 0;
+             p2 -= size)
+        {
+            ngx_memcpy(p2, p2 - size, size);
+        }
+
+        ngx_memcpy(p2, p, size);
+    }
+
+    ngx_free(p);
+}
+
 
