@@ -99,7 +99,7 @@ struct ngx_cycle_s {
 #endif
 };
 
-
+// nginx core 层配置字段
 typedef struct {
     ngx_flag_t                daemon;
     ngx_flag_t                master;

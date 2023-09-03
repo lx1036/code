@@ -17,6 +17,7 @@ typedef struct ngx_stream_session_s  ngx_stream_session_t;
 
 
 #include <ngx_stream_variables.h>
+#include <ngx_stream_script.h>
 #include <ngx_stream_upstream.h>
 #include <ngx_stream_upstream_round_robin.h>
 

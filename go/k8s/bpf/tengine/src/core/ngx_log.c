@@ -203,7 +203,6 @@ u_char *
 ngx_log_errno(u_char *buf, u_char *last, ngx_err_t err)
 {
     if (buf > last - 50) {
-
         /* leave a space for an error code */
 
         buf = last - 50;
@@ -212,15 +211,8 @@ ngx_log_errno(u_char *buf, u_char *last, ngx_err_t err)
         *buf++ = '.';
     }
 
-#if (NGX_WIN32)
-    buf = ngx_slprintf(buf, last, ((unsigned) err < 0x80000000)
-                                       ? " (%d: " : " (%Xd: ", err);
-#else
     buf = ngx_slprintf(buf, last, " (%d: ", err);
-#endif
-
     buf = ngx_strerror(err, buf, last - buf);
-
     if (buf < last) {
         *buf++ = ')';
     }

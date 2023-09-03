@@ -402,6 +402,39 @@ static u_char * ngx_proxy_protocol_read_port(u_char *p, u_char *last, in_port_t 
     return p;
 }
 
+u_char * ngx_proxy_protocol_write(ngx_connection_t *c, u_char *buf, u_char *last, ngx_uint_t version) {
+    ngx_uint_t  port, lport;
+    if (version == 2) {
+        return ngx_proxy_protocol_v2_write(c, buf, last);
+    }
+
+    if (last - buf < NGX_PROXY_PROTOCOL_V1_MAX_HEADER) {
+        ngx_log_error(NGX_LOG_ALERT, c->log, 0, "too small buffer for PROXY protocol");
+        return NULL;
+    }
+
+    if (ngx_connection_local_sockaddr(c, NULL, 0) != NGX_OK) {
+        return NULL;
+    }
+
+    switch (c->sockaddr->sa_family) {
+    case AF_INET:
+        buf = ngx_cpymem(buf, "PROXY TCP4 ", sizeof("PROXY TCP4 ") - 1);
+        break;
+    default:
+        return ngx_cpymem(buf, "PROXY UNKNOWN" CRLF,
+                          sizeof("PROXY UNKNOWN" CRLF) - 1);
+    }
+
+    buf += ngx_sock_ntop(c->sockaddr, c->socklen, buf, last - buf, 0);
+    *buf++ = ' ';
+    buf += ngx_sock_ntop(c->local_sockaddr, c->local_socklen, buf, last - buf, 0);
+    port = ngx_inet_get_port(c->sockaddr);
+    lport = ngx_inet_get_port(c->local_sockaddr);
+
+    return ngx_slprintf(buf, last, " %ui %ui" CRLF, port, lport);
+}
+
 // ./configure --prefix=./bin --with-stream --with-debug --add-module=./modules/ngx_http_echo_module/ && make && make install
 // ./bin/sbin/nginx -c conf/proxy-pass-module.conf  -p .
 // https://github.com/dedok/nginx-stream-proxy-protocol-v2/blob/main/stream-proxy-protocol-v2-release-1.19.8.patch

@@ -648,3 +648,118 @@ no_port:
     return NGX_OK;
 }
 
+ngx_int_t
+ngx_parse_addr_port(ngx_pool_t *pool, ngx_addr_t *addr, u_char *text,
+    size_t len)
+{
+    u_char     *p, *last;
+    size_t      plen;
+    ngx_int_t   rc, port;
+
+    rc = ngx_parse_addr(pool, addr, text, len);
+
+    if (rc != NGX_DECLINED) {
+        return rc;
+    }
+
+    last = text + len;
+
+#if (NGX_HAVE_INET6)
+    if (len && text[0] == '[') {
+
+        p = ngx_strlchr(text, last, ']');
+
+        if (p == NULL || p == last - 1 || *++p != ':') {
+            return NGX_DECLINED;
+        }
+
+        text++;
+        len -= 2;
+
+    } else
+#endif
+
+    {
+        p = ngx_strlchr(text, last, ':');
+
+        if (p == NULL) {
+            return NGX_DECLINED;
+        }
+    }
+
+    p++;
+    plen = last - p;
+
+    port = ngx_atoi(p, plen);
+
+    if (port < 1 || port > 65535) {
+        return NGX_DECLINED;
+    }
+
+    len -= plen + 1;
+
+    rc = ngx_parse_addr(pool, addr, text, len);
+
+    if (rc != NGX_OK) {
+        return rc;
+    }
+
+    ngx_inet_set_port(addr->sockaddr, (in_port_t) port);
+
+    return NGX_OK;
+}
+
+ngx_int_t
+ngx_parse_addr(ngx_pool_t *pool, ngx_addr_t *addr, u_char *text, size_t len)
+{
+    in_addr_t             inaddr;
+    ngx_uint_t            family;
+    struct sockaddr_in   *sin;
+#if (NGX_HAVE_INET6)
+    struct in6_addr       inaddr6;
+    struct sockaddr_in6  *sin6;
+
+    /*
+     * prevent MSVC8 warning:
+     *    potentially uninitialized local variable 'inaddr6' used
+     */
+    ngx_memzero(&inaddr6, sizeof(struct in6_addr));
+#endif
+
+    inaddr = ngx_inet_addr(text, len);
+
+    if (inaddr != INADDR_NONE) {
+        family = AF_INET;
+        len = sizeof(struct sockaddr_in);
+    } else {
+        return NGX_DECLINED;
+    }
+
+    addr->sockaddr = ngx_pcalloc(pool, len);
+    if (addr->sockaddr == NULL) {
+        return NGX_ERROR;
+    }
+
+    addr->sockaddr->sa_family = (u_char) family;
+    addr->socklen = len;
+
+    switch (family) {
+
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+        sin6 = (struct sockaddr_in6 *) addr->sockaddr;
+        ngx_memcpy(sin6->sin6_addr.s6_addr, inaddr6.s6_addr, 16);
+        break;
+#endif
+
+    default: /* AF_INET */
+        sin = (struct sockaddr_in *) addr->sockaddr;
+        sin->sin_addr.s_addr = inaddr;
+        break;
+    }
+
+    return NGX_OK;
+}
+
+
+

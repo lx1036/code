@@ -261,9 +261,7 @@ static char * ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void 
     }
 
     if (conf->handler == NULL) {
-        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                      "no handler for server in %s:%ui",
-                      conf->file_name, conf->line);
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "no handler for server in %s:%ui", conf->file_name, conf->line);
         return NGX_CONF_ERROR;
     }
 
@@ -275,16 +273,10 @@ static char * ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void 
         }
     }
 
-    ngx_conf_merge_msec_value(conf->proxy_protocol_timeout,
-                              prev->proxy_protocol_timeout, 30000);
-
+    ngx_conf_merge_msec_value(conf->proxy_protocol_timeout, prev->proxy_protocol_timeout, 30000);
     ngx_conf_merge_value(conf->tcp_nodelay, prev->tcp_nodelay, 1);
-
-    ngx_conf_merge_size_value(conf->preread_buffer_size,
-                              prev->preread_buffer_size, 16384);
-
-    ngx_conf_merge_msec_value(conf->preread_timeout,
-                              prev->preread_timeout, 30000);
+    ngx_conf_merge_size_value(conf->preread_buffer_size, prev->preread_buffer_size, 16384);
+    ngx_conf_merge_msec_value(conf->preread_timeout, prev->preread_timeout, 30000);
 
 #if (T_NGX_STREAM_SNI)
     if (conf->server_names.nelts == 0) {
@@ -366,7 +358,7 @@ static char * ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *c
     pcf = *cf;
     cf->ctx = ctx;
     cf->cmd_type = NGX_STREAM_SRV_CONF;
-    rv = ngx_conf_parse(cf, NULL);
+    rv = ngx_conf_parse(cf, NULL); // parse server{} 里的 listen 等指令，会跳转到 ngx_stream_core_listen
 
     *cf = pcf;
 
@@ -391,7 +383,7 @@ static char * ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *c
     cscf->listen = 1;
     value = cf->args->elts;
     ngx_memzero(&u, sizeof(ngx_url_t));
-    u.url = value[1];
+    u.url = value[1]; // 4001
     u.listen = 1;
     if (ngx_parse_url(cf->pool, &u) != NGX_OK) {
         if (u.err) {
@@ -671,9 +663,9 @@ static char * ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *c
             nls = ls;
         }
 
-        nls->sockaddr = u.addrs[n].sockaddr;
+        nls->sockaddr = u.addrs[n].sockaddr; // 4001=0x0fa1
         nls->socklen = u.addrs[n].socklen;
-        nls->addr_text = u.addrs[n].name;
+        nls->addr_text = u.addrs[n].name; // 0.0.0.0:4001
         nls->wildcard = ngx_inet_wildcard(nls->sockaddr);
         als = cmcf->listen.elts;
 

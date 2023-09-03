@@ -321,12 +321,10 @@ ngx_vslprintf(u_char *buf, u_char *last, const char *fmt, va_list args)
 
                 continue;
 
-#if !(NGX_WIN32)
             case 'r':
                 i64 = (int64_t) va_arg(args, rlim_t);
                 sign = 1;
                 break;
-#endif
 
             case 'p':
                 ui64 = (uintptr_t) va_arg(args, void *);
@@ -350,14 +348,7 @@ ngx_vslprintf(u_char *buf, u_char *last, const char *fmt, va_list args)
                 continue;
 
             case 'N':
-#if (NGX_WIN32)
-                *buf++ = CR;
-                if (buf < last) {
-                    *buf++ = LF;
-                }
-#else
                 *buf++ = LF;
-#endif
                 fmt++;
 
                 continue;
@@ -904,4 +895,192 @@ ngx_sort(void *base, size_t n, size_t size,
     ngx_free(p);
 }
 
+
+void
+ngx_explicit_memzero(void *buf, size_t n)
+{
+    ngx_memzero(buf, n);
+    ngx_memory_barrier();
+}
+
+uintptr_t
+ngx_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
+{
+    ngx_uint_t      n;
+    uint32_t       *escape;
+    static u_char   hex[] = "0123456789ABCDEF";
+
+    /*
+     * Per RFC 3986 only the following chars are allowed in URIs unescaped:
+     *
+     * unreserved    = ALPHA / DIGIT / "-" / "." / "_" / "~"
+     * gen-delims    = ":" / "/" / "?" / "#" / "[" / "]" / "@"
+     * sub-delims    = "!" / "$" / "&" / "'" / "(" / ")"
+     *               / "*" / "+" / "," / ";" / "="
+     *
+     * And "%" can appear as a part of escaping itself.  The following
+     * characters are not allowed and need to be escaped: %00-%1F, %7F-%FF,
+     * " ", """, "<", ">", "\", "^", "`", "{", "|", "}".
+     */
+
+                    /* " ", "#", "%", "?", not allowed */
+
+    static uint32_t   uri[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0xd000002d, /* 1101 0000 0000 0000  0000 0000 0010 1101 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x50000000, /* 0101 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0xb8000001, /* 1011 1000 0000 0000  0000 0000 0000 0001 */
+
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff  /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+    };
+
+                    /* " ", "#", "%", "&", "+", ";", "?", not allowed */
+
+    static uint32_t   args[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0xd800086d, /* 1101 1000 0000 0000  0000 1000 0110 1101 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x50000000, /* 0101 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0xb8000001, /* 1011 1000 0000 0000  0000 0000 0000 0001 */
+
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff  /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+    };
+
+                    /* not ALPHA, DIGIT, "-", ".", "_", "~" */
+
+    static uint32_t   uri_component[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0xfc009fff, /* 1111 1100 0000 0000  1001 1111 1111 1111 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x78000001, /* 0111 1000 0000 0000  0000 0000 0000 0001 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0xb8000001, /* 1011 1000 0000 0000  0000 0000 0000 0001 */
+
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff  /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+    };
+
+                    /* " ", "#", """, "%", "'", not allowed */
+
+    static uint32_t   html[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0x500000ad, /* 0101 0000 0000 0000  0000 0000 1010 1101 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x50000000, /* 0101 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0xb8000001, /* 1011 1000 0000 0000  0000 0000 0000 0001 */
+
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff  /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+    };
+
+                    /* " ", """, "'", not allowed */
+
+    static uint32_t   refresh[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0x50000085, /* 0101 0000 0000 0000  0000 0000 1000 0101 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x50000000, /* 0101 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0xd8000001, /* 1011 1000 0000 0000  0000 0000 0000 0001 */
+
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+        0xffffffff  /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+    };
+
+                    /* " ", "%", %00-%1F */
+
+    static uint32_t   memcached[] = {
+        0xffffffff, /* 1111 1111 1111 1111  1111 1111 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0x00000021, /* 0000 0000 0000 0000  0000 0000 0010 0001 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+    };
+
+                    /* mail_auth is the same as memcached */
+
+    static uint32_t  *map[] =
+        { uri, args, uri_component, html, refresh, memcached, memcached };
+
+
+    escape = map[type];
+
+    if (dst == NULL) {
+
+        /* find the number of the characters to be escaped */
+
+        n = 0;
+
+        while (size) {
+            if (escape[*src >> 5] & (1U << (*src & 0x1f))) {
+                n++;
+            }
+            src++;
+            size--;
+        }
+
+        return (uintptr_t) n;
+    }
+
+    while (size) {
+        if (escape[*src >> 5] & (1U << (*src & 0x1f))) {
+            *dst++ = '%';
+            *dst++ = hex[*src >> 4];
+            *dst++ = hex[*src & 0xf];
+            src++;
+
+        } else {
+            *dst++ = *src++;
+        }
+        size--;
+    }
+
+    return (uintptr_t) dst;
+}
 

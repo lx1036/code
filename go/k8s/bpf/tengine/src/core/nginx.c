@@ -18,19 +18,11 @@ static ngx_int_t ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv);
 static void *ngx_core_module_create_conf(ngx_cycle_t *cycle);
 static char *ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf);
 static char *ngx_set_user(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-static char *ngx_set_env(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_set_priority(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static char *ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
-static char *ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-#if (NGX_HAVE_DLOPEN)
-static void ngx_unload_module(void *data);
-#endif
-#if (T_NGX_MASTER_ENV)
-static char *ngx_master_set_env(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-#endif
 
 
 static ngx_conf_enum_t  ngx_debug_points[] = {
@@ -39,7 +31,6 @@ static ngx_conf_enum_t  ngx_debug_points[] = {
     { ngx_null_string, 0 }
 };
 static ngx_command_t  ngx_core_commands[] = {
-
     { ngx_string("daemon"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -138,41 +129,13 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, working_directory),
       NULL },
 
-    { ngx_string("env"),
-      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
-      ngx_set_env,
-      0,
-      0,
-      NULL },
-
-    { ngx_string("load_module"),
-      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
-      ngx_load_module,
-      0,
-      0,
-      NULL },
-
-#if (T_NGX_MASTER_ENV)
-
-    { ngx_string("master_env"),
-      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
-      ngx_master_set_env,
-      0,
-      0,
-      NULL },
-
-#endif
-
       ngx_null_command
 };
-
-
 static ngx_core_module_t  ngx_core_module_ctx = {
     ngx_string("core"),
     ngx_core_module_create_conf,
     ngx_core_module_init_conf
 };
-
 // c 语言里可以和 go 一样，缺省 field
 ngx_module_t  ngx_core_module = {
     NGX_MODULE_V1,
@@ -298,7 +261,7 @@ int main(int argc, char *const *argv) {
     if (ngx_add_inherited_sockets(&init_cycle) != NGX_OK) {
         return 1;
     }
-
+    // preinit modules
     if (ngx_preinit_modules() != NGX_OK) {
         return 1;
     }
@@ -664,11 +627,8 @@ ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv) {
     return NGX_OK;
 }
 
-static void *
-ngx_core_module_create_conf(ngx_cycle_t *cycle)
-{
+static void * ngx_core_module_create_conf(ngx_cycle_t *cycle) {
     ngx_core_conf_t  *ccf;
-
     ccf = ngx_pcalloc(cycle->pool, sizeof(ngx_core_conf_t));
     if (ccf == NULL) {
         return NULL;
@@ -712,18 +672,11 @@ static char *
 ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
 {
     ngx_core_conf_t  *ccf = conf;
-
     ngx_conf_init_value(ccf->daemon, 1);
     ngx_conf_init_value(ccf->master, 1);
     ngx_conf_init_msec_value(ccf->timer_resolution, 0);
     ngx_conf_init_msec_value(ccf->shutdown_timeout, 0);
-
-    ngx_conf_init_value(ccf->worker_processes,
-#if (T_NGX_MODIFY_DEFAULT_VALUE)
-                        ngx_ncpu);
-#else
-                        1);
-#endif
+    ngx_conf_init_value(ccf->worker_processes, ngx_ncpu);
     ngx_conf_init_value(ccf->debug_points, 0);
 
 #if (NGX_HAVE_CPU_AFFINITY)
@@ -760,9 +713,6 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
     ngx_memcpy(ngx_cpymem(ccf->oldpid.data, ccf->pid.data, ccf->pid.len),
                NGX_OLDPID_EXT, sizeof(NGX_OLDPID_EXT));
 
-
-#if !(NGX_WIN32)
-
     if (ccf->user == (uid_t) NGX_CONF_UNSET_UINT && geteuid() == 0) {
         struct group   *grp;
         struct passwd  *pwd;
@@ -789,7 +739,6 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
         ccf->group = grp->gr_gid;
     }
 
-
     if (ccf->lock_file.len == 0) {
         ngx_str_set(&ccf->lock_file, NGX_LOCK_PATH);
     }
@@ -798,14 +747,12 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    {
     ngx_str_t  lock_file;
 
     lock_file = cycle->old_cycle->lock_file;
 
     if (lock_file.len) {
         lock_file.len--;
-
         if (ccf->lock_file.len != lock_file.len
             || ngx_strncmp(ccf->lock_file.data, lock_file.data, lock_file.len)
                != 0)
@@ -834,131 +781,10 @@ ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
                               ccf->lock_file.len),
                    ".accept", sizeof(".accept"));
     }
-    }
-
-#endif
 
     return NGX_CONF_OK;
 }
 
-static char *
-ngx_load_module(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
-{
-#if (NGX_HAVE_DLOPEN)
-    void                *handle;
-    char               **names, **order;
-    ngx_str_t           *value, file;
-    ngx_uint_t           i;
-    ngx_module_t        *module, **modules;
-    ngx_pool_cleanup_t  *cln;
-
-    if (cf->cycle->modules_used) {
-        return "is specified too late";
-    }
-
-    value = cf->args->elts;
-
-    file = value[1];
-
-    if (ngx_conf_full_name(cf->cycle, &file, 0) != NGX_OK) {
-        return NGX_CONF_ERROR;
-    }
-
-    cln = ngx_pool_cleanup_add(cf->cycle->pool, 0);
-    if (cln == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    handle = ngx_dlopen(file.data);
-    if (handle == NULL) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           ngx_dlopen_n " \"%s\" failed (%s)",
-                           file.data, ngx_dlerror());
-        return NGX_CONF_ERROR;
-    }
-
-    cln->handler = ngx_unload_module;
-    cln->data = handle;
-
-    modules = ngx_dlsym(handle, "ngx_modules");
-    if (modules == NULL) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           ngx_dlsym_n " \"%V\", \"%s\" failed (%s)",
-                           &value[1], "ngx_modules", ngx_dlerror());
-        return NGX_CONF_ERROR;
-    }
-
-    names = ngx_dlsym(handle, "ngx_module_names");
-    if (names == NULL) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           ngx_dlsym_n " \"%V\", \"%s\" failed (%s)",
-                           &value[1], "ngx_module_names", ngx_dlerror());
-        return NGX_CONF_ERROR;
-    }
-
-    order = ngx_dlsym(handle, "ngx_module_order");
-
-    for (i = 0; modules[i]; i++) {
-        module = modules[i];
-        module->name = names[i];
-
-        if (ngx_add_module(cf, &file, module, order) != NGX_OK) {
-            return NGX_CONF_ERROR;
-        }
-
-        ngx_log_debug2(NGX_LOG_DEBUG_CORE, cf->log, 0, "module: %s i:%ui",
-                       module->name, module->index);
-    }
-
-    return NGX_CONF_OK;
-
-#else
-
-    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                       "\"load_module\" is not supported "
-                       "on this platform");
-    return NGX_CONF_ERROR;
-
-#endif
-}
-
-static char *
-ngx_master_set_env(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
-{
-    size_t       klen, vlen;
-    u_char      *key, *v, *p;
-    ngx_str_t   *value;
-
-    value = cf->args->elts;
-    p = ngx_strlchr(value[1].data, value[1].data + value[1].len, '=');
-    if (p == NULL) {
-        klen = value[1].len;
-        v = (u_char *) "1";
-
-    } else {
-        klen = p - value[1].data;
-        vlen = value[1].len - klen - 1;
-        v = ngx_palloc(cf->pool, vlen + 1);
-        if (v == NULL) {
-            return NGX_CONF_ERROR;
-        }
-
-        ngx_memcpy(v, p + 1, vlen);
-        v[vlen] = '\0';
-    }
-
-    key = ngx_palloc(cf->pool, klen + 1);
-    if (key == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    ngx_memcpy(key, value[1].data, klen);
-    key[klen] = '\0';
-
-    setenv((char *) key, (char *) v, 0);
-
-    return NGX_CONF_OK;
-}
 
 static char *
 ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
@@ -1109,47 +935,10 @@ ngx_get_cpu_affinity(ngx_uint_t n) {
 #endif
 }
 
-static char *
-ngx_set_env(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
-{
-    ngx_core_conf_t  *ccf = conf;
-
-    ngx_str_t   *value, *var;
-    ngx_uint_t   i;
-
-    var = ngx_array_push(&ccf->env);
-    if (var == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    value = cf->args->elts;
-    *var = value[1];
-
-    for (i = 0; i < value[1].len; i++) {
-
-        if (value[1].data[i] == '=') {
-
-            var->len = i;
-
-            return NGX_CONF_OK;
-        }
-    }
-
-    return NGX_CONF_OK;
-}
 
 static char *
 ngx_set_user(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-#if (NGX_WIN32)
-
-    ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-                       "\"user\" is not supported, ignored");
-
-    return NGX_CONF_OK;
-
-#else
-
     ngx_core_conf_t  *ccf = conf;
 
     char             *group;
@@ -1196,8 +985,6 @@ ngx_set_user(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ccf->group = grp->gr_gid;
 
     return NGX_CONF_OK;
-
-#endif
 }
 
 static char *
@@ -1227,22 +1014,6 @@ ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     return NGX_CONF_OK;
 }
-
-
-#if (NGX_HAVE_DLOPEN)
-
-static void
-ngx_unload_module(void *data)
-{
-    void  *handle = data;
-
-    if (ngx_dlclose(handle) != 0) {
-        ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
-                      ngx_dlclose_n " failed (%s)", ngx_dlerror());
-    }
-}
-
-#endif
 
 static char *
 ngx_set_priority(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)

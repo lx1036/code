@@ -34,6 +34,8 @@ CORE_DEPS = src/core/nginx.h \
 	src/core/ngx_proxy_protocol.h \
 	src/core/ngx_hash.h \
 	src/core/ngx_resolver.h \
+	src/core/ngx_rwlock.h \
+	src/core/ngx_parse_time.h \
 	src/event/ngx_event.h \
 	src/event/ngx_event_timer.h \
 	src/event/ngx_event_posted.h \
@@ -41,6 +43,7 @@ CORE_DEPS = src/core/nginx.h \
 	src/event/ngx_event_pipe.h \
 	src/event/ngx_event_udp.h \
 	src/event/ngx_event_udpv2.h \
+	src/event/ngx_event_openssl.h \
 	src/os/unix/ngx_time.h \
 	src/os/unix/ngx_errno.h \
 	src/os/unix/ngx_alloc.h \
@@ -63,7 +66,6 @@ CORE_DEPS = src/core/nginx.h \
 	src/os/unix/ngx_darwin_config.h \
 	src/os/unix/ngx_darwin.h \
 	src/proc/ngx_proc.h \
-	src/event/ngx_event_openssl.h \
 	src/core/ngx_auto_config.h
 
 CORE_INCS = -I src/core \
@@ -76,6 +78,7 @@ CORE_INCS = -I src/core \
 STREAM_DEPS = src/stream/ngx_stream.h \
 	src/stream/ngx_stream_variables.h \
 	src/stream/ngx_stream_upstream.h \
+	src/stream/ngx_stream_script.h \
 	src/stream/ngx_stream_upstream_round_robin.h \
 	src/stream/ngx_stream_ssl_module.h
 
@@ -103,6 +106,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/core/ngx_module.o \
 	objs/src/core/ngx_file.o \
 	objs/src/core/ngx_parse.o \
+	objs/src/core/ngx_parse_time.o \
 	objs/src/core/ngx_crc32.o \
 	objs/src/core/ngx_slab.o \
 	objs/src/core/ngx_inet.o \
@@ -112,6 +116,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/core/ngx_shmtx.o \
 	objs/src/core/ngx_hash.o \
 	objs/src/core/ngx_resolver.o \
+	objs/src/core/ngx_rwlock.o \
 	objs/src/event/ngx_event.o \
 	objs/src/event/ngx_event_timer.o \
 	objs/src/event/ngx_event_posted.o \
@@ -120,6 +125,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/event/modules/ngx_kqueue_module.o \
 	objs/src/event/ngx_event_openssl.o \
 	objs/src/event/ngx_event_openssl_stapling.o \
+	objs/src/event/ngx_event_connect.o \
 	objs/src/os/unix/ngx_alloc.o \
 	objs/src/os/unix/ngx_process.o \
 	objs/src/os/unix/ngx_dlopen.o \
@@ -146,6 +152,10 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/stream/ngx_stream_variables.o \
 	objs/src/stream/ngx_stream_core_module.o \
 	objs/src/stream/ngx_stream_handler.o \
+	objs/src/stream/ngx_stream_proxy_module.o \
+	objs/src/stream/ngx_stream_script.o \
+	objs/src/stream/ngx_stream_upstream_round_robin.o \
+	objs/src/stream/ngx_stream_upstream.o \
 
 	$(LINK) -o objs/nginx \
 	objs/src/core/nginx.o \
@@ -163,6 +173,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/core/ngx_module.o \
 	objs/src/core/ngx_file.o \
 	objs/src/core/ngx_parse.o \
+	objs/src/core/ngx_parse_time.o \
 	objs/src/core/ngx_cpuinfo.o \
 	objs/src/core/ngx_crc32.o \
 	objs/src/core/ngx_slab.o \
@@ -173,6 +184,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/core/ngx_shmtx.o \
 	objs/src/core/ngx_hash.o \
 	objs/src/core/ngx_resolver.o \
+	objs/src/core/ngx_rwlock.o \
 	objs/src/event/ngx_event.o \
 	objs/src/event/ngx_event_timer.o \
 	objs/src/event/ngx_event_posted.o \
@@ -181,6 +193,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/event/modules/ngx_kqueue_module.o \
 	objs/src/event/ngx_event_openssl.o \
 	objs/src/event/ngx_event_openssl_stapling.o \
+	objs/src/event/ngx_event_connect.o \
 	objs/src/os/unix/ngx_alloc.o \
 	objs/src/os/unix/ngx_process.o \
 	objs/src/os/unix/ngx_dlopen.o \
@@ -207,12 +220,16 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/stream/ngx_stream_variables.o \
 	objs/src/stream/ngx_stream_core_module.o \
 	objs/src/stream/ngx_stream_handler.o \
+	objs/src/stream/ngx_stream_proxy_module.o \
+	objs/src/stream/ngx_stream_script.o \
+	objs/src/stream/ngx_stream_upstream_round_robin.o \
+	objs/src/stream/ngx_stream_upstream.o \
 	-L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -Wl,-u,_pcre_version -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -L/usr/local/Cellar/pcre/8.45/lib -lpcre -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -lpcre2-8 -lssl -lcrypto -lz
 
 # objs/src/event/ngx_event_pipe.o
 test:
 	
-	objs/src/event/ngx_event_connect.o \
+	
 	objs/src/event/ngx_event_pipe.o \
 	objs/src/event/ngx_event_udpv2.o \
 	
@@ -231,10 +248,6 @@ test:
 	
 	objs/src/proc/ngx_proc.o \
 	
-	
-	
-	
-	objs/src/event/ngx_event_connect.o \
 	objs/src/event/ngx_event_udpv2.o \
 	
 	objs/src/os/unix/ngx_daemon.o \
@@ -399,6 +412,18 @@ objs/src/core/ngx_resolver.o:	$(CORE_DEPS) \
 		-o objs/src/core/ngx_resolver.o \
 		src/core/ngx_resolver.c
 
+objs/src/core/ngx_rwlock.o:	$(CORE_DEPS) \
+	src/core/ngx_rwlock.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) \
+		-o objs/src/core/ngx_rwlock.o \
+		src/core/ngx_rwlock.c
+
+objs/src/core/ngx_parse_time.o:	$(CORE_DEPS) \
+	src/core/ngx_parse_time.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) \
+		-o objs/src/core/ngx_parse_time.o \
+		src/core/ngx_parse_time.c
+		
 ################################os/event############################################
 # 以下是每一个 c -> o 文件编译, 主要使用 nginx 原有的 event/os/proc c 文件，路径 
 objs/src/event/ngx_event.o:	$(CORE_DEPS) \
@@ -688,6 +713,30 @@ objs/src/stream/ngx_stream_handler.o:	$(CORE_DEPS) $(STREAM_DEPS) \
 	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
 		-o objs/src/stream/ngx_stream_handler.o \
 		src/stream/ngx_stream_handler.c
+
+objs/src/stream/ngx_stream_proxy_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+	src/stream/ngx_stream_proxy_module.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+		-o objs/src/stream/ngx_stream_proxy_module.o \
+		src/stream/ngx_stream_proxy_module.c
+		
+objs/src/stream/ngx_stream_script.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+	src/stream/ngx_stream_script.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+		-o objs/src/stream/ngx_stream_script.o \
+		src/stream/ngx_stream_script.c
+				
+objs/src/stream/ngx_stream_upstream_round_robin.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+	src/stream/ngx_stream_upstream_round_robin.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+		-o objs/src/stream/ngx_stream_upstream_round_robin.o \
+		src/stream/ngx_stream_upstream_round_robin.c
+
+objs/src/stream/ngx_stream_upstream.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+	src/stream/ngx_stream_upstream.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+		-o objs/src/stream/ngx_stream_upstream.o \
+		src/stream/ngx_stream_upstream.c
 
 ################################################################
 run:

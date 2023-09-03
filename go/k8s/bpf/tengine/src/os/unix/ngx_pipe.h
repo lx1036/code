@@ -1,18 +1,10 @@
 
-/*
- * Copyright (C) 2010-2015 Alibaba Group Holding Limited
- */
-
-
-#ifndef _NGX_PIPE_H_INCLUDED_
-#define _NGX_PIPE_H_INCLUDED_
 
 
 #include <ngx_config.h>
 #include <ngx_core.h>
 
 
-#if !(NGX_WIN32)
 
 typedef struct {
     u_char           *cmd;
@@ -45,15 +37,4 @@ void ngx_pipe_broken_action(ngx_log_t *log, ngx_pid_t pid, ngx_int_t master);
 extern ngx_str_t ngx_log_error_backup;
 extern ngx_str_t ngx_log_access_backup;
 
-#else
 
-#define ngx_increase_pipe_generation
-#define ngx_close_old_pipes
-#define ngx_open_pipes(cycle)
-#define ngx_close_pipes
-#define ngx_pipe_broken_action(log, pid, master)
-
-#endif
-
-
-#endif /* _NGX_PIPE_H_INCLUDED_ */

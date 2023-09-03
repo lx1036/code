@@ -310,17 +310,14 @@ char * ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename) {
         /* open configuration file */
         fd = ngx_open_file(filename->data, NGX_FILE_RDONLY, NGX_FILE_OPEN, 0);
         if (fd == NGX_INVALID_FILE) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
-                               ngx_open_file_n " \"%s\" failed",
-                               filename->data);
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno, ngx_open_file_n " \"%s\" failed", filename->data);
             return NGX_CONF_ERROR;
         }
 
         prev = cf->conf_file;
         cf->conf_file = &conf_file;
         if (ngx_fd_info(fd, &cf->conf_file->file.info) == NGX_FILE_ERROR) {
-            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
-                          ngx_fd_info_n " \"%s\" failed", filename->data);
+            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno, ngx_fd_info_n " \"%s\" failed", filename->data);
         }
 
         cf->conf_file->buffer = &buf;
@@ -339,7 +336,6 @@ char * ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename) {
         cf->conf_file->file.offset = 0;
         cf->conf_file->file.log = cf->log;
         cf->conf_file->line = 1;
-
         type = parse_file;
         if (ngx_dump_config
 #if (NGX_DEBUG)
@@ -350,23 +346,17 @@ char * ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename) {
             if (ngx_conf_add_dump(cf, filename) != NGX_OK) {
                 goto failed;
             }
-
         } else {
             cf->conf_file->dump = NULL;
         }
-
     } else if (cf->conf_file->file.fd != NGX_INVALID_FILE) {
-
         type = parse_block;
-
     } else {
         type = parse_param;
     }
 
-
     for ( ;; ) {
         rc = ngx_conf_read_token(cf);
-
         /*
          * ngx_conf_read_token() may return
          *
@@ -380,9 +370,7 @@ char * ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename) {
         if (rc == NGX_ERROR) {
             goto done;
         }
-
         if (rc == NGX_CONF_BLOCK_DONE) {
-
             if (type != parse_block) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "unexpected \"}\"");
                 goto failed;
@@ -390,9 +378,7 @@ char * ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename) {
 
             goto done;
         }
-
         if (rc == NGX_CONF_FILE_DONE) {
-
             if (type == parse_block) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                    "unexpected end of file, expecting \"}\"");
@@ -403,66 +389,51 @@ char * ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename) {
         }
 
         if (rc == NGX_CONF_BLOCK_START) {
-
             if (type == parse_param) {
-                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                                   "block directives are not supported "
-                                   "in -g option");
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,  "block directives are not supported in -g option");
                 goto failed;
             }
         }
 
         /* rc == NGX_OK || rc == NGX_CONF_BLOCK_START */
-
         if (cf->handler) {
-
             /*
              * the custom handler, i.e., that is used in the http's
              * "types { ... }" directive
              */
-
             if (rc == NGX_CONF_BLOCK_START) {
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "unexpected \"{\"");
                 goto failed;
             }
-
             rv = (*cf->handler)(cf, NULL, cf->handler_conf);
             if (rv == NGX_CONF_OK) {
                 continue;
             }
-
             if (rv == NGX_CONF_ERROR) {
                 goto failed;
             }
 
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s", rv);
-
             goto failed;
         }
 
-
         rc = ngx_conf_handler(cf, rc);
-
         if (rc == NGX_ERROR) {
             goto failed;
         }
     }
 
 failed:
-
     rc = NGX_ERROR;
 
 done:
-
     if (filename) {
         if (cf->conf_file->buffer->start) {
             ngx_free(cf->conf_file->buffer->start);
         }
 
         if (ngx_close_file(fd) == NGX_FILE_ERROR) {
-            ngx_log_error(NGX_LOG_ALERT, cf->log, ngx_errno,
-                          ngx_close_file_n " %s failed",
-                          filename->data);
+            ngx_log_error(NGX_LOG_ALERT, cf->log, ngx_errno, ngx_close_file_n " %s failed", filename->data);
             rc = NGX_ERROR;
         }
 

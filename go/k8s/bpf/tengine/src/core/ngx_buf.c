@@ -9,8 +9,7 @@
 
 
 
-ngx_chain_t *
-ngx_alloc_chain_link(ngx_pool_t *pool)
+ngx_chain_t * ngx_alloc_chain_link(ngx_pool_t *pool)
 {
     ngx_chain_t  *cl;
 
@@ -29,8 +28,7 @@ ngx_alloc_chain_link(ngx_pool_t *pool)
     return cl;
 }
 
-off_t
-ngx_chain_coalesce_file(ngx_chain_t **in, off_t limit)
+off_t ngx_chain_coalesce_file(ngx_chain_t **in, off_t limit)
 {
     off_t         total, size, aligned, fprev;
     ngx_fd_t      fd;
@@ -73,8 +71,7 @@ ngx_chain_coalesce_file(ngx_chain_t **in, off_t limit)
     return total;
 }
 
-ngx_chain_t *
-ngx_chain_update_sent(ngx_chain_t *in, off_t sent)
+ngx_chain_t * ngx_chain_update_sent(ngx_chain_t *in, off_t sent)
 {
     off_t  size;
 
@@ -147,5 +144,64 @@ ngx_buf_t * ngx_create_temp_buf(ngx_pool_t *pool, size_t size) {
     b->temporary = 1;
 
     return b;
+}
+
+ngx_chain_t * ngx_chain_get_free_buf(ngx_pool_t *p, ngx_chain_t **free) {
+    ngx_chain_t  *cl;
+    if (*free) {
+        cl = *free;
+        *free = cl->next;
+        cl->next = NULL;
+        return cl;
+    }
+
+    cl = ngx_alloc_chain_link(p);
+    if (cl == NULL) {
+        return NULL;
+    }
+
+    cl->buf = ngx_calloc_buf(p);
+    if (cl->buf == NULL) {
+        return NULL;
+    }
+
+    cl->next = NULL;
+
+    return cl;
+}
+
+void ngx_chain_update_chains(ngx_pool_t *p, ngx_chain_t **free, ngx_chain_t **busy,
+    ngx_chain_t **out, ngx_buf_tag_t tag) {
+    ngx_chain_t  *cl;
+
+    if (*out) {
+        if (*busy == NULL) {
+            *busy = *out;
+        } else {
+            for (cl = *busy; cl->next; cl = cl->next) { /* void */ }
+            cl->next = *out;
+        }
+
+        *out = NULL;
+    }
+
+    while (*busy) {
+        cl = *busy;
+        if (cl->buf->tag != tag) {
+            *busy = cl->next;
+            ngx_free_chain(p, cl);
+            continue;
+        }
+
+        if (ngx_buf_size(cl->buf) != 0) {
+            break;
+        }
+
+        cl->buf->pos = cl->buf->start;
+        cl->buf->last = cl->buf->start;
+        *busy = cl->next;
+        cl->next = *free;
+        *free = cl;
+    }
 }
 

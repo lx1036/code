@@ -6,6 +6,8 @@
         "ngx_core.h": "c",
         "ngx_event.h": "c",
         "ngx_stream_upstream.h": "c",
-        "ngx_config.h": "c"
+        "ngx_config.h": "c",
+        "ngx_posix_config.h": "c",
+        "ngx_stream.h": "c"
     }
 }

@@ -50,6 +50,8 @@ static ngx_int_t ngx_stream_variable_time_local(ngx_stream_session_t *s,
 static ngx_int_t ngx_stream_variable_protocol(ngx_stream_session_t *s,
     ngx_stream_variable_value_t *v, uintptr_t data);
 
+static ngx_uint_t  ngx_stream_variable_depth = 100;
+
 
 static ngx_stream_variable_t  ngx_stream_core_variables[] = {
 
@@ -641,9 +643,7 @@ static ngx_int_t ngx_stream_variable_protocol(ngx_stream_session_t *s,
     return NGX_OK;
 }
 
-ngx_int_t
-ngx_stream_variables_init_vars(ngx_conf_t *cf)
-{
+ngx_int_t ngx_stream_variables_init_vars(ngx_conf_t *cf) {
     size_t                        len;
     ngx_uint_t                    i, n;
     ngx_hash_key_t               *key;
@@ -654,32 +654,23 @@ ngx_stream_variables_init_vars(ngx_conf_t *cf)
     /* set the handlers for the indexed stream variables */
 
     cmcf = ngx_stream_conf_get_module_main_conf(cf, ngx_stream_core_module);
-
     v = cmcf->variables.elts;
     pv = cmcf->prefix_variables.elts;
     key = cmcf->variables_keys->keys.elts;
 
     for (i = 0; i < cmcf->variables.nelts; i++) {
-
         for (n = 0; n < cmcf->variables_keys->keys.nelts; n++) {
-
             av = key[n].value;
-
             if (v[i].name.len == key[n].key.len
                 && ngx_strncmp(v[i].name.data, key[n].key.data, v[i].name.len)
-                   == 0)
-            {
+                   == 0) {
                 v[i].get_handler = av->get_handler;
                 v[i].data = av->data;
-
                 av->flags |= NGX_STREAM_VAR_INDEXED;
                 v[i].flags = av->flags;
-
                 av->index = i;
-
                 if (av->get_handler == NULL
-                    || (av->flags & NGX_STREAM_VAR_WEAK))
-                {
+                    || (av->flags & NGX_STREAM_VAR_WEAK)) {
                     break;
                 }
 
@@ -689,12 +680,10 @@ ngx_stream_variables_init_vars(ngx_conf_t *cf)
 
         len = 0;
         av = NULL;
-
         for (n = 0; n < cmcf->prefix_variables.nelts; n++) {
             if (v[i].name.len >= pv[n].name.len && v[i].name.len > len
                 && ngx_strncmp(v[i].name.data, pv[n].name.data, pv[n].name.len)
-                   == 0)
-            {
+                   == 0) {
                 av = &pv[n];
                 len = pv[n].name.len;
             }
@@ -709,8 +698,7 @@ ngx_stream_variables_init_vars(ngx_conf_t *cf)
          }
 
         if (v[i].get_handler == NULL) {
-            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                          "unknown \"%V\" variable", &v[i].name);
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "unknown \"%V\" variable", &v[i].name);
             return NGX_ERROR;
         }
 
@@ -718,15 +706,12 @@ ngx_stream_variables_init_vars(ngx_conf_t *cf)
         continue;
     }
 
-
     for (n = 0; n < cmcf->variables_keys->keys.nelts; n++) {
         av = key[n].value;
-
         if (av->flags & NGX_STREAM_VAR_NOHASH) {
             key[n].key.data = NULL;
         }
     }
-
 
     hash.hash = &cmcf->variables_hash;
     hash.key = ngx_hash_key;
@@ -735,11 +720,8 @@ ngx_stream_variables_init_vars(ngx_conf_t *cf)
     hash.name = "variables_hash";
     hash.pool = cf->pool;
     hash.temp_pool = NULL;
-
     if (ngx_hash_init(&hash, cmcf->variables_keys->keys.elts,
-                      cmcf->variables_keys->keys.nelts)
-        != NGX_OK)
-    {
+                      cmcf->variables_keys->keys.nelts) != NGX_OK) {
         return NGX_ERROR;
     }
 
@@ -747,3 +729,195 @@ ngx_stream_variables_init_vars(ngx_conf_t *cf)
 
     return NGX_OK;
 }
+
+ngx_int_t
+ngx_stream_get_variable_index(ngx_conf_t *cf, ngx_str_t *name)
+{
+    ngx_uint_t                    i;
+    ngx_stream_variable_t        *v;
+    ngx_stream_core_main_conf_t  *cmcf;
+
+    if (name->len == 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid variable name \"$\"");
+        return NGX_ERROR;
+    }
+
+    cmcf = ngx_stream_conf_get_module_main_conf(cf, ngx_stream_core_module);
+
+    v = cmcf->variables.elts;
+
+    if (v == NULL) {
+        if (ngx_array_init(&cmcf->variables, cf->pool, 4,
+                           sizeof(ngx_stream_variable_t))
+            != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+
+    } else {
+        for (i = 0; i < cmcf->variables.nelts; i++) {
+            if (name->len != v[i].name.len
+                || ngx_strncasecmp(name->data, v[i].name.data, name->len) != 0)
+            {
+                continue;
+            }
+
+            return i;
+        }
+    }
+
+    v = ngx_array_push(&cmcf->variables);
+    if (v == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->name.len = name->len;
+    v->name.data = ngx_pnalloc(cf->pool, name->len);
+    if (v->name.data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_strlow(v->name.data, name->data, name->len);
+
+    v->set_handler = NULL;
+    v->get_handler = NULL;
+    v->data = 0;
+    v->flags = 0;
+    v->index = cmcf->variables.nelts - 1;
+
+    return v->index;
+}
+
+ngx_stream_variable_value_t *
+ngx_stream_get_indexed_variable(ngx_stream_session_t *s, ngx_uint_t index)
+{
+    ngx_stream_variable_t        *v;
+    ngx_stream_core_main_conf_t  *cmcf;
+
+    cmcf = ngx_stream_get_module_main_conf(s, ngx_stream_core_module);
+
+    if (cmcf->variables.nelts <= index) {
+        ngx_log_error(NGX_LOG_ALERT, s->connection->log, 0,
+                      "unknown variable index: %ui", index);
+        return NULL;
+    }
+
+    if (s->variables[index].not_found || s->variables[index].valid) {
+        return &s->variables[index];
+    }
+
+    v = cmcf->variables.elts;
+
+    if (ngx_stream_variable_depth == 0) {
+        ngx_log_error(NGX_LOG_ERR, s->connection->log, 0,
+                      "cycle while evaluating variable \"%V\"",
+                      &v[index].name);
+        return NULL;
+    }
+
+    ngx_stream_variable_depth--;
+
+    if (v[index].get_handler(s, &s->variables[index], v[index].data)
+        == NGX_OK)
+    {
+        ngx_stream_variable_depth++;
+
+        if (v[index].flags & NGX_STREAM_VAR_NOCACHEABLE) {
+            s->variables[index].no_cacheable = 1;
+        }
+
+        return &s->variables[index];
+    }
+
+    ngx_stream_variable_depth++;
+
+    s->variables[index].valid = 0;
+    s->variables[index].not_found = 1;
+
+    return NULL;
+}
+
+
+
+ngx_stream_variable_value_t *
+ngx_stream_get_flushed_variable(ngx_stream_session_t *s, ngx_uint_t index)
+{
+    ngx_stream_variable_value_t  *v;
+
+    v = &s->variables[index];
+
+    if (v->valid || v->not_found) {
+        if (!v->no_cacheable) {
+            return v;
+        }
+
+        v->valid = 0;
+        v->not_found = 0;
+    }
+
+    return ngx_stream_get_indexed_variable(s, index);
+}
+
+size_t
+ngx_stream_script_copy_var_len_code(ngx_stream_script_engine_t *e)
+{
+    ngx_stream_variable_value_t   *value;
+    ngx_stream_script_var_code_t  *code;
+
+    code = (ngx_stream_script_var_code_t *) e->ip;
+
+    e->ip += sizeof(ngx_stream_script_var_code_t);
+
+    if (e->flushed) {
+        value = ngx_stream_get_indexed_variable(e->session, code->index);
+
+    } else {
+        value = ngx_stream_get_flushed_variable(e->session, code->index);
+    }
+
+    if (value && !value->not_found) {
+        return value->len;
+    }
+
+    return 0;
+}
+
+
+void
+ngx_stream_script_copy_var_code(ngx_stream_script_engine_t *e)
+{
+    u_char                        *p;
+    ngx_stream_variable_value_t   *value;
+    ngx_stream_script_var_code_t  *code;
+
+    code = (ngx_stream_script_var_code_t *) e->ip;
+
+    e->ip += sizeof(ngx_stream_script_var_code_t);
+
+    if (!e->skip) {
+
+        if (e->flushed) {
+            value = ngx_stream_get_indexed_variable(e->session, code->index);
+
+        } else {
+            value = ngx_stream_get_flushed_variable(e->session, code->index);
+        }
+
+        if (value && !value->not_found) {
+            p = e->pos;
+            e->pos = ngx_copy(p, value->data, value->len);
+
+            ngx_log_debug2(NGX_LOG_DEBUG_STREAM,
+                           e->session->connection->log, 0,
+                           "stream script var: \"%*s\"", e->pos - p, p);
+        }
+    }
+}
+
+
+
+
+
+
+

@@ -56,7 +56,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
     ngx_core_conf_t     *ccf, *old_ccf;
     ngx_core_module_t   *module;
     char                 hostname[NGX_MAXHOSTNAMELEN];
-
     
     log = old_cycle->log;
     pool = ngx_create_pool(NGX_CYCLE_POOL_SIZE, log);
@@ -64,7 +63,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
         return NULL;
     }
     pool->log = log;
-
     cycle = ngx_pcalloc(pool, sizeof(ngx_cycle_t)); // info: 实例化 cycle 对象
     if (cycle == NULL) {
         ngx_destroy_pool(pool);
@@ -73,9 +71,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
     cycle->pool = pool;
     cycle->log = log;
     cycle->old_cycle = old_cycle;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    cycle->no_ssl_init = old_cycle->no_ssl_init;
-#endif
     cycle->conf_prefix.len = old_cycle->conf_prefix.len;
     cycle->conf_prefix.data = ngx_pstrdup(pool, &old_cycle->conf_prefix); // copy(dst, src)
     if (cycle->conf_prefix.data == NULL) {
@@ -156,14 +151,14 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
         ngx_destroy_pool(pool);
         return NULL;
     }
+
+    // get hostname，c 语言太费劲
     if (gethostname(hostname, NGX_MAXHOSTNAMELEN) == -1) {
         ngx_log_error(NGX_LOG_EMERG, log, ngx_errno, "gethostname() failed");
         ngx_destroy_pool(pool);
         return NULL;
     }
-
     /* on Linux gethostname() silently truncates name that does not fit */
-
     hostname[NGX_MAXHOSTNAMELEN - 1] = '\0';
     cycle->hostname.len = ngx_strlen(hostname);
     cycle->hostname.data = ngx_pnalloc(pool, cycle->hostname.len);
@@ -172,10 +167,14 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
         return NULL;
     }
     ngx_strlow(cycle->hostname.data, (u_char *) hostname, cycle->hostname.len);
+
+    // copy ngx_modules into cycle->modules
     if (ngx_cycle_modules(cycle) != NGX_OK) {
         ngx_destroy_pool(pool);
         return NULL;
     }
+
+    // 1. modules 初始化: modules.create_conf()
     for (i = 0; cycle->modules[i]; i++) {
         if (cycle->modules[i]->type != NGX_CORE_MODULE) {
             continue;
@@ -192,6 +191,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
         }
     }
 
+    // 2. modules 初始化: modules.init_conf()
     senv = environ;
     ngx_memzero(&conf, sizeof(ngx_conf_t));
     /* STUB: init array ? */
@@ -216,13 +216,11 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
         ngx_destroy_cycle_pools(&conf);
         return NULL;
     }
-
     if (ngx_conf_parse(&conf, &cycle->conf_file) != NGX_CONF_OK) {
         environ = senv;
         ngx_destroy_cycle_pools(&conf);
         return NULL;
     }
-
     if (ngx_test_config && !ngx_quiet_mode) {
         ngx_log_stderr(0, "the configuration file %s syntax is ok", cycle->conf_file.data);
     }
@@ -243,7 +241,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
     if (ngx_process == NGX_PROCESS_SIGNALLER) { // NGX_PROCESS_SINGLE
         return cycle;
     }
-
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
     if (ngx_test_config) {
         if (ngx_create_pidfile(&ccf->pid, log) != NGX_OK) {
@@ -314,7 +311,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
 
     cycle->log = &cycle->new_log;
     pool->log = &cycle->new_log;
-    
     /* create shared memory */
     part = &cycle->shared_memory.part;
     shm_zone = part->elts;
@@ -415,80 +411,22 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
                         nls[n].listen = 1;
                     }
 
-#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
-
-                    /*
-                     * FreeBSD, except the most recent versions,
-                     * could not remove accept filter
-                     */
-                    nls[n].deferred_accept = ls[i].deferred_accept;
-
-                    if (ls[i].accept_filter && nls[n].accept_filter) {
-                        if (ngx_strcmp(ls[i].accept_filter,
-                                       nls[n].accept_filter)
-                            != 0)
-                        {
-                            nls[n].delete_deferred = 1;
-                            nls[n].add_deferred = 1;
-                        }
-
-                    } else if (ls[i].accept_filter) {
-                        nls[n].delete_deferred = 1;
-
-                    } else if (nls[n].accept_filter) {
-                        nls[n].add_deferred = 1;
-                    }
-#endif
-
-#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
-
-                    if (ls[i].deferred_accept && !nls[n].deferred_accept) {
-                        nls[n].delete_deferred = 1;
-
-                    } else if (ls[i].deferred_accept != nls[n].deferred_accept)
-                    {
-                        nls[n].add_deferred = 1;
-                    }
-#endif
-
 #if (NGX_HAVE_REUSEPORT)
                     if (nls[n].reuseport && !ls[i].reuseport) {
                         nls[n].add_reuseport = 1;
                     }
 #endif
-
                     break;
                 }
             }
-
             if (nls[n].fd == (ngx_socket_t) -1) {
                 nls[n].open = 1;
-#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
-                if (nls[n].accept_filter) {
-                    nls[n].add_deferred = 1;
-                }
-#endif
-#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
-                if (nls[n].deferred_accept) {
-                    nls[n].add_deferred = 1;
-                }
-#endif
             }
         }
     } else {
         ls = cycle->listening.elts;
         for (i = 0; i < cycle->listening.nelts; i++) {
             ls[i].open = 1;
-#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
-            if (ls[i].accept_filter) {
-                ls[i].add_deferred = 1;
-            }
-#endif
-#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
-            if (ls[i].deferred_accept) {
-                ls[i].add_deferred = 1;
-            }
-#endif
         }
     }
 
@@ -504,6 +442,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
         (void) ngx_log_redirect_stderr(cycle);
     }
     pool->log = cycle->log;
+    // 3. 调用 modules.init_module() 函数，很重要!!!
     if (ngx_init_modules(cycle) != NGX_OK) {
         /* fatal */
         exit(1);
@@ -647,7 +586,6 @@ old_shm_zone_done:
     }
 
     return cycle;
-
 
 failed:
     if (!ngx_is_init_cycle(old_cycle)) {

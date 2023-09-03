@@ -34,10 +34,6 @@
 #include <ngx_darwin_config.h>
 
 
-#elif (NGX_WIN32)
-#include <ngx_win32_config.h>
-
-
 #else /* POSIX */
 #include <ngx_posix_config.h>
 
@@ -47,9 +43,6 @@
 #ifndef NGX_HAVE_SO_SNDLOWAT
 #define NGX_HAVE_SO_SNDLOWAT     1
 #endif
-
-
-#if !(NGX_WIN32)
 
 #define ngx_signal_helper(n)     SIG##n
 #define ngx_signal_value(n)      ngx_signal_helper(n)
@@ -85,7 +78,6 @@
 #define ngx_cdecl
 #define ngx_libc_cdecl
 
-#endif
 
 typedef intptr_t        ngx_int_t;
 typedef uintptr_t       ngx_uint_t;

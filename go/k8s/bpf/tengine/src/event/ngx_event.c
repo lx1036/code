@@ -88,7 +88,7 @@ ngx_atomic_t         *ngx_stat_request_time = &ngx_stat_request_time0;
 static ngx_command_t  ngx_events_commands[] = {
     { ngx_string("events"),
       NGX_MAIN_CONF|NGX_CONF_BLOCK|NGX_CONF_NOARGS,
-      ngx_events_block,
+      ngx_events_block, // ngx_conf_file.c::ngx_conf_handler() 里 rv = cmd->set(cf, cmd, conf) 调用
       0,
       0,
       NULL },
@@ -119,7 +119,7 @@ static ngx_str_t  event_core_name = ngx_string("event_core");
 static ngx_command_t  ngx_event_core_commands[] = {
     { ngx_string("worker_connections"),
       NGX_EVENT_CONF|NGX_CONF_TAKE1,
-      ngx_event_connections,
+      ngx_event_connections, // ngx_conf_file.c::ngx_conf_handler() 里 rv = cmd->set(cf, cmd, conf) 调用
       0,
       0,
       NULL },
@@ -209,7 +209,7 @@ static char * ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
 
         m = cf->cycle->modules[i]->ctx;
         if (m->create_conf) { // *->ngx_event_core_create_conf
-            (*ctx)[cf->cycle->modules[i]->ctx_index] = m->create_conf(cf->cycle);
+            (*ctx)[cf->cycle->modules[i]->ctx_index] = m->create_conf(cf->cycle); // 调用 ngx_event_core_create_conf
             if ((*ctx)[cf->cycle->modules[i]->ctx_index] == NULL) {
                 return NGX_CONF_ERROR;
             }
@@ -534,7 +534,6 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
 
     do {
         i--;
-
         c[i].data = next;
         c[i].read = &cycle->read_events[i];
         c[i].write = &cycle->write_events[i];
@@ -544,7 +543,6 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
 
     cycle->free_connections = next;
     cycle->free_connection_n = cycle->connection_n;
-
     /* for each listening socket */
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
@@ -558,12 +556,10 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
         if (c == NULL) {
             return NGX_ERROR;
         }
-
         c->type = ls[i].type;
         c->log = &ls[i].log;
         c->listening = &ls[i];
         ls[i].connection = c;
-
         rev = c->read;
         rev->log = c->log;
         rev->accept = 1;
@@ -593,8 +589,7 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
             }
         }
 
-        rev->handler = (c->type == SOCK_STREAM) ? ngx_event_accept
-                                                : ngx_event_recvmsg;
+        rev->handler = (c->type == SOCK_STREAM) ? ngx_event_accept : ngx_event_recvmsg;
 
 #if (NGX_HAVE_REUSEPORT)
 
@@ -633,13 +628,10 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
         if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
             return NGX_ERROR;
         }
-
-
     }
 
     return NGX_OK;
 }
-
 
 void ngx_process_events_and_timers(ngx_cycle_t *cycle) {
     ngx_uint_t  flags;
@@ -669,7 +661,6 @@ void ngx_process_events_and_timers(ngx_cycle_t *cycle) {
     ngx_event_expire_timers();
     ngx_event_process_posted(cycle, &ngx_posted_events);
 }
-
 
 static void * ngx_event_core_create_conf(ngx_cycle_t *cycle) {
     ngx_event_conf_t  *ecf;

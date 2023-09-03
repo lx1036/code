@@ -541,11 +541,6 @@ ngx_int_t ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags);
 ngx_int_t ngx_handle_write_event(ngx_event_t *wev, size_t lowat);
 
 
-#if (NGX_WIN32)
-void ngx_event_acceptex(ngx_event_t *ev);
-ngx_int_t ngx_event_post_acceptex(ngx_listening_t *ls, ngx_uint_t n);
-u_char *ngx_acceptex_log_error(ngx_log_t *log, u_char *buf, size_t len);
-#endif
 
 
 ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
@@ -559,9 +554,6 @@ ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
 #include <ngx_event_posted.h>
 #include <ngx_event_udp.h>
 
-#if (NGX_WIN32)
-#include <ngx_iocp_module.h>
-#endif
 
 #if (T_NGX_UDPV2)
 #include <ngx_event_udpv2.h>

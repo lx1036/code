@@ -82,11 +82,9 @@ void ngx_master_process_cycle(ngx_cycle_t *cycle) {
     sigaddset(&set, ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
     sigaddset(&set, ngx_signal_value(NGX_CHANGEBIN_SIGNAL));
     if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
-        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
-                      "sigprocmask() failed");
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno, "sigprocmask() failed");
     }
     sigemptyset(&set);
-
     size = sizeof(master_process);
     for (i = 0; i < ngx_argc; i++) {
         size += ngx_strlen(ngx_argv[i]) + 1;
@@ -128,7 +126,6 @@ void ngx_master_process_cycle(ngx_cycle_t *cycle) {
         sigsuspend(&set);
         ngx_time_update();
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "wake up, sigio %i", sigio);
-
     }
 }
 
@@ -136,7 +133,6 @@ void ngx_master_process_cycle(ngx_cycle_t *cycle) {
 static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type) {
     ngx_int_t  i;
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "start worker processes");
-
     for (i = 0; i < n; i++) {
         ngx_spawn_process(cycle, ngx_worker_process_cycle, (void *) (intptr_t) i, "worker process", type);
         ngx_pass_open_channel(cycle);
@@ -169,7 +165,7 @@ static void ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data){
     }
 }
 
-static void ngx_pass_open_channel(ngx_cycle_t *cycle){
+static void ngx_pass_open_channel(ngx_cycle_t *cycle) {
     ngx_int_t      i;
     ngx_channel_t  ch;
 
@@ -192,9 +188,7 @@ static void ngx_pass_open_channel(ngx_cycle_t *cycle){
                       ngx_processes[i].channel[0]);
 
         /* TODO: NGX_AGAIN */
-
-        ngx_write_channel(ngx_processes[i].channel[0],
-                          &ch, sizeof(ngx_channel_t), cycle->log);
+        ngx_write_channel(ngx_processes[i].channel[0], &ch, sizeof(ngx_channel_t), cycle->log);
     }
 }
 

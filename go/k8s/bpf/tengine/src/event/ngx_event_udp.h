@@ -12,7 +12,6 @@
 #include <ngx_core.h>
 
 
-#if !(NGX_WIN32)
 
 #if ((NGX_HAVE_MSGHDR_MSG_CONTROL)                                            \
      && (NGX_HAVE_IP_SENDSRCADDR || NGX_HAVE_IP_RECVDSTADDR                   \
@@ -50,7 +49,6 @@ void ngx_event_recvmsg(ngx_event_t *ev);
 ssize_t ngx_sendmsg(ngx_connection_t *c, struct msghdr *msg, int flags);
 void ngx_udp_rbtree_insert_value(ngx_rbtree_node_t *temp,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
-#endif
 
 void ngx_delete_udp_connection(void *data);
 
