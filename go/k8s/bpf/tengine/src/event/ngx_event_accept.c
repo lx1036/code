@@ -13,7 +13,7 @@ static void ngx_reorder_accept_events(ngx_listening_t *ls);
 static void ngx_close_accepted_connection(ngx_connection_t *c);
 
 
-// 
+// 当前 connection 没法去 read event
 ngx_int_t ngx_enable_accept_events(ngx_cycle_t *cycle){
     ngx_uint_t         i;
     ngx_listening_t   *ls;
@@ -100,7 +100,7 @@ void ngx_event_accept(ngx_event_t *ev) {
         socklen = sizeof(ngx_sockaddr_t);
         // accept a connection on a socket, return a file descriptor for the accepted socket
         // https://man7.org/linux/man-pages/man2/accept.2.html
-        s = accept(lc->fd, &sa.sockaddr, &socklen);
+        s = accept(lc->fd, &sa.sockaddr, &socklen); // &sa.sockaddr 是客户端地址
         if (s == (ngx_socket_t) -1) {
             err = ngx_socket_errno;
             if (err == NGX_EAGAIN) {
@@ -153,15 +153,14 @@ void ngx_event_accept(ngx_event_t *ev) {
         }
 
 #if (NGX_STAT_STUB)
-        (void) ngx_atomic_fetch_add(ngx_stat_accepted, 1);
+        (void) ngx_atomic_fetch_add(ngx_stat_accepted, 1); // accept() 一个 client_fd
 #endif
 
         ngx_accept_disabled = ngx_cycle->connection_n / 8 - ngx_cycle->free_connection_n;
         c = ngx_get_connection(s, ev->log);
         if (c == NULL) {
             if (ngx_close_socket(s) == -1) {
-                ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_socket_errno,
-                              ngx_close_socket_n " failed");
+                ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_socket_errno, ngx_close_socket_n " failed");
             }
 
             return;
@@ -173,22 +172,21 @@ void ngx_event_accept(ngx_event_t *ev) {
         (void) ngx_atomic_fetch_add(ngx_stat_active, 1);
 #endif
 
+        // 继续初始化 connection 结构体
         c->pool = ngx_create_pool(ls->pool_size, ev->log);
         if (c->pool == NULL) {
             ngx_close_accepted_connection(c);
             return;
         }
-
         if (socklen > (socklen_t) sizeof(ngx_sockaddr_t)) {
             socklen = sizeof(ngx_sockaddr_t);
         }
-
         c->sockaddr = ngx_palloc(c->pool, socklen);
         if (c->sockaddr == NULL) {
             ngx_close_accepted_connection(c);
             return;
         }
-
+        // 这里 socklen 是 type(ngx_sockaddr_t) 的前部分字节，就是 ngx_sockaddr_t.sockaddr, 这里取值注意下
         ngx_memcpy(c->sockaddr, &sa, socklen);
 
         log = ngx_palloc(c->pool, sizeof(ngx_log_t));
@@ -221,7 +219,6 @@ void ngx_event_accept(ngx_event_t *ev) {
         }
 
         *log = ls->log;
-
         c->recv = ngx_recv;
         c->send = ngx_send;
         c->recv_chain = ngx_recv_chain;
@@ -243,11 +240,9 @@ void ngx_event_accept(ngx_event_t *ev) {
         rev = c->read;
         wev = c->write;
         wev->ready = 1;
-
         if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
             rev->ready = 1;
         }
-
         if (ev->deferred_accept) {
             rev->ready = 1;
 #if (NGX_HAVE_KQUEUE || NGX_HAVE_EPOLLRDHUP)
@@ -266,7 +261,6 @@ void ngx_event_accept(ngx_event_t *ev) {
          *           - ngx_atomic_fetch_add()
          *             or protection by critical section or light mutex
          */
-
         c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
         c->start_time = ngx_current_msec;
 

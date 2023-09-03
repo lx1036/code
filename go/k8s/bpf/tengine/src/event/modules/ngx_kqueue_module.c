@@ -90,7 +90,6 @@ static ngx_event_module_t  ngx_kqueue_module_ctx = {
         ngx_kqueue_done,                   /* done the events */
     }
 };
-
 ngx_module_t  ngx_kqueue_module = {
     NGX_MODULE_V1,
     &ngx_kqueue_module_ctx,                /* module context */

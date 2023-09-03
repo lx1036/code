@@ -174,15 +174,7 @@ struct ngx_connection_s {
 #endif
     ngx_event_t        *read;
     ngx_event_t        *write;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    ngx_event_t        *async;
-#endif
-
     ngx_socket_t        fd;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    ngx_socket_t        async_fd;
-#endif
-
     ngx_recv_pt         recv;
     ngx_send_pt         send;
     ngx_recv_chain_pt   recv_chain;
@@ -209,9 +201,6 @@ struct ngx_connection_s {
 
 #if (NGX_SSL || NGX_COMPAT)
     ngx_ssl_connection_t  *ssl;
-#if (NGX_SSL_ASYNC)
-    ngx_flag_t          async_enable;
-#endif
 #endif
 
     ngx_udp_connection_t  *udp;
@@ -249,9 +238,6 @@ struct ngx_connection_s {
 
     unsigned            need_last_buf:1;
     unsigned            need_flush_buf:1;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-    unsigned            num_async_fds:8;
-#endif
 
 #if (NGX_HAVE_SENDFILE_NODISKIO || NGX_COMPAT)
     unsigned            busy_count:2;
@@ -259,10 +245,6 @@ struct ngx_connection_s {
 
 #if (NGX_THREADS || NGX_COMPAT)
     ngx_thread_task_t  *sendfile_task;
-#endif
-
-#if (T_NGX_HAVE_XUDP)
-    unsigned            xudp_tx:1;
 #endif
 };
 

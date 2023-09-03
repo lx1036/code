@@ -362,7 +362,8 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
     return NGX_OK;
 }
 
-// 通过 socket fd 获取 connection 对象
+// 通过 socket fd 获取 connection 对象: 
+// 先从 ngx_cycle->free_connections 获取 connection
 ngx_connection_t * ngx_get_connection(ngx_socket_t s, ngx_log_t *log) {
     ngx_uint_t         instance;
     ngx_event_t       *rev, *wev;
@@ -391,10 +392,10 @@ ngx_connection_t * ngx_get_connection(ngx_socket_t s, ngx_log_t *log) {
     }
     rev = c->read;
     wev = c->write;
-    ngx_memzero(c, sizeof(ngx_connection_t));
+    ngx_memzero(c, sizeof(ngx_connection_t)); // 这里是把 c 结构体的字段全部清空，其实就是要初始化，但是 c 比较麻烦
     c->read = rev;
     c->write = wev;
-    c->fd = s;
+    c->fd = s; // 然后赋值 fd
     c->log = log;
     instance = rev->instance;
     ngx_memzero(rev, sizeof(ngx_event_t));

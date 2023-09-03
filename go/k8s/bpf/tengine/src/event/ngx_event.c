@@ -160,8 +160,6 @@ static ngx_event_module_t  ngx_event_core_module_ctx = {
     ngx_event_core_init_conf,              /* init configuration */
     { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
 };
-
-
 ngx_module_t  ngx_event_core_module = {
     NGX_MODULE_V1,
     &ngx_event_core_module_ctx,            /* module context */
@@ -417,6 +415,9 @@ static void ngx_timer_signal_handler(int signo) {
     ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ngx_cycle->log, 0, "timer signal");
 }
 
+/*
+重点：ngx_event_process_init() -> ngx_event_accept() -> 
+*/
 static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
     ngx_uint_t           m, i;
     ngx_event_t         *rev, *wev;
@@ -452,7 +453,9 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
         if (cycle->modules[m]->ctx_index != ecf->use) {
             continue;
         }
-
+        /*
+        这里在 mac 会调用 ngx_kqueue_module_ctx.ngx_kqueue_init(), linux 调用 ngx_epoll_init()
+        */
         module = cycle->modules[m]->ctx;
         if (module->actions.init(cycle, ngx_timer_resolution) != NGX_OK) {
             /* fatal */
@@ -563,13 +566,7 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
         rev = c->read;
         rev->log = c->log;
         rev->accept = 1;
-
-#if (NGX_HAVE_DEFERRED_ACCEPT)
-        rev->deferred_accept = ls[i].deferred_accept;
-#endif
-
-        if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)
-            && cycle->old_cycle) {
+        if (!(ngx_event_flags & NGX_USE_IOCP_EVENT) && cycle->old_cycle) {
             if (ls[i].previous) {
 
                 /*

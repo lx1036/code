@@ -31,6 +31,9 @@ static ngx_conf_enum_t  ngx_debug_points[] = {
     { ngx_null_string, 0 }
 };
 static ngx_command_t  ngx_core_commands[] = {
+    /*
+    这里给 ngx_core_conf_t 赋值有意思，注意 offsetof(ngx_core_conf_t, xxx)
+    */
     { ngx_string("daemon"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -38,6 +41,7 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, daemon),
       NULL },
 
+    // 如果 "master_process off" 则不会有 worker process，只有 master process 进程处理请求
     { ngx_string("master_process"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot,
@@ -282,9 +286,9 @@ int main(int argc, char *const *argv) {
     }
 
     if (ngx_process == NGX_PROCESS_SINGLE) {
-        // ngx_single_process_cycle(cycle);
+        ngx_single_process_cycle(cycle); // NGX_PROCESS_SINGLE 意思是 master-only 模式
     } else {
-        ngx_master_process_cycle(cycle); // NGX_PROCESS_MASTER
+        ngx_master_process_cycle(cycle); // NGX_PROCESS_MASTER 意思是 master-worker 模式
     }
 
     return 0;
@@ -668,12 +672,10 @@ static void * ngx_core_module_create_conf(ngx_cycle_t *cycle) {
     return ccf;
 }
 
-static char *
-ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf)
-{
+static char * ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf) {
     ngx_core_conf_t  *ccf = conf;
     ngx_conf_init_value(ccf->daemon, 1);
-    ngx_conf_init_value(ccf->master, 1);
+    ngx_conf_init_value(ccf->master, 1); // master_process 默认是 on
     ngx_conf_init_msec_value(ccf->timer_resolution, 0);
     ngx_conf_init_msec_value(ccf->shutdown_timeout, 0);
     ngx_conf_init_value(ccf->worker_processes, ngx_ncpu);
