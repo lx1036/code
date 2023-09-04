@@ -17,10 +17,6 @@ static ngx_int_t ngx_process_options(ngx_cycle_t *cycle);
 static ngx_int_t ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv);
 static void *ngx_core_module_create_conf(ngx_cycle_t *cycle);
 static char *ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf);
-static char *ngx_set_user(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-static char *ngx_set_priority(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-static char *ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd,
-    void *conf);
 static char *ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
@@ -84,41 +80,6 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, debug_points),
       &ngx_debug_points },
 
-    { ngx_string("user"),
-      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE12,
-      ngx_set_user,
-      0,
-      0,
-      NULL },
-
-    { ngx_string("worker_priority"),
-      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
-      ngx_set_priority,
-      0,
-      0,
-      NULL },
-
-    { ngx_string("worker_cpu_affinity"),
-      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_1MORE,
-      ngx_set_cpu_affinity,
-      0,
-      0,
-      NULL },
-
-    { ngx_string("worker_rlimit_nofile"),
-      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_num_slot,
-      0,
-      offsetof(ngx_core_conf_t, rlimit_nofile),
-      NULL },
-
-    { ngx_string("worker_rlimit_core"),
-      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_off_slot,
-      0,
-      offsetof(ngx_core_conf_t, rlimit_core),
-      NULL },
-
     { ngx_string("worker_shutdown_timeout"),
       NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_msec_slot,
@@ -126,12 +87,6 @@ static ngx_command_t  ngx_core_commands[] = {
       offsetof(ngx_core_conf_t, shutdown_timeout),
       NULL },
 
-    { ngx_string("working_directory"),
-      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_str_slot,
-      0,
-      offsetof(ngx_core_conf_t, working_directory),
-      NULL },
 
       ngx_null_command
 };
@@ -159,12 +114,6 @@ ngx_module_t  ngx_core_module = {
 static ngx_uint_t   ngx_show_help;
 static ngx_uint_t   ngx_show_version;
 static ngx_uint_t   ngx_show_configure;
-#if (NGX_SSL && NGX_SSL_ASYNC)
-/* indicate that nginx start without ngx_ssl_init()
- * which will involve OpenSSL configuration file to
- * start OpenSSL engine */
-static ngx_uint_t   ngx_no_ssl_init;
-#endif
 static u_char      *ngx_prefix;
 static u_char      *ngx_error_log;
 static u_char      *ngx_conf_file;
@@ -600,9 +549,7 @@ ngx_process_options(ngx_cycle_t *cycle)
     return NGX_OK;
 }
 
-
-static ngx_int_t
-ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv) {
+static ngx_int_t ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv) {
     size_t     len;
     ngx_int_t  i;
 
@@ -787,210 +734,7 @@ static char * ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf) {
     return NGX_CONF_OK;
 }
 
-
-static char *
-ngx_set_cpu_affinity(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
-#if (NGX_HAVE_CPU_AFFINITY)
-    ngx_core_conf_t  *ccf = conf;
-
-    u_char            ch, *p;
-    ngx_str_t        *value;
-    ngx_uint_t        i, n;
-    ngx_cpuset_t     *mask;
-
-    if (ccf->cpu_affinity) {
-        return "is duplicate";
-    }
-
-    mask = ngx_palloc(cf->pool, (cf->args->nelts - 1) * sizeof(ngx_cpuset_t));
-    if (mask == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    ccf->cpu_affinity_n = cf->args->nelts - 1;
-    ccf->cpu_affinity = mask;
-
-    value = cf->args->elts;
-
-    if (ngx_strcmp(value[1].data, "auto") == 0) {
-
-        if (cf->args->nelts > 3) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "invalid number of arguments in "
-                               "\"worker_cpu_affinity\" directive");
-            return NGX_CONF_ERROR;
-        }
-
-        ccf->cpu_affinity_auto = 1;
-
-        CPU_ZERO(&mask[0]);
-        for (i = 0; i < (ngx_uint_t) ngx_min(ngx_ncpu, CPU_SETSIZE); i++) {
-            CPU_SET(i, &mask[0]);
-        }
-
-        n = 2;
-
-    } else {
-        n = 1;
-    }
-
-    for ( /* void */ ; n < cf->args->nelts; n++) {
-
-        if (value[n].len > CPU_SETSIZE) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                         "\"worker_cpu_affinity\" supports up to %d CPUs only",
-                         CPU_SETSIZE);
-            return NGX_CONF_ERROR;
-        }
-
-        i = 0;
-        CPU_ZERO(&mask[n - 1]);
-
-        for (p = value[n].data + value[n].len - 1;
-             p >= value[n].data;
-             p--)
-        {
-            ch = *p;
-
-            if (ch == ' ') {
-                continue;
-            }
-
-            i++;
-
-            if (ch == '0') {
-                continue;
-            }
-
-            if (ch == '1') {
-                CPU_SET(i - 1, &mask[n - 1]);
-                continue;
-            }
-
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                          "invalid character \"%c\" in \"worker_cpu_affinity\"",
-                          ch);
-            return NGX_CONF_ERROR;
-        }
-    }
-
-#else
-
-    ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-                       "\"worker_cpu_affinity\" is not supported "
-                       "on this platform, ignored");
-#endif
-
-    return NGX_CONF_OK;
-}
-
-
-ngx_cpuset_t *
-ngx_get_cpu_affinity(ngx_uint_t n) {
-#if (NGX_HAVE_CPU_AFFINITY)
-    ngx_uint_t        i, j;
-    ngx_cpuset_t     *mask;
-    ngx_core_conf_t  *ccf;
-
-    static ngx_cpuset_t  result;
-
-    ccf = (ngx_core_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx,
-                                           ngx_core_module);
-
-    if (ccf->cpu_affinity == NULL) {
-        return NULL;
-    }
-
-    if (ccf->cpu_affinity_auto) {
-        mask = &ccf->cpu_affinity[ccf->cpu_affinity_n - 1];
-
-        for (i = 0, j = n; /* void */ ; i++) {
-
-            if (CPU_ISSET(i % CPU_SETSIZE, mask) && j-- == 0) {
-                break;
-            }
-
-            if (i == CPU_SETSIZE && j == n) {
-                /* empty mask */
-                return NULL;
-            }
-
-            /* void */
-        }
-
-        CPU_ZERO(&result);
-        CPU_SET(i % CPU_SETSIZE, &result);
-
-        return &result;
-    }
-
-    if (ccf->cpu_affinity_n > n) {
-        return &ccf->cpu_affinity[n];
-    }
-
-    return &ccf->cpu_affinity[ccf->cpu_affinity_n - 1];
-
-#else
-
-    return NULL;
-
-#endif
-}
-
-
-static char *
-ngx_set_user(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
-{
-    ngx_core_conf_t  *ccf = conf;
-
-    char             *group;
-    struct passwd    *pwd;
-    struct group     *grp;
-    ngx_str_t        *value;
-
-    if (ccf->user != (uid_t) NGX_CONF_UNSET_UINT) {
-        return "is duplicate";
-    }
-
-    if (geteuid() != 0) {
-        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
-                           "the \"user\" directive makes sense only "
-                           "if the master process runs "
-                           "with super-user privileges, ignored");
-        return NGX_CONF_OK;
-    }
-
-    value = cf->args->elts;
-
-    ccf->username = (char *) value[1].data;
-
-    ngx_set_errno(0);
-    pwd = getpwnam((const char *) value[1].data);
-    if (pwd == NULL) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
-                           "getpwnam(\"%s\") failed", value[1].data);
-        return NGX_CONF_ERROR;
-    }
-
-    ccf->user = pwd->pw_uid;
-
-    group = (char *) ((cf->args->nelts == 2) ? value[1].data : value[2].data);
-
-    ngx_set_errno(0);
-    grp = getgrnam(group);
-    if (grp == NULL) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
-                           "getgrnam(\"%s\") failed", group);
-        return NGX_CONF_ERROR;
-    }
-
-    ccf->group = grp->gr_gid;
-
-    return NGX_CONF_OK;
-}
-
-static char *
-ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+static char * ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_str_t        *value;
     ngx_core_conf_t  *ccf;
@@ -1017,48 +761,7 @@ ngx_set_worker_processes(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 
-static char *
-ngx_set_priority(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
-{
-    ngx_core_conf_t  *ccf = conf;
-
-    ngx_str_t        *value;
-    ngx_uint_t        n, minus;
-
-    if (ccf->priority != 0) {
-        return "is duplicate";
-    }
-
-    value = cf->args->elts;
-
-    if (value[1].data[0] == '-') {
-        n = 1;
-        minus = 1;
-
-    } else if (value[1].data[0] == '+') {
-        n = 1;
-        minus = 0;
-
-    } else {
-        n = 0;
-        minus = 0;
-    }
-
-    ccf->priority = ngx_atoi(&value[1].data[n], value[1].len - n);
-    if (ccf->priority == NGX_ERROR) {
-        return "invalid number";
-    }
-
-    if (minus) {
-        ccf->priority = -ccf->priority;
-    }
-
-    return NGX_CONF_OK;
-}
-
-
-static ngx_int_t
-ngx_add_inherited_sockets(ngx_cycle_t *cycle)
+static ngx_int_t ngx_add_inherited_sockets(ngx_cycle_t *cycle)
 {
     u_char           *p, *v, *inherited;
     ngx_int_t         s;

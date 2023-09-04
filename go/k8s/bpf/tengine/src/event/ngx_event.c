@@ -630,6 +630,7 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
     return NGX_OK;
 }
 
+/* 事件驱动函数 事件分发、惊群处理、简单的负载均衡*/
 void ngx_process_events_and_timers(ngx_cycle_t *cycle) {
     ngx_uint_t  flags;
     ngx_msec_t  timer, delta;
@@ -641,9 +642,32 @@ void ngx_process_events_and_timers(ngx_cycle_t *cycle) {
         timer = ngx_event_find_timer();
         flags = NGX_UPDATE_TIME;
     }
-
+    /* 描述符accept锁  accept mutex 的作用就是避免惊群，同时实现负载均衡*/
     if (ngx_use_accept_mutex) {
-        // todo: accept_mutex
+        /**
+		 * 	ngx_accept_disabled = ngx_cycle->connection_n / 8 - ngx_cycle->free_connection_n;
+		 * 	当connection达到连接总数的7/8的时候，就不再处理新的连接accept事件，只处理当前连接的read事件
+		 * 	这个是比较简单的一种负载均衡方法
+		 */
+        if (ngx_accept_disabled > 0) {
+            ngx_accept_disabled--;
+        } else {
+            if (ngx_trylock_accept_mutex(cycle) == NGX_ERROR) {
+                return;
+            }
+
+            if (ngx_accept_mutex_held) {
+                /* 拿到锁，flags会被设置成NGX_POST_EVENTS
+                这个标志会在事件处理函数ngx_process_events中将所有事件（accept和read）
+                放入对应的ngx_posted_accept_events和ngx_posted_events队列中进行延后处理。 */
+                /* epollin|epollout普通事件都放到ngx_posted_events链表中 */
+                flags |= NGX_POST_EVENTS;
+            } else {
+                if (timer == NGX_TIMER_INFINITE || timer > ngx_accept_mutex_delay) {
+                    timer = ngx_accept_mutex_delay;
+                }
+            }
+        }
     }
 
     if (!ngx_queue_empty(&ngx_posted_next_events)) {
@@ -651,11 +675,22 @@ void ngx_process_events_and_timers(ngx_cycle_t *cycle) {
         timer = 0;
     }
     delta = ngx_current_msec;
+    /* 当拿到锁，flags=NGX_POST_EVENTS 的时候，不会直接处理事件 */
+    /* 将accept事件放到 ngx_posted_accept_events，read 事件放到ngx_posted_events队列 */
+    /* 当没有拿到锁，则处理的全部是read事件，直接进行回调函数处理 */
     (void) ngx_process_events(cycle, timer, flags);
     delta = ngx_current_msec - delta;
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "timer delta: %M", delta);
+    /**
+	 * 1. ngx_posted_accept_events是一个事件队列，暂存epoll从监听套接口wait到的accept事件
+	 * 2. 这个方法是循环处理 accept 事件列队上的 accept 事件
+	 */
     ngx_event_process_posted(cycle, &ngx_posted_accept_events);
     ngx_event_expire_timers();
+    /**
+	 *1. 普通事件都会存放在ngx_posted_events队列上
+	 *2. 这个方法是循环处理read事件列队上的read事件
+	 */
     ngx_event_process_posted(cycle, &ngx_posted_events);
 }
 

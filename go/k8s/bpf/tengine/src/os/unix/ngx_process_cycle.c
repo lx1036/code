@@ -55,6 +55,57 @@ ngx_uint_t    ngx_restart;
 
 static u_char  master_process[] = "master process";
 
+static ngx_cycle_t      ngx_exit_cycle;
+static ngx_log_t        ngx_exit_log;
+static ngx_open_file_t  ngx_exit_log_file;
+
+void ngx_single_process_cycle(ngx_cycle_t *cycle) {
+    ngx_uint_t  i;
+    // if (ngx_set_environment(cycle, NULL) == NULL) {
+    //     /* fatal */
+    //     exit(2);
+    // }
+
+    for (i = 0; cycle->modules[i]; i++) {
+        if (cycle->modules[i]->init_process) { // ngx_event_core_module.ngx_event_process_init()
+            if (cycle->modules[i]->init_process(cycle) == NGX_ERROR) {
+                /* fatal */
+                exit(2);
+            }
+        }
+    }
+
+    for ( ;; ) {
+        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
+        ngx_process_events_and_timers(cycle);
+        if (ngx_terminate || ngx_quit) {
+            for (i = 0; cycle->modules[i]; i++) {
+                if (cycle->modules[i]->exit_process) {
+                    cycle->modules[i]->exit_process(cycle);
+                }
+            }
+            ngx_master_process_exit(cycle);
+        }
+
+        if (ngx_reconfigure) {
+            ngx_reconfigure = 0;
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
+            cycle = ngx_init_cycle(cycle);
+            if (cycle == NULL) {
+                cycle = (ngx_cycle_t *) ngx_cycle;
+                continue;
+            }
+            ngx_cycle = cycle;
+        }
+
+        if (ngx_reopen) {
+            ngx_reopen = 0;
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
+            ngx_reopen_files(cycle, (ngx_uid_t) -1);
+        }
+    }
+}
+
 void ngx_master_process_cycle(ngx_cycle_t *cycle) {
     char              *title;
     u_char            *p;
@@ -192,6 +243,7 @@ static void ngx_pass_open_channel(ngx_cycle_t *cycle) {
     }
 }
 
+// ngx_worker_process_init() 去掉了 `user`/`cpu_affinity` 这些非重点指令
 static void ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker) {
     ngx_core_conf_t  *ccf;
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
@@ -278,3 +330,40 @@ static void ngx_channel_handler(ngx_event_t *ev) {
         }
     }
 }
+
+static void ngx_master_process_exit(ngx_cycle_t *cycle) {
+    ngx_uint_t  i;
+    ngx_delete_pidfile(cycle);
+    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exit");
+    for (i = 0; cycle->modules[i]; i++) {
+        if (cycle->modules[i]->exit_master) {
+            cycle->modules[i]->exit_master(cycle);
+        }
+    }
+
+    ngx_close_listening_sockets(cycle);
+    /*
+     * Copy ngx_cycle->log related data to the special static exit cycle,
+     * log, and log file structures enough to allow a signal handler to log.
+     * The handler may be called when standard ngx_cycle->log allocated from
+     * ngx_cycle->pool is already destroyed.
+     */
+    ngx_exit_log = *ngx_log_get_file_log(ngx_cycle->log);
+    ngx_exit_log_file.fd = ngx_exit_log.file->fd;
+    ngx_exit_log.file = &ngx_exit_log_file;
+    ngx_exit_log.next = NULL;
+    ngx_exit_log.writer = NULL;
+    ngx_exit_cycle.log = &ngx_exit_log;
+    ngx_exit_cycle.files = ngx_cycle->files;
+    ngx_exit_cycle.files_n = ngx_cycle->files_n;
+    ngx_cycle = &ngx_exit_cycle;
+    ngx_destroy_pool(cycle->pool);
+#if (T_PIPES)
+    /* Terminate all pipe processes */
+    ngx_increase_pipe_generation();
+    ngx_close_old_pipes();
+#endif
+
+    exit(0);
+}
+

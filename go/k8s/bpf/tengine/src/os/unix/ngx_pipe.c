@@ -237,6 +237,10 @@ err:
     return NGX_ERROR;
 }
 
+void ngx_increase_pipe_generation(void) {
+    ngx_pipe_generation++;
+}
+
 void ngx_close_pipes(void) {
     ngx_uint_t i, last;
 
@@ -247,6 +251,23 @@ void ngx_close_pipes(void) {
         }
 
         if (ngx_pipes[i].generation == ngx_pipe_generation) {
+            ngx_close_pipe(&ngx_pipes[i]);
+        } else {
+            last = i;
+        }
+    }
+
+    ngx_last_pipe = last + 1;
+}
+
+void ngx_close_old_pipes(void) {
+    ngx_uint_t i, last;
+    for (i = 0, last = -1; i < ngx_last_pipe; i++) {
+        if (!ngx_pipes[i].configured) {
+            continue;
+        }
+
+        if (ngx_pipes[i].generation < ngx_pipe_generation) {
             ngx_close_pipe(&ngx_pipes[i]);
         } else {
             last = i;

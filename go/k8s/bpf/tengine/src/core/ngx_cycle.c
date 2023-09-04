@@ -938,3 +938,122 @@ ngx_write_file(ngx_file_t *file, u_char *buf, size_t size, off_t offset)
 #endif
 }
 
+void ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user) {
+    ngx_fd_t          fd;
+    ngx_uint_t        i;
+    ngx_list_part_t  *part;
+    ngx_open_file_t  *file;
+
+    part = &cycle->open_files.part;
+    file = part->elts;
+
+    for (i = 0; /* void */ ; i++) {
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+            part = part->next;
+            file = part->elts;
+            i = 0;
+        }
+
+        if (file[i].name.len == 0) {
+            continue;
+        }
+
+        if (file[i].flush) {
+            file[i].flush(&file[i], cycle->log);
+        }
+
+        fd = ngx_open_file(file[i].name.data, NGX_FILE_APPEND,
+                           NGX_FILE_CREATE_OR_OPEN, NGX_FILE_DEFAULT_ACCESS);
+
+        ngx_log_debug3(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                       "reopen file \"%s\", old:%d new:%d",
+                       file[i].name.data, file[i].fd, fd);
+
+        if (fd == NGX_INVALID_FILE) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                          ngx_open_file_n " \"%s\" failed", file[i].name.data);
+            continue;
+        }
+
+        if (user != (ngx_uid_t) NGX_CONF_UNSET_UINT) {
+            ngx_file_info_t  fi;
+
+            if (ngx_file_info(file[i].name.data, &fi) == NGX_FILE_ERROR) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                              ngx_file_info_n " \"%s\" failed",
+                              file[i].name.data);
+
+                if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+                    ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                                  ngx_close_file_n " \"%s\" failed",
+                                  file[i].name.data);
+                }
+
+                continue;
+            }
+
+            if (fi.st_uid != user) {
+                if (chown((const char *) file[i].name.data, user, -1) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                                  "chown(\"%s\", %d) failed",
+                                  file[i].name.data, user);
+
+                    if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+                        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                                      ngx_close_file_n " \"%s\" failed",
+                                      file[i].name.data);
+                    }
+
+                    continue;
+                }
+            }
+
+            if ((fi.st_mode & (S_IRUSR|S_IWUSR)) != (S_IRUSR|S_IWUSR)) {
+
+                fi.st_mode |= (S_IRUSR|S_IWUSR);
+
+                if (chmod((const char *) file[i].name.data, fi.st_mode) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                                  "chmod() \"%s\" failed", file[i].name.data);
+
+                    if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+                        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                                      ngx_close_file_n " \"%s\" failed",
+                                      file[i].name.data);
+                    }
+
+                    continue;
+                }
+            }
+        }
+
+        if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                          "fcntl(FD_CLOEXEC) \"%s\" failed",
+                          file[i].name.data);
+
+            if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                              ngx_close_file_n " \"%s\" failed",
+                              file[i].name.data);
+            }
+
+            continue;
+        }
+
+        if (ngx_close_file(file[i].fd) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                          ngx_close_file_n " \"%s\" failed",
+                          file[i].name.data);
+        }
+
+        file[i].fd = fd;
+    }
+
+    (void) ngx_log_redirect_stderr(cycle);
+}
+
+

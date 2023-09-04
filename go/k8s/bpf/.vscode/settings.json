@@ -8,6 +8,7 @@
         "ngx_stream_upstream.h": "c",
         "ngx_config.h": "c",
         "ngx_posix_config.h": "c",
-        "ngx_stream.h": "c"
+        "ngx_stream.h": "c",
+        "ngx_event_timer.h": "c"
     }
 }

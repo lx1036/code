@@ -55,17 +55,11 @@ ngx_shmtx_destroy(ngx_shmtx_t *mtx)
 #endif
 }
 
-
-ngx_uint_t
-ngx_shmtx_trylock(ngx_shmtx_t *mtx)
-{
+ngx_uint_t ngx_shmtx_trylock(ngx_shmtx_t *mtx) {
     return (*mtx->lock == 0 && ngx_atomic_cmp_set(mtx->lock, 0, ngx_pid));
 }
 
-
-void
-ngx_shmtx_lock(ngx_shmtx_t *mtx)
-{
+void ngx_shmtx_lock(ngx_shmtx_t *mtx) {
     ngx_uint_t         i, n;
 
     ngx_log_debug0(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0, "shmtx lock");
