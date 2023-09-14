@@ -833,7 +833,7 @@ ngx_stream_core_content_phase(ngx_stream_session_t *s,
         return NGX_OK;
     }
 
-    cscf->handler(s);
+    cscf->handler(s); // ngx_stream_proxy_handler()
 
     return NGX_OK;
 }
@@ -887,7 +887,7 @@ ngx_stream_core_run_phases(ngx_stream_session_t *s)
 
     cmcf = ngx_stream_get_module_main_conf(s, ngx_stream_core_module);
     ph = cmcf->phase_engine.handlers;
-    while (ph[s->phase_handler].checker) {
+    while (ph[s->phase_handler].checker) { // ngx_stream_core_content_phase -> 
         rc = ph[s->phase_handler].checker(s, &ph[s->phase_handler]);
         if (rc == NGX_OK) {
             return;

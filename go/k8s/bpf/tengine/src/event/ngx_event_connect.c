@@ -12,7 +12,7 @@ static ngx_int_t ngx_event_connect_set_transparent(ngx_peer_connection_t *pc,
 
 
 
-
+// bind(可能非本地 ip) -> connect(local_socket, upstream_addr)
 ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc) {
     int                rc, type, value;
 #if (NGX_HAVE_IP_BIND_ADDRESS_NO_PORT || NGX_LINUX)
@@ -115,7 +115,8 @@ ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc) {
         }
 
 #endif
-
+        // 这里 ngx_event_connect_set_transparent() 设置 setsockopt(s, IPPROTO_IP, IP_TRANSPARENT)，bind 可能为非本地地址，是客户端地址
+        // 即 nginx 透明代理
         if (bind(s, pc->local->sockaddr, pc->local->socklen) == -1) {
             ngx_log_error(NGX_LOG_CRIT, pc->log, ngx_socket_errno, "bind(%V) failed", &pc->local->name);
             goto failed;
@@ -188,40 +189,24 @@ ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc) {
 
     if (ngx_add_conn) {
         if (rc == -1) {
-
             /* NGX_EINPROGRESS */
-
             return NGX_AGAIN;
         }
 
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, pc->log, 0, "connected");
-
         wev->ready = 1;
-
         return NGX_OK;
     }
 
     if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
-
-        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, pc->log, ngx_socket_errno,
-                       "connect(): %d", rc);
-
+        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, pc->log, ngx_socket_errno, "connect(): %d", rc);
         if (ngx_blocking(s) == -1) {
-            ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno,
-                          ngx_blocking_n " failed");
+            ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno, ngx_blocking_n " failed");
             goto failed;
         }
 
-        /*
-         * FreeBSD's aio allows to post an operation on non-connected socket.
-         * NT does not support it.
-         *
-         * TODO: check in Win32, etc. As workaround we can use NGX_ONESHOT_EVENT
-         */
-
         rev->ready = 1;
         wev->ready = 1;
-
         return NGX_OK;
     }
 

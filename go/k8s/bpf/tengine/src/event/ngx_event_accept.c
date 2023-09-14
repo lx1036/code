@@ -126,9 +126,9 @@ void ngx_event_accept(ngx_event_t *ev) {
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0, "accept on %V, ready: %d", &ls->addr_text, ev->available);
 
     do {
-        socklen = sizeof(ngx_sockaddr_t);
         // accept a connection on a socket, return a file descriptor for the accepted socket
         // https://man7.org/linux/man-pages/man2/accept.2.html
+        socklen = sizeof(ngx_sockaddr_t);
         s = accept(lc->fd, &sa.sockaddr, &socklen); // &sa.sockaddr 是客户端地址
         if (s == (ngx_socket_t) -1) {
             err = ngx_socket_errno;
@@ -358,6 +358,7 @@ void ngx_event_accept(ngx_event_t *ev) {
         }
 #endif
 
+        // 这里是重点，读/写数据
         ls->handler(c);
         if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
             ev->available--;

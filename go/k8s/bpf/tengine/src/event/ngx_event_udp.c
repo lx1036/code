@@ -23,7 +23,7 @@ static ngx_connection_t *ngx_lookup_udp_connection(ngx_listening_t *ls,
     struct sockaddr *local_sockaddr, socklen_t local_socklen);
 
 
-
+// 断点调试：`python3 udp_client.py`
 void ngx_event_recvmsg(ngx_event_t *ev) {
     ssize_t            n;
     ngx_buf_t          buf;
@@ -62,15 +62,12 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
     ls = lc->listening;
     ev->ready = 0;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
-                   "recvmsg on %V, ready: %d", &ls->addr_text, ev->available);
+    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0, "recvmsg on %V, ready: %d", &ls->addr_text, ev->available);
 
     do {
         ngx_memzero(&msg, sizeof(struct msghdr));
-
         iov[0].iov_base = (void *) buffer;
         iov[0].iov_len = sizeof(buffer);
-
         msg.msg_name = &sa;
         msg.msg_namelen = sizeof(ngx_sockaddr_t);
         msg.msg_iov = iov;
@@ -80,11 +77,10 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
         if (ls->wildcard) {
             msg.msg_control = &msg_control;
             msg.msg_controllen = sizeof(msg_control);
-
             ngx_memzero(&msg_control, sizeof(msg_control));
         }
 #endif
-
+        // udp 直接就是 recvmsg() 数据，参见 ngx_epoll_module.c::ngx_epoll_process_events()
         n = recvmsg(lc->fd, &msg, 0);
         if (n == -1) {
             err = ngx_socket_errno;
@@ -150,9 +146,7 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
 
 #endif
 
-        c = ngx_lookup_udp_connection(ls, sockaddr, socklen, local_sockaddr,
-                                      local_socklen);
-
+        c = ngx_lookup_udp_connection(ls, sockaddr, socklen, local_sockaddr, local_socklen);
         if (c) {
 
 #if (NGX_DEBUG)
@@ -170,17 +164,13 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
 #endif
 
             ngx_memzero(&buf, sizeof(ngx_buf_t));
-
             buf.pos = buffer;
             buf.last = buffer + n;
-
             rev = c->read;
-
             c->udp->buffer = &buf;
-
             rev->ready = 1;
             rev->active = 0;
-
+            // 
             rev->handler(rev);
 
             if (c->udp) {
@@ -226,21 +216,16 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
         }
 
         ngx_memcpy(c->sockaddr, sockaddr, socklen);
-
         log = ngx_palloc(c->pool, sizeof(ngx_log_t));
         if (log == NULL) {
             ngx_close_accepted_udp_connection(c);
             return;
         }
-
         *log = ls->log;
-
         c->recv = ngx_udp_shared_recv;
         c->send = ngx_udp_send;
         c->send_chain = ngx_udp_send_chain;
-
         c->need_flush_buf = 1;
-
         c->log = log;
         c->pool->log = log;
         c->listening = ls;
@@ -265,13 +250,10 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
         }
 
         c->buffer->last = ngx_cpymem(c->buffer->last, buffer, n);
-
         rev = c->read;
         wev = c->write;
-
         rev->active = 1;
         wev->ready = 1;
-
         rev->log = log;
         wev->log = log;
 
@@ -285,7 +267,6 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
          */
 
         c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
-
         c->start_time = ngx_current_msec;
 
 #if (NGX_STAT_STUB)
@@ -328,7 +309,7 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
 
         log->data = NULL;
         log->handler = NULL;
-
+        // ngx_stream_handler.c::ngx_stream_init_connection()
         ls->handler(c);
 
     next:
@@ -396,6 +377,7 @@ static ngx_int_t ngx_insert_udp_connection(ngx_connection_t *c) {
     return NGX_OK;
 }
 
+// 红黑树里查找 udp connection, ngx_listening_t.rbtree
 static ngx_connection_t * ngx_lookup_udp_connection(ngx_listening_t *ls, struct sockaddr *sockaddr,
     socklen_t socklen, struct sockaddr *local_sockaddr, socklen_t local_socklen) {
     uint32_t               hash;
@@ -444,12 +426,9 @@ static ngx_connection_t * ngx_lookup_udp_connection(ngx_listening_t *ls, struct 
         /* hash == node->key */
         udp = (ngx_udp_connection_t *) node;
         c = udp->connection;
-        rc = ngx_cmp_sockaddr(sockaddr, socklen,
-                              c->sockaddr, c->socklen, 1);
-
+        rc = ngx_cmp_sockaddr(sockaddr, socklen, c->sockaddr, c->socklen, 1);
         if (rc == 0 && ls->wildcard) {
-            rc = ngx_cmp_sockaddr(local_sockaddr, local_socklen,
-                                  c->local_sockaddr, c->local_socklen, 1);
+            rc = ngx_cmp_sockaddr(local_sockaddr, local_socklen, c->local_sockaddr, c->local_socklen, 1);
         }
 
         if (rc == 0) {

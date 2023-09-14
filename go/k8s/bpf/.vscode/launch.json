@@ -44,7 +44,7 @@
             "program": "${workspaceFolder}/tengine/objs/nginx",
             "args": ["-c", "${workspaceFolder}/tengine/nginx-tcp.conf", "-e", "stderr", "-p", "${workspaceFolder}/tengine"],
             // "args": ["-c", "${workspaceFolder}/conf/nginx-tcp.conf", "-p", "${workspaceFolder}"],
-            "stopAtEntry": true,
+            "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
             // 使用 vscode debugConsole https://code.visualstudio.com/docs/cpp/launch-json-reference#_externalconsole

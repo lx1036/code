@@ -359,7 +359,9 @@ extern ngx_event_accept_filter_pt ngx_event_top_accept_filter;
 #define NGX_CLEAR_EVENT    0    /* dummy declaration */
 #endif
 
-
+/*
+ngx_event -> ngx_kqueue_module/ngx_epoll_module 转换是通过如下定义的 event 函数
+*/
 // {
 //     ngx_kqueue_add_event,              /* add an event */
 //     ngx_kqueue_del_event,              /* delete an event */

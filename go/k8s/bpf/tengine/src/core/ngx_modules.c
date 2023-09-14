@@ -7,9 +7,12 @@ extern ngx_module_t  ngx_errlog_module;
 
 extern ngx_module_t  ngx_events_module;
 extern ngx_module_t  ngx_event_core_module;
+extern ngx_module_t  ngx_kqueue_module;
 
 extern ngx_module_t  ngx_stream_module;
 extern ngx_module_t  ngx_stream_core_module;
+extern ngx_module_t  ngx_stream_return_module;
+extern ngx_module_t  ngx_stream_write_filter_module;
 extern ngx_module_t  ngx_stream_proxy_module; 
 extern ngx_module_t  ngx_stream_upstream_module; 
 
@@ -19,9 +22,12 @@ ngx_module_t *ngx_modules[] = {
     
     &ngx_events_module,
     &ngx_event_core_module,
+    &ngx_kqueue_module,
 
     &ngx_stream_module,
     &ngx_stream_core_module,
+    &ngx_stream_return_module,
+    &ngx_stream_write_filter_module,
     &ngx_stream_proxy_module,
     &ngx_stream_upstream_module,
 
@@ -38,7 +44,7 @@ char *ngx_module_names[] = {
     // "ngx_regex_module",
     "ngx_events_module",
     "ngx_event_core_module",
-    // "ngx_kqueue_module",
+    "ngx_kqueue_module",
     // "ngx_procs_module",
     // "ngx_proc_core_module",
     // "ngx_http_module",
@@ -90,17 +96,19 @@ char *ngx_module_names[] = {
     // "ngx_http_not_modified_filter_module",
     "ngx_stream_module",
     "ngx_stream_core_module",
+    "ngx_stream_return_module",
+    "ngx_stream_write_filter_module",
     // "ngx_stream_log_module",
     "ngx_stream_proxy_module",
     "ngx_stream_upstream_module",
-    // "ngx_stream_write_filter_module",
+    
     // "ngx_stream_ssl_module",
     // "ngx_stream_limit_conn_module",
     // "ngx_stream_access_module",
     // "ngx_stream_geo_module",
     // "ngx_stream_map_module",
     // "ngx_stream_split_clients_module",
-    // "ngx_stream_return_module",
+    
     // "ngx_stream_set_module",
     // "ngx_stream_upstream_hash_module",
     // "ngx_stream_upstream_least_conn_module",

@@ -42,7 +42,7 @@ sig_atomic_t          ngx_event_timer_alarm;
 static ngx_uint_t     ngx_event_max_module;
 
 ngx_uint_t            ngx_event_flags;
-ngx_event_actions_t   ngx_event_actions;
+ngx_event_actions_t   ngx_event_actions; // mac 里在 ngx_kqueue_init() 赋值
 
 
 static ngx_atomic_t   connection_counter = 1;
@@ -426,7 +426,7 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
     ngx_core_conf_t     *ccf;
     ngx_event_conf_t    *ecf;
     ngx_event_module_t  *module;
-
+    // 使用函数获取 core_conf 和 event_conf
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
     ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
     if (ccf->master && ccf->worker_processes > 1 && ecf->accept_mutex) {
@@ -456,7 +456,7 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
         /*
         这里在 mac 会调用 ngx_kqueue_module_ctx.ngx_kqueue_init(), linux 调用 ngx_epoll_init()
         */
-        module = cycle->modules[m]->ctx;
+        module = cycle->modules[m]->ctx; // kqueue module 里的 actions
         if (module->actions.init(cycle, ngx_timer_resolution) != NGX_OK) {
             /* fatal */
             exit(2);
@@ -678,7 +678,7 @@ void ngx_process_events_and_timers(ngx_cycle_t *cycle) {
     /* 当拿到锁，flags=NGX_POST_EVENTS 的时候，不会直接处理事件 */
     /* 将accept事件放到 ngx_posted_accept_events，read 事件放到ngx_posted_events队列 */
     /* 当没有拿到锁，则处理的全部是read事件，直接进行回调函数处理 */
-    (void) ngx_process_events(cycle, timer, flags);
+    (void) ngx_process_events(cycle, timer, flags); // -> ngx_kqueue_process_events()
     delta = ngx_current_msec - delta;
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "timer delta: %M", delta);
     /**
@@ -773,7 +773,7 @@ ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
     ngx_conf_init_uint_value(ecf->connections, DEFAULT_CONNECTIONS); // 默认 512
     cycle->connection_n = ecf->connections;
     ngx_conf_init_uint_value(ecf->use, module->ctx_index);
-    event_module = module->ctx;
+    event_module = module->ctx; // ngx_kqueue_module 或者 ngx_epoll_module
     ngx_conf_init_ptr_value(ecf->name, event_module->name->data);
     ngx_conf_init_value(ecf->multi_accept, 0);
     ngx_conf_init_value(ecf->accept_mutex, 0);

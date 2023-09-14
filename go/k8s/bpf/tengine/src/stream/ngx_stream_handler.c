@@ -250,7 +250,7 @@ void ngx_stream_init_connection(ngx_connection_t *c) {
         return;
     }
 
-    rev->handler(rev);
+    rev->handler(rev); // ngx_stream_session_handler
 }
 
 static void

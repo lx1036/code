@@ -9,6 +9,8 @@
         "ngx_config.h": "c",
         "ngx_posix_config.h": "c",
         "ngx_stream.h": "c",
-        "ngx_event_timer.h": "c"
+        "ngx_event_timer.h": "c",
+        "socket.h": "c",
+        "in.h": "c"
     }
 }

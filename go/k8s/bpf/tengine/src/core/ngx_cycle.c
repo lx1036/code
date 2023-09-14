@@ -211,6 +211,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
     conf.log = log;
     conf.module_type = NGX_CORE_MODULE;
     conf.cmd_type = NGX_MAIN_CONF;
+    // 这里配置 log level
+    log->log_level = NGX_LOG_DEBUG_ALL;
     if (ngx_conf_param(&conf) != NGX_CONF_OK) {
         environ = senv;
         ngx_destroy_cycle_pools(&conf);
@@ -242,25 +244,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) {
         return cycle;
     }
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
-    if (ngx_test_config) {
-        if (ngx_create_pidfile(&ccf->pid, log) != NGX_OK) {
-            goto failed;
-        }
-    } else if (!ngx_is_init_cycle(old_cycle)) {
-        /*
-         * we do not create the pid file in the first ngx_init_cycle() call
-         * because we need to write the demonized process pid
-         */
-        old_ccf = (ngx_core_conf_t *) ngx_get_conf(old_cycle->conf_ctx, ngx_core_module);
-        if (ccf->pid.len != old_ccf->pid.len || ngx_strcmp(ccf->pid.data, old_ccf->pid.data) != 0) {
-            /* new pid file name */
-            if (ngx_create_pidfile(&ccf->pid, log) != NGX_OK) {
-                goto failed;
-            }
-
-            ngx_delete_pidfile(old_cycle);
-        }
-    }
     if (ngx_test_lockfile(cycle->lock_file.data, log) != NGX_OK) {
         goto failed;
     }
@@ -776,56 +759,6 @@ static void ngx_clean_old_cycles(ngx_event_t *ev) {
     }
 }
 
-ngx_int_t ngx_create_pidfile(ngx_str_t *name, ngx_log_t *log) {
-    size_t      len;
-    ngx_int_t   rc;
-    ngx_uint_t  create;
-    ngx_file_t  file;
-    u_char      pid[NGX_INT64_LEN + 2];
-
-    if (ngx_process > NGX_PROCESS_MASTER) {
-        return NGX_OK;
-    }
-
-    ngx_memzero(&file, sizeof(ngx_file_t));
-
-    file.name = *name;
-    file.log = log;
-    create = ngx_test_config ? NGX_FILE_CREATE_OR_OPEN : NGX_FILE_TRUNCATE;
-    file.fd = ngx_open_file(file.name.data, NGX_FILE_RDWR, create, NGX_FILE_DEFAULT_ACCESS);
-    if (file.fd == NGX_INVALID_FILE) {
-        ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
-                      ngx_open_file_n " \"%s\" failed", file.name.data);
-        return NGX_ERROR;
-    }
-
-    rc = NGX_OK;
-    if (!ngx_test_config) {
-        len = ngx_snprintf(pid, NGX_INT64_LEN + 2, "%P%N", ngx_pid) - pid;
-        if (ngx_write_file(&file, pid, len, 0) == NGX_ERROR) {
-            rc = NGX_ERROR;
-        }
-    }
-
-    if (ngx_close_file(file.fd) == NGX_FILE_ERROR) {
-        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
-                      ngx_close_file_n " \"%s\" failed", file.name.data);
-    }
-
-    return rc;
-}
-
-void ngx_delete_pidfile(ngx_cycle_t *cycle) {
-    u_char           *name;
-    ngx_core_conf_t  *ccf;
-    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
-    name = ngx_new_binary ? ccf->oldpid.data : ccf->pid.data;
-    if (ngx_delete_file(name) == NGX_FILE_ERROR) {
-        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
-                      ngx_delete_file_n " \"%s\" failed", name);
-    }
-}
-
 static void
 ngx_destroy_cycle_pools(ngx_conf_t *conf)
 {
@@ -869,8 +802,6 @@ ngx_write_file(ngx_file_t *file, u_char *buf, size_t size, off_t offset)
 
     ngx_log_debug4(NGX_LOG_DEBUG_CORE, file->log, 0, "write: %d, %p, %uz, %O", file->fd, buf, size, offset);
     written = 0;
-
-#if (NGX_HAVE_PWRITE)
     for ( ;; ) {
         n = pwrite(file->fd, buf + written, size, offset);
 
@@ -898,44 +829,6 @@ ngx_write_file(ngx_file_t *file, u_char *buf, size_t size, off_t offset)
         offset += n;
         size -= n;
     }
-
-#else
-
-    if (file->sys_offset != offset) {
-        if (lseek(file->fd, offset, SEEK_SET) == -1) {
-            ngx_log_error(NGX_LOG_CRIT, file->log, ngx_errno,
-                          "lseek() \"%s\" failed", file->name.data);
-            return NGX_ERROR;
-        }
-
-        file->sys_offset = offset;
-    }
-
-    for ( ;; ) {
-        n = write(file->fd, buf + written, size);
-
-        if (n == -1) {
-            err = ngx_errno;
-            if (err == NGX_EINTR) {
-                ngx_log_debug0(NGX_LOG_DEBUG_CORE, file->log, err,
-                               "write() was interrupted");
-                continue;
-            }
-
-            ngx_log_error(NGX_LOG_CRIT, file->log, err, "write() \"%s\" failed", file->name.data);
-            return NGX_ERROR;
-        }
-
-        file->sys_offset += n;
-        file->offset += n;
-        written += n;
-        if ((size_t) n == size) {
-            return written;
-        }
-
-        size -= n;
-    }
-#endif
 }
 
 void ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user) {

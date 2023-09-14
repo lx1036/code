@@ -120,8 +120,7 @@ static void * ngx_kqueue_create_conf(ngx_cycle_t *cycle) {
 
 static char * ngx_kqueue_init_conf(ngx_cycle_t *cycle, void *conf) {
     ngx_kqueue_conf_t *kcf = conf;
-
-    ngx_conf_init_uint_value(kcf->changes, 512);
+    ngx_conf_init_uint_value(kcf->changes, 512); // 在这里做初始化
     ngx_conf_init_uint_value(kcf->events, 512);
 
     return NGX_CONF_OK;
@@ -246,13 +245,12 @@ static ngx_int_t ngx_kqueue_init(ngx_cycle_t *cycle, ngx_msec_t timer) {
 #if (NGX_HAVE_TIMER_EVENT)
     struct kevent       kev;
 #endif
-
+    // 函数获取 event module 里的 kqueue 配置
     kcf = ngx_event_get_conf(cycle->conf_ctx, ngx_kqueue_module);
     if (ngx_kqueue == -1) {
         ngx_kqueue = kqueue();
         if (ngx_kqueue == -1) {
-            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
-                          "kqueue() failed");
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno, "kqueue() failed");
             return NGX_ERROR;
         }
 
@@ -282,15 +280,13 @@ static ngx_int_t ngx_kqueue_init(ngx_cycle_t *cycle, ngx_msec_t timer) {
             ngx_free(change_list);
         }
 
-        change_list = ngx_alloc(kcf->changes * sizeof(struct kevent),
-                                cycle->log);
+        change_list = ngx_alloc(kcf->changes * sizeof(struct kevent), cycle->log);
         if (change_list == NULL) {
             return NGX_ERROR;
         }
     }
 
     max_changes = kcf->changes;
-
     if (nevents < kcf->events) {
         if (event_list) {
             ngx_free(event_list);
@@ -314,10 +310,8 @@ static ngx_int_t ngx_kqueue_init(ngx_cycle_t *cycle, ngx_msec_t timer) {
         kev.fflags = 0;
         kev.data = timer;
         kev.udata = 0;
-
         ts.tv_sec = 0;
         ts.tv_nsec = 0;
-
         if (kevent(ngx_kqueue, &kev, 1, NULL, 0, &ts) == -1) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           "kevent(EVFILT_TIMER) failed");
@@ -341,6 +335,7 @@ static ngx_int_t ngx_kqueue_init(ngx_cycle_t *cycle, ngx_msec_t timer) {
 
     nevents = kcf->events;
     ngx_io = ngx_os_io;
+    // 这里逻辑很重要，mac 本地赋值 ngx_event_actions，使用 ngx_kqueue_module_ctx.actions
     ngx_event_actions = ngx_kqueue_module_ctx.actions;
 
     return NGX_OK;

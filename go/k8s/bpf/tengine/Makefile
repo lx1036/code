@@ -152,6 +152,8 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/stream/ngx_stream_variables.o \
 	objs/src/stream/ngx_stream_core_module.o \
 	objs/src/stream/ngx_stream_handler.o \
+	objs/src/stream/ngx_stream_return_module.o \
+	objs/src/stream/ngx_stream_write_filter_module.o \
 	objs/src/stream/ngx_stream_proxy_module.o \
 	objs/src/stream/ngx_stream_script.o \
 	objs/src/stream/ngx_stream_upstream_round_robin.o \
@@ -220,46 +222,13 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/stream/ngx_stream_variables.o \
 	objs/src/stream/ngx_stream_core_module.o \
 	objs/src/stream/ngx_stream_handler.o \
+	objs/src/stream/ngx_stream_return_module.o \
+	objs/src/stream/ngx_stream_write_filter_module.o \
 	objs/src/stream/ngx_stream_proxy_module.o \
 	objs/src/stream/ngx_stream_script.o \
 	objs/src/stream/ngx_stream_upstream_round_robin.o \
 	objs/src/stream/ngx_stream_upstream.o \
 	-L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -Wl,-u,_pcre_version -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -L/usr/local/Cellar/pcre/8.45/lib -lpcre -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -lpcre2-8 -lssl -lcrypto -lz
-
-# objs/src/event/ngx_event_pipe.o
-test:
-	
-	
-	objs/src/event/ngx_event_pipe.o \
-	objs/src/event/ngx_event_udpv2.o \
-	
-	objs/src/os/unix/ngx_send.o \
-	
-	objs/src/os/unix/ngx_daemon.o \
-	objs/src/os/unix/ngx_setaffinity.o \
-	
-	
-	objs/src/os/unix/ngx_user.o \
-	
-	
-	objs/src/os/unix/ngx_sysinfo.o \
-	
-	
-	
-	objs/src/proc/ngx_proc.o \
-	
-	objs/src/event/ngx_event_udpv2.o \
-	
-	objs/src/os/unix/ngx_daemon.o \
-	objs/src/os/unix/ngx_setaffinity.o \
-	objs/src/os/unix/ngx_user.o \
-	
-	objs/src/os/unix/ngx_sysinfo.o \
-	
-	
-	
-	objs/src/proc/ngx_proc.o \
-	
 
 
 objs/src/core/nginx.o:	$(CORE_DEPS) \
@@ -713,6 +682,18 @@ objs/src/stream/ngx_stream_handler.o:	$(CORE_DEPS) $(STREAM_DEPS) \
 	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
 		-o objs/src/stream/ngx_stream_handler.o \
 		src/stream/ngx_stream_handler.c
+
+objs/src/stream/ngx_stream_return_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+	src/stream/ngx_stream_return_module.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+		-o objs/src/stream/ngx_stream_return_module.o \
+		src/stream/ngx_stream_return_module.c
+
+objs/src/stream/ngx_stream_write_filter_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+	src/stream/ngx_stream_write_filter_module.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+		-o objs/src/stream/ngx_stream_write_filter_module.o \
+		src/stream/ngx_stream_write_filter_module.c
 
 objs/src/stream/ngx_stream_proxy_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
 	src/stream/ngx_stream_proxy_module.c

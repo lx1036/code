@@ -333,7 +333,6 @@ static void ngx_channel_handler(ngx_event_t *ev) {
 
 static void ngx_master_process_exit(ngx_cycle_t *cycle) {
     ngx_uint_t  i;
-    ngx_delete_pidfile(cycle);
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exit");
     for (i = 0; cycle->modules[i]; i++) {
         if (cycle->modules[i]->exit_master) {
