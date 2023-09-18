@@ -96,7 +96,7 @@ void ngx_shmtx_lock(ngx_shmtx_t *mtx) {
                 return;
             }
 
-            ngx_log_debug1(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
+            ngx_log_error(NGX_LOG_STDERR, ngx_cycle->log, 0,
                            "shmtx wait %uA", *mtx->wait);
 
             while (sem_wait(&mtx->sem) == -1) {
@@ -175,7 +175,7 @@ ngx_shmtx_wakeup(ngx_shmtx_t *mtx)
         }
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ngx_cycle->log, 0,
                    "shmtx wake %uA", wait);
 
     if (sem_post(&mtx->sem) == -1) {

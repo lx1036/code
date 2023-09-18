@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
     int nfds, connfd;
     int i, nread;
     for (;;) {
-        //等待事件发生 https://man7.org/linux/man-pages/man2/epoll_wait.2.html
+        // 等待事件发生 https://man7.org/linux/man-pages/man2/epoll_wait.2.html
         nfds = epoll_wait(epfd, events, 20, -1);
         printf("nfds=%d\n", nfds);
         //处理所发生的所有事件

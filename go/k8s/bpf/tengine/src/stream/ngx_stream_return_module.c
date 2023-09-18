@@ -109,7 +109,7 @@ static void ngx_stream_return_handler(ngx_stream_session_t *s) {
         return;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0, "stream return text: \"%V\"", &text);
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0, "stream return text: \"%V\"", &text);
     if (text.len == 0) {
         ngx_stream_finalize_session(s, NGX_STREAM_OK);
         return;
@@ -158,15 +158,15 @@ static void ngx_stream_return_write_handler(ngx_event_t *ev) {
     }
 
     ctx = ngx_stream_get_module_ctx(s, ngx_stream_return_module);
-    // 在 ngx_stream_write_filter_module.c 里初始化
+    // 在 ngx_stream.c 里初始化 ngx_stream_write_filter()
     if (ngx_stream_top_filter(s, ctx->out, 1) == NGX_ERROR) {
         ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
         return;
     }
 
     ctx->out = NULL;
-    if (!c->buffered) {
-        ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "stream return done sending");
+    if (!c->buffered) { // 目前没有配置 buffer，直接 finalize session，断掉连接
+        ngx_log_error(NGX_LOG_STDERR, c->log, 0, "stream return done sending");
         ngx_stream_finalize_session(s, NGX_STREAM_OK);
         return;
     }

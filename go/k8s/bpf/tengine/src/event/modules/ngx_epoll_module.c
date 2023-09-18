@@ -126,8 +126,7 @@ static char * ngx_epoll_init_conf(ngx_cycle_t *cycle, void *conf) {
 }
 
 // 参考 epoll_test.c, 常用逻辑
-static ngx_int_t
-ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
+static ngx_int_t ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
 {
     int                  op;
     uint32_t             events, prev;
@@ -139,13 +138,13 @@ ngx_epoll_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
     events = (uint32_t) event;
     if (event == NGX_READ_EVENT) {
         e = c->write;
-        prev = EPOLLOUT; // EPOLLOUT 是写数据
+        prev = EPOLLOUT; // 设置用于注测的写操作事件
 #if (NGX_READ_EVENT != EPOLLIN|EPOLLRDHUP)
-        events = EPOLLIN|EPOLLRDHUP;
+        events = EPOLLIN|EPOLLRDHUP; // epoll_in-> 读, epoll_out -> 写
 #endif
     } else {
         e = c->read;
-        prev = EPOLLIN|EPOLLRDHUP; // EPOLLIN 是读数据
+        prev = EPOLLIN|EPOLLRDHUP; // 如果是已经连接的用户，并且收到数据，那么进行读数据
 #if (NGX_WRITE_EVENT != EPOLLOUT)
         events = EPOLLOUT;
 #endif
@@ -229,7 +228,7 @@ static ngx_int_t ngx_epoll_add_connection(ngx_connection_t *c) {
 
     ee.events = EPOLLIN|EPOLLOUT|EPOLLET|EPOLLRDHUP;
     ee.data.ptr = (void *) ((uintptr_t) c | c->read->instance); // 注意下 c->read->instance
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0, "epoll add connection: fd:%d ev:%08XD", c->fd, ee.events);
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0, "epoll add connection: fd:%d ev:%08XD", c->fd, ee.events);
     if (epoll_ctl(ep, EPOLL_CTL_ADD, c->fd, &ee) == -1) {
         ngx_log_error(NGX_LOG_ALERT, c->log, ngx_errno, "epoll_ctl(EPOLL_CTL_ADD, %d) failed", c->fd);
         return NGX_ERROR;
@@ -256,7 +255,7 @@ static ngx_int_t ngx_epoll_del_connection(ngx_connection_t *c, ngx_uint_t flags)
         return NGX_OK;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "epoll del connection: fd:%d", c->fd);
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0, "epoll del connection: fd:%d", c->fd);
     op = EPOLL_CTL_DEL;
     ee.events = 0;
     ee.data.ptr = NULL;
@@ -403,9 +402,7 @@ static void ngx_epoll_done(ngx_cycle_t *cycle) {
     nevents = 0;
 }
 
-static ngx_int_t
-ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
-{
+static ngx_int_t ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags) {
     int                events;
     uint32_t           revents;
     ngx_int_t          instance, i;
@@ -416,9 +413,8 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     ngx_connection_t  *c;
 
     /* NGX_TIMER_INFINITE == INFTIM */
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                   "epoll timer: %M", timer);
-
+    ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "epoll timer: %M", timer);
+    // 等待事件发生 https://man7.org/linux/man-pages/man2/epoll_wait.2.html, 阻塞的
     events = epoll_wait(ep, event_list, (int) nevents, timer);
     err = (events == -1) ? ngx_errno : 0;
     if (flags & NGX_UPDATE_TIME || ngx_event_timer_alarm) {
@@ -432,7 +428,6 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             }
 
             level = NGX_LOG_INFO;
-
         } else {
             level = NGX_LOG_ALERT;
         }
@@ -446,8 +441,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             return NGX_OK;
         }
 
-        ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
-                      "epoll_wait() returned no events without timeout");
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, 0, "epoll_wait() returned no events without timeout");
         return NGX_ERROR;
     }
     
@@ -481,28 +475,21 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
              * the stale event from a file descriptor
              * that was just closed in this iteration
              */
-
-            ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                           "epoll: stale event %p", c);
+            ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "epoll: stale event %p", c);
             continue;
         }
 
         revents = event_list[i].events;
-
-        ngx_log_debug3(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                       "epoll: fd:%d ev:%04XD d:%p",
+        ngx_log_debug3(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "epoll: fd:%d ev:%04XD d:%p",
                        c->fd, revents, event_list[i].data.ptr);
 
         if (revents & (EPOLLERR|EPOLLHUP)) {
-            ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                           "epoll_wait() error on fd:%d ev:%04XD",
-                           c->fd, revents);
+            ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "epoll_wait() error on fd:%d ev:%04XD", c->fd, revents);
 
             /*
              * if the error events were returned, add EPOLLIN and EPOLLOUT
              * to handle the events at least in one active handler
              */
-
             revents |= EPOLLIN|EPOLLOUT;
         }
         // 1.读数据
@@ -511,9 +498,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             rev->available = -1;
 
             if (flags & NGX_POST_EVENTS) {
-                queue = rev->accept ? &ngx_posted_accept_events
-                                    : &ngx_posted_events;
-
+                queue = rev->accept ? &ngx_posted_accept_events : &ngx_posted_events;
                 ngx_post_event(rev, queue);
             } else {
                 // 如果是 TCP, handler=ngx_event_accept();
@@ -532,7 +517,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
                  * the stale event from a file descriptor
                  * that was just closed in this iteration
                  */
-                ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "epoll: stale event %p", c);
+                ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "epoll: stale event %p", c);
                 continue;
             }
 
@@ -544,7 +529,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
             if (flags & NGX_POST_EVENTS) {
                 ngx_post_event(wev, &ngx_posted_events);
             } else {
-                // 如果是 TCP, handler=ngx_event_accept();
+                // 如果是 TCP, handler=ngx_event_accept(); 这里不对，应该是写数据, send() 才对，也存疑(应该是对的)!!!
                 // 如果是 UDP, handler=ngx_event_recvmsg();
                 // 看 ngx_event.c::ngx_event_process_init()
                 wev->handler(wev);
@@ -574,7 +559,7 @@ ngx_epoll_notify_init(ngx_log_t *log)
         return NGX_ERROR;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, log, 0,
+    ngx_log_error(NGX_LOG_STDERR, log, 0,
                    "notify eventfd: %d", notify_fd);
 
     notify_event.handler = ngx_epoll_notify_handler;

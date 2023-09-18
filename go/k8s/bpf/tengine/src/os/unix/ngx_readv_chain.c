@@ -182,7 +182,7 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
                     rev->ready = 0;
                 }
 
-                ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
+                ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                                "readv: avail:%d", rev->available);
 
             } else if (n == size) {
@@ -193,7 +193,7 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
                     break;
                 }
 
-                ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
+                ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                                "readv: avail:%d", rev->available);
             }
 

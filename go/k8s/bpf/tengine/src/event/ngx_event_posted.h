@@ -20,10 +20,10 @@
         (ev)->posted = 1;                                                     \
         ngx_queue_insert_tail(q, &(ev)->queue);                               \
                                                                               \
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, (ev)->log, 0, "post event %p", ev);\
+        ngx_log_error(NGX_LOG_STDERR, (ev)->log, 0, "post event %p", ev);\
                                                                               \
     } else  {                                                                 \
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, (ev)->log, 0,                      \
+        ngx_log_error(NGX_LOG_STDERR, (ev)->log, 0,                      \
                        "update posted event %p", ev);                         \
     }
 
@@ -33,7 +33,7 @@
     (ev)->posted = 0;                                                         \
     ngx_queue_remove(&(ev)->queue);                                           \
                                                                               \
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, (ev)->log, 0,                          \
+    ngx_log_error(NGX_LOG_STDERR, (ev)->log, 0,                          \
                    "delete posted event %p", ev);
 
 

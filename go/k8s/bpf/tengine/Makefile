@@ -76,7 +76,6 @@ CORE_INCS = -I src/core \
 	-I objs
 
 STREAM_DEPS = src/stream/ngx_stream.h \
-	src/stream/ngx_stream_variables.h \
 	src/stream/ngx_stream_upstream.h \
 	src/stream/ngx_stream_script.h \
 	src/stream/ngx_stream_upstream_round_robin.h \
@@ -149,11 +148,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/os/unix/ngx_pipe.o \
 	objs/src/os/unix/ngx_files.o \
 	objs/src/stream/ngx_stream.o \
-	objs/src/stream/ngx_stream_variables.o \
-	objs/src/stream/ngx_stream_core_module.o \
-	objs/src/stream/ngx_stream_handler.o \
 	objs/src/stream/ngx_stream_return_module.o \
-	objs/src/stream/ngx_stream_write_filter_module.o \
 	objs/src/stream/ngx_stream_proxy_module.o \
 	objs/src/stream/ngx_stream_script.o \
 	objs/src/stream/ngx_stream_upstream_round_robin.o \
@@ -219,11 +214,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/os/unix/ngx_pipe.o \
 	objs/src/os/unix/ngx_files.o \
 	objs/src/stream/ngx_stream.o \
-	objs/src/stream/ngx_stream_variables.o \
-	objs/src/stream/ngx_stream_core_module.o \
-	objs/src/stream/ngx_stream_handler.o \
 	objs/src/stream/ngx_stream_return_module.o \
-	objs/src/stream/ngx_stream_write_filter_module.o \
 	objs/src/stream/ngx_stream_proxy_module.o \
 	objs/src/stream/ngx_stream_script.o \
 	objs/src/stream/ngx_stream_upstream_round_robin.o \
@@ -665,23 +656,23 @@ objs/src/stream/ngx_stream.o:	$(CORE_DEPS) $(STREAM_DEPS) \
 		-o objs/src/stream/ngx_stream.o \
 		src/stream/ngx_stream.c
 
-objs/src/stream/ngx_stream_core_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
-	src/stream/ngx_stream_core_module.c
-	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
-		-o objs/src/stream/ngx_stream_core_module.o \
-		src/stream/ngx_stream_core_module.c
+# objs/src/stream/ngx_stream_core_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+# 	src/stream/ngx_stream_core_module.c
+# 	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+# 		-o objs/src/stream/ngx_stream_core_module.o \
+# 		src/stream/ngx_stream_core_module.c
 
-objs/src/stream/ngx_stream_variables.o:	$(CORE_DEPS) $(STREAM_DEPS) \
-	src/stream/ngx_stream_variables.c
-	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
-		-o objs/src/stream/ngx_stream_variables.o \
-		src/stream/ngx_stream_variables.c
+# objs/src/stream/ngx_stream_variables.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+# 	src/stream/ngx_stream_variables.c
+# 	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+# 		-o objs/src/stream/ngx_stream_variables.o \
+# 		src/stream/ngx_stream_variables.c
 
-objs/src/stream/ngx_stream_handler.o:	$(CORE_DEPS) $(STREAM_DEPS) \
-	src/stream/ngx_stream_handler.c
-	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
-		-o objs/src/stream/ngx_stream_handler.o \
-		src/stream/ngx_stream_handler.c
+# objs/src/stream/ngx_stream_handler.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+# 	src/stream/ngx_stream_handler.c
+# 	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+# 		-o objs/src/stream/ngx_stream_handler.o \
+# 		src/stream/ngx_stream_handler.c
 
 objs/src/stream/ngx_stream_return_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
 	src/stream/ngx_stream_return_module.c
@@ -689,11 +680,11 @@ objs/src/stream/ngx_stream_return_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
 		-o objs/src/stream/ngx_stream_return_module.o \
 		src/stream/ngx_stream_return_module.c
 
-objs/src/stream/ngx_stream_write_filter_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
-	src/stream/ngx_stream_write_filter_module.c
-	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
-		-o objs/src/stream/ngx_stream_write_filter_module.o \
-		src/stream/ngx_stream_write_filter_module.c
+# objs/src/stream/ngx_stream_write_filter_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+# 	src/stream/ngx_stream_write_filter_module.c
+# 	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+# 		-o objs/src/stream/ngx_stream_write_filter_module.o \
+# 		src/stream/ngx_stream_write_filter_module.c
 
 objs/src/stream/ngx_stream_proxy_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
 	src/stream/ngx_stream_proxy_module.c

@@ -106,9 +106,6 @@ struct ngx_listening_s {
 #if (T_NGX_XQUIC)
     unsigned            xquic:1;
 #endif
-#if (NGX_HAVE_INET6)
-    unsigned            ipv6only:1;
-#endif
     unsigned            reuseport:1;
     unsigned            add_reuseport:1;
     unsigned            keepalive:2;

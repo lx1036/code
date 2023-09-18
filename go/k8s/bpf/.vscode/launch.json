@@ -12,10 +12,10 @@
             "name": "master",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/sbin/nginx",
+            "program": "${workspaceFolder}/tengine/objs/nginx",
             // "args": ["-c", "${workspaceFolder}/modules/ngx_http_echo_module/nginx.conf", "-p", "${workspaceFolder}"],
-            "args": ["-c", "${workspaceFolder}/conf/nginx-tcp.conf", "-p", "${workspaceFolder}"],
-            "stopAtEntry": true,
+            "args": ["-c", "${workspaceFolder}/tengine/nginx-tcp.conf", "-e", "stderr", "-p", "${workspaceFolder}"],
+            "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
             // 使用 vscode debugConsole https://code.visualstudio.com/docs/cpp/launch-json-reference#_externalconsole
@@ -29,7 +29,7 @@
             "name": "worker",
             "type": "cppdbg",
             "request": "attach",
-            "program": "${workspaceFolder}/bin/sbin/nginx",
+            "program": "${workspaceFolder}/tengine/objs/nginx",
             // "args": ["-c", "${workspaceFolder}/modules/ngx_http_echo_module/nginx.conf", "-p", "${workspaceFolder}"],
             "MIMode": "lldb",
             // "processId": "41893" // 这里不写具体 pid，可以弹框选择 worker pid

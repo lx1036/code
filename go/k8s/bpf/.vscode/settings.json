@@ -11,6 +11,7 @@
         "ngx_stream.h": "c",
         "ngx_event_timer.h": "c",
         "socket.h": "c",
-        "in.h": "c"
+        "in.h": "c",
+        "complex": "c"
     }
 }

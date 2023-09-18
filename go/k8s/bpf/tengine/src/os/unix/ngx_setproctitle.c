@@ -79,5 +79,5 @@ void ngx_setproctitle(char *title) {
         ngx_memset(p, NGX_SETPROCTITLE_PAD, ngx_os_argv_last - (char *) p);
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0, "setproctitle: \"%s\"", ngx_os_argv[0]);
+    ngx_log_error(NGX_LOG_STDERR, ngx_cycle->log, 0, "setproctitle: \"%s\"", ngx_os_argv[0]);
 }

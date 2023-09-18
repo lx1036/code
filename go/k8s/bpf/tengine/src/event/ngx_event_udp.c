@@ -22,7 +22,7 @@ static ngx_connection_t *ngx_lookup_udp_connection(ngx_listening_t *ls,
     struct sockaddr *sockaddr, socklen_t socklen,
     struct sockaddr *local_sockaddr, socklen_t local_socklen);
 
-
+// echo "hello" | nc -uw1 localhost 5002
 // 断点调试：`python3 udp_client.py`
 void ngx_event_recvmsg(ngx_event_t *ev) {
     ssize_t            n;
@@ -53,7 +53,6 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
     }
 
     ecf = ngx_event_get_conf(ngx_cycle->conf_ctx, ngx_event_core_module);
-
     if (!(ngx_event_flags & NGX_USE_KQUEUE_EVENT)) {
         ev->available = ecf->multi_accept;
     }
@@ -61,8 +60,7 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
     lc = ev->data;
     ls = lc->listening;
     ev->ready = 0;
-
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0, "recvmsg on %V, ready: %d", &ls->addr_text, ev->available);
+    ngx_log_error(NGX_LOG_STDERR, ev->log, 0, "recvmsg on %V, ready: %d", &ls->addr_text, ev->available);
 
     do {
         ngx_memzero(&msg, sizeof(struct msghdr));
@@ -86,7 +84,7 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
             err = ngx_socket_errno;
 
             if (err == NGX_EAGAIN) {
-                ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ev->log, err,
+                ngx_log_error(NGX_LOG_STDERR, ev->log, err,
                                "recvmsg() not ready");
                 return;
             }
@@ -156,7 +154,7 @@ void ngx_event_recvmsg(ngx_event_t *ev) {
                 handler = c->log->handler;
                 c->log->handler = NULL;
 
-                ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
+                ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                                "recvmsg: fd:%d n:%z", c->fd, n);
 
                 c->log->handler = handler;
@@ -394,7 +392,7 @@ static ngx_connection_t * ngx_lookup_udp_connection(ngx_listening_t *ls, struct 
         if (socklen <= (socklen_t) offsetof(struct sockaddr_un, sun_path)
             || saun->sun_path[0] == '\0')
         {
-            ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ngx_cycle->log, 0,
+            ngx_log_error(NGX_LOG_STDERR, ngx_cycle->log, 0,
                            "unbound unix socket");
             return NULL;
         }

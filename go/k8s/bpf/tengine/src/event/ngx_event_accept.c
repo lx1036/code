@@ -14,7 +14,7 @@ static void ngx_close_accepted_connection(ngx_connection_t *c);
 
 ngx_int_t ngx_trylock_accept_mutex(ngx_cycle_t *cycle) {
     if (ngx_shmtx_trylock(&ngx_accept_mutex)) {
-        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "accept mutex locked");
+        ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "accept mutex locked");
         if (ngx_accept_mutex_held && ngx_accept_events == 0) {
             return NGX_OK;
         }
@@ -30,7 +30,7 @@ ngx_int_t ngx_trylock_accept_mutex(ngx_cycle_t *cycle) {
         return NGX_OK;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "accept mutex lock failed: %ui", ngx_accept_mutex_held);
+    ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "accept mutex lock failed: %ui", ngx_accept_mutex_held);
     if (ngx_accept_mutex_held) {
         if (ngx_disable_accept_events(cycle, 0) == NGX_ERROR) {
             return NGX_ERROR;
@@ -123,7 +123,7 @@ void ngx_event_accept(ngx_event_t *ev) {
     lc = ev->data;
     ls = lc->listening;
     ev->ready = 0;
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0, "accept on %V, ready: %d", &ls->addr_text, ev->available);
+    ngx_log_error(NGX_LOG_STDERR, ev->log, 0, "accept on %V, ready: %d", &ls->addr_text, ev->available);
 
     do {
         // accept a connection on a socket, return a file descriptor for the accepted socket
@@ -133,13 +133,11 @@ void ngx_event_accept(ngx_event_t *ev) {
         if (s == (ngx_socket_t) -1) {
             err = ngx_socket_errno;
             if (err == NGX_EAGAIN) {
-                ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ev->log, err,
-                               "accept() not ready");
+                ngx_log_error(NGX_LOG_STDERR, ev->log, err, "accept() not ready");
                 return;
             }
 
             level = NGX_LOG_ALERT;
-
             if (err == NGX_ECONNABORTED) {
                 level = NGX_LOG_ERR;
 
@@ -152,16 +150,13 @@ void ngx_event_accept(ngx_event_t *ev) {
                 if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
                     ev->available--;
                 }
-
                 if (ev->available) {
                     continue;
                 }
             }
 
             if (err == NGX_EMFILE || err == NGX_ENFILE) {
-                if (ngx_disable_accept_events((ngx_cycle_t *) ngx_cycle, 1)
-                    != NGX_OK)
-                {
+                if (ngx_disable_accept_events((ngx_cycle_t *) ngx_cycle, 1) != NGX_OK) {
                     return;
                 }
 
@@ -172,7 +167,6 @@ void ngx_event_accept(ngx_event_t *ev) {
                     }
 
                     ngx_accept_disabled = 1;
-
                 } else {
                     ngx_add_timer(ev, ecf->accept_mutex_delay);
                 }
@@ -184,7 +178,11 @@ void ngx_event_accept(ngx_event_t *ev) {
 #if (NGX_STAT_STUB)
         (void) ngx_atomic_fetch_add(ngx_stat_accepted, 1); // accept() 一个 client_fd
 #endif
-
+        // 重要: 使用 ngx_log_error(NGX_LOG_STDERR, xxx) 来打印日志!!!
+        u_char text[NGX_SOCKADDR_STRLEN];
+        ngx_inet_get_addr(&sa.sockaddr, text);
+        ngx_log_error(NGX_LOG_STDERR, ev->log, 0, "accept() success from client: %s:%d to server: %s ", text, ngx_inet_get_port(&sa.sockaddr), ls->addr_text.data);
+        // printf("accept() success from client: %s:%d to server: %s \n", text, ngx_inet_get_port(&sa.sockaddr), ls->addr_text.data);
         ngx_accept_disabled = ngx_cycle->connection_n / 8 - ngx_cycle->free_connection_n;
         c = ngx_get_connection(s, ev->log);
         if (c == NULL) {
@@ -258,14 +256,6 @@ void ngx_event_accept(ngx_event_t *ev) {
         c->listening = ls;
         c->local_sockaddr = ls->sockaddr;
         c->local_socklen = ls->socklen;
-
-#if (NGX_HAVE_UNIX_DOMAIN)
-        if (c->sockaddr->sa_family == AF_UNIX) {
-            c->tcp_nopush = NGX_TCP_NOPUSH_DISABLED;
-            c->tcp_nodelay = NGX_TCP_NODELAY_DISABLED;
-        }
-#endif
-
         rev = c->read;
         wev = c->write;
         wev->ready = 1;
@@ -304,9 +294,7 @@ void ngx_event_accept(ngx_event_t *ev) {
                 return;
             }
 
-            c->addr_text.len = ngx_sock_ntop(c->sockaddr, c->socklen,
-                                             c->addr_text.data,
-                                             ls->addr_text_max_len, 0);
+            c->addr_text.len = ngx_sock_ntop(c->sockaddr, c->socklen, c->addr_text.data, ls->addr_text_max_len, 0);
             if (c->addr_text.len == 0) {
                 ngx_close_accepted_connection(c);
                 return;
@@ -317,21 +305,16 @@ void ngx_event_accept(ngx_event_t *ev) {
         {
         ngx_str_t  addr;
         u_char     text[NGX_SOCKADDR_STRLEN];
-
         ngx_debug_accepted_connection(ecf, c);
-
         if (log->log_level & NGX_LOG_DEBUG_EVENT) {
             addr.data = text;
-            addr.len = ngx_sock_ntop(c->sockaddr, c->socklen, text,
-                                     NGX_SOCKADDR_STRLEN, 1);
-
-            ngx_log_debug3(NGX_LOG_DEBUG_EVENT, log, 0,
-                           "*%uA accept: %V fd:%d", c->number, &addr, s);
+            addr.len = ngx_sock_ntop(c->sockaddr, c->socklen, text, NGX_SOCKADDR_STRLEN, 1);
+            ngx_log_debug3(NGX_LOG_DEBUG_EVENT, log, 0, "*%uA accept: %V fd:%d", c->number, &addr, s);
         }
 
         }
 #endif
-
+        // linux 里 ngx_epoll_add_connection() -> epoll_ctl(ep, EPOLL_CTL_ADD, c->fd, &ee)
         if (ngx_add_conn && (ngx_event_flags & NGX_USE_EPOLL_EVENT) == 0) {
             if (ngx_add_conn(c) == NGX_ERROR) {
                 ngx_close_accepted_connection(c);
@@ -358,7 +341,7 @@ void ngx_event_accept(ngx_event_t *ev) {
         }
 #endif
 
-        // 这里是重点，读/写数据
+        // 这里是重点，读/写数据, -> ngx_stream_init_connection()
         ls->handler(c);
         if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
             ev->available--;
@@ -389,11 +372,8 @@ static void ngx_close_accepted_connection(ngx_connection_t *c) {
 #endif
 }
 
-u_char *
-ngx_accept_log_error(ngx_log_t *log, u_char *buf, size_t len)
-{
-    return ngx_snprintf(buf, len, " while accepting new connection on %V",
-                        log->data);
+u_char * ngx_accept_log_error(ngx_log_t *log, u_char *buf, size_t len) {
+    return ngx_snprintf(buf, len, " while accepting new connection on %V", log->data);
 }
 
 

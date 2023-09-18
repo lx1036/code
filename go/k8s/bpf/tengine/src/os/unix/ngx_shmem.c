@@ -93,7 +93,7 @@ ngx_shm_alloc(ngx_shm_t *shm)
         return NGX_ERROR;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, shm->log, 0, "shmget id: %d", id);
+    ngx_log_error(NGX_LOG_STDERR, shm->log, 0, "shmget id: %d", id);
 
     shm->addr = shmat(id, NULL, 0);
 

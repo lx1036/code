@@ -119,7 +119,7 @@ ngx_proxy_protocol_get_tlv(ngx_connection_t *c, ngx_str_t *name,
         return NGX_DECLINED;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                    "PROXY protocol v2 get tlv \"%V\"", name);
 
     te = ngx_proxy_protocol_tlv_entries;
@@ -194,7 +194,7 @@ ngx_proxy_protocol_lookup_tlv(ngx_connection_t *c, ngx_str_t *tlvs,
     size_t                     n, len;
     ngx_proxy_protocol_tlv_t  *tlv;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                    "PROXY protocol v2 lookup tlv:%02xi", type);
 
     p = tlvs->data;
@@ -485,13 +485,6 @@ ngx_proxy_protocol_v2_write(ngx_connection_t *c, u_char *buf, u_char *last) {
         // ngx_memcpy(&data->ipv4.src_port, ((struct sockaddr_in *) src)->sin_port, 2);
 
         break;
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        v6_used = 1;
-        // ngx_memcpy(data->addrs.ip6.src_addr, &((struct sockaddr_in6 *) src)->sin6_addr, 16);
-        // data->addrs.ip6.src_port = ((struct sockaddr_in6 *) src)->sin6_port;
-        break;
-#endif    
     default: 
         ngx_log_error(NGX_LOG_ERR, c->log, 0,  "PPv2 unsupported src address family %ui", src->sa_family); 
         goto unspec;
@@ -506,13 +499,6 @@ ngx_proxy_protocol_v2_write(ngx_connection_t *c, u_char *buf, u_char *last) {
         // ngx_memcpy(&data->ipv4.dst_addr, ((struct sockaddr_in *) dst)->sin_addr.s_addr, 4);
         // ngx_memcpy(&data->ipv4.dst_port, ((struct sockaddr_in *) dst)->sin_port, 2);
         break;
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        v6_used = 1;
-        // ngx_memcpy(data->addrs.ip6.dst_addr, &((struct sockaddr_in6 *) dst)->sin6_addr, 16);
-        // data->addrs.ip6.dst_port = ((struct sockaddr_in6 *) dst)->sin6_port;
-        break;
-#endif    
     default: 
         ngx_log_error(NGX_LOG_ERR, c->log, 0,  "PPv2 unsupported dst address family %ui", dst->sa_family); 
         goto unspec;
@@ -578,7 +564,7 @@ ngx_proxy_protocol_v2_read(ngx_connection_t *c, u_char *buf, u_char *last)
 
     /* only PROXY is supported */
     if (command != 1) {
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                        "PROXY protocol v2 unsupported command %ui", command);
         return end;
     }
@@ -587,7 +573,7 @@ ngx_proxy_protocol_v2_read(ngx_connection_t *c, u_char *buf, u_char *last)
 
     /* only STREAM is supported */
     if (transport != 1) { // TODO: 还需要支持 UDP PPv2, TCP or UNIX_STREAM, 不支持 UDP or UNIX_DGRAM
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                        "PROXY protocol v2 unsupported transport %ui",
                        transport);
         return end;
@@ -628,7 +614,7 @@ ngx_proxy_protocol_v2_read(ngx_connection_t *c, u_char *buf, u_char *last)
         break;
 
     default:
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                        "PROXY protocol v2 unsupported address family %ui",
                        family);
         return end;

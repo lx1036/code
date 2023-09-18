@@ -148,7 +148,7 @@ static ngx_int_t ngx_kqueue_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint
     if (ev->index < nchanges
         && ((uintptr_t) change_list[ev->index].udata & (uintptr_t) ~1)
             == (uintptr_t) ev) {
-        ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, ev->log, 0,
                        "kevent deleted: %d: ft:%i",
                        ngx_event_ident(ev->data), event);
         /* if the event is still not passed to a kernel we will not pass it */
@@ -227,7 +227,7 @@ static ngx_int_t ngx_kqueue_set_event(ngx_event_t *ev, ngx_int_t filter, ngx_uin
     if (flags & NGX_FLUSH_EVENT) {
         ts.tv_sec = 0;
         ts.tv_nsec = 0;
-        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ev->log, 0, "kevent flush");
+        ngx_log_error(NGX_LOG_STDERR, ev->log, 0, "kevent flush");
         if (kevent(ngx_kqueue, change_list, (int) nchanges, NULL, 0, &ts) == -1) {
             ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno, "kevent() failed");
             return NGX_ERROR;
@@ -411,16 +411,15 @@ static ngx_int_t ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
         tp = &ts;
     }
 
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                   "kevent timer: %M, changes: %d", timer, n);
-
+    ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "kevent timer: %M, changes: %d", timer, n);
+    // kevent() 阻塞等待，等于 epoll_wait()，这个逻辑非常重要!!!
     events = kevent(ngx_kqueue, change_list, n, event_list, (int) nevents, tp);
     err = (events == -1) ? ngx_errno : 0;
     if (flags & NGX_UPDATE_TIME || ngx_event_timer_alarm) {
         ngx_time_update();
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "kevent events: %d", events);
+    ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "kevent events: %d", events);
     if (err) {
         if (err == NGX_EINTR) {
             if (ngx_event_timer_alarm) {
@@ -448,7 +447,7 @@ static ngx_int_t ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     for (i = 0; i < events; i++) {
         ngx_kqueue_dump_event(cycle->log, &event_list[i]);
         if (event_list[i].flags & EV_ERROR) {
-            ngx_log_error(NGX_LOG_ALERT, cycle->log, event_list[i].data,
+            ngx_log_error(NGX_LOG_STDERR, cycle->log, event_list[i].data,
                           "kevent() error on %d filter:%d flags:%04Xd",
                           (int) event_list[i].ident, event_list[i].filter,
                           event_list[i].flags);
@@ -479,7 +478,7 @@ static ngx_int_t ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
                  * that was just closed in this iteration
                  */
 
-                ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "kevent: stale event %p", ev);
+                ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "kevent: stale event %p", ev);
                 continue;
             }
 
@@ -528,7 +527,7 @@ static ngx_int_t ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
             ngx_post_event(ev, queue);
             continue;
         }
-
+        // ->ngx_event_accept()
         ev->handler(ev);
     }
 

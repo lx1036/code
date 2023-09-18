@@ -478,7 +478,7 @@ ngx_stream_script_copy_code(ngx_stream_script_engine_t *e)
     e->ip += sizeof(ngx_stream_script_copy_code_t)
           + ((code->len + sizeof(uintptr_t) - 1) & ~(sizeof(uintptr_t) - 1));
 
-    ngx_log_debug2(NGX_LOG_DEBUG_STREAM, e->session->connection->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, e->session->connection->log, 0,
                    "stream script copy: \"%*s\"", e->pos - p, p);
 }
 
@@ -655,7 +655,7 @@ ngx_stream_script_full_name_code(ngx_stream_script_engine_t *e)
     }
 
     e->buf = value;
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, e->session->connection->log, 0, "stream script fullname: \"%V\"", &value);
+    ngx_log_error(NGX_LOG_STDERR, e->session->connection->log, 0, "stream script fullname: \"%V\"", &value);
     e->ip += sizeof(ngx_stream_script_full_name_code_t);
 }
 
@@ -748,7 +748,7 @@ ngx_stream_script_copy_capture_code(ngx_stream_script_engine_t *e)
         e->pos = ngx_copy(pos, &p[cap[n]], cap[n + 1] - cap[n]);
     }
 
-    ngx_log_debug2(NGX_LOG_DEBUG_STREAM, e->session->connection->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, e->session->connection->log, 0,
                    "stream script capture: \"%*s\"", e->pos - pos, pos);
 }
 

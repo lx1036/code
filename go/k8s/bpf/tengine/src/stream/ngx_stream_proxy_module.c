@@ -335,7 +335,7 @@ static void ngx_stream_proxy_handler(ngx_stream_session_t *s) {
 
     c = s->connection;
     pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_proxy_module);
-    ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "proxy connection handler");
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0, "proxy connection handler");
 
     u = ngx_pcalloc(c->pool, sizeof(ngx_stream_upstream_t));
     if (u == NULL) {
@@ -515,7 +515,7 @@ static void ngx_stream_proxy_connect(ngx_stream_session_t *s) {
     u->state->response_time = (ngx_msec_t) -1;
 
     rc = ngx_event_connect_peer(&u->peer);
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0, "proxy connect: %i", rc);
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0, "proxy connect: %i", rc);
     if (rc == NGX_ERROR) {
         ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
         return;
@@ -561,7 +561,7 @@ static void ngx_stream_proxy_connect_handler(ngx_event_t *ev) {
     }
 
     ngx_del_timer(c->write);
-    ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "stream proxy connect upstream");
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0, "stream proxy connect upstream");
     if (ngx_stream_proxy_test_connect(c) != NGX_OK) {
         ngx_stream_proxy_next_upstream(s);
         return;
@@ -696,7 +696,7 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
     }
 
     if (c->buffer && c->buffer->pos <= c->buffer->last) {
-        ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                        "stream proxy add preread buffer: %uz",
                        c->buffer->last - c->buffer->pos);
 
@@ -717,7 +717,7 @@ ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
     }
 
     if (u->proxy_protocol) {
-        ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                        "stream proxy add PROXY protocol header");
 
         cl = ngx_chain_get_free_buf(c->pool, &u->free);
@@ -946,7 +946,7 @@ static void ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_up
             }
 
             u->half_closed = 1;
-            ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
+            ngx_log_error(NGX_LOG_STDERR, s->connection->log, 0,
                            "stream proxy %s socket shutdown",
                            from_upstream ? "client" : "upstream");
         }
@@ -969,7 +969,7 @@ static void ngx_stream_proxy_finalize(ngx_stream_session_t *s, ngx_uint_t rc) {
     ngx_connection_t       *pc;
     ngx_stream_upstream_t  *u;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0, "finalize stream proxy: %i", rc);
+    ngx_log_error(NGX_LOG_STDERR, s->connection->log, 0, "finalize stream proxy: %i", rc);
     u = s->upstream;
     if (u == NULL) {
         goto noupstream;
@@ -1006,7 +1006,7 @@ static void ngx_stream_proxy_finalize(ngx_stream_session_t *s, ngx_uint_t rc) {
     }
 
     if (pc) {
-        ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, s->connection->log, 0,
                        "close stream proxy upstream connection: %d", pc->fd);
 
 #if (NGX_STREAM_SSL)
@@ -1210,7 +1210,7 @@ ngx_stream_proxy_process_connection(ngx_event_t *ev, ngx_uint_t from_upstream)
 
     } else if (ev->delayed) {
 
-        ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                        "stream connection delayed");
 
         if (ngx_handle_read_event(ev, 0) != NGX_OK) {
@@ -1309,7 +1309,7 @@ ngx_stream_proxy_next_upstream(ngx_stream_session_t *s)
     ngx_stream_upstream_t        *u;
     ngx_stream_proxy_srv_conf_t  *pscf;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, s->connection->log, 0,
                    "stream proxy next upstream");
 
     u = s->upstream;
@@ -1344,7 +1344,7 @@ ngx_stream_proxy_next_upstream(ngx_stream_session_t *s)
     }
 
     if (pc) {
-        ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, s->connection->log, 0,
                        "close proxy upstream connection: %d", pc->fd);
 
 #if (NGX_STREAM_SSL)
@@ -1379,7 +1379,7 @@ ngx_stream_proxy_resolve_handler(ngx_resolver_ctx_t *ctx)
     u = s->upstream;
     ur = u->resolved;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, s->connection->log, 0,
                    "stream upstream resolve");
 
     if (ctx->state) {
@@ -1407,7 +1407,7 @@ ngx_stream_proxy_resolve_handler(ngx_resolver_ctx_t *ctx)
         addr.len = ngx_sock_ntop(ur->addrs[i].sockaddr, ur->addrs[i].socklen,
                                  text, NGX_SOCKADDR_STRLEN, 0);
 
-        ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, s->connection->log, 0,
                        "name was resolved to %V", &addr);
     }
     }
@@ -1446,7 +1446,7 @@ ngx_stream_proxy_send_proxy_protocol(ngx_stream_session_t *s)
 
     c = s->connection;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                    "stream proxy send PROXY protocol header");
 
     p = ngx_proxy_protocol_write(c, buf,
@@ -1757,7 +1757,7 @@ ngx_stream_proxy_ssl_name(ngx_stream_session_t *s)
 
     name.data = p;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, s->connection->log, 0,
                    "upstream SSL server name: \"%s\"", name.data);
 
     if (SSL_set_tlsext_host_name(u->peer.connection->ssl->connection,
@@ -1930,7 +1930,7 @@ ngx_stream_proxy_ssl_certificate(ngx_stream_session_t *s)
         return NGX_ERROR;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                    "stream upstream ssl cert: \"%s\"", cert.data);
 
     if (*cert.data == '\0') {
@@ -1943,7 +1943,7 @@ ngx_stream_proxy_ssl_certificate(ngx_stream_session_t *s)
         return NGX_ERROR;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                    "stream upstream ssl key: \"%s\"", key.data);
 
     if (ngx_ssl_connection_certificate(c, c->pool, &cert, &key,

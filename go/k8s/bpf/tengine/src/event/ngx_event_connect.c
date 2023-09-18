@@ -32,7 +32,7 @@ ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc) {
 
     type = (pc->type ? pc->type : SOCK_STREAM);
     s = ngx_socket(pc->sockaddr->sa_family, type, 0);
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, pc->log, 0, "%s socket %d",
+    ngx_log_error(NGX_LOG_STDERR, pc->log, 0, "%s socket %d",
                    (type == SOCK_STREAM) ? "stream" : "dgram", s);
     if (s == (ngx_socket_t) -1) {
         ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno, ngx_socket_n " failed");
@@ -193,13 +193,13 @@ ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc) {
             return NGX_AGAIN;
         }
 
-        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, pc->log, 0, "connected");
+        ngx_log_error(NGX_LOG_STDERR, pc->log, 0, "connected");
         wev->ready = 1;
         return NGX_OK;
     }
 
     if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
-        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, pc->log, ngx_socket_errno, "connect(): %d", rc);
+        ngx_log_error(NGX_LOG_STDERR, pc->log, ngx_socket_errno, "connect(): %d", rc);
         if (ngx_blocking(s) == -1) {
             ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno, ngx_blocking_n " failed");
             goto failed;
@@ -230,7 +230,7 @@ ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc) {
         return NGX_AGAIN;
     }
 
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, pc->log, 0, "connected");
+    ngx_log_error(NGX_LOG_STDERR, pc->log, 0, "connected");
     wev->ready = 1;
     return NGX_OK;
 

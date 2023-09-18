@@ -147,7 +147,7 @@ ngx_darwin_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                     return NGX_CHAIN_ERROR;
                 }
 
-                ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, err,
+                ngx_log_error(NGX_LOG_STDERR, c->log, err,
                                "sendfile() sent only %O bytes", sent);
             }
 
@@ -171,7 +171,7 @@ ngx_darwin_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                            rc, file->file_pos, sent, file_size + header.size);
 
         } else {
-            n = ngx_writev(c, &header);
+            n = ngx_writev(c, &header); // 很重要，在这里会返回客户端 "hello world" -> writev(connection_fd, text)
 
             if (n == NGX_ERROR) {
                 return NGX_CHAIN_ERROR;

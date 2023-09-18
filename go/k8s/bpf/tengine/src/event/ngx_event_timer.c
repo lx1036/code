@@ -14,11 +14,8 @@ static ngx_rbtree_node_t  ngx_event_timer_sentinel;
  * it should not be a problem, because we use the rbtree to find
  * a minimum timer value only
  */
-
 ngx_int_t ngx_event_timer_init(ngx_log_t *log) {
-    ngx_rbtree_init(&ngx_event_timer_rbtree, &ngx_event_timer_sentinel,
-                    ngx_rbtree_insert_timer_value);
-
+    ngx_rbtree_init(&ngx_event_timer_rbtree, &ngx_event_timer_sentinel, ngx_rbtree_insert_timer_value);
     return NGX_OK;
 }
 
@@ -40,7 +37,7 @@ void ngx_event_expire_timers(void) {
         }
 
         ev = ngx_rbtree_data(node, ngx_event_t, timer);
-        ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0, "event timer del: %d: %M", ngx_event_ident(ev->data), ev->timer.key);
+        ngx_log_error(NGX_LOG_STDERR, ev->log, 0, "event timer del: %d: %M", ngx_event_ident(ev->data), ev->timer.key);
         ngx_rbtree_delete(&ngx_event_timer_rbtree, &ev->timer);
 
 #if (NGX_DEBUG)

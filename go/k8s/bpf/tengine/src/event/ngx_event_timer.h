@@ -25,7 +25,7 @@ extern ngx_rbtree_t  ngx_event_timer_rbtree;
 static ngx_inline void
 ngx_event_del_timer(ngx_event_t *ev)
 {
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ev->log, 0,
                    "event timer del: %d: %M",
                     ngx_event_ident(ev->data), ev->timer.key);
 

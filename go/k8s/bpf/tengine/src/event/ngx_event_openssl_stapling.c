@@ -211,7 +211,7 @@ ngx_ssl_ocsp_cleanup(ngx_connection_t *c)
 static void
 ngx_ssl_ocsp_done(ngx_ssl_ocsp_ctx_t *ctx)
 {
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp done");
 
     if (ctx->peer.connection) {
@@ -336,7 +336,7 @@ ngx_ssl_ocsp_validate(ngx_connection_t *c)
 
     X509_free(cert);
 
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                    "ssl ocsp validate, certs:%d", sk_X509_num(ocsp->certs));
 
     ngx_ssl_ocsp_validate_next(c);
@@ -366,13 +366,13 @@ ngx_ssl_ocsp_validate_next(ngx_connection_t *c)
     for ( ;; ) {
 
         if (ocsp->ncert == n - 1 || (ocf->depth == 2 && ocsp->ncert == 1)) {
-            ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
+            ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                            "ssl ocsp validated, certs:%ui", ocsp->ncert);
             rc = NGX_OK;
             goto done;
         }
 
-        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, c->log, 0,
                        "ssl ocsp validate cert:%ui", ocsp->ncert);
 
         ctx = ngx_ssl_ocsp_start(c->log);
@@ -426,7 +426,7 @@ ngx_ssl_ocsp_validate_next(ngx_connection_t *c)
         /* rc == NGX_OK */
 
         if (ctx->status != V_OCSP_CERTSTATUS_GOOD) {
-            ngx_log_debug1(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+            ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                            "ssl ocsp cached status \"%s\"",
                            OCSP_cert_status_str(ctx->status));
             ocsp->cert_status = ctx->status;
@@ -470,7 +470,7 @@ ngx_ssl_ocsp_cache_lookup(ngx_ssl_ocsp_ctx_t *ctx)
         return NGX_ERROR;
     }
 
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0, "ssl ocsp cache lookup");
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0, "ssl ocsp cache lookup");
 
     cache = shm_zone->data;
     shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
@@ -486,7 +486,7 @@ ngx_ssl_ocsp_cache_lookup(ngx_ssl_ocsp_ctx_t *ctx)
             ctx->status = node->status;
             ngx_shmtx_unlock(&shpool->mutex);
 
-            ngx_log_debug1(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+            ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                            "ssl ocsp cache hit, %s",
                            OCSP_cert_status_str(ctx->status));
 
@@ -499,7 +499,7 @@ ngx_ssl_ocsp_cache_lookup(ngx_ssl_ocsp_ctx_t *ctx)
 
         ngx_shmtx_unlock(&shpool->mutex);
 
-        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                        "ssl ocsp cache expired");
 
         return NGX_DECLINED;
@@ -507,7 +507,7 @@ ngx_ssl_ocsp_cache_lookup(ngx_ssl_ocsp_ctx_t *ctx)
 
     ngx_shmtx_unlock(&shpool->mutex);
 
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0, "ssl ocsp cache miss");
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0, "ssl ocsp cache miss");
 
     return NGX_DECLINED;
 }
@@ -542,7 +542,7 @@ ngx_ssl_ocsp_cache_store(ngx_ssl_ocsp_ctx_t *ctx)
         valid = now + 3600;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp cache store, valid:%T", valid - now);
 
     cache = shm_zone->data;
@@ -627,7 +627,7 @@ ngx_ssl_ocsp_create_key(ngx_ssl_ocsp_ctx_t *ctx)
     p = ngx_cpymem(p, serial->data, serial->length);
     ngx_memzero(p, 20 - serial->length);
 
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp key %xV", &ctx->key);
 
     return NGX_OK;
@@ -718,7 +718,7 @@ done:
 static void
 ngx_ssl_ocsp_error(ngx_ssl_ocsp_ctx_t *ctx)
 {
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp error");
 
     ctx->code = 0;
@@ -730,7 +730,7 @@ ngx_ssl_ocsp_request(ngx_ssl_ocsp_ctx_t *ctx)
 {
     ngx_resolver_ctx_t  *resolve, temp;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp request");
 
     if (ngx_ssl_ocsp_create_request(ctx) != NGX_OK) {
@@ -912,7 +912,7 @@ ngx_ssl_ocsp_connect(ngx_ssl_ocsp_ctx_t *ctx)
     ngx_int_t    rc;
     ngx_addr_t  *addr;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp connect %ui/%ui", ctx->naddr, ctx->naddrs);
 
     addr = &ctx->addrs[ctx->naddr];
@@ -926,7 +926,7 @@ ngx_ssl_ocsp_connect(ngx_ssl_ocsp_ctx_t *ctx)
 
     rc = ngx_event_connect_peer(&ctx->peer);
 
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp connect peer done");
 
     if (rc == NGX_ERROR) {
@@ -968,7 +968,7 @@ ngx_ssl_ocsp_write_handler(ngx_event_t *wev)
     c = wev->data;
     ctx = c->data;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, wev->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, wev->log, 0,
                    "ssl ocsp write handler");
 
     if (wev->timedout) {
@@ -1011,7 +1011,7 @@ ngx_ssl_ocsp_write_handler(ngx_event_t *wev)
 }
 
 static void ngx_ssl_ocsp_dummy_handler(ngx_event_t *ev) {
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ev->log, 0, "ssl ocsp dummy handler");
+    ngx_log_error(NGX_LOG_STDERR, ev->log, 0, "ssl ocsp dummy handler");
 }
 
 
@@ -1026,7 +1026,7 @@ ngx_ssl_ocsp_read_handler(ngx_event_t *rev)
     c = rev->data;
     ctx = c->data;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, rev->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, rev->log, 0,
                    "ssl ocsp read handler");
 
     if (rev->timedout) {
@@ -1155,7 +1155,7 @@ ngx_ssl_ocsp_create_request(ngx_ssl_ocsp_ctx_t *ctx)
     escape = ngx_escape_uri(NULL, base64.data, base64.len,
                             NGX_ESCAPE_URI_COMPONENT);
 
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp request length %z, escape %d",
                    base64.len, (int) escape);
 
@@ -1219,7 +1219,7 @@ ngx_ssl_ocsp_resolve_handler(ngx_resolver_ctx_t *resolve)
     ngx_uint_t        i;
     struct sockaddr  *sockaddr;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp resolve handler");
 
     if (resolve->state) {
@@ -1242,7 +1242,7 @@ ngx_ssl_ocsp_resolve_handler(ngx_resolver_ctx_t *resolve)
                                  resolve->addrs[i].socklen,
                                  text, NGX_SOCKADDR_STRLEN, 0);
 
-        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                        "name was resolved to %V", &addr);
 
     }
@@ -1392,7 +1392,7 @@ ngx_ssl_ocsp_verify(ngx_ssl_ocsp_ctx_t *ctx)
     OCSP_BASICRESP_free(basic);
     OCSP_RESPONSE_free(ocsp);
 
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp response, %s, %uz",
                    OCSP_cert_status_str(ctx->status), len);
 
@@ -1506,7 +1506,7 @@ ngx_encode_base64(ngx_str_t *dst, ngx_str_t *src)
 static void
 ngx_ssl_ocsp_next(ngx_ssl_ocsp_ctx_t *ctx)
 {
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp next");
 
     if (++ctx->naddr >= ctx->naddrs) {
@@ -1584,7 +1584,7 @@ ngx_ssl_ocsp_parse_status_line(ngx_ssl_ocsp_ctx_t *ctx)
         sw_almost_done
     } state;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp process status line");
 
     state = ctx->state;
@@ -1772,7 +1772,7 @@ ngx_ssl_ocsp_process_headers(ngx_ssl_ocsp_ctx_t *ctx)
     size_t     len;
     ngx_int_t  rc;
 
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp process headers");
 
     for ( ;; ) {
@@ -2030,7 +2030,7 @@ header_done:
 static ngx_int_t
 ngx_ssl_ocsp_process_body(ngx_ssl_ocsp_ctx_t *ctx)
 {
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ctx->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, ctx->log, 0,
                    "ssl ocsp process body");
 
     if (ctx->done) {

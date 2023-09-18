@@ -15,7 +15,7 @@ void ngx_event_process_posted(ngx_cycle_t *cycle, ngx_queue_t *posted) {
     while (!ngx_queue_empty(posted)) {
         q = ngx_queue_head(posted);
         ev = ngx_queue_data(q, ngx_event_t, queue);
-        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "posted event %p", ev);
+        ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "posted event %p", ev);
         ngx_delete_posted_event(ev);
         ev->handler(ev);
     }
@@ -29,7 +29,7 @@ void ngx_event_move_posted_next(ngx_cycle_t *cycle) {
          q != ngx_queue_sentinel(&ngx_posted_next_events);
          q = ngx_queue_next(q)) {
         ev = ngx_queue_data(q, ngx_event_t, queue);
-        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "posted next event %p", ev);
+        ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "posted next event %p", ev);
         ev->ready = 1;
         ev->available = -1;
     }

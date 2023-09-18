@@ -173,7 +173,7 @@ ngx_stream_upstream_free_round_robin_peer(ngx_peer_connection_t *pc, void *data,
     time_t                          now;
     ngx_stream_upstream_rr_peer_t  *peer;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_STREAM, pc->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, pc->log, 0,
                    "free rr peer %ui %ui", pc->tries, state);
 
     peer = rrp->current;
@@ -207,7 +207,7 @@ ngx_stream_upstream_free_round_robin_peer(ngx_peer_connection_t *pc, void *data,
             }
         }
 
-        ngx_log_debug2(NGX_LOG_DEBUG_STREAM, pc->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, pc->log, 0,
                        "free rr peer failed: %p %i",
                        peer, peer->effective_weight);
 
@@ -322,7 +322,7 @@ ngx_stream_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
     ngx_stream_upstream_rr_peer_t   *peer;
     ngx_stream_upstream_rr_peers_t  *peers;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, pc->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, pc->log, 0,
                    "get rr peer, try: %ui", pc->tries);
 
     pc->connection = NULL;
@@ -353,7 +353,7 @@ ngx_stream_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
             goto failed;
         }
 
-        ngx_log_debug2(NGX_LOG_DEBUG_STREAM, pc->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, pc->log, 0,
                        "get rr peer, current: %p %i",
                        peer, peer->current_weight);
     }
@@ -372,7 +372,7 @@ failed:
 
     if (peers->next) {
 
-        ngx_log_debug0(NGX_LOG_DEBUG_STREAM, pc->log, 0, "backup servers");
+        ngx_log_error(NGX_LOG_STDERR, pc->log, 0, "backup servers");
 
         rrp->peers = peers->next;
 
@@ -751,7 +751,7 @@ ngx_stream_upstream_set_round_robin_peer_session(ngx_peer_connection_t *pc,
 
         rc = ngx_ssl_set_session(pc->connection, ssl_session);
 
-        ngx_log_debug1(NGX_LOG_DEBUG_STREAM, pc->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, pc->log, 0,
                        "set session: %p", ssl_session);
 
         ngx_ssl_free_session(ssl_session);
@@ -764,7 +764,7 @@ ngx_stream_upstream_set_round_robin_peer_session(ngx_peer_connection_t *pc,
 
     rc = ngx_ssl_set_session(pc->connection, ssl_session);
 
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, pc->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, pc->log, 0,
                    "set session: %p", ssl_session);
 
     return rc;
@@ -797,7 +797,7 @@ ngx_stream_upstream_save_round_robin_peer_session(ngx_peer_connection_t *pc,
             return;
         }
 
-        ngx_log_debug1(NGX_LOG_DEBUG_STREAM, pc->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, pc->log, 0,
                        "save session: %p", ssl_session);
 
         len = i2d_SSL_SESSION(ssl_session, NULL);
@@ -853,7 +853,7 @@ ngx_stream_upstream_save_round_robin_peer_session(ngx_peer_connection_t *pc,
         return;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, pc->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, pc->log, 0,
                    "save session: %p", ssl_session);
 
     peer = rrp->current;
@@ -863,7 +863,7 @@ ngx_stream_upstream_save_round_robin_peer_session(ngx_peer_connection_t *pc,
 
     if (old_ssl_session) {
 
-        ngx_log_debug1(NGX_LOG_DEBUG_STREAM, pc->log, 0,
+        ngx_log_error(NGX_LOG_STDERR, pc->log, 0,
                        "old session: %p", old_ssl_session);
 
         /* TODO: may block */

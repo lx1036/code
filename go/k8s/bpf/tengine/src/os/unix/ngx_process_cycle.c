@@ -66,8 +66,11 @@ void ngx_single_process_cycle(ngx_cycle_t *cycle) {
     //     exit(2);
     // }
 
+    /*
+    ngx_event_core_module.ngx_event_process_init()
+    */
     for (i = 0; cycle->modules[i]; i++) {
-        if (cycle->modules[i]->init_process) { // ngx_event_core_module.ngx_event_process_init()
+        if (cycle->modules[i]->init_process) {
             if (cycle->modules[i]->init_process(cycle) == NGX_ERROR) {
                 /* fatal */
                 exit(2);
@@ -78,6 +81,7 @@ void ngx_single_process_cycle(ngx_cycle_t *cycle) {
     for ( ;; ) {
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
         ngx_process_events_and_timers(cycle);
+        
         if (ngx_terminate || ngx_quit) {
             for (i = 0; cycle->modules[i]; i++) {
                 if (cycle->modules[i]->exit_process) {
@@ -176,7 +180,7 @@ void ngx_master_process_cycle(ngx_cycle_t *cycle) {
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "sigsuspend");
         sigsuspend(&set);
         ngx_time_update();
-        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "wake up, sigio %i", sigio);
+        ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "wake up, sigio %i", sigio);
     }
 }
 
@@ -268,7 +272,7 @@ static void ngx_channel_handler(ngx_event_t *ev) {
 
     for ( ;; ) {
         n = ngx_read_channel(c->fd, &ch, sizeof(ngx_channel_t), ev->log);
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0, "channel: %i", n);
+        ngx_log_error(NGX_LOG_STDERR, ev->log, 0, "channel: %i", n);
         if (n == NGX_ERROR) {
             if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
 #if (NGX_HTTP_SSL && NGX_SSL_ASYNC)

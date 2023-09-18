@@ -493,16 +493,6 @@ old_shm_zone_done:
                           ngx_close_socket_n " listening socket on %V failed",
                           &ls[i].addr_text);
         }
-#if (NGX_HAVE_UNIX_DOMAIN)
-        if (ls[i].sockaddr->sa_family == AF_UNIX) {
-            u_char  *name;
-            name = ls[i].addr_text.data + sizeof("unix:") - 1;
-            ngx_log_error(NGX_LOG_WARN, cycle->log, 0, "deleting socket %s", name);
-            if (ngx_delete_file(name) == NGX_FILE_ERROR) {
-                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno, ngx_delete_file_n " %s failed", name);
-            }
-        }
-#endif
     }
 
 #if (T_PIPES)
@@ -734,7 +724,7 @@ static void ngx_clean_old_cycles(ngx_event_t *ev) {
         for (n = 0; n < cycle[i]->connection_n; n++) {
             if (cycle[i]->connections[n].fd != (ngx_socket_t) -1) {
                 found = 1;
-                ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "live fd:%ui", n);
+                ngx_log_error(NGX_LOG_STDERR, log, 0, "live fd:%ui", n);
                 break;
             }
         }
@@ -744,12 +734,12 @@ static void ngx_clean_old_cycles(ngx_event_t *ev) {
             continue;
         }
 
-        ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "clean old cycle: %ui", i);
+        ngx_log_error(NGX_LOG_STDERR, log, 0, "clean old cycle: %ui", i);
         ngx_destroy_pool(cycle[i]->pool);
         cycle[i] = NULL;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "old cycles status: %ui", live);
+    ngx_log_error(NGX_LOG_STDERR, log, 0, "old cycles status: %ui", live);
     if (live) {
         ngx_add_timer(ev, 30000);
     } else {

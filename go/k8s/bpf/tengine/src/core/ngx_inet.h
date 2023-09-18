@@ -35,12 +35,6 @@
 typedef union {
     struct sockaddr           sockaddr;
     struct sockaddr_in        sockaddr_in;
-#if (NGX_HAVE_INET6)
-    struct sockaddr_in6       sockaddr_in6;
-#endif
-#if (NGX_HAVE_UNIX_DOMAIN)
-    struct sockaddr_un        sockaddr_un;
-#endif
 } ngx_sockaddr_t;
 
 
@@ -112,17 +106,14 @@ typedef struct {
 
 
 in_addr_t ngx_inet_addr(u_char *text, size_t len);
-#if (NGX_HAVE_INET6)
-ngx_int_t ngx_inet6_addr(u_char *p, size_t len, u_char *addr);
-size_t ngx_inet6_ntop(u_char *p, u_char *text, size_t len);
-#endif
+u_char * ngx_inet_get_addr(struct sockaddr *sa, u_char *text);
 size_t ngx_sock_ntop(struct sockaddr *sa, socklen_t socklen, u_char *text,
     size_t len, ngx_uint_t port);
 size_t ngx_inet_ntop(int family, void *addr, u_char *text, size_t len);
 ngx_int_t ngx_ptocidr(ngx_str_t *text, ngx_cidr_t *cidr);
 ngx_int_t ngx_cidr_match(struct sockaddr *sa, ngx_array_t *cidrs);
 ngx_int_t ngx_parse_addr(ngx_pool_t *pool, ngx_addr_t *addr, u_char *text,
-    size_t len);
+    size_t len);    
 ngx_int_t ngx_parse_addr_port(ngx_pool_t *pool, ngx_addr_t *addr,
     u_char *text, size_t len);
 ngx_int_t ngx_parse_url(ngx_pool_t *pool, ngx_url_t *u);

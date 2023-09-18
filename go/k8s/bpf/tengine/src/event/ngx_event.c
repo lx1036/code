@@ -381,7 +381,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 
     ngx_connection_counter = (ngx_atomic_t *) (shared + 1 * cl);
     (void) ngx_atomic_cmp_set(ngx_connection_counter, 0, 1);
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+    ngx_log_error(NGX_LOG_STDERR, cycle->log, 0,
                    "counter: %p, %uA",
                    ngx_connection_counter, *ngx_connection_counter);
 
@@ -412,7 +412,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 
 static void ngx_timer_signal_handler(int signo) {
     ngx_event_timer_alarm = 1;
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ngx_cycle->log, 0, "timer signal");
+    ngx_log_error(NGX_LOG_STDERR, ngx_cycle->log, 0, "timer signal");
 }
 
 /*
@@ -441,6 +441,7 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
     ngx_queue_init(&ngx_posted_accept_events);
     ngx_queue_init(&ngx_posted_next_events);
     ngx_queue_init(&ngx_posted_events);
+    // ngx_rbtree_init() 使用红黑树
     if (ngx_event_timer_init(cycle->log) == NGX_ERROR) {
         return NGX_ERROR;
     }
@@ -455,6 +456,7 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
         }
         /*
         这里在 mac 会调用 ngx_kqueue_module_ctx.ngx_kqueue_init(), linux 调用 ngx_epoll_init()
+        在这里选定 epoll_init() 来 epoll
         */
         module = cycle->modules[m]->ctx; // kqueue module 里的 actions
         if (module->actions.init(cycle, ngx_timer_resolution) != NGX_OK) {
@@ -522,8 +524,7 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
         rev[i].instance = 1;
     }
 
-    cycle->write_events = ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n,
-                                    cycle->log);
+    cycle->write_events = ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n, cycle->log);
     if (cycle->write_events == NULL) {
         return NGX_ERROR;
     }
@@ -585,11 +586,10 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
                 old->fd = (ngx_socket_t) -1;
             }
         }
-
+        // 这里重要逻辑 ngx_event_accept/ngx_event_recvmsg，根据 conf 里的 listen tcp(http)/udp 配置选择对应 handler 函数!!!
         rev->handler = (c->type == SOCK_STREAM) ? ngx_event_accept : ngx_event_recvmsg;
 
 #if (NGX_HAVE_REUSEPORT)
-
         if (ls[i].reuseport) {
             if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
                 return NGX_ERROR;
@@ -597,7 +597,6 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
 
             continue;
         }
-
 #endif
 
         if (ngx_use_accept_mutex) {
@@ -621,7 +620,10 @@ static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle) {
         }
 
 #endif
-
+        /*
+        linux 里调用 epoll_ctl(), 注册epoll事件
+        epoll_ctl(epfd, EPOLL_CTL_ADD, connfd, &ev)
+        */
         if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
             return NGX_ERROR;
         }
@@ -678,9 +680,10 @@ void ngx_process_events_and_timers(ngx_cycle_t *cycle) {
     /* 当拿到锁，flags=NGX_POST_EVENTS 的时候，不会直接处理事件 */
     /* 将accept事件放到 ngx_posted_accept_events，read 事件放到ngx_posted_events队列 */
     /* 当没有拿到锁，则处理的全部是read事件，直接进行回调函数处理 */
-    (void) ngx_process_events(cycle, timer, flags); // -> ngx_kqueue_process_events()
+    // ngx_epoll_process_events() 调用 epoll_wait() 会阻塞等待!!!
+    (void) ngx_process_events(cycle, timer, flags); // -> ngx_kqueue_process_events(),ngx_epoll_process_events()
     delta = ngx_current_msec - delta;
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "timer delta: %M", delta);
+    ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "timer delta: %M", delta);
     /**
 	 * 1. ngx_posted_accept_events是一个事件队列，暂存epoll从监听套接口wait到的accept事件
 	 * 2. 这个方法是循环处理 accept 事件列队上的 accept 事件
@@ -887,7 +890,7 @@ ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static ngx_int_t
 ngx_event_dummy_accept_filter(ngx_connection_t *c)
 {
-    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, 0, "event dummy accept filter");
+    ngx_log_error(NGX_LOG_STDERR, c->log, 0, "event dummy accept filter");
     return NGX_OK;
 }
 #endif
@@ -960,42 +963,29 @@ ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags)
 }
 
 
-ngx_int_t
-ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
-{
+ngx_int_t ngx_handle_write_event(ngx_event_t *wev, size_t lowat) {
     ngx_connection_t  *c;
 
     if (lowat) {
         c = wev->data;
-
         if (ngx_send_lowat(c, lowat) == NGX_ERROR) {
             return NGX_ERROR;
         }
     }
 
     if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
-
         /* kqueue, epoll */
-
         if (!wev->active && !wev->ready) {
-            if (ngx_add_event(wev, NGX_WRITE_EVENT,
-                              NGX_CLEAR_EVENT | (lowat ? NGX_LOWAT_EVENT : 0))
-                == NGX_ERROR)
-            {
+            if (ngx_add_event(wev, NGX_WRITE_EVENT, NGX_CLEAR_EVENT | (lowat ? NGX_LOWAT_EVENT : 0)) == NGX_ERROR) {
                 return NGX_ERROR;
             }
         }
 
         return NGX_OK;
-
     } else if (ngx_event_flags & NGX_USE_LEVEL_EVENT) {
-
         /* select, poll, /dev/poll */
-
         if (!wev->active && !wev->ready) {
-            if (ngx_add_event(wev, NGX_WRITE_EVENT, NGX_LEVEL_EVENT)
-                == NGX_ERROR)
-            {
+            if (ngx_add_event(wev, NGX_WRITE_EVENT, NGX_LEVEL_EVENT) == NGX_ERROR) {
                 return NGX_ERROR;
             }
 
@@ -1003,9 +993,7 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
         }
 
         if (wev->active && wev->ready) {
-            if (ngx_del_event(wev, NGX_WRITE_EVENT, NGX_LEVEL_EVENT)
-                == NGX_ERROR)
-            {
+            if (ngx_del_event(wev, NGX_WRITE_EVENT, NGX_LEVEL_EVENT) == NGX_ERROR) {
                 return NGX_ERROR;
             }
 
@@ -1013,9 +1001,7 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
         }
 
     } else if (ngx_event_flags & NGX_USE_EVENTPORT_EVENT) {
-
         /* event ports */
-
         if (!wev->active && !wev->ready) {
             if (ngx_add_event(wev, NGX_WRITE_EVENT, 0) == NGX_ERROR) {
                 return NGX_ERROR;
@@ -1034,7 +1020,6 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
     }
 
     /* iocp */
-
     return NGX_OK;
 }
 
