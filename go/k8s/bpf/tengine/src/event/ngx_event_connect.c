@@ -11,7 +11,7 @@ static ngx_int_t ngx_event_connect_set_transparent(ngx_peer_connection_t *pc,
 #endif
 
 
-
+// connect() 函数就是发送/接收三次握手报文
 // bind(可能非本地 ip) -> connect(local_socket, upstream_addr)
 ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc) {
     int                rc, type, value;

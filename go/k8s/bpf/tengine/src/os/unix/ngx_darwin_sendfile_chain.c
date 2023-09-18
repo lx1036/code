@@ -5,26 +5,8 @@
 #include <ngx_event.h>
 
 
-/*
- * It seems that Darwin 9.4 (Mac OS X 1.5) sendfile() has the same
- * old bug as early FreeBSD sendfile() syscall:
- * http://bugs.freebsd.org/33771
- *
- * Besides sendfile() has another bug: if one calls sendfile()
- * with both a header and a trailer, then sendfile() ignores a file part
- * at all and sends only the header and the trailer together.
- * For this reason we send a trailer only if there is no a header.
- *
- * Although sendfile() allows to pass a header or a trailer,
- * it may send the header or the trailer and a part of the file
- * in different packets.  And FreeBSD workaround (TCP_NOPUSH option)
- * does not help.
- */
 
-
-ngx_chain_t *
-ngx_darwin_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
-{
+ngx_chain_t * ngx_darwin_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit) {
     int              rc;
     off_t            send, prev_send, sent;
     off_t            file_size;

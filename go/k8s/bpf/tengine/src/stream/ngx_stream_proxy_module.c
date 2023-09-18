@@ -527,7 +527,7 @@ static void ngx_stream_proxy_connect(ngx_stream_session_t *s) {
     u->state->connect_time = (ngx_msec_t) -1;
     u->state->first_byte_time = (ngx_msec_t) -1;
     u->state->response_time = (ngx_msec_t) -1;
-
+    // 重要: 这里 connect() upstream，connect() 建立连接!!!
     rc = ngx_event_connect_peer(&u->peer);
     ngx_log_error(NGX_LOG_STDERR, c->log, 0, "proxy connect: %i", rc);
     if (rc == NGX_ERROR) {
@@ -535,7 +535,7 @@ static void ngx_stream_proxy_connect(ngx_stream_session_t *s) {
         return;
     }
 
-    u->state->peer = u->peer.name;
+    u->state->peer = u->peer.name; // "127.0.0.1:12345"
     if (rc == NGX_BUSY) {
         ngx_log_error(NGX_LOG_ERR, c->log, 0, "no live upstreams");
         ngx_stream_proxy_finalize(s, NGX_STREAM_BAD_GATEWAY);
@@ -621,9 +621,7 @@ static ngx_int_t ngx_stream_proxy_test_connect(ngx_connection_t *c) {
     return NGX_OK;
 }
 
-static void
-ngx_stream_proxy_init_upstream(ngx_stream_session_t *s)
-{
+static void ngx_stream_proxy_init_upstream(ngx_stream_session_t *s) {
     u_char                       *p;
     ngx_chain_t                  *cl;
     ngx_connection_t             *c, *pc;
@@ -840,7 +838,7 @@ static void ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_up
         if (do_write && dst) {
             if (*out || *busy || dst->buffered) {
                 c->log->action = send_action;
-                // 在 ngx_stream_write_filter_module.c 里初始化
+                // 重要: 在 ngx_stream_write_filter_module.c 里初始化, 作用: nginx listen server -> upstream 发报文!!!
                 rc = ngx_stream_top_filter(s, *out, from_upstream);
                 if (rc == NGX_ERROR) {
                     ngx_stream_proxy_finalize(s, NGX_STREAM_OK);
