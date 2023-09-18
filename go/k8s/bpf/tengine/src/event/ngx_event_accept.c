@@ -256,7 +256,7 @@ void ngx_event_accept(ngx_event_t *ev) {
         c->listening = ls;
         c->local_sockaddr = ls->sockaddr;
         c->local_socklen = ls->socklen;
-        rev = c->read;
+        rev = c->read; // read event 没有设置 rev->ready=1
         wev = c->write;
         wev->ready = 1;
         if (ngx_event_flags & NGX_USE_IOCP_EVENT) {

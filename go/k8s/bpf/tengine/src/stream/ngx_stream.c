@@ -566,6 +566,7 @@ static ngx_int_t ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
 #if (NGX_STREAM_SSL)
         addrs[i].conf.ssl = addr[i].opt.ssl;
 #endif
+        // 这里初始化 proxy_protocol 配置
         addrs[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
         addrs[i].conf.addr_text = addr[i].opt.addr_text;
 
@@ -653,14 +654,14 @@ static void ngx_stream_proxy_protocol_handler(ngx_event_t *rev) {
         ngx_del_timer(rev);
     }
 
-    p = ngx_proxy_protocol_read(c, buf, buf + n);
+    p = ngx_proxy_protocol_read(c, buf, buf + n); // buf: "PROXY TCP4 127.0.0.1 127.0.0.1 12345 5003\r\nhello world"
     if (p == NULL) {
         ngx_stream_finalize_session(s, NGX_STREAM_BAD_REQUEST);
         return;
     }
 
     size = p - buf;
-    if (c->recv(c, buf, size) != (ssize_t) size) {
+    if (c->recv(c, buf, size) != (ssize_t) size) { // recv -> ngx_recv.c::ngx_unix_recv()
         ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
         return;
     }
@@ -758,7 +759,7 @@ void ngx_stream_init_connection(ngx_connection_t *c) {
     ngx_set_connection_log(c, cscf->error_log);
     len = ngx_sock_ntop(c->sockaddr, c->socklen, text, NGX_SOCKADDR_STRLEN, 1);
     ngx_log_error(NGX_LOG_STDERR, c->log, 0, "*%uA %sclient %*s connected to %V",
-                  c->number, c->type == SOCK_DGRAM ? "udp " : "",
+                  c->number, c->type == SOCK_DGRAM ? "udp " : "tcp",
                   len, text, &addr_conf->addr_text);
 
     c->log->connection = c->number;
@@ -1389,10 +1390,8 @@ static ngx_int_t ngx_stream_variable_remote_port(ngx_stream_session_t *s,
     return NGX_OK;
 }
 
-static ngx_int_t
-ngx_stream_variable_proxy_protocol_addr(ngx_stream_session_t *s,
-    ngx_stream_variable_value_t *v, uintptr_t data)
-{
+// https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol/#configuring-nginx-to-accept-the-proxy-protocol
+static ngx_int_t ngx_stream_variable_proxy_protocol_addr(ngx_stream_session_t *s, ngx_stream_variable_value_t *v, uintptr_t data) {
     ngx_str_t             *addr;
     ngx_proxy_protocol_t  *pp;
 
@@ -1403,7 +1402,6 @@ ngx_stream_variable_proxy_protocol_addr(ngx_stream_session_t *s,
     }
 
     addr = (ngx_str_t *) ((char *) pp + data);
-
     v->len = addr->len;
     v->valid = 1;
     v->no_cacheable = 0;
@@ -1412,12 +1410,7 @@ ngx_stream_variable_proxy_protocol_addr(ngx_stream_session_t *s,
 
     return NGX_OK;
 }
-
-
-static ngx_int_t
-ngx_stream_variable_proxy_protocol_port(ngx_stream_session_t *s,
-    ngx_stream_variable_value_t *v, uintptr_t data)
-{
+static ngx_int_t ngx_stream_variable_proxy_protocol_port(ngx_stream_session_t *s, ngx_stream_variable_value_t *v, uintptr_t data) {
     ngx_uint_t             port;
     ngx_proxy_protocol_t  *pp;
 
@@ -1431,14 +1424,12 @@ ngx_stream_variable_proxy_protocol_port(ngx_stream_session_t *s,
     v->valid = 1;
     v->no_cacheable = 0;
     v->not_found = 0;
-
     v->data = ngx_pnalloc(s->connection->pool, sizeof("65535") - 1);
     if (v->data == NULL) {
         return NGX_ERROR;
     }
 
     port = *(in_port_t *) ((char *) pp + data);
-
     if (port > 0 && port < 65536) {
         v->len = ngx_sprintf(v->data, "%ui", port) - v->data;
     }
@@ -2000,7 +1991,6 @@ static char * ngx_stream_core_server(ngx_conf_t *cf, ngx_command_t *cmd, void *c
 
     return rv;
 }
-
 static char * ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     ngx_stream_core_srv_conf_t  *cscf = conf;
     ngx_str_t                    *value, size;
@@ -2272,10 +2262,7 @@ static char * ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *c
 
     for (n = 0; n < u.naddrs; n++) {
         for (i = 0; i < n; i++) {
-            if (ngx_cmp_sockaddr(u.addrs[n].sockaddr, u.addrs[n].socklen,
-                                 u.addrs[i].sockaddr, u.addrs[i].socklen, 1)
-                == NGX_OK)
-            {
+            if (ngx_cmp_sockaddr(u.addrs[n].sockaddr, u.addrs[n].socklen, u.addrs[i].sockaddr, u.addrs[i].socklen, 1) == NGX_OK) {
                 goto next;
             }
         }
@@ -2285,9 +2272,7 @@ static char * ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *c
             if (nls == NULL) {
                 return NGX_CONF_ERROR;
             }
-
             *nls = *ls;
-
         } else {
             nls = ls;
         }
@@ -2307,16 +2292,11 @@ static char * ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *c
                 continue;
             }
 
-            if (ngx_cmp_sockaddr(als[i].sockaddr, als[i].socklen,
-                                 nls->sockaddr, nls->socklen, 1)
-                != NGX_OK)
-            {
+            if (ngx_cmp_sockaddr(als[i].sockaddr, als[i].socklen, nls->sockaddr, nls->socklen, 1) != NGX_OK) {
                 continue;
             }
 
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "duplicate \"%V\" address and port pair",
-                               &nls->addr_text);
+            ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "duplicate \"%V\" address and port pair", &nls->addr_text);
             return NGX_CONF_ERROR;
         }
 

@@ -568,6 +568,7 @@ ngx_int_t ngx_open_listening_sockets(ngx_cycle_t *cycle) {
                 ls[i].fd = s;
                 continue;
             }
+            // udp 没有 listen()
             if (listen(s, ls[i].backlog) == -1) {
                 err = ngx_socket_errno;
                 if (err != NGX_EADDRINUSE || !ngx_test_config) {
@@ -749,7 +750,7 @@ void ngx_close_listening_sockets(ngx_cycle_t *cycle) {
 
     cycle->listening.nelts = 0;
 }
-
+// 获取本地服务端 ip:port
 ngx_int_t ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s, ngx_uint_t port) {
     socklen_t             len;
     ngx_uint_t            addr;

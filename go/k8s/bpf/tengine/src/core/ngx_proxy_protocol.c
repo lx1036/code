@@ -230,9 +230,7 @@ ngx_proxy_protocol_lookup_tlv(ngx_connection_t *c, ngx_str_t *tlvs,
     return NGX_DECLINED;
 }
 
-u_char *
-ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
-{
+u_char * ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last) {
     size_t                 len;
     u_char                *p;
     ngx_proxy_protocol_t  *pp;
@@ -241,55 +239,41 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
 
     p = buf; // 指针拷贝，修改 p 不影响 buf: "PROXY TCP4 127.0.0.1 127.0.0.1 56935 12345"
     len = last - buf;
-
-    if (len >= sizeof(ngx_proxy_protocol_header_t)
-        && ngx_memcmp(p, signature, sizeof(signature) - 1) == 0)
-    {
+    if (len >= sizeof(ngx_proxy_protocol_header_t) && ngx_memcmp(p, signature, sizeof(signature) - 1) == 0) {
         return ngx_proxy_protocol_v2_read(c, buf, last);
     }
 
     if (len < 8 || ngx_strncmp(p, "PROXY ", 6) != 0) {
         goto invalid;
     }
-
     p += 6;
     len -= 6;
-
     if (len >= 7 && ngx_strncmp(p, "UNKNOWN", 7) == 0) {
-        ngx_log_debug0(NGX_LOG_DEBUG_CORE, c->log, 0,
-                       "PROXY protocol unknown protocol");
+        ngx_log_error(NGX_LOG_STDERR, c->log, 0, "PROXY protocol unknown protocol");
         p += 7;
         goto skip;
     }
-
-    if (len < 5 || ngx_strncmp(p, "TCP", 3) != 0
-        || (p[3] != '4' && p[3] != '6') || p[4] != ' ')
-    {
+    if (len < 5 || ngx_strncmp(p, "TCP", 3) != 0 || (p[3] != '4' && p[3] != '6') || p[4] != ' ') {
         goto invalid;
     }
 
     p += 5;
-
     pp = ngx_pcalloc(c->pool, sizeof(ngx_proxy_protocol_t));
     if (pp == NULL) {
         return NULL;
     }
-
     p = ngx_proxy_protocol_read_addr(c, p, last, &pp->src_addr); // 因为可能是 ipv4/ipv6 地址，所以只能这么取值
     if (p == NULL) {
         goto invalid;
     }
-
     p = ngx_proxy_protocol_read_addr(c, p, last, &pp->dst_addr);
     if (p == NULL) {
         goto invalid;
     }
-
     p = ngx_proxy_protocol_read_port(p, last, &pp->src_port, ' ');
     if (p == NULL) {
         goto invalid;
     }
-
     p = ngx_proxy_protocol_read_port(p, last, &pp->dst_port, CR);
     if (p == NULL) {
         goto invalid;
@@ -298,15 +282,11 @@ ngx_proxy_protocol_read(ngx_connection_t *c, u_char *buf, u_char *last)
     if (p == last) {
         goto invalid;
     }
-
     if (*p++ != LF) {
         goto invalid;
     }
 
-    ngx_log_debug4(NGX_LOG_DEBUG_CORE, c->log, 0,
-                   "PROXY protocol src: %V %d, dst: %V %d",
-                   &pp->src_addr, pp->src_port, &pp->dst_addr, pp->dst_port);
-
+    ngx_log_error(NGX_LOG_ERR, c->log, 0, "PROXY protocol src: %V %d, dst: %V %d", &pp->src_addr, pp->src_port, &pp->dst_addr, pp->dst_port);
     c->proxy_protocol = pp;
 
     return p;
@@ -327,8 +307,7 @@ invalid:
         }
     }
 
-    ngx_log_error(NGX_LOG_ERR, c->log, 0,
-                  "broken header: \"%*s\"", (size_t) (p - buf), buf);
+    ngx_log_error(NGX_LOG_ERR, c->log, 0, "broken header: \"%*s\"", (size_t) (p - buf), buf);
 
     return NULL;
 }
@@ -402,6 +381,7 @@ static u_char * ngx_proxy_protocol_read_port(u_char *p, u_char *last, in_port_t 
     return p;
 }
 
+// 写 "PROXY TCP4 127.0.0.1 127.0.0.1 12345 5003\r\n"
 u_char * ngx_proxy_protocol_write(ngx_connection_t *c, u_char *buf, u_char *last, ngx_uint_t version) {
     ngx_uint_t  port, lport;
     if (version == 2) {
@@ -422,8 +402,7 @@ u_char * ngx_proxy_protocol_write(ngx_connection_t *c, u_char *buf, u_char *last
         buf = ngx_cpymem(buf, "PROXY TCP4 ", sizeof("PROXY TCP4 ") - 1);
         break;
     default:
-        return ngx_cpymem(buf, "PROXY UNKNOWN" CRLF,
-                          sizeof("PROXY UNKNOWN" CRLF) - 1);
+        return ngx_cpymem(buf, "PROXY UNKNOWN" CRLF, sizeof("PROXY UNKNOWN" CRLF) - 1);
     }
 
     buf += ngx_sock_ntop(c->sockaddr, c->socklen, buf, last - buf, 0);
@@ -438,8 +417,7 @@ u_char * ngx_proxy_protocol_write(ngx_connection_t *c, u_char *buf, u_char *last
 // ./configure --prefix=./bin --with-stream --with-debug --add-module=./modules/ngx_http_echo_module/ && make && make install
 // ./bin/sbin/nginx -c conf/proxy-pass-module.conf  -p .
 // https://github.com/dedok/nginx-stream-proxy-protocol-v2/blob/main/stream-proxy-protocol-v2-release-1.19.8.patch
-u_char *
-ngx_proxy_protocol_v2_write(ngx_connection_t *c, u_char *buf, u_char *last) {
+u_char * ngx_proxy_protocol_v2_write(ngx_connection_t *c, u_char *buf, u_char *last) {
     size_t                          len = 0;
     struct sockaddr                 *src, *dst;
     ngx_proxy_protocol_v2_t         *header;
