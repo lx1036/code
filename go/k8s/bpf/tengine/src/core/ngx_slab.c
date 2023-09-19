@@ -158,7 +158,19 @@ void ngx_slab_init(ngx_slab_pool_t *pool) {
     pool->log_ctx = &pool->zero;
     pool->zero = '\0';
 }
+void *
+ngx_slab_alloc(ngx_slab_pool_t *pool, size_t size)
+{
+    void  *p;
 
+    ngx_shmtx_lock(&pool->mutex);
+
+    p = ngx_slab_alloc_locked(pool, size);
+
+    ngx_shmtx_unlock(&pool->mutex);
+
+    return p;
+}
 void
 ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 {

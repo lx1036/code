@@ -153,6 +153,8 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/stream/ngx_stream_script.o \
 	objs/src/stream/ngx_stream_upstream_round_robin.o \
 	objs/src/stream/ngx_stream_upstream.o \
+	objs/src/stream/ngx_stream_ssl_module.o \
+	objs/src/stream/ngx_stream_ssl_preread_module.o \
 
 	$(LINK) -o objs/nginx \
 	objs/src/core/nginx.o \
@@ -219,6 +221,8 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/stream/ngx_stream_script.o \
 	objs/src/stream/ngx_stream_upstream_round_robin.o \
 	objs/src/stream/ngx_stream_upstream.o \
+	objs/src/stream/ngx_stream_ssl_module.o \
+	objs/src/stream/ngx_stream_ssl_preread_module.o \
 	-L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -Wl,-u,_pcre_version -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -L/usr/local/Cellar/pcre/8.45/lib -lpcre -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -lpcre2-8 -lssl -lcrypto -lz
 
 
@@ -709,6 +713,18 @@ objs/src/stream/ngx_stream_upstream.o:	$(CORE_DEPS) $(STREAM_DEPS) \
 	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
 		-o objs/src/stream/ngx_stream_upstream.o \
 		src/stream/ngx_stream_upstream.c
+
+objs/src/stream/ngx_stream_ssl_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+	src/stream/ngx_stream_ssl_module.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+		-o objs/src/stream/ngx_stream_ssl_module.o \
+		src/stream/ngx_stream_ssl_module.c
+
+objs/src/stream/ngx_stream_ssl_preread_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+	src/stream/ngx_stream_ssl_preread_module.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+		-o objs/src/stream/ngx_stream_ssl_preread_module.o \
+		src/stream/ngx_stream_ssl_preread_module.c
 
 ################################################################
 run:

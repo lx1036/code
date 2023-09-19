@@ -939,4 +939,77 @@ void ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user) {
     (void) ngx_log_redirect_stderr(cycle);
 }
 
+ngx_shm_zone_t *
+ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
+{
+    ngx_uint_t        i;
+    ngx_shm_zone_t   *shm_zone;
+    ngx_list_part_t  *part;
+
+    part = &cf->cycle->shared_memory.part;
+    shm_zone = part->elts;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+            part = part->next;
+            shm_zone = part->elts;
+            i = 0;
+        }
+
+        if (name->len != shm_zone[i].shm.name.len) {
+            continue;
+        }
+
+        if (ngx_strncmp(name->data, shm_zone[i].shm.name.data, name->len)
+            != 0)
+        {
+            continue;
+        }
+
+        if (tag != shm_zone[i].tag) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                            "the shared memory zone \"%V\" is "
+                            "already declared for a different use",
+                            &shm_zone[i].shm.name);
+            return NULL;
+        }
+
+        if (shm_zone[i].shm.size == 0) {
+            shm_zone[i].shm.size = size;
+        }
+
+        if (size && size != shm_zone[i].shm.size) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                            "the size %uz of shared memory zone \"%V\" "
+                            "conflicts with already declared size %uz",
+                            size, &shm_zone[i].shm.name, shm_zone[i].shm.size);
+            return NULL;
+        }
+
+        return &shm_zone[i];
+    }
+
+    shm_zone = ngx_list_push(&cf->cycle->shared_memory);
+
+    if (shm_zone == NULL) {
+        return NULL;
+    }
+
+    shm_zone->data = NULL;
+    shm_zone->shm.log = cf->cycle->log;
+    shm_zone->shm.addr = NULL;
+    shm_zone->shm.size = size;
+    shm_zone->shm.name = *name;
+    shm_zone->shm.exists = 0;
+    shm_zone->init = NULL;
+    shm_zone->tag = tag;
+    shm_zone->noreuse = 0;
+
+    return shm_zone;
+}
+
 

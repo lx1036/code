@@ -167,6 +167,10 @@ int main(int argc, char *const *argv) {
         return 1;
     }
 
+#if (NGX_OPENSSL)
+    ngx_ssl_init(log);
+#endif
+
     /*
      * init_cycle->log is required for signal handlers and
      * ngx_process_options()

@@ -296,3 +296,4 @@ char *ngx_conf_set_bitmask_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 
 #endif /* _NGX_CONF_FILE_H_INCLUDED_ */
+ 

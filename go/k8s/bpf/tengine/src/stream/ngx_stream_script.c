@@ -659,6 +659,21 @@ ngx_stream_script_full_name_code(ngx_stream_script_engine_t *e)
     e->ip += sizeof(ngx_stream_script_full_name_code_t);
 }
 
+ngx_uint_t
+ngx_stream_script_variables_count(ngx_str_t *value)
+{
+    ngx_uint_t  i, n;
+
+    for (n = 0, i = 0; i < value->len; i++) {
+        if (value->data[i] == '$') {
+            n++;
+        }
+    }
+
+    return n;
+}
+
+
 
 #if (NGX_PCRE)
 

@@ -27,7 +27,6 @@ static void ngx_stream_proxy_protocol_handler(ngx_event_t *rev);
 static ngx_int_t ngx_stream_write_filter(ngx_stream_session_t *s, ngx_chain_t *in, ngx_uint_t from_upstream);
 static ngx_int_t ngx_stream_write_filter_init(ngx_conf_t *cf);
 
-static ngx_int_t ngx_stream_core_preconfiguration(ngx_conf_t *cf);
 static void *ngx_stream_core_create_main_conf(ngx_conf_t *cf);
 static char *ngx_stream_core_init_main_conf(ngx_conf_t *cf, void *conf);
 static void *ngx_stream_core_create_srv_conf(ngx_conf_t *cf);
@@ -169,7 +168,7 @@ static char * ngx_stream_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
         }
         module = cf->cycle->modules[m]->ctx;
         if (module->preconfiguration) {
-            if (module->preconfiguration(cf) != NGX_OK) { // -> ngx_stream_core_preconfiguration()
+            if (module->preconfiguration(cf) != NGX_OK) { // -> ngx_stream_variables_add_core_vars()
                 return NGX_CONF_ERROR;
             }
         }
@@ -608,6 +607,7 @@ void ngx_stream_session_handler(ngx_event_t *rev) {
 
     ngx_stream_core_run_phases(s);
 }
+// 剥离 proxy-protocol header
 static void ngx_stream_proxy_protocol_handler(ngx_event_t *rev) {
     u_char                      *p, buf[NGX_PROXY_PROTOCOL_MAX_HEADER];
     size_t                       size;
@@ -968,7 +968,7 @@ static ngx_command_t  ngx_stream_core_commands[] = {
       ngx_null_command
 };
 static ngx_stream_module_t  ngx_stream_core_module_ctx = {
-    ngx_stream_core_preconfiguration,      /* preconfiguration */
+    ngx_stream_variables_add_core_vars,    /* preconfiguration */
     NULL,                                  /* postconfiguration */
 
     ngx_stream_core_create_main_conf,      /* create main configuration */
@@ -1197,9 +1197,6 @@ static ngx_stream_variable_t  ngx_stream_core_variables[] = {
 
       ngx_stream_null_variable
 };
-static ngx_int_t ngx_stream_core_preconfiguration(ngx_conf_t *cf) {
-    return ngx_stream_variables_add_core_vars(cf);
-}
 ngx_int_t ngx_stream_variables_add_core_vars(ngx_conf_t *cf) {
     ngx_stream_variable_t        *cv, *v;
     ngx_stream_core_main_conf_t  *cmcf;
@@ -2125,20 +2122,20 @@ static char * ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *c
         }
 
         if (ngx_strcmp(value[i].data, "ssl") == 0) {
-// #if (NGX_STREAM_SSL)
-//             ngx_stream_ssl_conf_t  *sslcf;
-//             sslcf = ngx_stream_conf_get_module_srv_conf(cf, ngx_stream_ssl_module);
-//             sslcf->listen = 1;
-//             sslcf->file = cf->conf_file->file.name.data;
-//             sslcf->line = cf->conf_file->line;
-//             ls->ssl = 1;
-//             continue;
-// #else
-//             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-//                                "the \"ssl\" parameter requires "
-//                                "ngx_stream_ssl_module");
-//             return NGX_CONF_ERROR;
-// #endif
+#if (NGX_STREAM_SSL)
+            ngx_stream_ssl_conf_t  *sslcf;
+            sslcf = ngx_stream_conf_get_module_srv_conf(cf, ngx_stream_ssl_module);
+            sslcf->listen = 1;
+            sslcf->file = cf->conf_file->file.name.data;
+            sslcf->line = cf->conf_file->line;
+            ls->ssl = 1;
+            continue;
+#else
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "the \"ssl\" parameter requires "
+                               "ngx_stream_ssl_module");
+            return NGX_CONF_ERROR;
+#endif
         }
 
         if (ngx_strncmp(value[i].data, "so_keepalive=", 13) == 0) {
