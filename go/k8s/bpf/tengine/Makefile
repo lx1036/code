@@ -119,7 +119,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/event/ngx_event.o \
 	objs/src/event/ngx_event_timer.o \
 	objs/src/event/ngx_event_posted.o \
-	objs/src/event/ngx_event_accept.o \
+	objs/src/event/ngx_event_tcp.o \
 	objs/src/event/ngx_event_udp.o \
 	objs/src/event/modules/ngx_kqueue_module.o \
 	objs/src/event/ngx_event_openssl.o \
@@ -187,7 +187,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/event/ngx_event.o \
 	objs/src/event/ngx_event_timer.o \
 	objs/src/event/ngx_event_posted.o \
-	objs/src/event/ngx_event_accept.o \
+	objs/src/event/ngx_event_tcp.o \
 	objs/src/event/ngx_event_udp.o \
 	objs/src/event/modules/ngx_kqueue_module.o \
 	objs/src/event/ngx_event_openssl.o \
@@ -411,11 +411,11 @@ objs/src/event/ngx_event_posted.o:	$(CORE_DEPS) \
 		src/event/ngx_event_posted.c
 
 
-objs/src/event/ngx_event_accept.o:	$(CORE_DEPS) \
-	src/event/ngx_event_accept.c
+objs/src/event/ngx_event_tcp.o:	$(CORE_DEPS) \
+	src/event/ngx_event_tcp.c
 	$(CC) -c $(CFLAGS) $(CORE_INCS) \
-		-o objs/src/event/ngx_event_accept.o \
-		src/event/ngx_event_accept.c
+		-o objs/src/event/ngx_event_tcp.o \
+		src/event/ngx_event_tcp.c
 
 
 objs/src/event/ngx_event_udp.o:	$(CORE_DEPS) \

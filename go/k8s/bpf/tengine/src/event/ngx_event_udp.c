@@ -21,7 +21,7 @@ static ngx_int_t ngx_insert_udp_connection(ngx_connection_t *c);
 static ngx_connection_t *ngx_lookup_udp_connection(ngx_listening_t *ls,
     struct sockaddr *sockaddr, socklen_t socklen,
     struct sockaddr *local_sockaddr, socklen_t local_socklen);
-
+// udp 报文需要调试这个函数
 // echo "hello" | nc -uw1 localhost 5002
 // 断点调试：`python3 udp_client.py`
 void ngx_event_recvmsg(ngx_event_t *ev) {

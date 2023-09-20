@@ -428,8 +428,7 @@ static char * ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports) {
 
     port = ports->elts;
     for (p = 0; p < ports->nelts; p++) {
-        ngx_sort(port[p].addrs.elts, (size_t) port[p].addrs.nelts,
-                 sizeof(ngx_stream_conf_addr_t), ngx_stream_cmp_conf_addrs);
+        ngx_sort(port[p].addrs.elts, (size_t) port[p].addrs.nelts, sizeof(ngx_stream_conf_addr_t), ngx_stream_cmp_conf_addrs);
         addr = port[p].addrs.elts;
         last = port[p].addrs.nelts;
         /*
@@ -456,7 +455,9 @@ static char * ngx_stream_optimize_servers(ngx_conf_t *cf, ngx_array_t *ports) {
             }
 
             ls->addr_ntop = 1;
-            ls->handler = ngx_stream_init_connection; // 这里注册的 listener 的 handler，ngx_event_accept() 会调用 ls->handler()
+            // 这里注册的 listener 的 handler
+            // ngx_event_tcp.c::ngx_event_accept() 会调用 ls->handler(c), ngx_event_udp.c::ngx_event_recvmsg() 会调用 ls->handler(c)
+            ls->handler = ngx_stream_init_connection;
             ls->pool_size = 256;
             ls->type = addr[i].opt.type;
             cscf = addr->opt.ctx->srv_conf[ngx_stream_core_module.ctx_index];
@@ -543,7 +544,7 @@ static ngx_int_t ngx_stream_cmp_conf_addrs(const void *one, const void *two) {
 
     return 0;
 }
-
+// 添加一些server的配置
 static ngx_int_t ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport, ngx_stream_conf_addr_t *addr){
     ngx_uint_t             i;
     struct sockaddr_in    *sin;
@@ -670,6 +671,7 @@ static void ngx_stream_proxy_protocol_handler(ngx_event_t *rev) {
 
     ngx_stream_session_handler(rev);
 }
+// ngx_stream_session_handler() 处理 read event, 即处理客户端的请求报文
 void ngx_stream_init_connection(ngx_connection_t *c) {
     u_char                        text[NGX_SOCKADDR_STRLEN];
     size_t                        len;
@@ -727,6 +729,25 @@ void ngx_stream_init_connection(ngx_connection_t *c) {
             addr_conf = &addr[0].conf; // "0.0.0.0:5001", "0.0.0.0:5002"
             break;
         }
+    }
+
+    // 这里需要每一个 udp 报文必须加上 pp header
+    // 这里有个奇怪的点: c->buffer 直接就拿到了请求报文数据，而且还会变化，待验证???
+    if (c->type == SOCK_DGRAM && addr_conf->proxy_protocol && c->buffer != NULL) {
+        c->log->action = "reading PROXY protocol for UDP";
+        u_char *buf_pos = c->buffer->pos;
+        u_char *buf_last = c->buffer->last;
+        size_t len = buf_last - buf_pos;
+        u_char *p;
+        p = ngx_proxy_protocol_read(c, buf_pos, buf_last); // p 已经截断 pp header 后的报文
+        if (p == NULL) {
+            ngx_stream_session_t *s;
+            s = c->data;
+            ngx_stream_finalize_session(s, NGX_STREAM_BAD_REQUEST);
+            return;
+        }
+        size_t pp_len = p - buf_pos; // 43="PROXY TCP4 127.0.0.1 127.0.0.1 12345 5006\r\n"
+        c->buffer->pos += pp_len;
     }
 
     s = ngx_pcalloc(c->pool, sizeof(ngx_stream_session_t));
@@ -787,7 +808,7 @@ void ngx_stream_init_connection(ngx_connection_t *c) {
     rev = c->read;
     rev->handler = ngx_stream_session_handler;
 
-    if (addr_conf->proxy_protocol) {
+    if (c->type == SOCK_STREAM && addr_conf->proxy_protocol) {
         c->log->action = "reading PROXY protocol";
         rev->handler = ngx_stream_proxy_protocol_handler;
         if (!rev->ready) {
@@ -2246,9 +2267,9 @@ static char * ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *c
             return "\"so_keepalive\" parameter is incompatible with \"udp\"";
         }
 
-        if (ls->proxy_protocol) {
-            return "\"proxy_protocol\" parameter is incompatible with \"udp\"";
-        }
+        // if (ls->proxy_protocol) {
+        //     return "\"proxy_protocol\" parameter is incompatible with \"udp\"";
+        // }
 
 #if (NGX_HAVE_TCP_FASTOPEN)
         if (ls->fastopen != -1) {
