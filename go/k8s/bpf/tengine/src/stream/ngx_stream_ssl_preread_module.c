@@ -231,7 +231,7 @@ static ngx_int_t ngx_stream_ssl_preread_handler(ngx_stream_session_t *s) {
     if (!sscf->enabled) {
         return NGX_DECLINED;
     }
-
+    // 必须是 TCP!!!但是 UDP 也可以 ssl 的，为何???
     if (c->type != SOCK_STREAM) {
         return NGX_DECLINED;
     }
@@ -287,7 +287,6 @@ static ngx_int_t ngx_stream_ssl_preread_handler(ngx_stream_session_t *s) {
             ngx_stream_set_ctx(s, NULL, ngx_stream_ssl_preread_module);
             return NGX_DECLINED;
         }
-
         if (rc != NGX_AGAIN) {
             return rc;
         }
