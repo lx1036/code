@@ -412,14 +412,14 @@ static ngx_int_t ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     }
 
     ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "kevent timer: %M, changes: %d", timer, n);
-    // kevent() 阻塞等待，等于 epoll_wait()，这个逻辑非常重要!!!
+    // INFO: kevent() 阻塞等待，等于 epoll_wait()，这个逻辑非常重要!!! 有点像 go 里的 case event := <-keventCh
     events = kevent(ngx_kqueue, change_list, n, event_list, (int) nevents, tp);
     err = (events == -1) ? ngx_errno : 0;
     if (flags & NGX_UPDATE_TIME || ngx_event_timer_alarm) {
         ngx_time_update();
     }
 
-    ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "kevent events: %d", events);
+    ngx_log_error(NGX_LOG_STDERR, cycle->log, 0, "kevent events: %d", events); // kevent events: 1
     if (err) {
         if (err == NGX_EINTR) {
             if (ngx_event_timer_alarm) {
@@ -516,9 +516,7 @@ static ngx_int_t ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 #endif
 
         default:
-            ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
-                          "unexpected kevent() filter %d",
-                          event_list[i].filter);
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, 0, "unexpected kevent() filter %d", event_list[i].filter);
             continue;
         }
 
@@ -527,6 +525,7 @@ static ngx_int_t ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
             ngx_post_event(ev, queue);
             continue;
         }
+
         // ->ngx_event_accept()
         ev->handler(ev);
     }
@@ -537,15 +536,16 @@ static ngx_int_t ngx_kqueue_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 static ngx_inline void
 ngx_kqueue_dump_event(ngx_log_t *log, struct kevent *kev)
 {
+    // "kevent: 3: ft:-1 fl:0005 ff:00000000 d:1 ud:00007F8995051000"
     if (kev->ident > 0x8000000 && kev->ident != (unsigned) -1) { // 0x8000000=134217728
-        ngx_log_debug6(NGX_LOG_DEBUG_EVENT, log, 0,
+        ngx_log_error(NGX_LOG_DEBUG_EVENT, log, 0,
                        "kevent: %p: ft:%d fl:%04Xd ff:%08Xd d:%d ud:%p",
                        (void *) kev->ident, kev->filter,
                        kev->flags, kev->fflags,
                        (int) kev->data, kev->udata);
 
     } else {
-        ngx_log_debug6(NGX_LOG_DEBUG_EVENT, log, 0,
+        ngx_log_error(NGX_LOG_DEBUG_EVENT, log, 0,
                        "kevent: %d: ft:%d fl:%04Xd ff:%08Xd d:%d ud:%p",
                        (int) kev->ident, kev->filter,
                        kev->flags, kev->fflags,

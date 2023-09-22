@@ -12,6 +12,8 @@
         "ngx_event_timer.h": "c",
         "socket.h": "c",
         "in.h": "c",
-        "complex": "c"
+        "complex": "c",
+        "ngx_errno.h": "c",
+        "pcre2.h": "c"
     }
 }

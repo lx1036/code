@@ -32,8 +32,7 @@ ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc) {
 
     type = (pc->type ? pc->type : SOCK_STREAM);
     s = ngx_socket(pc->sockaddr->sa_family, type, 0);
-    ngx_log_error(NGX_LOG_STDERR, pc->log, 0, "%s socket %d",
-                   (type == SOCK_STREAM) ? "stream" : "dgram", s);
+    ngx_log_error(NGX_LOG_STDERR, pc->log, 0, "%s socket %d", (type == SOCK_STREAM) ? "stream" : "dgram", s);
     if (s == (ngx_socket_t) -1) {
         ngx_log_error(NGX_LOG_ALERT, pc->log, ngx_socket_errno, ngx_socket_n " failed");
         return NGX_ERROR;
@@ -156,6 +155,7 @@ ngx_int_t ngx_event_connect_peer(ngx_peer_connection_t *pc) {
     }
 
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, pc->log, 0, "connect to %V, fd:%d #%uA", pc->name, s, c->number);
+    // 实际发起 tcp/udp 请求!!!
     rc = connect(s, pc->sockaddr, pc->socklen);
     if (rc == -1) {
         err = ngx_socket_errno;

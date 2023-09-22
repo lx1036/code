@@ -401,10 +401,7 @@ failed:
     return NGX_BUSY;
 }
 
-ngx_int_t
-ngx_stream_upstream_init_round_robin(ngx_conf_t *cf,
-    ngx_stream_upstream_srv_conf_t *us)
-{
+ngx_int_t ngx_stream_upstream_init_round_robin(ngx_conf_t *cf, ngx_stream_upstream_srv_conf_t *us) {
     ngx_url_t                        u;
     ngx_uint_t                       i, j, n, w, t;
     ngx_stream_upstream_server_t    *server;
@@ -412,14 +409,11 @@ ngx_stream_upstream_init_round_robin(ngx_conf_t *cf,
     ngx_stream_upstream_rr_peers_t  *peers, *backup;
 
     us->peer.init = ngx_stream_upstream_init_round_robin_peer;
-
     if (us->servers) {
         server = us->servers->elts;
-
         n = 0;
         w = 0;
         t = 0;
-
         for (i = 0; i < us->servers->nelts; i++) {
             if (server[i].backup) {
                 continue;
@@ -427,16 +421,13 @@ ngx_stream_upstream_init_round_robin(ngx_conf_t *cf,
 
             n += server[i].naddrs;
             w += server[i].naddrs * server[i].weight;
-
             if (!server[i].down) {
                 t += server[i].naddrs;
             }
         }
 
         if (n == 0) {
-            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                          "no servers in upstream \"%V\" in %s:%ui",
-                          &us->host, us->file_name, us->line);
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "no servers in upstream \"%V\" in %s:%ui", &us->host, us->file_name, us->line);
             return NGX_ERROR;
         }
 

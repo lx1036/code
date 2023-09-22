@@ -1,4 +1,4 @@
-package tcp_server
+package ssl
 
 import (
 	"crypto/tls"
@@ -11,10 +11,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // 该测试可以
-func TestTCPSSLClient(test *testing.T) {
+func TestHTTPSSLClient(test *testing.T) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true, // 跳过客户端验证服务端证书，仅用于测试环境
 		// 设置SNI字段, 只有是域名时(IP 不行)，Handshake Protocol: Client Hello 报文里才有 Extension: server_name
@@ -45,8 +46,8 @@ func TestTCPSSLClient(test *testing.T) {
 	// 打印响应内容
 	fmt.Println("Response:", string(body))
 }
-func TestTCPSSLClient2(test *testing.T) {
-	caPemPath, _ := filepath.Abs("../../ssl/ca.pem")
+func TestTCPSSLClient(test *testing.T) {
+	caPemPath, _ := filepath.Abs("ca.pem")
 	rootPEM, _ := os.ReadFile(caPemPath)
 	// First, create the set of root certificates. For this example we only
 	// have one. It's also possible to omit this in order to use the
@@ -57,17 +58,21 @@ func TestTCPSSLClient2(test *testing.T) {
 		panic("failed to parse root certificate")
 	}
 	conn, err := tls.Dial("tcp", "127.0.0.1:5005", &tls.Config{
-		//RootCAs: roots,
+		RootCAs: roots,
 		// 跳过客户端验证服务端证书 CA 不在 CA list 中，仅用于测试环境，不需要验证 "x509: certificate signed by unknown authority"
 		InsecureSkipVerify: true,
-		//ServerName:         "kubernetes.default.svc.cluster",
+		ServerName:         "kubernetes.default.svc.cluster",
 	})
 	if err != nil {
 		panic("failed to connect: " + err.Error())
 	}
 	defer conn.Close()
 
-	//io.WriteString(conn, "hello")
+	_ = conn.SetWriteDeadline(time.Now().Add(time.Second * 3))
+	_, err = conn.Write([]byte("hello server"))
+	if err != nil {
+		panic("failed to write: " + err.Error())
+	}
 	serverData, err := io.ReadAll(conn)
 	if err != nil {
 		fmt.Println("Error reading request:", err)
@@ -114,8 +119,8 @@ func TestHTTPSSLServer(test *testing.T) {
 
 func TestTCPSSLServer(test *testing.T) {
 	// 加载SSL证书和私钥
-	serverPem, _ := filepath.Abs("../../ssl/server.pem")
-	serverKeyPem, _ := filepath.Abs("../../ssl/server-key.pem")
+	serverPem, _ := filepath.Abs("server.pem")
+	serverKeyPem, _ := filepath.Abs("server-key.pem")
 	cert, err := tls.LoadX509KeyPair(serverPem, serverKeyPem)
 	if err != nil {
 		fmt.Println("Error loading certificate:", err)
@@ -152,6 +157,7 @@ func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	// 读取客户端请求
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second * 3))
 	requestData, err := io.ReadAll(conn)
 	if err != nil {
 		fmt.Println("Error reading request:", err)

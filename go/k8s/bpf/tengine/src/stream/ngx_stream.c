@@ -2329,7 +2329,7 @@ static char * ngx_stream_core_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void
     ngx_stream_core_srv_conf_t  *cscf = conf;
     return ngx_log_set_log(cf, &cscf->error_log);
 }
-
+// ngx_stream_core_preread_phase()->ngx_stream_ssl_preread_handler()
 ngx_int_t ngx_stream_core_preread_phase(ngx_stream_session_t *s, ngx_stream_phase_handler_t *ph) {
     size_t                       size;
     ssize_t                      n;
@@ -2350,7 +2350,7 @@ ngx_int_t ngx_stream_core_preread_phase(ngx_stream_session_t *s, ngx_stream_phas
         rc = NGX_AGAIN;
 
     } else {
-        rc = ph->handler(s);
+        rc = ph->handler(s); // (nginx`ngx_stream_ssl_preread_handler at ngx_stream_ssl_preread_module.c:220)
     }
 
     while (rc == NGX_AGAIN) {
@@ -2501,10 +2501,12 @@ void ngx_stream_core_run_phases(ngx_stream_session_t *s) {
     ngx_int_t                     rc;
     ngx_stream_phase_handler_t   *ph;
     ngx_stream_core_main_conf_t  *cmcf;
-
+    // 1. checker=ngx_stream_core_generic_phase,handler=ngx_stream_ssl_handler
+    // 2. ngx_stream_core_preread_phase,ngx_stream_ssl_preread_handler
+    // 3. ngx_stream_core_content_phase,ngx_stream_return_handler
     cmcf = ngx_stream_get_module_main_conf(s, ngx_stream_core_module);
     ph = cmcf->phase_engine.handlers;
-    while (ph[s->phase_handler].checker) { // ngx_stream_core_content_phase -> 
+    while (ph[s->phase_handler].checker) {
         rc = ph[s->phase_handler].checker(s, &ph[s->phase_handler]);
         if (rc == NGX_OK) {
             return;

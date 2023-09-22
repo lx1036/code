@@ -255,21 +255,28 @@ static ngx_int_t ngx_stream_ssl_preread_handler(ngx_stream_session_t *s) {
 
     p = ctx->pos;
     last = c->buffer->last;
+    /* 5:
+        outBuf[0] = byte(typ) 
+        outBuf[1] = byte(vers >> 8)
+		outBuf[2] = byte(vers)
+		outBuf[3] = byte(m >> 8)
+		outBuf[4] = byte(m)
+    */
     while (last - p >= 5) {
-        if ((p[0] & 0x80) && p[2] == 1 && (p[3] == 0 || p[3] == 3)) {
+        if ((p[0] & 0x80) && p[2] == 1 && (p[3] == 0 || p[3] == 3)) { // 128=0x80
             ngx_log_debug0(NGX_LOG_DEBUG_STREAM, ctx->log, 0, "ssl preread: version 2 ClientHello");
             ctx->version[0] = p[3];
             ctx->version[1] = p[4];
             return NGX_OK;
         }
 
-        if (p[0] != 0x16) {
+        if (p[0] != 0x16) { // 0x16=22
             ngx_log_debug0(NGX_LOG_DEBUG_STREAM, ctx->log, 0, "ssl preread: not a handshake");
             ngx_stream_set_ctx(s, NULL, ngx_stream_ssl_preread_module);
             return NGX_DECLINED;
         }
 
-        if (p[1] != 3) {
+        if (p[1] != 3) { // 0x03=VersionTLS10~13 >> 8
             ngx_log_debug0(NGX_LOG_DEBUG_STREAM, ctx->log, 0, "ssl preread: unsupported SSL version");
             ngx_stream_set_ctx(s, NULL, ngx_stream_ssl_preread_module);
             return NGX_DECLINED;
