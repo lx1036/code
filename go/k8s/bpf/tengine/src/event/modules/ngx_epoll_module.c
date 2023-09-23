@@ -282,8 +282,7 @@ ngx_epoll_init(ngx_cycle_t *cycle, ngx_msec_t timer)
         // epoll_create() 创建 epoll_fd
         ep = epoll_create(cycle->connection_n / 2);
         if (ep == -1) {
-            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
-                          "epoll_create() failed");
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno, "epoll_create() failed");
             return NGX_ERROR;
         }
 
@@ -480,7 +479,7 @@ static ngx_int_t ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, 
         }
 
         revents = event_list[i].events;
-        ngx_log_debug3(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "epoll: fd:%d ev:%04XD d:%p",
+        ngx_log_error(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "epoll: fd:%d ev:%04XD d:%p",
                        c->fd, revents, event_list[i].data.ptr);
 
         if (revents & (EPOLLERR|EPOLLHUP)) {

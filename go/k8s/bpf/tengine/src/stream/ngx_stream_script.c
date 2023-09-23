@@ -549,6 +549,23 @@ ngx_stream_script_flush_complex_value(ngx_stream_session_t *s,
     }
 }
 
+void
+ngx_stream_script_flush_no_cacheable_variables(ngx_stream_session_t *s,
+                                               ngx_array_t *indices)
+{
+    ngx_uint_t  n, *index;
+
+    if (indices) {
+        index = indices->elts;
+        for (n = 0; n < indices->nelts; n++) {
+            if (s->variables[index[n]].no_cacheable) {
+                s->variables[index[n]].valid = 0;
+                s->variables[index[n]].not_found = 0;
+            }
+        }
+    }
+}
+
 static ngx_int_t
 ngx_stream_script_init_arrays(ngx_stream_script_compile_t *sc)
 {

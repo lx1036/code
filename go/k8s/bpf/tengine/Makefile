@@ -148,6 +148,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/os/unix/ngx_pipe.o \
 	objs/src/os/unix/ngx_files.o \
 	objs/src/stream/ngx_stream.o \
+	objs/src/stream/ngx_stream_log_module.o \
 	objs/src/stream/ngx_stream_return_module.o \
 	objs/src/stream/ngx_stream_proxy_module.o \
 	objs/src/stream/ngx_stream_script.o \
@@ -216,6 +217,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/os/unix/ngx_pipe.o \
 	objs/src/os/unix/ngx_files.o \
 	objs/src/stream/ngx_stream.o \
+	objs/src/stream/ngx_stream_log_module.o \
 	objs/src/stream/ngx_stream_return_module.o \
 	objs/src/stream/ngx_stream_proxy_module.o \
 	objs/src/stream/ngx_stream_script.o \
@@ -659,6 +661,12 @@ objs/src/stream/ngx_stream.o:	$(CORE_DEPS) $(STREAM_DEPS) \
 	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
 		-o objs/src/stream/ngx_stream.o \
 		src/stream/ngx_stream.c
+
+objs/src/stream/ngx_stream_log_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
+	src/stream/ngx_stream_log_module.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
+		-o objs/src/stream/ngx_stream_log_module.o \
+		src/stream/ngx_stream_log_module.c
 
 # objs/src/stream/ngx_stream_core_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
 # 	src/stream/ngx_stream_core_module.c

@@ -752,11 +752,8 @@ ngx_stream_upstream_set_round_robin_peer_session(ngx_peer_connection_t *pc,
 #endif
 
     ssl_session = peer->ssl_session;
-
     rc = ngx_ssl_set_session(pc->connection, ssl_session);
-
-    ngx_log_error(NGX_LOG_STDERR, pc->log, 0,
-                   "set session: %p", ssl_session);
+    ngx_log_error(NGX_LOG_STDERR, pc->log, 0, "set session: %p", ssl_session);
 
     return rc;
 }
@@ -767,7 +764,6 @@ ngx_stream_upstream_save_round_robin_peer_session(ngx_peer_connection_t *pc,
     void *data)
 {
     ngx_stream_upstream_rr_peer_data_t  *rrp = data;
-
     ngx_ssl_session_t               *old_ssl_session, *ssl_session;
     ngx_stream_upstream_rr_peer_t   *peer;
 #if (NGX_STREAM_UPSTREAM_ZONE)

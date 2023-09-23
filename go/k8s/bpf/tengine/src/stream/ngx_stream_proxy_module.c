@@ -1060,8 +1060,7 @@ static void ngx_stream_proxy_finalize(ngx_stream_session_t *s, ngx_uint_t rc) {
     }
 
     if (pc) {
-        ngx_log_error(NGX_LOG_STDERR, s->connection->log, 0,
-                       "close stream proxy upstream connection: %d", pc->fd);
+        ngx_log_error(NGX_LOG_STDERR, s->connection->log, 0, "close stream proxy upstream connection: %d", pc->fd);
 
 #if (NGX_STREAM_SSL)
         if (pc->ssl) {

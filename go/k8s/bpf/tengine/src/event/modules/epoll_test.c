@@ -1,4 +1,28 @@
 
+
+
+/*
+ * golang epoll 原理: https://mp.weixin.qq.com/s/xt0Elppc_OaDFnTI_tW3hg
+ *
+ * (1)epoll:
+ * • 每次处理的 sock_fd 数量无上限
+   • loop thread 通过 epoll_create 操作创建一个 epoll 池子
+   • loop thread 通过 epoll_ctl 每次将一个待监听的 sock_fd 添加到 epoll 池中，linux 使用 rbtree 红黑树存储 sock_fd
+   • 每当 sock_fd 红黑树中有 sock_fd 就绪事件到达时，会唤醒 loop thread. 同时内核会将处于就绪态的 sock_fd 直接告知 loop thread，无需额外遍历
+ *
+ * (2)select
+• 一次可以处理多个 fd，体现多路. 但 fd 数量有限，最多 1024 个
+• loop thread 通过 select 将一组 fd 提交到内核做监听
+• 当 fd 中无 io event 就绪时，loop thread 会陷入阻塞
+• 每当这组 fd 中有 io event 到达时，内核会唤醒 loop thread
+• loop thread 无法精准感知到哪些 fd 就绪，需要遍历一轮 fd 列表，时间复杂度 O(N)
+• 托付给内核的 fd 列表只具有一轮交互的时效. 新的轮次中，loop thread 需要重新将监听的 fd 列表再传递给内核一次
+ *
+ *
+ */
+
+
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -34,22 +58,22 @@ int main(int argc, char* argv[]) {
     //声明epoll_event结构体的变量,ev用于注册事件,数组用于回传要处理的事件
     struct epoll_event ev, events[20];
     int epfd;
-    epfd = epoll_create(256);
+    epfd = epoll_create(256); // 1. 创建一个 epoll pool
     
-    int listenfd;
-    listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    int sock_fd;
+    sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     //把socket设置为非阻塞方式
-    if (ngx_nonblocking(listenfd) == -1) {
+    if (ngx_nonblocking(sock_fd) == -1) {
         perror("set nonblock error");
         return 1;
     }
     //设置与要处理的事件相关的文件描述符
-    ev.data.fd = listenfd;
-    //设置监听的事件类型为EPOLLIN，即读事件
+    ev.data.fd = sock_fd;
+    //设置监听的事件类型为EPOLLIN，即读事件, 就是说关心读事件
     // EPOLLET: 将EPOLL设为边缘触发(Edge Triggered)模式，这是相对于水平触发(Level Triggered)来说的
     ev.events = EPOLLIN|EPOLLET;
     //注册epoll事件
-    epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev);
+    epoll_ctl(epfd, EPOLL_CTL_ADD, sock_fd, &ev); // 2. 将一个待监听的 fd 注册/删除到 epoll pool 中
     struct sockaddr_in serveraddr;
     ngx_memzero(&serveraddr, sizeof(serveraddr)); // 初始化结构体 &serveraddr
     serveraddr.sin_family = AF_INET;
@@ -58,9 +82,9 @@ int main(int argc, char* argv[]) {
     inet_aton(local_addr, &(serveraddr.sin_addr));//htons(portnumber);
     serveraddr.sin_port = htons(portnumber);
     //绑定 ip:port
-    bind(listenfd, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
+    bind(sock_fd, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
     //监听连接请求
-    listen(listenfd, LISTENQ);
+    listen(sock_fd, LISTENQ);
 
     socklen_t addrlen;
     struct sockaddr_in clientaddr;
@@ -71,12 +95,12 @@ int main(int argc, char* argv[]) {
     int i, nread;
     for (;;) {
         // 等待事件发生 https://man7.org/linux/man-pages/man2/epoll_wait.2.html
-        nfds = epoll_wait(epfd, events, 20, -1);
+        nfds = epoll_wait(epfd, events, 20, -1); // 3. 当 epoll pool 中有 fd read/write 读写事件就绪时, 唤醒 loop thread 来处理数据
         printf("nfds=%d\n", nfds);
         //处理所发生的所有事件
         for (i = 0; i < nfds; i++) {
-            if(events[i].data.fd == listenfd) { // 如果新监测到一个SOCKET用户连接到了绑定的SOCKET端口，建立新的连接
-                connfd = accept(listenfd, (struct sockaddr*)&clientaddr, &addrlen);
+            if(events[i].data.fd == sock_fd) { // 如果新监测到一个SOCKET用户连接到了绑定的SOCKET端口，建立新的连接
+                connfd = accept(sock_fd, (struct sockaddr*)&clientaddr, &addrlen);
                 if(connfd < 0){
                     perror("connfd<0");
                     continue;
@@ -149,6 +173,6 @@ int main(int argc, char* argv[]) {
     }
 
     close(epfd);
-    close(listenfd);
+    close(sock_fd);
     return 0;
 }
