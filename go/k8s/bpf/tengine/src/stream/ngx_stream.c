@@ -520,6 +520,7 @@ static ngx_int_t ngx_stream_cmp_conf_addrs(const void *one, const void *two) {
     ngx_stream_conf_addr_t  *first, *second;
     first = (ngx_stream_conf_addr_t *) one;
     second = (ngx_stream_conf_addr_t *) two;
+
     if (first->opt.wildcard) {
         /* a wildcard must be the last resort, shift it to the end */
         return 1;
@@ -737,13 +738,14 @@ void ngx_stream_init_connection(ngx_connection_t *c) {
         c->log->action = "reading PROXY protocol for UDP";
         u_char *buf_pos = c->buffer->pos;
         u_char *buf_last = c->buffer->last;
-        size_t len = buf_last - buf_pos;
+//        size_t len = buf_last - buf_pos;
         u_char *p;
         p = ngx_proxy_protocol_read(c, buf_pos, buf_last); // p 已经截断 pp header 后的报文
         if (p == NULL) {
-            ngx_stream_session_t *s;
-            s = c->data;
-            ngx_stream_finalize_session(s, NGX_STREAM_BAD_REQUEST);
+//            ngx_stream_session_t *s;
+//            s = c->data;
+//            ngx_stream_finalize_session(s, NGX_STREAM_BAD_REQUEST);
+            ngx_stream_close_connection(c);
             return;
         }
         size_t pp_len = p - buf_pos; // 43="PROXY TCP4 127.0.0.1 127.0.0.1 12345 5006\r\n"

@@ -322,6 +322,8 @@ INFO:
 
 // mkdir -p /tmp/fuse/hellofs
 // go run . --mountpoint=./globalmount
+// umount globalmount
+// df -h globalmount
 func main() {
 	flag.Parse()
 

@@ -21,7 +21,7 @@ include_directories(src/auto
 		src/stream)
 
 set(SOURCE_FILES
-        src/core/nginx.c
+    src/core/nginx.c
     src/core/ngx_array.c
     src/core/ngx_buf.c
     src/core/ngx_conf_file.c
@@ -87,7 +87,10 @@ set(SOURCE_FILES
     src/stream/ngx_stream_upstream.c
     src/stream/ngx_stream_upstream_round_robin.c
     src/core/ngx_proxy_protocol.h
-		src/stream/ngx_stream_log_module.c)
+		src/stream/ngx_stream_log_module.c
+        src/http/ngx_http.c
+		src/http/ngx_http_request.h
+		src/core/ngx_open_file_cache.h)
 
 add_executable(nginx ${SOURCE_FILES})
 target_link_libraries(nginx -lpcre -lz)

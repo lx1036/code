@@ -1,0 +1,44 @@
+@startuml k8s
+
+autonumber
+
+actor "用户" as user
+participant "ExternalProvisioner"
+participant "ExternalAttacher"
+participant "polefs-csi" as csi
+participant "kube-api-server" as apiserver
+participant "pod调度器" as scheduler
+participant "PVController"
+participant "ADController"
+participant "kubelet VolumeManager" as kubelet
+activate User
+
+  
+  alt 容器存储详细流程
+		== pod 调度流程 ==
+    user -> apiserver:创建 pod1(pvc1)
+		scheduler -> apiserver:watch pod，并调度 pod
+		scheduler -> apiserver:选择 node
+
+		== Provision 流程 ==
+		PVController -> apiserver: watch pvc，并发现需要动态创建 pv
+		ExternalProvisioner -> apiserver: watch pvc
+		ExternalProvisioner -> csi: 调用 polefs-csi provision 相关函数创建 pv
+		csi -> apiserver: 创建 pv 对象
+		csi -> apiserver: 绑定 pvc/pv
+
+		== Attach 流程 ==
+		ADController -> apiserver: watch pv, 发现有外部 attacher 来做 attach
+		ADController -> apiserver: 创建 VolumeAttachment 对象
+		ExternalAttacher -> apiserver: watch VolumeAttachment 对象
+		ExternalAttacher -> csi: 调用 polefs-csi attach 相关函数
+
+		== Mount 流程 ==
+		kubelet -> csi: 调用 polefs-csi mount 相关函数
+		kubelet -> apiserver: pod 挂载 volume
+		apiserver -> user: 用户使用 polefs 容器存储
+
+
+  end
+
+@enduml

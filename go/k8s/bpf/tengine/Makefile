@@ -36,6 +36,7 @@ CORE_DEPS = src/core/nginx.h \
 	src/core/ngx_resolver.h \
 	src/core/ngx_rwlock.h \
 	src/core/ngx_parse_time.h \
+	src/core/ngx_open_file_cache.h \
 	src/event/ngx_event.h \
 	src/event/ngx_event_timer.h \
 	src/event/ngx_event_posted.h \
@@ -74,6 +75,22 @@ CORE_INCS = -I src/core \
 	-I src/os/unix \
 	-I src/proc \
 	-I objs
+
+HTTP_DEPS = src/http/ngx_http.h \
+	src/http/ngx_http_request.h \
+	src/http/ngx_http_config.h \
+	src/http/ngx_http_core_module.h \
+	src/http/ngx_http_cache.h \
+	src/http/ngx_http_variables.h \
+	src/http/ngx_http_script.h \
+	src/http/ngx_http_upstream.h \
+	src/http/ngx_http_upstream_round_robin.h \
+	src/http/modules/ngx_http_ssi_filter_module.h \
+	src/http/modules/ngx_http_ssl_module.h
+
+HTTP_INCS = -I src/http \
+	-I src/http/modules \
+
 
 STREAM_DEPS = src/stream/ngx_stream.h \
 	src/stream/ngx_stream_upstream.h \
@@ -156,6 +173,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/stream/ngx_stream_upstream.o \
 	objs/src/stream/ngx_stream_ssl_module.o \
 	objs/src/stream/ngx_stream_ssl_preread_module.o \
+	objs/src/http/ngx_http.o \
 
 	$(LINK) -o objs/nginx \
 	objs/src/core/nginx.o \
@@ -225,6 +243,7 @@ objs/nginx: objs/src/core/nginx.o \
 	objs/src/stream/ngx_stream_upstream.o \
 	objs/src/stream/ngx_stream_ssl_module.o \
 	objs/src/stream/ngx_stream_ssl_preread_module.o \
+	objs/src/http/ngx_http.o \
 	-L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -Wl,-u,_pcre_version -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -L/usr/local/Cellar/pcre/8.45/lib -lpcre -L/usr/local/Cellar/openresty/1.21.4.2_1/luajit/lib -lluajit-5.1 -lm -ldl -pagezero_size 10000 -image_base 100000000 -lpcre2-8 -lssl -lcrypto -lz
 
 
@@ -733,6 +752,13 @@ objs/src/stream/ngx_stream_ssl_preread_module.o:	$(CORE_DEPS) $(STREAM_DEPS) \
 	$(CC) -c $(CFLAGS) $(CORE_INCS) $(STREAM_INCS) \
 		-o objs/src/stream/ngx_stream_ssl_preread_module.o \
 		src/stream/ngx_stream_ssl_preread_module.c
+
+################################http############################################
+objs/src/http/ngx_http.o:	$(CORE_DEPS) $(HTTP_DEPS) \
+	src/http/ngx_http.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) $(HTTP_INCS) \
+		-o objs/src/http/ngx_http.o \
+		src/http/ngx_http.c
 
 ################################################################
 run:
