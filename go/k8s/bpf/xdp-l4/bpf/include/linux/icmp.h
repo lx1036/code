@@ -8,6 +8,7 @@
 
 #include <linux/types.h>
 
+#define ICMP_ECHOREPLY		0	/* Echo Reply			*/
 #define ICMP_DEST_UNREACH	3	/* Destination Unreachable	*/
 #define ICMP_ECHO		8	/* Echo Request			*/
 /* Codes for UNREACH. */
