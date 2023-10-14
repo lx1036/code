@@ -1,12 +1,18 @@
 
 
-#ifndef __PROTOCOL_H
-#define __PROTOCOL_H
 
+
+#ifndef __PACKET_ENCAP_PARSE_H
+#define __PACKET_ENCAP_PARSE_H
+
+#include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 
 #include <linux/bpf.h>
 #include <linux/types.h>
+#include <linux/in.h>
+#include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/icmp.h>
@@ -18,11 +24,25 @@
 
 #include <loadbalancer/balancer_consts.h>
 #include <loadbalancer/csum_helpers.h>
+#include <loadbalancer/stats.h>
+#include <loadbalancer/packet_encap_parse.h>
 
 /*
  * This file contains description of all structs which has been used both by
  * balancer and by packet's parsing routines
  */
+
+
+// value for ctl array, could contain e.g. mac address of default router
+// or other flags
+struct ctl_value {
+  union {
+    __u64 value;
+    __u32 ifindex;
+    __u8 mac[6];
+  };
+};
+
 
 // flow metadata
 struct flow_key {
@@ -41,6 +61,7 @@ struct flow_key {
   __u8 proto;
 };
 
+
 // client's packet metadata
 struct packet_description {
   struct flow_key flow;
@@ -48,53 +69,6 @@ struct packet_description {
   __u8 flags;
   // dscp / ToS value in client's packet
   __u8 tos;
-};
-
-// value for ctl array, could contain e.g. mac address of default router
-// or other flags
-struct ctl_value {
-  union {
-    __u64 value;
-    __u32 ifindex;
-    __u8 mac[6];
-  };
-};
-
-// vip's definition for lookup
-struct vip_definition {
-  union {
-    __be32 vip;
-    __be32 vipv6[4];
-  };
-  __u16 port;
-  __u8 proto;
-};
-
-// result of vip's lookup
-struct vip_meta {
-  __u32 flags;
-  __u32 vip_num;
-};
-
-// where to send client's packet from LRU_MAP
-struct real_pos_lru {
-  __u32 pos;
-  __u64 atime;
-};
-
-// where to send client's packet from lookup in ch ring.
-struct real_definition {
-  union {
-    __be32 dst;
-    __be32 dstv6[4];
-  };
-  __u8 flags;
-};
-
-// per vip statistics
-struct lb_stats {
-  __u64 v1;
-  __u64 v2;
 };
 
 // key for ipv4 lpm lookups
@@ -158,15 +132,6 @@ struct lb_quic_packets_stats {
 };
 
 
-// map, which contains all the vips for which we are doing load balancing，这个是关键 map!!!
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(key_size, sizeof(struct vip_definition));
-	__uint(value_size, sizeof(struct vip_meta));
-	__uint(max_entries, MAX_VIPS);
-	__uint(pinning, LIBBPF_PIN_BY_NAME);
-  __uint(map_flags, NO_FLAGS);
-} vip_map SEC(".maps");
 
 // control array. contains metadata such as default router mac
 // and/or interfaces ifindexes
@@ -181,35 +146,6 @@ struct {
   __uint(map_flags, NO_FLAGS);
 } ctl_array SEC(".maps");
 
-// map which contains opaque real's id to real mapping, 这个是关键 map!!!
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__uint(key_size, sizeof(__u32));
-	__uint(value_size, sizeof(struct real_definition));
-	__uint(max_entries, MAX_REALS);
-	__uint(pinning, LIBBPF_PIN_BY_NAME);
-  __uint(map_flags, NO_FLAGS);
-} reals SEC(".maps");
-// map with per real pps/bps statistic
-struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__uint(key_size, sizeof(__u32));
-	__uint(value_size, sizeof(struct lb_stats));
-	__uint(max_entries, MAX_REALS);
-	__uint(pinning, LIBBPF_PIN_BY_NAME);
-  __uint(map_flags, NO_FLAGS);
-} reals_stats SEC(".maps");
-
-
-// map vip stats
-struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__uint(key_size, sizeof(__u32));
-	__uint(value_size, sizeof(struct lb_stats));
-	__uint(max_entries, STATS_MAP_SIZE);
-	__uint(pinning, LIBBPF_PIN_BY_NAME);
-  __uint(map_flags, NO_FLAGS);
-} stats SEC(".maps");
 
 // fallback lru. we should never hit this one outside of unittests
 struct {
@@ -240,6 +176,9 @@ struct {
         __uint(max_entries, DEFAULT_LRU_SIZE);
       });
 } lru_mapping SEC(".maps");
+
+
+
 
 
 
@@ -351,8 +290,8 @@ __attribute__((__always_inline__)) static inline bool parse_tcp(void* data,
     }
 
     if (!is_icmp) {
-    pckt->flow.port16[0] = tcp->source;
-    pckt->flow.port16[1] = tcp->dest;
+      pckt->flow.port16[0] = tcp->source;
+      pckt->flow.port16[1] = tcp->dest;
     } else {
       // packet_description was created from icmp "packet too big". hence
       // we need to invert src/dst ports
@@ -409,6 +348,7 @@ __attribute__((__always_inline__)) static inline void create_v4_hdr(struct iphdr
     iph->check = csum;
 }
 
+// ipip 封装
 __attribute__((__always_inline__)) static inline bool encap_v4(struct xdp_md* xdp, struct ctl_value* cval,
     struct packet_description* pckt, struct real_definition* dst, __u32 pkt_bytes) {
     void* data;
@@ -420,7 +360,8 @@ __attribute__((__always_inline__)) static inline bool encap_v4(struct xdp_md* xd
     ip_suffix <<= 16;
     ip_suffix ^= pckt->flow.src;
     __u64 csum = 0;
-    // ipip encap
+    
+    // ipip encap，需要 ip header 空出来一个 ip header 位置
     if (bpf_xdp_adjust_head(xdp, 0 - (int)sizeof(struct iphdr))) {
       return false;
     }
@@ -433,8 +374,8 @@ __attribute__((__always_inline__)) static inline bool encap_v4(struct xdp_md* xd
     if (new_eth + 1 > data_end || old_eth + 1 > data_end || iph + 1 > data_end) {
       return false;
     }
-    memcpy(new_eth->h_dest, cval->mac, 6);
-    memcpy(new_eth->h_source, old_eth->h_dest, 6);
+    memcpy(new_eth->h_dest, cval->mac, 6); // cval->mac 是本机器默认网关的 mac 地址
+    memcpy(new_eth->h_source, old_eth->h_dest, 6); // old_eth->h_dest 是原始包，目的网卡(ip)对应的 mac 地址
     new_eth->h_proto = BE_ETH_P_IP;
 
     create_v4_hdr(iph, pckt->tos, ((0xFFFF0000 & ip_suffix) | IPIP_V4_PREFIX),
