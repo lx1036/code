@@ -33,7 +33,7 @@ https://docs.cilium.io/en/v1.10/concepts/ebpf/intro/ :
 # Cilium 基于 eBPF 收发包路径 datapath
 http://arthurchiao.art/blog/understanding-ebpf-datapath-in-cilium-zh/ :
 * L1->L2: packet 到达网卡，被网卡驱动轮询poll中执行
-* L2->L3: poll->XDP, XDP 包括三种结果: pass/drop/transmit(XDP 使用 transmit 实现一个 TCP/IP 负载均衡器)，见 [L2-L3-XDP](./L2-L3-XDP.png)，
+* L2->L3: poll->XDP, XDP 包括三种结果: pass/drop/transmit(XDP 使用 transmit 实现一个 TCP/IP 负载均衡器)，见 [L2-L3-XDP](./L2-L3-XDP-eBPF.png)，
 
 
 > 如何查看已加载的 eBPF 程序，可参考 [Cilium Network Topology and Traffic Path on AWS](http://arthurchiao.art/blog/cilium-network-topology-on-aws/)

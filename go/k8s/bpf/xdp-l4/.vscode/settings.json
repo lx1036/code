@@ -4,6 +4,10 @@
         "stddef.h": "c",
         "in.h": "c",
         "stdbool.h": "c",
-        "csum_helpers.h": "c"
+        "csum_helpers.h": "c",
+        "bpf_helpers.h": "c",
+        "bpf.h": "c",
+        "__locale": "c",
+        "locale": "c"
     }
 }
