@@ -7,6 +7,7 @@ go 1.17
 // go get github.com/cilium/ipam@latest
 
 require (
+	github.com/google/gopacket v1.1.18
 	bou.ke/monkey v1.0.2
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/BurntSushi/toml v0.4.1
@@ -175,6 +176,9 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/serf v0.9.6 // indirect
+	github.com/jacobsa/oglemock v0.0.0-20150831005832-e94d794d06ff // indirect
+	github.com/jacobsa/ogletest v0.0.0-20170503003838-80d50a735a11 // indirect
+	github.com/jacobsa/reqtrace v0.0.0-20150505043853-245c9e0234cb // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/mdlayher/arp v0.0.0-20191213142603-f72070a231fc // indirect
 	github.com/mdlayher/ethernet v0.0.0-20190606142754-0394541c37b7 // indirect
