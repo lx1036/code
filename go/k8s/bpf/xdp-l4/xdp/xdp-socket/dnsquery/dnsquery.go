@@ -15,6 +15,7 @@ import (
 	xdp_socket "k8s-lx1036/k8s/bpf/xdp-l4/xdp/xdp-socket"
 
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/miekg/dns"
 	"github.com/vishvananda/netlink"
 )

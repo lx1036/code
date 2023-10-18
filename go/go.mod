@@ -7,7 +7,6 @@ go 1.17
 // go get github.com/cilium/ipam@latest
 
 require (
-	github.com/google/gopacket v1.1.18
 	bou.ke/monkey v1.0.2
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/BurntSushi/toml v0.4.1
@@ -51,6 +50,7 @@ require (
 	github.com/google/cadvisor v0.43.0
 	github.com/google/go-querystring v1.0.0
 	github.com/google/gofuzz v1.2.0
+	github.com/google/gopacket v1.1.19
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
@@ -59,7 +59,6 @@ require (
 	github.com/hashicorp/go-msgpack v0.5.5
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/raft v1.3.6
-	github.com/jacobsa/fuse v0.0.0-20230810134708-ab21db1af836
 	github.com/jacobsa/oglematchers v0.0.0-20150720000706-141901ea67cd
 	github.com/jacobsa/syncutil v0.0.0-20180201203307-228ac8e5a6c3
 	github.com/jessevdk/go-flags v1.5.0

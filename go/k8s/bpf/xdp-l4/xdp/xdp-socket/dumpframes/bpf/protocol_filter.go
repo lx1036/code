@@ -10,16 +10,17 @@ import (
 
 // go generate requires appropriate linux headers in included (-I) paths.
 // See accompanying Makefile + Dockerfile to make updates.
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc "$CLANG" -strip "$STRIP" -makebase "$MAKEDIR" tcpHeader ../ebpf/test_tcp_hdr_options.c -- -mcpu=v2 -nostdinc -Wall -Werror -Wno-compare-distinct-pointer-types -I../../ebpf/include
 
-// NewIPProtoProgram returns an new eBPF that directs packets of the given ip protocol to to XDP sockets
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc "$CLANG" -strip "$STRIP" -makebase "$MAKEDIR" ipproto protocol_filter.c -- -mcpu=v2 -nostdinc -Wall -Werror -Wno-compare-distinct-pointer-types -I./include
+
+// NewIPProtoProgram returns an new eBPF that directs packets of the given ip protocol to XDP sockets
 func NewIPProtoProgram(protocol uint32, options *ebpf.CollectionOptions) (*xdp_socket.Program, error) {
 	spec, err := loadIpproto()
 	if err != nil {
 		return nil, err
 	}
 
-	if protocol >= 0 && protocol <= 255 {
+	if protocol <= 255 {
 		if err := spec.RewriteConstants(map[string]interface{}{"PROTO": uint8(protocol)}); err != nil {
 			return nil, err
 		}

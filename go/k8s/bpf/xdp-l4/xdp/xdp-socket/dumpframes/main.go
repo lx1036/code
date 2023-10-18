@@ -9,13 +9,24 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"log"
-	"net"
-
+	"github.com/vishvananda/netlink"
 	xdp_socket "k8s-lx1036/k8s/bpf/xdp-l4/xdp/xdp-socket"
 	"k8s-lx1036/k8s/bpf/xdp-l4/xdp/xdp-socket/dumpframes/bpf"
+	"log"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
+// 该程序作用：在网卡 eth0 queue=0 注册个 xdp 程序，然后把 tcp/udp 包 redirect 到 xdp_socket 用户态程序上
+
+// TCP: go run . --ipproto=6 --linkname=eth1 然后 ip addr 查看 eth1 网卡注册了 xdp generic 程序
+// UDP: go run . --ipproto=17
+// 测试没法在 eth0 attach ip-proto xdp 程序，很奇怪
+// 但是新建一个 eth1 可以，应该是 eth0 网卡配置有问题
+// ip link add eth1 type dummy
+// ip link set eth3 up
+// ip addr add 100.200.0.126 dev eth1
 func main() {
 	var linkName string
 	var queueID int
@@ -23,28 +34,17 @@ func main() {
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
-	flag.StringVar(&linkName, "linkname", "enp3s0", "The network link on which rebroadcast should run on.")
+	flag.StringVar(&linkName, "linkname", "eth0", "The network link on which rebroadcast should run on.")
 	flag.IntVar(&queueID, "queueid", 0, "The ID of the Rx queue to which to attach to on the network link.")
-	flag.Int64Var(&protocol, "ip-proto", 0, "If greater than 0 and less than or equal to 255, limit xdp bpf_redirect_map to packets with the specified IP protocol number.")
+	flag.Int64Var(&protocol, "ipproto", 0, "If greater than 0 and less than or equal to 255, limit xdp bpf_redirect_map to packets with the specified IP protocol number.")
 	flag.Parse()
 
-	interfaces, err := net.Interfaces()
+	link, err := netlink.LinkByName(linkName)
 	if err != nil {
-		fmt.Printf("error: failed to fetch the list of network interfaces on the system: %v\n", err)
+		fmt.Printf("error: failed to fetch network link: %v\n", err)
 		return
 	}
-
-	Ifindex := -1
-	for _, iface := range interfaces {
-		if iface.Name == linkName {
-			Ifindex = iface.Index
-			break
-		}
-	}
-	if Ifindex == -1 {
-		fmt.Printf("error: couldn't find a suitable network interface to attach to\n")
-		return
-	}
+	Ifindex := link.Attrs().Index
 
 	var program *xdp_socket.Program
 
@@ -65,8 +65,7 @@ func main() {
 	}
 	defer program.Detach(Ifindex)
 
-	// Create and initialize an XDP socket attached to our chosen network
-	// link.
+	// Create and initialize an XDP socket attached to our chosen network link
 	xsk, err := xdp_socket.NewSocket(Ifindex, queueID, nil)
 	if err != nil {
 		fmt.Printf("error: failed to create an XDP socket: %v\n", err)

@@ -2,7 +2,7 @@
 
 // +build ignore
 
-// <linux/xxx> 代码都在目录下 /usr/include/linux
+// <linux/xxx> 代码都在目录下 /usr/include/linux，但是不能直接复制，还需要裁剪
 
 #include <linux/bpf.h>
 #include <linux/in.h>
@@ -10,9 +10,10 @@
 #include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
+
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
-
+#include <bpf/const.h>
 
 #define MAX_SOCKS 64
 
