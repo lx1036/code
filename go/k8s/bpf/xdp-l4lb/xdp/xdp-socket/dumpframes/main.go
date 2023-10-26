@@ -10,8 +10,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/vishvananda/netlink"
-	xdp_socket "k8s-lx1036/k8s/bpf/xdp-l4/xdp/xdp-socket"
-	"k8s-lx1036/k8s/bpf/xdp-l4/xdp/xdp-socket/dumpframes/bpf"
+	xdp_socket "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp/xdp-socket"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp/xdp-socket/dumpframes/bpf"
 	"log"
 
 	"github.com/google/gopacket"

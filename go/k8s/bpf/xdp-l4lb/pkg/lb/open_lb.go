@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 
-	"k8s-lx1036/k8s/bpf/xdp-l4/pkg/rpc"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/pkg/rpc"
 
 	"github.com/cilium/ebpf"
 	"github.com/sirupsen/logrus"

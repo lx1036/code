@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 
-	"k8s-lx1036/k8s/bpf/xdp-l4/pkg/rpc"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/pkg/rpc"
 )
 
 const (

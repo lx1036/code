@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"k8s-lx1036/k8s/bpf/xdp-l4/xdp/xdp-tutorial/basic/bpf"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp/xdp-tutorial/basic/bpf"
 	"log"
 	"net"
 	"time"

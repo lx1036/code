@@ -3,7 +3,7 @@ package lb
 import (
 	"context"
 
-	"k8s-lx1036/k8s/bpf/xdp-l4/pkg/rpc"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/pkg/rpc"
 )
 
 func (lb *OpenLb) ModifyQuicRealsMapping(ctx context.Context, reals *rpc.ModifiedQuicReals) (*rpc.Bool, error) {

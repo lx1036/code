@@ -15,7 +15,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"net"
 
-	xdp_socket "k8s-lx1036/k8s/bpf/xdp-l4/xdp/xdp-socket"
+	xdp_socket "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp/xdp-socket"
 
 	"github.com/google/gopacket"
 )
