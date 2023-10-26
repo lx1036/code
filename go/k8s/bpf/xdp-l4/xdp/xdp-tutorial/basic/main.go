@@ -12,6 +12,7 @@ import (
 
 var (
 	ifaceName = flag.String("iface", "eth0", "specify a network interface")
+	funcName  = flag.String("funcName", "passFunc", "specify a xdp program")
 )
 
 /*
@@ -26,12 +27,16 @@ var (
 func main() {
 	flag.Parse()
 
+	LoadAndAttachXdpDropFunc()
+}
+
+func LoadAndAttachXdpDropFunc() {
 	iface, err := net.InterfaceByName(*ifaceName)
 	if err != nil {
 		log.Fatalf("lookup network iface %q: %s", *ifaceName, err)
 	}
 
-	xdpObjects, err := bpf.LoadAndAttachXdp(iface.Index)
+	xdpObjects, err := bpf.LoadAndAttachXdp(iface.Index, *funcName)
 	if err != nil {
 		log.Fatalf("LoadAndAttachXdp err: %v", err)
 	}
@@ -42,4 +47,9 @@ func main() {
 	for range ticker.C {
 		log.Printf("ok\n")
 	}
+}
+
+// XdpStatsCount https://github.com/xdp-project/xdp-tutorial/blob/master/basic03-map-counter/xdp_load_and_stats.c
+func XdpStatsCount() {
+
 }

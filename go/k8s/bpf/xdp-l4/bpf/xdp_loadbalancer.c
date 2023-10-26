@@ -27,7 +27,7 @@ struct {
 	__uint(value_size, sizeof(__u32));
 	__uint(max_entries, CH_RINGS_SIZE);
 	__uint(pinning, LIBBPF_PIN_BY_NAME);
-  __uint(map_flags, NO_FLAGS);
+    __uint(map_flags, NO_FLAGS);
 } ch_rings SEC(".maps");
 
 
