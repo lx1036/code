@@ -23,7 +23,11 @@ type XdpObjects struct {
 func LoadAndAttachXdp(iIndex int, funcName string) (*XdpObjects, error) {
 	// Load pre-compiled programs into the kernel
 	objs := xdpObjects{}
-	if err := loadXdpObjects(&objs, nil); err != nil {
+	if err := loadXdpObjects(&objs, &ebpf.CollectionOptions{
+		Maps: ebpf.MapOptions{
+			PinPath: "/sys/fs/bpf",
+		},
+	}); err != nil {
 		return nil, err
 	}
 
@@ -46,6 +50,7 @@ func LoadAndAttachXdp(iIndex int, funcName string) (*XdpObjects, error) {
 	l, err := link.AttachXDP(link.XDPOptions{
 		Program:   program, // 挂载 xdp_drop_func xdp
 		Interface: iIndex,
+		Flags:     link.XDPDriverMode,
 	})
 	if err != nil {
 		log.Fatalf("could not attach XDP program: %s", err)
