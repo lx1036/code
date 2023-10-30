@@ -533,6 +533,7 @@ usage()
 
 
 # ./testenv.sh setup --name veth-basic02
+# ./setup-env.sh teardown
 
 OPTS="hn:gl:s:"
 LONGOPTS="help,name:,gen-new,loader:,stats:,legacy-ip,vlan,inner"

@@ -1,9 +1,33 @@
 
+# docker in ubuntu
+```shell
+# https://docs.docker.com/engine/install/ubuntu/
+
+# Add Docker's official GPG key:
+sudo apt-get update
+sudo apt-get install ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+# Add the repository to Apt sources:
+echo \
+  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+```
+
 
 # Cilium Standalone L4LB
 与 K8S 环境无关，Cilium 可以单独作为一个 XDP L4LB 部署，和 Katran 一样，部署代码：
 
 ```shell
+# ubuntu-20 上验证没问题!!!
+
 # https://hub.docker.com/r/cilium/cilium
 # v1.10.20 从 v1.10 版本开始生产可用 Standalone L4LB
 docker pull cilium/cilium:v1.14.3
@@ -14,10 +38,12 @@ ethtool -K eth0 tso off gso off rx off tx off
 docker rm l4lb
 
 docker run --cap-add NET_ADMIN --cap-add SYS_MODULE --cap-add CAP_SYS_ADMIN --network host --privileged \
--v /sys/fs/bpf:/sys/fs/bpf -v /lib/modules --name l4lb cilium/cilium:v1.14.3 cilium-agent \
+-v /sys/fs/bpf:/sys/fs/bpf -v /lib/modules:/lib/modules -v /var/run/cilium:/var/run/cilium \
+--name l4lb cilium/cilium:v1.14.3 cilium-agent \
 --bpf-lb-algorithm=maglev \
 --bpf-lb-mode=dsr \
---bpf-lb-acceleration=native \
+#--bpf-lb-acceleration=native \ # ecs eth0 不支持 xdpdrv mode，只能 xdpgeneric mode
+--bpf-lb-acceleration="testing-only" \
 --bpf-lb-dsr-dispatch=ipip \
 --devices=eth0 \
 --datapath-mode=lb-only \
@@ -36,10 +62,12 @@ docker run --cap-add NET_ADMIN --cap-add SYS_MODULE --cap-add CAP_SYS_ADMIN --ne
 --bpf-lb-map-max 512000
 
 # https://www.ebpf.top/post/cilium-standalone-L4LB-XDP-zh/
+# https://github.com/cilium/cilium-l4lb-test/blob/master/cilium-lb-example.yaml
 # 配置 vip/rs
+docker exec -it l4lb bash
 cilium service update --id 1 --frontend "10.20.30.40:7047" \
 --backends "10.30.30.41:7047, 10.30.30.42:7047, 10.30.30.43:7047" --k8s-node-port
-
+cilium service list
 ```
 
 
