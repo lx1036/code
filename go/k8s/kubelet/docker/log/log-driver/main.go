@@ -41,7 +41,8 @@ func respond(err error, w http.ResponseWriter) {
 	_ = json.NewEncoder(w).Encode(&res)
 }
 
-/**
+/*
+*
 @see https://github.com/cpuguy83/docker-log-driver-test
 */
 func main() {
@@ -111,12 +112,12 @@ func NewDriver() *Driver {
 	}
 }
 
-//{
-//	"File": "/path/to/file/stream",
-//	"Info": {
-//		"ContainerID": "123456"
+//	{
+//		"File": "/path/to/file/stream",
+//		"Info": {
+//			"ContainerID": "123456"
+//		}
 //	}
-//}
 func (driver *Driver) StartLogging(file string, info logger.Info) error {
 	driver.mu.Lock()
 	if _, exists := driver.logs[file]; exists {

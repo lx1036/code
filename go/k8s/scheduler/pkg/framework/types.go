@@ -570,7 +570,7 @@ type nodeTransientInfo struct {
 	RequestedVolumes int
 }
 
-//initializeNodeTransientInfo initializes transient information pertaining to node.
+// initializeNodeTransientInfo initializes transient information pertaining to node.
 func initializeNodeTransientInfo() nodeTransientInfo {
 	return nodeTransientInfo{AllocatableVolumesCount: 0, RequestedVolumes: 0}
 }

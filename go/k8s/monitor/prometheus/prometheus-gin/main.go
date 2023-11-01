@@ -64,7 +64,8 @@ func pkgNetHttpDemo() {
 	http.ListenAndServe(":9090", nil)
 }
 
-/**
+/*
+*
 https://www.jianshu.com/p/b38b1719636e
 https://github.com/qcrao/Go-Questions/blob/master/interface/Go%20%E6%8E%A5%E5%8F%A3%E4%B8%8E%20C%2B%2B%20%E6%8E%A5%E5%8F%A3%E6%9C%89%E4%BD%95%E5%BC%82%E5%90%8C.md
 https://github.com/developer-learning/night-reading-go/issues/393

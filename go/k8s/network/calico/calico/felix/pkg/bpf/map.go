@@ -328,13 +328,14 @@ func (m *Map) Delete(k []byte) error {
 type MapFD uint32
 
 // INFO: BPF map 和程序作为内核资源只能通过文件描述符访问，其背后是内核中的匿名 inode，这带来了很多优点：
-//  (1) 用户空间应用能够使用大部分文件描述符相关的 API
-//  (2) 在 Unix socket 中传递文件描述符是透明的，等等
-//  但同时，也有很多缺点：文件描述符受限于进程的生命周期，使得 map 共享之类的操作非常笨重。
-//  为了解决这个问题，内核实现了一个最小内核空间 BPF 文件系统，BPF map 和 BPF 程序 都可以钉到（pin）这个文件系统内，这个过程称为 object pinning（钉住对象）
-//  相应地，BPF 系统调用进行了扩展，添加了两个新命令，分别用于钉住（BPF_OBJ_PIN）一个对象和获取（BPF_OBJ_GET）一个被钉住的对象（pinned objects）
-//  http://arthurchiao.art/blog/cilium-bpf-xdp-reference-guide-zh/#14-object-pinning%E9%92%89%E4%BD%8F%E5%AF%B9%E8%B1%A1
-//  @see ObjGet(pathname)
+//
+//	(1) 用户空间应用能够使用大部分文件描述符相关的 API
+//	(2) 在 Unix socket 中传递文件描述符是透明的，等等
+//	但同时，也有很多缺点：文件描述符受限于进程的生命周期，使得 map 共享之类的操作非常笨重。
+//	为了解决这个问题，内核实现了一个最小内核空间 BPF 文件系统，BPF map 和 BPF 程序 都可以钉到（pin）这个文件系统内，这个过程称为 object pinning（钉住对象）
+//	相应地，BPF 系统调用进行了扩展，添加了两个新命令，分别用于钉住（BPF_OBJ_PIN）一个对象和获取（BPF_OBJ_GET）一个被钉住的对象（pinned objects）
+//	http://arthurchiao.art/blog/cilium-bpf-xdp-reference-guide-zh/#14-object-pinning%E9%92%89%E4%BD%8F%E5%AF%B9%E8%B1%A1
+//	@see ObjGet(pathname)
 type bpftoolMapMeta struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`

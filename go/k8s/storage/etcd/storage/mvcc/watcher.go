@@ -57,7 +57,8 @@ type WatchStream interface {
 }
 
 // INFO: 表示多个 watchers 对一个 streaming channel，
-//  etcd 设计如此：一个 watch client 的 watch 请求过来，watch server 会创建一个 watchStream 对象，
+//
+//	etcd 设计如此：一个 watch client 的 watch 请求过来，watch server 会创建一个 watchStream 对象，
 type watchStream struct {
 	mu sync.Mutex
 

@@ -13,7 +13,8 @@ const (
 
 // Dentry
 // INFO: linux 中 dentry struct 包含 inodeID 信息，见 dentry_inode.png
-//  dentry 是 file name 和 inode 的映射，dentry struct 包含 name 和 inode
+//
+//	dentry 是 file name 和 inode 的映射，dentry struct 包含 name 和 inode
 type Dentry struct {
 	inodeID    uint64
 	expiration int64 // second

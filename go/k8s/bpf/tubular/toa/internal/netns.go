@@ -36,4 +36,3 @@ func programPath(base string) string {
 func linkPath(base string) string {
 	return filepath.Join(base, "link")
 }
-

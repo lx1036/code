@@ -710,7 +710,7 @@ func (p *csiProvisioner) prepareProvision(ctx context.Context, claim *v1.Persist
 	}, ProvisioningNoChange, nil
 }
 
-//TODO use a unique volume handle from and to Id
+// TODO use a unique volume handle from and to Id
 func (p *csiProvisioner) volumeIdToHandle(id string) string {
 	return id
 }

@@ -77,7 +77,7 @@ func (vol *Volume) cloneMetaPartitionMap() map[uint64]*MetaPartition {
 	return mps
 }
 
-//key=#vol#volID,value=json.Marshal(vv)
+// key=#vol#volID,value=json.Marshal(vv)
 func (cluster *Cluster) submitVol(opType uint32, vol *Volume) (err error) {
 	cmd := new(RaftCmd)
 	cmd.Op = opType

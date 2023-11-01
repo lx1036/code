@@ -20,13 +20,14 @@ type Config struct {
 }
 
 /*
- net-conf.json: |
-    {
-      "Network": "10.244.0.0/16",
-      "Backend": {
-        "Type": "vxlan"
-      }
-    }
+net-conf.json: |
+
+	{
+	  "Network": "10.244.0.0/16",
+	  "Backend": {
+	    "Type": "vxlan"
+	  }
+	}
 */
 func getSubnetConfig(netConfPath string) (*Config, error) {
 	netConf, err := ioutil.ReadFile(netConfPath) // /etc/kube-flannel/net-conf.json

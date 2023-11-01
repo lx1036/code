@@ -148,7 +148,8 @@ func newBackend(cfg Config) *backend {
 }
 
 // INFO: 定时任务，每 batchInterval 内去批量提交所有事务
-//  etcd 通过合并多个写事务请求，是异步机制定时（默认每隔 100ms）将批量事务一次性提交（pending 事务过多才会触发同步提交），从而大大提高吞吐量
+//
+//	etcd 通过合并多个写事务请求，是异步机制定时（默认每隔 100ms）将批量事务一次性提交（pending 事务过多才会触发同步提交），从而大大提高吞吐量
 func (b *backend) run() {
 	defer close(b.donec)
 	tick := time.Tick(b.batchInterval)
@@ -176,7 +177,9 @@ func (b *backend) ReadTx() ReadTx {
 }
 
 // ConcurrentReadTx
-//  INFO: @see https://github.com/etcd-io/etcd/commit/9c82e8c72b96eec1e7667a0e139a07b944c33b75
+//
+//	INFO: @see https://github.com/etcd-io/etcd/commit/9c82e8c72b96eec1e7667a0e139a07b944c33b75
+//
 // ConcurrentReadTx creates and returns a new ReadTx, which:
 // A) creates and keeps a copy of backend.readTx.txReadBuffer,
 // B) references the boltdb readTx (and its bucket cache) of current batch interval.

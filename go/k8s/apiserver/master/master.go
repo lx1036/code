@@ -274,7 +274,8 @@ type RESTStorageProvider interface {
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
-//   KubeletClientConfig
+//
+//	KubeletClientConfig
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Master, error) {
 	genericServer, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
 	if err != nil {

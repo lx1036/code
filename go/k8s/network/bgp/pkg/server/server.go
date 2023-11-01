@@ -1019,7 +1019,8 @@ func (s *BgpServer) propagateUpdate(peer *peer, pathList []*table.Path) {
 }
 
 // INFO: 把 advertise/withdraw 路由发给 router server
-//  @see fsm.sendMessageloop()
+//
+//	@see fsm.sendMessageloop()
 func (s *BgpServer) propagateUpdateToNeighbors(source *peer, newPath *table.Path, dsts []*table.Update, needOld bool) {
 	if table.SelectionOptions.DisableBestPathSelection {
 		return

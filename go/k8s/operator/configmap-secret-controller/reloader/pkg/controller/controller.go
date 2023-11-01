@@ -64,7 +64,7 @@ func NewController(client kubernetes.Interface, resource string, namespace strin
 	return c, nil
 }
 
-//Run function for controller which handles the queue
+// Run function for controller which handles the queue
 func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 	defer runtime.HandleCrash()
 	// Let the workers stop when we are done

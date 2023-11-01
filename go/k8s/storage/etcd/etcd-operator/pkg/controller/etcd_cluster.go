@@ -287,8 +287,9 @@ func (cluster *Cluster) reconcile(pods []*corev1.Pod) error {
 // 4. If len(L) < len(members)/2 + 1, return quorum lost error.
 // 5. Add one missing member. END.
 // INFO:
-//  (1) 先与 running diff，删除 unknown etcd member
-//  (2) 再去 resize 到期望节点数量
+//
+//	(1) 先与 running diff，删除 unknown etcd member
+//	(2) 再去 resize 到期望节点数量
 func (cluster *Cluster) reconcileMembers(running MemberSet) error {
 	unknownMembers := running.Diff(cluster.members)
 	if unknownMembers.Size() > 0 {
@@ -347,8 +348,9 @@ func (cluster *Cluster) newMember() *Member {
 }
 
 // INFO: 这里先后顺序很重要，先往etcd里写数据，再去起一个etcd实例
-//  (1)使用 etcdctl cli 来 add member，这样可以先更新下 etcd 数据；
-//  (2)然后创建 etcd pod
+//
+//	(1)使用 etcdctl cli 来 add member，这样可以先更新下 etcd 数据；
+//	(2)然后创建 etcd pod
 func (cluster *Cluster) addOneMember() error {
 	cfg := clientv3.Config{
 		Endpoints:   cluster.members.ClientURLs(),

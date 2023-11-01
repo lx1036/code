@@ -27,25 +27,26 @@ func main() {
 
 /*
 NetConf
-{
-      "name": "cbr0",
-      "cniVersion": "0.3.1",
-      "plugins": [
-        {
-          "type": "flannel",
-          "delegate": {
-            "hairpinMode": true,
-            "isDefaultGateway": true
-          }
-        },
-        {
-          "type": "portmap",
-          "capabilities": {
-            "portMappings": true
-          }
-        }
-      ]
-    }
+
+	{
+	      "name": "cbr0",
+	      "cniVersion": "0.3.1",
+	      "plugins": [
+	        {
+	          "type": "flannel",
+	          "delegate": {
+	            "hairpinMode": true,
+	            "isDefaultGateway": true
+	          }
+	        },
+	        {
+	          "type": "portmap",
+	          "capabilities": {
+	            "portMappings": true
+	          }
+	        }
+	      ]
+	    }
 */
 type NetConf struct {
 	types.NetConf

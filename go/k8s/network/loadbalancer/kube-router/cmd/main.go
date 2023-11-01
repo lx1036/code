@@ -11,7 +11,6 @@ import (
 	"k8s.io/component-base/logs"
 )
 
-//
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()

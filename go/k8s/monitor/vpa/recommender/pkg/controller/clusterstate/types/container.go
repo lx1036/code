@@ -6,7 +6,8 @@ import "time"
 // Each ContainerState has a pointer to the aggregation that is used for
 // aggregating its usage samples.
 // It holds the recent history of CPU and memory utilization.
-//   Note: samples are added to intervals based on their start timestamps.
+//
+//	Note: samples are added to intervals based on their start timestamps.
 type ContainerState struct {
 	// Current request.
 	Request Resources

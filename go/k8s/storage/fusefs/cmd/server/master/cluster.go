@@ -552,7 +552,7 @@ func (cluster *Cluster) chooseTargetMetaHosts(excludeNodeSet *nodeSet, excludeHo
 	return
 }
 
-////////////////////////////Submit cmd to Raft///////////////////////////////////
+// //////////////////////////Submit cmd to Raft///////////////////////////////////
 // apply log to fsm
 func (cluster *Cluster) submit(cmd *RaftCmd) error {
 	data, _ := json.Marshal(cmd)

@@ -233,8 +233,9 @@ func (controller *NetworkServiceController) syncService(serviceMap serviceInfoMa
 }
 
 // INFO: (1) add ipvs virtual server
-//  (2) assign clusterIP to dummy interface, add route in local table
-//  (3) add/delete ipvs real server
+//
+//	(2) assign clusterIP to dummy interface, add route in local table
+//	(3) add/delete ipvs real server
 func (controller *NetworkServiceController) syncClusterIPService(serviceMap serviceInfoMap, endpointMap endpointInfoMap) error {
 	// (2) assign clusterIP to dummy interface, add route in local table
 	dummyVipInterface, err := controller.ln.EnsureDummyDevice()

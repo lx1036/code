@@ -473,7 +473,6 @@ func (exporter *Exporter) connectToRedis() (redis.Conn, error) {
 	return conn, nil
 }
 
-//
 func (exporter *Exporter) extractConfigMetrics(ch chan<- prometheus.Metric, config []string) (dbCount int, err error) {
 	if len(config)%2 != 0 {
 		return 0, fmt.Errorf("invalid config: %#v", config)

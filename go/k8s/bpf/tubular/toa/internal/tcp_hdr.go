@@ -12,21 +12,18 @@ import (
 
 	"k8s-lx1036/k8s/bpf/tubular/toa/internal/lock"
 
-
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc "$CLANG" -strip "$STRIP" -makebase "$MAKEDIR" tcpHeader ../ebpf/test_tcp_hdr_options.c -- -mcpu=v2 -nostdinc -Wall -Werror -Wno-compare-distinct-pointer-types -I../../ebpf/include
 
-
 type TcpHdr struct {
-	stateDir     *lock.File
-	Path         string
+	stateDir *lock.File
+	Path     string
 	// bindings     *ebpf.Map
 	// destinations *destinations
 }
-
 
 // "/proc/self/ns/net": 当前进程的网络命名空间
 // "/sys/fs/bpf"
@@ -96,7 +93,7 @@ func CreateTcpHdr(netnsPath, bpfFsPath string) (_ *TcpHdr, err error) {
 
 	return &TcpHdr{
 		stateDir: stateDir,
-		Path: pinPath,
+		Path:     pinPath,
 	}, nil
 }
 
@@ -160,4 +157,3 @@ func loadPatchedTcpHeader(to interface{}, opts *ebpf.CollectionOptions) (*ebpf.C
 
 	return spec, nil
 }
-

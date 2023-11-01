@@ -190,8 +190,9 @@ func (r *raftNode) startRaft() {
 }
 
 // INFO: @see https://github.com/etcd-io/etcd/blob/v3.5.1/server/embed/etcd.go#L530-L588
-//  https://github.com/etcd-io/etcd/blob/v3.5.1/server/etcdserver/api/etcdhttp/peer.go#L39-L76
-//  tcp serve peers，peers 之间消息传递：MsgHeartbeat 等，可见 https://github.com/etcd-io/etcd/blob/v3.5.1/raft/raftpb/raft.pb.go#L70-L94
+//
+//	https://github.com/etcd-io/etcd/blob/v3.5.1/server/etcdserver/api/etcdhttp/peer.go#L39-L76
+//	tcp serve peers，peers 之间消息传递：MsgHeartbeat 等，可见 https://github.com/etcd-io/etcd/blob/v3.5.1/raft/raftpb/raft.pb.go#L70-L94
 func (r *raftNode) servePeers() {
 	u, err := url.Parse(r.peers[r.id-1])
 	if err != nil {

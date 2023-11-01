@@ -28,37 +28,38 @@ const (
 
 /*
 INFO:
-  /usr/local/bin/etcd \
-      --name=$(name) \
-      --data-dir= /var/etcd/data\
-      # List of this member's peer URLs to advertise to the rest of the cluster
-      --initial-advertise-peer-urls=https://127.0.0.1:52380 \
-      # List of this member's client URLs to advertise to the public.
-      # The client URLs advertised should be accessible to machines that talk to etcd cluster.
-      # etcd client libraries parse these URLs to connect to the cluster
-      --advertise-client-urls=https://127.0.0.1:52379 \
-      # List of URLs to listen on for peer traffic
-      --listen-peer-urls=https://127.0.0.1:52380 \
-      # List of URLs to listen on for client traffic
-      --listen-client-urls=https://127.0.0.1:52379 \
-      # --initial-cluster Initial cluster configuration for bootstrapping
-      --initial-cluster 'infra1=https://127.0.0.1:42380,infra2=https://127.0.0.1:52380,infra3=https://127.0.0.1:62380' \
-      # Initial cluster state ('new' or 'existing')
-      --initial-cluster-state=new \
-      # Initial cluster token for the etcd cluster during bootstrap.
-      # Specifying this can protect you from unintended cross-cluster interaction when running multiple clusters
-      # 只有 state=new 才需要 --initial-cluster-token
-      --initial-cluster-token=etcd-cluster-0 \
-      # securePeer, peer 之间是否是 HTTPS
-      --peer-client-cert-auth=true \
-      --peer-trusted-ca-file=$(PWD)/tls/ca.pem \
-      --peer-cert-file=$(PWD)/tls/etcd.pem \
-      --peer-key-file=$(PWD)/tls/etcd-key.pem \
-      # secureClient, client 是否是 HTTPS
-      --client-cert-auth=true \
-      --trusted-ca-file=$(PWD)/tls/ca.pem \
-      --cert-file=$(PWD)/tls/etcd.pem \
-      --key-file=$(PWD)/tls/etcd-key.pem \
+
+	/usr/local/bin/etcd \
+	    --name=$(name) \
+	    --data-dir= /var/etcd/data\
+	    # List of this member's peer URLs to advertise to the rest of the cluster
+	    --initial-advertise-peer-urls=https://127.0.0.1:52380 \
+	    # List of this member's client URLs to advertise to the public.
+	    # The client URLs advertised should be accessible to machines that talk to etcd cluster.
+	    # etcd client libraries parse these URLs to connect to the cluster
+	    --advertise-client-urls=https://127.0.0.1:52379 \
+	    # List of URLs to listen on for peer traffic
+	    --listen-peer-urls=https://127.0.0.1:52380 \
+	    # List of URLs to listen on for client traffic
+	    --listen-client-urls=https://127.0.0.1:52379 \
+	    # --initial-cluster Initial cluster configuration for bootstrapping
+	    --initial-cluster 'infra1=https://127.0.0.1:42380,infra2=https://127.0.0.1:52380,infra3=https://127.0.0.1:62380' \
+	    # Initial cluster state ('new' or 'existing')
+	    --initial-cluster-state=new \
+	    # Initial cluster token for the etcd cluster during bootstrap.
+	    # Specifying this can protect you from unintended cross-cluster interaction when running multiple clusters
+	    # 只有 state=new 才需要 --initial-cluster-token
+	    --initial-cluster-token=etcd-cluster-0 \
+	    # securePeer, peer 之间是否是 HTTPS
+	    --peer-client-cert-auth=true \
+	    --peer-trusted-ca-file=$(PWD)/tls/ca.pem \
+	    --peer-cert-file=$(PWD)/tls/etcd.pem \
+	    --peer-key-file=$(PWD)/tls/etcd-key.pem \
+	    # secureClient, client 是否是 HTTPS
+	    --client-cert-auth=true \
+	    --trusted-ca-file=$(PWD)/tls/ca.pem \
+	    --cert-file=$(PWD)/tls/etcd.pem \
+	    --key-file=$(PWD)/tls/etcd-key.pem \
 */
 func newEtcdPod(member *Member, initialCluster []string, clusterName, state, token string, etcdClusterSpec v1.EtcdClusterSpec) *corev1.Pod {
 	commands := fmt.Sprintf("/usr/local/bin/etcd --name=%s --data-dir=%s --initial-advertise-peer-urls=%s --advertise-client-urls=%s --listen-peer-urls=%s --listen-client-urls=%s --initial-cluster=%s --initial-cluster-state=%s",

@@ -51,8 +51,9 @@ type PartitionConfig struct {
 
 // PartitionFSM
 // INFO: metadata 是由成百上千的partition组成，每个partition是由两个 BTree inode 和 BTree dentry 组成。
-//  每个partition使用multi raft组成保证高可用和一致性。
-//  @see https://chubaofs.readthedocs.io/zh_CN/latest/design/metanode.html
+//
+//	每个partition使用multi raft组成保证高可用和一致性。
+//	@see https://chubaofs.readthedocs.io/zh_CN/latest/design/metanode.html
 type PartitionFSM struct {
 	config  *PartitionConfig
 	size    uint64 // For partition all file size

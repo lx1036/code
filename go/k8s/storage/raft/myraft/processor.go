@@ -37,7 +37,6 @@ func (processor *FollowerProcessor) Init() error {
 	return nil
 }
 
-//
 func (processor *FollowerProcessor) handleAppend(request *AppendLogRequest) (*AppendLogResponse, error) {
 
 	appendLogResponse := &AppendLogResponse{}

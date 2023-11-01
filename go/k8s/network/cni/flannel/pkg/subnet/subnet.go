@@ -60,12 +60,13 @@ type kubeSubnetManager struct {
 
 // NewSubnetManager netConfPath=/etc/kube-flannel/net-conf.json
 // net-conf.json: |
-//    {
-//      "Network": "10.244.0.0/16",
-//      "Backend": {
-//        "Type": "vxlan"
-//      }
-//    }
+//
+//	{
+//	  "Network": "10.244.0.0/16",
+//	  "Backend": {
+//	    "Type": "vxlan"
+//	  }
+//	}
 func NewSubnetManager(ctx context.Context, kubeConfig, prefix,
 	netConfPath string, setNodeNetworkUnavailable bool) (Manager, error) {
 	cfg, err := clientcmd.BuildConfigFromFlags("", kubeConfig)

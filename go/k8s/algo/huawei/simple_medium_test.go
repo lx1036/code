@@ -842,7 +842,7 @@ func hj76() {
 	fmt.Println(VerifyingNicochaseTheorem(in))
 }
 
-//转化为数学问题，即等差数列求和问题，公差为2，由规律可知项数n等于输入的m
+// 转化为数学问题，即等差数列求和问题，公差为2，由规律可知项数n等于输入的m
 func VerifyingNicochaseTheorem(in int) string {
 	sum := math.Pow(float64(in), 3)
 	n := in
@@ -964,9 +964,9 @@ func longestPalindrome(s string) string {
 // https://www.nowcoder.com/practice/4b1658fd8ffb4217bc3b7e85a38cfaf2?tpId=37&tags=&title=&difficulty=2&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D2%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ86 求最大连续bit数
 // 输入描述：
-//输入一个int类型数字
-//输出描述：
-//输出转成二进制之后连续1的个数
+// 输入一个int类型数字
+// 输出描述：
+// 输出转成二进制之后连续1的个数
 func hj86() {
 	input := bufio.NewScanner(os.Stdin)
 	for input.Scan() {
@@ -991,10 +991,10 @@ func hj86() {
 
 // https://www.nowcoder.com/practice/52d382c2a7164767bca2064c1c9d5361?tpId=37&tags=&title=&difficulty=2&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D2%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ87 密码强度等级
-//输入描述：
-//输入一个string的密码
-//输出描述：
-//输出密码等级
+// 输入描述：
+// 输入一个string的密码
+// 输出描述：
+// 输出密码等级
 func hj87() {
 	for {
 		var a string
@@ -1126,11 +1126,11 @@ func award(c *Counter) int {
 // HJ91 走方格的方案数
 // INFO: DP: 动态规划
 // 请计算n*m的棋盘格子（n为横向的格子数，m为竖向的格子数）从棋盘左上角出发沿着边缘线从左上角走到右下角，总共有多少种走法，要求不能走回头路，即：只能往右和往下走，不能往左和往上走。
-//注：沿棋盘格之间的边缘线行走
-//输入描述：
-//输入两个正整数n和m，用空格隔开。(1≤n,m≤8)
-//输出描述：
-//输出一行结果
+// 注：沿棋盘格之间的边缘线行走
+// 输入描述：
+// 输入两个正整数n和m，用空格隔开。(1≤n,m≤8)
+// 输出描述：
+// 输出一行结果
 func hj91() {
 	var n, m int
 	fmt.Scan(&n, &m)
@@ -1160,10 +1160,10 @@ func hj91DP(n, m int) int {
 // https://www.nowcoder.com/practice/3350d379a5d44054b219de7af6708894?tpId=37&tags=&title=&difficulty=2&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D2%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ94 记票统计
 // 请实现一个计票统计系统。你会收到很多投票，其中有合法的也有不合法的，请统计每个候选人得票的数量以及不合法的票数。
-//输入描述：
-//第一行输入候选人的人数n，第二行输入n个候选人的名字（均为大写字母的字符串），第三行输入投票人的人数，第四行输入投票。
-//输出描述：
-//按照输入的顺序，每行输出候选人的名字和得票数量（以" : "隔开，注：英文冒号左右两边都有一个空格！），最后一行输出不合法的票数，格式为"Invalid : "+不合法的票数。
+// 输入描述：
+// 第一行输入候选人的人数n，第二行输入n个候选人的名字（均为大写字母的字符串），第三行输入投票人的人数，第四行输入投票。
+// 输出描述：
+// 按照输入的顺序，每行输出候选人的名字和得票数量（以" : "隔开，注：英文冒号左右两边都有一个空格！），最后一行输出不合法的票数，格式为"Invalid : "+不合法的票数。
 func hj94() {
 	input := bufio.NewScanner(os.Stdin)
 	for input.Scan() {
@@ -1193,10 +1193,10 @@ func hj94() {
 // https://www.nowcoder.com/practice/637062df51674de8ba464e792d1a0ac6?tpId=37&tags=&title=&difficulty=2&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D2%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ96 表示数字
 // 将一个字符串中所有的整数前后加上符号“*”，其他字符保持不变。连续的数字视为一个整数。
-//输入描述：
-//输入一个字符串
-//输出描述：
-//字符中所有出现的数字前后加上符号“*”，其他字符保持不变
+// 输入描述：
+// 输入一个字符串
+// 输出描述：
+// 字符中所有出现的数字前后加上符号“*”，其他字符保持不变
 func hj96() {
 	input := bufio.NewScanner(os.Stdin)
 	for input.Scan() {
@@ -1229,11 +1229,11 @@ func hj96() {
 // HJ97 记负均正
 // 首先输入要输入的整数个数n，然后输入n个整数。输出为n个整数中负数的个数，和所有正整数的平均值，结果保留一位小数。
 // 0即不是正整数，也不是负数，不计入计算。如果没有正数，则平均值为0。
-//输入描述：
-//首先输入一个正整数n，
-//然后输入n个整数。
-//输出描述：
-//输出负数的个数，和所有正整数的平均值。
+// 输入描述：
+// 首先输入一个正整数n，
+// 然后输入n个整数。
+// 输出描述：
+// 输出负数的个数，和所有正整数的平均值。
 func hj97() {
 	input := bufio.NewScanner(os.Stdin)
 	for input.Scan() {
@@ -1266,9 +1266,9 @@ func hj97() {
 // HJ99 自守数
 // 自守数是指一个数的平方的尾数等于该数自身的自然数。例如：25^2 = 625，76^2 = 5776，9376^2 = 87909376。请求出n(包括n)以内的自守数的个数
 // 输入描述：
-//int型整数
-//输出描述：
-//n以内自守数的数量。
+// int型整数
+// 输出描述：
+// n以内自守数的数量。
 func hj99() {
 	input := bufio.NewScanner(os.Stdin)
 	for input.Scan() {
@@ -1287,8 +1287,8 @@ func hj99() {
 // https://www.nowcoder.com/practice/f792cb014ed0474fb8f53389e7d9c07f?tpId=37&tags=&title=&difficulty=2&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D2%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ100 等差数列
 // 等差数列 2，5，8，11，14。。。。
-//（从 2 开始的 3 为公差的等差数列）
-//输出求等差数列前n项和
+// （从 2 开始的 3 为公差的等差数列）
+// 输出求等差数列前n项和
 func hj100() {
 	input := bufio.NewScanner(os.Stdin)
 	for input.Scan() {
@@ -1306,9 +1306,9 @@ func hj100() {
 // https://www.nowcoder.com/practice/c1f9561de1e240099bdb904765da9ad0?tpId=37&tags=&title=&difficulty=2&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D2%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ102 字符统计
 // 输入描述：
-//一个只包含小写英文字母和数字的字符串。
-//输出描述：
-//一个字符串，为不同字母出现次数的降序表示。若出现次数相同，则按ASCII码的升序输出。
+// 一个只包含小写英文字母和数字的字符串。
+// 输出描述：
+// 一个字符串，为不同字母出现次数的降序表示。若出现次数相同，则按ASCII码的升序输出。
 func hj102() {
 	input := bufio.NewScanner(os.Stdin)
 	for input.Scan() {
@@ -1333,12 +1333,12 @@ func hj102() {
 
 // https://www.nowcoder.com/practice/64f6f222499c4c94b338e588592b6a62?tpId=37&tags=&title=&difficulty=2&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D2%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ105 记负均正II
-//输入 n 个整型数，统计其中的负数个数并求所有非负数的平均值，结果保留一位小数，如果没有非负数，则平均值为0
-//本题有多组输入数据，输入到文件末尾。
+// 输入 n 个整型数，统计其中的负数个数并求所有非负数的平均值，结果保留一位小数，如果没有非负数，则平均值为0
+// 本题有多组输入数据，输入到文件末尾。
 // 输入描述：
-//输入任意个整数，每行输入一个。
-//输出描述：
-//输出负数个数以及所有非负数的平均值
+// 输入任意个整数，每行输入一个。
+// 输出描述：
+// 输出负数个数以及所有非负数的平均值
 func hj105() {
 	count, no := 0, 0
 	var sum float64 = 0
@@ -1377,9 +1377,9 @@ func hj106() {
 // https://www.nowcoder.com/practice/22948c2cad484e0291350abad86136c3?tpId=37&tags=&title=&difficulty=2&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D2%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ108 求最小公倍数
 // 输入描述：
-//输入两个正整数A和B。
-//输出描述：
-//输出A和B的最小公倍数。
+// 输入两个正整数A和B。
+// 输出描述：
+// 输出A和B的最小公倍数。
 func hj108() {
 	var a, b int
 	fmt.Scanf("%d %d", &a, &b)
@@ -1518,29 +1518,29 @@ func max(a int, b int) int {
 // https://www.nowcoder.com/practice/119bcca3befb405fbe58abe9c532eb29?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ17 坐标移动
 // 描述
-//开发一个坐标计算工具， A表示向左移动，D表示向右移动，W表示向上移动，S表示向下移动。从（0,0）点开始移动，从输入字符串里面读取一些坐标，并将最终输入结果输出到输出文件里面。
-//输入：
-//合法坐标为A(或者D或者W或者S) + 数字（两位以内）
-//坐标之间以;分隔。
-//非法坐标点需要进行丢弃。如AA10;  A1A;  $%$;  YAD; 等。
-//下面是一个简单的例子 如：
-//A10;S20;W10;D30;X;A1A;B10A11;;A10;
-//处理过程：
-//起点（0,0）
-//+   A10   =  （-10,0）
-//+   S20   =  (-10,-20)
-//+   W10  =  (-10,-10)
-//+   D30  =  (20,-10)
-//+   x    =  无效
-//+   A1A   =  无效
-//+   B10A11   =  无效
-//+  一个空 不影响
-//+   A10  =  (10,-10)
-//结果 （10， -10）
+// 开发一个坐标计算工具， A表示向左移动，D表示向右移动，W表示向上移动，S表示向下移动。从（0,0）点开始移动，从输入字符串里面读取一些坐标，并将最终输入结果输出到输出文件里面。
+// 输入：
+// 合法坐标为A(或者D或者W或者S) + 数字（两位以内）
+// 坐标之间以;分隔。
+// 非法坐标点需要进行丢弃。如AA10;  A1A;  $%$;  YAD; 等。
+// 下面是一个简单的例子 如：
+// A10;S20;W10;D30;X;A1A;B10A11;;A10;
+// 处理过程：
+// 起点（0,0）
+// +   A10   =  （-10,0）
+// +   S20   =  (-10,-20)
+// +   W10  =  (-10,-10)
+// +   D30  =  (20,-10)
+// +   x    =  无效
+// +   A1A   =  无效
+// +   B10A11   =  无效
+// +  一个空 不影响
+// +   A10  =  (10,-10)
+// 结果 （10， -10）
 // 输入描述：
-//一行字符串
-//输出描述：
-//最终坐标，以逗号分隔
+// 一行字符串
+// 输出描述：
+// 最终坐标，以逗号分隔
 func hj17() {
 	input := bufio.NewScanner(os.Stdin)
 	input.Scan()
@@ -1581,15 +1581,15 @@ func removeCoord(s string) (int, int) {
 // https://www.nowcoder.com/practice/184edec193864f0985ad2684fbc86841?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ20 密码验证合格程序
 // 描述
-//密码要求:
-//1.长度超过8位
-//2.包括大小写字母.数字.其它符号,以上四种至少三种
-//3.不能有长度大于2的包含公共元素的子串重复 （注：其他符号不含空格或换行）
-//数据范围：输入的字符串长度满足 1 \le n \le 100 \1≤n≤100
-//输入描述：
-//一组字符串。
-//输出描述：
-//如果符合要求输出：OK，否则输出NG
+// 密码要求:
+// 1.长度超过8位
+// 2.包括大小写字母.数字.其它符号,以上四种至少三种
+// 3.不能有长度大于2的包含公共元素的子串重复 （注：其他符号不含空格或换行）
+// 数据范围：输入的字符串长度满足 1 \le n \le 100 \1≤n≤100
+// 输入描述：
+// 一组字符串。
+// 输出描述：
+// 如果符合要求输出：OK，否则输出NG
 func hj20() {
 	var inputHexStr string
 	for {
@@ -1656,41 +1656,45 @@ func hj20() {
 // https://www.nowcoder.com/practice/6d9d69e3898f45169a441632b325c7b4?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ24 合唱队
 // 描述
-//N 位同学站成一排，音乐老师要请最少的同学出列，使得剩下的 K 位同学排成合唱队形。
-//设KK位同学从左到右依次编号为 1，2…，K ，他们的身高分别为T_1,T_2,…,T_KT
-//1
+// N 位同学站成一排，音乐老师要请最少的同学出列，使得剩下的 K 位同学排成合唱队形。
+// 设KK位同学从左到右依次编号为 1，2…，K ，他们的身高分别为T_1,T_2,…,T_KT
+// 1
 // ,T
-//2
+// 2
 // ,…,T
-//K
-//  ，若存在i(1\leq i\leq K)i(1≤i≤K) 使得T_1<T_2<......<T_{i-1}<T_iT
-//1
+// K
+//
+//	，若存在i(1\leq i\leq K)i(1≤i≤K) 使得T_1<T_2<......<T_{i-1}<T_iT
+//
+// 1
 // <T
-//2
+// 2
 // <......<T
-//i−1
+// i−1
 // <T
-//i
-//  且 T_i>T_{i+1}>......>T_KT
-//i
+// i
+//
+//	且 T_i>T_{i+1}>......>T_KT
+//
+// i
 // >T
-//i+1
+// i+1
 // >......>T
-//K
+// K
 // ，则称这KK名同学排成了合唱队形。
-//通俗来说，能找到一个同学，他的两边的同学身高都依次严格降低的队形就是合唱队形。
-//例子：
-//123 124 125 123 121 是一个合唱队形
-//123 123 124 122不是合唱队形，因为前两名同学身高相等，不符合要求
-//123 122 121 122不是合唱队形，因为找不到一个同学，他的两侧同学身高递减。
+// 通俗来说，能找到一个同学，他的两边的同学身高都依次严格降低的队形就是合唱队形。
+// 例子：
+// 123 124 125 123 121 是一个合唱队形
+// 123 123 124 122不是合唱队形，因为前两名同学身高相等，不符合要求
+// 123 122 121 122不是合唱队形，因为找不到一个同学，他的两侧同学身高递减。
 //
-//你的任务是，已知所有N位同学的身高，计算最少需要几位同学出列，可以使得剩下的同学排成合唱队形。
+// 你的任务是，已知所有N位同学的身高，计算最少需要几位同学出列，可以使得剩下的同学排成合唱队形。
 //
-//注意：不允许改变队列元素的先后顺序 且 不要求最高同学左右人数必须相等
+// 注意：不允许改变队列元素的先后顺序 且 不要求最高同学左右人数必须相等
 // 输入描述：
-//用例两行数据，第一行是同学的总数 N ，第二行是 N 位同学的身高，以空格隔开
-//输出描述：
-//最少需要几位同学出列
+// 用例两行数据，第一行是同学的总数 N ，第二行是 N 位同学的身高，以空格隔开
+// 输出描述：
+// 最少需要几位同学出列
 func hj24() {
 	var n, scanN int
 	var heights []int
@@ -1747,13 +1751,13 @@ func hj24DP(heights []int) int {
 // https://www.nowcoder.com/practice/5190a1db6f4f4ddb92fd9c365c944584?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ26 字符串排序
 // 描述
-//编写一个程序，将输入字符串中的字符按如下规则排序。
-//规则 1 ：英文字母从 A 到 Z 排列，不区分大小写。
-//如，输入： Type 输出： epTy
-//规则 2 ：同一个英文字母的大小写同时存在时，按照输入顺序排列。
-//如，输入： BabA 输出： aABb
-//规则 3 ：非英文字母的其它字符保持原来的位置。
-//如，输入： By?e 输出： Be?y
+// 编写一个程序，将输入字符串中的字符按如下规则排序。
+// 规则 1 ：英文字母从 A 到 Z 排列，不区分大小写。
+// 如，输入： Type 输出： epTy
+// 规则 2 ：同一个英文字母的大小写同时存在时，按照输入顺序排列。
+// 如，输入： BabA 输出： aABb
+// 规则 3 ：非英文字母的其它字符保持原来的位置。
+// 如，输入： By?e 输出： Be?y
 func hj26() {
 	input := bufio.NewScanner(os.Stdin)
 	for input.Scan() {
@@ -1785,9 +1789,9 @@ func hj26() {
 // https://www.nowcoder.com/practice/03ba8aeeef73400ca7a37a5f3370fe68?tpId=37&tqId=21250&rp=1&ru=/exam/oj/ta&qru=/exam/oj/ta&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37&difficulty=3&judgeStatus=undefined&tags=&title=
 // HJ27 查找兄弟单词
 // 输入描述：
-//输入只有一行。 先输入字典中单词的个数n，再输入n个单词作为字典单词。 然后输入一个单词x 最后后输入一个整数k
-//输出描述：
-//第一行输出查找到x的兄弟单词的个数m 第二行输出查找到的按照字典顺序排序后的第k个兄弟单词，没有符合第k个的话则不用输出。
+// 输入只有一行。 先输入字典中单词的个数n，再输入n个单词作为字典单词。 然后输入一个单词x 最后后输入一个整数k
+// 输出描述：
+// 第一行输出查找到x的兄弟单词的个数m 第二行输出查找到的按照字典顺序排序后的第k个兄弟单词，没有符合第k个的话则不用输出。
 func hj27() {
 	input := bufio.NewScanner(os.Stdin)
 	input.Scan()
@@ -1832,11 +1836,11 @@ func hj27() {
 // https://www.nowcoder.com/practice/2aa32b378a024755a3f251e75cbf233a?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ29 字符串加解密
 // 对输入的字符串进行加解密，并输出。
-//加密方法为：
-//当内容是英文字母时则用该英文字母的后一个字母替换，同时字母变换大小写,如字母a时则替换为B；字母Z时则替换为a；
-//当内容是数字时则把该数字加1，如0替换1，1替换2，9替换0；
-//其他字符不做变化。
-//解密方法为加密的逆过程。
+// 加密方法为：
+// 当内容是英文字母时则用该英文字母的后一个字母替换，同时字母变换大小写,如字母a时则替换为B；字母Z时则替换为a；
+// 当内容是数字时则把该数字加1，如0替换1，1替换2，9替换0；
+// 其他字符不做变化。
+// 解密方法为加密的逆过程。
 func hj29() {
 	input := bufio.NewScanner(os.Stdin)
 	for input.Scan() {
@@ -1919,7 +1923,7 @@ func permuteUnique(nums []int) (ans [][]int) {
 // https://leetcode.cn/problems/nge-tou-zi-de-dian-shu-lcof/
 // 剑指 Offer 60. n个骰子的点数
 // 把n个骰子扔在地上，所有骰子朝上一面的点数之和为s。输入n，打印出s的所有可能的值出现的概率。
-//你需要用一个浮点数数组返回答案，其中第 i 个元素代表这 n 个骰子所能掷出的点数集合中第 i 小的那个的概率。
+// 你需要用一个浮点数数组返回答案，其中第 i 个元素代表这 n 个骰子所能掷出的点数集合中第 i 小的那个的概率。
 func twoSum(n int) []float64 {
 	dp := make([][]int, n+1)
 	for i := 0; i <= n; i++ {
@@ -1953,9 +1957,9 @@ func twoSum(n int) []float64 {
 // https://www.nowcoder.com/practice/3cd4621963e8454594f00199f4536bb1?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ32 密码截取
 // 输入描述：
-//输入一个字符串（字符串的长度不超过2500）
-//输出描述：
-//返回有效密码串的最大长度
+// 输入一个字符串（字符串的长度不超过2500）
+// 输出描述：
+// 返回有效密码串的最大长度
 // 和 HJ85 最长回文子串一样
 func hj32() {
 	var s string
@@ -1995,13 +1999,13 @@ func longestPalindromehj32(s string) int {
 // https://www.nowcoder.com/practice/66ca0e28f90c42a196afd78cc9c496ea?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ33 整数与IP地址间的转换
 // 输入描述：
-//输入
-//1 输入IP地址
-//2 输入10进制型的IP地址
-//输出描述：
-//输出
-//1 输出转换成10进制的IP地址
-//2 输出转换后的IP地址
+// 输入
+// 1 输入IP地址
+// 2 输入10进制型的IP地址
+// 输出描述：
+// 输出
+// 1 输出转换成10进制的IP地址
+// 2 输出转换后的IP地址
 func hj33() {
 	var ip string
 	fmt.Scan(&ip)
@@ -2123,10 +2127,10 @@ func hj38() {
 // https://www.nowcoder.com/practice/f9a4c19050fc477e9e27eb75f3bfd49c?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ41 称砝码
 // 输入描述：
-//对于每组测试数据：
-//第一行：n --- 砝码的种数(范围[1,10])
-//第二行：m1 m2 m3 ... mn --- 每种砝码的重量(范围[1,2000])
-//第三行：x1 x2 x3 .... xn --- 每种砝码对应的数量(范围[1,10])
+// 对于每组测试数据：
+// 第一行：n --- 砝码的种数(范围[1,10])
+// 第二行：m1 m2 m3 ... mn --- 每种砝码的重量(范围[1,2000])
+// 第三行：x1 x2 x3 .... xn --- 每种砝码对应的数量(范围[1,10])
 func hj41() {
 	var n int
 	fmt.Scan(&n)
@@ -2161,14 +2165,14 @@ func hj41() {
 // https://www.nowcoder.com/practice/cf24906056f4488c9ddb132f317e03bc?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ43 迷宫问题
 // 定义一个二维数组 N*M ，如 5 × 5 数组下所示：
-//int maze[5][5] = {
-//0, 1, 0, 0, 0,
-//0, 1, 1, 1, 0,
-//0, 0, 0, 0, 0,
-//0, 1, 1, 1, 0,
-//0, 0, 0, 1, 0,
-//};
-//它表示一个迷宫，其中的1表示墙壁，0表示可以走的路，只能横着走或竖着走，不能斜着走，要求编程序找出从左上角到右下角的路线。入口点为[0,0],既第一格是可以走的路。
+// int maze[5][5] = {
+// 0, 1, 0, 0, 0,
+// 0, 1, 1, 1, 0,
+// 0, 0, 0, 0, 0,
+// 0, 1, 1, 1, 0,
+// 0, 0, 0, 1, 0,
+// };
+// 它表示一个迷宫，其中的1表示墙壁，0表示可以走的路，只能横着走或竖着走，不能斜着走，要求编程序找出从左上角到右下角的路线。入口点为[0,0],既第一格是可以走的路。
 func dfs(flag [1000][1000]bool, input [][]int, ret *[][]int, i, j, m, n int) { // INFO: 深度优先搜索
 	if i < 0 || j < 0 || i >= m || j >= n {
 		return
@@ -2222,8 +2226,8 @@ func hj43() {
 // https://www.nowcoder.com/practice/02cb8d3597cf416d9f6ae1b9ddc4fde3?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ45 名字的漂亮度
 // 给出一个字符串，该字符串仅由小写字母组成，定义这个字符串的“漂亮度”是其所有字母“漂亮度”的总和。
-//每个字母都有一个“漂亮度”，范围在1到26之间。没有任何两个不同字母拥有相同的“漂亮度”。字母忽略大小写。
-//给出多个字符串，计算每个字符串最大可能的“漂亮度”。
+// 每个字母都有一个“漂亮度”，范围在1到26之间。没有任何两个不同字母拥有相同的“漂亮度”。字母忽略大小写。
+// 给出多个字符串，计算每个字符串最大可能的“漂亮度”。
 func hj45() {
 	n := 0
 	fmt.Scan(&n)
@@ -2358,9 +2362,9 @@ func isDigit(n byte) bool {
 // https://www.nowcoder.com/practice/3959837097c7413a961a135d7104c314?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ52 计算字符串的编辑距离
 // 字符串A: abcdefg
-//字符串B: abcdef
-//通过增加或是删掉字符 ”g” 的方式达到目的。这两种方案都需要一次操作。把这个操作所需要的次数定义为两个字符串的距离。
-//不看答案想不出系列 动态规划 dp[i][j] = min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+1 {是否加1视情况而定})
+// 字符串B: abcdef
+// 通过增加或是删掉字符 ”g” 的方式达到目的。这两种方案都需要一次操作。把这个操作所需要的次数定义为两个字符串的距离。
+// 不看答案想不出系列 动态规划 dp[i][j] = min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+1 {是否加1视情况而定})
 func hj52() {
 	for {
 		var word1, word2 string
@@ -2406,7 +2410,7 @@ func Min(args ...int) int {
 // https://www.nowcoder.com/practice/ba241b85371c409ea01ac0aa1a8d957b?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ55 挑7
 // 输出 1到n之间 的与 7 有关数字的个数。
-//一个数与7有关是指这个数是 7 的倍数，或者是包含 7 的数字（如 17 ，27 ，37 ... 70 ，71 ，72 ，73...）
+// 一个数与7有关是指这个数是 7 的倍数，或者是包含 7 的数字（如 17 ，27 ，37 ... 70 ，71 ，72 ，73...）
 func hj55() {
 	bs := bufio.NewScanner(os.Stdin)
 	for bs.Scan() {
@@ -2433,10 +2437,10 @@ func hj55() {
 }
 
 // https://www.nowcoder.com/practice/49e772ab08994a96980f9618892e55b6?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
-//输入描述：
-//输入两个字符串。保证字符串只含有'0'~'9'字符
-//输出描述：
-//输出求和后的结果
+// 输入描述：
+// 输入两个字符串。保证字符串只含有'0'~'9'字符
+// 输出描述：
+// 输出求和后的结果
 // HJ57 高精度整数加法
 func hj57() {
 	bs := bufio.NewScanner(os.Stdin)
@@ -2723,7 +2727,7 @@ func solutionhj66(s string) {
 // https://www.nowcoder.com/practice/fbc417f314f745b1978fc751a54ac8cb?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ67 24点游戏算法
 // 给出4个1-10的数字，通过加减乘除运算，得到数字为24就算胜利,除法指实数除法运算,运算符仅允许出现在两个数字之间,本题对数字选取顺序无要求，但每个数字仅允许使用一次，且需考虑括号运算
-//此题允许数字重复，如3 3 4 4为合法输入，此输入一共有两个3，但是每个数字只允许使用一次，则运算过程中两个3都被选取并进行对应的计算操作。
+// 此题允许数字重复，如3 3 4 4为合法输入，此输入一共有两个3，但是每个数字只允许使用一次，则运算过程中两个3都被选取并进行对应的计算操作。
 var visited []bool
 var li []float64
 
@@ -2761,13 +2765,13 @@ func counthj67(num, sum float64) bool {
 // HJ69 矩阵乘法
 // 如果A是个x行y列的矩阵，B是个y行z列的矩阵，把A和B相乘，其结果将是另一个x行z列的矩阵C。这个矩阵的每个元素是由下面的公式决定的
 // 输入描述：
-//第一行包含一个正整数x，代表第一个矩阵的行数
-//第二行包含一个正整数y，代表第一个矩阵的列数和第二个矩阵的行数
-//第三行包含一个正整数z，代表第二个矩阵的列数
-//之后x行，每行y个整数，代表第一个矩阵的值
-//之后y行，每行z个整数，代表第二个矩阵的值
+// 第一行包含一个正整数x，代表第一个矩阵的行数
+// 第二行包含一个正整数y，代表第一个矩阵的列数和第二个矩阵的行数
+// 第三行包含一个正整数z，代表第二个矩阵的列数
+// 之后x行，每行y个整数，代表第一个矩阵的值
+// 之后y行，每行z个整数，代表第二个矩阵的值
 // 输出描述：
-//对于每组输入数据，输出x行，每行z个整数，代表两个矩阵相乘的结果
+// 对于每组输入数据，输出x行，每行z个整数，代表两个矩阵相乘的结果
 func hj69() {
 	for true {
 		var a, b, c int
@@ -2817,11 +2821,11 @@ func hj69() {
 
 // https://www.nowcoder.com/practice/15e41630514445719a942e004edc0a5b?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ70 矩阵乘法计算量估算
-//矩阵乘法的运算量与矩阵乘法的顺序强相关。
-//例如：
-//A是一个50×10的矩阵，B是10×20的矩阵，C是20×5的矩阵
-//计算A*B*C有两种顺序：((AB)C)或者(A(BC))，前者需要计算15000次乘法，后者只需要3500次。
-//编写程序计算不同的计算顺序需要进行的乘法次数。
+// 矩阵乘法的运算量与矩阵乘法的顺序强相关。
+// 例如：
+// A是一个50×10的矩阵，B是10×20的矩阵，C是20×5的矩阵
+// 计算A*B*C有两种顺序：((AB)C)或者(A(BC))，前者需要计算15000次乘法，后者只需要3500次。
+// 编写程序计算不同的计算顺序需要进行的乘法次数。
 func hj70() {
 	var n int
 	fmt.Scan(&n)
@@ -2872,12 +2876,12 @@ func multi(x, y []int) ([]int, int) {
 // https://www.nowcoder.com/practice/43072d50a6eb44d2a6c816a283b02036?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ71 字符串通配符
 // 问题描述：在计算机中，通配符一种特殊语法，广泛应用于文件搜索、数据库、正则表达式等领域。现要求各位实现字符串通配符的算法。
-//要求：
-//实现如下2个通配符：
-//*：匹配0个或以上的字符（注：能被*和?匹配的字符仅由英文字母和数字0到9组成，下同）
-//？：匹配1个字符
-//注意：匹配时不区分大小写。
-//考虑暴力递归过于复杂，可考虑动态规划计dp[i][j]为以s1[i],s2[j]结尾的字符串能否匹配,状态满足无后效性前提，
+// 要求：
+// 实现如下2个通配符：
+// *：匹配0个或以上的字符（注：能被*和?匹配的字符仅由英文字母和数字0到9组成，下同）
+// ？：匹配1个字符
+// 注意：匹配时不区分大小写。
+// 考虑暴力递归过于复杂，可考虑动态规划计dp[i][j]为以s1[i],s2[j]结尾的字符串能否匹配,状态满足无后效性前提，
 // 可尝试进行递推动态转移方程
 // 则 dp[i][j] =
 // 若 s2[j] 为给定字符类型（数字和字母） 分五种情况讨论
@@ -2938,7 +2942,7 @@ func hj71() {
 	}
 }
 
-//判断是否为给定字符类型
+// 判断是否为给定字符类型
 func match(r byte) bool {
 	if r >= '0' && r <= '9' {
 		return true
@@ -3030,7 +3034,7 @@ func hj82() {
 // https://www.nowcoder.com/practice/995b8a548827494699dc38c3e2a54ee9?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ90 合法IP
 // IPV4地址可以用一个32位无符号整数来表示，一般用点分方式来显示，点将IP地址分成4个部分，每个部分为8位，表示成一个无符号整数（因此正号不需要出现），如10.137.17.1，是我们非常熟悉的IP地址，一个IP地址串中没有空格出现（因为要表示成一个32数字）。
-//现在需要你用程序来判断IP是否合法。
+// 现在需要你用程序来判断IP是否合法。
 func hj90() {
 	for {
 		var (
@@ -3076,7 +3080,7 @@ func hj90() {
 // https://www.nowcoder.com/practice/2c81f88ecd5a4cc395b5308a99afbbec?tpId=37&tags=&title=&difficulty=3&judgeStatus=0&rp=1&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37
 // HJ92 在字符串中找出连续最长的数字串
 // 输入一个字符串，返回其最长的数字子串，以及其长度。若有多个最长的数字子串，则将它们全部输出（按原字符串的相对位置）
-//本题含有多组样例输入。
+// 本题含有多组样例输入。
 func hj92() {
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
@@ -3117,7 +3121,7 @@ func getReshj92(str string) (string, int) {
 // https://www.nowcoder.com/practice/caf35ae421194a1090c22fe223357dca?tpId=37&tqId=21330&rp=1&ru=/exam/oj/ta&qru=/exam/oj/ta&sourceUrl=%2Fexam%2Foj%2Fta%3Fdifficulty%3D3%26page%3D1%26pageSize%3D50%26search%3D%26tpId%3D37%26type%3D37&difficulty=3&judgeStatus=undefined&tags=&title=
 // HJ107 求解立方根
 // 计算一个浮点数的立方根，不使用库函数。
-//保留一位小数。
+// 保留一位小数。
 func hj107() {
 	var (
 		input float64

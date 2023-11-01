@@ -89,8 +89,9 @@ const (
 
 // InodeCache
 // INFO: 这里使用了 LRU 数据结构，并且每一个 item 都有过期时间
-//  最新使用的置前，60min 后会 evict 过期的。然后再 tcp 从 meta partition cluster 重新获取新的 inode info，
-//  然后每 AttrValidDuration 5min 内核会检查该 inode Attributes 会过期，重新调用 GetInodeAttributes 来刷新，见 GetInodeAttributes() 函数
+//
+//	最新使用的置前，60min 后会 evict 过期的。然后再 tcp 从 meta partition cluster 重新获取新的 inode info，
+//	然后每 AttrValidDuration 5min 内核会检查该 inode Attributes 会过期，重新调用 GetInodeAttributes 来刷新，见 GetInodeAttributes() 函数
 type InodeCache struct {
 	sync.RWMutex
 

@@ -70,7 +70,8 @@ func New(b backend.Backend, le lease.Lessor, cfg StoreConfig) WatchableKV {
 
 // NewWatchableStore
 // INFO: 该对象是etcd最核心的一个功能，watch 功能，可以 watch key 和 watch range keys
-//  会启动两个goroutine, syncedWatchers/unsyncedWatchers/
+//
+//	会启动两个goroutine, syncedWatchers/unsyncedWatchers/
 func NewWatchableStore(b backend.Backend, le lease.Lessor, cfg StoreConfig) *watchableStore {
 	s := &watchableStore{
 		store:    NewStore(b, le, cfg),

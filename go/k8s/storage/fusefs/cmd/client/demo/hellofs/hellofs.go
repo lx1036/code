@@ -116,9 +116,9 @@ type helloFS struct {
 
 // NewHelloFS INFO: Create a file system with a fixed structure that looks like this:
 //
-//     hello
-//     dir/
-//         world
+//	hello
+//	dir/
+//	    world
 //
 // Each file contains the string "Hello, world!".
 func NewHelloFS() (fuse.Server, error) {
@@ -208,21 +208,20 @@ func (fs *helloFS) ReadDir(ctx context.Context, op *fuseops.ReadDirOp) error {
 	return nil
 }
 
-//func (fs *helloFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
-//	// Let io.ReaderAt deal with the semantics.
-//	reader := strings.NewReader("Hello, world!")
+//	func (fs *helloFS) ReadFile(ctx context.Context, op *fuseops.ReadFileOp) error {
+//		// Let io.ReaderAt deal with the semantics.
+//		reader := strings.NewReader("Hello, world!")
 //
-//	var err error
-//	op.BytesRead, err = reader.ReadAt(op.Dst, op.Offset)
+//		var err error
+//		op.BytesRead, err = reader.ReadAt(op.Dst, op.Offset)
 //
-//	// Special case: FUSE doesn't expect us to return io.EOF.
-//	if err == io.EOF {
-//		return nil
+//		// Special case: FUSE doesn't expect us to return io.EOF.
+//		if err == io.EOF {
+//			return nil
+//		}
+//
+//		return err
 //	}
-//
-//	return err
-//}
-//
 func (fs *helloFS) LookUpInode(ctx context.Context, op *fuseops.LookUpInodeOp) error {
 	// Find the info for the parent.
 	parentInfo, ok := gInodeInfo[op.Parent]

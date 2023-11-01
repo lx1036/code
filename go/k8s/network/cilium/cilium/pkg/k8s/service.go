@@ -324,7 +324,9 @@ func (s *ServiceCache) UpdateService(k8sSvc *corev1.Service, swg *lock.Stoppable
 // returns a boolean that indicates whether the service is ready to be plumbed,
 // this is true if:
 // IF If ta local endpoints resource is present. Regardless whether the
-//    endpoints resource contains actual backends or not.
+//
+//	endpoints resource contains actual backends or not.
+//
 // OR Remote endpoints exist which correlate to the service.
 func (s *ServiceCache) correlateEndpoints(id ServiceID) (*Endpoints, bool) {
 	endpoints := newEndpoints()

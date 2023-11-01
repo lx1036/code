@@ -322,7 +322,7 @@ type ContainerLogConfig struct {
 	MultilinePattern MultilineConfig `json:"multiline_pattern,omitempty"`
 }
 
-//type ContainerLogConfigs map[string]ContainerLogConfig // key写container name
+// type ContainerLogConfigs map[string]ContainerLogConfig // key写container name
 type Conf struct {
 	ContainerLogConfigs ContainerLogConfig `json:"containerLogConfigs"`
 }

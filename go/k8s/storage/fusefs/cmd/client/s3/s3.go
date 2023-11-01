@@ -221,8 +221,9 @@ func (s3Client *S3Client) SupportCallBack() bool {
 }
 
 // INFO: 从 file 文件读取数据写到 data
-//  aws s3api get-object --key=2 --bucket pvc-f73f7c99-0b5c-40ee-b57c-acdebcebed34 --endpoint-url ${endpoint-url} --range bytes=1-100 2.txt
-//  => "asdfadfasdfasdfasdf"
+//
+//	aws s3api get-object --key=2 --bucket pvc-f73f7c99-0b5c-40ee-b57c-acdebcebed34 --endpoint-url ${endpoint-url} --range bytes=1-100 2.txt
+//	=> "asdfadfasdfasdfasdf"
 func (s3Client *S3Client) Read(file string, offset int64, data []byte) (int, error) {
 	rNeed := len(data)
 	end := offset + int64(rNeed) - 1

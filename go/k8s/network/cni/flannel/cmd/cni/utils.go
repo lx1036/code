@@ -29,7 +29,9 @@ func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 	return ioutil.WriteFile(path, netconf, 0600)
 }
 
-/* /run/flannel/subnet.env file that looks like this
+/*
+	/run/flannel/subnet.env file that looks like this
+
 FLANNEL_NETWORK=10.1.0.0/16
 FLANNEL_SUBNET=10.1.17.1/24
 FLANNEL_MTU=1472

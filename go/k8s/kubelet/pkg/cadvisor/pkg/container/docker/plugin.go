@@ -135,7 +135,7 @@ var (
 // The retry times for getting docker root dir
 const rootDirRetries = 5
 
-//The retry period for getting docker root dir, Millisecond
+// The retry period for getting docker root dir, Millisecond
 const rootDirRetryPeriod time.Duration = 1000 * time.Millisecond
 
 func RootDir() string {

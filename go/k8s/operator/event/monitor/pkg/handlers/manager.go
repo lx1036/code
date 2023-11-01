@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-//
 type Manager struct {
 	// 处理event的各个handler，包括log,360home,email等
 	Handlers []events.Handler

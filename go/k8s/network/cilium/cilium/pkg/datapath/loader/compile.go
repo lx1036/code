@@ -98,7 +98,8 @@ func compile(ctx context.Context, prog *progInfo, dir *directoryInfo, debug bool
 }
 
 // INFO: clang -O2 -g -Wall -target bpf -emit-llvm -c xdp-example.c -o xdp-example.bc -| llc xdp-example.bc -march=bpf -mattr=dwarfris -filetype=obj -o xdp-example.o
-//  这个 Compile 逻辑，以后 BPF 可以直接复用就行
+//
+//	这个 Compile 逻辑，以后 BPF 可以直接复用就行
 func compileAndLink(ctx context.Context, prog *progInfo, dir *directoryInfo, debug bool, compileArgs ...string) error {
 	compileCmd := exec.CommandContext(ctx, compiler, compileArgs...)
 	compilerStdout, compilerStderr, err := prepareCmdPipes(compileCmd)
