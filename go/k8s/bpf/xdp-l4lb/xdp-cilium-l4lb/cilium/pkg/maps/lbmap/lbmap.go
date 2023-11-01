@@ -1,0 +1,155 @@
+package lbmap
+
+import (
+	"fmt"
+	"github.com/cilium/cilium/pkg/loadbalancer"
+	"github.com/cilium/cilium/pkg/logging"
+	"github.com/cilium/cilium/pkg/logging/logfields"
+	"github.com/cilium/cilium/pkg/option"
+	"github.com/cilium/cilium/pkg/u8proto"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
+)
+
+var log = logging.DefaultLogger.WithField(logfields.LogSubsys, "map-lb")
+
+var (
+	// MaxEntries contains the maximum number of entries that are allowed
+	// in Cilium LB service, backend and affinity maps.
+	MaxEntries = 65536
+)
+
+// LBBPFMap is an implementation of the LBMap interface.
+type LBBPFMap struct {
+	// Buffer used to avoid excessive allocations to temporarily store backend
+	// IDs. Concurrent access is protected by the
+	// pkg/service.go:(Service).UpsertService() lock.
+	maglevBackendIDsBuffer []uint16
+	maglevTableSize        uint64
+}
+
+// UpsertService inserts or updates the given service in a BPF map.
+//
+// The corresponding backend entries (identified with the given backendIDs)
+// have to exist before calling the function.
+//
+// The given prevBackendCount denotes a previous service backend entries count,
+// so that the function can remove obsolete ones.
+func (lbmap *LBBPFMap) UpsertService(p *UpsertServiceParams) error {
+	var svcKey ServiceKey
+
+	if p.ID == 0 {
+		return fmt.Errorf("Invalid svc ID 0")
+	}
+
+	if p.IPv6 {
+		svcKey = NewService6Key(p.IP, p.Port, u8proto.ANY, p.Scope, 0)
+	} else {
+		svcKey = NewService4Key(p.IP, p.Port, u8proto.ANY, p.Scope, 0)
+	}
+
+	slot := 1
+	svcVal := svcKey.NewValue().(ServiceValue)
+
+	if p.UseMaglev && len(p.Backends) != 0 {
+		if err := lbmap.UpsertMaglevLookupTable(p.ID, p.Backends, p.IPv6); err != nil {
+			return err
+		}
+	}
+
+	backendIDs := make([]uint16, 0, len(p.Backends))
+	for _, id := range p.Backends {
+		backendIDs = append(backendIDs, id)
+	}
+	for _, backendID := range backendIDs {
+		if backendID == 0 {
+			return fmt.Errorf("Invalid backend ID 0")
+		}
+		svcVal.SetBackendID(loadbalancer.BackendID(backendID))
+		svcVal.SetRevNat(int(p.ID))
+		svcKey.SetBackendSlot(slot)
+		if err := updateServiceEndpoint(svcKey, svcVal); err != nil {
+			if errors.Is(err, unix.E2BIG) {
+				return fmt.Errorf("Unable to update service entry %+v => %+v: "+
+					"Unable to update element for LB bpf map: "+
+					"You can resize it with the flag \"--%s\". "+
+					"The resizing might break existing connections to services",
+					svcKey, svcVal, option.LBMapEntriesName)
+			}
+
+			return fmt.Errorf("Unable to update service entry %+v => %+v: %w", svcKey, svcVal, err)
+		}
+		slot++
+	}
+
+	zeroValue := svcKey.NewValue().(ServiceValue)
+	zeroValue.SetRevNat(int(p.ID)) // TODO change to uint16
+	revNATKey := zeroValue.RevNatKey()
+	revNATValue := svcKey.RevNatValue()
+	if err := updateRevNatLocked(revNATKey, revNATValue); err != nil {
+		return fmt.Errorf("Unable to update reverse NAT %+v => %+v: %s", revNATKey, revNATValue, err)
+	}
+
+	if err := updateMasterService(svcKey, len(backendIDs), int(p.ID), p.Type, p.Local,
+		p.SessionAffinity, p.SessionAffinityTimeoutSec, p.CheckSourceRange); err != nil {
+
+		deleteRevNatLocked(revNATKey)
+		return fmt.Errorf("Unable to update service %+v: %s", svcKey, err)
+	}
+
+	for i := slot; i <= p.PrevBackendCount; i++ {
+		svcKey.SetBackendSlot(i)
+		if err := deleteServiceLocked(svcKey); err != nil {
+			log.WithFields(logrus.Fields{
+				logfields.ServiceKey:  svcKey,
+				logfields.BackendSlot: svcKey.GetBackendSlot(),
+			}).WithError(err).Warn("Unable to delete service entry from BPF map")
+		}
+	}
+
+	return nil
+}
+
+func updateServiceEndpoint(key ServiceKey, value ServiceValue) error {
+	log.WithFields(logrus.Fields{
+		logfields.ServiceKey:   key,
+		logfields.ServiceValue: value,
+		logfields.BackendSlot:  key.GetBackendSlot(),
+	}).Debug("Upserting service entry")
+
+	if key.GetBackendSlot() != 0 && value.RevNatKey().GetKey() == 0 {
+		return fmt.Errorf("invalid RevNat ID (0) in the Service Value")
+	}
+	if _, err := key.Map().OpenOrCreate(); err != nil {
+		return err
+	}
+
+	return key.Map().Update(key.ToNetwork(), value.ToNetwork())
+}
+
+func updateMasterService(fe ServiceKey, nbackends int, revNATID int, svcType loadbalancer.SVCType,
+	svcLocal bool, sessionAffinity bool, sessionAffinityTimeoutSec uint32,
+	checkSourceRange bool) error {
+
+	// isRoutable denotes whether this service can be accessed from outside the cluster.
+	isRoutable := !fe.IsSurrogate() &&
+		(svcType != loadbalancer.SVCTypeClusterIP || option.Config.ExternalClusterIP)
+
+	fe.SetBackendSlot(0)
+	zeroValue := fe.NewValue().(ServiceValue)
+	zeroValue.SetCount(nbackends)
+	zeroValue.SetRevNat(revNATID)
+	flag := loadbalancer.NewSvcFlag(&loadbalancer.SvcFlagParam{
+		SvcType:          svcType,
+		SvcLocal:         svcLocal,
+		SessionAffinity:  sessionAffinity,
+		IsRoutable:       isRoutable,
+		CheckSourceRange: checkSourceRange,
+	})
+	zeroValue.SetFlags(flag.UInt16())
+	if sessionAffinity {
+		zeroValue.SetSessionAffinityTimeoutSec(sessionAffinityTimeoutSec)
+	}
+
+	return updateServiceEndpoint(fe, zeroValue)
+}
