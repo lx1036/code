@@ -14,6 +14,8 @@
         "in.h": "c",
         "complex": "c",
         "ngx_errno.h": "c",
-        "pcre2.h": "c"
+        "pcre2.h": "c",
+        "xdp.h": "c",
+        "helpers_xdp.h": "c"
     }
 }

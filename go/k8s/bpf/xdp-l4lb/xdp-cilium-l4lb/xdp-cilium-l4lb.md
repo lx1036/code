@@ -26,7 +26,7 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin 
 与 K8S 环境无关，Cilium 可以单独作为一个 XDP L4LB 部署，和 Katran 一样，部署代码：
 
 ```shell
-# ubuntu-20 上验证没问题!!!
+# ubuntu-20 上验证没问题, 版本 v1.14.3 验证没问题!!!
 
 # https://hub.docker.com/r/cilium/cilium
 # v1.10.20 从 v1.10 版本开始生产可用 Standalone L4LB
@@ -66,7 +66,7 @@ docker run --cap-add NET_ADMIN --cap-add SYS_MODULE --cap-add CAP_SYS_ADMIN --ne
 # 配置 vip/rs
 docker exec -it l4lb bash
 cilium service update --id 1 --frontend "10.20.30.40:7047" \
---backends "10.30.30.41:7047, 10.30.30.42:7047, 10.30.30.43:7047" --k8s-node-port
+--backends "10.30.30.41:7047,10.30.30.42:7047,10.30.30.43:7047" --k8s-node-port
 cilium service list
 ```
 
