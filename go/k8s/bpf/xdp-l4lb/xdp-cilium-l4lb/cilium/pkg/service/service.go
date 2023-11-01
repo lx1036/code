@@ -5,12 +5,14 @@ import (
 	"github.com/cilium/cilium/pkg/counter"
 	"github.com/cilium/cilium/pkg/lock"
 	"github.com/cilium/cilium/pkg/logging/logfields"
-	"github.com/cilium/cilium/pkg/maps/lbmap"
 	"github.com/cilium/cilium/pkg/option"
+	"github.com/cilium/cilium/pkg/service/healthserver"
 	"github.com/sirupsen/logrus"
 	nodeTypes "k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/node/types"
+	"time"
 
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/loadbalancer"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/lbmap"
 	"sync/atomic"
 )
 
@@ -40,8 +42,31 @@ type Service struct {
 	healthServer  healthServer
 	monitorNotify monitorNotify
 
-	lbmap         LBMap
+	lbmap         *lbmap.LBBPFMap
 	lastUpdatedTs atomic.Value
+}
+
+func NewService(monitorNotify monitorNotify) *Service {
+
+	var localHealthServer healthServer
+	if option.Config.EnableHealthCheckNodePort {
+		localHealthServer = healthserver.New()
+	}
+
+	maglev := option.Config.NodePortAlg == option.NodePortAlgMaglev
+	maglevTableSize := option.Config.MaglevTableSize
+
+	svc := &Service{
+		svcByHash:       map[string]*svcInfo{},
+		svcByID:         map[loadbalancer.ID]*svcInfo{},
+		backendRefCount: counter.StringCounter{},
+		backendByHash:   map[string]*loadbalancer.Backend{},
+		monitorNotify:   monitorNotify,
+		healthServer:    localHealthServer,
+		lbmap:           lbmap.New(maglev, maglevTableSize),
+	}
+	svc.lastUpdatedTs.Store(time.Now())
+	return svc
 }
 
 // UpsertService inserts or updates the given service.
@@ -77,18 +102,17 @@ func (s *Service) UpsertService(params *loadbalancer.SVC) (bool, loadbalancer.ID
 	ipv6Svc := params.Frontend.IsIPv6()
 	if ipv6Svc && !option.Config.EnableIPv6 {
 		err := fmt.Errorf("Unable to upsert service %s as IPv6 is disabled", params.Frontend.L3n4Addr.String())
-		return false, lb.ID(0), err
+		return false, loadbalancer.ID(0), err
 	}
 	if !ipv6Svc && !option.Config.EnableIPv4 {
 		err := fmt.Errorf("Unable to upsert service %s as IPv4 is disabled", params.Frontend.L3n4Addr.String())
-		return false, lb.ID(0), err
+		return false, loadbalancer.ID(0), err
 	}
 
 	// If needed, create svcInfo and allocate service ID
-	svc, new, prevSessionAffinity, prevLoadBalancerSourceRanges, err :=
-		s.createSVCInfoIfNotExist(params)
+	svc, n, prevSessionAffinity, prevLoadBalancerSourceRanges, err := s.createSVCInfoIfNotExist(params)
 	if err != nil {
-		return false, lb.ID(0), err
+		return false, loadbalancer.ID(0), err
 	}
 	// TODO(brb) defer ServiceID release after we have a lbmap "rollback"
 	scopedLog = scopedLog.WithField(logfields.ServiceID, svc.frontend.ID)
@@ -97,7 +121,7 @@ func (s *Service) UpsertService(params *loadbalancer.SVC) (bool, loadbalancer.ID
 	onlyLocalBackends, filterBackends := svc.requireNodeLocalBackends(params.Frontend)
 	prevBackendCount := len(svc.backends)
 
-	backendsCopy := []lb.Backend{}
+	backendsCopy := []loadbalancer.Backend{}
 	for _, b := range params.Backends {
 		// Local redirect services or services with trafficPolicy=Local may
 		// only use node-local backends for external scope. We implement this by
@@ -113,10 +137,9 @@ func (s *Service) UpsertService(params *loadbalancer.SVC) (bool, loadbalancer.ID
 	// defer filtering the backends list (thereby defer redirecting traffic)
 	// in such cases. GH #12859
 	// Update backends cache and allocate/release backend IDs
-	newBackends, obsoleteBackendIDs, obsoleteSVCBackendIDs, err :=
-		s.updateBackendsCacheLocked(svc, backendsCopy)
+	newBackends, obsoleteBackendIDs, obsoleteSVCBackendIDs, err := s.updateBackendsCacheLocked(svc, backendsCopy)
 	if err != nil {
-		return false, lb.ID(0), err
+		return false, loadbalancer.ID(0), err
 	}
 
 	// Update lbmaps (BPF service maps)
@@ -125,7 +148,7 @@ func (s *Service) UpsertService(params *loadbalancer.SVC) (bool, loadbalancer.ID
 		prevLoadBalancerSourceRanges, obsoleteSVCBackendIDs,
 		scopedLog); err != nil {
 
-		return false, lb.ID(0), err
+		return false, loadbalancer.ID(0), err
 	}
 
 	// Only add a HealthCheckNodePort server if this is a service which may
@@ -133,17 +156,17 @@ func (s *Service) UpsertService(params *loadbalancer.SVC) (bool, loadbalancer.ID
 	if option.Config.EnableHealthCheckNodePort {
 		if onlyLocalBackends && filterBackends {
 			localBackendCount := len(backendsCopy)
-			s.healthServer.UpsertService(lb.ID(svc.frontend.ID), svc.svcNamespace, svc.svcName,
+			s.healthServer.UpsertService(loadbalancer.ID(svc.frontend.ID), svc.svcNamespace, svc.svcName,
 				localBackendCount, svc.svcHealthCheckNodePort)
 		} else if svc.svcHealthCheckNodePort == 0 {
 			// Remove the health check server in case this service used to have
 			// externalTrafficPolicy=Local with HealthCheckNodePort in the previous
 			// version, but not anymore.
-			s.healthServer.DeleteService(lb.ID(svc.frontend.ID))
+			s.healthServer.DeleteService(loadbalancer.ID(svc.frontend.ID))
 		}
 	}
 
-	if new {
+	if n {
 		addMetric.Inc()
 	} else {
 		updateMetric.Inc()
@@ -151,18 +174,18 @@ func (s *Service) UpsertService(params *loadbalancer.SVC) (bool, loadbalancer.ID
 
 	s.notifyMonitorServiceUpsert(svc.frontend, svc.backends,
 		svc.svcType, svc.svcTrafficPolicy, svc.svcName, svc.svcNamespace)
-	return new, lb.ID(svc.frontend.ID), nil
+	return n, loadbalancer.ID(svc.frontend.ID), nil
 }
 
 func (s *Service) upsertServiceIntoLBMaps(svc *svcInfo, onlyLocalBackends bool,
-	prevBackendCount int, newBackends []lb.Backend, obsoleteBackendIDs []lb.BackendID,
+	prevBackendCount int, newBackends []loadbalancer.Backend, obsoleteBackendIDs []loadbalancer.BackendID,
 	prevSessionAffinity bool, prevLoadBalancerSourceRanges []*cidr.CIDR,
-	obsoleteSVCBackendIDs []lb.BackendID, scopedLog *logrus.Entry) error {
+	obsoleteSVCBackendIDs []loadbalancer.BackendID, scopedLog *logrus.Entry) error {
 
 	ipv6 := svc.frontend.IsIPv6()
 
 	var (
-		toDeleteAffinity, toAddAffinity []lb.BackendID
+		toDeleteAffinity, toAddAffinity []loadbalancer.BackendID
 		checkLBSrcRange                 bool
 	)
 
@@ -171,19 +194,19 @@ func (s *Service) upsertServiceIntoLBMaps(svc *svcInfo, onlyLocalBackends bool,
 		if prevSessionAffinity && !svc.sessionAffinity {
 			// Remove backends from the affinity match because the svc's sessionAffinity
 			// has been disabled
-			toDeleteAffinity = make([]lb.BackendID, 0, len(obsoleteSVCBackendIDs)+len(svc.backends))
+			toDeleteAffinity = make([]loadbalancer.BackendID, 0, len(obsoleteSVCBackendIDs)+len(svc.backends))
 			toDeleteAffinity = append(toDeleteAffinity, obsoleteSVCBackendIDs...)
 			for _, b := range svc.backends {
 				toDeleteAffinity = append(toDeleteAffinity, b.ID)
 			}
 		} else if svc.sessionAffinity {
-			toAddAffinity = make([]lb.BackendID, 0, len(svc.backends))
+			toAddAffinity = make([]loadbalancer.BackendID, 0, len(svc.backends))
 			for _, b := range svc.backends {
 				toAddAffinity = append(toAddAffinity, b.ID)
 			}
 			if prevSessionAffinity {
 				// Remove obsolete svc backends if previously the svc had the affinity enabled
-				toDeleteAffinity = make([]lb.BackendID, 0, len(obsoleteSVCBackendIDs))
+				toDeleteAffinity = make([]loadbalancer.BackendID, 0, len(obsoleteSVCBackendIDs))
 				for _, bID := range obsoleteSVCBackendIDs {
 					toDeleteAffinity = append(toDeleteAffinity, bID)
 				}

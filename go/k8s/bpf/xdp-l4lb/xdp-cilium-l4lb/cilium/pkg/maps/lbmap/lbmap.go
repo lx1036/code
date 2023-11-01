@@ -1,14 +1,18 @@
 package lbmap
 
 import (
+	"errors"
 	"fmt"
-	"github.com/cilium/cilium/pkg/loadbalancer"
+	"net"
+
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/u8proto"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
+
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/loadbalancer"
 )
 
 var log = logging.DefaultLogger.WithField(logfields.LogSubsys, "map-lb")
@@ -19,6 +23,22 @@ var (
 	MaxEntries = 65536
 )
 
+type UpsertServiceParams struct {
+	ID                        uint16
+	IP                        net.IP
+	Port                      uint16
+	Backends                  map[string]uint16
+	PrevBackendCount          int
+	IPv6                      bool
+	Type                      loadbalancer.SVCType
+	Local                     bool
+	Scope                     uint8
+	SessionAffinity           bool
+	SessionAffinityTimeoutSec uint32
+	CheckSourceRange          bool
+	UseMaglev                 bool
+}
+
 // LBBPFMap is an implementation of the LBMap interface.
 type LBBPFMap struct {
 	// Buffer used to avoid excessive allocations to temporarily store backend
@@ -26,6 +46,17 @@ type LBBPFMap struct {
 	// pkg/service.go:(Service).UpsertService() lock.
 	maglevBackendIDsBuffer []uint16
 	maglevTableSize        uint64
+}
+
+func New(maglev bool, maglevTableSize int) *LBBPFMap {
+	m := &LBBPFMap{}
+
+	if maglev {
+		m.maglevBackendIDsBuffer = make([]uint16, maglevTableSize)
+		m.maglevTableSize = uint64(maglevTableSize)
+	}
+
+	return m
 }
 
 // UpsertService inserts or updates the given service in a BPF map.
@@ -92,7 +123,6 @@ func (lbmap *LBBPFMap) UpsertService(p *UpsertServiceParams) error {
 
 	if err := updateMasterService(svcKey, len(backendIDs), int(p.ID), p.Type, p.Local,
 		p.SessionAffinity, p.SessionAffinityTimeoutSec, p.CheckSourceRange); err != nil {
-
 		deleteRevNatLocked(revNATKey)
 		return fmt.Errorf("Unable to update service %+v: %s", svcKey, err)
 	}
@@ -108,23 +138,6 @@ func (lbmap *LBBPFMap) UpsertService(p *UpsertServiceParams) error {
 	}
 
 	return nil
-}
-
-func updateServiceEndpoint(key ServiceKey, value ServiceValue) error {
-	log.WithFields(logrus.Fields{
-		logfields.ServiceKey:   key,
-		logfields.ServiceValue: value,
-		logfields.BackendSlot:  key.GetBackendSlot(),
-	}).Debug("Upserting service entry")
-
-	if key.GetBackendSlot() != 0 && value.RevNatKey().GetKey() == 0 {
-		return fmt.Errorf("invalid RevNat ID (0) in the Service Value")
-	}
-	if _, err := key.Map().OpenOrCreate(); err != nil {
-		return err
-	}
-
-	return key.Map().Update(key.ToNetwork(), value.ToNetwork())
 }
 
 func updateMasterService(fe ServiceKey, nbackends int, revNATID int, svcType loadbalancer.SVCType,
@@ -152,4 +165,21 @@ func updateMasterService(fe ServiceKey, nbackends int, revNATID int, svcType loa
 	}
 
 	return updateServiceEndpoint(fe, zeroValue)
+}
+
+func updateServiceEndpoint(key ServiceKey, value ServiceValue) error {
+	log.WithFields(logrus.Fields{
+		logfields.ServiceKey:   key,
+		logfields.ServiceValue: value,
+		logfields.BackendSlot:  key.GetBackendSlot(),
+	}).Debug("Upserting service entry")
+
+	if key.GetBackendSlot() != 0 && value.RevNatKey().GetKey() == 0 {
+		return fmt.Errorf("invalid RevNat ID (0) in the Service Value")
+	}
+	if _, err := key.Map().OpenOrCreate(); err != nil {
+		return err
+	}
+
+	return key.Map().Update(key.ToNetwork(), value.ToNetwork())
 }
