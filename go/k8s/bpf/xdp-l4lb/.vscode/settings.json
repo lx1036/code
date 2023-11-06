@@ -8,6 +8,11 @@
         "bpf_helpers.h": "c",
         "bpf.h": "c",
         "__locale": "c",
-        "locale": "c"
+        "locale": "c",
+        "xdp.h": "c",
+        "common.h": "c",
+        "helpers_xdp.h": "c",
+        "xdp_basic.h": "c",
+        "bpf_common.h": "c"
     }
 }

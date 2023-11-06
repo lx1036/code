@@ -2,3 +2,4 @@ vendor
 tmp
 node_modules
 bin
+*.o

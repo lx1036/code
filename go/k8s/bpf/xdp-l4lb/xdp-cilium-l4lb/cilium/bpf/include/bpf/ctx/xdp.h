@@ -6,6 +6,8 @@
 #define __BPF_CTX_XDP_H_
 
 
+#include <linux/if_ether.h>
+
 #define __ctx_buff			xdp_md
 #define __ctx_is			__ctx_xdp
 
