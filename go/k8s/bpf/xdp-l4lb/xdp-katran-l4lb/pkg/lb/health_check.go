@@ -3,7 +3,7 @@ package lb
 import (
 	"context"
 
-	"k8s-lx1036/k8s/bpf/xdp-l4lb/pkg/rpc"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-katran-l4lb/pkg/rpc"
 )
 
 func (lb *OpenLb) AddHealthcheckerDst(ctx context.Context, healthcheck *rpc.Healthcheck) (*rpc.Bool, error) {

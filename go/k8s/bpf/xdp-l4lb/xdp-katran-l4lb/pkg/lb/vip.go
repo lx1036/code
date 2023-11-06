@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s-lx1036/k8s/bpf/xdp-l4lb/pkg/rpc"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-katran-l4lb/pkg/rpc"
 
 	"github.com/sirupsen/logrus"
 )
