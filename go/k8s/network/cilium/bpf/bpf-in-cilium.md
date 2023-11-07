@@ -83,6 +83,8 @@ nsenter -t 18421 -n arp -n # 查看 arp(Address Resolution Packet)
 #10.216.136.172           ether   92:36:a1:12:9b:1b   C                     eth0
 #10.208.40.96             ether   92:36:a1:12:9b:1b   C                     eth0
 
+# ubuntu
+apt install linux-tools-5.4.0-162-generic -y
 yum install -y bpftool
 # 查看所有loaded bpf程序
 bpftool prog
