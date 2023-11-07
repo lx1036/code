@@ -3,7 +3,7 @@ package lock
 import (
 	"errors"
 	"fmt"
-	"k8s-lx1036/k8s/bpf/tubular/toa/internal/sysconn"
+	"k8s-lx1036/k8s/bpf/toa/internal/sysconn"
 	"os"
 
 	"golang.org/x/sys/unix"

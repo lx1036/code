@@ -1,16 +1,14 @@
 package internal
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
 
-	"k8s-lx1036/k8s/bpf/tubular/toa/internal/lock"
+	"k8s-lx1036/k8s/bpf/toa/internal/lock"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
