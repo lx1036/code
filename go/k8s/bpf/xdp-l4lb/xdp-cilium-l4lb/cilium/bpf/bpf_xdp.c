@@ -2,9 +2,6 @@
 
 #include <bpf/ctx/xdp.h>
 
-
-
-
 static __always_inline __maybe_unused int
 bpf_xdp_exit(struct xdp_md* ctx, const int verdict)
 {
@@ -28,8 +25,6 @@ bpf_xdp_exit(struct xdp_md* ctx, const int verdict)
 	return verdict;
 }
 
-
-
 #ifdef ENABLE_IPV4
 #ifdef ENABLE_NODEPORT_ACCELERATION
 __section_tail(CILIUM_MAP_CALLS, CILIUM_CALL_IPV4_FROM_LXC)
@@ -40,8 +35,7 @@ int tail_lb_ipv4(struct __ctx_buff *ctx)
 	if (!bpf_skip_nodeport(ctx)) {
 		ret = nodeport_lb4(ctx, 0);
 		if (IS_ERR(ret))
-			return send_drop_notify_error(ctx, 0, ret, CTX_ACT_DROP,
-						      METRIC_INGRESS);
+			return send_drop_notify_error(ctx, 0, ret, CTX_ACT_DROP, METRIC_INGRESS);
 	}
 
 	return bpf_xdp_exit(ctx, ret);
@@ -50,8 +44,7 @@ int tail_lb_ipv4(struct __ctx_buff *ctx)
 static __always_inline int check_v4_lb(struct __ctx_buff *ctx)
 {
 	ep_tail_call(ctx, CILIUM_CALL_IPV4_FROM_LXC);
-	return send_drop_notify_error(ctx, 0, DROP_MISSED_TAIL_CALL, CTX_ACT_DROP,
-				      METRIC_INGRESS);
+	return send_drop_notify_error(ctx, 0, DROP_MISSED_TAIL_CALL, CTX_ACT_DROP, METRIC_INGRESS);
 }
 #else
 static __always_inline int check_v4_lb(struct __ctx_buff *ctx __maybe_unused)
@@ -122,14 +115,9 @@ static __always_inline int check_filters(struct xdp_md* ctx) {
     return bpf_xdp_exit(ctx, ret);
 }
 
-
-
 SEC("from-netdev")
 int bpf_xdp_entry(struct xdp_md* ctx) {
     return check_filters(ctx);
 }
-
-
-
 
 char _license[] SEC("license") = "GPL";
