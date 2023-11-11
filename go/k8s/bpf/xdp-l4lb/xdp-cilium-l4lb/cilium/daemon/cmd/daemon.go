@@ -11,8 +11,11 @@ import (
 	"github.com/cilium/cilium/pkg/fqdn"
 	"github.com/cilium/cilium/pkg/hubble/observer"
 	"github.com/cilium/cilium/pkg/ipam"
+	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/logging/logfields"
+	"github.com/cilium/cilium/pkg/maps/ctmap"
 	"github.com/cilium/cilium/pkg/maps/eppolicymap"
+	"github.com/cilium/cilium/pkg/maps/policymap"
 	"github.com/cilium/cilium/pkg/mtu"
 	"github.com/cilium/cilium/pkg/policy"
 	"github.com/cilium/cilium/pkg/rate"
@@ -28,6 +31,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/lbmap"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/service"
 )
@@ -118,6 +122,17 @@ type Daemon struct {
 func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointmanager.EndpointManager,
 	dp datapath.Datapath) (*Daemon, *endpointRestoreState, error) {
 
+	ctmap.InitMapInfo(option.Config.CTMapEntriesGlobalTCP, option.Config.CTMapEntriesGlobalAny,
+		option.Config.EnableIPv4, option.Config.EnableIPv6, option.Config.EnableNodePort)
+	policymap.InitMapInfo(option.Config.PolicyMapEntries)
+	lbmap.Init(lbmap.InitParams{
+		IPv4: option.Config.EnableIPv4,
+		IPv6: option.Config.EnableIPv6,
+
+		MaxSockRevNatMapEntries: option.Config.SockRevNatEntries,
+		MaxEntries:              option.Config.LBMapEntries,
+	})
+
 	d := Daemon{
 		ctx:               ctx,
 		cancel:            cancel,
@@ -133,6 +148,19 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
 	}
 
 	d.svc = service.NewService(&d)
+
+	// Open or create BPF maps.
+	bootstrapStats.mapsInit.Start()
+	err = d.initMaps()
+	bootstrapStats.mapsInit.EndError(err)
+	if err != nil {
+		log.WithError(err).Error("Error while opening/creating BPF maps")
+		return nil, nil, err
+	}
+	// Upsert restored CIDRs after the new ipcache has been opened above
+	if len(restoredCIDRidentities) > 0 {
+		ipcache.UpsertGeneratedIdentities(restoredCIDRidentities, nil)
+	}
 
 }
 

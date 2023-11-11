@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/cilium/cilium/pkg/logging"
-	"github.com/cilium/cilium/pkg/logging/logfields"
-	"github.com/cilium/cilium/pkg/option"
-	"github.com/cilium/cilium/pkg/u8proto"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/loadbalancer"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/u8proto"
 )
 
 var log = logging.DefaultLogger.WithField(logfields.LogSubsys, "map-lb")
@@ -22,6 +22,27 @@ var (
 	// in Cilium LB service, backend and affinity maps.
 	MaxEntries = 65536
 )
+
+type InitParams struct {
+	IPv4, IPv6 bool
+
+	MaxSockRevNatMapEntries, MaxEntries int
+}
+
+func Init(params InitParams) {
+	if params.MaxSockRevNatMapEntries != 0 {
+		MaxSockRevNat4MapEntries = params.MaxSockRevNatMapEntries
+		//MaxSockRevNat6MapEntries = params.MaxSockRevNatMapEntries
+	}
+
+	if params.MaxEntries != 0 {
+		MaxEntries = params.MaxEntries
+	}
+
+	initSVC(params)
+	initAffinity(params)
+	initSourceRange(params)
+}
 
 type UpsertServiceParams struct {
 	ID                        uint16
@@ -60,12 +81,6 @@ func New(maglev bool, maglevTableSize int) *LBBPFMap {
 }
 
 // UpsertService inserts or updates the given service in a BPF map.
-//
-// The corresponding backend entries (identified with the given backendIDs)
-// have to exist before calling the function.
-//
-// The given prevBackendCount denotes a previous service backend entries count,
-// so that the function can remove obsolete ones.
 func (lbmap *LBBPFMap) UpsertService(p *UpsertServiceParams) error {
 	var svcKey ServiceKey
 
@@ -74,14 +89,13 @@ func (lbmap *LBBPFMap) UpsertService(p *UpsertServiceParams) error {
 	}
 
 	if p.IPv6 {
-		svcKey = NewService6Key(p.IP, p.Port, u8proto.ANY, p.Scope, 0)
+		//svcKey = NewService6Key(p.IP, p.Port, u8proto.ANY, p.Scope, 0)
 	} else {
 		svcKey = NewService4Key(p.IP, p.Port, u8proto.ANY, p.Scope, 0)
 	}
 
 	slot := 1
 	svcVal := svcKey.NewValue().(ServiceValue)
-
 	if p.UseMaglev && len(p.Backends) != 0 {
 		if err := lbmap.UpsertMaglevLookupTable(p.ID, p.Backends, p.IPv6); err != nil {
 			return err

@@ -16,6 +16,16 @@ struct bpf_elf_map __section_maps LB4_SERVICES_MAP_V2 = {
 	.flags		= CONDITIONAL_PREALLOC,
 };
 
+#ifdef ENABLE_SESSION_AFFINITY
+struct bpf_elf_map __section_maps LB4_AFFINITY_MAP = {
+	.type		= BPF_MAP_TYPE_LRU_HASH,
+	.size_key	= sizeof(struct lb4_affinity_key),
+	.size_value	= sizeof(struct lb_affinity_val),
+	.pinning	= PIN_GLOBAL_NS,
+	.max_elem	= CILIUM_LB_MAP_MAX_ENTRIES,
+};
+#endif
+
 #endif /* ENABLE_IPV4 */
 
 
