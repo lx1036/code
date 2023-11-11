@@ -51,6 +51,7 @@ require (
 	github.com/google/go-querystring v1.0.0
 	github.com/google/gofuzz v1.2.0
 	github.com/google/gopacket v1.1.19
+	github.com/google/gops v0.3.22
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
@@ -130,6 +131,7 @@ require (
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/go-playground/validator.v8 v8.18.2
 	gopkg.in/h2non/gock.v1 v1.0.15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -171,6 +173,7 @@ require (
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-logr/logr v1.2.0 // indirect
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
+	github.com/google/renameio v1.0.1 // indirect
 	github.com/hashicorp/consul/api v1.12.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
@@ -185,6 +188,8 @@ require (
 	github.com/mdlayher/raw v0.0.0-20210412142147-51b895745faf // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
+	github.com/tklauser/go-sysconf v0.3.9 // indirect
+	github.com/tklauser/numcpus v0.3.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f // indirect
 	k8s.io/mount-utils v0.23.4 // indirect
@@ -250,7 +255,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.6 // indirect
 	github.com/go-openapi/loads v0.21.1 // indirect
-	github.com/go-openapi/runtime v0.23.1 // indirect
+	github.com/go-openapi/runtime v0.23.1
 	github.com/go-openapi/spec v0.20.4 // indirect
 	github.com/go-openapi/strfmt v0.21.2 // indirect
 	github.com/go-openapi/swag v0.21.1 // indirect

@@ -16,6 +16,9 @@
 
 
 #ifndef SKIP_CALLS_MAP
+
+// CALLS_MAP 在 xdp.go 里定义为 "cilium_calls_xdp" map
+
 /* Private per EP map for internal tail calls */
 struct bpf_elf_map __section_maps CALLS_MAP = {
 	.type		= BPF_MAP_TYPE_PROG_ARRAY,

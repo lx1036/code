@@ -170,6 +170,7 @@ static __always_inline int nodeport_lb4(struct __ctx_buff *ctx,
 			return ret;
 	}
 
+	// 1. 从 
 	svc = lb4_lookup_service(&key, false);
 	if (svc) {
 		const bool skip_l3_xlate = DSR_ENCAP_MODE == DSR_ENCAP_IPIP;

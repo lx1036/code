@@ -5,13 +5,14 @@ import (
 	"github.com/cilium/cilium/api/v1/models"
 	"github.com/cilium/cilium/pkg/clustermesh"
 	"github.com/cilium/cilium/pkg/counter"
-	"github.com/cilium/cilium/pkg/datapath"
 	linuxrouting "github.com/cilium/cilium/pkg/datapath/linux/routing"
 	"github.com/cilium/cilium/pkg/egressgateway"
 	"github.com/cilium/cilium/pkg/eventqueue"
 	"github.com/cilium/cilium/pkg/fqdn"
 	"github.com/cilium/cilium/pkg/hubble/observer"
 	"github.com/cilium/cilium/pkg/ipam"
+	"github.com/cilium/cilium/pkg/logging/logfields"
+	"github.com/cilium/cilium/pkg/maps/eppolicymap"
 	"github.com/cilium/cilium/pkg/mtu"
 	"github.com/cilium/cilium/pkg/policy"
 	"github.com/cilium/cilium/pkg/rate"
@@ -20,10 +21,14 @@ import (
 	"github.com/cilium/cilium/pkg/status"
 	"github.com/cilium/cilium/pkg/trigger"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	log "github.com/sirupsen/logrus"
+	"os"
 
 	"github.com/cilium/cilium/pkg/lock"
 	"golang.org/x/sync/semaphore"
 
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/service"
 )
 
@@ -129,4 +134,43 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
 
 	d.svc = service.NewService(&d)
 
+}
+
+func (d *Daemon) init() error {
+	globalsDir := option.Config.GetGlobalsDir()
+	if err := os.MkdirAll(globalsDir, defaults.RuntimePathRights); err != nil {
+		log.WithError(err).WithField(logfields.Path, globalsDir).Fatal("Could not create runtime directory")
+	}
+
+	if err := os.Chdir(option.Config.StateDir); err != nil {
+		log.WithError(err).WithField(logfields.Path, option.Config.StateDir).Fatal("Could not change to runtime directory")
+	}
+
+	// Remove any old sockops and re-enable with _new_ programs if flag is set
+	sockops.SockmapDisable()
+	sockops.SkmsgDisable()
+
+	if !option.Config.DryMode {
+		//bandwidth.InitBandwidthManager()
+		if err := d.createNodeConfigHeaderfile(); err != nil {
+			return err
+		}
+
+		if option.Config.SockopsEnable {
+			eppolicymap.CreateEPPolicyMap()
+			if err := sockops.SockmapEnable(); err != nil {
+				log.WithError(err).Error("Failed to enable Sockmap")
+			} else if err := sockops.SkmsgEnable(); err != nil {
+				log.WithError(err).Error("Failed to enable Sockmsg")
+			} else {
+				sockmap.SockmapCreate()
+			}
+		}
+
+		if err := d.Datapath().Loader().Reinitialize(d.ctx, d, d.mtuConfig.GetDeviceMTU(), d.Datapath(), d.l7Proxy); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
