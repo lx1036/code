@@ -162,6 +162,13 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
 		ipcache.UpsertGeneratedIdentities(restoredCIDRidentities, nil)
 	}
 
+	// option.Config.RestoreState=true, restore from 从已有的 bpf maps
+	if option.Config.RestoreState && !option.Config.DryMode {
+		bootstrapStats.restore.Start()
+		d.svc.RestoreServices()
+		bootstrapStats.restore.End(true)
+	}
+
 }
 
 func (d *Daemon) init() error {

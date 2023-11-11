@@ -206,3 +206,32 @@ func deleteMapIfMNotMatch(mapName string) (bool, error) {
 
 	return deleteMap, nil
 }
+
+func updateMaglevTable(ipv6 bool, revNATID uint16, backendIDs []uint16) error {
+	outerMap := MaglevOuter4Map
+	innerMapName := MaglevInner4MapName
+	if ipv6 {
+		outerMap = MaglevOuter6Map
+		innerMapName = MaglevInner6MapName
+	}
+
+	innerMap := newInnerMaglevMap(innerMapName)
+	if err := innerMap.CreateUnpinned(); err != nil {
+		return err
+	}
+	defer innerMap.Close()
+
+	innerKey := &MaglevInnerKey{Zero: 0}
+	innerVal := &MaglevInnerVal{BackendIDs: backendIDs}
+	if err := innerMap.Update(innerKey, innerVal); err != nil {
+		return err
+	}
+
+	outerKey := (&MaglevOuterKey{RevNatID: revNATID}).ToNetwork()
+	outerVal := &MaglevOuterVal{FD: uint32(innerMap.GetFd())}
+	if err := outerMap.Update(outerKey, outerVal); err != nil {
+		return err
+	}
+
+	return nil
+}

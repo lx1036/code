@@ -4,13 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
+	"strconv"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/loadbalancer"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maglev"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/u8proto"
 )
@@ -196,4 +200,154 @@ func updateServiceEndpoint(key ServiceKey, value ServiceValue) error {
 	}
 
 	return key.Map().Update(key.ToNetwork(), value.ToNetwork())
+}
+
+type svcMap map[string]loadbalancer.SVC
+
+func (svcs svcMap) addFE(fe *loadbalancer.L3n4AddrID) *loadbalancer.SVC {
+	hash := fe.Hash()
+	lbsvc, ok := svcs[hash]
+	if !ok {
+		lbsvc = loadbalancer.SVC{Frontend: *fe}
+		svcs[hash] = lbsvc
+	}
+	return &lbsvc
+}
+
+func (svcs svcMap) addFEnBE(fe *loadbalancer.L3n4AddrID, be *loadbalancer.Backend, beIndex int) *loadbalancer.SVC {
+	hash := fe.Hash()
+	lbsvc, ok := svcs[hash]
+	if !ok {
+		var bes []loadbalancer.Backend
+		if beIndex == 0 {
+			bes = make([]loadbalancer.Backend, 1)
+			bes[0] = *be
+		} else {
+			bes = make([]loadbalancer.Backend, beIndex)
+			bes[beIndex-1] = *be
+		}
+		lbsvc = loadbalancer.SVC{
+			Frontend: *fe,
+			Backends: bes,
+		}
+	} else {
+		var bes []loadbalancer.Backend
+		if len(lbsvc.Backends) < beIndex {
+			bes = make([]loadbalancer.Backend, beIndex)
+			copy(bes, lbsvc.Backends)
+			lbsvc.Backends = bes
+		}
+		if beIndex == 0 {
+			lbsvc.Backends = append(lbsvc.Backends, *be)
+		} else {
+			lbsvc.Backends[beIndex-1] = *be
+		}
+	}
+
+	svcs[hash] = lbsvc
+	return &lbsvc
+}
+
+// DumpServiceMaps dumps the services from the BPF maps.
+func (*LBBPFMap) DumpServiceMaps() ([]*loadbalancer.SVC, []error) {
+	newSVCMap := svcMap{}
+	var errs []error
+	flagsCache := map[string]loadbalancer.ServiceFlags{}
+	backendValueMap := map[loadbalancer.BackendID]BackendValue{}
+
+	parseBackendEntries := func(key bpf.MapKey, value bpf.MapValue) {
+		backendKey := key.(BackendKey)
+		backendValue := value.DeepCopyMapValue().(BackendValue).ToHost()
+		backendValueMap[backendKey.GetID()] = backendValue
+	}
+
+	parseSVCEntries := func(key bpf.MapKey, value bpf.MapValue) {
+		svcKey := key.DeepCopyMapKey().(ServiceKey).ToHost()
+		svcValue := value.DeepCopyMapValue().(ServiceValue).ToHost()
+
+		fe := svcFrontend(svcKey, svcValue)
+
+		// Create master entry in case there are no backends.
+		if svcKey.GetBackendSlot() == 0 {
+			// Build a cache of flags stored in the value of the master key to
+			// map it later.
+			// FIXME proto is being ignored everywhere in the datapath.
+			addrStr := svcKey.GetAddress().String()
+			portStr := strconv.Itoa(int(svcKey.GetPort()))
+			flagsCache[net.JoinHostPort(addrStr, portStr)] = loadbalancer.ServiceFlags(svcValue.GetFlags())
+
+			newSVCMap.addFE(fe)
+			return
+		}
+
+		backendID := svcValue.GetBackendID()
+		backendValue, found := backendValueMap[backendID]
+		if !found {
+			errs = append(errs, fmt.Errorf("backend %d not found", backendID))
+			return
+		}
+
+		be := svcBackend(backendID, backendValue)
+		newSVCMap.addFEnBE(fe, be, svcKey.GetBackendSlot())
+	}
+
+	if option.Config.EnableIPv4 {
+		// TODO(brb) optimization: instead of dumping the backend map, we can
+		// pass its content to the function.
+		err := Backend4Map.DumpWithCallback(parseBackendEntries)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		err = Service4MapV2.DumpWithCallback(parseSVCEntries)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	newSVCList := make([]*loadbalancer.SVC, 0, len(newSVCMap))
+	for hash := range newSVCMap {
+		svc := newSVCMap[hash]
+		addrStr := svc.Frontend.IP.String()
+		portStr := strconv.Itoa(int(svc.Frontend.Port))
+		host := net.JoinHostPort(addrStr, portStr)
+		svc.Type = flagsCache[host].SVCType()
+		svc.TrafficPolicy = flagsCache[host].SVCTrafficPolicy()
+		newSVCList = append(newSVCList, &svc)
+	}
+
+	return newSVCList, errs
+}
+
+// IsMaglevLookupTableRecreated returns true if the maglev lookup BPF map
+// was recreated due to the changed M param.
+func (*LBBPFMap) IsMaglevLookupTableRecreated(ipv6 bool) bool {
+	if ipv6 {
+		return maglevRecreatedIPv6
+	}
+	return maglevRecreatedIPv4
+}
+
+// UpsertMaglevLookupTable calculates Maglev lookup table for given backends, and
+// inserts into the Maglev BPF map.
+func (lbmap *LBBPFMap) UpsertMaglevLookupTable(svcID uint16, backends map[string]uint16, ipv6 bool) error {
+	backendNames := make([]string, 0, len(backends))
+	for name := range backends {
+		backendNames = append(backendNames, name)
+	}
+
+	// Maglev algorithm might produce different lookup table for the same
+	// set of backends listed in a different order. To avoid that sort
+	// backends by name, as the names are the same on all nodes (in opposite
+	// to backend IDs which are node-local).
+	sort.Strings(backendNames)
+	table := maglev.GetLookupTable(backendNames, lbmap.maglevTableSize)
+	for i, pos := range table {
+		lbmap.maglevBackendIDsBuffer[i] = backends[backendNames[pos]]
+	}
+
+	if err := updateMaglevTable(ipv6, svcID, lbmap.maglevBackendIDsBuffer); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -4,15 +4,18 @@ import (
 	"fmt"
 	"github.com/cilium/cilium/pkg/counter"
 	"github.com/cilium/cilium/pkg/lock"
-	"github.com/cilium/cilium/pkg/logging/logfields"
-	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/service/healthserver"
 	"github.com/sirupsen/logrus"
 	nodeTypes "k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/node/types"
+	"net"
 	"time"
 
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/cidr"
+	datapathOption "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/option"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/loadbalancer"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/lbmap"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 	"sync/atomic"
 )
 
@@ -285,4 +288,145 @@ func (s *Service) upsertServiceIntoLBMaps(svc *svcInfo, onlyLocalBackends bool,
 	}
 
 	return nil
+}
+
+// RestoreServices restores services from BPF maps.
+func (s *Service) RestoreServices() error {
+	s.Lock()
+	defer s.Unlock()
+
+	// Restore backend IDs
+	if err := s.restoreBackendsLocked(); err != nil {
+		return err
+	}
+
+	// Restore service cache from BPF maps
+	if err := s.restoreServicesLocked(); err != nil {
+		return err
+	}
+
+	// Remove no longer existing affinity matches
+	if option.Config.EnableSessionAffinity {
+		if err := s.deleteOrphanAffinityMatchesLocked(); err != nil {
+			return err
+		}
+	}
+
+	// Remove LB source ranges for no longer existing services
+	if option.Config.EnableSVCSourceRangeCheck {
+		if err := s.restoreAndDeleteOrphanSourceRanges(); err != nil {
+			return err
+		}
+	}
+
+	// Remove obsolete backends and release their IDs
+	if err := s.deleteOrphanBackends(); err != nil {
+		log.WithError(err).Warn("Failed to remove orphan backends")
+
+	}
+
+	return nil
+}
+
+type svcInfo struct {
+	hash          string
+	frontend      loadbalancer.L3n4AddrID
+	backends      []loadbalancer.Backend
+	backendByHash map[string]*loadbalancer.Backend
+
+	svcType                   loadbalancer.SVCType
+	svcTrafficPolicy          loadbalancer.SVCTrafficPolicy
+	sessionAffinity           bool
+	sessionAffinityTimeoutSec uint32
+	svcHealthCheckNodePort    uint16
+	svcName                   string
+	svcNamespace              string
+	loadBalancerSourceRanges  []*cidr.CIDR
+
+	restoredFromDatapath bool
+}
+
+func (svc *svcInfo) useMaglev() bool {
+	return option.Config.NodePortAlg == option.NodePortAlgMaglev &&
+		((svc.svcType == loadbalancer.SVCTypeNodePort && !isWildcardAddr(svc.frontend)) ||
+			svc.svcType == loadbalancer.SVCTypeExternalIPs ||
+			svc.svcType == loadbalancer.SVCTypeLoadBalancer)
+}
+
+func (s *Service) restoreServicesLocked() error {
+	svcs, errors := s.lbmap.DumpServiceMaps()
+	for _, err := range errors {
+		log.WithError(err).Warning("Error occurred while dumping service maps")
+	}
+
+	for _, svc := range svcs {
+		scopedLog := log.WithFields(logrus.Fields{
+			logfields.ServiceID: svc.Frontend.ID,
+			logfields.ServiceIP: svc.Frontend.L3n4Addr.String(),
+		})
+		scopedLog.Debug("Restoring service")
+
+		if _, err := RestoreID(svc.Frontend.L3n4Addr, uint32(svc.Frontend.ID)); err != nil {
+			failed++
+			scopedLog.WithError(err).Warning("Unable to restore service ID")
+		}
+
+		newSVC := &svcInfo{
+			hash:             svc.Frontend.Hash(),
+			frontend:         svc.Frontend,
+			backends:         svc.Backends,
+			backendByHash:    map[string]*loadbalancer.Backend{},
+			svcType:          svc.Type,
+			svcTrafficPolicy: svc.TrafficPolicy,
+
+			sessionAffinity:           svc.SessionAffinity,
+			sessionAffinityTimeoutSec: svc.SessionAffinityTimeoutSec,
+
+			// Indicate that the svc was restored from the BPF maps, so that
+			// SyncWithK8sFinished() could remove services which were restored
+			// from the maps but not present in the k8sServiceCache (e.g. a svc
+			// was deleted while cilium-agent was down).
+			restoredFromDatapath: true,
+		}
+
+		for j, backend := range svc.Backends {
+			hash := backend.L3n4Addr.Hash()
+			s.backendRefCount.Add(hash)
+			newSVC.backendByHash[hash] = &svc.Backends[j]
+		}
+
+		// Recalculate Maglev lookup tables if the maps were removed due to the changed M param.
+		ipv6 := newSVC.frontend.IsIPv6()
+		if option.Config.DatapathMode == datapathOption.DatapathModeLBOnly &&
+			newSVC.useMaglev() && s.lbmap.IsMaglevLookupTableRecreated(ipv6) {
+
+			backends := make(map[string]uint16, len(newSVC.backends))
+			for _, b := range newSVC.backends {
+				backends[b.String()] = uint16(b.ID)
+			}
+			if err := s.lbmap.UpsertMaglevLookupTable(uint16(newSVC.frontend.ID), backends, ipv6); err != nil {
+				return err
+			}
+		}
+
+		s.svcByHash[newSVC.hash] = newSVC
+		s.svcByID[newSVC.frontend.ID] = newSVC
+		restored++
+	}
+
+	log.WithFields(logrus.Fields{
+		"restored": restored,
+		"failed":   failed,
+	}).Info("Restored services from maps")
+
+	return nil
+}
+
+// isWildcardAddr returns true if given frontend is used for wildcard svc lookups
+// (by bpf_sock).
+func isWildcardAddr(frontend loadbalancer.L3n4AddrID) bool {
+	if frontend.IsIPv6() {
+		return net.IPv6zero.Equal(frontend.IP)
+	}
+	return net.IPv4zero.Equal(frontend.IP)
 }

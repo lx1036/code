@@ -54,3 +54,11 @@ func (s *SpanStat) end(success bool) *SpanStat {
 	s.spanStart = time.Time{}
 	return s
 }
+
+// Total returns the total duration of all spans measured, including both
+// successes and failures
+func (s *SpanStat) Total() time.Duration {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.successDuration + s.failureDuration
+}

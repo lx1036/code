@@ -7,6 +7,7 @@ import (
 	"github.com/cilium/cilium/pkg/byteorder"
 	"github.com/cilium/cilium/pkg/lock"
 	"github.com/cilium/cilium/pkg/metrics"
+	"io"
 	"os"
 	"path"
 	"reflect"
@@ -113,6 +114,35 @@ func NewMapWithOpts(name string, mapType MapType, mapKey MapKey, keySize int,
 	return m
 }
 
+// Open map path -> map fd
+func (m *Map) Open() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	return m.open()
+}
+
+func (m *Map) open() error {
+	if m.fd != 0 {
+		return nil
+	}
+
+	if err := m.setPathIfUnset(); err != nil {
+		return err
+	}
+
+	fd, err := ObjGet(m.path)
+	if err != nil {
+		return err
+	}
+
+	registerMap(m.path, m)
+
+	m.fd = fd
+	m.MapType = GetMapType(m.MapType)
+	return nil
+}
+
 func (m *Map) OpenOrCreate() (bool, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -196,6 +226,71 @@ func (m *Map) WithPressureMetric() *Map {
 
 func (m *Map) NonPrefixedName() string {
 	return strings.TrimPrefix(m.name, metrics.Namespace+"_")
+}
+
+func (m *Map) DumpWithCallback(cb DumpCallback) error {
+	if err := m.Open(); err != nil {
+		return err
+	}
+
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	key := make([]byte, m.KeySize)
+	nextKey := make([]byte, m.KeySize)
+	value := make([]byte, m.ReadValueSize)
+
+	if err := GetFirstKey(m.fd, unsafe.Pointer(&nextKey[0])); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		return err
+	}
+
+	mk := m.MapKey.DeepCopyMapKey()
+	mv := m.MapValue.DeepCopyMapValue()
+
+	bpfCurrentKey := bpfAttrMapOpElem{
+		mapFd: uint32(m.fd),
+		key:   uint64(uintptr(unsafe.Pointer(&key[0]))),
+		value: uint64(uintptr(unsafe.Pointer(&nextKey[0]))),
+	}
+	bpfCurrentKeyPtr := unsafe.Pointer(&bpfCurrentKey)
+	bpfCurrentKeySize := unsafe.Sizeof(bpfCurrentKey)
+
+	bpfNextKey := bpfAttrMapOpElem{
+		mapFd: uint32(m.fd),
+		key:   uint64(uintptr(unsafe.Pointer(&nextKey[0]))),
+		value: uint64(uintptr(unsafe.Pointer(&value[0]))),
+	}
+
+	bpfNextKeyPtr := unsafe.Pointer(&bpfNextKey)
+	bpfNextKeySize := unsafe.Sizeof(bpfNextKey)
+
+	for {
+		err := LookupElementFromPointers(m.fd, bpfNextKeyPtr, bpfNextKeySize)
+		if err != nil {
+			return err
+		}
+
+		mk, mv, err = m.DumpParser(nextKey, value, mk, mv)
+		if err != nil {
+			return err
+		}
+
+		if cb != nil {
+			cb(mk, mv)
+		}
+
+		copy(key, nextKey)
+
+		if err := GetNextKeyFromPointers(m.fd, bpfCurrentKeyPtr, bpfCurrentKeySize); err != nil {
+			if err == io.EOF { // end of map, we're done iterating
+				return nil
+			}
+			return err
+		}
+	}
 }
 
 type MapKey interface {

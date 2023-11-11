@@ -147,3 +147,20 @@ type RevNatValue interface {
 	// ToHost converts fields to host byte order.
 	ToHost() RevNatValue
 }
+
+func svcFrontend(svcKey ServiceKey, svcValue ServiceValue) *loadbalancer.L3n4AddrID {
+	feL3n4Addr := loadbalancer.NewL3n4Addr(loadbalancer.NONE, svcKey.GetAddress(), svcKey.GetPort(), svcKey.GetScope())
+	feL3n4AddrID := &loadbalancer.L3n4AddrID{
+		L3n4Addr: *feL3n4Addr,
+		ID:       loadbalancer.ID(svcValue.GetRevNat()),
+	}
+	return feL3n4AddrID
+}
+
+func svcBackend(backendID loadbalancer.BackendID, backend BackendValue) *loadbalancer.Backend {
+	beIP := backend.GetAddress()
+	bePort := backend.GetPort()
+	beProto := loadbalancer.NONE
+	beBackend := loadbalancer.NewBackend(backendID, beProto, beIP, bePort)
+	return beBackend
+}
