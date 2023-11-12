@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/cilium/cilium/pkg/counter"
 	"github.com/cilium/cilium/pkg/lock"
-	"github.com/cilium/cilium/pkg/service/healthserver"
 	"github.com/sirupsen/logrus"
 	nodeTypes "k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/node/types"
 	"net"
@@ -13,11 +12,15 @@ import (
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/cidr"
 	datapathOption "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/option"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/loadbalancer"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/lbmap"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/service/healthserver"
 	"sync/atomic"
 )
+
+var log = logging.DefaultLogger.WithField(logfields.LogSubsys, "service")
 
 // ServiceID is the service's ID.
 type ServiceID uint16
@@ -49,8 +52,13 @@ type Service struct {
 	lastUpdatedTs atomic.Value
 }
 
-func NewService(monitorNotify monitorNotify) *Service {
+// healthServer is used to manage HealtCheckNodePort listeners
+type healthServer interface {
+	UpsertService(svcID loadbalancer.ID, svcNS, svcName string, localEndpoints int, port uint16)
+	DeleteService(svcID loadbalancer.ID)
+}
 
+func NewService(monitorNotify monitorNotify) *Service {
 	var localHealthServer healthServer
 	if option.Config.EnableHealthCheckNodePort {
 		localHealthServer = healthserver.New()

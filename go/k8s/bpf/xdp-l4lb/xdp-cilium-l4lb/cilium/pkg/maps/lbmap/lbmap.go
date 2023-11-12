@@ -158,6 +158,34 @@ func (lbmap *LBBPFMap) UpsertService(p *UpsertServiceParams) error {
 	return nil
 }
 
+// AddBackend adds a backend into a BPF map.
+func (*LBBPFMap) AddBackend(id uint16, ip net.IP, port uint16, ipv6 bool) error {
+	var (
+		backend Backend
+		err     error
+	)
+
+	if id == 0 {
+		return fmt.Errorf("Invalid backend ID 0")
+	}
+
+	if ipv6 {
+		//backend, err = NewBackend6(loadbalancer.BackendID(id), ip, port, u8proto.ANY)
+	} else {
+		backend, err = NewBackend4(loadbalancer.BackendID(id), ip, port, u8proto.ANY)
+	}
+	if err != nil {
+		return fmt.Errorf("Unable to create backend (%d, %s, %d, %t): %s",
+			id, ip, port, ipv6, err)
+	}
+
+	if err := updateBackend(backend); err != nil {
+		return fmt.Errorf("Unable to add backend %+v: %s", backend, err)
+	}
+
+	return nil
+}
+
 func updateMasterService(fe ServiceKey, nbackends int, revNATID int, svcType loadbalancer.SVCType,
 	svcLocal bool, sessionAffinity bool, sessionAffinityTimeoutSec uint32,
 	checkSourceRange bool) error {
@@ -200,6 +228,13 @@ func updateServiceEndpoint(key ServiceKey, value ServiceValue) error {
 	}
 
 	return key.Map().Update(key.ToNetwork(), value.ToNetwork())
+}
+
+func updateBackend(backend Backend) error {
+	if _, err := backend.Map().OpenOrCreate(); err != nil {
+		return err
+	}
+	return backend.Map().Update(backend.GetKey(), backend.GetValue().ToNetwork())
 }
 
 type svcMap map[string]loadbalancer.SVC

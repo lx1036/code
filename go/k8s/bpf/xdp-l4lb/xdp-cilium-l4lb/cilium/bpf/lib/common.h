@@ -37,6 +37,21 @@
 #define CILIUM_CALL_IPV6_ENCAP_NODEPORT_NAT	24
 #define CILIUM_CALL_SIZE			25
 
+/* Lookup scope for externalTrafficPolicy=Local */
+#define LB_LOOKUP_SCOPE_EXT	0
+#define LB_LOOKUP_SCOPE_INT	1 // local
+
+/* Service flags (lb{4,6}_service->flags) */
+enum {
+	SVC_FLAG_EXTERNAL_IP  = (1 << 0),  /* External IPs */
+	SVC_FLAG_NODEPORT     = (1 << 1),  /* NodePort service */
+	SVC_FLAG_LOCAL_SCOPE  = (1 << 2),  /* externalTrafficPolicy=Local */
+	SVC_FLAG_HOSTPORT     = (1 << 3),  /* hostPort forwarding */
+	SVC_FLAG_AFFINITY     = (1 << 4),  /* sessionAffinity=clientIP */
+	SVC_FLAG_LOADBALANCER = (1 << 5),  /* LoadBalancer service */
+	SVC_FLAG_ROUTABLE     = (1 << 6),  /* Not a surrogate/ClusterIP entry */
+	SVC_FLAG_SOURCE_RANGE = (1 << 7),  /* Check LoadBalancer source range */
+};
 
 struct lb4_key {
 	__be32 address;		/* Service virtual IPv4 address */

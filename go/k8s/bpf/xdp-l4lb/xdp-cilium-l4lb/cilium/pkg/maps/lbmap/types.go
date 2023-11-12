@@ -91,6 +91,18 @@ type ServiceValue interface {
 	ToHost() ServiceValue
 }
 
+// Backend is the interface describing protocol independent backend used by services v2.
+type Backend interface {
+	// Return the BPF map matching the type
+	Map() *bpf.Map
+
+	// Get key of the backend entry
+	GetKey() BackendKey
+
+	// Get value of the backend entry
+	GetValue() BackendValue
+}
+
 // BackendKey is the interface describing protocol independent backend key.
 type BackendKey interface {
 	bpf.MapKey

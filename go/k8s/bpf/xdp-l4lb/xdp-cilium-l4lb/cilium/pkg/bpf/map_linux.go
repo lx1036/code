@@ -293,6 +293,49 @@ func (m *Map) DumpWithCallback(cb DumpCallback) error {
 	}
 }
 
+func (m *Map) Update(key MapKey, value MapValue) error {
+	var err error
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	defer func() {
+		if m.cache == nil {
+			return
+		}
+
+		if m.withValueCache {
+			desiredAction := OK
+			if err != nil {
+				desiredAction = Insert
+				m.scheduleErrorResolver()
+			}
+
+			m.cache[key.String()] = &cacheEntry{
+				Key:           key,
+				Value:         value,
+				DesiredAction: desiredAction,
+				LastError:     err,
+			}
+			m.updatePressureMetric()
+		} else if err == nil {
+			m.cache[key.String()] = nil
+			m.updatePressureMetric()
+		}
+	}()
+
+	if err = m.open(); err != nil {
+		return err
+	}
+
+	err = UpdateElement(m.fd, m.name, key.GetKeyPtr(), value.GetValuePtr(), 0)
+	if option.Config.MetricsConfig.BPFMapOps {
+		metrics.BPFMapOps.WithLabelValues(m.commonName(), metricOpUpdate, metrics.Error2Outcome(err)).Inc()
+	}
+
+	return err
+}
+
 type MapKey interface {
 	fmt.Stringer
 

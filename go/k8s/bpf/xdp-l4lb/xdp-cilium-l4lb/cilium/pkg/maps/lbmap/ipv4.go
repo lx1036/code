@@ -1,6 +1,7 @@
 package lbmap
 
 import (
+	"fmt"
 	"net"
 	"unsafe"
 
@@ -229,10 +230,46 @@ func (in *pad2uint8) DeepCopyInto(out *pad2uint8) {
 	return
 }
 
+type Backend4 struct {
+	Key   *Backend4Key
+	Value *Backend4Value
+}
+
+func (b *Backend4) Map() *bpf.Map {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (b *Backend4) GetKey() BackendKey {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (b *Backend4) GetValue() BackendValue {
+	//TODO implement me
+	panic("implement me")
+}
+
+func NewBackend4(id loadbalancer.BackendID, ip net.IP, port uint16, proto u8proto.U8proto) (*Backend4, error) {
+	val, err := NewBackend4Value(ip, port, proto)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Backend4{
+		Key:   NewBackend4Key(id),
+		Value: val,
+	}, nil
+}
+
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=github.com/cilium/cilium/pkg/bpf.MapKey
 type Backend4Key struct {
 	ID loadbalancer.BackendID
+}
+
+func NewBackend4Key(id loadbalancer.BackendID) *Backend4Key {
+	return &Backend4Key{ID: id}
 }
 
 func (b *Backend4Key) String() string {
@@ -289,6 +326,21 @@ type Backend4Value struct {
 	Port    uint16          `align:"port"`
 	Proto   u8proto.U8proto `align:"proto"`
 	Pad     uint8           `align:"pad"`
+}
+
+func NewBackend4Value(ip net.IP, port uint16, proto u8proto.U8proto) (*Backend4Value, error) {
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return nil, fmt.Errorf("Not an IPv4 address")
+	}
+
+	val := Backend4Value{
+		Port:  port,
+		Proto: proto,
+	}
+	copy(val.Address[:], ip.To4())
+
+	return &val, nil
 }
 
 func (b *Backend4Value) String() string {
