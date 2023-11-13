@@ -38,6 +38,16 @@ struct bpf_elf_map __section_maps CALLS_MAP = {
 };
 #endif /* SKIP_CALLS_MAP */
 
+/* Global IP -> Identity map for applying egress label-based policy */
+struct bpf_elf_map __section_maps IPCACHE_MAP = {
+	.type		= LPM_MAP_TYPE,
+	.size_key	= sizeof(struct ipcache_key),
+	.size_value	= sizeof(struct remote_endpoint_info),
+	.pinning	= PIN_GLOBAL_NS,
+	.max_elem	= IPCACHE_MAP_SIZE,
+	.flags		= BPF_F_NO_PREALLOC,
+};
+
 
 
 #ifndef SKIP_CALLS_MAP

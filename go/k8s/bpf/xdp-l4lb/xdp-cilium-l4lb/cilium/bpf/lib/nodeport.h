@@ -55,6 +55,7 @@ static __always_inline bool nodeport_uses_dsr4(const struct ipv4_ct_tuple *tuple
 	return nodeport_uses_dsr(tuple->nexthdr);
 }
 
+// https://cilium.io/blog/2020/06/22/cilium-18/
 __section_tail(CILIUM_MAP_CALLS, CILIUM_CALL_IPV4_NODEPORT_NAT)
 int tail_nodeport_nat_ipv4(struct __ctx_buff *ctx)
 {

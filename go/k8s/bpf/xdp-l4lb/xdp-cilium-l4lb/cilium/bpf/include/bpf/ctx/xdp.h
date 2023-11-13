@@ -32,6 +32,11 @@
 /* This must be a mask and all offsets guaranteed to be less than that. */
 #define __CTX_OFF_MAX			0xff
 
+#define ctx_get_tunnel_key		xdp_get_tunnel_key__stub
+#define ctx_set_tunnel_key		xdp_set_tunnel_key__stub
+#define ctx_event_output		xdp_event_output
+#define ctx_adjust_meta			xdp_adjust_meta
+
 
 struct bpf_elf_map __section_maps cilium_xdp_scratch = {
 	.type		= BPF_MAP_TYPE_PERCPU_ARRAY,
