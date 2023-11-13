@@ -33,10 +33,35 @@
 #define __CTX_OFF_MAX			0xff
 
 
+struct bpf_elf_map __section_maps cilium_xdp_scratch = {
+	.type		= BPF_MAP_TYPE_PERCPU_ARRAY,
+	.size_key	= sizeof(int),
+	.size_value	= META_PIVOT,
+	.pinning	= PIN_GLOBAL_NS,
+	.max_elem	= 1,
+};
 
+static __always_inline __maybe_unused void
+ctx_store_meta(struct xdp_md *ctx __maybe_unused, const __u64 off, __u32 datum)
+{
+	__u32 zero = 0;
+	__u32 *data_meta = map_lookup_elem(&cilium_xdp_scratch, &zero);
 
+	if (always_succeeds(data_meta))
+		data_meta[off] = datum;
+	build_bug_on((off + 1) * sizeof(__u32) > META_PIVOT);
+}
 
+static __always_inline __maybe_unused __u32
+ctx_load_meta(const struct xdp_md *ctx __maybe_unused, const __u64 off)
+{
+	__u32 zero = 0, *data_meta = map_lookup_elem(&cilium_xdp_scratch, &zero);
 
+	if (always_succeeds(data_meta))
+		return data_meta[off];
+	build_bug_on((off + 1) * sizeof(__u32) > META_PIVOT);
+	return 0;
+}
 
 
 

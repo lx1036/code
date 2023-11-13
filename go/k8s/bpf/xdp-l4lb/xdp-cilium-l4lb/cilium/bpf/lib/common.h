@@ -44,6 +44,12 @@
 #define SRC_RANGE_STATIC_PREFIX(STRUCT)		\
 	(8 * (sizeof(STRUCT) - sizeof(struct bpf_lpm_trie_key)))
 
+#ifdef PREALLOCATE_MAPS
+#define CONDITIONAL_PREALLOC 0
+#else
+#define CONDITIONAL_PREALLOC BPF_F_NO_PREALLOC
+#endif
+
 /* Service flags (lb{4,6}_service->flags) */
 enum {
 	SVC_FLAG_EXTERNAL_IP  = (1 << 0),  /* External IPs */

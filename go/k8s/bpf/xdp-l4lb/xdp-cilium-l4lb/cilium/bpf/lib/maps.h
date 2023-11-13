@@ -12,6 +12,14 @@
 #include "bpf/compiler.h"
 
 
+struct bpf_elf_map __section_maps ENDPOINTS_MAP = {
+	.type		= BPF_MAP_TYPE_HASH,
+	.size_key	= sizeof(struct endpoint_key),
+	.size_value	= sizeof(struct endpoint_info),
+	.pinning	= PIN_GLOBAL_NS,
+	.max_elem	= ENDPOINTS_MAP_SIZE,
+	.flags		= CONDITIONAL_PREALLOC,
+};
 
 
 
