@@ -14,17 +14,17 @@
 
 
 
-static __always_inline void *ctx_data(const struct __ctx_buff *ctx)
+static __always_inline void *ctx_data(const struct xdp_md *ctx)
 {
 	return (void *)(unsigned long)ctx->data;
 }
 
-static __always_inline void *ctx_data_meta(const struct __ctx_buff *ctx)
+static __always_inline void *ctx_data_meta(const struct xdp_md *ctx)
 {
 	return (void *)(unsigned long)ctx->data_meta;
 }
 
-static __always_inline void *ctx_data_end(const struct __ctx_buff *ctx)
+static __always_inline void *ctx_data_end(const struct xdp_md *ctx)
 {
 	return (void *)(unsigned long)ctx->data_end;
 }

@@ -6,6 +6,21 @@
 #define __LIB_COMMON_H_
 
 
+#include <bpf/ctx/ctx.h>
+#include <bpf/api.h>
+
+#include <linux/if_ether.h>
+#include <linux/ipv6.h>
+#include <linux/in.h>
+#include <linux/socket.h>
+
+#include "eth.h"
+#include "endian.h"
+#include "mono.h"
+#include "config.h"
+
+
+
 /* These are shared with test/bpf/check-complexity.sh, when modifying any of
  * the below, that script should also be updated.
  */
@@ -149,6 +164,33 @@ struct remote_endpoint_info {
 	__u32		tunnel_endpoint;
 	__u8		key;
 };
+
+
+
+static __always_inline bool validate_ethertype(struct xdp_md *ctx, __u16 *proto) {
+	void *data = ctx_data(ctx);
+	void *data_end = ctx_data_end(ctx);
+	struct ethhdr *eth = data;
+
+	if (ETH_HLEN == 0) {
+		/* The packet is received on L2-less device. Determine L3
+		 * protocol from skb->protocol.
+		 */
+		*proto = ctx_get_protocol(ctx);
+		return true;
+	}
+
+	if (data + ETH_HLEN > data_end)
+		return false;
+
+	*proto = eth->h_proto;
+	if (bpf_ntohs(*proto) < ETH_P_802_3_MIN)
+		return false; /* non-Ethernet II unsupported */
+	
+	return true;
+}
+
+
 
 
 

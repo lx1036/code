@@ -1,6 +1,18 @@
 
 
 #include <bpf/ctx/xdp.h>
+#include <bpf/api.h>
+
+#include <node_config.h>
+#include <netdev_config.h>
+#include <filter_config.h>
+
+
+#include "lib/common.h"
+#include "lib/maps.h"
+#include "lib/eps.h"
+#include "lib/events.h"
+#include "lib/nodeport.h"
 
 static __always_inline __maybe_unused int
 bpf_xdp_exit(struct xdp_md* ctx, const int verdict)
@@ -95,7 +107,8 @@ static __always_inline int check_filters(struct xdp_md* ctx) {
     if (!validate_ethertype(ctx, &proto))
 		return CTX_ACT_OK;
 
-
+	ctx_store_meta(ctx, XFER_MARKER, 0);
+	bpf_skip_nodeport_clear(ctx);
 
     switch (proto) {
 #ifdef ENABLE_IPV4
