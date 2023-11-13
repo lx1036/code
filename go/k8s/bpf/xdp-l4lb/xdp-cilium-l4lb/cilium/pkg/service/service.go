@@ -31,11 +31,7 @@ type BackendID uint16
 // ID is the ID of L3n4Addr endpoint (either service or backend).
 type ID uint32
 
-// Service is a service handler. Its main responsibility is to reflect
-// service-related changes into BPF maps used by datapath BPF programs.
-// The changes can be triggered either by k8s_watcher or directly by
-// API calls to the /services endpoint.
-// 注意：可以被 k8s_watcher 调用，或者直接被 cli /services 调用
+// Service 注意：可以被 k8s_watcher 调用，或者直接被 cli /services 调用
 type Service struct {
 	lock.RWMutex
 

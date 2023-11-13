@@ -41,6 +41,9 @@
 #define LB_LOOKUP_SCOPE_EXT	0
 #define LB_LOOKUP_SCOPE_INT	1 // local
 
+#define SRC_RANGE_STATIC_PREFIX(STRUCT)		\
+	(8 * (sizeof(STRUCT) - sizeof(struct bpf_lpm_trie_key)))
+
 /* Service flags (lb{4,6}_service->flags) */
 enum {
 	SVC_FLAG_EXTERNAL_IP  = (1 << 0),  /* External IPs */
@@ -114,7 +117,12 @@ struct endpoint_info {
 	__u32		pad[4];
 };
 
-
+struct lb4_src_range_key {
+	struct bpf_lpm_trie_key lpm_key;
+	__u16 rev_nat_id;
+	__u16 pad;
+	__u32 addr;
+};
 
 
 

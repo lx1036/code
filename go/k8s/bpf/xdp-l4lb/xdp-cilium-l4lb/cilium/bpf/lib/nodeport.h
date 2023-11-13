@@ -6,6 +6,13 @@
 #define __NODEPORT_H_
 
 
+
+#ifndef DSR_ENCAP_MODE
+#define DSR_ENCAP_MODE 0
+#define DSR_ENCAP_IPIP 2
+#endif
+
+
 static __always_inline bool nodeport_uses_dsr(__u8 nexthdr __maybe_unused)
 {
 # if defined(ENABLE_DSR) && !defined(ENABLE_DSR_HYBRID)
@@ -170,7 +177,7 @@ static __always_inline int nodeport_lb4(struct __ctx_buff *ctx,
 			return ret;
 	}
 
-	// 1. 从 
+	// 1. 从 cilium_lb4_services_v2 map 里查找 service/backends
 	svc = lb4_lookup_service(&key, false);
 	if (svc) {
 		const bool skip_l3_xlate = DSR_ENCAP_MODE == DSR_ENCAP_IPIP;
