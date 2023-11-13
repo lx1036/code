@@ -7,6 +7,7 @@ import (
 	"github.com/cilium/cilium/pkg/byteorder"
 	"github.com/cilium/cilium/pkg/lock"
 	"github.com/cilium/cilium/pkg/metrics"
+	"golang.org/x/sys/unix"
 	"io"
 	"os"
 	"path"
@@ -334,6 +335,34 @@ func (m *Map) Update(key MapKey, value MapValue) error {
 	}
 
 	return err
+}
+
+// Reopen attempts to close and re-open the received map.
+func (m *Map) Reopen() error {
+	m.Close()
+	return m.Open()
+}
+
+func (m *Map) controllerName() string {
+	return fmt.Sprintf("bpf-map-sync-%s", m.name)
+}
+
+func (m *Map) Close() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if m.enableSync {
+		mapControllers.RemoveController(m.controllerName())
+	}
+
+	if m.fd != 0 {
+		unix.Close(m.fd)
+		m.fd = 0
+	}
+
+	unregisterMap(m.path, m)
+
+	return nil
 }
 
 type MapKey interface {

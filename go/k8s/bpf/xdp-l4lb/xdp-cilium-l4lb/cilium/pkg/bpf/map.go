@@ -3,6 +3,8 @@ package bpf
 import (
 	"github.com/cilium/cilium/pkg/datapath/linux/probes"
 	"time"
+
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/controller"
 )
 
 type MapType int
@@ -48,6 +50,8 @@ const (
 
 var (
 	supportedMapTypes *probes.MapTypes
+
+	mapControllers = controller.NewManager()
 )
 
 func GetMapType(t MapType) MapType {

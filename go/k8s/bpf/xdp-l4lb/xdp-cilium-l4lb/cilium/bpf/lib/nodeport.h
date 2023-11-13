@@ -311,18 +311,14 @@ drop_err:
 	return send_drop_notify_error(ctx, 0, ret, CTX_ACT_DROP, METRIC_EGRESS);
 }
 
-
 #endif /* ENABLE_DSR */
-
 
 
 /* Main node-port entry point for host-external ingressing node-port traffic
  * which handles the case of: i) backend is local EP, ii) backend is remote EP,
  * iii) reply from remote backend EP.
  */
-static __always_inline int nodeport_lb4(struct __ctx_buff *ctx,
-					__u32 src_identity)
-{
+static __always_inline int nodeport_lb4(struct __ctx_buff *ctx, __u32 src_identity) {
 	struct ipv4_ct_tuple tuple = {};
 	void *data, *data_end;
 	struct iphdr *ip4;

@@ -38,7 +38,25 @@ struct bpf_elf_map __section_maps CALLS_MAP = {
 };
 #endif /* SKIP_CALLS_MAP */
 
+
+struct ipcache_key {
+	struct bpf_lpm_trie_key lpm_key;
+	__u16 pad1;
+	__u8 pad2;
+	__u8 family;
+	union {
+		struct {
+			__u32		ip4;
+			__u32		pad4;
+			__u32		pad5;
+			__u32		pad6;
+		};
+		union v6addr	ip6;
+	};
+} __packed;
+
 /* Global IP -> Identity map for applying egress label-based policy */
+// 实际上在用户态里定义为 "cilium_ipcache" bpf map
 struct bpf_elf_map __section_maps IPCACHE_MAP = {
 	.type		= LPM_MAP_TYPE,
 	.size_key	= sizeof(struct ipcache_key),

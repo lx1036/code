@@ -62,6 +62,20 @@ enum {
 	SVC_FLAG_SOURCE_RANGE = (1 << 7),  /* Check LoadBalancer source range */
 };
 
+union v6addr {
+	struct {
+		__u32 p1;
+		__u32 p2;
+		__u32 p3;
+		__u32 p4;
+	};
+	struct {
+		__u64 d1;
+		__u64 d2;
+	};
+	__u8 addr[16];
+} __packed;
+
 struct lb4_key {
 	__be32 address;		/* Service virtual IPv4 address */
 	__be16 dport;		/* L4 port filter, if unset, all ports apply */
@@ -116,7 +130,7 @@ struct lb_affinity_match {
 struct endpoint_info {
 	__u32		ifindex;
 	__u16		unused; /* used to be sec_label, no longer used */
-	__u16           lxc_id;
+	__u16       lxc_id;
 	__u32		flags;
 	mac_t		mac;
 	mac_t		node_mac;
@@ -128,6 +142,12 @@ struct lb4_src_range_key {
 	__u16 rev_nat_id;
 	__u16 pad;
 	__u32 addr;
+};
+
+struct remote_endpoint_info {
+	__u32		sec_label;
+	__u32		tunnel_endpoint;
+	__u8		key;
 };
 
 

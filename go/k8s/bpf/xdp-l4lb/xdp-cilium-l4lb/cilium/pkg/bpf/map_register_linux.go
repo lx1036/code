@@ -19,3 +19,11 @@ func registerMap(path string, m *Map) {
 
 	log.WithField("path", path).Debug("Registered BPF map")
 }
+
+func unregisterMap(path string, m *Map) {
+	mutex.Lock()
+	delete(mapRegister, path)
+	mutex.Unlock()
+
+	log.WithField("path", path).Debug("Unregistered BPF map")
+}

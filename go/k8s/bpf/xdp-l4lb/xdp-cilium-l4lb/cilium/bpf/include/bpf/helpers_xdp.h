@@ -44,11 +44,14 @@ static int BPF_STUB(xdp_change_tail, struct xdp_md *xdp, __u32 nlen,
 		    __u32 flags);
 
 /* Packet tunnel encap/decap */
+/*
+bpf_skb_get_tunnel_key: 从封装包里获取 metadata
+bpf_skb_set_tunnel_key: 把 metadata xdp_set_tunnel_key 封装到 xdp_md 里
+*/
 static int BPF_STUB(xdp_get_tunnel_key, struct xdp_md *xdp,
 		    struct bpf_tunnel_key *to, __u32 size, __u32 flags);
 static int BPF_STUB(xdp_set_tunnel_key, struct xdp_md *xdp,
-		    const struct bpf_tunnel_key *from, __u32 size,
-		    __u32 flags);
+		    const struct bpf_tunnel_key *from, __u32 size, __u32 flags);
 
 /* Events for user space */
 static int BPF_FUNC_REMAP(xdp_event_output, struct xdp_md *xdp, void *map,
