@@ -166,11 +166,12 @@ struct remote_endpoint_info {
 };
 
 
-
-static __always_inline bool validate_ethertype(struct xdp_md *ctx, __u16 *proto) {
+// 从二层头 ethernet header 中获取 __u16 *protocol，并验证符合二层头协议的包
+static __always_inline bool 
+validate_ethertype(struct xdp_md *ctx, __u16 *proto) {
 	void *data = ctx_data(ctx);
 	void *data_end = ctx_data_end(ctx);
-	struct ethhdr *eth = data;
+	struct ethhdr *eth = data; // 转换成二层头
 
 	if (ETH_HLEN == 0) {
 		/* The packet is received on L2-less device. Determine L3
@@ -180,11 +181,11 @@ static __always_inline bool validate_ethertype(struct xdp_md *ctx, __u16 *proto)
 		return true;
 	}
 
-	if (data + ETH_HLEN > data_end)
+	if (data + ETH_HLEN > data_end) // 如果不符合二层头协议的包
 		return false;
 
 	*proto = eth->h_proto;
-	if (bpf_ntohs(*proto) < ETH_P_802_3_MIN)
+	if (bpf_ntohs(*proto) < ETH_P_802_3_MIN) // bpf_ntohs: 把 __u16->0xXXXX
 		return false; /* non-Ethernet II unsupported */
 	
 	return true;

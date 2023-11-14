@@ -24,7 +24,11 @@
 #include "pcap.h"
 // #include "host_firewall.h"
 
-
+static __always_inline __maybe_unused void
+bpf_skip_nodeport_clear(struct __ctx_buff *ctx)
+{
+	ctx_skip_nodeport_clear(ctx);
+}
 
 #ifndef DSR_ENCAP_MODE
 #define DSR_ENCAP_MODE 0

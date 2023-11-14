@@ -6,7 +6,10 @@
 #define __BPF_CTX_COMMON_H_
 
 #include <linux/types.h>
+#include <linux/bpf.h>
 
+#include "../compiler.h"
+#include "../errno.h"
 
 
 #define __ctx_skb		1

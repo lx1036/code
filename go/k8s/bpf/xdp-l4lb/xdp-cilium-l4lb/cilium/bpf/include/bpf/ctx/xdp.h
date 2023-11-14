@@ -14,7 +14,10 @@
 
 #include "common.h"
 #include "../helpers_xdp.h"
-
+#include "../builtins.h"
+#include "../section.h"
+#include "../loader.h"
+#include "../csum.h"
 
 
 
@@ -25,9 +28,9 @@
 
 #define CTX_DIRECT_WRITE_OK		1
 
-					/* cb + RECIRC_MARKER + XFER_MARKER */
-#define META_PIVOT			((int)(field_sizeof(struct __sk_buff, cb) + \
-					       sizeof(__u32) * 2))
+// xdp_md.cb + 4字节*2
+/* cb + RECIRC_MARKER + XFER_MARKER */
+#define META_PIVOT	((int)(field_sizeof(struct xdp_md, cb) + sizeof(__u32) * 2))
 
 /* This must be a mask and all offsets guaranteed to be less than that. */
 #define __CTX_OFF_MAX			0xff
@@ -47,8 +50,7 @@ struct bpf_elf_map __section_maps cilium_xdp_scratch = {
 };
 
 static __always_inline __maybe_unused void
-ctx_store_meta(struct xdp_md *ctx __maybe_unused, const __u64 off, __u32 datum)
-{
+ctx_store_meta(struct xdp_md *ctx __maybe_unused, const __u64 off, __u32 datum) {
 	__u32 zero = 0;
 	__u32 *data_meta = map_lookup_elem(&cilium_xdp_scratch, &zero);
 
@@ -58,8 +60,7 @@ ctx_store_meta(struct xdp_md *ctx __maybe_unused, const __u64 off, __u32 datum)
 }
 
 static __always_inline __maybe_unused __u32
-ctx_load_meta(const struct xdp_md *ctx __maybe_unused, const __u64 off)
-{
+ctx_load_meta(const struct xdp_md *ctx __maybe_unused, const __u64 off) {
 	__u32 zero = 0, *data_meta = map_lookup_elem(&cilium_xdp_scratch, &zero);
 
 	if (always_succeeds(data_meta))
@@ -68,7 +69,16 @@ ctx_load_meta(const struct xdp_md *ctx __maybe_unused, const __u64 off)
 	return 0;
 }
 
+static __always_inline __maybe_unused __u32
+ctx_get_protocol(const struct xdp_md *ctx) {
+	void *data_end = ctx_data_end(ctx);
+	struct ethhdr *eth = ctx_data(ctx);
 
+	if (ctx_no_room(eth + 1, data_end))
+		return 0;
+
+	return eth->h_proto; // 还是从二层头里读取 protocol
+}
 
 
 #endif /* __BPF_CTX_XDP_H_ */
