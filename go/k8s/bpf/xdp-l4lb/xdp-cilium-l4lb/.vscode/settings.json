@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "helpers_xdp.h": "c"
+        "helpers_xdp.h": "c",
+        "if_ether.h": "c"
     }
 }

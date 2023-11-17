@@ -4,6 +4,7 @@
 
 # 验证：安装完软件后，然后直接运行 `sh test.sh`，验证没有问题
 
+# ipip demo 验证: https://blog.csdn.net/WuYuChen20/article/details/104572969
 
 
 #!/bin/bash
@@ -29,6 +30,9 @@ apt-get install -y gcc-multilib libbpf-dev
 # 这里安装 libbpf-dev 包后，代码里可以直接 include linux 头文件
 clang -O2 -Wall -target bpf -c bpf_xdp_veth_host.c -o bpf_xdp_veth_host.o
 
+# worker node 收到的包还是 IPIP 包，在 worker node 上没有创建 ipip 类型网卡来解包
+# 通过在 eth0 上挂载 tc ingress bpf 程序来解析 ipip 包
+
 # The worker (aka backend node) will receive IPIP packets from the LB node.
 # To decapsulate the packets instead of creating an ipip dev which would
 # complicate network setup, we will attach the following program which
@@ -43,8 +47,9 @@ clang -O2 -Wall -target bpf -c test_tc_tunnel.c -o test_tc_tunnel.o
 #
 # The LB cilium does not connect to the kube-apiserver. For now we use Kind
 # just to create Docker-in-Docker containers.
-
 kind create cluster --config kind-config.yaml --image=kindest/node:v1.19.16
+
+# l4lb-veth0(host) 3.3.3.1 <-> l4lb-veth1(control-plane) 3.3.3.2
 
 # Create additional veth pair which is going to be used to test XDP_REDIRECT.
 ip l a l4lb-veth0 type veth peer l4lb-veth1
@@ -61,7 +66,6 @@ nsenter -t $CONTROL_PLANE_PID -n /bin/sh -c "\
 # 新的安装方式：
 # helm repo add cilium https://helm.cilium.io/
 # helm install cilium cilium/cilium --version 1.14.4 --namespace kube-system
-
 # 文件来自 https://github.com/cilium/cilium/blob/511463db8f42541cef3730138a58591dce2f3a44/install/kubernetes/cilium
 helm install cilium ${HELM_CHART_DIR} \
     --wait \
@@ -83,6 +87,7 @@ helm install cilium ${HELM_CHART_DIR} \
     --set affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator=In \
     --set affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]=kind-control-plane
 
+# xdp bpf 程序挂载在 l4lb-veth0 和 vethf919756@if33(control-plane node 里 eth0 的 veth-pair)
 IFIDX=$(docker exec -i kind-control-plane \
     /bin/sh -c 'echo $(( $(ip -o l show eth0 | awk "{print $1}" | cut -d: -f1) ))')
 LB_VETH_HOST=$(ip -o l | grep "if$IFIDX" | awk '{print $2}' | cut -d@ -f1)
@@ -94,6 +99,9 @@ ip l set dev l4lb-veth0 xdp obj bpf_xdp_veth_host.o
 ethtool -K $LB_VETH_HOST rx off tx off
 ethtool -K l4lb-veth0 rx off tx off
 
+# worker node 上 eth0 挂载 tc ingress IPIP 解包程序
+# `tc filter show dev eth0 ingress`
+# 卸载 tc 程序：`tc filter del dev eth0 ingress pref 49152`
 docker exec kind-worker /bin/sh -c 'apt-get update && apt-get install -y nginx && systemctl start nginx'
 WORKER_IP=$(docker exec kind-worker ip -o -4 a s eth0 | awk '{print $4}' | cut -d/ -f1)
 nsenter -t $(docker inspect kind-worker -f '{{ .State.Pid }}') -n /bin/sh -c \

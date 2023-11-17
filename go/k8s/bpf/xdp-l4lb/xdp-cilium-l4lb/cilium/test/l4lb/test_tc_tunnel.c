@@ -494,6 +494,10 @@ static int decap_internal(struct __sk_buff *skb, int off, int len, char proto)
 		return TC_ACT_OK;
 	}
 
+	// 主要就是 shrink 外层的三层 iphdr 头
+	// Grow or shrink the room for data in the packet
+	// BPF_ADJ_ROOM_MAC: Adjust room at the mac layer
+	// BPF_F_ADJ_ROOM_FIXED_GSO: Do not adjust gso_size
    	if (bpf_skb_adjust_room(skb, -olen, BPF_ADJ_ROOM_MAC, BPF_F_ADJ_ROOM_FIXED_GSO))
     	return TC_ACT_SHOT;
 
@@ -504,15 +508,13 @@ static int decap_ipv4(struct __sk_buff *skb)
 {
 	struct iphdr iph_outer;
 
-	if (bpf_skb_load_bytes(skb, ETH_HLEN, &iph_outer,
-			       sizeof(iph_outer)) < 0)
+	if (bpf_skb_load_bytes(skb, ETH_HLEN, &iph_outer, sizeof(iph_outer)) < 0)
 		return TC_ACT_OK;
 
 	if (iph_outer.ihl != 5)
 		return TC_ACT_OK;
 
-	return decap_internal(skb, ETH_HLEN, sizeof(iph_outer),
-			      iph_outer.protocol);
+	return decap_internal(skb, ETH_HLEN, sizeof(iph_outer), iph_outer.protocol);
 }
 
 static int decap_ipv6(struct __sk_buff *skb)
@@ -526,6 +528,14 @@ static int decap_ipv6(struct __sk_buff *skb)
 	return decap_internal(skb, ETH_HLEN, sizeof(iph_outer),
 			      iph_outer.nexthdr);
 }
+
+
+/*
+TC_ACT_OK: accept packet
+TC_ACT_SHOT: drop packet
+
+*/
+
 
 SEC("decap")
 int decap_f(struct __sk_buff *skb)
