@@ -62,5 +62,51 @@ tail -n 100 /sys/kernel/debug/tracing/trace
 ```
 
 
+# 过程解释
+
+过程描述：ns1 里 ping vip(10.10.1.102) 是通的
+
+```
+root@xxx:~/ipip# ip netns exec ns1 ping -c3 10.10.1.102
+PING 10.10.1.102 (10.10.1.102) 56(84) bytes of data.
+64 bytes from 10.10.1.102: icmp_seq=1 ttl=63 time=0.064 ms
+64 bytes from 10.10.1.102: icmp_seq=2 ttl=63 time=0.069 ms
+64 bytes from 10.10.1.102: icmp_seq=3 ttl=63 time=0.067 ms
+
+--- 10.10.1.102 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2041ms
+rtt min/avg/max/mdev = 0.064/0.066/0.069/0.002 ms
+```
+
+解释包的流程：
+路由决策 -> vens1(ns1) ->[veth pair]-> ve1(tc ingress redirect, host) -> bpf_redirect -> vens2(ns2) 已经做了 ipip 封装  -> 
+路由决策 -> ve2(host) -> ve2(host, tc ingress forward) -> tun1(host) ->
+路由决策 -> vens2(ns2) -> vens2(tc ingress) -> tun2(tcpdump 后已经 ipip 解包)
+
+```
+# ip netns exec ns2 tcpdump -i vens2 -nneevv -A
+16:45:12.749308 16:01:bc:fe:59:75 > d2:b4:19:fa:f2:ae, ethertype IPv4 (0x0800), length 118: (tos 0x0, ttl 64, id 29564, offset 0, flags [none], proto IPIP (4), length 104)
+    10.2.1.1 > 10.2.1.102: (tos 0x0, ttl 64, id 1499, offset 0, flags [DF], proto ICMP (1), length 84)
+    10.1.1.101 > 10.10.1.102: ICMP echo request, id 16026, seq 1, length 64
+
+16:45:12.749437 d2:b4:19:fa:f2:ae > 16:01:bc:fe:59:75, ethertype IPv4 (0x0800), length 118: (tos 0x0, ttl 64, id 7393, offset 0, flags [DF], proto IPIP (4), length 104)
+    10.2.1.102 > 10.2.1.1: (tos 0x0, ttl 64, id 49789, offset 0, flags [none], proto ICMP (1), length 84)
+    10.10.1.102 > 10.1.1.101: ICMP echo reply, id 16026, seq 1, length 64
+
+
+# ip netns exec ns2 tcpdump -i tun2 -nneevv -A
+17:30:14.818789 ip: (tos 0x0, ttl 64, id 5112, offset 0, flags [DF], proto ICMP (1), length 84)
+    10.1.1.101 > 10.10.1.102: ICMP echo request, id 16865, seq 1, length 64
+
+17:30:14.818814 ip: (tos 0x0, ttl 64, id 38308, offset 0, flags [none], proto ICMP (1), length 84)
+    10.10.1.102 > 10.1.1.101: ICMP echo reply, id 16865, seq 1, length 64
+```
+
+
+
 # 参考文献
+
+https://www.spinics.net/lists/netdev/msg403578.html
+https://www.spinics.net/lists/netdev/msg403580.html
+https://www.spinics.net/lists/netdev/msg403579.html
 

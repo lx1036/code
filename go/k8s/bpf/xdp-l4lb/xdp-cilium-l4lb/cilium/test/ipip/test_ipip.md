@@ -28,11 +28,15 @@ ecs2 172.16.111.102
 ip tunnel add tun1 mode ipip remote 172.16.111.102 local 172.16.111.103
 ip link set tun1 up
 ip addr add 10.10.100.10 peer 10.10.200.10 dev tun1
+# 会自动创建一条路由
+10.10.200.10 dev tun1 proto kernel scope link src 10.10.100.10
 
 # ecs2
 ip tunnel add tun2 mode ipip remote 172.16.111.103 local 172.16.111.102
 ip link set tun2 up
 ip addr add 10.10.200.10 peer 10.10.100.10 dev tun2
+# 会自动创建一条路由
+10.10.100.10 dev tun2 proto kernel scope link src 10.10.200.10
 
 root@xxx:~# ip addr show tun1
 5: tun1@NONE: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1480 qdisc noqueue state UNKNOWN group default qlen 1000

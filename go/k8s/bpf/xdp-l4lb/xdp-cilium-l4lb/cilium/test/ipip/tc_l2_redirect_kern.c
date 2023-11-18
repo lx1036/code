@@ -22,13 +22,11 @@
 
 #include <linux/if_packet.h>
 #include <linux/filter.h>
-#include <net/ipv6.h>
-// #include <bpf/bpf_helpers.h>
-
+// #include <net/ipv6.h>
 
 
 #define _htonl __builtin_bswap32
-#define SEC(NAME) __attribute__((section(NAME), used))
+// #define SEC(NAME) __attribute__((section(NAME), used))
 #define PIN_GLOBAL_NS		2
 
 struct bpf_elf_map {
@@ -53,7 +51,7 @@ struct bpf_elf_map SEC("maps") tun_iface = {
 };
 
 
-// 目标vip 在网段 10.10.1.0/24 内
+// 目标 vip 在网段 10.10.1.0/24 内
 static __always_inline bool is_vip_addr(__be16 eth_proto, __be32 daddr)
 {
 	if (eth_proto == __bpf_htons(ETH_P_IP))
@@ -64,7 +62,8 @@ static __always_inline bool is_vip_addr(__be16 eth_proto, __be32 daddr)
 	return false;
 }
 
-
+// vens2 tc ingress 主要拦截 10.10.1.0/24 的包, 此时的包为 ipip，所以不会被丢弃:
+// Outer 10.2.1.1(ve2) > 10.2.1.102(vens2) Inner 10.1.1.101(vens1) > 10.10.1.102
 SEC("drop_non_tun_vip")
 int _drop_non_tun_vip(struct __sk_buff *skb)
 {
@@ -82,6 +81,7 @@ int _drop_non_tun_vip(struct __sk_buff *skb)
 		if (data + sizeof(*eth) + sizeof(*iph) > data_end)
 			return TC_ACT_OK;
 
+		// 如果访问 ip 在网段 10.10.1.0/24 内, 则丢弃包
 		if (is_vip_addr(eth->h_proto, iph->daddr))
 			return TC_ACT_SHOT;
 	} else if (eth->h_proto == __bpf_htons(ETH_P_IPV6)) {
@@ -117,16 +117,19 @@ int _l2_to_iptun_ingress_forward(struct __sk_buff *skb)
 		return TC_ACT_OK;
 
 	if (eth->h_proto == __bpf_htons(ETH_P_IP)) {
-		char fmt4[] = "ingress forward to ifindex:%d daddr4:%x\n";
+		char fmt4[] = "ingress forward to ifindex:%d daddr4:%x\n"; // "ingress forward to ifindex:8 daddr4:a020101"
 		struct iphdr *iph = data + sizeof(*eth);
 
 		if (data + sizeof(*eth) + sizeof(*iph) > data_end)
 			return TC_ACT_OK;
 
+		// ve2 收到的包已经是封装后的 ipip 包
 		if (iph->protocol != IPPROTO_IPIP)
 			return TC_ACT_OK;
 
-		bpf_trace_printk(fmt4, sizeof(fmt4), *ifindex, _htonl(iph->daddr));
+		bpf_trace_printk(fmt4, sizeof(fmt4), *ifindex, _htonl(iph->daddr)); // __u32 -> a020101=10.2.1.1(ve2, host)
+
+		// BPF_F_INGRESS 表示 redirect 到 ifindex 的 ingress 这个 hook
 		return bpf_redirect(*ifindex, BPF_F_INGRESS);
 	} else if (eth->h_proto == __bpf_htons(ETH_P_IPV6)) {
 		char fmt6[] = "ingress forward to ifindex:%d daddr6:%x::%x\n";
@@ -185,7 +188,8 @@ int _l2_to_iptun_ingress_redirect(struct __sk_buff *skb)
 
 	tkey.tunnel_id = 10000;
 	tkey.tunnel_ttl = 64;
-	tkey.remote_ipv4 = 0x0a020166; /* 10.2.1.102 */
+	tkey.remote_ipv4 = 0x0a020166; /* 10.2.1.102 vens2(ns2) 网卡地址 */
+	// Populate tunnel metadata for packet associated to *skb.*
 	bpf_skb_set_tunnel_key(skb, &tkey, sizeof(tkey), 0);
 	return bpf_redirect(*ifindex, 0);
 }
