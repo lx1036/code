@@ -7,12 +7,12 @@
 #include <linux/types.h>
 
 // https://en.wikipedia.org/wiki/IP_in_IP
-
+// https://en.wikipedia.org/wiki/Internet_Protocol_version_4#IHL
 // IPv4 header
 // #include <linux/ip.h>
 // ipv4 头, 字节大小: 1+1+2+2+2+1+1+2+4+4=20，也就是说，ipip 会多 20 字节大小，所以 MTU 原来 1500，使用 ipip 后只能搬运 1480 字节数据
 struct iphdr {
-  __u8 ihl : 4;
+  __u8 ihl : 4; // Internet Header Length,
   __u8 version : 4;
 
   // Type of Service (TOS): 8 bits. This field is copied from the inner IP header

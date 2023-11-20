@@ -10,78 +10,78 @@
 #define __BPF_COMPILER_H_
 
 #ifndef __non_bpf_context
-# include "stddef.h"
+#include "stddef.h"
 #endif
 
 #ifndef __section
-# define __section(X)		__attribute__((section(X), used))
+#define __section(X) __attribute__((section(X), used))
 #endif
 
 #ifndef __maybe_unused
-# define __maybe_unused		__attribute__((__unused__))
+#define __maybe_unused		__attribute__((__unused__))
 #endif
 
 #ifndef offsetof
-# define offsetof(T, M)		__builtin_offsetof(T, M)
+#define offsetof(T, M)		__builtin_offsetof(T, M)
 #endif
 
 #ifndef field_sizeof
-# define field_sizeof(T, M)	sizeof((((T *)NULL)->M))
+#define field_sizeof(T, M)	sizeof((((T *)NULL)->M))
 #endif
 
 #ifndef __packed
-# define __packed		__attribute__((packed))
+#define __packed		__attribute__((packed))
 #endif
 
 #ifndef __nobuiltin
-# if __clang_major__ >= 10
-#  define __nobuiltin(X)	__attribute__((no_builtin(X)))
-# else
-#  define __nobuiltin(X)
-# endif
+#if __clang_major__ >= 10
+#define __nobuiltin(X) __attribute__((no_builtin(X)))
+#else
+#define __nobuiltin(X)
+#endif
 #endif
 
 #ifndef likely
-# define likely(X)		__builtin_expect(!!(X), 1)
+#define likely(X)		__builtin_expect(!!(X), 1)
 #endif
 
 #ifndef unlikely
-# define unlikely(X)		__builtin_expect(!!(X), 0)
+#define unlikely(X)		__builtin_expect(!!(X), 0)
 #endif
 
 #ifndef always_succeeds		/* Mainly for documentation purpose. */
-# define always_succeeds(X)	likely(X)
+#define always_succeeds(X)	likely(X)
 #endif
 
 #undef __always_inline		/* stddef.h defines its own */
 #define __always_inline		inline __attribute__((always_inline))
 
 #ifndef __stringify
-# define __stringify(X)		#X
+#define __stringify(X)		#X
 #endif
 
 #ifndef __fetch
-# define __fetch(X)		(__u32)(__u64)(&(X))
+#define __fetch(X)		(__u32)(__u64)(&(X))
 #endif
 
 #ifndef __aligned
-# define __aligned(X)		__attribute__((aligned(X)))
+#define __aligned(X)		__attribute__((aligned(X)))
 #endif
 
 #ifndef build_bug_on
-# define build_bug_on(E)	((void)sizeof(char[1 - 2*!!(E)]))
+#define build_bug_on(E)	((void)sizeof(char[1 - 2*!!(E)]))
 #endif
 
 #ifndef __throw_build_bug
-# define __throw_build_bug()	__builtin_trap()
+#define __throw_build_bug()	__builtin_trap()
 #endif
 
 #ifndef __printf
-# define __printf(X, Y)		__attribute__((__format__(printf, X, Y)))
+#define __printf(X, Y)		__attribute__((__format__(printf, X, Y)))
 #endif
 
 #ifndef barrier
-# define barrier()		asm volatile("": : :"memory")
+#define barrier() asm volatile("": : :"memory")
 #endif
 
 #ifndef barrier_data

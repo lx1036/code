@@ -165,6 +165,21 @@ struct remote_endpoint_info {
 	__u8		key;
 };
 
+struct ipv4_ct_tuple {
+    /* Address fields are reversed, i.e.,
+     * these field names are correct for reply direction traffic.
+     */
+    __be32		daddr;
+    __be32		saddr;
+    /* The order of dport+sport must not be changed!
+     * These field names are correct for original direction traffic.
+     */
+    __be16		dport;
+    __be16		sport;
+    __u8		nexthdr;
+    __u8		flags;
+} __packed;
+
 
 // 从二层头 ethernet header 中获取 __u16 *protocol，并验证符合二层头协议的包
 static __always_inline bool 
@@ -191,6 +206,7 @@ validate_ethertype(struct xdp_md *ctx, __u16 *proto) {
 	return true;
 }
 
+#define IS_ERR(x) (unlikely((x < 0) || (x == CTX_ACT_DROP)))
 
 
 

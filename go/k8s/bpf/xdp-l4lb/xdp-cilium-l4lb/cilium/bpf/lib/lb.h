@@ -61,7 +61,7 @@ bool lb4_svc_has_src_range_check(const struct lb4_service *svc __maybe_unused)
 
 
 
-#ifdef ENABLE_IPV4
+//#ifdef ENABLE_IPV4
 
 // add source range check
 static __always_inline
@@ -106,10 +106,17 @@ static __always_inline struct lb4_service *lb4_lookup_service(struct lb4_key *ke
 	return NULL;
 }
 
+// extract ipv4 lb key from packet
+static __always_inline int lb4_extract_key(struct __ctx_buff *ctx __maybe_unused,
+                                           struct iphdr *ip4,
+                                           int l4_off __maybe_unused,
+                                           struct lb4_key *key,
+                                           struct csum_offset *csum_off,
+                                           int dir)
+{}
 
 
-
-#endif /* ENABLE_IPV4 */
+//#endif /* ENABLE_IPV4 */
 
 
 #endif /* __LB_H_ */

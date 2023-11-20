@@ -37,9 +37,9 @@ bpf_xdp_exit(struct xdp_md* ctx, const int verdict)
 	return verdict;
 }
 
-#ifdef ENABLE_IPV4
+//#ifdef ENABLE_IPV4
 // ENABLE_NODEPORT_ACCELERATION 默认开启
-#ifdef ENABLE_NODEPORT_ACCELERATION
+//#ifdef ENABLE_NODEPORT_ACCELERATION
 __section_tail(CILIUM_MAP_CALLS, CILIUM_CALL_IPV4_FROM_LXC)
 int tail_lb_ipv4(struct __ctx_buff *ctx) {
 	int ret = CTX_ACT_OK;
@@ -58,30 +58,30 @@ static __always_inline int check_v4_lb(struct __ctx_buff *ctx)
 	ep_tail_call(ctx, CILIUM_CALL_IPV4_FROM_LXC);
 	return send_drop_notify_error(ctx, 0, DROP_MISSED_TAIL_CALL, CTX_ACT_DROP, METRIC_INGRESS);
 }
-#else
-static __always_inline int check_v4_lb(struct __ctx_buff *ctx __maybe_unused)
-{
-	return CTX_ACT_OK;
-}
-#endif /* ENABLE_NODEPORT_ACCELERATION */
+//#else
+//static __always_inline int check_v4_lb(struct __ctx_buff *ctx __maybe_unused)
+//{
+//	return CTX_ACT_OK;
+//}
+//#endif /* ENABLE_NODEPORT_ACCELERATION */
 
 // ENABLE_PREFILTER 暂时默认不开启
-#ifdef ENABLE_PREFILTER
-
-static __always_inline int 
-check_v4(struct __ctx_buff *ctx) {
+//#ifdef ENABLE_PREFILTER
+//
+//static __always_inline int
+//check_v4(struct __ctx_buff *ctx) {
 // 	void *data_end = ctx_data_end(ctx);
 // 	void *data = ctx_data(ctx);
 // 	struct iphdr *ipv4_hdr = data + sizeof(struct ethhdr);
 // 	struct lpm_v4_key pfx __maybe_unused;
-
+//
 // 	if (ctx_no_room(ipv4_hdr + 1, data_end))
 // 		return CTX_ACT_DROP;
-
+//
 // #ifdef CIDR4_FILTER
 // 	memcpy(pfx.lpm.data, &ipv4_hdr->saddr, sizeof(pfx.addr));
 // 	pfx.lpm.prefixlen = 32;
-
+//
 // #ifdef CIDR4_LPM_PREFILTER
 // 	if (map_lookup_elem(&CIDR4_LMAP_NAME, &pfx))
 // 		return CTX_ACT_DROP;
@@ -89,17 +89,18 @@ check_v4(struct __ctx_buff *ctx) {
 // 	return map_lookup_elem(&CIDR4_HMAP_NAME, &pfx) ?
 // 		CTX_ACT_DROP : check_v4_lb(ctx);
 // #else
-	return check_v4_lb(ctx);
+//	return check_v4_lb(ctx);
 // #endif /* CIDR4_FILTER */
-}
-#else
+//}
+//#else
+
 static __always_inline int 
 check_v4(struct __ctx_buff *ctx) {
 	return check_v4_lb(ctx);
 }
 
-#endif /* ENABLE_PREFILTER */
-#endif /* ENABLE_IPV4 */
+//#endif /* ENABLE_PREFILTER */
+//#endif /* ENABLE_IPV4 */
 
 
 
@@ -114,11 +115,11 @@ static __always_inline int check_filters(struct xdp_md* ctx) {
 	bpf_skip_nodeport_clear(ctx);
 
     switch (proto) {
-#ifdef ENABLE_IPV4
+//#ifdef ENABLE_IPV4
 	case bpf_htons(ETH_P_IP): // ip 包, 0x0800->__u16
 		ret = check_v4(ctx);
 		break;
-#endif /* ENABLE_IPV4 */
+//#endif /* ENABLE_IPV4 */
 #ifdef ENABLE_IPV6
 	// case bpf_htons(ETH_P_IPV6):
 		// ret = check_v6(ctx);

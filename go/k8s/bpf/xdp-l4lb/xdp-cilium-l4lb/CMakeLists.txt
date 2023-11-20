@@ -59,4 +59,9 @@ add_executable(xdp_cilium_l4lb
         cilium/test/ipip/tc_l2_redirect_kern.c
         cilium/test/l4lb/bpf_xdp_veth_host.c
         cilium/test/l4lb/test_tc_tunnel.c
-        cilium/test/tunnel/test_tunnel_kern.c)
+        cilium/test/tunnel/test_tunnel_kern.c
+        cilium/bpf/include/linux/byteorder/little_endian.h
+        cilium/bpf/include/linux/byteorder/big_endian.h
+        cilium/bpf/include/linux/byteorder.h
+        cilium/bpf/include/linux/swab.h
+        cilium/bpf/lib/ipv4.h)

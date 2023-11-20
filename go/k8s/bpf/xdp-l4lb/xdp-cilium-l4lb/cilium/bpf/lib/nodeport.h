@@ -56,7 +56,7 @@ bool nodeport_uses_dsr(__u8 nexthdr __maybe_unused)
 
 
 
-#ifdef ENABLE_IPV4
+//#ifdef ENABLE_IPV4
 
 static __always_inline bool nodeport_uses_dsr4(const struct ipv4_ct_tuple *tuple)
 {
@@ -224,7 +224,7 @@ drop_err:
 
 
 
-#ifdef ENABLE_DSR
+//#ifdef ENABLE_DSR
 
 __section_tail(CILIUM_MAP_CALLS, CILIUM_CALL_IPV4_NODEPORT_DSR)
 int tail_nodeport_ipv4_dsr(struct __ctx_buff *ctx) {
@@ -319,7 +319,7 @@ drop_err:
 	return send_drop_notify_error(ctx, 0, ret, CTX_ACT_DROP, METRIC_EGRESS);
 }
 
-#endif /* ENABLE_DSR */
+//#endif /* ENABLE_DSR */
 
 
 /* Main node-port entry point for host-external ingressing node-port traffic
@@ -348,7 +348,7 @@ static __always_inline int nodeport_lb4(struct __ctx_buff *ctx, __u32 src_identi
 	tuple.daddr = ip4->daddr;
 	tuple.saddr = ip4->saddr;
 
-	l4_off = l3_off + ipv4_hdrlen(ip4);
+	l4_off = l3_off + ipv4_hdrlen(ip4); // l4_off 此时指针指向 ipv4 body 数据部分
 
 	ret = lb4_extract_key(ctx, ip4, l4_off, &key, &csum_off, CT_EGRESS);
 	if (IS_ERR(ret)) {
@@ -506,7 +506,7 @@ redo_local:
 
 
 
-#endif /* ENABLE_IPV4 */
+//#endif /* ENABLE_IPV4 */
 
 
 
