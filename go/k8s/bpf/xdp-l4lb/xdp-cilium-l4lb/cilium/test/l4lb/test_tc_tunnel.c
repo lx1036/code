@@ -533,7 +533,6 @@ static int decap_ipv6(struct __sk_buff *skb)
 /*
 TC_ACT_OK: accept packet
 TC_ACT_SHOT: drop packet
-
 */
 
 

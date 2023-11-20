@@ -1,0 +1,62 @@
+cmake_minimum_required(VERSION 3.26)
+project(xdp_cilium_l4lb C)
+
+set(CMAKE_C_STANDARD 11)
+
+include_directories(cilium/bpf)
+include_directories(cilium/bpf/include)
+include_directories(cilium/bpf/include/bpf)
+include_directories(cilium/bpf/include/bpf/ctx)
+include_directories(cilium/bpf/include/linux)
+include_directories(cilium/bpf/lib)
+
+add_executable(xdp_cilium_l4lb
+        cilium/bpf/include/bpf/ctx/common.h
+        cilium/bpf/include/bpf/ctx/ctx.h
+        cilium/bpf/include/bpf/ctx/xdp.h
+        cilium/bpf/include/bpf/api.h
+        cilium/bpf/include/bpf/builtins.h
+        cilium/bpf/include/bpf/compiler.h
+        cilium/bpf/include/bpf/features.h
+        cilium/bpf/include/bpf/features_xdp.h
+        cilium/bpf/include/bpf/helpers.h
+        cilium/bpf/include/bpf/helpers_xdp.h
+        cilium/bpf/include/bpf/loader.h
+        cilium/bpf/include/bpf/section.h
+        cilium/bpf/include/bpf/stddef.h
+        cilium/bpf/include/bpf/tailcall.h
+        cilium/bpf/include/bpf/types_mapper.h
+        cilium/bpf/include/linux/bpf.h
+        cilium/bpf/include/linux/bpf_common.h
+        cilium/bpf/include/linux/icmp.h
+        cilium/bpf/include/linux/icmpv6.h
+        cilium/bpf/include/linux/if_ether.h
+        cilium/bpf/include/linux/in.h
+        cilium/bpf/include/linux/in6.h
+        cilium/bpf/include/linux/ip.h
+        cilium/bpf/include/linux/ipv6.h
+        cilium/bpf/include/linux/jhash.h
+        cilium/bpf/include/linux/tcp.h
+        cilium/bpf/include/linux/types.h
+        cilium/bpf/include/linux/udp.h
+        cilium/bpf/lib/common.h
+        cilium/bpf/lib/encap.h
+        cilium/bpf/lib/endian.h
+        cilium/bpf/lib/endpoints.h
+        cilium/bpf/lib/eth.h
+        cilium/bpf/lib/ids.h
+        cilium/bpf/lib/lb.h
+        cilium/bpf/lib/maps.h
+        cilium/bpf/lib/nat.h
+        cilium/bpf/lib/nodeport.h
+        cilium/bpf/lib/overloadable.h
+        cilium/bpf/lib/overloadable_skb.h
+        cilium/bpf/lib/overloadable_xdp.h
+        cilium/bpf/lib/utils.h
+        cilium/bpf/bpf_features.h
+        cilium/bpf/bpf_xdp.c
+        cilium/bpf/node_config.h
+        cilium/test/ipip/tc_l2_redirect_kern.c
+        cilium/test/l4lb/bpf_xdp_veth_host.c
+        cilium/test/l4lb/test_tc_tunnel.c
+        cilium/test/tunnel/test_tunnel_kern.c)

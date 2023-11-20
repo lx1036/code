@@ -41,8 +41,7 @@ bpf_xdp_exit(struct xdp_md* ctx, const int verdict)
 // ENABLE_NODEPORT_ACCELERATION 默认开启
 #ifdef ENABLE_NODEPORT_ACCELERATION
 __section_tail(CILIUM_MAP_CALLS, CILIUM_CALL_IPV4_FROM_LXC)
-int tail_lb_ipv4(struct __ctx_buff *ctx)
-{
+int tail_lb_ipv4(struct __ctx_buff *ctx) {
 	int ret = CTX_ACT_OK;
 
 	if (!bpf_skip_nodeport(ctx)) {

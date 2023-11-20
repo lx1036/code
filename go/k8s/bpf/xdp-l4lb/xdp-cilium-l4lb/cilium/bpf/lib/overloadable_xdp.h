@@ -18,6 +18,16 @@ ctx_skip_nodeport_clear(struct xdp_md *ctx __maybe_unused) {
 #endif
 }
 
+static __always_inline __maybe_unused bool
+ctx_skip_nodeport(struct xdp_md *ctx __maybe_unused)
+{
+#ifdef ENABLE_NODEPORT
+	return ctx_load_meta(ctx, RECIRC_MARKER);
+#else
+	return true;
+#endif
+}
+
 
 
 

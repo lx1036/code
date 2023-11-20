@@ -25,9 +25,13 @@
 // #include "host_firewall.h"
 
 static __always_inline __maybe_unused void
-bpf_skip_nodeport_clear(struct __ctx_buff *ctx)
-{
+bpf_skip_nodeport_clear(struct __ctx_buff *ctx) {
 	ctx_skip_nodeport_clear(ctx);
+}
+
+static __always_inline __maybe_unused bool
+bpf_skip_nodeport(struct __ctx_buff *ctx) {
+	return ctx_skip_nodeport(ctx);
 }
 
 #ifndef DSR_ENCAP_MODE

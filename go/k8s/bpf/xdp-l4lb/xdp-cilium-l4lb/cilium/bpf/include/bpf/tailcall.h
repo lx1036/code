@@ -9,9 +9,7 @@
 
 #if !defined(__non_bpf_context) && defined(__bpf__)
 static __always_inline __maybe_unused void
-tail_call_static(const struct __ctx_buff *ctx, const void *map,
-		 const __u32 slot)
-{
+tail_call_static(const struct __ctx_buff *ctx, const void *map, const __u32 slot) {
 	if (!__builtin_constant_p(slot))
 		__throw_build_bug();
 
@@ -34,8 +32,7 @@ tail_call_static(const struct __ctx_buff *ctx, const void *map,
 }
 
 static __always_inline __maybe_unused void
-tail_call_dynamic(struct __ctx_buff *ctx, const void *map, __u32 slot)
-{
+tail_call_dynamic(struct __ctx_buff *ctx, const void *map, __u32 slot) {
 	if (__builtin_constant_p(slot))
 		__throw_build_bug();
 
