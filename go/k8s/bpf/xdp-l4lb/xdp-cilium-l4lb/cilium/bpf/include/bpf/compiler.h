@@ -29,6 +29,15 @@
 #define field_sizeof(T, M)	sizeof((((T *)NULL)->M))
 #endif
 
+// 是GCC编译器的一个特性，它用于告诉编译器取消结构体/联合体/枚举类型变量在内存中的对齐，而按照实际占用的字节数进行内存布局
+/*
+ * struct A {
+    char a;
+    int b;
+} __attribute__((packed));
+在默认情况下，由于int类型的对齐要求，结构体A的大小可能会为8字节。但使用了__attribute__((packed))后，结构体A的大小就会为5字节，节省了内存空间
+在大多数情况下，int类型占用4字节（32位）
+ */
 #ifndef __packed
 #define __packed		__attribute__((packed))
 #endif
@@ -42,11 +51,11 @@
 #endif
 
 #ifndef likely
-#define likely(X)		__builtin_expect(!!(X), 1)
+#define likely(X)		__builtin_expect(!!(X), 1) // !! true == 1
 #endif
 
 #ifndef unlikely
-#define unlikely(X)		__builtin_expect(!!(X), 0)
+#define unlikely(X)		__builtin_expect(!!(X), 0) // !! false == 0
 #endif
 
 #ifndef always_succeeds		/* Mainly for documentation purpose. */

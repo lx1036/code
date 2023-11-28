@@ -64,4 +64,8 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/include/linux/byteorder/big_endian.h
         cilium/bpf/include/linux/byteorder.h
         cilium/bpf/include/linux/swab.h
-        cilium/bpf/lib/ipv4.h)
+        cilium/bpf/lib/ipv4.h
+        cilium/bpf/lib/static_data.h
+        cilium/bpf/lib/csum.h
+        cilium/bpf/lib/pcap.h
+        cilium/bpf/lib/l4.h)

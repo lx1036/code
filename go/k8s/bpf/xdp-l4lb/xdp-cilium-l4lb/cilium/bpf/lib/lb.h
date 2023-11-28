@@ -10,6 +10,7 @@
 #include "ipv4.h"
 #include "hash.h"
 #include "ids.h"
+#include "l4.h"
 
 #ifdef ENABLE_IPV4
 struct bpf_elf_map __section_maps LB4_SERVICES_MAP_V2 = {
@@ -32,6 +33,44 @@ struct bpf_elf_map __section_maps LB4_AFFINITY_MAP = {
 #endif
 
 #endif /* ENABLE_IPV4 */
+
+// 获取 tcp header dst port 字段值
+static __always_inline int extract_l4_port(struct __ctx_buff *ctx, __u8 nexthdr, int l4_off,
+                                           int dir __maybe_unused, __be16 *port, __maybe_unused struct iphdr *ip4) {
+    int ret;
+
+    switch (nexthdr) {
+        case IPPROTO_TCP:
+        case IPPROTO_UDP:
+//#ifdef ENABLE_IPV4_FRAGMENTS
+            if (ip4) {
+                struct ipv4_frag_l4ports ports = {};
+                ret = ipv4_handle_fragmentation(ctx, ip4, l4_off, dir, &ports, NULL);
+                if (IS_ERR(ret))
+                    return ret;
+                *port = ports.dport;
+                break;
+            }
+//#endif
+            /* Port offsets for UDP and TCP are the same */
+            // 从字节数组 bytes 里取 port，可参考!!!
+            ret = l4_load_port(ctx, l4_off + TCP_DPORT_OFF, port);
+            if (IS_ERR(ret))
+                return ret;
+            break;
+
+        case IPPROTO_ICMPV6:
+        case IPPROTO_ICMP:
+            /* No need to perform a service lookup for ICMP packets */
+            return DROP_NO_SERVICE;
+
+        default:
+            /* Pass unknown L4 to stack */
+            return DROP_UNKNOWN_L4;
+    }
+
+    return 0;
+}
 
 
 static __always_inline 
@@ -106,14 +145,34 @@ static __always_inline struct lb4_service *lb4_lookup_service(struct lb4_key *ke
 	return NULL;
 }
 
-// extract ipv4 lb key from packet
+/** Extract IPv4 LB key from packet
+ * @arg ctx		Packet
+ * @arg ip4		Pointer to L3 header
+ * @arg l4_off		Offset to L4 header
+ * @arg key		Pointer to store LB key in
+ * @arg csum_off	Pointer to store L4 checksum field offset  in
+ * @arg dir		Flow direction
+ *
+ * Returns:
+ *   - CTX_ACT_OK on successful extraction
+ *   - DROP_UNKNOWN_L4 if packet should be ignore (sent to stack)
+ *   - Negative error code
+ */
 static __always_inline int lb4_extract_key(struct __ctx_buff *ctx __maybe_unused,
                                            struct iphdr *ip4,
                                            int l4_off __maybe_unused,
                                            struct lb4_key *key,
                                            struct csum_offset *csum_off,
                                            int dir)
-{}
+{
+    /* FIXME: set after adding support for different L4 protocols in LB */
+    key->proto = 0;
+    key->address = (dir == CT_INGRESS) ? ip4->saddr : ip4->daddr;
+    if (ipv4_has_l4_header(ip4))
+        csum_l4_offset_and_flags(ip4->protocol, csum_off);
+
+    return extract_l4_port(ctx, ip4->protocol, l4_off, dir, &key->dport, ip4);
+}
 
 
 //#endif /* ENABLE_IPV4 */

@@ -339,7 +339,7 @@ static __always_inline int nodeport_lb4(struct __ctx_buff *ctx, __u32 src_identi
 	bool backend_local;
 	__u32 monitor = 0;
 
-	cilium_capture_in(ctx);
+//	cilium_capture_in(ctx);
 
 	if (!revalidate_data(ctx, &data, &data_end, &ip4))
 		return DROP_INVALID;

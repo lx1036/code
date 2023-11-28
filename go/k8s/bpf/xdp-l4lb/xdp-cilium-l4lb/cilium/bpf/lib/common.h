@@ -65,6 +65,48 @@
 #define CONDITIONAL_PREALLOC BPF_F_NO_PREALLOC
 #endif
 
+
+static __always_inline __maybe_unused bool
+____revalidate_data_pull(struct __ctx_buff *ctx, void **data_, void **data_end_,
+                         void **l3, const __u32 l3_len, const bool pull,
+                         __u8 eth_hlen)
+{
+    const __u64 tot_len = eth_hlen + l3_len;
+    void *data_end;
+    void *data;
+
+    /* Verifier workaround, do this unconditionally: invalid size of register spill. */
+    if (pull)
+        ctx_pull_data(ctx, tot_len);
+    data_end = ctx_data_end(ctx);
+    data = ctx_data(ctx);
+    if (data + tot_len > data_end)
+        return false;
+
+    /* Verifier workaround: pointer arithmetic on pkt_end prohibited. */
+    *data_ = data;
+    *data_end_ = data_end;
+
+    *l3 = data + eth_hlen;
+    return true;
+}
+
+static __always_inline __maybe_unused bool
+__revalidate_data_pull(struct __ctx_buff *ctx, void **data, void **data_end,
+                       void **l3, const __u32 l3_len, const bool pull)
+{
+    return ____revalidate_data_pull(ctx, data, data_end, l3, l3_len, pull, ETH_HLEN);
+}
+
+/* revalidate_data() initializes the provided pointers from the ctx.
+ * Returns true if 'ctx' is long enough for an IP header of the provided type,
+ * false otherwise.
+ */
+#define revalidate_data(ctx, data, data_end, ip)			\
+	__revalidate_data_pull(ctx, data, data_end, (void **)ip, sizeof(**ip), false)
+
+
+
 /* Service flags (lb{4,6}_service->flags) */
 enum {
 	SVC_FLAG_EXTERNAL_IP  = (1 << 0),  /* External IPs */
@@ -141,6 +183,20 @@ struct lb_affinity_match {
 	__u16 pad;
 } __packed;
 
+struct ct_state {
+    __u16 rev_nat_index;
+    __u16 loopback:1,
+            node_port:1,
+            proxy_redirect:1, /* Connection is redirected to a proxy */
+    dsr:1,
+            reserved:12;
+    __be32 addr;
+    __be32 svc_addr;
+    __u32 src_sec_id;
+    __u16 ifindex;
+    __u16 backend_id;	/* Backend ID in lb4_backends */
+};
+
 /* Value of endpoint map */
 struct endpoint_info {
 	__u32		ifindex;
@@ -207,6 +263,71 @@ validate_ethertype(struct xdp_md *ctx, __u16 *proto) {
 }
 
 #define IS_ERR(x) (unlikely((x < 0) || (x == CTX_ACT_DROP)))
+
+/* Cilium error codes, must NOT overlap with TC return codes.
+ * These also serve as drop reasons for metrics,
+ * where reason > 0 corresponds to -(DROP_*)
+ *
+ * These are shared with pkg/monitor/api/drop.go and api/v1/flow/flow.proto.
+ * When modifying any of the below, those files should also be updated.
+ */
+#define DROP_UNUSED1		-130 /* unused */
+#define DROP_UNUSED2		-131 /* unused */
+#define DROP_INVALID_SIP	-132
+#define DROP_POLICY		-133
+#define DROP_INVALID		-134
+#define DROP_CT_INVALID_HDR	-135
+#define DROP_FRAG_NEEDED	-136
+#define DROP_CT_UNKNOWN_PROTO	-137
+#define DROP_UNUSED4		-138 /* unused */
+#define DROP_UNKNOWN_L3		-139
+#define DROP_MISSED_TAIL_CALL	-140
+#define DROP_WRITE_ERROR	-141
+#define DROP_UNKNOWN_L4		-142
+#define DROP_UNKNOWN_ICMP_CODE	-143
+#define DROP_UNKNOWN_ICMP_TYPE	-144
+#define DROP_UNKNOWN_ICMP6_CODE	-145
+#define DROP_UNKNOWN_ICMP6_TYPE	-146
+#define DROP_NO_TUNNEL_KEY	-147
+#define DROP_UNUSED5		-148 /* unused */
+#define DROP_UNUSED6		-149 /* unused */
+#define DROP_UNKNOWN_TARGET	-150
+#define DROP_UNROUTABLE		-151
+#define DROP_UNUSED7		-152 /* unused */
+#define DROP_CSUM_L3		-153
+#define DROP_CSUM_L4		-154
+#define DROP_CT_CREATE_FAILED	-155
+#define DROP_INVALID_EXTHDR	-156
+#define DROP_FRAG_NOSUPPORT	-157
+#define DROP_NO_SERVICE		-158
+#define DROP_UNUSED8		-159 /* unused */
+#define DROP_NO_TUNNEL_ENDPOINT -160
+#define DROP_UNUSED9		-161 /* unused */
+#define DROP_EDT_HORIZON	-162
+#define DROP_UNKNOWN_CT		-163
+#define DROP_HOST_UNREACHABLE	-164
+#define DROP_NO_CONFIG		-165
+#define DROP_UNSUPPORTED_L2	-166
+#define DROP_NAT_NO_MAPPING	-167
+#define DROP_NAT_UNSUPP_PROTO	-168
+#define DROP_NO_FIB		-169
+#define DROP_ENCAP_PROHIBITED	-170
+#define DROP_INVALID_IDENTITY	-171
+#define DROP_UNKNOWN_SENDER	-172
+#define DROP_NAT_NOT_NEEDED	-173 /* Mapped as drop code, though drop not necessary. */
+#define DROP_IS_CLUSTER_IP	-174
+#define DROP_FRAG_NOT_FOUND	-175
+#define DROP_FORBIDDEN_ICMP6	-176
+#define DROP_NOT_IN_SRC_RANGE	-177
+#define DROP_PROXY_LOOKUP_FAILED	-178
+#define DROP_PROXY_SET_FAILED	-179
+#define DROP_PROXY_UNKNOWN_PROTO	-180
+#define DROP_POLICY_DENY	-181
+
+
+#define CT_EGRESS 0
+#define CT_INGRESS 1
+#define CT_SERVICE 2
 
 
 

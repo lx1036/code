@@ -7,15 +7,16 @@
 
 #include <linux/types.h>
 
+// https://datatracker.ietf.org/doc/html/rfc9293#name-header-format
 struct tcphdr {
-	__be16	source;
-	__be16	dest;
-	__be32	seq;
-	__be32	ack_seq;
+	__be16	source; // src port
+	__be16	dest; // dst port
+	__be32	seq; // Sequence Number
+	__be32	ack_seq; // Acknowledgment Number
 
-	__u16	doff:4,
-		res1:4,
-		cwr:1,
+	__u16	doff:4, // Data Offset
+		res1:4, // Rsrvd
+		cwr:1, //
 		ece:1,
 		urg:1,
 		ack:1,
@@ -24,9 +25,9 @@ struct tcphdr {
 		syn:1,
 		fin:1;
         
-	__be16	window;
-	__sum16	check;
-	__be16	urg_ptr;
+	__be16	window; // Window
+	__sum16	check; // Checksum
+	__be16	urg_ptr; // Urgent Pointer
 };
 
 
