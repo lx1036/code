@@ -22,6 +22,7 @@
 #include "trace.h"
 #include "ghash.h"
 #include "pcap.h"
+#include "endpoints.h"
 // #include "host_firewall.h"
 
 
@@ -95,8 +96,9 @@ int tail_nodeport_nat_ipv4(struct __ctx_buff *ctx)
 	bool l2_hdr_required = true;
 
 	target.addr = IPV4_DIRECT_ROUTING;
-#ifdef TUNNEL_MODE
-	if (dir == NAT_DIR_EGRESS) {
+
+//#ifdef TUNNEL_MODE
+	if (dir == NAT_DIR_EGRESS) { // reverse SNAT
 		struct remote_endpoint_info *info;
 
 		if (!revalidate_data(ctx, &data, &data_end, &ip4)) {
@@ -139,9 +141,13 @@ int tail_nodeport_nat_ipv4(struct __ctx_buff *ctx)
 			}
 		}
 	}
-#endif
-	/* Handles SNAT on NAT_DIR_EGRESS and reverse SNAT for reply packets
+//#endif
+
+	/** Handles SNAT on NAT_DIR_EGRESS and reverse SNAT for reply packets
 	 * from remote backends on NAT_DIR_INGRESS.
+	 * client->lb->backend:
+	 *      * srcIP(clientIP):dstIP(lbIP) -> SNAT -> srcIP(lbIP):dstIP(backendIP)
+	 *      * srcIP(lbIP):dstIP(clientIP) <- reverse SNAT <- srcIP(backendIP):dstIP(lbIP)
 	 */
 	ret = snat_v4_process(ctx, dir, &target, false);
 	if (IS_ERR(ret)) {
@@ -163,7 +169,7 @@ int tail_nodeport_nat_ipv4(struct __ctx_buff *ctx)
 	bpf_mark_snat_done(ctx);
 
 	if (dir == NAT_DIR_INGRESS) {
-		/* Handle reverse DNAT for reply packets from remote backends. */
+		/** Handle reverse DNAT for reply packets from remote backends. 对于回包，需要做 reverse DNAT */
 		ep_tail_call(ctx, CILIUM_CALL_IPV4_NODEPORT_REVNAT);
 		ret = DROP_MISSED_TAIL_CALL;
 		goto drop_err;
@@ -177,8 +183,7 @@ int tail_nodeport_nat_ipv4(struct __ctx_buff *ctx)
 		goto drop_err;
 	}
 
-	ret = maybe_add_l2_hdr(ctx, DIRECT_ROUTING_DEV_IFINDEX,
-			       &l2_hdr_required);
+	ret = maybe_add_l2_hdr(ctx, DIRECT_ROUTING_DEV_IFINDEX, &l2_hdr_required);
 	if (ret != 0)
 		goto drop_err;
 	if (!l2_hdr_required)

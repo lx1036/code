@@ -58,11 +58,11 @@ DEFINE_IPV6(HOST_IP, 0xbe, 0xef, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0xa, 0x
 #define IPV4_MASK 0xffff
 #define IPV4_GATEWAY 0xfffff50a
 #define IPV4_LOOPBACK 0x1ffff50a
-#ifdef ENABLE_NODEPORT
+//#ifdef ENABLE_NODEPORT
 #define SNAT_MAPPING_IPV4 test_cilium_snat_v4_external
 #define SNAT_MAPPING_IPV4_SIZE 524288
 #define NODEPORT_NEIGH4_SIZE 524288
-#endif /* ENABLE_NODEPORT */
+//#endif /* ENABLE_NODEPORT */
 #define CAPTURE4_RULES cilium_capture4_rules
 #define CAPTURE4_SIZE 16384
 //#endif /* ENABLE_IPV4 */
@@ -154,20 +154,20 @@ DEFINE_IPV6(HOST_IP, 0xbe, 0xef, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0xa, 0x
 #endif
 #endif
 
-#ifdef ENABLE_NODEPORT
+//#ifdef ENABLE_NODEPORT
 # define DIRECT_ROUTING_DEV_IFINDEX 0
-# ifdef ENABLE_IPV4
+//# ifdef ENABLE_IPV4
 #  define IPV4_DIRECT_ROUTING 0
 #  define IPV4_RSS_PREFIX IPV4_DIRECT_ROUTING
 #  define IPV4_RSS_PREFIX_BITS 32
-# endif
+//# endif
 # ifdef ENABLE_IPV6
 #  define IPV6_DIRECT_ROUTING { .addr = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 } }
 #  define IPV6_RSS_PREFIX IPV6_DIRECT_ROUTING
 #  define IPV6_RSS_PREFIX_BITS 128
 # endif
 #define IS_L3_DEV(ifindex) false
-#endif
+//#endif
 
 //#ifdef ENABLE_SRC_RANGE_CHECK
 # define LB4_SRC_RANGE_MAP	test_cilium_lb4_source_range

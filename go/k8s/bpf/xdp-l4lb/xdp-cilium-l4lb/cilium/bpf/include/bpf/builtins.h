@@ -127,7 +127,14 @@ static __always_inline __nobuiltin("memcpy") void memcpy(void *d, const void *s,
 	return __bpf_memcpy(d, s, len);
 }
 
-
+/* Unfortunately verifier forces aligned stack access while other memory
+ * do not have to be aligned (map, pkt, etc). Mark those on the /stack/
+ * for objects > 8 bytes in order to force-align such memcpy candidates
+ * when we really need them to be aligned, this is not needed for objects
+ * of size <= 8 bytes and in case of > 8 bytes /only/ when 8 byte is not
+ * the natural object alignment (e.g. __u8 foo[12]).
+ */
+#define __align_stack_8		__aligned(8)
 
 
 

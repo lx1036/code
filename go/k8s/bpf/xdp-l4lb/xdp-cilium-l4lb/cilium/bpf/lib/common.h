@@ -29,6 +29,13 @@
 #define TUPLE_F_RELATED		2	/* Flow represents related packets */
 #define TUPLE_F_SERVICE		4	/* Flow represents packets to service */
 
+#ifndef AF_INET
+#define AF_INET 2
+#endif
+
+#ifndef AF_INET6
+#define AF_INET6 10
+#endif
 
 
 /* These are shared with test/bpf/check-complexity.sh, when modifying any of

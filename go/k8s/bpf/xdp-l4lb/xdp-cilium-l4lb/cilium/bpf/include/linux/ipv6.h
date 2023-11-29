@@ -9,6 +9,9 @@
 #include <linux/in6.h>
 
 
+#define GET_PREFIX(PREFIX)  bpf_htonl(PREFIX <= 0 ? 0 : PREFIX < 32 ? ((1<<PREFIX) - 1) << (32-PREFIX)	: 0xFFFFFFFF)
+
+
 /*
  *	IPv6 fixed header
  *

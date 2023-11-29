@@ -4351,6 +4351,16 @@ struct bpf_fib_lookup {
 	__u8	dmac[6];     /* ETH_ALEN */
 };
 
+struct bpf_redir_neigh {
+    /* network family for lookup (AF_INET, AF_INET6) */
+    __u32 nh_family;
+    /* network address of nexthop; skips fib lookup to find gateway */
+    union {
+        __be32		ipv4_nh;
+        __u32		ipv6_nh[4];  /* in6_addr; network order */
+    };
+};
+
 enum bpf_task_fd_type {
 	BPF_FD_TYPE_RAW_TRACEPOINT,	/* tp name */
 	BPF_FD_TYPE_TRACEPOINT,		/* tp name */
