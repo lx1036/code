@@ -66,8 +66,6 @@ bool nodeport_uses_dsr(__u8 nexthdr __maybe_unused)
 # endif
 }
 
-
-
 //#ifdef ENABLE_IPV4
 
 static __always_inline bool nodeport_uses_dsr4(const struct ipv4_ct_tuple *tuple)
@@ -238,6 +236,7 @@ drop_err:
 
 //#ifdef ENABLE_DSR
 
+// 如果使用 DSR，则需要使用 ipip 来封包发给 backend
 __section_tail(CILIUM_MAP_CALLS, CILIUM_CALL_IPV4_NODEPORT_DSR)
 int tail_nodeport_ipv4_dsr(struct __ctx_buff *ctx) {
     struct bpf_fib_lookup_padded fib_params = {
@@ -410,6 +409,7 @@ skip_service_lookup:
 		return DROP_MISSED_TAIL_CALL;
 	}
 
+    // 设计 endpoint 目的是???
 	backend_local = __lookup_ip4_endpoint(tuple.daddr);
 	if (!backend_local && lb4_svc_is_hostport(svc))
 		return DROP_INVALID;
@@ -418,7 +418,7 @@ skip_service_lookup:
 	 * need to track in here.
 	 */
 	// backend_local 不可能为 true，lb 节点不会有 local backend
-	if (backend_local || !nodeport_uses_dsr4(&tuple)) {
+	/*if (backend_local || !nodeport_uses_dsr4(&tuple)) {
 		struct ct_state ct_state = {};
 
 		ret = ct_lookup4(get_ct_map4(&tuple), &tuple, ctx, l4_off,
@@ -430,7 +430,7 @@ redo_all:
 			ct_state_new.src_sec_id = WORLD_ID;
 #else
 			ct_state_new.src_sec_id = SECLABEL;
-#endif /* PRESERVE_WORLD_ID */
+#endif
 			ct_state_new.node_port = 1;
 			ct_state_new.ifindex = NATIVE_DEV_IFINDEX;
 			ret = ct_create4(get_ct_map4(&tuple), NULL, &tuple, ctx,
@@ -440,9 +440,7 @@ redo_all:
 			if (backend_local) {
 				ct_flip_tuple_dir4(&tuple);
 redo_local:
-				/* Reset rev_nat_index, otherwise ipv4_policy()
-				 * in bpf_lxc will do invalid xlation.
-				 */
+                // Reset rev_nat_index, otherwise ipv4_policy() in bpf_lxc will do invalid xlation.
 				ct_state_new.rev_nat_index = 0;
 				ret = ct_create4(get_ct_map4(&tuple), NULL,
 						 &tuple, ctx, CT_INGRESS,
@@ -454,9 +452,7 @@ redo_local:
 		case CT_REOPENED:
 		case CT_ESTABLISHED:
 		case CT_REPLY:
-			/* Recreate CT entries, as the existing one is stale and
-			 * belongs to a flow which target a different svc.
-			 */
+            // Recreate CT entries, as the existing one is stale and belongs to a flow which target a different svc.
 			if (unlikely(ct_state.rev_nat_index !=
 				     svc->rev_nat_index))
 				goto redo_all;
@@ -467,7 +463,7 @@ redo_local:
 					ct_state_new.src_sec_id = WORLD_ID;
 #else
 					ct_state_new.src_sec_id = SECLABEL;
-#endif /* PRESERVE_WORLD_ID */
+#endif
 					ct_state_new.node_port = 1;
 					ct_state_new.ifindex = NATIVE_DEV_IFINDEX;
 					goto redo_local;
@@ -489,11 +485,14 @@ redo_local:
 			if (ret < 0)
 				return ret;
 		}
-	}
+	}*/
 
 	if (!backend_local) {
 		// edt_set_aggregate(ctx, 0);
 		if (nodeport_uses_dsr4(&tuple)) {
+            // 默认使用 SNAT 模式，而不是 DSR 模式. NodePortModeDSR for performing DSR for requests to remote nodes.
+            // NodePortMode: ("snat", "dsr" or "hybrid")
+
 #if DSR_ENCAP_MODE == DSR_ENCAP_IPIP
 			ctx_store_meta(ctx, CB_HINT, ((__u32)tuple.sport << 16) | tuple.dport);
 			ctx_store_meta(ctx, CB_ADDR_V4, tuple.daddr);
@@ -501,8 +500,17 @@ redo_local:
 			ctx_store_meta(ctx, CB_PORT, key.dport);
 			ctx_store_meta(ctx, CB_ADDR_V4, key.address);
 #endif /* DSR_ENCAP_MODE */
+
+            // 重要逻辑: tail_nodeport_ipv4_dsr
 			ep_tail_call(ctx, CILIUM_CALL_IPV4_NODEPORT_DSR);
 		} else {
+            /**
+             * https://cilium.io/blog/2020/06/22/cilium-18/
+             * SNAT: 是最常用的模式，不保留 clientIP. 把 clientIP 给 SNAT 掉，然后 client->lb(SNAT)->backend，回包 client<-lb<-backend
+             * DSR(Direct Server Return):
+             *      * in the tc eBPF layer in order to remove an extra hop and therefore latency for reply traffic as well as for client source IP address preservation
+             *      * In Cilium's DSR mode, we encode the service IP/port tuple as an IP option only once for TCP in SYN packets, or in every UDP packet.
+             */
 			ctx_store_meta(ctx, CB_NAT, NAT_DIR_EGRESS);
 			ep_tail_call(ctx, CILIUM_CALL_IPV4_NODEPORT_NAT);
 		}

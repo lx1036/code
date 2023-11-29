@@ -37,6 +37,7 @@ docker pull cilium/cilium:v1.10.20
 
 docker rm l4lb
 
+# 注意，--bpf-xxx 这些参数逐渐废弃，使用其他参数代替
 docker run --cap-add NET_ADMIN --cap-add SYS_MODULE --cap-add CAP_SYS_ADMIN --network host --privileged \
 -v /sys/fs/bpf:/sys/fs/bpf -v /lib/modules:/lib/modules -v /var/run/cilium:/var/run/cilium \
 --name l4lb cilium/cilium:v1.10.20 cilium-agent \

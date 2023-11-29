@@ -21,7 +21,10 @@
 #include "conntrack_map.h"
 // #include "icmp6.h"
 
-
+enum {
+    NAT_DIR_EGRESS  = TUPLE_F_OUT,
+    NAT_DIR_INGRESS = TUPLE_F_IN,
+};
 
 struct ipv4_nat_target {
 	__be32 addr;
