@@ -54,7 +54,7 @@ DEFINE_IPV6(HOST_IP, 0xbe, 0xef, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0xa, 0x
 #define HASH_INIT4_SEED 0xcafe
 #define HASH_INIT6_SEED 0xeb9f
 
-#ifdef ENABLE_IPV4
+//#ifdef ENABLE_IPV4
 #define IPV4_MASK 0xffff
 #define IPV4_GATEWAY 0xfffff50a
 #define IPV4_LOOPBACK 0x1ffff50a
@@ -65,7 +65,7 @@ DEFINE_IPV6(HOST_IP, 0xbe, 0xef, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0xa, 0x
 #endif /* ENABLE_NODEPORT */
 #define CAPTURE4_RULES cilium_capture4_rules
 #define CAPTURE4_SIZE 16384
-#endif /* ENABLE_IPV4 */
+//#endif /* ENABLE_IPV4 */
 
 #ifdef ENABLE_IPV6
 #ifdef ENABLE_NODEPORT
@@ -132,7 +132,7 @@ DEFINE_IPV6(HOST_IP, 0xbe, 0xef, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0xa, 0x
 #endif
 #define MTU 1500
 #define EPHEMERAL_MIN 32768
-#if defined(ENABLE_NODEPORT) || defined(ENABLE_HOST_FIREWALL) || defined(ENABLE_NAT46)
+//#if defined(ENABLE_NODEPORT) || defined(ENABLE_HOST_FIREWALL) || defined(ENABLE_NAT46)
 #define CT_MAP_TCP6 test_cilium_ct_tcp6_65535
 #define CT_MAP_ANY6 test_cilium_ct_any6_65535
 #define CT_MAP_TCP4 test_cilium_ct_tcp4_65535
@@ -143,7 +143,7 @@ DEFINE_IPV6(HOST_IP, 0xbe, 0xef, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0xa, 0x
 #define CONNTRACK_ACCOUNTING
 #define LB4_HEALTH_MAP test_cilium_lb4_health
 #define LB6_HEALTH_MAP test_cilium_lb6_health
-#endif /* ENABLE_NODEPORT || ENABLE_HOST_FIREWALL */
+//#endif /* ENABLE_NODEPORT || ENABLE_HOST_FIREWALL */
 
 #ifdef ENABLE_NODEPORT
 #ifdef ENABLE_IPV4
@@ -169,12 +169,12 @@ DEFINE_IPV6(HOST_IP, 0xbe, 0xef, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0xa, 0x
 #define IS_L3_DEV(ifindex) false
 #endif
 
-#ifdef ENABLE_SRC_RANGE_CHECK
+//#ifdef ENABLE_SRC_RANGE_CHECK
 # define LB4_SRC_RANGE_MAP	test_cilium_lb4_source_range
 # define LB4_SRC_RANGE_MAP_SIZE	1000
 # define LB6_SRC_RANGE_MAP	test_cilium_lb6_source_range
 # define LB6_SRC_RANGE_MAP_SIZE	1000
-#endif
+//#endif
 
 #ifndef LB_SELECTION
 # define LB_SELECTION_RANDOM	1

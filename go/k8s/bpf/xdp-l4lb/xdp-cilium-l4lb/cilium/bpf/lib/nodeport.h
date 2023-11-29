@@ -24,6 +24,18 @@
 #include "pcap.h"
 // #include "host_firewall.h"
 
+
+
+struct bpf_elf_map __section_maps NODEPORT_NEIGH4 = {
+        .type		= BPF_MAP_TYPE_LRU_HASH,
+        .size_key	= sizeof(__be32),		/* ipv4 addr */
+        .size_value	= sizeof(union macaddr),	/* hw addr */
+        .pinning	= PIN_GLOBAL_NS,
+        .max_elem	= NODEPORT_NEIGH4_SIZE,
+};
+
+
+
 static __always_inline __maybe_unused void
 bpf_skip_nodeport_clear(struct __ctx_buff *ctx) {
 	ctx_skip_nodeport_clear(ctx);
@@ -376,7 +388,7 @@ static __always_inline int nodeport_lb4(struct __ctx_buff *ctx, __u32 src_identi
 			return ret;
 	}
 
-	if (!svc || !lb4_svc_is_routable(svc)) {
+	if (!svc || !lb4_svc_is_routable(svc)) { // not a ClusterIP service
 		if (svc)
 			return DROP_IS_CLUSTER_IP;
 
@@ -450,8 +462,7 @@ redo_local:
 				goto redo_all;
 			if (backend_local) {
 				ct_flip_tuple_dir4(&tuple);
-				if (!__ct_entry_keep_alive(get_ct_map4(&tuple),
-							   &tuple)) {
+				if (!__ct_entry_keep_alive(get_ct_map4(&tuple), &tuple)) {
 #ifdef PRESERVE_WORLD_ID
 					ct_state_new.src_sec_id = WORLD_ID;
 #else
@@ -474,8 +485,7 @@ redo_local:
 
 		mac = map_lookup_elem(&NODEPORT_NEIGH4, &ip4->saddr);
 		if (!mac || eth_addrcmp(mac, &smac)) {
-			ret = map_update_elem(&NODEPORT_NEIGH4, &ip4->saddr,
-					      &smac, 0);
+			ret = map_update_elem(&NODEPORT_NEIGH4, &ip4->saddr, &smac, 0);
 			if (ret < 0)
 				return ret;
 		}

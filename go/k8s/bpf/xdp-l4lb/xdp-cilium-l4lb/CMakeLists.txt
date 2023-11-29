@@ -68,4 +68,6 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/lib/static_data.h
         cilium/bpf/lib/csum.h
         cilium/bpf/lib/pcap.h
-        cilium/bpf/lib/l4.h)
+        cilium/bpf/lib/l4.h
+        cilium/bpf/lib/dbg.h
+        cilium/bpf/lib/conntrack.h)

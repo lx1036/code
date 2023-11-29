@@ -11,6 +11,20 @@
 #include "ctx/ctx.h"
 #include "compiler.h"
 
+#ifndef BPF_FUNC
+# define BPF_FUNC(NAME, ...)						\
+	(* NAME)(__VA_ARGS__) __maybe_unused = (void *)BPF_FUNC_##NAME
+#endif
+
+#ifndef BPF_STUB
+# define BPF_STUB(NAME, ...)						\
+	(* NAME##__stub)(__VA_ARGS__) __maybe_unused = (void *)((__u32)-1)
+#endif
+
+#ifndef BPF_FUNC_REMAP
+# define BPF_FUNC_REMAP(NAME, ...)					\
+	(* NAME)(__VA_ARGS__) __maybe_unused
+#endif
 
 
 #if __ctx_is == __ctx_skb
@@ -30,7 +44,9 @@ static int BPF_FUNC(map_delete_elem, const void *map, const void *key);
 /* Tail calls */
 static void BPF_FUNC(tail_call, void *ctx, const void *map, __u32 index);
 
-
+/* Random numbers */
+// u32 bpf_get_prandom_u32(void)
+static __u32 BPF_FUNC(get_prandom_u32);
 
 
 /* Routing helpers */
