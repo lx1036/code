@@ -142,6 +142,15 @@
 #define CONDITIONAL_PREALLOC BPF_F_NO_PREALLOC
 #endif
 
+#ifndef TRACE_PAYLOAD_LEN
+#define TRACE_PAYLOAD_LEN 128ULL
+#endif
+
+/* Cilium metrics direction for dropping/forwarding packet */
+#define METRIC_INGRESS  1
+#define METRIC_EGRESS   2
+#define METRIC_SERVICE  3
+
 
 static __always_inline __maybe_unused bool
 ____revalidate_data_pull(struct __ctx_buff *ctx, void **data_, void **data_end_,

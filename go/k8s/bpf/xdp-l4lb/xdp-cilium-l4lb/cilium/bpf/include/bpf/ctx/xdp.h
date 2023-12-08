@@ -139,5 +139,13 @@ ctx_get_protocol(const struct xdp_md *ctx) {
 	return eth->h_proto; // 还是从二层头里读取 protocol
 }
 
+static __always_inline __maybe_unused int
+ctx_redirect(const struct xdp_md *ctx, int ifindex, const __u32 flags)
+{
+    if ((__u32)ifindex == ctx->ingress_ifindex)
+        return XDP_TX;
+
+    return redirect(ifindex, flags);
+}
 
 #endif /* __BPF_CTX_XDP_H_ */

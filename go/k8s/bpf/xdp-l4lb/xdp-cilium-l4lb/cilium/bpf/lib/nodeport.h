@@ -47,6 +47,23 @@ bpf_skip_nodeport(struct __ctx_buff *ctx) {
 	return ctx_skip_nodeport(ctx);
 }
 
+static __always_inline void
+bpf_mark_snat_done(struct __ctx_buff *ctx __maybe_unused)
+{
+    /* From XDP layer, we do not go through an egress hook from
+     * here, hence nothing to be done.
+     */
+#if __ctx_is == __ctx_skb
+    ctx->mark |= MARK_MAGIC_SNAT_DONE;
+#endif
+}
+
+static __always_inline bool nodeport_lb_hairpin(void)
+{
+    return is_defined(ENABLE_NODEPORT_HAIRPIN);
+}
+
+
 #ifndef DSR_ENCAP_MODE
 #define DSR_ENCAP_MODE 0
 #define DSR_ENCAP_IPIP 2
@@ -174,10 +191,10 @@ int tail_nodeport_nat_ipv4(struct __ctx_buff *ctx)
 		ret = DROP_MISSED_TAIL_CALL;
 		goto drop_err;
 	}
-#ifdef TUNNEL_MODE
+//#ifdef TUNNEL_MODE
 	if (fib_params.l.ifindex == ENCAP_IFINDEX)
 		goto out_send;
-#endif
+//#endif
 	if (!revalidate_data(ctx, &data, &data_end, &ip4)) {
 		ret = DROP_INVALID;
 		goto drop_err;
@@ -188,13 +205,13 @@ int tail_nodeport_nat_ipv4(struct __ctx_buff *ctx)
 		goto drop_err;
 	if (!l2_hdr_required)
 		goto out_send;
-	else if (!revalidate_data_with_eth_hlen(ctx, &data, &data_end, &ip4,
-						__ETH_HLEN))
+	else if (!revalidate_data_with_eth_hlen(ctx, &data, &data_end, &ip4, __ETH_HLEN))
 		return DROP_INVALID;
 
 	if (nodeport_lb_hairpin())
 		dmac = map_lookup_elem(&NODEPORT_NEIGH4, &ip4->daddr);
-	if (dmac) {
+
+    if (dmac) {
 		union macaddr mac = NATIVE_DEV_MAC_BY_IFINDEX(fib_params.l.ifindex);
 
 		if (eth_store_daddr_aligned(ctx, dmac->addr, 0) < 0) {
@@ -215,9 +232,10 @@ int tail_nodeport_nat_ipv4(struct __ctx_buff *ctx)
 			ret = DROP_NO_FIB;
 			goto drop_err;
 		}
+
+        // hairpin 模式
 		if (nodeport_lb_hairpin())
-			map_update_elem(&NODEPORT_NEIGH4, &ip4->daddr,
-					fib_params.l.dmac, 0);
+			map_update_elem(&NODEPORT_NEIGH4, &ip4->daddr, fib_params.l.dmac, 0);
 
 		if (eth_store_daddr(ctx, fib_params.l.dmac, 0) < 0) {
 			ret = DROP_WRITE_ERROR;
@@ -232,9 +250,7 @@ out_send:
 	cilium_capture_out(ctx);
 	return ctx_redirect(ctx, fib_params.l.ifindex, 0);
 drop_err:
-	return send_drop_notify_error(ctx, 0, ret, CTX_ACT_DROP,
-				      dir == NAT_DIR_INGRESS ?
-				      METRIC_INGRESS : METRIC_EGRESS);
+	return send_drop_notify_error(ctx, 0, ret, CTX_ACT_DROP, dir == NAT_DIR_INGRESS ? METRIC_INGRESS : METRIC_EGRESS);
 }
 
 

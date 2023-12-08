@@ -74,4 +74,5 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/lib/endpoints.h
         cilium/bpf/include/bpf/csum.h
         cilium/bpf/include/bpf/helpers_skb.h
-        cilium/bpf/include/bpf/features_skb.h)
+        cilium/bpf/include/bpf/features_skb.h
+        cilium/test/xdp-l4lb/slb.bpf.c)

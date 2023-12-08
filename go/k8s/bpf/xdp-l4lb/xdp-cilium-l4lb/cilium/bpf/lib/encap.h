@@ -10,8 +10,8 @@
 #include "l3.h"
 
 
-#ifdef ENCAP_IFINDEX
-#ifdef ENABLE_IPSEC
+//#ifdef ENCAP_IFINDEX
+//#ifdef ENABLE_IPSEC
 
 
 static __always_inline int
@@ -49,5 +49,5 @@ __encap_with_nodeid(struct __ctx_buff *ctx, __u32 tunnel_endpoint,
 
 
 
-#endif /* ENCAP_IFINDEX */
-#endif /* __LIB_ENCAP_H_ */
+//#endif /* ENCAP_IFINDEX */
+//#endif /* __LIB_ENCAP_H_ */

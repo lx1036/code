@@ -12,6 +12,14 @@
 #include "bpf/compiler.h"
 
 
+
+#ifdef HAVE_LPM_TRIE_MAP_TYPE
+#define LPM_MAP_TYPE BPF_MAP_TYPE_LPM_TRIE
+#else
+#define LPM_MAP_TYPE BPF_MAP_TYPE_HASH
+#endif
+
+
 struct bpf_elf_map __section_maps ENDPOINTS_MAP = {
 	.type		= BPF_MAP_TYPE_HASH,
 	.size_key	= sizeof(struct endpoint_key),
