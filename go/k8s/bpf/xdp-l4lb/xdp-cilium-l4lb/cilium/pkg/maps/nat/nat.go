@@ -49,10 +49,10 @@ func NewMap(name string, v4 bool, entries int) *Map {
 		mapValue = &NatEntry4{}
 		sizeVal = SizeofNatEntry4
 	} else {
-		mapKey = &NatKey6{}
-		sizeKey = SizeofNatKey6
-		mapValue = &NatEntry6{}
-		sizeVal = SizeofNatEntry6
+		//mapKey = &NatKey6{}
+		//sizeKey = SizeofNatKey6
+		//mapValue = &NatEntry6{}
+		//sizeVal = SizeofNatEntry6
 	}
 	return &Map{
 		Map: *bpf.NewMap(

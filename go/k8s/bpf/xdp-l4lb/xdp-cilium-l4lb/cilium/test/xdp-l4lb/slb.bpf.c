@@ -2,6 +2,17 @@
 
 #include "vmlinux.h"
 
+// /root/linux-5.10.142/tools/lib/bpf/bpf_tracing.h
+#include <bpf/bpf_tracing.h>
+
+// /root/linux-5.10.142/tools/lib/bpf/bpf_endian.h
+#include <bpf/bpf_endian.h>
+
+// /root/linux-5.10.142/tools/lib/bpf/bpf_helpers.h
+// 它定义了一些用于 BPF（Berkeley Packet Filter）程序的辅助函数，例如用于操作 BPF maps、发送事件到用户空间、获取当前时间戳等
+#include <bpf/bpf_helpers.h>
+
+
 /**
  * __attribute__((always_inline)) 是 GNU C 的一个特性，用来告诉编译器尽可能将某个函数内联
  * 在 C 语言中，函数调用通常会有一些额外的开销，比如参数传递、栈帧管理等。为了优化这些开销，

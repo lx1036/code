@@ -8,6 +8,9 @@
 #include "compiler.h"
 
 #if !defined(__non_bpf_context) && defined(__bpf__)
+
+// 函数来自于 /root/linux-5.10.142/tools/lib/bpf/bpf_helpers.h::bpf_tail_call_static()，做了改造，可以 throw exception
+
 static __always_inline __maybe_unused void
 tail_call_static(const struct __ctx_buff *ctx, const void *map, const __u32 slot) {
 	if (!__builtin_constant_p(slot))
