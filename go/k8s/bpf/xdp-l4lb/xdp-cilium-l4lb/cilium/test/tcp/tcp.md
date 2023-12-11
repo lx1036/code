@@ -1,5 +1,9 @@
 
 
+# TCP RTT
+
+
+
 # TCP Header
 https://datatracker.ietf.org/doc/html/rfc9293#name-header-format
 
@@ -32,7 +36,24 @@ tcphdr 结构体:
 ```
 
 
+## ebpf 示例
+
+代码在：
+```md
+内核态:
+/root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_tcp_hdr_options.c
+/root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_tcp_hdr_options.h
+
+用户态:
+/root/linux-5.10.142/tools/testing/selftests/bpf/prog_tests/tcp_hdr_options.c
+
+```
+
+
+
 # TCP FSM
 https://datatracker.ietf.org/doc/html/rfc9293#name-state-machine-overview
+
+
 
 

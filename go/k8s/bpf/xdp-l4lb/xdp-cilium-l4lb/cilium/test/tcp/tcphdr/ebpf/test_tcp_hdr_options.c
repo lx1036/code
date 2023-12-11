@@ -14,6 +14,9 @@
 #include <linux/types.h>
 #include <linux/tcp.h>
 
+// /root/linux-5.10.142/tools/lib/bpf/bpf_tracing.h
+// /root/linux-5.10.142/tools/lib/bpf/bpf_endian.h
+// /root/linux-5.10.142/tools/lib/bpf/bpf_helpers.h
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/errno.h>
