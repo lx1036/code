@@ -75,4 +75,5 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/include/bpf/csum.h
         cilium/bpf/include/bpf/helpers_skb.h
         cilium/bpf/include/bpf/features_skb.h
-        cilium/test/xdp-l4lb/slb.bpf.c)
+        cilium/test/xdp-l4lb/slb.bpf.c
+        cilium/test/tcp/tcprtt/demo2/tcprtt_bpf.c)

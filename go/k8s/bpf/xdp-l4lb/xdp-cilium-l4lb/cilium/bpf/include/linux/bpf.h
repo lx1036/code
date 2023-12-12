@@ -4110,6 +4110,8 @@ struct bpf_sock_addr {
 	__bpf_md_ptr(struct bpf_sock *, sk);
 };
 
+// /root/linux-5.10.142/include/uapi/linux/bpf.h
+
 /* User bpf_sock_ops struct to access socket values and specify request ops
  * and their replies.
  * Some of this fields are in network (bigendian) byte order and may need

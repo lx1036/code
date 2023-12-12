@@ -16,7 +16,9 @@
 #include <stddef.h>
 #include <string.h>
 #include <arpa/inet.h>
+// /root/linux-5.10.142/include/uapi/linux/bpf.h
 #include <linux/bpf.h>
+// /root/linux-5.10.142/include/uapi/linux/if_ether.h
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <linux/ip.h>
@@ -25,6 +27,7 @@
 #include <linux/socket.h>
 #include <linux/pkt_cls.h>
 #include <linux/erspan.h>
+// /root/linux-5.10.142/tools/lib/bpf/bpf_helpers.h
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
