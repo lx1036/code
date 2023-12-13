@@ -4,12 +4,6 @@
 
 // /root/linux-5.10.142/include/uapi/linux/bpf.h
 #include <linux/bpf.h>
-// /root/linux-5.10.142/include/uapi/linux/types.h
-#include <linux/types.h>
-// /root/linux-5.10.142/tools/lib/bpf/bpf_tracing.h, 定义 BPF_PROG()
-#include <bpf/bpf_tracing.h>
-// /root/linux-5.10.142/tools/lib/bpf/bpf_endian.h
-#include <bpf/bpf_endian.h>
 // /root/linux-5.10.142/tools/lib/bpf/bpf_helpers.h
 #include <bpf/bpf_helpers.h>
 
