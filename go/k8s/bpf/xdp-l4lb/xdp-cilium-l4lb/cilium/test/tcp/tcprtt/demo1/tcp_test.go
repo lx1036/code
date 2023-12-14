@@ -34,4 +34,20 @@ func TestTCP(test *testing.T) {
 	}
 
 	log.Println("success")
+
+	serverSockAddr, err := unix.Getsockname(fd)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	clientFd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	setSocketTimeout(clientFd, 0)
+	// 非阻塞的
+	err = unix.Connect(clientFd, serverSockAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
