@@ -9,6 +9,7 @@ include_directories(cilium/bpf/include/bpf)
 include_directories(cilium/bpf/include/bpf/ctx)
 include_directories(cilium/bpf/include/linux)
 include_directories(cilium/bpf/lib)
+include_directories(cilium/test/linux)
 
 add_executable(xdp_cilium_l4lb
         cilium/bpf/include/bpf/ctx/common.h
@@ -75,5 +76,7 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/include/bpf/csum.h
         cilium/bpf/include/bpf/helpers_skb.h
         cilium/bpf/include/bpf/features_skb.h
-        cilium/test/xdp-l4lb/slb.bpf.c
-        cilium/test/tcp/tcprtt/demo2/tcprtt_bpf.c)
+        cilium/test/linux/linux/ip.h
+        cilium/test/tcp/tcpsyncookie/tcp_syncookie.c
+        cilium/test/linux/linux/tcp.h
+        cilium/test/linux/bpf/bpf_helper_defs.h)

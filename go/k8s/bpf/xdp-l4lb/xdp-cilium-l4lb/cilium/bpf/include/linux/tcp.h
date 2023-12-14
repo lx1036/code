@@ -8,6 +8,7 @@
 #include <linux/types.h>
 
 // https://datatracker.ietf.org/doc/html/rfc9293#name-header-format
+// 2+2+4+4+2+2+2+2=20
 struct tcphdr {
 	__be16	source; // src port
 	__be16	dest; // dst port
