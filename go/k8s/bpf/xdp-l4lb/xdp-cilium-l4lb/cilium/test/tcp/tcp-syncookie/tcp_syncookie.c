@@ -1,6 +1,28 @@
 
 /**
  * syn cookie: https://cs.pynote.net/net/tcp/202205052/
+
+ linux 内核里的代码在: /root/linux-5.10.142/net/ipv4/syncookies.c
+
+ linux 内核里代码流程:
+
+-> 收到第一个包 syn 包
+-> /root/linux-5.10.142/net/ipv4/af_inet.c#inet_init->tcp_protocol->tcp_v4_rcv
+-> /root/linux-5.10.142/net/ipv4/tcp_ipv4.c#tcp_v4_rcv->tcp_v4_do_rcv->tcp_rcv_state_process
+->/root/linux-5.10.142/net/ipv4/tcp_input.c#tcp_rcv_state_process->conn_request->tcp_v4_conn_request
+-> /root/linux-5.10.142/net/ipv4/tcp_input.c#([tcp_v4_conn_request->]tcp_conn_request->cookie_init_sequence)
+-> /root/linux-5.10.142/include/net/tcp.h#(cookie_init_sequence-> ops->cookie_init_seq)
+-> /root/linux-5.10.142/net/ipv4/tcp_ipv4.c#(cookie_init_seq = cookie_v4_init_sequence)
+-> /root/linux-5.10.142/net/ipv4/syncookies.c#(cookie_v4_init_sequence->__cookie_v4_init_sequence->secure_tcp_syn_cookie->cookie_hash)
+
+
+总结一下，linux kernel 收到一个 ipv4 包经过的代码流程:
+->tcp_v4_rcv() // /root/linux-5.10.142/net/ipv4/tcp_ipv4.c
+->__inet_lookup_skb()[查询已经listen socket]
+-> // if (sk->sk_state == TCP_NEW_SYN_RECV)
+->tcp_v4_do_rcv() // if (sk->sk_state == TCP_LISTEN)
+->tcp_rcv_established() // if (sk->sk_state == TCP_ESTABLISHED)->tcp_v4_cookie_check() // if (sk->sk_state == TCP_LISTEN)
+->tcp_rcv_state_process()->conn_request()
  */
 
 
