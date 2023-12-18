@@ -121,7 +121,6 @@ static inline void check_syncookie(void *ctx, void *data, void *data_end) {
         break;
 
     case ETH_P_IPV6:
-        return;
     default:
         return;
     }

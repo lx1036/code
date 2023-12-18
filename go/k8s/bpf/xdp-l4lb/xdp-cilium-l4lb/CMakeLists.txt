@@ -77,6 +77,7 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/include/bpf/helpers_skb.h
         cilium/bpf/include/bpf/features_skb.h
         cilium/test/linux/linux/ip.h
-        cilium/test/tcp/tcpsyncookie/tcp_syncookie.c
+        cilium/test/tcp/tcp-syncookie/tcp_syncookie.c
         cilium/test/linux/linux/tcp.h
-        cilium/test/linux/bpf/bpf_helper_defs.h)
+        cilium/test/linux/bpf/bpf_helper_defs.h
+        cilium/test/tcp/tcpnotify/tcpnotify.c)
