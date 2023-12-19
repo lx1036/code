@@ -42,6 +42,7 @@ struct {
 } perf_event_map SEC(".maps");
 
 // /root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_tcpnotify_kern.c
+// perf event retrans
 SEC("sockops")
 int bpf_sockops_cb(struct bpf_sock_ops *skops) {
     int rv = -1;
