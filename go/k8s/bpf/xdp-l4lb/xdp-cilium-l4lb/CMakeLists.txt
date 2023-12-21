@@ -82,4 +82,5 @@ add_executable(xdp_cilium_l4lb
         cilium/test/linux/bpf/bpf_helper_defs.h
         cilium/test/tcp/tcpnotify/tcpnotify.c
         cilium/test/tcp/tcpconnect/tcp_connect.c
-        cilium/test/tcp/tcpconnect/tcp_connect.c)
+        cilium/test/tcp/tcpconnect/tcp_connect.c
+        cilium/test/tcp/tcpconnect/tcp_connect.h)

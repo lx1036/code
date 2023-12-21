@@ -143,6 +143,7 @@ static inline void bpf_sock_ops_rtt_cb(struct bpf_sock_ops *skops) {
     bpf_ringbuf_submit(rtt_event, 0);
 }
 
+// https://github.com/cilium/ebpf/blob/main/examples/tcprtt_sockops/tcprtt_sockops.c
 SEC("sockops")
 int bpf_sockops_cb(struct bpf_sock_ops *skops) {
     __u32 op;
