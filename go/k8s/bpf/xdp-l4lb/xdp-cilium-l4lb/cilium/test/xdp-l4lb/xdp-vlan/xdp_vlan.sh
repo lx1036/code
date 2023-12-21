@@ -1,9 +1,6 @@
-
+#!/bin/bash
 
 # /root/linux-5.10.142/tools/testing/selftests/bpf/test_xdp_vlan.sh
-
-
-
 
 # Exit on failure
 set -e
