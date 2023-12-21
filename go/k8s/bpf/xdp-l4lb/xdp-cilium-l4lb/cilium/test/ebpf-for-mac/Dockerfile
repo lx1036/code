@@ -36,7 +36,6 @@ RUN git clone https://github.com/iovisor/bcc.git && \
 CMD mount -t debugfs debugfs /sys/kernel/debug && /bin/bash
 
 
-#docker build -t ebpf-for-mac -f ./Dockerfile .
+# docker build -t lx1036/ebpf-for-mac:2.0 -f ./Dockerfile .
 # 或者直接 pull 已经 build 好的
-# docker pull lx1036/ebpf-for-mac
-#
+# docker pull lx1036/ebpf-for-mac:latest

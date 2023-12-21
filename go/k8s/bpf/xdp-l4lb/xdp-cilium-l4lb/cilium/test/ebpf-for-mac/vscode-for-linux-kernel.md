@@ -9,7 +9,7 @@ https://zhuanlan.zhihu.com/p/353592340
 
 可以解决 C 函数跳转，以及头文件 .h 报错问题，阅读 linux 源码的确顺畅很多！！！
 
-(1) 搞一台 ubuntu ecs，不要 centos 装不了 global
+(1)搞一台 ubuntu ecs，不要 centos 装不了 global
 ```shell
 wget https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-5.10.142.tar.gz
 

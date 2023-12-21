@@ -83,4 +83,5 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tcp/tcpnotify/tcpnotify.c
         cilium/test/tcp/tcpconnect/tcp_connect.c
         cilium/test/tcp/tcpconnect/tcp_connect.c
-        cilium/test/tcp/tcpconnect/tcp_connect.h)
+        cilium/test/tcp/tcpconnect/tcp_connect.h
+        cilium/test/xdp-l4lb/xdp-vlan/test_xdp_vlan.c)
