@@ -28,7 +28,7 @@
 #define ICMP_PORT_UNREACH	3	/* Port Unreachable		*/
 #define ICMP_FRAG_NEEDED	4	/* Fragmentation Needed/DF set	*/
 
-
+// /root/linux-5.10.142/include/uapi/linux/icmp.h, 8 字节
 struct icmphdr {
   __u8		type;
   __u8		code;
