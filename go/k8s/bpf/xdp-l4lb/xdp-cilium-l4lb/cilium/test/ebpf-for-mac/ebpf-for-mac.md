@@ -38,14 +38,8 @@ sudo systemctl restart docker
 
 mac 本地运行 ebpf bcc 示例:
 ```shell
-docker run -it --rm \
-  --name ebpf-for-mac \
-  --privileged \
-  -v /lib/modules:/lib/modules:ro \
-  -v /etc/localtime:/etc/localtime:ro \
-  --pid=host \
-  lx1036/ebpf-for-mac
-  
+docker run -it --name ebpf-for-mac --privileged -v /lib/modules:/lib/modules:ro -v /etc/localtime:/etc/localtime:ro --pid=host lx1036/ebpf-for-mac:2.0 /bin/bash
+
 wget https://raw.githubusercontent.com/singe/ebpf-docker-for-mac/main/hello_world.py
 python3 hello_world.py
 ```

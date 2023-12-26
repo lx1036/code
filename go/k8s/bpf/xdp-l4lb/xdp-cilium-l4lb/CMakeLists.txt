@@ -87,4 +87,9 @@ add_executable(xdp_cilium_l4lb
         cilium/test/xdp-l4lb/xdp-vlan/test_xdp_vlan.c
         cilium/test/linux/linux/if_vlan.h
         cilium/test/xdp-l4lb/xdp-ping/xdp_ping.c
-        cilium/test/linux/linux/if_packet.h)
+        cilium/test/linux/linux/if_packet.h
+        cilium/test/xdp-l4lb/xdp-veth/xdp_veth.c
+        cilium/test/xdp-l4lb/xdp-veth/xdp_veth.c
+        cilium/test/xdp-l4lb/xdp-redirect/xdp_redirect.c
+        cilium/test/xdp-l4lb/xdp_meta/xdp_meta.c
+        cilium/test/xdp-l4lb/xdp/xdp.c)
