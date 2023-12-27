@@ -13,7 +13,7 @@
 #     root namespace   |     tc_ns0 namespace
 #                      |
 #      ----------      |     ----------
-#      |  veth1  | --------- |  veth0  |
+#|  veth1(10.1.1.200)  | --------- |  veth0(10.1.1.100)  |
 #      ----------    peer    ----------
 #
 # Device Configuration
@@ -51,50 +51,21 @@ cleanup()
 	ip link del veth1 2>/dev/null
 }
 
-test()
-{
-	client_args="$1"
-	server_args="$2"
-
-	echo "Test client args '$client_args'; server args '$server_args'"
-
-	server_pid=0
-	if [[ -n "$server_args" ]]; then
-		ip netns exec $TARGET_NS ./xdping $server_args &
-		server_pid=$!
-		sleep 10
-	fi
-
-	./xdping $client_args $TARGET_IP
-
-	if [[ $server_pid -ne 0 ]]; then
-		kill -TERM $server_pid
-		server_pid=0
-	fi
-
-	echo "Test client args '$client_args'; server args '$server_args': PASS"
-}
-
 set -e
-
-server_pid=0
 
 setup
 
-for server_args in "" "-I veth0 -s -S" ; do
-	# client in skb mode
-	client_args="-I veth1 -S"
-	test "$client_args" "$server_args"
-
-	# client with count of 10 RTT measurements.
-	client_args="-I veth1 -S -c 10"
-	test "$client_args" "$server_args"
-done
-
-echo "OK. All tests passed"
 exit 0
 
+# 报错，这个 .o 文件不能直接使用 ip link 挂载
+ip netns exec xdp_ns0 ip link set veth0 xdp object bpf_bpfel.o section xdp/server
 
+# 直接使用 ip link 命令来挂载 xdp 程序
+ip netns exec xdp_ns0 ip link set veth0 xdp off
+clang -O2 -Wall -target bpf -c xdp_ping.c -o xdp_ping.o
+# clang -S -I. -O2 -emit-llvm -c xdp_ping.c -o - | llc -march=bpf -filetype=obj -o xdp_ping2.o
+ip netns exec xdp_ns0 ip link set dev veth0 xdp object xdp_ping.o section xdp_server # 容器里可以挂载
+ip link set veth1 xdp off
+ip link set dev veth1 xdp object xdp_ping.o section xdp_client # 但是容器里不能挂载会报错
 
-
-
+ping -c 3 -I veth1 10.1.1.100 # 可达

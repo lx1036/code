@@ -90,16 +90,23 @@ static __always_inline __u16 ipv4_csum(void *data_start, int data_size) {
     return csum_fold_helper(sum);
 }
 
-SEC("xdpclient")
+// tail -n 100 /sys/kernel/debug/tracing/trace
+
+SEC("xdp_drop")
+int xdp_drop_prog(struct xdp_md *ctx) {
+    return XDP_DROP;
+}
+
+SEC("xdp_client")
 int xdping_client(struct xdp_md *ctx) {
-    void *data_end = (void *) (long) ctx->data_end;
+//    void *data_end = (void *) (long) ctx->data_end;
     void *data = (void *) (long) ctx->data;
-    struct pinginfo *pinginfo = NULL;
+//    struct pinginfo *pinginfo = NULL;
     struct ethhdr *eth = data;
     struct icmphdr *icmph;
     struct iphdr *iph;
     __u64 recvtime;
-    __be32 raddr;
+    __u32 raddr;
     __be16 seq;
     int ret;
     __u8 i;
@@ -112,12 +119,21 @@ int xdping_client(struct xdp_md *ctx) {
     iph = data + sizeof(*eth);
     icmph = data + sizeof(*eth) + sizeof(*iph);
     raddr = iph->saddr;
+    char fmt4[] = "iph->saddr:%x, %x\n";
+    bpf_trace_printk(fmt4, sizeof(fmt4), raddr, bpf_htonl(iph->saddr)); // 6401010a, a010164, 10.1.1.100
+//    char ip_str[16];
+//    bpf_trace_printk("IP address: %s\n", inet_ntoa((struct in_addr) {raddr}));
 
     /* Record time reply received. */
+    char fmt1[] = "pinginfo->seq:%d, icmph->un.echo.sequence:%d\n"; // %x 用于输出十六进制整数值
     recvtime = bpf_ktime_get_ns();
-    pinginfo = bpf_map_lookup_elem(&ping_map, &raddr);
-    if (!pinginfo || pinginfo->seq != icmph->un.echo.sequence)
+    struct pinginfo *pinginfo = bpf_map_lookup_elem(&ping_map, &raddr); // raddr=10.1.1.100
+    if(!pinginfo) {
+        bpf_trace_printk(fmt1, sizeof(fmt1), pinginfo->seq, icmph->un.echo.sequence); // 这里调试有问题???
+    }
+    if (!pinginfo || pinginfo->seq != icmph->un.echo.sequence) {
         return XDP_PASS;
+    }
 
     if (pinginfo->start) {
 #pragma clang loop unroll(full)
@@ -152,9 +168,9 @@ int xdping_client(struct xdp_md *ctx) {
     return XDP_TX;
 }
 
-SEC("xdpserver")
+SEC("xdp_server")
 int xdping_server(struct xdp_md *ctx) {
-    void *data_end = (void *)(long)ctx->data_end;
+//    void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
     struct ethhdr *eth = data;
     struct icmphdr *icmph; // icmp 和 tcp 都是四层协议
