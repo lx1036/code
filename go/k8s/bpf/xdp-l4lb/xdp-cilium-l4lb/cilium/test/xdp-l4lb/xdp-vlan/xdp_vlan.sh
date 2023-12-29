@@ -36,7 +36,7 @@ ip netns exec ns1 ip link set veth1 up
 export VLAN=4011
 export DEVNS2=veth2
 ip netns exec ns2 ip link add link $DEVNS2 name $DEVNS2.$VLAN type vlan id $VLAN
-ip netns exec ns2 ip addr add ${IPADDR2}/24 dev $DEVNS2.$VLAN
+ip netns exec ns2 ip addr add ${IPADDR2}/24 dev $DEVNS2.$VLAN # 注意这里的 ip 地址在 veth2.4011
 ip netns exec ns2 ip link set $DEVNS2 up
 ip netns exec ns2 ip link set $DEVNS2.$VLAN up
 
@@ -56,21 +56,23 @@ XDP_MODE=xdp
 export DEVNS1=veth1
 export FILE=test_xdp_vlan.o
 
+clang -O2 -Wall -target bpf -c test_xdp_vlan.c -o test_xdp_vlan.o
+
 # First test: Remove VLAN by setting VLAN ID 0, using "xdp_vlan_change"
+# 1.解包来自 ns2/veth2.4011 的 vlan 包
 export XDP_PROG=xdp_vlan_change
 ip netns exec ns1 ip link set $DEVNS1 $XDP_MODE object $FILE section $XDP_PROG
 
 # In ns1: egress use TC to add back VLAN tag 4011
-#  (del cmd)
-#  tc qdisc del dev $DEVNS1 clsact 2> /dev/null
-#
+# 2.封包 ns1/veth1 -> n2/veth2 的 vlan 包，然后 ns2/veth2.4011 会解包
 ip netns exec ns1 tc qdisc add dev $DEVNS1 clsact
 ip netns exec ns1 tc filter add dev $DEVNS1 egress \
   prio 1 handle 1 bpf da obj $FILE sec tc_vlan_push
 
 # Now the namespaces can reach each-other, test with ping:
-ip netns exec ns2 ping -i 0.2 -W 2 -c 2 $IPADDR1
-ip netns exec ns1 ping -i 0.2 -W 2 -c 2 $IPADDR2
+# 验证通过!!!
+ip netns exec ns1 ping -c 2 100.64.41.2
+ip netns exec ns2 ping -c 2 100.64.41.1
 
 # Second test: Replace xdp prog, that fully remove vlan header
 #
@@ -81,11 +83,9 @@ ip netns exec ns1 ping -i 0.2 -W 2 -c 2 $IPADDR2
 export XDP_PROG=xdp_vlan_remove_outer2
 ip netns exec ns1 ip link set $DEVNS1 $XDP_MODE off
 ip netns exec ns1 ip link set $DEVNS1 $XDP_MODE object $FILE section $XDP_PROG
-
 # Now the namespaces should still be able reach each-other, test with ping:
-ip netns exec ns2 ping -i 0.2 -W 2 -c 2 $IPADDR1
-ip netns exec ns1 ping -i 0.2 -W 2 -c 2 $IPADDR2
-
+ip netns exec ns1 ping -c 2 100.64.41.2
+ip netns exec ns2 ping -c 2 100.64.41.1
 
 cleanup()
 {
