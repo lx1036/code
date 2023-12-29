@@ -61,9 +61,9 @@ exit 0
 ip netns exec xdp_ns0 ip link set veth0 xdp object bpf_bpfel.o section xdp/server
 
 # 直接使用 ip link 命令来挂载 xdp 程序
-ip netns exec xdp_ns0 ip link set veth0 xdp off
 clang -O2 -Wall -target bpf -c xdp_ping.c -o xdp_ping.o
-# clang -S -I. -O2 -emit-llvm -c xdp_ping.c -o - | llc -march=bpf -filetype=obj -o xdp_ping2.o
+# clang -S -I. -O2 -emit-llvm -c xdp_ping.c -o - | llc -march=bpf -filetype=obj -o xdp_ping.o
+ip netns exec xdp_ns0 ip link set veth0 xdp off
 ip netns exec xdp_ns0 ip link set dev veth0 xdp object xdp_ping.o section xdp_server # 容器里可以挂载
 ip link set veth1 xdp off
 ip link set dev veth1 xdp object xdp_ping.o section xdp_client # 但是容器里不能挂载会报错

@@ -1,6 +1,15 @@
 
 // /root/linux-5.10.142/tools/testing/selftests/bpf/progs/xdping_kern.c
 
+/**
+ * 调试运行成功
+ * 抓包:
+ * tcpdump -i veth1 -nneevv -A icmp -w client.pcap
+ * ip netns exec xdp_ns0 tcpdump -i veth0 -nneevv -A icmp -w server.pcap (抓不到包)
+ *
+ * (1)xdp_server 可以使用 ip link 命令挂载
+ * (2)xdp_client 只能 go 来挂载
+ */
 
 #include <stddef.h>
 #include <string.h>
@@ -119,22 +128,29 @@ int xdping_client(struct xdp_md *ctx) {
     iph = data + sizeof(*eth);
     icmph = data + sizeof(*eth) + sizeof(*iph);
     raddr = iph->saddr;
-    char fmt4[] = "iph->saddr:%x, %x\n";
+    char fmt4[] = "iph->saddr:%x, %x";
     bpf_trace_printk(fmt4, sizeof(fmt4), raddr, bpf_htonl(iph->saddr)); // 6401010a, a010164, 10.1.1.100
-//    char ip_str[16];
-//    bpf_trace_printk("IP address: %s\n", inet_ntoa((struct in_addr) {raddr}));
 
     /* Record time reply received. */
     char fmt1[] = "pinginfo->seq:%d, icmph->un.echo.sequence:%d\n"; // %x 用于输出十六进制整数值
     recvtime = bpf_ktime_get_ns();
+//    seq = icmph->un.echo.sequence;
+//    seq = bpf_htons(bpf_ntohs(icmph->un.echo.sequence));
     struct pinginfo *pinginfo = bpf_map_lookup_elem(&ping_map, &raddr); // raddr=10.1.1.100
     if(!pinginfo) {
-        bpf_trace_printk(fmt1, sizeof(fmt1), pinginfo->seq, icmph->un.echo.sequence); // 这里调试有问题???
+//        bpf_trace_printk(fmt1, sizeof(fmt1), pinginfo->seq, seq); // 这里调试发现会报错
     }
-    if (!pinginfo || pinginfo->seq != icmph->un.echo.sequence) {
+
+    char fmt5[] = "icmph->un.echo.sequence: %d";
+    bpf_trace_printk(fmt5, sizeof(fmt5), icmph->un.echo.sequence);
+
+    if (!pinginfo) {
+//    if (!pinginfo || pinginfo->seq != icmph->un.echo.sequence) {
         return XDP_PASS;
     }
 
+    char fmt2[] = "pinginfo->start: %d";
+    bpf_trace_printk(fmt2, sizeof(fmt2), pinginfo->start);
     if (pinginfo->start) {
 #pragma clang loop unroll(full)
         for (i = 0; i < XDPING_MAX_COUNT; i++) {
@@ -158,12 +174,15 @@ int xdping_client(struct xdp_md *ctx) {
     iph->saddr = iph->daddr;
     iph->daddr = raddr;
     icmph->type = ICMP_ECHO;
-    seq = bpf_htons(bpf_ntohs(icmph->un.echo.sequence) + 1);
+    seq = bpf_htons(bpf_ntohs(icmph->un.echo.sequence) + 1); // 256(0x0100) -> 512(0x0200) -> 768(0x0300), 这里的 1 是加一个 0x0100(LE)
     icmph->un.echo.sequence = seq;
     icmph->checksum = 0;
     icmph->checksum = ipv4_csum(icmph, ICMP_ECHO_LEN); // 对 icmp 包做 checksum
     pinginfo->seq = seq;
     pinginfo->start = bpf_ktime_get_ns();
+
+    char fmt3[] = "pinginfo->seq:%d";
+    bpf_trace_printk(fmt3, sizeof(fmt3), pinginfo->seq);
 
     return XDP_TX;
 }
