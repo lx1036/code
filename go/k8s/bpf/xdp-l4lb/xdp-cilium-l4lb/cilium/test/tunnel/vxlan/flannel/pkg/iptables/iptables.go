@@ -2,8 +2,8 @@ package iptables
 
 import (
 	"fmt"
-	"k8s-lx1036/k8s/network/cni/flannel/pkg/ip"
-	"k8s-lx1036/k8s/network/cni/flannel/pkg/subnet"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tunnel/vxlan/flannel/pkg/ip"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tunnel/vxlan/flannel/pkg/subnet"
 	"k8s.io/klog/v2"
 
 	coreosIptables "github.com/coreos/go-iptables/iptables"

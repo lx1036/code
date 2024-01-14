@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"time"
 
-	"k8s-lx1036/k8s/network/cni/flannel/pkg/ip"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tunnel/vxlan/flannel/pkg/ip"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -1,0 +1,202 @@
+
+# [一文看懂k8s的Flannel网络](https://zhuanlan.zhihu.com/p/140711132)
+# [flannel跨主网络通信方案 UDP、VXLAN、HOST-GW 详解](https://cloud.tencent.com/developer/article/1651126)
+
+# kubectl create deploy my-nginx --image=nginx:1.24.0 --replicas=3
+#
+
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: DaemonSet
+  metadata:
+    labels:
+      app: flannel
+      k8s-app: flannel
+      tier: node
+    name: kube-flannel-ds
+    namespace: kube-flannel
+  spec:
+    selector:
+      matchLabels:
+        app: flannel
+    template:
+      metadata:
+        labels:
+          app: flannel
+          tier: node
+      spec:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/os
+                  operator: In
+                  values:
+                  - linux
+        containers:
+        - args:
+          - --ip-masq
+          - --kube-subnet-mgr
+          command:
+          - /opt/bin/flanneld
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: EVENT_QUEUE_DEPTH
+            value: "5000"
+          image: docker.io/flannel/flannel:v0.22.3
+          imagePullPolicy: IfNotPresent
+          name: kube-flannel
+          resources:
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            capabilities:
+              add:
+              - NET_ADMIN
+              - NET_RAW
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /run/flannel
+            name: run
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+          - mountPath: /run/xtables.lock
+            name: xtables-lock
+        dnsPolicy: ClusterFirst
+        hostNetwork: true
+        initContainers:
+        - args:
+          - -f
+          - /flannel
+          - /opt/cni/bin/flannel
+          command:
+          - cp
+          image: docker.io/flannel/flannel-cni-plugin:v1.2.0
+          imagePullPolicy: IfNotPresent
+          name: install-cni-plugin
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /opt/cni/bin
+            name: cni-plugin
+        - args:
+          - -f
+          - /etc/kube-flannel/cni-conf.json
+          - /etc/cni/net.d/10-flannel.conflist
+          command:
+          - cp
+          image: docker.io/flannel/flannel:v0.22.3
+          imagePullPolicy: IfNotPresent
+          name: install-cni
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/cni/net.d
+            name: cni
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+        priorityClassName: system-node-critical
+        restartPolicy: Always
+        securityContext: {}
+        serviceAccount: flannel
+        serviceAccountName: flannel
+        terminationGracePeriodSeconds: 30
+        tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        volumes:
+        - hostPath:
+            path: /run/flannel
+            type: ""
+          name: run
+        - hostPath:
+            path: /opt/cni/bin
+            type: ""
+          name: cni-plugin
+        - hostPath:
+            path: /etc/cni/net.d
+            type: ""
+          name: cni
+        - configMap:
+            defaultMode: 420
+            name: kube-flannel-cfg
+          name: flannel-cfg
+        - hostPath:
+            path: /run/xtables.lock
+            type: FileOrCreate
+          name: xtables-lock
+    updateStrategy:
+      rollingUpdate:
+        maxSurge: 0
+        maxUnavailable: 1
+      type: RollingUpdate
+kind: List
+metadata:
+  resourceVersion: ""
+
+---
+
+apiVersion: v1
+data:
+  cni-conf.json: |
+    {
+      "name": "cbr0",
+      "cniVersion": "0.3.1",
+      "plugins": [
+        {
+          "type": "flannel",
+          "delegate": {
+            "hairpinMode": true,
+            "isDefaultGateway": true
+          }
+        },
+        {
+          "type": "portmap",
+          "capabilities": {
+            "portMappings": true
+          }
+        }
+      ]
+    }
+  net-conf.json: |
+    {
+      "Network": "10.244.0.0/16",
+      "Backend": {
+        "Type": "vxlan"
+      }
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    app: flannel
+    k8s-app: flannel
+    tier: node
+  name: kube-flannel-cfg
+  namespace: kube-flannel
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    k8s-app: flannel
+  name: flannel
+  namespace: kube-flannel
+

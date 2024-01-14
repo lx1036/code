@@ -8,11 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"k8s-lx1036/k8s/network/cni/flannel/pkg/backend"
-	_ "k8s-lx1036/k8s/network/cni/flannel/pkg/backend/vxlan"
-	"k8s-lx1036/k8s/network/cni/flannel/pkg/ip"
-	"k8s-lx1036/k8s/network/cni/flannel/pkg/iptables"
-	"k8s-lx1036/k8s/network/cni/flannel/pkg/subnet"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tunnel/vxlan/flannel/pkg/backend"
+	_ "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tunnel/vxlan/flannel/pkg/backend/vxlan"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tunnel/vxlan/flannel/pkg/ip"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tunnel/vxlan/flannel/pkg/iptables"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tunnel/vxlan/flannel/pkg/subnet"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/logs"

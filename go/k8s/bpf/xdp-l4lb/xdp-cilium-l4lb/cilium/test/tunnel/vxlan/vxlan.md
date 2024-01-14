@@ -33,24 +33,6 @@ VTEP: Vxlan Tunnel Endpoint
 # 安装 bridge 命令
 yum install -y iproute iproute-devel iproute-tc
 
-# 自学习模式(没有验证通过)
-# node1
-ip link add name vxlan-br0 type bridge
-ip addr add 100.1.1.2/24 dev vxlan-br0
-ip link set up vxlan-br0
-ip addr show vxlan-br0
-ip link add vxlan0 type vxlan id 1 group 239.1.1.1 dev eth2 dstport 4789 # 这里 eth2 是出口网卡
-# 把 br-veth0 搭到 vxlan-br0 网桥上
-ip link set dev vxlan0 master vxlan-br0 # brctl addif vxlan-br0 vxlan0
-ip link del vxlan0
-ip link del vxlan-br0
-# node2
-ip link add name vxlan-br0 type bridge
-ip addr add 100.1.1.3/24 dev vxlan-br0
-ip link set up vxlan-br0
-ip addr show vxlan-br0
-ip link del vxlan0
-ip link del vxlan-br0
 
 
 # 手动更新FDB表来实现VXLAN通信(验证通过)
@@ -130,6 +112,10 @@ ip netns exec ns1 ping -c 2 3.3.3.3
 
 
 # 参考文献
+[Linux 下实践 VxLAN](https://mp.weixin.qq.com/s/bsoWU2WC6SxPgseNxwG9cw)
+[什么是 VxLAN？](https://mp.weixin.qq.com/s/Ku-feXSz-UPJKjBBL752bw)
+[Flannel的两种模式解析（VXLAN、host-gw)](https://juejin.cn/post/6994825163757846565) https://mp.weixin.qq.com/s/uPbKZe2NBAwZRuWfiORrqw
+
 **[Kubernetes flannel网络分析](http://just4coding.com/2021/11/03/flannel/)** , 这个很重要！！！
 
 **[动态维护FDB表项实现VXLAN通信](http://just4coding.com/2020/04/20/vxlan-fdb/)** , 这个很重要！！！

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s-lx1036/k8s/network/cni/flannel/pkg/subnet"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tunnel/vxlan/flannel/pkg/subnet"
 )
 
 type Manager interface {

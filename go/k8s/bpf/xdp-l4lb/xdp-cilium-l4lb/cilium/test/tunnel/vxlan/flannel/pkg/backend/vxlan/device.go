@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/cilium/cilium/pkg/mac"
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
-	"k8s-lx1036/k8s/network/cni/flannel/pkg/ip"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tunnel/vxlan/flannel/pkg/ip"
 	"k8s.io/klog/v2"
 	"net"
 	"syscall"
