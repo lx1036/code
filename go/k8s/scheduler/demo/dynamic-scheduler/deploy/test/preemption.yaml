@@ -29,7 +29,7 @@ spec:
     spec:
       priorityClassName: high-priority
       containers:
-        - image: nginx:1.17.8
+        - image: nginx:1.24.0
           imagePullPolicy: IfNotPresent
           name: nginx
           resources:

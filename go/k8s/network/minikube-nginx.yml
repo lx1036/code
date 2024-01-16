@@ -54,7 +54,7 @@ spec:
             name: nginx-demo
       containers:
         - name: nginx-demo-1
-          image: nginx:1.17.8
+          image: nginx:1.24.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -66,7 +66,7 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
         - name: nginx-demo-2
-          image: nginx:1.17.8
+          image: nginx:1.24.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

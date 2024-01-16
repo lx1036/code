@@ -8,7 +8,7 @@ metadata:
 spec:
   containers:
     - name: serviceaccount-admission-plugin
-      image: nginx:1.17.8
+      image: nginx:1.24.0
       imagePullPolicy: IfNotPresent
       ports:
         - containerPort: 80

@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: hpa-test-1
-          image: nginx:1.17.8
+          image: nginx:1.24.0
           resources:
             requests:
               cpu: 50m

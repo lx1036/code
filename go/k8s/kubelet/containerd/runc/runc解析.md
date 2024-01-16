@@ -24,7 +24,7 @@ docker export $(docker create busybox) | tar -C rootfs -xvf - # 把 busybox:late
 mkdir nginx
 cd nginx
 mkdir rootfs
-docker export $(docker create nginx:1.17.8) | tar -C rootfs -xvf -
+docker export $(docker create nginx:1.24.0) | tar -C rootfs -xvf -
 runc spec
 # config.json 修改
 "args": [

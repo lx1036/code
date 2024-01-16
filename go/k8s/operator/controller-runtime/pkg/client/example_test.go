@@ -98,7 +98,7 @@ func TestClientCreate(test *testing.T) {
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Image: "nginx:1.17.8",
+					Image: "nginx:1.24.0",
 					Name:  "nginx",
 				},
 			},
@@ -136,7 +136,7 @@ func TestClientCreate(test *testing.T) {
 					"containers": []map[string]interface{}{
 						{
 							"name":  "nginx",
-							"image": "nginx:1.17.8",
+							"image": "nginx:1.24.0",
 						},
 					},
 				},

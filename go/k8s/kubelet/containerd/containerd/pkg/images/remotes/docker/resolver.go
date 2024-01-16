@@ -56,7 +56,7 @@ func NewResolver(options ResolverOptions) *Resolver {
 
 }
 
-// Resolve ref="docker.io/library/nginx:1.17.8"
+// Resolve ref="docker.io/library/nginx:1.24.0"
 func (r *Resolver) Resolve(ctx context.Context, ref string) (string, ocispec.Descriptor, error) {
 	base, err := r.resolveDockerBase(ref)
 	if err != nil {

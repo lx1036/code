@@ -7,7 +7,7 @@ import (
 )
 
 func TestParse(test *testing.T) {
-	ref := "docker.io/library/nginx:1.17.8"
+	ref := "docker.io/library/nginx:1.24.0"
 	spec, err := Parse(ref)
 	if err != nil {
 		klog.Fatal(err)
