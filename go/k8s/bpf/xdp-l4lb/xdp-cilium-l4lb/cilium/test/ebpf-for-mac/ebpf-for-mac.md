@@ -19,11 +19,11 @@ cat /root/.docker/config.json
 
 
 # ubuntu 安装 docker
-sudo apt-get update
+sudo apt-get update -y
 sudo apt-get install apt-transport-https ca-certificates curl software-properties-common lrzsz -y
 sudo curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | sudo apt-key add -
 sudo add-apt-repository "deb [arch=amd64] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable"
-sudo apt-get update
+sudo apt-get update -y
 sudo apt-get install docker-ce -y
 sudo mkdir -p /etc/docker
 sudo tee /etc/docker/daemon.json <<-'EOF'

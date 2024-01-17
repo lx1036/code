@@ -53,6 +53,8 @@ ip netns exec ns2 ping -c 3 100.0.1.1
 自己实现一个 ipip cni: https://zhuanlan.zhihu.com/p/571966611
 
 https://developers.redhat.com/blog/2019/05/17/an-introduction-to-linux-virtual-interfaces-tunnels#ipip
+ethhdr -> outer iphdr(ipip proto) -> inner iphdr -> payload : https://datatracker.ietf.org/doc/html/rfc2003
+
 ipip linux 源码: /root/linux-5.10.142/net/ipv4/ipip.c
 ipip wiki: https://en.wikipedia.org/wiki/IP_in_IP
 ipip shell 命令验证: https://blog.csdn.net/qq_22918243/article/details/130886641
@@ -74,6 +76,9 @@ ip link set ipip.1 up
 ip addr add 10.10.100.10 peer 10.10.200.10 dev ipip.1
 # 会自动创建一条路由
 10.10.200.10 dev tun1 proto kernel scope link src 10.10.100.10
+# ip addr add INTERNAL_IPV4_ADDR/24 dev ipip.1
+# 然后手动创建路由
+# ip route add REMOTE_INTERNAL_SUBNET/24 dev ipip.1
 
 # ecs2
 ip tunnel add ipip.1 mode ipip remote 172.16.111.103 local 172.16.111.102
