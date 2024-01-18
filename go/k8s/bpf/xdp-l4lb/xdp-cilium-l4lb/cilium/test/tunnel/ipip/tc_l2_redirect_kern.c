@@ -97,7 +97,7 @@ int _drop_non_tun_vip(struct __sk_buff *skb)
 	return TC_ACT_OK;
 }
 
-// 把包转发到 从 ve2->tun1
+// 把回包转发到 veth2->tun1.ipip
 SEC("l2_to_iptun_ingress_forward")
 int _l2_to_iptun_ingress_forward(struct __sk_buff *skb)
 {
@@ -127,6 +127,8 @@ int _l2_to_iptun_ingress_forward(struct __sk_buff *skb)
 		if (iph->protocol != IPPROTO_IPIP)
 			return TC_ACT_OK;
 
+        // cat /sys/kernel/debug/tracing/trace_pipe
+        // 此时的回包为 10.2.1.102 > 10.2.1.1(10.10.1.102 > 10.1.1.101)
 		bpf_trace_printk(fmt4, sizeof(fmt4), *ifindex, _htonl(iph->daddr)); // __u32 -> a020101=10.2.1.1(ve2, host)
 
 		// BPF_F_INGRESS 表示 redirect 到 ifindex 的 ingress 这个 hook
@@ -171,14 +173,14 @@ int _l2_to_iptun_ingress_redirect(struct __sk_buff *skb)
 		return TC_ACT_OK;
 
 	if (eth->h_proto == __bpf_htons(ETH_P_IP)) {
-		char fmt4[] = "e/ingress redirect daddr4:%x to ifindex:%d\n";
+		char fmt4[] = "e/ingress redirect daddr4:%x to ifindex:%d\n"; // 去的 icmp 包: 10.1.1.101 > 10.10.1.102
 		struct iphdr *iph = data + sizeof(*eth);
 		__be32 daddr = iph->daddr;
 
 		if (data + sizeof(*eth) + sizeof(*iph) > data_end)
 			return TC_ACT_OK;
 
-		if (!is_vip_addr(eth->h_proto, daddr))
+		if (!is_vip_addr(eth->h_proto, daddr)) // 10.1.1.101 > 10.10.1.102
 			return TC_ACT_OK;
 
 		bpf_trace_printk(fmt4, sizeof(fmt4), _htonl(daddr), *ifindex);
@@ -186,12 +188,13 @@ int _l2_to_iptun_ingress_redirect(struct __sk_buff *skb)
 		return TC_ACT_OK;
 	}
 
+    // 回的包 ipip: 10.2.1.102(10.10.1.102) > 10.2.1.1(10.1.1.101)
 	tkey.tunnel_id = 10000;
 	tkey.tunnel_ttl = 64;
 	tkey.remote_ipv4 = 0x0a020166; /* 10.2.1.102 vens2(ns2) 网卡地址 */
 	// Populate tunnel metadata for packet associated to *skb.*
 	bpf_skb_set_tunnel_key(skb, &tkey, sizeof(tkey), 0);
-	return bpf_redirect(*ifindex, 0);
+	return bpf_redirect(*ifindex, 0); // egress direction
 }
 
 /*

@@ -67,9 +67,9 @@ mac 本地运行，需要 volume debugfs(验证可用)
 ```shell
 docker volume create --driver local --opt type=debugfs --opt device=debugfs debugfs
 
-docker stop ebpf-for-mac2 && docker rm ebpf-for-mac2
+docker stop ebpf-for-mac && docker rm ebpf-for-mac
 
-docker run -it --name ebpf-for-mac2 --privileged -v debugfs:/sys/kernel/debug:ro \
+docker run -it --name ebpf-for-mac --privileged -v debugfs:/sys/kernel/debug:ro \
 -v /lib/modules:/lib/modules:ro -v /etc/localtime:/etc/localtime:ro --pid=host \
 -v /Users/liuxiang/Code/code:/mnt/code \
 -v /Users/liuxiang/go/pkg/mod:/root/go/pkg/mod \
@@ -98,6 +98,14 @@ rtt min/avg/max/mdev = 0.064/0.066/0.069/0.002 ms
 路由决策 -> ve2(host) -> ve2(host, tc ingress forward) -> tun1(host) ->
 路由决策 -> vens2(ns2) -> vens2(tc ingress) -> tun2(tcpdump 后已经 ipip 解包)
 
+10.1.1.101 > 10.10.1.102 -> ve1(l2_to_iptun_ingress_redirect) -> tun1 egress -> (10.1.1.101, 10.10.1.102) ->
+ve2 10.2.1.1 > 10.2.1.102(10.1.1.101 > 10.10.1.102), 外层 iphdr dstIP 是 l2_to_iptun_ingress_redirect 添加的 -> 
+vens2 10.2.1.1 > 10.2.1.102(10.1.1.101 > 10.10.1.102) ->
+tun2 命中 local/remote 解包 10.1.1.101 > 10.10.1.102 -> lo 10.10.1.102 > 10.1.1.101 -> 命中路由 -> tun2 10.10.1.102 > 10.1.1.101 -> 
+vens2 命中 local/remote 封包 10.2.1.102 > 10.2.1.1(10.10.1.102 > 10.1.1.101) -> ve2 10.2.1.102 > 10.2.1.1(10.10.1.102 > 10.1.1.101) ->
+ve2(l2_to_iptun_ingress_forward) -> tun1 ingress -> tun1 10.2.1.102 > 10.2.1.1(10.10.1.102 > 10.1.1.101) -> tun1 ipip external 解包外层 iphdr ->
+10.10.1.102 > 10.1.1.101 -> 路由 -> ve1 10.10.1.102 > 10.1.1.101 -> vens1 10.10.1.102 > 10.1.1.101
+
 ```
 # ip netns exec ns2 tcpdump -i vens2 -nneevv -A
 16:45:12.749308 16:01:bc:fe:59:75 > d2:b4:19:fa:f2:ae, ethertype IPv4 (0x0800), length 118: (tos 0x0, ttl 64, id 29564, offset 0, flags [none], proto IPIP (4), length 104)
@@ -117,6 +125,19 @@ rtt min/avg/max/mdev = 0.064/0.066/0.069/0.002 ms
     10.10.1.102 > 10.1.1.101: ICMP echo reply, id 16865, seq 1, length 64
 ```
 
+
+# 问题
+
+# 2024-01-17
+这次遇到的问题，是没有 ping 通，原因是 /proc/sys/net/ipv4/conf/tun1/rp_filter=2，应该为 0:
+```shell
+# rp_filter 是Linux内核中的一个参数，用于控制网络包的接收策略。它主要用于防止IP欺骗攻击，
+# 通过检查接收到的数据包是否来自正确的源地址来决定是否接受该数据包
+# 0：关闭反向路径过滤功能。
+# 1：只检查本地子网内的数据包。如果数据包的目的地址不在本地子网内，则直接丢弃该数据包。
+# 2：检查所有的数据包。如果数据包的目的地址不在本地子网内，并且没有有效的路由可以到达该地址，则直接丢弃该数据包。
+sysctl -q -w net.ipv4.conf.tun1.rp_filter=0 # 2 不可以，但是还是没法解释
+```
 
 
 # 参考文献
