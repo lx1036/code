@@ -55,7 +55,7 @@ struct bpf_elf_map SEC("maps") tun_iface = {
 static __always_inline bool is_vip_addr(__be16 eth_proto, __be32 daddr)
 {
 	if (eth_proto == __bpf_htons(ETH_P_IP))
-		return (_htonl(0xffffff00) & daddr) == _htonl(0x0a0a0100);
+		return (_htonl(0xffffff00) & daddr) == _htonl(0x0a0a0100); // 10.10.1.0/24
 	else if (eth_proto == __bpf_htons(ETH_P_IPV6))
 		return (daddr == _htonl(0x2401face));
 
@@ -128,6 +128,7 @@ int _l2_to_iptun_ingress_forward(struct __sk_buff *skb)
 			return TC_ACT_OK;
 
         // cat /sys/kernel/debug/tracing/trace_pipe
+        // cat /sys/kernel/debug/tracing/trace
         // 此时的回包为 10.2.1.102 > 10.2.1.1(10.10.1.102 > 10.1.1.101)
 		bpf_trace_printk(fmt4, sizeof(fmt4), *ifindex, _htonl(iph->daddr)); // __u32 -> a020101=10.2.1.1(ve2, host)
 
@@ -181,6 +182,9 @@ int _l2_to_iptun_ingress_redirect(struct __sk_buff *skb)
 			return TC_ACT_OK;
 
 		if (!is_vip_addr(eth->h_proto, daddr)) // 10.1.1.101 > 10.10.1.102
+//		char fmt_is_vip_addr[] = "[fmt_is_vip_addr]ingress redirect daddr4:%x to ifindex:%d\n";
+//		if (!is_vip_addr(eth->h_proto, daddr))
+//		    bpf_trace_printk(fmt_is_vip_addr, sizeof(fmt_is_vip_addr), _htonl(daddr), *ifindex);
 			return TC_ACT_OK;
 
 		bpf_trace_printk(fmt4, sizeof(fmt4), _htonl(daddr), *ifindex);
@@ -191,7 +195,7 @@ int _l2_to_iptun_ingress_redirect(struct __sk_buff *skb)
     // 回的包 ipip: 10.2.1.102(10.10.1.102) > 10.2.1.1(10.1.1.101)
 	tkey.tunnel_id = 10000;
 	tkey.tunnel_ttl = 64;
-	tkey.remote_ipv4 = 0x0a020166; /* 10.2.1.102 vens2(ns2) 网卡地址 */
+	tkey.remote_ipv4 = 0x0a010265; /* 10.1.2.101 eth0(ns2) 网卡地址 */
 	// Populate tunnel metadata for packet associated to *skb.*
 	bpf_skb_set_tunnel_key(skb, &tkey, sizeof(tkey), 0);
 	return bpf_redirect(*ifindex, 0); // egress direction
