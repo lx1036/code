@@ -1,10 +1,9 @@
 
 
-// /root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_tunnel_kern.c
-
-
-
-
+/**
+ * /root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_tunnel_kern.c
+ *
+ */
 
 /*
  *
@@ -12,7 +11,7 @@
  * modify it under the terms of version 2 of the GNU General Public
  * License as published by the Free Software Foundation.
  */
-
+#include <stdio.h>
 #include <stddef.h>
 #include <string.h>
 #include <arpa/inet.h>
@@ -36,8 +35,6 @@
 		bpf_trace_printk(fmt, sizeof(fmt), __LINE__, ret); \
 	} while (0)
 
-int _version SEC("version") = 1;
-
 struct geneve_opt {
 	__be16	opt_class;
 	__u8	type;
@@ -51,6 +48,23 @@ struct geneve_opt {
 struct vxlan_metadata {
 	__u32     gbp;
 };
+
+// 定义一个函数，输入是__u32类型IP地址，输出是一个已分配内存的字符串
+static __always_inline char* u32toIpStr(__u32 ip) {
+    static char str[16]; // IP地址字符串长度最大为"255.255.255.255"即15个字符加结束符'\0'
+
+    // 分离IP地址的四个字节
+    unsigned char bytes[4];
+    bytes[0] = (ip >> 24) & 0xFF;
+    bytes[1] = (ip >> 16) & 0xFF;
+    bytes[2] = (ip >> 8) & 0xFF;
+    bytes[3] = ip & 0xFF;
+
+    // 将字节转换为点分十进制字符串
+    sprintf(str, "%d.%d.%d.%d", bytes[0], bytes[1], bytes[2], bytes[3]);
+
+    return str;
+}
 
 SEC("gre_set_tunnel")
 int _gre_set_tunnel(struct __sk_buff *skb)
@@ -327,6 +341,7 @@ int _ipip_get_tunnel(struct __sk_buff *skb)
 {
 	int ret;
 	struct bpf_tunnel_key key;
+//	char fmt[] = "remote ip %s\n";
 	char fmt[] = "remote ip 0x%x\n";
 
 	ret = bpf_skb_get_tunnel_key(skb, &key, sizeof(key), 0);
@@ -336,6 +351,7 @@ int _ipip_get_tunnel(struct __sk_buff *skb)
 	}
 
     // tail -n 100 /sys/kernel/debug/tracing/trace
+//    char* ip_str = u32toIpStr(key.remote_ipv4);
 	bpf_trace_printk(fmt, sizeof(fmt), key.remote_ipv4); // remote ip 0xad100164(=173.16.1.100)，这里是回包的 outer ip 地址
 	return TC_ACT_OK;
 }
@@ -357,3 +373,4 @@ int _xfrm_get_state(struct __sk_buff *skb)
 }
 
 char _license[] SEC("license") = "GPL";
+int _version SEC("version") = 1;

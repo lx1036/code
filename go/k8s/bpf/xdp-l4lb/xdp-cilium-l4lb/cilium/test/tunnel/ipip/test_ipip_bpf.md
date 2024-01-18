@@ -98,16 +98,27 @@ rtt min/avg/max/mdev = 0.064/0.066/0.069/0.002 ms
 路由决策 -> ve2(host) -> ve2(host, tc ingress forward) -> tun1(host) ->
 路由决策 -> vens2(ns2) -> vens2(tc ingress) -> tun2(tcpdump 后已经 ipip 解包)
 
-10.1.1.101 > 10.10.1.102 -> ve1(l2_to_iptun_ingress_redirect) -> tun1 egress -> (10.1.1.101, 10.10.1.102) ->
-ve2 10.2.1.1 > 10.2.1.102(10.1.1.101 > 10.10.1.102), 外层 iphdr dstIP 是 l2_to_iptun_ingress_redirect 添加的 -> 
-vens2 10.2.1.1 > 10.2.1.102(10.1.1.101 > 10.10.1.102) ->
-tun2 命中 local/remote 解包 10.1.1.101 > 10.10.1.102 -> lo 10.10.1.102 > 10.1.1.101 -> 命中路由 -> tun2 10.10.1.102 > 10.1.1.101 -> 
-vens2 命中 local/remote 封包 10.2.1.102 > 10.2.1.1(10.10.1.102 > 10.1.1.101) -> ve2 10.2.1.102 > 10.2.1.1(10.10.1.102 > 10.1.1.101) ->
-ve2(l2_to_iptun_ingress_forward) -> tun1 ingress -> tun1 10.2.1.102 > 10.2.1.1(10.10.1.102 > 10.1.1.101) -> tun1 ipip external 解包外层 iphdr ->
-10.10.1.102 > 10.1.1.101 -> 路由 -> ve1 10.10.1.102 > 10.1.1.101 -> vens1 10.10.1.102 > 10.1.1.101
+ping (10.1.1.101 > 10.10.1.102) -> veth1(l2_to_iptun_ingress_redirect) -> tun1 egress -> (10.1.1.101 > 10.10.1.102) ->
+veth2 10.1.2.1 > 10.1.2.101(10.1.1.101 > 10.10.1.102), 外层 iphdr dstIP 是 l2_to_iptun_ingress_redirect 添加的, 10.1.2.1 srcIP 是路由添加的 -> 
+eth0(ns2) 10.1.1.1 > 10.1.2.101(10.1.1.101 > 10.10.1.102) ->
+tun2 命中 local/remote 解包 (10.1.1.101 > 10.10.1.102) -> lo (10.10.1.102 > 10.1.1.101) -> 命中路由 -> tun2 10.10.1.102 > 10.1.1.101 ->
+tun2 命中 local/remote 封包 10.1.2.101 > 10.1.2.1(10.10.1.102 > 10.1.1.101) -> veth2 10.1.2.101 > 10.1.2.1(10.10.1.102 > 10.1.1.101) ->
+veth2(l2_to_iptun_ingress_forward) -> tun1 ingress -> tun1 10.2.1.102 > 10.2.1.1(10.10.1.102 > 10.1.1.101) -> tun1 ipip external 解包外层 iphdr ->
+10.10.1.102 > 10.1.1.101 -> 路由 -> veth1 10.10.1.102 > 10.1.1.101 -> eth0(ns1) 10.10.1.102 > 10.1.1.101
+
+> tcpdump 在 xdp 之后，在 tc ingress 之前抓包，所以 tcpdump -i veth1 会在 tc ingress rule 里 redirect 之前能抓到包。 
 
 ```
-# ip netns exec ns2 tcpdump -i vens2 -nneevv -A
+# tcpdump -i veth1 -nneevv -A icmp
+
+# 包从 veth1 -> tun1 egress，会走 xdp->tcpdump->tc_ingress->netfilter->tc_egress，绕过 tc_ingress->netfilter，
+# 所以能抓到包，且去包和 veth1 一样都是 icmp 包，没有被 tun1 封包
+# tcpdump -i tun1 -nneevv -A
+# tcpdump -i veth2 -nneevv -A
+# ip netns exec ns2 tcpdump -i eth0 -nneevv -A
+# ip netns exec ns2 tcpdump -i tun2 -nneevv -A
+
+# ip netns exec ns2 tcpdump -i eth0 -nneevv -A
 16:45:12.749308 16:01:bc:fe:59:75 > d2:b4:19:fa:f2:ae, ethertype IPv4 (0x0800), length 118: (tos 0x0, ttl 64, id 29564, offset 0, flags [none], proto IPIP (4), length 104)
     10.2.1.1 > 10.2.1.102: (tos 0x0, ttl 64, id 1499, offset 0, flags [DF], proto ICMP (1), length 84)
     10.1.1.101 > 10.10.1.102: ICMP echo request, id 16026, seq 1, length 64

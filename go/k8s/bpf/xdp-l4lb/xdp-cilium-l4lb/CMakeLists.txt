@@ -57,7 +57,6 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/bpf_features.h
         cilium/bpf/bpf_xdp.c
         cilium/bpf/node_config.h
-        cilium/test/ipip/tc_l2_redirect_kern.c
         cilium/test/l4lb/bpf_xdp_veth_host.c
         cilium/test/l4lb/test_tc_tunnel.c
         cilium/test/tunnel/test_tunnel_kern.c
@@ -91,5 +90,7 @@ add_executable(xdp_cilium_l4lb
         cilium/test/xdp-l4lb/xdp-veth/xdp_veth.c
         cilium/test/xdp-l4lb/xdp-veth/xdp_veth.c
         cilium/test/xdp-l4lb/xdp-redirect/xdp_redirect.c
-        cilium/test/xdp-l4lb/xdp_meta/xdp_meta.c
-        cilium/test/xdp-l4lb/xdp/xdp.c)
+        cilium/test/xdp-l4lb/xdp-meta/xdp_meta.c
+        cilium/test/xdp-l4lb/xdp/xdp.c
+        cilium/test/tunnel/ipip/tc_l2_redirect_kern.c
+        cilium/test/tunnel/ipip/ipip-tunnel/test_tunnel_kern.c)
