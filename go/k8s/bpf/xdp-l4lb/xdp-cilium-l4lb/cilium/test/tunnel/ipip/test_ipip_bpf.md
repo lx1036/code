@@ -139,7 +139,7 @@ veth2(l2_to_iptun_ingress_forward) -> tun1 ingress -> tun1 10.2.1.102 > 10.2.1.1
 
 # 问题
 
-# 2024-01-17
+## 2024-01-17
 这次遇到的问题，是没有 ping 通，原因是 /proc/sys/net/ipv4/conf/tun1/rp_filter=2，应该为 0:
 ```shell
 # rp_filter 是Linux内核中的一个参数，用于控制网络包的接收策略。它主要用于防止IP欺骗攻击，
@@ -149,6 +149,9 @@ veth2(l2_to_iptun_ingress_forward) -> tun1 ingress -> tun1 10.2.1.102 > 10.2.1.1
 # 2：检查所有的数据包。如果数据包的目的地址不在本地子网内，并且没有有效的路由可以到达该地址，则直接丢弃该数据包。
 sysctl -q -w net.ipv4.conf.tun1.rp_filter=0 # 2 不可以，但是还是没法解释
 ```
+
+## tcpdump 和 ebpf hook 流程
+xdp->tcpdump->tc_ingress->netfilter->tc_egress: https://arthurchiao.art/blog/firewalling-with-bpf-xdp/#51-tcpdump-hooking-point
 
 
 # 参考文献
