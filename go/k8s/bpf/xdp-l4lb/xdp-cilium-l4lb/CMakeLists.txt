@@ -95,7 +95,9 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tunnel/ipip/tc_l2_redirect_kern.c
         cilium/test/tunnel/ipip/ipip-tunnel/test_tunnel_kern.c
         cilium/test/tunnel/vxlan/vxlan-tunnel/test_tunnel_kern.c
-        cilium/test/tunnel/veth-pair/veth_ingress.c
+        cilium/test/tunnel/veth-pair/pod-to-pod/veth_ingress.c
         cilium/test/tunnel/veth-pair/tc-veth-pair/test_tc_peer.c
         cilium/test/tunnel/veth-pair/tc-veth-pair/test_tc_neigh.c
-        cilium/test/tunnel/veth-pair/tc-veth-pair/test_tc_neigh_fib.c)
+        cilium/test/tunnel/veth-pair/tc-veth-pair/test_tc_neigh_fib.c
+        cilium/test/tcp/tcprtt/demo2/tcprtt_sockops.c
+        cilium/test/tunnel/vxlan/pod-to-pod/vxlan.c)

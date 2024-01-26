@@ -1,6 +1,7 @@
 
 //go:build ignore
 
+#include <stddef.h>
 
 // /root/linux-5.10.142/include/uapi/linux/bpf.h
 #include <linux/bpf.h>
@@ -15,7 +16,7 @@
 
 #define AF_INET 2
 #define SOCKOPS_MAP_SIZE 65535
-#define NULL    ((void *)0)
+//#define NULL    ((void *)0)
 
 enum {
     SOCK_TYPE_ACTIVE  = 0,

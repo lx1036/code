@@ -12,10 +12,6 @@
 # to drop unexpected traffic.
 
 
-readonly NS_SRC="ns-src"
-readonly NS_FWD="ns-fwd"
-readonly NS_DST="ns-dst"
-
 netns_cleanup()
 {
   ip netns del ns-src
@@ -23,6 +19,9 @@ netns_cleanup()
   ip netns del ns-dst
 }
 
+# 验证通过
+# src <-> fwd <-> dst, 通过添加 route 和 neigh 实现连通性
+# 没有 ebpf，所有网卡 netfilter 都要走，没有网络加速
 netns_setup()
 {
   ip netns add ns-src
@@ -51,16 +50,25 @@ netns_setup()
   ip netns exec ns-src ip route add 173.16.2.100/32 dev veth_src scope global
   ip netns exec ns-src ip route add 169.254.0.0/16 dev veth_src scope global
   ip netns exec ns-fwd ip route add 173.16.1.100/32 dev veth_src_fwd scope global
+  ip netns exec ns-fwd ip route add 173.16.2.100/32 dev veth_dst_fwd scope global
   ip netns exec ns-dst ip route add 173.16.1.100/32 dev veth_dst scope global
   ip netns exec ns-dst ip route add 169.254.0.0/16 dev veth_dst scope global
-  ip netns exec ns-fwd ip route add 173.16.2.100/32 dev veth_dst_fwd scope global
 
   fmac_src=$(ip netns exec ns-fwd cat /sys/class/net/veth_src_fwd/address)
   fmac_dst=$(ip netns exec ns-fwd cat /sys/class/net/veth_dst_fwd/address)
   ip netns exec ns-src ip neigh add 173.16.2.100 dev veth_src lladdr $fmac_src
   ip netns exec ns-dst ip neigh add 173.16.1.100 dev veth_dst lladdr $fmac_dst
+
+  ip netns exec ns-src ping -c 1 173.16.2.100
+  ip netns exec ns-dst ping -c 1 173.16.1.100
 }
 
+hex_mem_str()
+{
+  perl -e 'print join(" ", unpack("(H2)8", pack("L", @ARGV)))' $1
+}
+
+# 下发 ebpf 程序来网络加速
 netns_setup_bpf()
 {
   local obj=$1
@@ -78,8 +86,6 @@ netns_setup_bpf()
   if [ "$use_forwarding" -eq "1" ]; then
     # bpf_fib_lookup() checks if forwarding is enabled
     ip netns exec ns-fwd sysctl -w net.ipv4.ip_forward=1
-    ip netns exec ns-fwd sysctl -w net.ipv6.conf.veth_dst_fwd.forwarding=1
-    ip netns exec ns-fwd sysctl -w net.ipv6.conf.veth_src_fwd.forwarding=1
     return 0
   fi
 
@@ -91,10 +97,38 @@ netns_setup_bpf()
     if [ ! -z "$map" ]; then
       bpftool map update id $map key hex $(hex_mem_str 0) value hex $(hex_mem_str $veth_src)
       bpftool map update id $map key hex $(hex_mem_str 1) value hex $(hex_mem_str $veth_dst)
+      bpftool map dump id $map -j | jq
     fi
   done
 }
 
+netns_test_connectivity()
+{
+  echo -e "TCPv4 connectivity test"
+  ip netns exec ns-dst bash -c "python3 -m http.server 8080 &"
+  ip netns exec ns-src bash -c "curl 173.16.2.100:8080"
+
+  echo -e "ICMPv4 connectivity test"
+  ip netns exec ns-src ping -c 3 173.16.2.100
+  ip netns exec ns-dst ping -c 3 173.16.1.100
+}
+
+# 验证通过
 netns_cleanup
 netns_setup
 netns_setup_bpf test_tc_peer.o
+netns_test_connectivity
+
+## 以下两个 bpf 程序，没有看到网络加速效果，很奇怪!!!
+
+# 验证通过
+netns_cleanup
+netns_setup
+netns_setup_bpf test_tc_neigh.o
+netns_test_connectivity
+
+# 验证通过
+netns_cleanup
+netns_setup
+netns_setup_bpf test_tc_neigh_fib.o 1
+netns_test_connectivity
