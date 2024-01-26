@@ -86,8 +86,9 @@ int from_container(struct __sk_buff *skb) {
     // 拿到 mac 地址
     __u8 src_mac[ETH_ALEN];
     __u8 dst_mac[ETH_ALEN];
-    struct endpointKey epKey = {};
-    epKey.ip = dst_ip;
+    struct endpointKey epKey = {
+        .ip = dst_ip,
+    };
     // 在 lxc 中查找
     struct endpointInfo *ep = bpf_map_lookup_elem(&ding_lxc, &epKey); // 去包: 100.0.1.1->100.0.1.2, 回包:
     if (ep) {

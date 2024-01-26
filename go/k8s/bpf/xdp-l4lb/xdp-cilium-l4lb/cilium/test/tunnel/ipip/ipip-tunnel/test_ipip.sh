@@ -34,6 +34,6 @@ config_device()
   ip netns exec ipip_ns0 ping -c 1 10.1.1.200
 }
 
-# 验证没问题
+# 验证通过
 cleanup
 config_device

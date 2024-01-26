@@ -100,4 +100,5 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tunnel/veth-pair/tc-veth-pair/test_tc_neigh.c
         cilium/test/tunnel/veth-pair/tc-veth-pair/test_tc_neigh_fib.c
         cilium/test/tcp/tcprtt/demo2/tcprtt_sockops.c
-        cilium/test/tunnel/vxlan/pod-to-pod/vxlan.c)
+        cilium/test/tunnel/vxlan/pod-to-pod/vxlan.c
+        cilium/test/tunnel/vxlan/pod-to-pod/veth_ingress.c)

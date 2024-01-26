@@ -50,7 +50,7 @@ static __always_inline int tc_redir(struct __sk_buff *skb)
   int ret = -1;
 
   switch (skb->protocol) {
-  case __bpf_constant_htons(ETH_P_IP):
+  case bpf_htons(ETH_P_IP):
     ret = fill_fib_params_v4(skb, &fib_params);
     break;
   }

@@ -80,12 +80,12 @@ int tc_dst(struct __sk_buff *skb)
 //        break;
 //    }
 
-    if (skb->protocol != __bpf_constant_htons(ETH_P_IP)) { // arp
+    if (skb->protocol != bpf_htons(ETH_P_IP)) { // arp
         return TC_ACT_OK;
     }
 
-    if (skb->protocol == __bpf_constant_htons(ETH_P_IP)) {
-        redirect = is_remote_ep_v4(skb, __bpf_constant_htonl(ip4_src)); // 173.16.2.100->173.16.1.100
+    if (skb->protocol == bpf_htons(ETH_P_IP)) {
+        redirect = is_remote_ep_v4(skb, bpf_htonl(ip4_src)); // 173.16.2.100->173.16.1.100
         bpf_printk("[dst_ingress]redirect: %d", redirect);
     }
 
@@ -119,12 +119,12 @@ int tc_src(struct __sk_buff *skb)
 //        break;
 //    }
 
-    if (skb->protocol != __bpf_constant_htons(ETH_P_IP)) { // arp
+    if (skb->protocol != bpf_htons(ETH_P_IP)) { // arp
         return TC_ACT_OK;
     }
 
-    if (skb->protocol == __bpf_constant_htons(ETH_P_IP)) {
-        redirect = is_remote_ep_v4(skb, __bpf_constant_htonl(ip4_dst)); // 173.16.1.100->173.16.2.100
+    if (skb->protocol == bpf_htons(ETH_P_IP)) {
+        redirect = is_remote_ep_v4(skb, bpf_htonl(ip4_dst)); // 173.16.1.100->173.16.2.100
         bpf_printk("[src_ingress]redirect: %d", redirect);
     }
 

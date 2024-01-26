@@ -5,12 +5,6 @@
  *
  */
 
-/*
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of version 2 of the GNU General Public
- * License as published by the Free Software Foundation.
- */
 #include <stdio.h>
 #include <stddef.h>
 #include <string.h>
@@ -64,8 +58,9 @@ int _vxlan_set_tunnel(struct __sk_buff *skb)
 	struct bpf_tunnel_key key;
 	struct vxlan_metadata md;
 
+//    struct bpf_tunnel_key key = {};
 	__builtin_memset(&key, 0x0, sizeof(key));
-	key.remote_ipv4 = 0xac100164; /* 172.16.1.100 */
+	key.remote_ipv4 = 0xad100164; /* 173.16.1.100 */
 	key.tunnel_id = 2;
 	key.tunnel_tos = 0;
 	key.tunnel_ttl = 64;
@@ -92,7 +87,6 @@ int _vxlan_get_tunnel(struct __sk_buff *skb)
 	int ret;
 	struct bpf_tunnel_key key;
 	struct vxlan_metadata md;
-	char fmt[] = "key %d remote ip 0x%x vxlan gbp 0x%x\n";
 
 	ret = bpf_skb_get_tunnel_key(skb, &key, sizeof(key), 0);
 	if (ret < 0) {
@@ -106,7 +100,8 @@ int _vxlan_get_tunnel(struct __sk_buff *skb)
 		return TC_ACT_SHOT;
 	}
 
-	bpf_trace_printk(fmt, sizeof(fmt), key.tunnel_id, key.remote_ipv4, md.gbp);
+    // key.remote_ipv4=173.16.1.100, src_ip, md.gbp=0x800ff
+    bpf_printk("key %d, remote ip 0x%x, vxlan gbp 0x%x", key.tunnel_id, key.remote_ipv4, md.gbp);
 
 	return TC_ACT_OK;
 }
