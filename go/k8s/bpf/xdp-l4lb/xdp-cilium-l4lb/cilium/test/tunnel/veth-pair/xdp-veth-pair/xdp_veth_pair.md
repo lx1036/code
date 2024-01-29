@@ -1,4 +1,6 @@
 
+# 目的
+验证 xdp ebpf 加速了通节点 pod 之间的网络包的转发过程。
 
 # xdp veth
 
