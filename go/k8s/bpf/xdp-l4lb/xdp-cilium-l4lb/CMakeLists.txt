@@ -57,8 +57,8 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/bpf_features.h
         cilium/bpf/bpf_xdp.c
         cilium/bpf/node_config.h
-        cilium/test/l4lb/bpf_xdp_veth_host.c
-        cilium/test/l4lb/test_tc_tunnel.c
+        cilium/test/l4lb/l4lb-tc-tunnel-cilium/bpf_xdp_veth_host.c
+        cilium/test/l4lb/l4lb-tc-tunnel-cilium/test_tc_tunnel.c
         cilium/test/tunnel/test_tunnel_kern.c
         cilium/bpf/include/linux/byteorder/little_endian.h
         cilium/bpf/include/linux/byteorder/big_endian.h
@@ -101,4 +101,6 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tunnel/veth-pair/tc-veth-pair/test_tc_neigh_fib.c
         cilium/test/tcp/tcprtt/demo2/tcprtt_sockops.c
         cilium/test/tunnel/vxlan/pod-to-pod/vxlan.c
-        cilium/test/tunnel/vxlan/pod-to-pod/veth_ingress.c)
+        cilium/test/l4lb/l4lb-tc/test_l4lb.c
+        cilium/test/l4lb/l4lb-xdp/test_xdp_l4lb.c
+        cilium/test/l4lb/l4lb-nodeport/tc_nodeport.c)

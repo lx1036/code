@@ -66,8 +66,8 @@ int from_container(struct __sk_buff *skb) {
         return TC_ACT_UNSPEC;
     }
 
-    struct ethhdr  *eth  = data;
-    struct iphdr   *ip   = (data + sizeof(struct ethhdr));
+    struct ethhdr *eth = data;
+    struct iphdr *ip = (data + sizeof(struct ethhdr));
     if (eth->h_proto != bpf_htons(ETH_P_IP)) {
         // 当eBPF程序返回 TC_ACT_UNSPEC 时，意味着它没有明确地指示内核如何处理这个数据包。
         // 在这种情况下，内核通常会按照默认的方式处理数据包，例如将其传递给下一个处理阶段或者直接丢弃
