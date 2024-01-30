@@ -67,6 +67,10 @@ type vxlanLeaseAttrs struct {
 	VtepMAC hardwareAddr
 }
 
+/**
+INFO: 调试 flannel vxlan，`kubectl -n kube-flannel edit ds kube-flannel-ds` 新加参数 --v=5 就行
+*/
+
 // 配置路由和 arp, 这里 batch 包含除了当前 node subnet 之外的其他所有 node subnet
 // INFO: flanneld 通过 watch k8s Node 来动态地维护各节点通信所需的ARP、FDB以及路由条目
 func (network *vxlanNetwork) handleSubnetEvents(batch []subnet.Event) {
@@ -98,7 +102,7 @@ func (network *vxlanNetwork) handleSubnetEvents(batch []subnet.Event) {
 				Scope:     netlink.SCOPE_UNIVERSE,
 				// 到达新 node 的 vxlan 网卡的路由，`10.230.91.0/24 via 10.230.91.0 dev flannel.1 onlink`,
 				// 然后 10.230.91.0 对应的 mac 在 ARP 表里，下面 AddARP() 设置了，然后这个 mac 对应的 IP 在 FDB 表里设置了，就是另一台 nodeIP，最后封包结束
-				Dst: sn.ToIPNet(),
+				Dst: sn.ToIPNet(), // 10.230.91.0/24
 				Gw:  sn.IP.ToIP(), // 10.230.91.0
 			}
 			// flanneld在加入集群时会为每个其他节点生成一条on-link路由，on-link路由表示是直连路由，匹配该条路由的数据包将触发ARP请求获取目的IP的MAC地址
@@ -123,6 +127,7 @@ func (network *vxlanNetwork) handleSubnetEvents(batch []subnet.Event) {
 
 		// INFO: 这里是最重点之处，主要配置 route/arp/fdb，就可以实现了 vxlan 封包，回答了上面的问题
 		//  其实主要就是实现了这篇文章所说的配置 http://just4coding.com/2020/04/20/vxlan-fdb/ , 配置 arp/fdb 来实现 vxlan 封包
+		//  注意：只有增加新的 node 时才会触发这个 vxlan_network.go 订阅逻辑
 		switch event.Type {
 		case subnet.EventAdded:
 			if event.Lease.EnableIPv4 {
@@ -135,12 +140,16 @@ func (network *vxlanNetwork) handleSubnetEvents(batch []subnet.Event) {
 				} else {
 					klog.Infof(fmt.Sprintf("adding subnet: %s for nodeIP: %s VtepMAC: %s",
 						sn, attrs.PublicIP, net.HardwareAddr(vxlanAttrs.VtepMAC)))
-					// 这里 sn.IP 是 vxlan 网卡的 IP
+					// (1)这里 sn.IP 是新加 node 的 vtep 的 IP，即 vxlan 网卡的 IP
+					// vxlanAttrs.VtepMAC 是新加 node 的 vtep mac 地址，即 vxlan 网卡的 mac
+					// 10.244.1.0, 72:ff:29:6f:e7:98
 					if err := network.dev.AddARP(neighbor{IP: sn.IP, MAC: net.HardwareAddr(vxlanAttrs.VtepMAC)}); err != nil {
 						klog.Error("AddARP failed: ", err)
 						continue
 					}
-					// 这里 attrs.PublicIP 就是 nodeIP, 或者也叫 VTEP IP 地址, 可以参考验证 @see http://just4coding.com/2020/04/20/vxlan-fdb/
+					// (2)这里 attrs.PublicIP 就是新加 node 的 nodeIP(k8s里验证是这个结论),
+					// vxlanAttrs.VtepMAC 是新加 node 的 vtep mac 地址，即 vxlan 网卡的 mac
+					// 或者也叫 VTEP IP 地址, 可以参考验证 @see http://just4coding.com/2020/04/20/vxlan-fdb/
 					if err := network.dev.AddFDB(neighbor{IP: attrs.PublicIP, MAC: net.HardwareAddr(vxlanAttrs.VtepMAC)}); err != nil {
 						// Try to clean up the ARP entry then continue
 						if err := network.dev.DelARP(neighbor{IP: sn.IP, MAC: net.HardwareAddr(vxlanAttrs.VtepMAC)}); err != nil {
@@ -150,8 +159,8 @@ func (network *vxlanNetwork) handleSubnetEvents(batch []subnet.Event) {
 						continue
 					}
 
-					// Set the route - the kernel would ARP for the Gw IP address if it hadn't already been set above so make sure
-					// this is done last.
+					// (3)10.244.1.0/24 via 10.244.1.0 dev flannel.1 onlink，10.244.1.0/24 是新加 node 的 flannel.1 vxlan 网卡，flannel.1 是本 node 的网卡
+					// 即新增路由，访问 pod 子网 10.244.1.0/24(node2的pod网段)，需要从本地 vtep 设备 flannel.1 vxlan 网卡走
 					if err := netlink.RouteReplace(&vxlanRoute); err != nil {
 						klog.Errorf(fmt.Sprintf("failed to add vxlanRoute (%s -> %s): %v", vxlanRoute.Dst, vxlanRoute.Gw, err))
 						// Try to clean up both the ARP and FDB entries then continue
