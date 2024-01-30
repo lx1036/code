@@ -1,5 +1,9 @@
-
 #!/bin/bash
+
+# https://xiaohanliang.gitbook.io/xiaohanliang/v/os/network-devices/vxlan
+# https://xiaohanliang.gitbook.io/xiaohanliang/v/os/network-devices/vxlan-multicast
+# https://xiaohanliang.gitbook.io/xiaohanliang/v/os/network-devices/vxlan-dfb
+
 
 ############ 1.点对点 vxlan demo 测试(验证通过) ############
 # [Linux 下实践 VxLAN](https://mp.weixin.qq.com/s/bsoWU2WC6SxPgseNxwG9cw)
@@ -7,47 +11,60 @@
 # 构造两个 ns 来模拟两个 vm
 # ns1(eth0, vxlan1) <---> ns2(eth0, vxlan1), 两个 vxlan1 在一个网段，使用 ns1/ns2 模拟两个 vm
 
-ip netns add vxlan-ns1
-ip netns add vxlan-ns2
-ip link add vxlan-veth0 type veth peer name vxlan-veth1
-ip link set vxlan-veth0 netns vxlan-ns1
-ip link set vxlan-veth1 netns vxlan-ns2
-ip netns exec vxlan-ns1 ip link set dev vxlan-veth0 name eth0
-ip netns exec vxlan-ns2 ip link set dev vxlan-veth1 name eth0
-ip netns exec vxlan-ns1 ip link set eth0 up
-ip netns exec vxlan-ns2 ip link set eth0 up
-ip netns exec vxlan-ns1 ip addr add 172.31.0.106/24 dev eth0
-ip netns exec vxlan-ns2 ip addr add 172.31.0.107/24 dev eth0
-# 连通性
-ip netns exec vxlan-ns1 ping -c 3 172.31.0.107
-ip netns exec vxlan-ns2 ping -c 3 172.31.0.106
+cleanup_1()
+{
+  ip netns del vxlan-ns1
+  ip netns del vxlan-ns2
+}
 
-# "remote 172.31.0.107 dstport 4789 dev eth0" 这里是对方的网络数据
-# 在构造 Outer Mac/IP Header 时需要填充 Outer_Mac_Header(node1_src_mac/node2_dst_mac), Outer_IP_Header(node1_src_ip/node2_dst_ip)
-ip netns exec vxlan-ns1 ip link add vxlan1 type vxlan id 100 remote 172.31.0.107 dstport 4789 dev eth0
-ip netns exec vxlan-ns2 ip link add vxlan1 type vxlan id 100 remote 172.31.0.106 dstport 4789 dev eth0
-ip netns exec vxlan-ns1 ip link set vxlan1 up
-ip netns exec vxlan-ns2 ip link set vxlan1 up
-ip netns exec vxlan-ns1 ip addr add 10.0.0.106/24 dev vxlan1
-ip netns exec vxlan-ns2 ip addr add 10.0.0.107/24 dev vxlan1
+# 注意这里的 vxlan1 的 remote 配置，通过组播 multicast 获取 fdb 表数据(验证通过)
+# https://xiaohanliang.gitbook.io/xiaohanliang/v/os/network-devices/vxlan-multicast
+config_device_1()
+{
+  ip netns add vxlan-ns1
+  ip netns add vxlan-ns2
+  ip link add vxlan-veth0 type veth peer name vxlan-veth1
+  ip link set vxlan-veth0 netns vxlan-ns1
+  ip link set vxlan-veth1 netns vxlan-ns2
+  ip netns exec vxlan-ns1 ip link set dev vxlan-veth0 name eth0
+  ip netns exec vxlan-ns2 ip link set dev vxlan-veth1 name eth0
+  ip netns exec vxlan-ns1 ip link set eth0 up
+  ip netns exec vxlan-ns2 ip link set eth0 up
+  ip netns exec vxlan-ns1 ip addr add 172.31.0.106/24 dev eth0
+  ip netns exec vxlan-ns2 ip addr add 172.31.0.107/24 dev eth0
+  # 连通性
+  ip netns exec vxlan-ns1 ping -c 3 172.31.0.107
+  ip netns exec vxlan-ns2 ping -c 3 172.31.0.106
 
-ip netns exec vxlan-ns1 ip -d addr show vxlan1
-# 注意这里的 "vxlan id 100 remote 172.31.0.107 dev eth0 srcport 0 0 dstport 4789"
-4: vxlan1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UNKNOWN group default qlen 1000
-    link/ether 6a:16:55:92:a3:e5 brd ff:ff:ff:ff:ff:ff promiscuity 0
-    vxlan id 100 remote 172.31.0.107 dev eth0 srcport 0 0 dstport 4789 ageing 300 udpcsum noudp6zerocsumtx noudp6zerocsumrx numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535
-    inet 10.0.0.106/24 scope global vxlan1
-       valid_lft forever preferred_lft forever
-    inet6 fe80::6816:55ff:fe92:a3e5/64 scope link
-       valid_lft forever preferred_lft forever
-ip netns exec vxlan-ns2 ip -d addr show vxlan1
-# 查看fdb表
-ip netns exec vxlan-ns1 bridge fdb show
-ip netns exec vxlan-ns2 bridge fdb show
-# 连通性
-ip netns exec vxlan-ns1 ping -c 3 10.0.0.107
-ip netns exec vxlan-ns2 ping -c 3 10.0.0.106
+  # "remote 172.31.0.107 dstport 4789 dev eth0" 这里是对方的网络数据
+  # 在构造 Outer Mac/IP Header 时需要填充 Outer_Mac_Header(node1_src_mac/node2_dst_mac), Outer_IP_Header(node1_src_ip/node2_dst_ip)
+  ip netns exec vxlan-ns1 ip link add vxlan1 type vxlan id 100 remote 172.31.0.107 dstport 4789 dev eth0
+  ip netns exec vxlan-ns2 ip link add vxlan1 type vxlan id 100 remote 172.31.0.106 dstport 4789 dev eth0
+  ip netns exec vxlan-ns1 ip link set vxlan1 up
+  ip netns exec vxlan-ns2 ip link set vxlan1 up
+  ip netns exec vxlan-ns1 ip addr add 10.0.0.106/24 dev vxlan1
+  ip netns exec vxlan-ns2 ip addr add 10.0.0.107/24 dev vxlan1
 
+  ip netns exec vxlan-ns1 ip -d addr show vxlan1
+  # 注意这里的 "vxlan id 100 remote 172.31.0.107 dev eth0 srcport 0 0 dstport 4789"
+  4: vxlan1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UNKNOWN group default qlen 1000
+      link/ether 6a:16:55:92:a3:e5 brd ff:ff:ff:ff:ff:ff promiscuity 0
+      vxlan id 100 remote 172.31.0.107 dev eth0 srcport 0 0 dstport 4789 ageing 300 udpcsum noudp6zerocsumtx noudp6zerocsumrx numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535
+      inet 10.0.0.106/24 scope global vxlan1
+         valid_lft forever preferred_lft forever
+      inet6 fe80::6816:55ff:fe92:a3e5/64 scope link
+         valid_lft forever preferred_lft forever
+  ip netns exec vxlan-ns2 ip -d addr show vxlan1
+  # 查看fdb表
+  ip netns exec vxlan-ns1 bridge fdb show
+  ip netns exec vxlan-ns2 bridge fdb show
+  # 连通性
+  ip netns exec vxlan-ns1 ping -c 3 10.0.0.107
+  ip netns exec vxlan-ns2 ping -c 3 10.0.0.106
+}
+
+cleanup_1
+config_device_1
 
 # 抓包
 ip netns exec vxlan-ns2 tcpdump -i eth0 -nneevv -A -w vxlan-ns2-eth0.pcap # 抓包 icmp 和 arp，原始 icmp/arp 报文 在 UDP Data 里
@@ -57,6 +74,53 @@ ip netns exec vxlan-ns1 ping -c 3 10.0.0.107
 ip netns exec vxlan-ns1 tcpdump -i eth0 -nneevv -A -w vxlan-ns1-eth0.pcap
 ip netns exec vxlan-ns1 tcpdump -i vxlan1 -nneevv -A -w vxlan-ns1-vxlan1.pcap
 ip netns exec vxlan-ns2 ping -c 3 10.0.0.106
+
+
+# 手动更新FDB表来实现VXLAN通信，类似 flannel(验证通过)
+# https://xiaohanliang.gitbook.io/xiaohanliang/v/os/network-devices/vxlan-dfb
+config_device_fdb()
+{
+  ip netns add vxlan-ns1
+  ip netns add vxlan-ns2
+
+  ip link add vxlan-veth0 type veth peer name vxlan-veth1
+  ip link set vxlan-veth0 netns vxlan-ns1
+  ip link set vxlan-veth1 netns vxlan-ns2
+  ip netns exec vxlan-ns1 ip link set dev vxlan-veth0 name eth0
+  ip netns exec vxlan-ns2 ip link set dev vxlan-veth1 name eth0
+  ip netns exec vxlan-ns1 ip link set eth0 up
+  ip netns exec vxlan-ns2 ip link set eth0 up
+  ip netns exec vxlan-ns1 ip addr add 172.31.0.106/24 dev eth0
+  ip netns exec vxlan-ns2 ip addr add 172.31.0.107/24 dev eth0
+
+  # 连通性
+  ip netns exec vxlan-ns1 ping -c 3 172.31.0.107
+  ip netns exec vxlan-ns2 ping -c 3 172.31.0.106
+
+  ip netns exec vxlan-ns1 ip link add vxlan1 type vxlan id 100 local 172.31.0.106 dstport 4789 dev eth0
+  ip netns exec vxlan-ns2 ip link add vxlan1 type vxlan id 100 local 172.31.0.107 dstport 4789 dev eth0
+  ip netns exec vxlan-ns1 ip link set vxlan1 up
+  ip netns exec vxlan-ns2 ip link set vxlan1 up
+  ip netns exec vxlan-ns1 ip addr add 10.0.0.106/24 dev vxlan1
+  ip netns exec vxlan-ns2 ip addr add 10.0.0.107/24 dev vxlan1
+
+  # 手动更新 arp/fdb 表，和 flannel.1 vxlan 一样
+  vxlan_ns1_mac=$(ip netns exec vxlan-ns1 cat /sys/class/net/vxlan1/address)
+  vxlan_ns2_mac=$(ip netns exec vxlan-ns2 cat /sys/class/net/vxlan1/address)
+  # 写 arp 表
+  ip netns exec vxlan-ns1 ip neigh add 10.0.0.107 dev vxlan1 lladdr $vxlan_ns2_mac
+  # ip netns exec vxlan-ns1 ip neigh replace 10.0.0.107 dev vxlan1 lladdr $vxlan_ns2_mac
+  ip netns exec vxlan-ns2 ip neigh add 10.0.0.106 dev vxlan1 lladdr $vxlan_ns1_mac
+  # ip netns exec vxlan-ns2 ip neigh replace 10.0.0.106 dev vxlan1 lladdr $vxlan_ns1_mac
+  # 写 fdb 表
+  ip netns exec vxlan-ns1 bridge fdb append $vxlan_ns2_mac dev vxlan1 dst 172.31.0.107
+  ip netns exec vxlan-ns2 bridge fdb append $vxlan_ns1_mac dev vxlan1 dst 172.31.0.106
+
+  ip netns exec vxlan-ns1 ping -c 3 10.0.0.107
+  # 抓包 ip netns exec vxlan-ns1 tcpdump -i vxlan1 -nneevv, 没有 arp，multicast 模式是有 arp 包的
+  ip netns exec vxlan-ns2 ping -c 3 10.0.0.106
+  # 抓包 ip netns exec vxlan-ns2 tcpdump -i vxlan1 -nneevv, 没有 arp
+}
 
 ########################################################################
 
