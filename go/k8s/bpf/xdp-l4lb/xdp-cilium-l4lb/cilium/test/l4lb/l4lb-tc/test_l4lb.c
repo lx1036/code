@@ -215,7 +215,7 @@ static __always_inline int process_packet(void *data, __u64 off, void *data_end,
     iph = data + off;
     if ((void*)(iph + 1) > data_end)
         return TC_ACT_SHOT;
-    if (iph->ihl != 5) // ???
+    if (iph->ihl != 5) // 5<=ip4->ihl<=15, ???
         return TC_ACT_SHOT;
 
     protocol = iph->protocol;

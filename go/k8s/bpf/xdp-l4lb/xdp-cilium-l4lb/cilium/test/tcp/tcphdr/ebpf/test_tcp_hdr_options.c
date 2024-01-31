@@ -68,8 +68,7 @@ static __u8 option_total_len(__u8 flags)
 		return len + 2; /* +1 kind, +1 kind-len */
 }
 
-static void write_test_option(const struct bpf_test_option *test_opt,
-			      __u8 *data)
+static void write_test_option(const struct bpf_test_option *test_opt, __u8 *data)
 {
 	__u8 offset = 0;
 

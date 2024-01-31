@@ -1,7 +1,7 @@
 
 
 
-# syn cookie
+# syn cookie(TFO?)
 代码在:
 ```md
 /root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_tcp_check_syncookie_kern.c

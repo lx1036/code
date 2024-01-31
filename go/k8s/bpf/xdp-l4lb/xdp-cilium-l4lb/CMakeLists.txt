@@ -103,4 +103,5 @@ add_executable(xdp_cilium_l4lb
         cilium/test/l4lb/l4lb-tc/test_l4lb.c
         cilium/test/l4lb/l4lb-xdp/test_xdp_l4lb.c
         cilium/test/l4lb/l4lb-nodeport/tc_nodeport.c
-        cilium/test/l4lb/slb-xdp/slb.bpf.c)
+        cilium/test/l4lb/slb-xdp/slb.bpf.c
+        cilium/test/tcp/tcphdr/ebpf/test_tcp_hdr_options.c)

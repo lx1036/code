@@ -2,7 +2,7 @@
 # TCP FastOpen
 > 作用：首次 client 在 syn TCP Option 里加上 tfo cookie request(tcp.options.tfo.request)，然后 server 回的 synack 包里
 > tfo option 里加上 Fast Open Cookie(69bd7321bdbafb15)，然后后面 client 再次发起新的链接时，新的 syn 报文带上这个 cookie 和
-> 请求报文如 HTTP/TCP 请求，即 HTTP/TCP 请求在第二次之后直接在 sync 包里发送请求，这样无需等待 synack + ack 这一个 rtt 时间。
+> 请求报文如 HTTP/TCP 请求，即 HTTP/TCP 请求在第二次之后直接在 syn 包里发送请求，这样无需等待 synack + ack 这一个 rtt 时间。
 >
 > 结论：首次 syn 获取 tfo cookie 之后，后续每次连接 syn 直接带上数据报文，减少了一个 rtt 时间，提高了性能。 
 

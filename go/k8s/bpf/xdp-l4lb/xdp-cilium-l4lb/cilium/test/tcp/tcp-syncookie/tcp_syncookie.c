@@ -93,7 +93,7 @@ static inline void check_syncookie(void *ctx, void *data, void *data_end) {
         if ((void *)(ipv4h + 1) > data_end)
             return;
 
-        if (ipv4h->ihl != 5) { // ???
+        if (ipv4h->ihl != 5) { // 5<=ip4->ihl<=15, ???
             return;
         }
 
