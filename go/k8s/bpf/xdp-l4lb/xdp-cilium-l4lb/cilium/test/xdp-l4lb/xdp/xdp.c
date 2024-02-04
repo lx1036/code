@@ -128,7 +128,7 @@ static __always_inline int handle_ipv4(struct xdp_md *xdp) {
     data_end = (void *)(long)xdp->data_end;
     new_eth = data;
     iph = data + sizeof(*new_eth);
-    old_eth = data + sizeof(*iph); // ???
+    old_eth = data + sizeof(*iph); // ???, 不太对吧，应该是 l4 hdr
     if ((void*)new_eth + 1 > data_end ||
         (void*)old_eth + 1 > data_end ||
         (void*)iph + 1 > data_end)
@@ -136,7 +136,7 @@ static __always_inline int handle_ipv4(struct xdp_md *xdp) {
 
     set_ethhdr(new_eth, old_eth, tnl, bpf_htons(ETH_P_IP));
     iph->version = 4;
-    iph->ihl = sizeof(*iph) >> 2; // ipip 有两个 iphdr
+    iph->ihl = sizeof(*iph) >> 2; // ipip 有两个 iphdr, ihl(ip header length) 必须是 5(0101) *4
     iph->frag_off =	0;
     iph->protocol = IPPROTO_IPIP;
     iph->check = 0;

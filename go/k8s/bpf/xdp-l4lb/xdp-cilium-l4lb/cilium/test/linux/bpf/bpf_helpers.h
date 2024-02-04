@@ -74,8 +74,9 @@
 
 /*
  * Helper function to perform a tail call with a constant/immediate map slot.
+ * 这里为了 IDE 代码跳转，暂时去掉 #if 语句
  */
-#if __clang_major__ >= 8 && defined(__bpf__)
+//#if __clang_major__ >= 8 && defined(__bpf__)
 static __always_inline void
 bpf_tail_call_static(void *ctx, const void *map, const __u32 slot)
 {
@@ -102,7 +103,7 @@ bpf_tail_call_static(void *ctx, const void *map, const __u32 slot)
 		     :: [ctx]"r"(ctx), [map]"r"(map), [slot]"i"(slot)
 		     : "r0", "r1", "r2", "r3", "r4", "r5");
 }
-#endif
+//#endif
 
 /*
  * Helper structure used by eBPF C program
