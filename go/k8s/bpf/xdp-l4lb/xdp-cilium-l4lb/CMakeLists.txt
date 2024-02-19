@@ -105,4 +105,10 @@ add_executable(xdp_cilium_l4lb
         cilium/test/l4lb/l4lb-nodeport/tc_nodeport.c
         cilium/test/l4lb/slb-xdp/slb.bpf.c
         cilium/test/tcp/tcphdr/ebpf/test_tcp_hdr_options.c
-        cilium/test/xdp-acl/acl.c)
+        cilium/test/xdp-acl/acl.c
+        cilium/test/tproxy/socket-assign/test_sk_assign.c
+        cilium/test/tproxy/socket-lookup/test_sk_lookup.c
+        cilium/test/tproxy/socket-lookup/main_test.c
+        cilium/test/tproxy/socket-reuseport/test_sk_reuseport.c
+        cilium/test/xdp-l4lb/xdp-socket/dumpframes/protocol_filter.c
+        cilium/test/tproxy/socket-reuseport/epoll_test.c)
