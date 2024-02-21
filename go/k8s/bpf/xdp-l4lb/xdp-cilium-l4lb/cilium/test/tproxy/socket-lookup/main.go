@@ -289,6 +289,8 @@ func makeServer(socketType int, reuseportProg *ebpf.Program) [MAX_SERVERS]int {
             }
         }
         if sockfd == unix.SOCK_STREAM {
+            // ignores TIME-WAIT state using SO_REUSEADDR option
+            // https://serverfault.com/questions/329845/how-to-forcibly-close-a-socket-in-time-wait
             err = unix.SetsockoptInt(sockfd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
             if err != nil {
                 logrus.Errorf("unix.SO_REUSEADDR error: %v", err)

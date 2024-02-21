@@ -112,4 +112,5 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tproxy/socket-reuseport/test_sk_reuseport.c
         cilium/test/xdp-l4lb/xdp-socket/dumpframes/protocol_filter.c
         cilium/test/tproxy/socket-reuseport/epoll_test.c
-        cilium/test/tproxy/bpf-map-in-map/test_map_in_map.c)
+        cilium/test/tproxy/bpf-map-in-map/test_map_in_map.c
+        cilium/test/tproxy/bpf-tailcall/tailcall1.c)
