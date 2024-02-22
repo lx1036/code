@@ -77,7 +77,6 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/include/bpf/features_skb.h
         cilium/test/linux/linux/ip.h
         cilium/test/tcp/tcp-syncookie/tcp_syncookie.c
-        cilium/test/linux/linux/tcp.h
         cilium/test/linux/bpf/bpf_helper_defs.h
         cilium/test/tcp/tcpnotify/tcpnotify.c
         cilium/test/tcp/tcpconnect/tcp_connect.c
@@ -113,4 +112,7 @@ add_executable(xdp_cilium_l4lb
         cilium/test/xdp-l4lb/xdp-socket/dumpframes/protocol_filter.c
         cilium/test/tproxy/socket-reuseport/epoll_test.c
         cilium/test/tproxy/bpf-map-in-map/test_map_in_map.c
-        cilium/test/tproxy/bpf-tailcall/tailcall1.c)
+        cilium/test/tproxy/bpf-tailcall/tailcall1.c
+        cilium/test/tproxy/socket-service/connect-force-port/connect_force_port4.c
+        cilium/test/tproxy/socket-service/connect-sendmsg/connect_send_recvmsg.c
+        cilium/test/tproxy/socket-service/sockopt/test_sockopt.c)

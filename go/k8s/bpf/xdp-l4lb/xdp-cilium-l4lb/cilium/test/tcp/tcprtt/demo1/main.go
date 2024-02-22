@@ -148,12 +148,16 @@ func setSocketTimeout(fd, timeoutMs int) {
 }
 
 func connectToFd(serverFd int) int {
+    socketType, err := unix.GetsockoptInt(serverFd, unix.SOL_SOCKET, unix.SO_TYPE)
+    if err != nil {
+        logrus.Fatal(err)
+    }
     serverSockAddr, err := unix.Getsockname(serverFd)
     if err != nil {
         log.Fatal(err)
     }
 
-    clientFd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM, 0)
+    clientFd, err := unix.Socket(unix.AF_INET, socketType, 0)
     if err != nil {
         log.Fatal(err)
     }

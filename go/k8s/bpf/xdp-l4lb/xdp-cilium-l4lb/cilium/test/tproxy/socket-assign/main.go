@@ -43,7 +43,7 @@ func main() {
         logrus.Fatalf("Accept err: %v", err)
     }
     clientPort := clientSockAddr.(*unix.SockaddrInet4).Port
-    logrus.Infof("client port %d", clientPort) // 5432
+    logrus.Infof("client port %d", clientPort) // 5432, 验证出 client port 还是原来的
 
     // 3. client write, server read
     if _, err = unix.Write(clientFd, []byte("testing")); err != nil {
