@@ -15,7 +15,7 @@ import (
 const (
     CgroupPath = "/sys/fs/cgroup/connect_force_port"
 
-    Loopback = "127.0.0.1"
+    INADDR_LOOPBACK = "127.0.0.1"
 
     PinPath = "/sys/fs/bpf/socket_service"
 )
@@ -121,7 +121,7 @@ func makeServer(socketType, port int) int {
         logrus.Fatalf("unix.SO_REUSEADDR error: %v", err)
     }
 
-    ip := net.ParseIP(Loopback)
+    ip := net.ParseIP(INADDR_LOOPBACK)
     sa := &unix.SockaddrInet4{
         Port: port,
         Addr: [4]byte{},

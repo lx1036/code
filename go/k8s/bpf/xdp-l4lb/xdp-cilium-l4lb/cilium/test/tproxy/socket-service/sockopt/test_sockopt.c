@@ -41,6 +41,8 @@ struct {
     __type(value, struct sockopt_sk);
 } socket_storage_map SEC(".maps");
 
+// EPERM: error permission
+
 SEC("cgroup/getsockopt")
 int getsockopt1(struct bpf_sockopt *ctx) {
     struct sockopt_sk *storage;
@@ -137,7 +139,6 @@ int setsockopt1(struct bpf_sockopt *ctx) {
 
     if (ctx->level == SOL_SOCKET && ctx->optname == SO_SNDBUF) {
         /* Overwrite SO_SNDBUF value */
-
         if (optval + sizeof(__u32) > optval_end)
             return 0; /* EPERM, bounds check */
 
@@ -149,7 +150,6 @@ int setsockopt1(struct bpf_sockopt *ctx) {
 
     if (ctx->level == SOL_TCP && ctx->optname == TCP_CONGESTION) {
         /* Always use cubic */
-
         if (optval + 5 > optval_end)
             return 0; /* EPERM, bounds check */
 
@@ -264,7 +264,6 @@ int getsockopt2(struct bpf_sockopt *ctx) {
 
     return 1;
 }
-
 
 SEC("cgroup/setsockopt")
 int setsockopt2(struct bpf_sockopt *ctx) {

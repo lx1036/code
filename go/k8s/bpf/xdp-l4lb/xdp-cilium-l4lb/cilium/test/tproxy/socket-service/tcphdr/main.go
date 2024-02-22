@@ -1,4 +1,4 @@
-package internal
+package main
 
 import (
     "errors"
@@ -8,16 +8,20 @@ import (
     "path/filepath"
     "syscall"
 
-    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tcp/tcphdr/internal/lock"
-
     "github.com/cilium/ebpf"
     "github.com/cilium/ebpf/link"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc "$CLANG" -strip "$STRIP" -makebase "$MAKEDIR" tcpHeader ../ebpf/test_tcp_hdr_options.c -- -mcpu=v2 -nostdinc -Wall -Werror -Wno-compare-distinct-pointer-types -I../../ebpf/include
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go bpf test_tcp_hdr_options.c -- -I.
+
+// go generate .
+// CGO_ENABLED=0 go run .
+func main() {
+
+}
 
 type TcpHdr struct {
-    stateDir *lock.File
+    stateDir *File
     Path     string
     // bindings     *ebpf.Map
     // destinations *destinations
@@ -45,7 +49,7 @@ func CreateTcpHdr(netnsPath, bpfFsPath string) (_ *TcpHdr, err error) {
     }
     defer os.RemoveAll(tempDir)
 
-    stateDir, err := lock.OpenLockedExclusive(tempDir)
+    stateDir, err := OpenLockedExclusive(tempDir)
     if err != nil {
         return nil, err
     }
@@ -84,7 +88,7 @@ func CreateTcpHdr(netnsPath, bpfFsPath string) (_ *TcpHdr, err error) {
     // otherwise it will return an error. In that case tempDir is removed,
     // and the pinned link + program are closed, undoing any changes.
     if err := os.Rename(tempDir, pinPath); os.IsExist(err) || errors.Is(err, syscall.ENOTEMPTY) {
-        return nil, fmt.Errorf("can't create dispatcher: %w", ErrLoaded)
+        return nil, fmt.Errorf("can't create dispatcher: %v", err)
     } else if err != nil {
         return nil, fmt.Errorf("can't create dispatcher: %s", err)
     }

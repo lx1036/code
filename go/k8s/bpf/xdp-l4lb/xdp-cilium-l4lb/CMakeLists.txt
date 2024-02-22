@@ -103,7 +103,7 @@ add_executable(xdp_cilium_l4lb
         cilium/test/l4lb/l4lb-xdp/test_xdp_l4lb.c
         cilium/test/l4lb/l4lb-nodeport/tc_nodeport.c
         cilium/test/l4lb/slb-xdp/slb.bpf.c
-        cilium/test/tcp/tcphdr/ebpf/test_tcp_hdr_options.c
+        cilium/test/tproxy/socket-service/tcphdr/test_tcp_hdr_options.c
         cilium/test/xdp-acl/acl.c
         cilium/test/tproxy/socket-assign/test_sk_assign.c
         cilium/test/tproxy/socket-lookup/test_sk_lookup.c
@@ -115,4 +115,5 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tproxy/bpf-tailcall/tailcall1.c
         cilium/test/tproxy/socket-service/connect-force-port/connect_force_port4.c
         cilium/test/tproxy/socket-service/connect-sendmsg/connect_send_recvmsg.c
-        cilium/test/tproxy/socket-service/sockopt/test_sockopt.c)
+        cilium/test/tproxy/socket-service/sockopt/test_sockopt.c
+        cilium/test/tproxy/socket-service/tcphdr/test_tcp_hdr_options.h)

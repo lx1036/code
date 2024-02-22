@@ -5,6 +5,7 @@ import (
     "fmt"
     "github.com/sirupsen/logrus"
     "golang.org/x/sys/unix"
+    "strconv"
     "testing"
 )
 
@@ -20,7 +21,11 @@ func TestHexDecode(test *testing.T) {
 func TestUint8(test *testing.T) {
     i := 0xde
     u := uint8(i)
-    fmt.Println(u)
+    fmt.Println(u) // 222
+
+    fmt.Println(strconv.Itoa(0x55))       // 85
+    fmt.Println(strconv.Itoa(0x55AA * 2)) // 21930 * 2
+
 }
 
 func TestGetSocketOptType(test *testing.T) {
