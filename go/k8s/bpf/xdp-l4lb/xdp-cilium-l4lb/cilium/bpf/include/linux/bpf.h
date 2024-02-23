@@ -4168,6 +4168,36 @@ struct bpf_sock_ops {
     __u64 bytes_received;
     __u64 bytes_acked;
     __bpf_md_ptr(struct bpf_sock *, sk);
+    /* [skb_data, skb_data_end) covers the whole TCP header.
+	 *
+	 * BPF_SOCK_OPS_PARSE_HDR_OPT_CB: The packet received
+	 * BPF_SOCK_OPS_HDR_OPT_LEN_CB:   Not useful because the
+	 *                                header has not been written.
+	 * BPF_SOCK_OPS_WRITE_HDR_OPT_CB: The header and options have
+	 *				  been written so far.
+	 * BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:  The SYNACK that concludes
+	 *					the 3WHS.
+	 * BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB: The ACK that concludes
+	 *					the 3WHS.
+	 *
+	 * bpf_load_hdr_opt() can also be used to read a particular option.
+	 */
+    __bpf_md_ptr(void *, skb_data);
+    __bpf_md_ptr(void *, skb_data_end);
+    __u32 skb_len;        /* The total length of a packet.
+				 * It includes the header, options,
+				 * and payload.
+				 */
+    __u32 skb_tcp_flags;    /* tcp_flags of the header.  It provides
+				 * an easy way to check for tcp_flags
+				 * without parsing skb_data.
+				 *
+				 * In particular, the skb_tcp_flags
+				 * will still be available in
+				 * BPF_SOCK_OPS_HDR_OPT_LEN even though
+				 * the outgoing header has not
+				 * been written yet.
+				 */
 };
 
 /* Definitions for bpf_sock_ops_cb_flags */
@@ -4176,8 +4206,51 @@ enum {
     BPF_SOCK_OPS_RETRANS_CB_FLAG = (1 << 1),
     BPF_SOCK_OPS_STATE_CB_FLAG = (1 << 2),
     BPF_SOCK_OPS_RTT_CB_FLAG = (1 << 3),
+    /* Call bpf for all received TCP headers.  The bpf prog will be
+	 * called under sock_ops->op == BPF_SOCK_OPS_PARSE_HDR_OPT_CB
+	 *
+	 * Please refer to the comment in BPF_SOCK_OPS_PARSE_HDR_OPT_CB
+	 * for the header option related helpers that will be useful
+	 * to the bpf programs.
+	 *
+	 * It could be used at the client/active side (i.e. connect() side)
+	 * when the server told it that the server was in syncookie
+	 * mode and required the active side to resend the bpf-written
+	 * options.  The active side can keep writing the bpf-options until
+	 * it received a valid packet from the server side to confirm
+	 * the earlier packet (and options) has been received.  The later
+	 * example patch is using it like this at the active side when the
+	 * server is in syncookie mode.
+	 *
+	 * The bpf prog will usually turn this off in the common cases.
+	 */
+    BPF_SOCK_OPS_PARSE_ALL_HDR_OPT_CB_FLAG = (1 << 4),
+    /* Call bpf when kernel has received a header option that
+     * the kernel cannot handle.  The bpf prog will be called under
+     * sock_ops->op == BPF_SOCK_OPS_PARSE_HDR_OPT_CB.
+     *
+     * Please refer to the comment in BPF_SOCK_OPS_PARSE_HDR_OPT_CB
+     * for the header option related helpers that will be useful
+     * to the bpf programs.
+     */
+    BPF_SOCK_OPS_PARSE_UNKNOWN_HDR_OPT_CB_FLAG = (1 << 5),
+    /* Call bpf when the kernel is writing header options for the
+     * outgoing packet.  The bpf prog will first be called
+     * to reserve space in a skb under
+     * sock_ops->op == BPF_SOCK_OPS_HDR_OPT_LEN_CB.  Then
+     * the bpf prog will be called to write the header option(s)
+     * under sock_ops->op == BPF_SOCK_OPS_WRITE_HDR_OPT_CB.
+     *
+     * Please refer to the comment in BPF_SOCK_OPS_HDR_OPT_LEN_CB
+     * and BPF_SOCK_OPS_WRITE_HDR_OPT_CB for the header option
+     * related helpers that will be useful to the bpf programs.
+     *
+     * The kernel gets its chance to reserve space and write
+     * options first before the BPF program does.
+     */
+    BPF_SOCK_OPS_WRITE_HDR_OPT_CB_FLAG = (1 << 6),
 /* Mask of all currently supported cb flags */
-    BPF_SOCK_OPS_ALL_CB_FLAGS = 0xF,
+    BPF_SOCK_OPS_ALL_CB_FLAGS = 0x7F,
 };
 
 /* List of known BPF sock_ops operators.
@@ -4317,6 +4390,63 @@ enum {
 enum {
     TCP_BPF_IW = 1001,    /* Set TCP initial congestion window */
     TCP_BPF_SNDCWND_CLAMP = 1002,    /* Set sndcwnd_clamp */
+    TCP_BPF_DELACK_MAX = 1003, /* Max delay ack in usecs */
+    TCP_BPF_RTO_MIN = 1004, /* Min delay ack in usecs */
+    /* Copy the SYN pkt to optval
+     *
+     * BPF_PROG_TYPE_SOCK_OPS only.  It is similar to the
+     * bpf_getsockopt(TCP_SAVED_SYN) but it does not limit
+     * to only getting from the saved_syn.  It can either get the
+     * syn packet from:
+     *
+     * 1. the just-received SYN packet (only available when writing the
+     *    SYNACK).  It will be useful when it is not necessary to
+     *    save the SYN packet for latter use.  It is also the only way
+     *    to get the SYN during syncookie mode because the syn
+     *    packet cannot be saved during syncookie.
+     *
+     * OR
+     *
+     * 2. the earlier saved syn which was done by
+     *    bpf_setsockopt(TCP_SAVE_SYN).
+     *
+     * The bpf_getsockopt(TCP_BPF_SYN*) option will hide where the
+     * SYN packet is obtained.
+     *
+     * If the bpf-prog does not need the IP[46] header,  the
+     * bpf-prog can avoid parsing the IP header by using
+     * TCP_BPF_SYN.  Otherwise, the bpf-prog can get both
+     * IP[46] and TCP header by using TCP_BPF_SYN_IP.
+     *
+     *      >0: Total number of bytes copied
+     * -ENOSPC: Not enough space in optval. Only optlen number of
+     *          bytes is copied.
+     * -ENOENT: The SYN skb is not available now and the earlier SYN pkt
+     *	    is not saved by setsockopt(TCP_SAVE_SYN).
+     */
+    TCP_BPF_SYN = 1005, /* Copy the TCP header */
+    TCP_BPF_SYN_IP = 1006, /* Copy the IP[46] and TCP header */
+    TCP_BPF_SYN_MAC = 1007, /* Copy the MAC, IP[46], and TCP header */
+};
+
+enum {
+    BPF_LOAD_HDR_OPT_TCP_SYN = (1ULL << 0),
+};
+
+/* args[0] value during BPF_SOCK_OPS_HDR_OPT_LEN_CB and
+ * BPF_SOCK_OPS_WRITE_HDR_OPT_CB.
+ */
+enum {
+    BPF_WRITE_HDR_TCP_CURRENT_MSS = 1,    /* Kernel is finding the
+						 * total option spaces
+						 * required for an established
+						 * sk in order to calculate the
+						 * MSS.  No skb is actually
+						 * sent.
+						 */
+    BPF_WRITE_HDR_TCP_SYNACK_COOKIE = 2,    /* Kernel is in syncookie mode
+						 * when sending a SYN.
+						 */
 };
 
 struct bpf_perf_event_value {

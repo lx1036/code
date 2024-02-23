@@ -33,7 +33,7 @@ var (
 
     epfd int
 
-    srv_sa unix.Sockaddr
+    serverSockAddr unix.Sockaddr
 
     reuseport_array_map *ebpf.Map
     outer_map           *ebpf.Map
@@ -172,7 +172,7 @@ func prepare_sk_fds(socketType, reuseportProgFd int) {
         err = reuseport_array_map.Put(i, sk_fds[i])
 
         if i == REUSEPORT_ARRAY_SIZE {
-            srv_sa, err = unix.Getsockname(sk_fds[i])
+            serverSockAddr, err = unix.Getsockname(sk_fds[i])
         }
 
     }
@@ -258,7 +258,13 @@ func do_test(socketType int, cmd Cmd) {
 }
 
 func send_data(socketType int, data []byte) int {
-    client_fd, err := unix.Socket(unix.AF_INET, socketType, 0)
+    clientFd, err := unix.Socket(unix.AF_INET, socketType, 0)
+
+    // INFO: 需要这个 socket option 么???
+    err = unix.SetsockoptInt(clientFd, unix.SOL_TCP, unix.TCP_FASTOPEN, 256)
+    if err != nil {
+        logrus.Fatal(err)
+    }
 
     // client bind ip:port
     // bind ip 单元测试时会报错 "address already in use"
@@ -268,16 +274,19 @@ func send_data(socketType int, data []byte) int {
         Addr: [4]byte{},
     }
     copy(sa.Addr[:], ip)
-    err = unix.Bind(client_fd, sa)
+    err = unix.Bind(clientFd, sa)
     if err != nil {
         logrus.Fatal(err)
     }
 
     //var data2 []byte
     //copy(data2[:], data[:])
-    err = unix.Sendto(client_fd, data, unix.MSG_FASTOPEN, srv_sa)
+    err = unix.Sendto(clientFd, data, unix.MSG_FASTOPEN, serverSockAddr)
+    if err != nil {
+        logrus.Fatal(err)
+    }
 
-    return client_fd
+    return clientFd
 }
 
 func check_results() {

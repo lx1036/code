@@ -116,4 +116,4 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tproxy/socket-service/connect-force-port/connect_force_port4.c
         cilium/test/tproxy/socket-service/connect-sendmsg/connect_send_recvmsg.c
         cilium/test/tproxy/socket-service/sockopt/test_sockopt.c
-        cilium/test/tproxy/socket-service/tcphdr/test_tcp_hdr_options.h)
+        cilium/test/tproxy/socket-service/tcphdr/rewrite-constant/test_rewrite_const.c)
