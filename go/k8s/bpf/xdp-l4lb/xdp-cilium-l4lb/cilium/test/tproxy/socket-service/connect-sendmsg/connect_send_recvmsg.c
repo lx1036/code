@@ -3,6 +3,7 @@
 /**
  * /root/linux-5.10.142/tools/testing/selftests/bpf/progs/connect4_prog.c
  * /root/linux-5.10.142/tools/testing/selftests/bpf/progs/sendmsg4_prog.c
+ * /root/linux-5.10.142/tools/testing/selftests/bpf/test_sock_addr.c
  */
 
 #include <sys/socket.h>

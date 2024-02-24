@@ -88,69 +88,6 @@ func handleConnection(clientSocket int) {
     logrus.Infof("write %d number bytes to client", n)
 }
 
-func connectToFd(network, serverAddr string) int {
-    var csk int
-    var err error
-    defer func() {
-        if err != nil {
-            logrus.Error(err)
-            unix.Close(csk)
-        }
-    }()
-
-    csk, err = unix.Socket(unix.AF_INET, unix.SOCK_STREAM, 0)
-    if err != nil {
-        return -1
-    }
-
-    raddr, err := net.ResolveTCPAddr(network, serverAddr)
-    if err != nil {
-        logrus.Errorf("Error resolving local address: %v", err)
-        return -1
-    }
-    rsockaddr := &unix.SockaddrInet4{
-        Port: raddr.Port,
-        Addr: [4]byte{},
-    }
-    copy(rsockaddr.Addr[:], raddr.IP.To4())
-    err = unix.Connect(csk, rsockaddr)
-
-    return csk
-}
-
-func fastOpenConnect(network, serverAddr string) int {
-    var csk int
-    var err error
-    defer func() {
-        if err != nil {
-            logrus.Errorf("connect %v", err)
-            unix.Close(csk)
-        }
-    }()
-
-    csk, err = unix.Socket(unix.AF_INET, unix.SOCK_STREAM, 0)
-    if err != nil {
-        return -1
-    }
-    err = unix.SetsockoptInt(csk, unix.SOL_TCP, unix.TCP_FASTOPEN, 256)
-    if err != nil {
-        return -1
-    }
-
-    raddr, err := net.ResolveTCPAddr(network, serverAddr)
-    rsockAddr := &unix.SockaddrInet4{
-        Port: raddr.Port,
-        Addr: [4]byte{},
-    }
-    copy(rsockAddr.Addr[:], raddr.IP.To4())
-    data := []byte("hello server!")
-    unix.Sendto(csk, data, unix.MSG_FASTOPEN, rsockAddr)
-    // INFO: Write() 不行，使用 Write() 必须要先 Connect()
-    //unix.Write(csk, data)
-
-    return csk
-}
-
 func getAddr(addr *unix.SockaddrInet4) (string, int) {
     cAddr := addr.Addr
     cPort := addr.Port

@@ -8,7 +8,11 @@ import (
     "golang.org/x/sys/unix"
     "net"
     "os"
+    "os/signal"
+    "syscall"
 )
+
+// /root/linux-5.10.142/tools/testing/selftests/bpf/prog_tests/connect_force_port.c
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go bpf connect_force_port4.c -- -I.
 
@@ -17,20 +21,29 @@ const (
 
     INADDR_LOOPBACK = "127.0.0.1"
 
-    PinPath = "/sys/fs/bpf/socket_service"
+    PinPath = "/sys/fs/bpf/socket_service/connect_force_port"
 )
 
+/*
+注意这里是 hook connect() 来支持 tcp，udp 还不行，还需要拦截 sendmsg()
+*/
+
+// 验证没问题
 // go generate .
 // CGO_ENABLED=0 go run .
 func main() {
     logrus.SetReportCaller(true)
 
+    stopCh := make(chan os.Signal, 1)
+    signal.Notify(stopCh, os.Interrupt, syscall.SIGTERM)
+
+    // `cat /sys/fs/cgroup/connect_force_port/cgroup.procs`
     joinCgroup()
     //defer cleanupCgroup()
 
     // tcp listen 127.0.0.1:60123, 作为 backend
     serverFd := makeServer(unix.SOCK_STREAM, 60123)
-    defer unix.Close(serverFd)
+    //defer unix.Close(serverFd)
 
     //1.Load pre-compiled programs and maps into the kernel.
     objs := bpfObjects{}
@@ -81,32 +94,45 @@ func main() {
     }
     defer l3.Close()
 
+    /**
+      抓包：tcpdump -i lo -nneevv port 22222
+        127.0.0.1.22222 > 127.0.0.1.60123
+    */
+
+    // 拦截 connect(), 127.0.0.1:xxx->1.2.3.4:60000 修改成 127.0.0.1:22222->backend 127.0.0.1:60123
     clientFd := connectToFd(serverFd)
-    defer unix.Close(clientFd)
+    //defer unix.Close(clientFd)
 
     verifyPorts(clientFd, 22222, 60000)
+
+    // Wait
+    <-stopCh
+    unix.Close(clientFd)
+    unix.Close(serverFd)
 }
 
 func verifyPorts(clientFd, expectedLocalPort, expectedPeerPort int) {
     logrus.Infof("check local/peer port")
 
-    serverSockAddr, err := unix.Getsockname(clientFd)
+    clientSockAddr, err := unix.Getsockname(clientFd)
     if err != nil {
         logrus.Fatal(err)
     }
-    localPort := serverSockAddr.(*unix.SockaddrInet4).Port
+    localPort := clientSockAddr.(*unix.SockaddrInet4).Port
     if localPort != expectedLocalPort {
         logrus.Errorf("Unexpected local port %d, expected %d", localPort, expectedLocalPort)
     }
+    logrus.Infof("expected client port: %d", localPort) // 22222
 
-    peerSockAddr, err := unix.Getpeername(clientFd)
+    serverSockAddr, err := unix.Getpeername(clientFd)
     if err != nil {
         logrus.Fatal(err)
     }
-    peerPort := peerSockAddr.(*unix.SockaddrInet4).Port
+    peerPort := serverSockAddr.(*unix.SockaddrInet4).Port
     if peerPort != expectedPeerPort {
         logrus.Errorf("Unexpected peer port %d, expected %d", peerPort, expectedPeerPort)
     }
+    logrus.Infof("expected server port: %d", peerPort) // 60000
 }
 
 func makeServer(socketType, port int) int {
@@ -192,7 +218,7 @@ func connectToFd(serverFd int) int {
 
 // 把当前进程 pid 写到新建的 connect_force_port cgroup
 func joinCgroup() {
-    if err := os.Mkdir(CgroupPath, 0777); err != nil {
+    if err := os.MkdirAll(CgroupPath, 0777); err != nil {
         logrus.Fatalf("os.Mkdir err: %v", err)
         return
     }

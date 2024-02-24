@@ -14,6 +14,8 @@
 #include <bpf/bpf_endian.h>
 
 
+static volatile __u32 inherit_cb_flags = 0;
+
 struct bpf_test_option {
     __u8 flags;
     __u8 max_delack_ms;
@@ -28,6 +30,9 @@ SEC("xdp/test_rewrite_const")
 int test_rewrite_const(struct xdp_md *ctx) {
     bpf_printk("flags: %d, max_delack_ms:%d, rand:%d", passive_synack_out.flags, passive_synack_out.max_delack_ms,
                passive_synack_out.rand);
+
+    inherit_cb_flags = 100;
+
     return XDP_PASS;
 }
 

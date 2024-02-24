@@ -197,9 +197,6 @@ int setsockopt1(struct bpf_sockopt *ctx) {
 }
 
 
-
-
-
 #define CUSTOM_INHERIT1            0
 #define CUSTOM_INHERIT2            1
 #define CUSTOM_LISTENER            2
@@ -237,7 +234,6 @@ static __always_inline struct sockopt_inherit *get_storage(struct bpf_sockopt *c
     else
         return bpf_sk_storage_get(&listener_only_map, ctx->sk, 0, BPF_SK_STORAGE_GET_F_CREATE);
 }
-
 
 SEC("cgroup/getsockopt")
 int getsockopt2(struct bpf_sockopt *ctx) {

@@ -8,7 +8,8 @@ import (
     "golang.org/x/sys/unix"
     "net"
     "os"
-    "strconv"
+    "os/signal"
+    "syscall"
     "testing"
 )
 
@@ -26,7 +27,19 @@ const (
     INADDR_LOOPBACK = "127.0.0.1"
 )
 
+/*
+/root/linux-5.10.142/tools/testing/selftests/bpf/progs/sockopt_inherit.c
+/root/linux-5.10.142/tools/testing/selftests/bpf/prog_tests/sockopt_inherit.c
+*/
+
+// CGO_ENABLED=0 go test -v -run ^TestSockOptInherit$ .
 func TestSockOptInherit(test *testing.T) {
+    logrus.SetReportCaller(true)
+
+    stopCh := make(chan os.Signal, 1)
+    signal.Notify(stopCh, os.Interrupt, syscall.SIGTERM)
+
+    // `cat /sys/fs/cgroup/sockopt/sockopt_inherit/cgroup.procs`
     cgroupPath := joinCgroup("sockopt_inherit")
     //defer cleanupCgroup()
 
@@ -85,14 +98,19 @@ func TestSockOptInherit(test *testing.T) {
         defer unix.Close(clientServerFd)
         verifySockOpt(clientServerFd, CUSTOM_INHERIT1, 0x01, "accept")
         verifySockOpt(clientServerFd, CUSTOM_INHERIT2, 0x01, "accept")
-        verifySockOpt(clientServerFd, CUSTOM_LISTENER, 0x01, "accept")
+        verifySockOpt(clientServerFd, CUSTOM_LISTENER, 0x01, "accept") // INFO: 经过测试，这里报错 value=0
     }(serverFd)
 
+    //time.Sleep(time.Millisecond * 100)
     clientFd := connectToFd(serverFd)
     defer unix.Close(clientFd)
+    // 因为只设置了 serverFd sk, 所以 clientFd 为 0
     verifySockOpt(clientFd, CUSTOM_INHERIT1, 0, "connect")
     verifySockOpt(clientFd, CUSTOM_INHERIT2, 0, "connect")
     verifySockOpt(clientFd, CUSTOM_LISTENER, 0, "connect")
+
+    // Wait
+    <-stopCh
 }
 
 func verifySockOpt(serverFd, optName, expected int, msg string) {
@@ -102,7 +120,7 @@ func verifySockOpt(serverFd, optName, expected int, msg string) {
     }
 
     if value != expected {
-        logrus.Errorf("%s: unexpected getsockopt value %d != %d", msg, value, expected)
+        logrus.Errorf("%s: unexpected getsockopt optName:%d value %d != %d", msg, optName, value, expected)
     }
 }
 
@@ -151,7 +169,18 @@ func setSocketTimeout(fd, timeoutMs int) {
     }
 }
 
+/*
+/root/linux-5.10.142/tools/testing/selftests/bpf/progs/sockopt_sk.c
+/root/linux-5.10.142/tools/testing/selftests/bpf/prog_tests/sockopt_sk.c
+*/
+
+// CGO_ENABLED=0 go test -v -run ^TestSockOpt$ .
 func TestSockOpt(test *testing.T) {
+    logrus.SetReportCaller(true)
+
+    stopCh := make(chan os.Signal, 1)
+    signal.Notify(stopCh, os.Interrupt, syscall.SIGTERM)
+
     cgroupPath := joinCgroup("sockopt_sk")
     //defer cleanupCgroup()
 
@@ -196,20 +225,24 @@ func TestSockOpt(test *testing.T) {
 
     GetSetSockOpt()
 
+    // Wait
+    <-stopCh
 }
 
 func GetSetSockOpt() {
-
     serverFd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM, 0)
+    if err != nil {
+        logrus.Fatal(err)
+    }
 
     /* IP_TOS - BPF bypass */
     err = unix.SetsockoptInt(serverFd, unix.SOL_IP, unix.IP_TOS, 0x08)
     if err != nil {
-
+        logrus.Fatal(err)
     }
     value, err := unix.GetsockoptInt(serverFd, unix.SOL_IP, unix.IP_TOS)
     if err != nil {
-
+        logrus.Fatal(err)
     }
     if value != 0x08 {
         logrus.Errorf("Unexpected getsockopt(IP_TOS) optval 0x%x != 0x08", value)
@@ -220,44 +253,59 @@ func GetSetSockOpt() {
     if err == nil {
         logrus.Errorf("Unexpected success from setsockopt(IP_TTL)")
     } else {
-        logrus.Infof("unix.IP_TTL expected err:%v", err)
+        logrus.Infof("unix.IP_TTL expected err:%v", err) // "unix.IP_TTL expected err:operation not permitted"
     }
 
     /* SOL_CUSTOM - handled by BPF */
     err = unix.SetsockoptInt(serverFd, SOL_CUSTOM, 0, 0x01)
     if err != nil {
-
+        logrus.Fatal(err)
     }
     value2, err := unix.GetsockoptInt(serverFd, SOL_CUSTOM, 0)
     if value2 != 0x01 {
-
+        logrus.Errorf("Unexpected getsockopt(SOL_CUSTOM) optval 0x%x != 0x01", value2)
     }
 
     /* IP_FREEBIND - BPF can't access optval past PAGE_SIZE */
-    pagesize := unix.Getpagesize()
-    bigBuf := make([]byte, pagesize*2)
-    err = unix.SetsockoptString(serverFd, unix.SOL_IP, unix.IP_FREEBIND, string(bigBuf))
-
-    value3, err := unix.GetsockoptString(serverFd, unix.SOL_IP, unix.IP_FREEBIND)
-    if value3 != strconv.Itoa(0x55) { // "85"
-
-    }
+    /*pagesize := unix.Getpagesize()
+      logrus.Infof("pagesize: %d", pagesize) // 4096
+      bigBuf := make([]byte, pagesize*2)
+      err = unix.SetsockoptInt(serverFd, unix.SOL_IP, unix.IP_FREEBIND, bigBuf)
+      if err != nil {
+          logrus.Fatal(err)
+      }
+      value3, err := unix.GetsockoptInt(serverFd, unix.SOL_IP, unix.IP_FREEBIND)
+      if err != nil {
+          logrus.Fatal(err)
+      }
+      if value3 != 0x55 { // "85"
+          logrus.Errorf("Unexpected getsockopt(IP_FREEBIND) optval 0x%x != 0x55", value3)
+      }*/
 
     /* SO_SNDBUF is overwritten */
     err = unix.SetsockoptInt(serverFd, unix.SOL_SOCKET, unix.SO_SNDBUF, 0x01010101)
     if err != nil {
+        logrus.Fatal(err)
     }
     value4, err := unix.GetsockoptInt(serverFd, unix.SOL_SOCKET, unix.SO_SNDBUF)
-    if value4 != 0x55AA*2 {
-
+    if err != nil {
+        logrus.Fatal(err)
+    }
+    if value4 != 0x55AA*2 { // ???
+        logrus.Errorf("Unexpected getsockopt(SO_SNDBUF) optval 0x%x != 0x55AA*2", value4)
     }
 
     /* TCP_CONGESTION can extend the string */
     err = unix.SetsockoptString(serverFd, unix.IPPROTO_TCP, unix.TCP_CONGESTION, "nv")
     if err != nil {
+        logrus.Fatal(err)
     }
     value5, err := unix.GetsockoptString(serverFd, unix.IPPROTO_TCP, unix.TCP_CONGESTION)
+    if err != nil {
+        logrus.Fatal(err)
+    }
     if value5 != "cubic" {
+        logrus.Errorf("Unexpected getsockopt(TCP_CONGESTION) optval %s != cubic", value5)
     }
 }
 
@@ -284,6 +332,7 @@ func cleanupCgroup() {
     os.RemoveAll(CgroupPath)
 }
 
+// tcp listen 127.0.0.1:60123
 func makeServer() int {
     serverFd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM, 0)
     if err != nil {
@@ -296,6 +345,7 @@ func makeServer() int {
     }
 
     // 赋值 SOL_CUSTOM
+    // 0:0x01, 1:0x01, 2:0x01
     for i := CUSTOM_INHERIT1; i <= CUSTOM_LISTENER; i++ {
         buf := 0x01
         err = unix.SetsockoptInt(serverFd, SOL_CUSTOM, i, buf)
@@ -306,7 +356,7 @@ func makeServer() int {
 
     ip := net.ParseIP(INADDR_LOOPBACK)
     sa := &unix.SockaddrInet4{
-        //Port: 5432,
+        Port: 60123,
         Addr: [4]byte{},
     }
     copy(sa.Addr[:], ip)

@@ -12,7 +12,7 @@ import (
     "github.com/cilium/ebpf/link"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go bpf test_tcp_hdr_options.c -- -I.
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -type bpf_test_option bpf test_tcp_hdr_options.c -- -I.
 
 // go generate .
 // CGO_ENABLED=0 go run .
@@ -55,23 +55,23 @@ func CreateTcpHdr(netnsPath, bpfFsPath string) (_ *TcpHdr, err error) {
     }
     defer closeOnError(stateDir)
 
-    var objs tcpHeaderObjects
-    _, err = loadPatchedTcpHeader(&objs, &ebpf.CollectionOptions{
+    var objs bpfObjects
+    _, err = loadPatchedbpf(&objs, &ebpf.CollectionOptions{
         Maps: ebpf.MapOptions{PinPath: tempDir},
     })
     if err != nil {
         return nil, fmt.Errorf("load BPF: %s", err)
     }
-    defer objs.tcpHeaderPrograms.Close()
-    defer closeOnError(&objs.tcpHeaderMaps)
+    defer objs.bpfPrograms.Close()
+    defer closeOnError(&objs.bpfMaps)
 
     // pin /sys/fs/bpf/tcp-hdr-*/program
-    if err := objs.tcpHeaderPrograms.Estab.Pin(programPath(tempDir)); err != nil {
+    if err := objs.bpfPrograms.Estab.Pin(programPath(tempDir)); err != nil {
         return nil, fmt.Errorf("pin program: %s", err)
     }
 
     // attach "sockops/estab" prog to a network ns
-    l, err := link.AttachNetNs(int(netns.Fd()), objs.tcpHeaderPrograms.Estab)
+    l, err := link.AttachNetNs(int(netns.Fd()), objs.bpfPrograms.Estab)
     if err != nil {
         return nil, fmt.Errorf("attach program to netns %s: %s", netns.Path(), err)
     }
@@ -131,14 +131,14 @@ func adjustPermissions(path string) error {
     return nil
 }
 
-func loadPatchedTcpHeader(to interface{}, opts *ebpf.CollectionOptions) (*ebpf.CollectionSpec, error) {
-    spec, err := loadTcpHeader()
+func loadPatchedbpf(to interface{}, opts *ebpf.CollectionOptions) (*ebpf.CollectionSpec, error) {
+    spec, err := loadBpf()
     if err != nil {
         return nil, err
     }
 
     // before loaded into kernel
-    var specs tcpHeaderSpecs
+    var specs bpfSpecs
     if err = spec.Assign(&specs); err != nil {
         return nil, err
     }

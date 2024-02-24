@@ -26,6 +26,11 @@ struct {
     __type(value, struct svc_addr);
 } service_mapping SEC(".maps");
 
+/**
+ * connect4() 在 socket 层面完成 ip:port 转换, 只需要一次转换
+ * 1. 不需要逐包的 dnat 行为
+ * 2. 不需要逐包的查找 svc 的行为
+ */
 SEC("cgroup/connect4")
 int connect4(struct bpf_sock_addr *ctx) {
     struct sockaddr_in sa = {};
@@ -54,8 +59,8 @@ int connect4(struct bpf_sock_addr *ctx) {
             return 0;
         }
 
-        orig->addr = ctx->user_ip4; // dst ip
-        orig->port = ctx->user_port; // dst port
+        orig->addr = ctx->user_ip4; // dst ip, 1.2.3.4
+        orig->port = ctx->user_port; // dst port, 60000
 
         ctx->user_ip4 = bpf_htonl(0x7f000001);
         ctx->user_port = bpf_htons(60123);

@@ -2,6 +2,7 @@ package main
 
 import (
     "github.com/cilium/ebpf"
+    "github.com/cilium/ebpf/btf"
     "github.com/cilium/ebpf/link"
     "github.com/sirupsen/logrus"
     "net"
@@ -61,6 +62,23 @@ func main() {
         logrus.Fatal(err)
     }
     defer l.Close()
+
+    /*for name, mapSpec := range spec.Maps {
+       logrus.Infof("map name: %s, mapSpec: %+v", name, *mapSpec)
+       if name == ".bss" {
+           for _, varSecinfo := range mapSpec.Value.(*btf.Datasec).Vars {
+               //logrus.Infof("%+v", varSecinfo.Type.(*btf.Var))
+               v := varSecinfo.Type.(*btf.Var)
+               logrus.Infof("%+v", v.Type)
+               u32 := v.Type.(*btf.Volatile).Type.(*btf.Typedef)
+               logrus.Infof("%+v", u32.Type.(*btf.Int))
+           }
+       }
+    }*/
+    // TODO: 无法访问 bpf 里 inherit_cb_flags 变量值
+    typ, err := spec.Types.AnyTypeByName("inherit_cb_flags")
+    logrus.Infof("%+v", typ)
+    logrus.Infof("%+v", typ.(*btf.Var).Type.(*btf.Volatile).Type.(*btf.Typedef).Type.(*btf.Int))
 
     // Wait
     <-stopCh
