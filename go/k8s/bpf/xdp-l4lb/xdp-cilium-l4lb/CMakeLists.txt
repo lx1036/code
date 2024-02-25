@@ -78,7 +78,7 @@ add_executable(xdp_cilium_l4lb
         cilium/test/linux/linux/ip.h
         cilium/test/tcp/tcp-syncookie/tcp_syncookie.c
         cilium/test/linux/bpf/bpf_helper_defs.h
-        cilium/test/tcp/tcpnotify/tcpnotify.c
+        cilium/test/tproxy/socket-service/tcphdr/tcpnotify/tcpnotify.c
         cilium/test/tcp/tcpconnect/tcp_connect.c
         cilium/test/tcp/tcpconnect/tcp_connect.c
         cilium/test/tcp/tcpconnect/tcp_connect.h
@@ -97,7 +97,8 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tunnel/veth-pair/tc-veth-pair/test_tc_peer.c
         cilium/test/tunnel/veth-pair/tc-veth-pair/test_tc_neigh.c
         cilium/test/tunnel/veth-pair/tc-veth-pair/test_tc_neigh_fib.c
-        cilium/test/tcp/tcprtt/demo2/tcprtt_sockops.c
+        cilium/test/tproxy/socket-service/tcphdr/tcprtt/demo1/tcprtt_sockops.c
+        cilium/test/tproxy/socket-service/tcphdr/tcprtt/demo2/tcprtt_sockops.c
         cilium/test/tunnel/vxlan/pod-to-pod/vxlan.c
         cilium/test/l4lb/l4lb-tc/test_l4lb.c
         cilium/test/l4lb/l4lb-xdp/test_xdp_l4lb.c
@@ -117,4 +118,6 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tproxy/socket-service/connect-sendmsg/connect_send_recvmsg.c
         cilium/test/tproxy/socket-service/sockopt/test_sockopt.c
         cilium/test/tproxy/socket-service/tcphdr/rewrite-constant/test_rewrite_const.c
-        cilium/test/tproxy/socket-service/udp-sk-limit/test_udp_sk_limit.c)
+        cilium/test/tproxy/socket-service/udp-sk-limit/test_udp_sk_limit.c
+        cilium/test/tproxy/socket-service/tcphdr/tcp-socket-cookie/test_tcp_socket_cookie.c
+        cilium/test/tproxy/socket-service/tcphdr/tcpfsm/test_tcp_fsm.c)

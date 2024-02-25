@@ -1,6 +1,6 @@
 
 // /root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_tcp_hdr_options.c
-// /root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_tcp_hdr_options.h
+// /root/linux-5.10.142/tools/testing/selftests/bpf/test_tcp_hdr_options.h
 // /root/linux-5.10.142/tools/testing/selftests/bpf/prog_tests/tcp_hdr_options.c
 
 #include <stddef.h>
@@ -42,13 +42,13 @@
 #define TCPHDR_ECE 0x40
 #define TCPHDR_CWR 0x80
 #define TCPHDR_SYNACK (TCPHDR_SYN | TCPHDR_ACK)
-#define TCPOPT_EOL		0
-#define TCPOPT_NOP		1
-#define TCPOPT_WINDOW		3
-#define TCPOPT_EXP		254
+#define TCPOPT_EOL        0
+#define TCPOPT_NOP        1
+#define TCPOPT_WINDOW        3
+#define TCPOPT_EXP        254
 
-#define CG_OK	1
-#define CG_ERR	0
+#define CG_OK    1
+#define CG_ERR    0
 
 #define TCP_BPF_EXPOPT_BASE_LEN 4
 
@@ -90,7 +90,7 @@ struct hdr_stg {
     bool active;
     bool resend_syn; /* active side only */
     bool syncookie;  /* passive side only */
-    bool fastopen;	/* passive side only */
+    bool fastopen;    /* passive side only */
 };
 struct {
     __uint(type, BPF_MAP_TYPE_SK_STORAGE);
@@ -100,40 +100,37 @@ struct {
 //    __uint(pinning, LIBBPF_PIN_BY_NAME);
 } hdr_stg_map SEC(".maps");
 
-static inline void clear_hdr_cb_flags(struct bpf_sock_ops *skops)
-{
+static inline void clear_hdr_cb_flags(struct bpf_sock_ops *skops) {
     bpf_sock_ops_cb_flags_set(skops,
                               skops->bpf_sock_ops_cb_flags &
                               ~(BPF_SOCK_OPS_PARSE_UNKNOWN_HDR_OPT_CB_FLAG |
                                 BPF_SOCK_OPS_WRITE_HDR_OPT_CB_FLAG));
 }
 
-static inline void clear_parse_all_hdr_cb_flags(struct bpf_sock_ops *skops)
-{
+static inline void clear_parse_all_hdr_cb_flags(struct bpf_sock_ops *skops) {
     bpf_sock_ops_cb_flags_set(skops,
                               skops->bpf_sock_ops_cb_flags &
                               ~BPF_SOCK_OPS_PARSE_ALL_HDR_OPT_CB_FLAG);
 }
 
-static inline void set_parse_all_hdr_cb_flags(struct bpf_sock_ops *skops)
-{
+static inline void set_parse_all_hdr_cb_flags(struct bpf_sock_ops *skops) {
     bpf_sock_ops_cb_flags_set(skops,
                               skops->bpf_sock_ops_cb_flags |
                               BPF_SOCK_OPS_PARSE_ALL_HDR_OPT_CB_FLAG);
 }
 
 
-#define RET_CG_ERR(__err) ({			\
-	struct linum_err __linum_err;		\
-	int __lport;				\
-						\
-	__linum_err.linum = __LINE__;		\
-	__linum_err.err = __err;		\
-	__lport = skops->local_port;		\
-	bpf_map_update_elem(&lport_linum_map, &__lport, &__linum_err, BPF_NOEXIST); \
-	clear_hdr_cb_flags(skops);					\
-	clear_parse_all_hdr_cb_flags(skops);				\
-	return CG_ERR;							\
+#define RET_CG_ERR(__err) ({            \
+    struct linum_err __linum_err;        \
+    int __lport;                \
+                        \
+    __linum_err.linum = __LINE__;        \
+    __linum_err.err = __err;        \
+    __lport = skops->local_port;        \
+    bpf_map_update_elem(&lport_linum_map, &__lport, &__linum_err, BPF_NOEXIST); \
+    clear_hdr_cb_flags(skops);                    \
+    clear_parse_all_hdr_cb_flags(skops);                \
+    return CG_ERR;                            \
 })
 
 
@@ -158,7 +155,7 @@ struct tcp_opt {
 
 
 #define TEST_OPTION_FLAGS(flags, option) (1 & ((flags) >> (option)))
-#define SET_OPTION_FLAGS(flags, option)	((flags) |= (1 << (option)))
+#define SET_OPTION_FLAGS(flags, option)    ((flags) |= (1 << (option)))
 
 enum {
     OPTION_RESEND,
@@ -167,8 +164,7 @@ enum {
     __NR_OPTION_FLAGS,
 };
 
-static int parse_test_option(struct bpf_test_option *opt, const __u8 *start)
-{
+static int parse_test_option(struct bpf_test_option *opt, const __u8 *start) {
     opt->flags = *start++;
 
     if (TEST_OPTION_FLAGS(opt->flags, OPTION_MAX_DELACK_MS))
@@ -181,8 +177,7 @@ static int parse_test_option(struct bpf_test_option *opt, const __u8 *start)
 }
 
 static int load_option(struct bpf_sock_ops *skops,
-                       struct bpf_test_option *test_opt, bool from_syn)
-{
+                       struct bpf_test_option *test_opt, bool from_syn) {
     union {
         struct tcp_exprm_opt exprm;
         struct tcp_opt regular;
@@ -209,18 +204,13 @@ static int load_option(struct bpf_sock_ops *skops,
     }
 }
 
-static inline __u8 skops_tcp_flags(const struct bpf_sock_ops *skops)
-{
+static inline __u8 skops_tcp_flags(const struct bpf_sock_ops *skops) {
     return skops->skb_tcp_flags;
 }
 
-static inline unsigned int tcp_hdrlen(const struct tcphdr *th)
-{
+static inline unsigned int tcp_hdrlen(const struct tcphdr *th) {
     return th->doff << 2; // ???
 }
-
-
-
 
 static bool skops_want_cookie(const struct bpf_sock_ops *skops) {
     return skops->args[0] == BPF_WRITE_HDR_TCP_SYNACK_COOKIE;
@@ -594,25 +584,28 @@ int estab(struct bpf_sock_ops *skops) {
             bpf_setsockopt(skops, SOL_TCP, TCP_SAVE_SYN, &true_val, sizeof(true_val));
             set_hdr_cb_flags(skops, BPF_SOCK_OPS_STATE_CB_FLAG);
             break;
-            // Calls BPF program right before an active connection is initialized
+
+        // Calls BPF program right before an active connection is initialized
         case BPF_SOCK_OPS_TCP_CONNECT_CB:
             set_hdr_cb_flags(skops, 0);
             break;
-            // Parse the header option from packet received
-            // It will be called to handle the packets received at an already established connection
+
+        // Parse the header option from packet received
+        // It will be called to handle the packets received at an already established connection
         case BPF_SOCK_OPS_PARSE_HDR_OPT_CB:
             return handle_parse_hdr(skops);
+
         case BPF_SOCK_OPS_HDR_OPT_LEN_CB:
             // return handle_hdr_opt_len(skops);
-            // Write the header options
+        // Write the header options
         case BPF_SOCK_OPS_WRITE_HDR_OPT_CB:
             return handle_write_hdr_opt(skops);
 
-            // Calls BPF program when a passive connection is established
+        // Calls BPF program when a passive connection is established
         case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
             return handle_passive_estab(skops);
 
-            // Calls BPF program when an active connection is established
+        // Calls BPF program when an active connection is established
         case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
             return handle_active_estab(skops);
     }

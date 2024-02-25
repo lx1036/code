@@ -151,6 +151,11 @@ int bpf_sockops_cb(struct bpf_sock_ops *skops) {
     op = skops->op;
 
     switch (op) {
+        /* Called when TCP changes state. Arg1: old_state Arg2: new_state */
+        case BPF_SOCK_OPS_STATE_CB:
+            bpf_sock_ops_state_cb(skops);
+            break;
+
         case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
             // client<-server, 回包
             bpf_sock_ops_establish_cb(skops, SOCK_TYPE_ACTIVE);
@@ -162,12 +167,11 @@ int bpf_sockops_cb(struct bpf_sock_ops *skops) {
         case BPF_SOCK_OPS_RTT_CB:
             bpf_sock_ops_rtt_cb(skops);
             break;
-        case BPF_SOCK_OPS_STATE_CB:
-            bpf_sock_ops_state_cb(skops);
-            break;
+        default:
+            return 0;
     }
 
-    return 0;
+    return 1;
 }
 
 char _license[] SEC("license") = "GPL";
