@@ -13,6 +13,10 @@ import (
     "testing"
 )
 
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go bpf test_sockopt.c -- -I.
+
+// go generate .
+
 const (
     CgroupPath = "/sys/fs/cgroup/sockopt"
 

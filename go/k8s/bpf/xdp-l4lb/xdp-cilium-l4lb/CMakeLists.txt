@@ -120,4 +120,6 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tproxy/socket-service/tcphdr/rewrite-constant/test_rewrite_const.c
         cilium/test/tproxy/socket-service/udp-sk-limit/test_udp_sk_limit.c
         cilium/test/tproxy/socket-service/tcphdr/tcp-socket-cookie/test_tcp_socket_cookie.c
-        cilium/test/tproxy/socket-service/tcphdr/tcpfsm/test_tcp_fsm.c)
+        cilium/test/tproxy/socket-service/tcphdr/tcpfsm/test_tcp_fsm.c
+        cilium/test/tproxy/socket-lookup/socket-lookup-cgroup/socket_lookup_cgroup.c
+        cilium/test/tproxy/socket-lookup/socket-lookup-cgroup/linux_tcp.h)

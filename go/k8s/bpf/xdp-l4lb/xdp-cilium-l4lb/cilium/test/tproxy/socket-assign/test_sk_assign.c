@@ -68,7 +68,7 @@ get_tuple(struct __sk_buff *skb, bool *tcp) {
             /* Options are not supported */
             return NULL;
 
-        ihl_len = iph->ihl * 4;
+        ihl_len = iph->ihl * 4; // iphdr 头字节长度 <<2
         proto = iph->protocol;
         result = (struct bpf_sock_tuple *) &iph->saddr; // 这个类型转换非常经典，bpf_sock_tuple 就是 saddr/daddr/sport/dport!!!
     } else {

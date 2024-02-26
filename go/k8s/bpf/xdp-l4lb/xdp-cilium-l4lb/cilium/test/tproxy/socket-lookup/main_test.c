@@ -15,6 +15,9 @@ enum server {
 int main() {
     int server_fds[] = {[0 ... MAX_SERVERS - 1] = -1};
     int size = ARRAY_SIZE(server_fds);
-    printf("%d", size); // 2
+    printf("%d\n", size); // 2
+
+    int cnt = ~0;
+    printf("%d\n", cnt); // -1
 }
 
