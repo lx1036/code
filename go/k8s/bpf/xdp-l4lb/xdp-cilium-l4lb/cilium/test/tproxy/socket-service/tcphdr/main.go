@@ -12,10 +12,6 @@ import (
     "github.com/cilium/ebpf/link"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -type bpf_test_option bpf test_tcp_hdr_options.c -- -I.
-
-// go generate .
-// CGO_ENABLED=0 go run .
 func main() {
 
 }

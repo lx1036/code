@@ -19,7 +19,7 @@
 //#define NULL    ((void *)0)
 
 enum {
-    SOCK_TYPE_ACTIVE  = 0,
+    SOCK_TYPE_ACTIVE = 0,
     SOCK_TYPE_PASSIVE = 1,
 };
 
@@ -57,9 +57,9 @@ struct {
 } rtt_events SEC(".maps");
 
 static inline void init_sk_key(struct bpf_sock_ops *skops, struct sk_key *sk_key) {
-    sk_key->local_ip4   = bpf_ntohl(skops->local_ip4);
-    sk_key->remote_ip4  = bpf_ntohl(skops->remote_ip4);
-    sk_key->local_port  = skops->local_port;
+    sk_key->local_ip4 = bpf_ntohl(skops->local_ip4);
+    sk_key->remote_ip4 = bpf_ntohl(skops->remote_ip4);
+    sk_key->local_port = skops->local_port;
     sk_key->remote_port = bpf_ntohl(skops->remote_port);
 }
 
@@ -76,7 +76,7 @@ static inline void bpf_sock_ops_establish_cb(struct bpf_sock_ops *skops, __u8 so
 
     // Store the socket info in map using the 4-tuple as key
     // We keep track of TCP connections in 'established' state
-    err = bpf_map_update_elem(&map_estab_sk, &sk_info.sk_key, &sk_info, BPF_NOEXIST); // 这里选择 BPF_NOEXIST
+    err = (int) bpf_map_update_elem(&map_estab_sk, &sk_info.sk_key, &sk_info, BPF_NOEXIST); // 这里选择 BPF_NOEXIST
     if (err != 0) {
         // Storing the 4-tuple in map has failed, return early.
         // This can happen in case the 4-tuple already exists in the map (i.e. BPF_NOEXIST flag)

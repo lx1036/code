@@ -1,12 +1,5 @@
 
 
-/**
- * /root/linux-5.10.142/tools/testing/selftests/bpf/progs/sockopt_sk.c
- * /root/linux-5.10.142/tools/testing/selftests/bpf/progs/sockopt_inherit.c
- */
-
-
-
 #include <sys/socket.h>
 
 #include <linux/bpf.h>
@@ -42,6 +35,12 @@ struct {
 } socket_storage_map SEC(".maps");
 
 // EPERM: error permission
+
+/**
+ * /root/linux-5.10.142/tools/testing/selftests/bpf/progs/sockopt_sk.c
+ * /root/linux-5.10.142/tools/testing/selftests/bpf/prog_tests/sockopt_sk.c
+ */
+
 
 SEC("cgroup/getsockopt")
 int getsockopt1(struct bpf_sockopt *ctx) {
@@ -234,6 +233,11 @@ static __always_inline struct sockopt_inherit *get_storage(struct bpf_sockopt *c
     else
         return bpf_sk_storage_get(&listener_only_map, ctx->sk, 0, BPF_SK_STORAGE_GET_F_CREATE);
 }
+
+/**
+ * /root/linux-5.10.142/tools/testing/selftests/bpf/progs/sockopt_inherit.c
+ * /root/linux-5.10.142/tools/testing/selftests/bpf/prog_tests/sockopt_inherit.c
+ */
 
 SEC("cgroup/getsockopt")
 int getsockopt2(struct bpf_sockopt *ctx) {

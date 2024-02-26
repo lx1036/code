@@ -51,11 +51,10 @@ struct {
 
 static inline void update_event_map(int event) {
     __u32 key = 0;
-    struct tcpbpf_globals g, *gp;
+    struct tcpbpf_globals g = {}, *gp;
 
     gp = bpf_map_lookup_elem(&global_map, &key);
     if (gp == NULL) {
-        struct tcpbpf_globals g = {0};
         g.event_map |= (1 << event);
         bpf_map_update_elem(&global_map, &key, &g, BPF_ANY);
     } else {
@@ -91,7 +90,7 @@ int bpf_tcp_fsm(struct bpf_sock_ops *skops) {
                 g = *gp;
                 if (skops->args[0] == BPF_TCP_LISTEN) { // listen->close
                     g.num_listen++;
-                } else {
+                } else { // establish->close
                     g.total_retrans = skops->total_retrans;
                     g.data_segs_in = skops->data_segs_in;
                     g.data_segs_out = skops->data_segs_out;
@@ -103,9 +102,17 @@ int bpf_tcp_fsm(struct bpf_sock_ops *skops) {
             }
             break;
 
-            // 调用 listen() 切换到 listen 状态时调用
+            // server 调用 listen() 切换到 listen 状态时调用
         case BPF_SOCK_OPS_TCP_LISTEN_CB: {
+            // @see tcprtt_sockops.c: (skops, BPF_SOCK_OPS_RTT_CB_FLAG | BPF_SOCK_OPS_STATE_CB_FLAG);
             bpf_sock_ops_cb_flags_set(skops, BPF_SOCK_OPS_STATE_CB_FLAG);
+            /**
+            TCP_SAVE_SYN is a socket option that if saves SYN packet
+            具体来说，当 TCP_SAVE_SYN 标志打开时，内核会在结构体 tcp_options_received 中存储发送端的 SYN 报文信息。
+            这个结构体中包括了源 IP 地址、源端口号、初始序列号等字段。在连接建立完成后，
+            应用程序可以通过套接字选项来获取这些信息。
+            */
+            // tcpSaveSyn, err := unix.GetsockoptInt(serverFd, unix.SOL_TCP, unix.TCP_SAVE_SYN)
             v = (int) bpf_setsockopt(skops, IPPROTO_TCP, TCP_SAVE_SYN, &save_syn, sizeof(save_syn));
             /* Update global map result of setsock opt */
             __u32 key = 0;
@@ -117,6 +124,7 @@ int bpf_tcp_fsm(struct bpf_sock_ops *skops) {
             // active connection，就是 client 主动建立 tcp connection
         case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB: {
             /* Test failure to set largest cb flag (assumes not defined) */
+            // enable sockops callbacks for tcp state change
             bad_call_rv = (int) bpf_sock_ops_cb_flags_set(skops, 0x80); // 0x80=hex(1<<7)
             /* Set callback */
             good_call_rv = (int) bpf_sock_ops_cb_flags_set(skops, BPF_SOCK_OPS_STATE_CB_FLAG);
@@ -137,8 +145,13 @@ int bpf_tcp_fsm(struct bpf_sock_ops *skops) {
         case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
             skops->sk_txhash = 0x12345f;
             v = 0xff;
+            // IP_TOS (Type of Service) is a field in the Internet Protocol (IP) header that specifies the type of service requested by the sender of the datagram
             rv = (int) bpf_setsockopt(skops, SOL_IP, IP_TOS, &v, sizeof(v));
             if (skops->family == AF_INET) {
+                /**
+                 * TCP_SAVED_SYN is a Linux kernel feature that is used to implement the SYN cookies mechanism,
+                 * which is a defense against SYN flood attacks.
+                 */
                 v = (int) bpf_getsockopt(skops, IPPROTO_TCP, TCP_SAVED_SYN, header,
                                          (sizeof(struct iphdr) + sizeof(struct tcphdr))); // IPPROTO_TCP=SOL_TCP
                 if (!v) {

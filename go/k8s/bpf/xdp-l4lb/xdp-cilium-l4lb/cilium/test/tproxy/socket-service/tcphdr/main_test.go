@@ -10,8 +10,15 @@ import (
     "golang.org/x/sys/unix"
     "net"
     "os"
+    "os/signal"
+    "syscall"
     "testing"
 )
+
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -type bpf_test_option bpf test_tcp_hdr_options.c -- -I.
+
+// go generate .
+// CGO_ENABLED=0 go run .
 
 const (
     CgroupPath = "/sys/fs/cgroup/tcphdr"
@@ -42,7 +49,13 @@ type SkFds struct {
     active_lport  int // clientPort
 }
 
+// CGO_ENABLED=0 go test -v -run ^TestSimpleEstablish$ .
 func TestSimpleEstablish(test *testing.T) {
+    logrus.SetReportCaller(true)
+
+    stopCh := make(chan os.Signal, 1)
+    signal.Notify(stopCh, os.Interrupt, syscall.SIGTERM)
+
     skFds := SkFds{}
 
     cgroupPath := joinCgroup("tcphdr_opt")
@@ -90,6 +103,9 @@ func TestSimpleEstablish(test *testing.T) {
     }
 
     checkHdrAndCloseFds(&skFds)
+
+    // Wait
+    <-stopCh
 }
 
 func TestNoExperimentalEstablish(test *testing.T) {
@@ -255,6 +271,8 @@ func connectToFd(serverFd int) int {
     if err != nil {
         logrus.Fatal(err)
     }
+
+    //tcpSaveSyn, err := unix.GetsockoptInt(serverFd, unix.SOL_TCP, unix.TCP_SAVE_SYN)
 
     serverSockAddr, err := unix.Getsockname(serverFd)
     if err != nil {
