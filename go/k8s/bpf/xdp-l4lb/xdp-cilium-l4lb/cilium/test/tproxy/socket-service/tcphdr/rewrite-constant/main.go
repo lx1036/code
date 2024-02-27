@@ -2,13 +2,13 @@ package main
 
 import (
     "github.com/cilium/ebpf"
-    "github.com/cilium/ebpf/btf"
     "github.com/cilium/ebpf/link"
     "github.com/sirupsen/logrus"
     "net"
     "os"
     "os/signal"
     "syscall"
+    "time"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -type bpf_test_option bpf test_rewrite_const.c -- -I.
@@ -63,22 +63,51 @@ func main() {
     }
     defer l.Close()
 
-    /*for name, mapSpec := range spec.Maps {
-       logrus.Infof("map name: %s, mapSpec: %+v", name, *mapSpec)
-       if name == ".bss" {
-           for _, varSecinfo := range mapSpec.Value.(*btf.Datasec).Vars {
-               //logrus.Infof("%+v", varSecinfo.Type.(*btf.Var))
-               v := varSecinfo.Type.(*btf.Var)
-               logrus.Infof("%+v", v.Type)
-               u32 := v.Type.(*btf.Volatile).Type.(*btf.Typedef)
-               logrus.Infof("%+v", u32.Type.(*btf.Int))
-           }
-       }
-    }*/
+    time.Sleep(time.Second)
+
+    for name, mapSpec := range spec.Maps {
+        logrus.Infof("map name: %s, mapSpec: %+v", name, *mapSpec)
+        //if name == ".bss" { // 有两个 .bss map
+        m, err := ebpf.NewMap(mapSpec)
+        if err != nil {
+            logrus.Errorf("err: %v", err)
+            continue
+        }
+
+        mapInfo, err := m.Info()
+        if err != nil {
+            logrus.Error(err)
+        }
+        logrus.Infof("map.Info: %+v", mapInfo)
+
+        var val uint32
+        err = m.Lookup(uint32(0), &val)
+        if err != nil {
+            logrus.Errorf("err: %v", err)
+        }
+        logrus.Infof("val: %d", val)
+
+        //iterator := m.Iterate()
+        //var key uint32
+        //var value uint32
+        //for iterator.Next(&key, &value) {
+        //    logrus.Infof("key: %v, value: %v", key, value)
+        //}
+
+        //for _, varSecinfo := range mapSpec.Value.(*btf.Datasec).Vars {
+        //    //logrus.Infof("%+v", varSecinfo.Type.(*btf.Var))
+        //    v := varSecinfo.Type.(*btf.Var)
+        //    logrus.Infof("%+v", v.Type)
+        //    u32 := v.Type.(*btf.Volatile).Type.(*btf.Typedef)
+        //    logrus.Infof("%+v", u32.Type.(*btf.Int))
+        //}
+        //}
+    }
+
     // TODO: 无法访问 bpf 里 inherit_cb_flags 变量值
-    typ, err := spec.Types.AnyTypeByName("inherit_cb_flags")
-    logrus.Infof("%+v", typ)
-    logrus.Infof("%+v", typ.(*btf.Var).Type.(*btf.Volatile).Type.(*btf.Typedef).Type.(*btf.Int))
+    //typ, err := spec.Types.AnyTypeByName("inherit_cb_flags")
+    //logrus.Infof("%+v", typ)
+    //logrus.Infof("%+v", typ.(*btf.Var).Type.(*btf.Volatile).Type.(*btf.Typedef).Type.(*btf.Int))
 
     // Wait
     <-stopCh

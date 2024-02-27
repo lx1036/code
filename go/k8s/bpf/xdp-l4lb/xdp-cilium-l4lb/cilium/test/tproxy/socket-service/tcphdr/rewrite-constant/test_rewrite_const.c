@@ -14,7 +14,13 @@
 #include <bpf/bpf_endian.h>
 
 
-static volatile __u32 inherit_cb_flags = 0;
+/**
+* bpftool gen skeleton bpf_bpfel.o > bpf_bpfel.skel.h
+* readelf -a bpf_bpfel.o
+*/
+// https://cilium.slack.com/archives/C4XCTGYEM/p1709030644794629?thread_ts=1709025000.815169&cid=C4XCTGYEM
+__u32 inherit_cb_flags = 0;
+//static volatile __u32 inherit_cb_flags = 0;
 
 struct bpf_test_option {
     __u8 flags;
