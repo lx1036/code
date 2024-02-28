@@ -103,18 +103,18 @@ static __always_inline int xdp_acl_ipv4_port(struct xdp_md *ctx) {
 
     struct iphdr *ipv4h = (data + sizeof(struct ethhdr));
     if ((void *) (ipv4h + 1) > data_end) {
-//        bpf_printk("fail to lookup from servers map. (void *) (ipv4h + 1) > data_end"); // 这里不能打印日志
+        bpf_printk("fail to lookup from servers map. (void *) (ipv4h + 1) > data_end"); // 这里不能打印日志
         return XDP_DROP;
     }
     if (ipv4h->ihl != 5) { // 必然是 5，感觉这种检查意义不大
-        // bpf_printk("fail to lookup from servers map. ipv4h->ihl != 5");
+        bpf_printk("fail to lookup from servers map. ipv4h->ihl != 5");
         return XDP_PASS;
     }
 
     // 这个逻辑是为了调试，因为 ecs eth0 网卡一直都有流量，这里限定另一台 ecs saddr 发 tcp 包
-    if (ipv4h->saddr != bpf_htonl(0xac100a02)) { /* 172.16.10.2 */
-        return XDP_PASS;
-    }
+//    if (ipv4h->saddr != bpf_htonl(0xac100a02)) { /* 172.16.10.2 */
+//        return XDP_PASS;
+//    }
 
     // 1.因为 eth0 可能绑定多个 ip 地址，dstIP 必须是指定的 ip，必须做检查过滤
     __u32 key = 0;
@@ -133,24 +133,25 @@ static __always_inline int xdp_acl_ipv4_port(struct xdp_md *ctx) {
             break; // break 起作用的
         }
 
-        bpf_printk("target_ip not found %d", i);
+//        bpf_printk("target_ip not found %d", i);
     }
 
     // bpf_printk("target_ip 0x%x", server->target_ips[0]);
 
     if (!found) {
-        bpf_printk("dst ip: 0x%x is not target ip, skip it. target_ip 0x%x", ipv4h->daddr,
-                   server->target_ips[0]); // 使用 u32toIP() 报错
+        // 使用 u32toIP() 报错
+//        bpf_printk("dst ip: 0x%x is not target ip, skip it. target_ip 0x%x", ipv4h->daddr, server->target_ips[0]);
         return XDP_PASS;
     }
 
-    bpf_debug_printk("dst ip: 0x%x is a target ip, acl it.", ipv4h->daddr); // XDPACL_DEBUG 参数起作用的, %pI4 不行
+//    bpf_debug_printk("dst ip: 0x%x is a target ip, acl it.", ipv4h->daddr); // XDPACL_DEBUG 参数起作用的, %pI4 不行
 
     if (ipv4h->protocol != IPPROTO_TCP && ipv4h->protocol != IPPROTO_UDP) {
         bpf_printk("protocol: %x is not tcp or udp, skip it.", ipv4h->protocol);
         return XDP_PASS;
     }
 
+    // 这样可以不用区分 tcphdr 和 udphdr
     struct ports *port;
     port = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
     if ((void *) (port + 1) > data_end) {
@@ -158,15 +159,21 @@ static __always_inline int xdp_acl_ipv4_port(struct xdp_md *ctx) {
         return XDP_PASS;
     }
 
+    // 这个逻辑是为了调试，因为 lo 网卡一直都有 tcp 包，把 ->9090 包过滤出来
+    if (bpf_ntohs(port->dest) != 9090) {
+        return XDP_PASS;
+    }
+
     // unsigned short, __u16 -> unsigned int, __u32
-    // __u32 dst_port = bpf_ntohs(port->dest); // network to host shorts
     struct endpoint endpoint = {}; // 对象初始化
-    endpoint.dport = port->dest;
+    // network to host shorts, 不加 bpf_ntohs() dport 为 0x8223, 而是加上 hex(9090)=0x2382, 需要注意!!!
+    endpoint.dport = bpf_ntohs(port->dest);
     endpoint.protocol = ipv4h->protocol;
     // bpftool map dump name endpoints | jq
     struct action *action;
     action = bpf_map_lookup_elem(&endpoints, &endpoint); // 这里报错一直查找不到对应的 endpoint???
     if (!action) {
+        bpf_printk("dport: %x, protocol: %x", endpoint.dport, endpoint.protocol);
         // fail to lookup endpoints map, dport: 9090, protocol: 6, action:0
         bpf_printk("fail to lookup endpoints map, dport: %d, protocol: %x, action:%x", bpf_ntohs(port->dest),
                    ipv4h->protocol, action);
@@ -174,7 +181,7 @@ static __always_inline int xdp_acl_ipv4_port(struct xdp_md *ctx) {
     }
 
     if (action->action == 0) { // deny
-        bpf_printk("action of protocol:%x port:%d is deny, drop it.", ipv4h->protocol, port->dest);
+        bpf_printk("action of protocol:%x port:%d is deny, drop it.", ipv4h->protocol, bpf_ntohs(port->dest));
         return XDP_DROP;
     }
 
@@ -186,6 +193,9 @@ static __always_inline int xdp_acl_ipv4_port(struct xdp_md *ctx) {
  * 根据 protocol/svcPort 来判断 action(XDP_PASS/XDP_DROP)
  *
  * 但是没有验证通过!!! 这里报错一直查找不到对应的 endpoint???
+ * 答案已经找到：bpf_ntohs(port->dest) 需要加上 bpf_ntohs(), 验证通过!!!
+ *
+ * TODO: 根据 bitmap 来寻找 action rule, 减少内存
  */
 
 SEC("xdp_acl")
