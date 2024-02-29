@@ -11,6 +11,16 @@
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 
+
+/**
+ * 注意：struct bpf_sk_lookup 的 bpf_sk_assign() 和 struct __sk_buff 的 bpf_sk_assign() 函数签名不一样，不是一个函数。
+ *
+ * sk_lookup hook 点处的 linux 源码:
+ * udp: https://github.com/jsitnicki/linux/commit/05a546b79413942da56a3b5d210b3716fe0aac0a
+ * tcp: https://github.com/jsitnicki/linux/commit/18a340195205e97f616bdacc9948cbf481158615
+ * https://github.com/torvalds/linux/blob/master/Documentation/bpf/prog_sk_lookup.rst
+ */
+
 #define MAX_SOCKS 32
 #define IP4(a, b, c, d)                    \
     bpf_htonl((((__u32)(a) & 0xffU) << 24) |    \

@@ -18,6 +18,7 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go bpf acl.c -- -I.
 
 const (
+    // 经过测试: 本地运行换成 eth0-acl 网卡和 ip 不行，还是走的 127.0.0.1
     INADDR_TEST = "127.0.0.1"
     BindPort    = 9090
 

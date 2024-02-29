@@ -14,6 +14,11 @@
 #include <bpf/bpf_endian.h>
 
 
+/**
+ * 注意：struct bpf_sk_lookup 的 bpf_sk_assign() 和 struct __sk_buff 的 bpf_sk_assign() 函数签名不一样，不是一个函数。
+ */
+
+
 #ifndef __section
 #define __section(X) __attribute__((section(X), used))
 #endif

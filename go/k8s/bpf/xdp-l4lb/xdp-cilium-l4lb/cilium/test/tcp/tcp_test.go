@@ -26,6 +26,7 @@ func TestUint8(test *testing.T) {
     fmt.Println(strconv.Itoa(0x55))       // 85
     fmt.Println(strconv.Itoa(0x55AA * 2)) // 21930 * 2
 
+    fmt.Println(int(^uint(0) >> 1)) // 9223372036854775807
 }
 
 func TestGetSocketOptType(test *testing.T) {

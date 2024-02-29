@@ -247,6 +247,7 @@ int ingress_read_sock_fields(struct __sk_buff *skb) {
 
     linum_idx = INGRESS_LINUM_IDX;
 
+    // 已经找到 socket
     sk = skb->sk;
     if (!sk)
         return ret_log(linum_idx);
@@ -257,7 +258,7 @@ int ingress_read_sock_fields(struct __sk_buff *skb) {
         return CG_OK;
 
     /* Only interested in TCP_LISTEN */
-    if (sk->state != 10)
+    if (sk->state != BPF_TCP_LISTEN)
         return CG_OK;
 
     /* It must be a fullsock for cgroup_skb/ingress prog */
@@ -286,6 +287,7 @@ int read_sk_dst_port(struct __sk_buff *skb) {
         return ret_log(linum_idx);
 
     /* Ignore everything but the SYN from the client socket */
+    // 只关注 syn 包
     if (sk->state != BPF_TCP_SYN_SENT)
         return CG_OK;
 

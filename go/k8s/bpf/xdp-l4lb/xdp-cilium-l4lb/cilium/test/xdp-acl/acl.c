@@ -171,7 +171,7 @@ static __always_inline int xdp_acl_ipv4_port(struct xdp_md *ctx) {
     endpoint.protocol = ipv4h->protocol;
     // bpftool map dump name endpoints | jq
     struct action *action;
-    action = bpf_map_lookup_elem(&endpoints, &endpoint); // 这里报错一直查找不到对应的 endpoint???
+    action = bpf_map_lookup_elem(&endpoints, &endpoint);
     if (!action) {
         bpf_printk("dport: %x, protocol: %x", endpoint.dport, endpoint.protocol);
         // fail to lookup endpoints map, dport: 9090, protocol: 6, action:0

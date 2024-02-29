@@ -3,6 +3,36 @@
 // /root/linux-5.10.142/tools/testing/selftests/bpf/test_tcp_hdr_options.h
 // /root/linux-5.10.142/tools/testing/selftests/bpf/prog_tests/tcp_hdr_options.c
 
+/**
+ * https://github.com/torvalds/linux/commit/ad2f8eb0095e9036724d9cf0eb6960f1e6d52d21
+ * https://lwn.net/Articles/827672/
+ *
+ * This patch adds tests for the new bpf tcp header option feature.
+
+test_tcp_hdr_options.c:
+- It tests header option writing and parsing in 3WHS: regular
+  connection establishment, fastopen, and syncookie.
+- In syncookie, the passive side's bpf prog is asking the active side
+  to resend its bpf header option by specifying a RESEND bit in the
+  outgoing SYNACK. handle_active_estab() and write_nodata_opt() has
+  some details.
+- handle_passive_estab() has comments on fastopen.
+- It also has test for header writing and parsing in FIN packet.
+- Most of the tests is writing an experimental option 254 with magic 0xeB9F.
+- The no_exprm_estab() also tests writing a regular TCP option
+  without any magic.
+
+test_misc_tcp_options.c:
+- It is an one directional test.  Active side writes option and
+  passive side parses option.  The focus is to exercise
+  the new helpers and API.
+- Testing the new helper: bpf_load_hdr_opt() and bpf_store_hdr_opt().
+- Testing the bpf_getsockopt(TCP_BPF_SYN).
+- Negative tests for the above helpers.
+- Testing the sock_ops->skb_data.
+ */
+
+
 #include <stddef.h>
 #include <stdbool.h>
 // #include <errno.h>
