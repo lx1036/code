@@ -5,6 +5,7 @@ import (
     "fmt"
     "github.com/cilium/ebpf"
     "golang.org/x/sys/unix"
+    "sort"
     "strings"
     "syscall"
 )
@@ -279,13 +280,59 @@ func newDestinationKey(dest *Destination) (*destinationKey, error) {
 
 type destinationValue struct {
     ID    DestinationID
-    Count uint32
+    Count uint32 // 引用计数,比如 foo label 可以 bind 多次 ip:port
 }
 
+// getAllocation returns an existing allocation, or creates a new one with an unused ID.
 func (destinations *Destinations) getAllocation(key *destinationKey) (*destinationValue, error) {
     alloc := new(destinationValue)
     if err := destinations.destinations.Lookup(key, alloc); err == nil {
         return alloc, nil
+    }
+
+    var (
+        unused destinationKey
+        ids    []DestinationID
+        iter   = destinations.destinations.Iterate()
+    )
+    for iter.Next(&unused, alloc) {
+        if destinations.allocationInUse(alloc) {
+            ids = append(ids, alloc.ID)
+        }
+    }
+    if err := iter.Err(); err != nil {
+        return nil, fmt.Errorf("iterate allocations: %s", err)
+    }
+
+    // [0, destinations.maxID] 之间找出 unused id，按照顺序 lookup
+    id := DestinationID(0)
+    if len(ids) > 0 {
+        sort.Slice(ids, func(i, j int) bool {
+            return ids[i] < ids[j]
+        })
+
+        for _, allocatedID := range ids {
+            if id < allocatedID {
+                break
+            }
+
+            id = allocatedID + 1
+            if id == 0 || id >= destinations.maxID {
+                return nil, fmt.Errorf("allocate destination: ran out of ids")
+            }
+        }
+    }
+
+    // Reset metrics to zero. There is currently no more straighforward way to do this.
+    // INFO: 注意这里用的是数组
+    var perCPUMetrics []DestinationMetrics
+    if err := destinations.metrics.Lookup(id, &perCPUMetrics); err != nil {
+        return nil, fmt.Errorf("lookup metrics for id %d: %s", id, err)
+    }
+
+    zero := make([]DestinationMetrics, len(perCPUMetrics))
+    if err := destinations.metrics.Put(id, zero); err != nil {
+        return nil, fmt.Errorf("zero metrics for id %d: %s", id, err)
     }
 
     alloc = &destinationValue{ID: id}
@@ -295,6 +342,19 @@ func (destinations *Destinations) getAllocation(key *destinationKey) (*destinati
     }
 
     return alloc, nil
+}
+
+func (destinations *Destinations) allocationInUse(alloc *destinationValue) bool {
+    if alloc.Count > 0 {
+        // There is at least one outstanding user of this ID.
+        return true
+    }
+
+    // There is no outstanding user, but we might need the ID to refer to an
+    // existing socket. Do a lookup in our sockmap to find out.
+    var unused uint64
+    err := destinations.sockets.Lookup(alloc.ID, &unused)
+    return !errors.Is(err, ebpf.ErrKeyNotExist)
 }
 
 // ReleaseByID releases a reference on a destination by its ID.
@@ -321,6 +381,26 @@ func (destinations *Destinations) ReleaseByID(id DestinationID) error {
     return fmt.Errorf("release reference: no allocation for id %d", id)
 }
 
+func (destinations *Destinations) releaseAllocation(key *destinationKey, alloc destinationValue) error {
+    if alloc.Count == 0 {
+        return fmt.Errorf("release id: underflow")
+    }
+
+    alloc.Count--
+    if destinations.allocationInUse(&alloc) {
+        if err := destinations.destinations.Update(key, &alloc, ebpf.UpdateExist); err != nil {
+            return fmt.Errorf("release id for %s: %s", key, err)
+        }
+        return nil
+    }
+
+    // There are no more references, and no socket. We can release the allocation.
+    if err := destinations.destinations.Delete(key); err != nil {
+        return fmt.Errorf("delete allocation: %s", err)
+    }
+    return nil
+}
+
 // Close INFO: 这里才 close bpf map
 func (destinations *Destinations) Close() error {
     if err := destinations.destinations.Close(); err != nil {
@@ -330,4 +410,14 @@ func (destinations *Destinations) Close() error {
         return err
     }
     return destinations.sockets.Close()
+}
+
+type DestinationMetrics struct {
+    // Total number of times traffic matched a destination.
+    Lookups uint64
+    // Total number of failed lookups since no socket was registered.
+    Misses uint64
+    // Total number of failed lookups since the socket was incompatible
+    // with the incoming traffic.
+    ErrorBadSocket uint64
 }

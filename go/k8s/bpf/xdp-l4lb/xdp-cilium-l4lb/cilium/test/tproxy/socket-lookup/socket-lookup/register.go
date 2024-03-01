@@ -17,7 +17,7 @@ var (
     netns         string
     registerLabel string
     protocol      string
-    ip            string
+    registerIp    string
     port          int
 )
 
@@ -33,7 +33,7 @@ func init() {
     viper.BindPFlag("label", flags.Lookup("label"))
     flags.StringVarP(&protocol, "protocol", "", "tcp", "protocol")
     viper.BindPFlag("protocol", flags.Lookup("protocol"))
-    flags.StringVarP(&ip, "ip", "", "127.0.0.1", "ip")
+    flags.StringVarP(&registerIp, "ip", "", "127.0.0.1", "ip")
     viper.BindPFlag("ip", flags.Lookup("ip"))
     flags.IntVarP(&port, "port", "", 0, "port")
     viper.BindPFlag("port", flags.Lookup("port"))
@@ -56,7 +56,7 @@ var registerCmd = &cobra.Command{
 }
 
 func registerPid() error {
-    netaddrIP, err := netaddr.ParseIP(ip)
+    netaddrIP, err := netaddr.ParseIP(registerIp)
     if err != nil {
         return err
     }
@@ -91,7 +91,7 @@ func registerFiles(label string, files []*os.File) error {
         return fmt.Errorf("no sockets")
     }
 
-    dispatcher, err := OpenDispatcher()
+    dispatcher, err := OpenDispatcher(false)
     if err != nil {
         return err
     }
@@ -146,7 +146,11 @@ func socketCookie(conn syscall.Conn) (string, error) {
         return "", fmt.Errorf("getsockopt(SO_COOKIE): %v", err)
     }
 
-    return fmt.Sprintf("sk:%d", cookie), nil
+    if cookie == 0 {
+        return fmt.Sprintf("sk:-"), nil
+    }
+
+    return fmt.Sprintf("sk:%x", uint64(cookie)), nil
 }
 
 // 比较两个 netns 是否相等，可以参考

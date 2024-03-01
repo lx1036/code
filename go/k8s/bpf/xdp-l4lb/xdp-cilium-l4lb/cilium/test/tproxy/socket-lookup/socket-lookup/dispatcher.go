@@ -25,11 +25,17 @@ func init() {
 
 }
 
+// CGO_ENABLED=0 go run . load
 var loadCmd = &cobra.Command{
     Use:     "load",
     Example: "load",
     Run: func(cmd *cobra.Command, args []string) {
-        CreateDispatcher()
+        dispatcher, err := CreateDispatcher()
+        if err != nil {
+            logrus.Errorf("err: %v", err)
+            return
+        }
+        defer dispatcher.Close()
     },
 }
 
@@ -59,6 +65,11 @@ func CreateDispatcher() (*Dispatcher, error) {
         return nil, err
     }
     defer netNs.Close()
+
+    err = os.MkdirAll(pinPath, 0750)
+    if err != nil {
+        return nil, err
+    }
 
     objs := dispatcherObjects{}
     opts := &ebpf.CollectionOptions{
@@ -135,7 +146,7 @@ func UnloadDispatcher() {
 }
 
 // OpenDispatcher loads an existing dispatcher from a namespace.
-func OpenDispatcher() (*Dispatcher, error) {
+func OpenDispatcher(readOnly bool) (*Dispatcher, error) {
     netNs, pinPath, err := openNetNS(NetnsPath, BPFFsPath)
     if err != nil {
         return nil, err
@@ -147,11 +158,30 @@ func OpenDispatcher() (*Dispatcher, error) {
     if err != nil {
         return nil, err
     }
+    var specs dispatcherSpecs
+    err = spec.Assign(&specs)
+    if err != nil {
+        return nil, err
+    }
+    // check max_entries of sockets/destinations/destination_metrics
+    maxSockets := specs.Sockets.MaxEntries
+    for _, m := range []*ebpf.MapSpec{
+        specs.Destinations,
+        specs.DestinationMetrics,
+    } {
+        if m.MaxEntries != maxSockets {
+            return nil, fmt.Errorf("map %q has %d max entries instead of %d", m.Name, m.MaxEntries, maxSockets)
+        }
+    }
+    // set key_size/value_size of destinations
+    specs.Destinations.KeySize = uint32(binary.Size(destinationKey{}))
+    specs.Destinations.ValueSize = uint32(binary.Size(destinationValue{}))
+
     err = spec.LoadAndAssign(&objs, &ebpf.CollectionOptions{
         Maps: ebpf.MapOptions{
             PinPath: pinPath, // /sys/fs/bpf/xxx_dispatcher/
             LoadPinOptions: ebpf.LoadPinOptions{
-                ReadOnly: true, // 注意这个参数
+                ReadOnly: readOnly, // 注意这个参数
             },
         },
     })

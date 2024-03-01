@@ -24,7 +24,7 @@
 //};
 
 /* Pin map under /sys/fs/bpf/tc/globals/<map name> */
-#define PIN_GLOBAL_NS 2
+//#define PIN_GLOBAL_NS 2
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -59,7 +59,7 @@ struct {
     __uint(key_size, sizeof(destination_id_t));
     __uint(value_size, sizeof(__u64));
     __uint(max_entries, MAX_SOCKETS);
-    __uint(pinning, PIN_GLOBAL_NS);
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
 } sockets SEC(".maps");
 
 struct {
@@ -68,7 +68,7 @@ struct {
     __type(value, struct binding);
     __uint(max_entries, MAX_BINDINGS);
     __uint(map_flags, BPF_F_NO_PREALLOC);
-    __uint(pinning, PIN_GLOBAL_NS);
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
 } bindings SEC(".maps");
 
 struct {
@@ -76,7 +76,7 @@ struct {
     __uint(key_size, 0);
     __uint(value_size, 0);
     __uint(max_entries, MAX_SOCKETS);
-    __uint(pinning, PIN_GLOBAL_NS);
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
 } destinations SEC(".maps");
 
 struct {
@@ -84,7 +84,7 @@ struct {
     __type(key, destination_id_t);
     __type(value, struct destination_metrics);
     __uint(max_entries, MAX_SOCKETS);
-    __uint(pinning, PIN_GLOBAL_NS);
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
 } destination_metrics SEC(".maps");
 
 static inline void cleanup_sk(struct bpf_sock **sk) {
@@ -171,6 +171,9 @@ int dispatcher(struct bpf_sk_lookup *ctx) {
 
     int err = bpf_sk_assign(ctx, sk, 0);
     if (err) {
+        if (sk) {
+            bpf_sk_release(sk);
+        }
         /* Same as for no socket case above,
          * except here socket is not compatible
          * with the IP family or L4 transport
@@ -181,6 +184,9 @@ int dispatcher(struct bpf_sk_lookup *ctx) {
         return SK_DROP;
     }
 
+    if (sk) {
+        bpf_sk_release(sk);
+    }
     /* Found and selected a suitable socket. Direct
 	 * the incoming connection to it. */
     return SK_PASS;

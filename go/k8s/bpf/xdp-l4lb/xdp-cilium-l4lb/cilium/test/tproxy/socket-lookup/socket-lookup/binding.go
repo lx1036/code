@@ -31,7 +31,6 @@ func init() {
     viper.BindPFlag("ip-prefix", flags.Lookup("ip-prefix"))
     flags.IntVarP(&bindPort, "port", "", 0, "port")
     viper.BindPFlag("port", flags.Lookup("port"))
-
 }
 
 var bindCmd = &cobra.Command{
@@ -41,7 +40,7 @@ var bindCmd = &cobra.Command{
         bind --label=bar --protocol=tcp --ip-prefix=127.0.0.1/32 --port=80
     `,
     Run: func(cmd *cobra.Command, args []string) {
-        dispatcher, err := OpenDispatcher()
+        dispatcher, err := OpenDispatcher(false)
         if err != nil {
             logrus.Errorf("[bind]err: %v", err)
             return
@@ -53,7 +52,10 @@ var bindCmd = &cobra.Command{
             return
         }
 
-        dispatcher.AddBinding(binding)
+        if err := dispatcher.AddBinding(binding); err != nil {
+            logrus.Errorf("[bind]err: %v", err)
+            return
+        }
     },
 }
 
@@ -134,7 +136,6 @@ type bindingValue struct {
 
 // AddBinding bindings 和 destinations bpf map 要一一对应
 func (dispatcher *Dispatcher) AddBinding(binding *Binding) error {
-
     key := newBindingKey(binding)
 
     var old bindingValue
@@ -161,7 +162,10 @@ func (dispatcher *Dispatcher) AddBinding(binding *Binding) error {
     }
 
     if releaseOldID {
-        dispatcher.destinations.ReleaseByID(old.ID)
+        err = dispatcher.destinations.ReleaseByID(old.ID)
+        if err != nil {
+            logrus.Errorf("err: %v", err)
+        }
     }
 
     return nil
