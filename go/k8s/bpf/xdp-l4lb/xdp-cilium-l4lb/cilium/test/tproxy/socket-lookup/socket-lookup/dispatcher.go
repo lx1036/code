@@ -52,6 +52,8 @@ type Dispatcher struct {
     destinations *Destinations
 }
 
+// CreateDispatcher
+// object pin 的作用: https://docs.cilium.io/en/latest/bpf/architecture/#object-pinning , 解耦 map/program/link 和进程的生命周期
 func CreateDispatcher() (*Dispatcher, error) {
     var err error
     closeOnError := func(c io.Closer) {

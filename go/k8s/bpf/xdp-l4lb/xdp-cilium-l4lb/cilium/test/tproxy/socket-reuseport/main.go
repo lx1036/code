@@ -147,7 +147,8 @@ func prepare_sk_fds(socketType, reuseportProgFd int) {
 
         err = unix.SetsockoptInt(sk_fds[i], unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
 
-        // INFO: 1.挂载 reuseport bpf program
+        // INFO: 1.挂载 reuseport bpf program, 这里只有第一个 socket_fd 挂载了 reuseport ebpf，但是可以每个 socket_fd 都挂载，
+        //  见 go/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/test/tproxy/socket-lookup/main.go
         if i == REUSEPORT_ARRAY_SIZE {
             err = unix.SetsockoptInt(sk_fds[i], unix.SOL_SOCKET, unix.SO_ATTACH_REUSEPORT_EBPF, reuseportProgFd)
         }

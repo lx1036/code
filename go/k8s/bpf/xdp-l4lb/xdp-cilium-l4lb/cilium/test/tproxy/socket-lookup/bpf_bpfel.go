@@ -53,15 +53,27 @@ type bpfSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfProgramSpecs struct {
-	LookupDrop              *ebpf.ProgramSpec `ebpf:"lookup_drop"`
-	LookupPass              *ebpf.ProgramSpec `ebpf:"lookup_pass"`
-	RedirIp                 *ebpf.ProgramSpec `ebpf:"redir_ip"`
-	RedirPort               *ebpf.ProgramSpec `ebpf:"redir_port"`
-	ReuseportDrop           *ebpf.ProgramSpec `ebpf:"reuseport_drop"`
-	ReuseportPass           *ebpf.ProgramSpec `ebpf:"reuseport_pass"`
-	SelectSockA             *ebpf.ProgramSpec `ebpf:"select_sock_a"`
-	SelectSockA_noReuseport *ebpf.ProgramSpec `ebpf:"select_sock_a_no_reuseport"`
-	SelectSockB             *ebpf.ProgramSpec `ebpf:"select_sock_b"`
+	AccessCtxSk                *ebpf.ProgramSpec `ebpf:"access_ctx_sk"`
+	CtxNarrowAccess            *ebpf.ProgramSpec `ebpf:"ctx_narrow_access"`
+	LookupDrop                 *ebpf.ProgramSpec `ebpf:"lookup_drop"`
+	LookupPass                 *ebpf.ProgramSpec `ebpf:"lookup_pass"`
+	MultiProgDrop1             *ebpf.ProgramSpec `ebpf:"multi_prog_drop1"`
+	MultiProgDrop2             *ebpf.ProgramSpec `ebpf:"multi_prog_drop2"`
+	MultiProgPass1             *ebpf.ProgramSpec `ebpf:"multi_prog_pass1"`
+	MultiProgPass2             *ebpf.ProgramSpec `ebpf:"multi_prog_pass2"`
+	MultiProgRedir1            *ebpf.ProgramSpec `ebpf:"multi_prog_redir1"`
+	MultiProgRedir2            *ebpf.ProgramSpec `ebpf:"multi_prog_redir2"`
+	RedirIp                    *ebpf.ProgramSpec `ebpf:"redir_ip"`
+	RedirPort                  *ebpf.ProgramSpec `ebpf:"redir_port"`
+	ReuseportDrop              *ebpf.ProgramSpec `ebpf:"reuseport_drop"`
+	ReuseportPass              *ebpf.ProgramSpec `ebpf:"reuseport_pass"`
+	SelectSockA                *ebpf.ProgramSpec `ebpf:"select_sock_a"`
+	SelectSockA_noReuseport    *ebpf.ProgramSpec `ebpf:"select_sock_a_no_reuseport"`
+	SelectSockB                *ebpf.ProgramSpec `ebpf:"select_sock_b"`
+	SkAssignEexist             *ebpf.ProgramSpec `ebpf:"sk_assign_eexist"`
+	SkAssignEstabsocknosupport *ebpf.ProgramSpec `ebpf:"sk_assign_estabsocknosupport"`
+	SkAssignNull               *ebpf.ProgramSpec `ebpf:"sk_assign_null"`
+	SkAssignReplaceFlag        *ebpf.ProgramSpec `ebpf:"sk_assign_replace_flag"`
 }
 
 // bpfMapSpecs contains maps before they are loaded into the kernel.
@@ -69,6 +81,7 @@ type bpfProgramSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
 	RedirMap *ebpf.MapSpec `ebpf:"redir_map"`
+	RunMap   *ebpf.MapSpec `ebpf:"run_map"`
 }
 
 // bpfObjects contains all objects after they have been loaded into the kernel.
@@ -91,11 +104,13 @@ func (o *bpfObjects) Close() error {
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
 	RedirMap *ebpf.Map `ebpf:"redir_map"`
+	RunMap   *ebpf.Map `ebpf:"run_map"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
 		m.RedirMap,
+		m.RunMap,
 	)
 }
 
@@ -103,21 +118,41 @@ func (m *bpfMaps) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfPrograms struct {
-	LookupDrop              *ebpf.Program `ebpf:"lookup_drop"`
-	LookupPass              *ebpf.Program `ebpf:"lookup_pass"`
-	RedirIp                 *ebpf.Program `ebpf:"redir_ip"`
-	RedirPort               *ebpf.Program `ebpf:"redir_port"`
-	ReuseportDrop           *ebpf.Program `ebpf:"reuseport_drop"`
-	ReuseportPass           *ebpf.Program `ebpf:"reuseport_pass"`
-	SelectSockA             *ebpf.Program `ebpf:"select_sock_a"`
-	SelectSockA_noReuseport *ebpf.Program `ebpf:"select_sock_a_no_reuseport"`
-	SelectSockB             *ebpf.Program `ebpf:"select_sock_b"`
+	AccessCtxSk                *ebpf.Program `ebpf:"access_ctx_sk"`
+	CtxNarrowAccess            *ebpf.Program `ebpf:"ctx_narrow_access"`
+	LookupDrop                 *ebpf.Program `ebpf:"lookup_drop"`
+	LookupPass                 *ebpf.Program `ebpf:"lookup_pass"`
+	MultiProgDrop1             *ebpf.Program `ebpf:"multi_prog_drop1"`
+	MultiProgDrop2             *ebpf.Program `ebpf:"multi_prog_drop2"`
+	MultiProgPass1             *ebpf.Program `ebpf:"multi_prog_pass1"`
+	MultiProgPass2             *ebpf.Program `ebpf:"multi_prog_pass2"`
+	MultiProgRedir1            *ebpf.Program `ebpf:"multi_prog_redir1"`
+	MultiProgRedir2            *ebpf.Program `ebpf:"multi_prog_redir2"`
+	RedirIp                    *ebpf.Program `ebpf:"redir_ip"`
+	RedirPort                  *ebpf.Program `ebpf:"redir_port"`
+	ReuseportDrop              *ebpf.Program `ebpf:"reuseport_drop"`
+	ReuseportPass              *ebpf.Program `ebpf:"reuseport_pass"`
+	SelectSockA                *ebpf.Program `ebpf:"select_sock_a"`
+	SelectSockA_noReuseport    *ebpf.Program `ebpf:"select_sock_a_no_reuseport"`
+	SelectSockB                *ebpf.Program `ebpf:"select_sock_b"`
+	SkAssignEexist             *ebpf.Program `ebpf:"sk_assign_eexist"`
+	SkAssignEstabsocknosupport *ebpf.Program `ebpf:"sk_assign_estabsocknosupport"`
+	SkAssignNull               *ebpf.Program `ebpf:"sk_assign_null"`
+	SkAssignReplaceFlag        *ebpf.Program `ebpf:"sk_assign_replace_flag"`
 }
 
 func (p *bpfPrograms) Close() error {
 	return _BpfClose(
+		p.AccessCtxSk,
+		p.CtxNarrowAccess,
 		p.LookupDrop,
 		p.LookupPass,
+		p.MultiProgDrop1,
+		p.MultiProgDrop2,
+		p.MultiProgPass1,
+		p.MultiProgPass2,
+		p.MultiProgRedir1,
+		p.MultiProgRedir2,
 		p.RedirIp,
 		p.RedirPort,
 		p.ReuseportDrop,
@@ -125,6 +160,10 @@ func (p *bpfPrograms) Close() error {
 		p.SelectSockA,
 		p.SelectSockA_noReuseport,
 		p.SelectSockB,
+		p.SkAssignEexist,
+		p.SkAssignEstabsocknosupport,
+		p.SkAssignNull,
+		p.SkAssignReplaceFlag,
 	)
 }
 

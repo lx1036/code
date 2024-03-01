@@ -65,6 +65,7 @@ struct {
     __uint(max_entries, MAX_SOCKS);
     __type(key, __u32);
     __type(value, __u64);
+//    __uint(pinning, LIBBPF_PIN_BY_NAME); // 方便调试，先不用 pin map
 } redir_map SEC(".maps");
 
 struct {
@@ -72,6 +73,7 @@ struct {
     __uint(max_entries, 2);
     __type(key, int);
     __type(value, int);
+//    __uint(pinning, LIBBPF_PIN_BY_NAME);
 } run_map SEC(".maps");
 
 
@@ -100,11 +102,6 @@ SEC("sk_lookup/redir_port")
 int redir_port(struct bpf_sk_lookup *ctx) {
     struct bpf_sock *sk;
     int err;
-
-    if (ctx->protocol != IPPROTO_UDP) {
-        bpf_printk("not IPPROTO_UDP port %d", ctx->local_port);
-        return SK_PASS;
-    }
 
     if (ctx->local_port != DST_PORT) {// 注意这里的 ctx->local_port 才是 dst_port
         bpf_printk("bpf_sk_assign port %d", ctx->local_port);

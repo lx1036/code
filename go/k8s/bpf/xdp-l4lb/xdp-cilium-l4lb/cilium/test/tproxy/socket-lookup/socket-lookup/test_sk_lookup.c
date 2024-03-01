@@ -171,9 +171,7 @@ int dispatcher(struct bpf_sk_lookup *ctx) {
 
     int err = bpf_sk_assign(ctx, sk, 0);
     if (err) {
-        if (sk) {
-            bpf_sk_release(sk);
-        }
+        bpf_sk_release(sk);
         /* Same as for no socket case above,
          * except here socket is not compatible
          * with the IP family or L4 transport
@@ -184,9 +182,7 @@ int dispatcher(struct bpf_sk_lookup *ctx) {
         return SK_DROP;
     }
 
-    if (sk) {
-        bpf_sk_release(sk);
-    }
+    bpf_sk_release(sk);
     /* Found and selected a suitable socket. Direct
 	 * the incoming connection to it. */
     return SK_PASS;

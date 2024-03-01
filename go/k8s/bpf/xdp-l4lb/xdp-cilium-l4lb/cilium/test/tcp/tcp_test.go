@@ -5,6 +5,7 @@ import (
     "fmt"
     "github.com/sirupsen/logrus"
     "golang.org/x/sys/unix"
+    "net"
     "strconv"
     "testing"
 )
@@ -46,4 +47,79 @@ func TestGetSocketOptType(test *testing.T) {
     } else {
         logrus.Info("fail")
     }
+}
+
+// CGO_ENABLED=0 go test -v -run ^TestUdpEchoServer$ .
+// udp echo server 打印成功:
+// "server unix.Recvmsg from client: a"
+// "client unix.Recvmsg from server: a"
+func TestUdpEchoServer(test *testing.T) {
+    // server
+    serverFd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, 0)
+    if err != nil {
+        logrus.Errorf("unix.Socket err: %v", err)
+        return
+    }
+    defer unix.Close(serverFd)
+    err = unix.SetsockoptInt(serverFd, unix.SOL_IP, unix.IP_RECVORIGDSTADDR, 1)
+    if err != nil {
+        logrus.Errorf("unix.SetsockoptInt err: %v", err)
+        return
+    }
+    ipAddr := net.ParseIP("127.0.0.1")
+    sa := &unix.SockaddrInet4{
+        Port: 8001,
+        Addr: [4]byte{},
+    }
+    copy(sa.Addr[:], ipAddr)
+    err = unix.Bind(serverFd, sa)
+    if err != nil {
+        logrus.Errorf("unix.Bind err: %v", err)
+        return
+    }
+
+    // client
+    clientFd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, 0)
+    if err != nil {
+        logrus.Errorf("unix.Socket err: %v", err)
+        return
+    }
+    defer unix.Close(clientFd)
+    serverSockAddr, err := unix.Getsockname(serverFd)
+    if err != nil {
+        logrus.Errorf("unix.Getsockname err: %v", err)
+        return
+    }
+    // client > server
+    err = unix.Connect(clientFd, serverSockAddr)
+    if err != nil {
+        logrus.Errorf("unix.Connect err: %v", err)
+        return
+    }
+
+    echoData := []byte("a")
+    err = unix.Send(clientFd, echoData, 0)
+    if err != nil {
+        logrus.Errorf("unix.Send err: %v", err)
+        return
+    }
+    cbuf := make([]byte, 1024)
+    n, _, _, from, err := unix.Recvmsg(serverFd, cbuf, nil, 0)
+    cbuf = cbuf[:n]
+    logrus.Infof("server unix.Recvmsg from client: %s", string(cbuf))
+
+    // 可以使用 unix.Sendto 直接 server > from(client)
+    err = unix.Sendto(serverFd, cbuf, 0, from)
+    if err != nil {
+        logrus.Errorf("unix.Sendto err: %v", err)
+        return
+    }
+    cbuf2 := make([]byte, 1024)
+    n2, _, _, _, err := unix.Recvmsg(clientFd, cbuf2, nil, 0)
+    if err != nil {
+        logrus.Errorf("unix.Recvmsg clientFd err: %v", err)
+        return
+    }
+    cbuf2 = cbuf2[:n2]
+    logrus.Infof("client unix.Recvmsg from server: %s", string(cbuf2))
 }

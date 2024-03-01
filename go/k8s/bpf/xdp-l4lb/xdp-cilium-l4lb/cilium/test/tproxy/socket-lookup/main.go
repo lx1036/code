@@ -22,10 +22,13 @@ const (
     };*/
     MAX_SERVERS = 2
 
-    INT_IP4  = "127.0.0.2"
-    INT_PORT = 8008
+    /* External (address, port) pairs the client sends packets to. */
     EXT_IP4  = "127.0.0.1"
     EXT_PORT = 7007
+
+    /* Internal (address, port) pairs the server listens/receives at. */
+    INT_IP4  = "127.0.0.2"
+    INT_PORT = 8008
 )
 
 const (
@@ -74,7 +77,7 @@ func main() {
     defer l.Close()
 
     // 3.update map
-    serverFds := makeServer(unix.SOCK_DGRAM, nil)
+    serverFds := makeServer(unix.SOCK_DGRAM, nil, EXT_IP4, INT_PORT)
     //serverFds := makeServer(unix.SOCK_STREAM, nil)
     defer unix.Close(serverFds[0])
     key := uint32(0)
@@ -87,97 +90,77 @@ func main() {
     //}
 
     // 4.echo server test
-    clientFd := makeClient(unix.SOCK_DGRAM)
+    clientFd := makeClient(unix.SOCK_DGRAM, EXT_IP4, EXT_PORT)
     //clientFd := makeClient(unix.SOCK_STREAM)
     defer unix.Close(clientFd)
     //tcpEcho(clientFd, serverFd)
     udpEcho(clientFd, serverFds[0])
 }
 
-// UDP 一直没调通, 貌似 bpf 程序没起作用!!!
-// INFO: 有 bpf 程序，makeClient() 里不能 connect() 表示已经 established socket
 func udpEcho(clientFd, serverFd int) {
     echoData := []byte("a")
 
-    //clientSockAddr, err := unix.Getsockname(clientFd)
-    //logrus.Infof("client port %d", clientSockAddr.(*unix.SockaddrInet4).Port) // 58442
-    //
-    //// 127.0.0.1.5432 > 127.0.0.1.7007
-    //serverSockAddr, err := unix.Getsockname(serverFd)
-    //if err != nil {
-    //    logrus.Errorf("unix.Getsockname err: %v", err)
-    //    return
-    //}
-    //serverPort := serverSockAddr.(*unix.SockaddrInet4).Port
-    //logrus.Infof("server port %d", serverPort) // 8008
-
-    ip := net.ParseIP(EXT_IP4)
-    sa := &unix.SockaddrInet4{
-        //Port: INT_PORT,
-        Port: EXT_PORT,
-        Addr: [4]byte{},
-    }
-    copy(sa.Addr[:], ip)
-    err := unix.Sendto(clientFd, echoData, 0, sa) // 一旦 udp 7007
+    err := unix.Send(clientFd, echoData, 0)
     if err != nil {
         logrus.Errorf("unix.Send err: %v", err)
         return
     }
-
-    cbuf := make([]byte, unix.CmsgSpace(4))
+    cbuf := make([]byte, 1024)
     n, _, _, from, err := unix.Recvmsg(serverFd, cbuf, nil, 0)
     cbuf = cbuf[:n]
     logrus.Infof("server unix.Recvmsg from client: %s", string(cbuf))
-    // 127.0.0.1.7007 > 127.0.0.1.5432
-    // server->client 回 echo 包
-    //newSockfd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, 0)
-    ////serverSockAddr, err := unix.Getsockname(serverFd)
-    //err = unix.Bind(newSockfd, from) // 这里报错已经监听该ip:port
-    //if err != nil {
-    //    logrus.Fatal(err)
-    //}
 
     // 127.0.0.1.7007 > 127.0.0.1.5432
     clientPort := from.(*unix.SockaddrInet4).Port
     logrus.Infof("client port %d", clientPort) // 58442
-    err = unix.Sendto(serverFd, cbuf, 0, from)
-    if err != nil {
-        logrus.Fatal(err)
-    }
 
-    //p1 := make([]byte, 1)
-    cbuf2 := make([]byte, unix.CmsgSpace(4))
-    n2, _, _, _, err := unix.Recvmsg(clientFd, cbuf2, nil, 0)
+    // INFO: 由于 serverFd 是 redirect 之后的 socket_fd，所以不能直接 unix.Sendto(serverFd, cbuf, 0, from)，会 block
+    //  只能新建一个 socket_fd, bind 到 original dest address，然后 unix.Sendmsg(clientServerFd, cbuf, nil, from, 0)
+
+    // INFO: 类似于 TCP Accept() 作用
+    serverSocketAddr, err := unix.Getpeername(clientFd)
     if err != nil {
-        logrus.Errorf("unix.Recvfrom clientFd err: %v", err)
+        logrus.Errorf("unix.Getpeername err: %v", err)
         return
     }
-    cbuf = cbuf[:n2]
-    //_, _, err = unix.Recvfrom(clientFd, p1, 0)
-    //if err != nil {
-    //    logrus.Errorf("unix.Recvfrom clientFd err: %v", err)
-    //    return
-    //}
-    logrus.Infof("client unix.Recvfrom from server: %s", string(cbuf))
+    clientServerFd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, 0)
+    if err != nil {
+        logrus.Errorf("unix.Socket: %v", err)
+        return
+    }
+    err = unix.SetsockoptInt(clientServerFd, unix.SOL_IP, unix.IP_RECVORIGDSTADDR, 1)
+    if err != nil {
+        logrus.Errorf("unix.IP_RECVORIGDSTADDR error: %v", err)
+        return
+    }
+    err = unix.Bind(clientServerFd, serverSocketAddr) // INFO: 必须是 original dest server，否则 block
+    if err != nil {
+        logrus.Errorf("unix.Bind err: %v", err)
+        return
+    }
 
-    //cbuf2 := make([]byte, unix.CmsgSpace(4))
-    //n2, _, _, _, err := unix.Recvmsg(clientFd, cbuf2, nil, 0)
-    //if err != nil {
-    //    logrus.Errorf("unix.Recvmsg clientFd err: %v", err)
-    //    return
-    //}
-    //cbuf2 = cbuf2[:n2]
-    //logrus.Infof("client recvmsg from server: %s", string(cbuf2))
-    //
-    //if cbuf2[0] == echoData[0] {
-    //    logrus.Infof("udp echo successfully")
-    //} else {
-    //    logrus.Errorf("fail to udp echo")
-    //}
+    err = unix.Sendmsg(clientServerFd, cbuf, nil, from, 0)
+    if err != nil {
+        logrus.Errorf("unix.Send err: %v", err)
+        return
+    }
+    cbuf2 := make([]byte, 1024)
+    n2, _, _, _, err := unix.Recvmsg(clientFd, cbuf2, nil, 0)
+    if err != nil {
+        logrus.Errorf("unix.Recvmsg clientFd err: %v", err)
+        return
+    }
+    cbuf2 = cbuf2[:n2]
+    logrus.Infof("client unix.Recvmsg from server: %s", string(cbuf2))
 
+    if cbuf2[0] == echoData[0] {
+        logrus.Infof("udp echo successfully")
+    } else {
+        logrus.Errorf("fail to tcp echo")
+    }
 }
 
-// INFO: 目前验证，TCP 保持源端口，无需改造 server tproxy+IP_TRANSPARENT(https://powerdns.org/tproxydoc/tproxy.md.html) 就可以获得源端口
+// INFO: 目前验证，TCP 保持目的源端口，无需改造 server tproxy+IP_TRANSPARENT(https://powerdns.org/tproxydoc/tproxy.md.html) 就可以获得源端口
 func tcpEcho(clientFd, serverFd int) {
     echoData := []byte("a")
 
@@ -193,11 +176,11 @@ func tcpEcho(clientFd, serverFd int) {
         logrus.Errorf("unix.Accept err: %v", err)
         return
     }
+    defer unix.Close(clientServerFd)
     // 保持源端口，无需改造 server IP_TRANSPARENT(https://powerdns.org/tproxydoc/tproxy.md.html) 就可以获得源端口
     clientPort := clientSockAddr.(*unix.SockaddrInet4).Port
     logrus.Infof("client port %d", clientPort) // 5432
-
-    cbuf := make([]byte, unix.CmsgSpace(4))
+    cbuf := make([]byte, 1024)
     n, _, _, _, err := unix.Recvmsg(clientServerFd, cbuf, nil, 0)
     if err != nil {
         logrus.Errorf("unix.Recvmsg clientServerFd err: %v", err)
@@ -205,13 +188,13 @@ func tcpEcho(clientFd, serverFd int) {
     }
     cbuf = cbuf[:n]
     logrus.Infof("server recvmsg from client: %s", string(cbuf))
-    err = unix.Send(clientServerFd, cbuf, 0)
+
+    err = unix.Send(clientServerFd, cbuf, 0) // server > client
     if err != nil {
         logrus.Errorf("unix.Send err: %v", err)
         return
     }
-
-    cbuf2 := make([]byte, unix.CmsgSpace(4))
+    cbuf2 := make([]byte, 1024)
     n2, _, _, _, err := unix.Recvmsg(clientFd, cbuf2, nil, 0)
     if err != nil {
         logrus.Errorf("unix.Recvmsg clientFd err: %v", err)
@@ -228,7 +211,7 @@ func tcpEcho(clientFd, serverFd int) {
 }
 
 // 127.0.0.1:5432 connect 127.0.0.1:7007
-func makeClient(socketType int) int {
+func makeClient(socketType int, ip string, port int) int {
     var err error
     var sockfd int
     defer func() {
@@ -256,14 +239,13 @@ func makeClient(socketType int) int {
           logrus.Fatal(err)
       }*/
 
-    ip := net.ParseIP(EXT_IP4)
+    ipAddr := net.ParseIP(ip)
     sa := &unix.SockaddrInet4{
-        //Port: INT_PORT,
-        Port: EXT_PORT,
+        Port: port,
         Addr: [4]byte{},
     }
-    copy(sa.Addr[:], ip)
-    // 非阻塞的
+    copy(sa.Addr[:], ipAddr)
+    // 非阻塞的, tcp/udp 都 connect()
     err = unix.Connect(sockfd, sa)
     if err != nil {
         logrus.Fatal(err)
@@ -273,8 +255,8 @@ func makeClient(socketType int) int {
 }
 
 // listen at 127.0.0.1:8008
-func makeServer(socketType int, reuseportProg *ebpf.Program) [MAX_SERVERS]int {
-    var sockfds [MAX_SERVERS]int
+func makeServer(socketType int, reuseportProg *ebpf.Program, ip string, port int) []int {
+    sockfds := make([]int, MAX_SERVERS)
     for i := 0; i < MAX_SERVERS; i++ {
         var err error
         var sockfd int
@@ -284,6 +266,7 @@ func makeServer(socketType int, reuseportProg *ebpf.Program) [MAX_SERVERS]int {
             logrus.Errorf("unix.Socket error: %v", err)
             continue
         }
+        // INFO: 注意 udp IP_RECVORIGDSTADDR 和 tcp SO_REUSEADDR
         if socketType == unix.SOCK_DGRAM {
             err = unix.SetsockoptInt(sockfd, unix.SOL_IP, unix.IP_RECVORIGDSTADDR, 1)
             if err != nil {
@@ -291,7 +274,7 @@ func makeServer(socketType int, reuseportProg *ebpf.Program) [MAX_SERVERS]int {
                 continue
             }
         }
-        if sockfd == unix.SOCK_STREAM {
+        if socketType == unix.SOCK_STREAM {
             // ignores TIME-WAIT state using SO_REUSEADDR option
             // https://serverfault.com/questions/329845/how-to-forcibly-close-a-socket-in-time-wait
             err = unix.SetsockoptInt(sockfd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
@@ -308,12 +291,13 @@ func makeServer(socketType int, reuseportProg *ebpf.Program) [MAX_SERVERS]int {
             }
         }
 
-        ip := net.ParseIP(EXT_IP4)
+        // bind 127.0.0.1:8008
+        ipAddr := net.ParseIP(ip)
         sa := &unix.SockaddrInet4{
-            Port: INT_PORT,
+            Port: port,
             Addr: [4]byte{},
         }
-        copy(sa.Addr[:], ip)
+        copy(sa.Addr[:], ipAddr)
         err = unix.Bind(sockfd, sa)
         if err != nil {
             logrus.Errorf("unix.Bind error: %v", err)
@@ -327,7 +311,7 @@ func makeServer(socketType int, reuseportProg *ebpf.Program) [MAX_SERVERS]int {
             }
         }
 
-        // attach reuseport program
+        // INFO: 注意这里 2 个 socket_fd 都挂载了 reuseport_ebpf
         if reuseportProg != nil {
             err = unix.SetsockoptInt(sockfd, unix.SOL_SOCKET, unix.SO_ATTACH_REUSEPORT_EBPF, reuseportProg.FD())
             if err != nil {
