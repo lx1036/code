@@ -51,6 +51,9 @@ struct destination_metrics {
     __u64 errors__bad_socket;
 };
 
+// (protocol, port, ip, prefix) -> binding -> destination_id_t -> key -> sockets -> socket_fd
+// (label, domain, protocol) -> destinations -> value.ID() -> destination_id_t -> key -> sockets -> socket_fd
+
 struct {
     __uint(type, BPF_MAP_TYPE_SOCKMAP);
     __uint(key_size, sizeof(destination_id_t));

@@ -3,14 +3,43 @@ package main
 import (
     "encoding/binary"
     "fmt"
+    "github.com/cilium/ebpf"
     "github.com/cilium/ebpf/link"
     "github.com/containernetworking/plugins/pkg/ns"
+    "github.com/sirupsen/logrus"
+    "github.com/spf13/cobra"
     "golang.org/x/sys/unix"
+    "io"
+    "os"
     "path/filepath"
-    "syscall"
-
-    "github.com/cilium/ebpf"
 )
+
+const (
+    NetnsPath = "/proc/self/ns/net"
+    BPFFsPath = "/sys/fs/bpf"
+)
+
+func init() {
+    rootCmd.AddCommand(loadCmd)
+    rootCmd.AddCommand(unloadCmd)
+
+}
+
+var loadCmd = &cobra.Command{
+    Use:     "load",
+    Example: "load",
+    Run: func(cmd *cobra.Command, args []string) {
+        CreateDispatcher()
+    },
+}
+
+var unloadCmd = &cobra.Command{
+    Use:     "unload",
+    Example: "unload",
+    Run: func(cmd *cobra.Command, args []string) {
+        UnloadDispatcher()
+    },
+}
 
 type Dispatcher struct {
     bindings     *ebpf.Map
@@ -18,9 +47,18 @@ type Dispatcher struct {
 }
 
 func CreateDispatcher() (*Dispatcher, error) {
-    netnsPath := "/proc/self/ns/net"
-    bpfFsPath := "/sys/fs/bpf"
-    netns, pinPath, err := openNetNS(netnsPath, bpfFsPath)
+    var err error
+    closeOnError := func(c io.Closer) {
+        if err != nil {
+            c.Close()
+        }
+    }
+
+    netNs, pinPath, err := openNetNS(NetnsPath, BPFFsPath)
+    if err != nil {
+        return nil, err
+    }
+    defer netNs.Close()
 
     objs := dispatcherObjects{}
     opts := &ebpf.CollectionOptions{
@@ -29,14 +67,18 @@ func CreateDispatcher() (*Dispatcher, error) {
             LogSize:  64 * 1024 * 1024, // 64M
         },
         Maps: ebpf.MapOptions{
-            PinPath: pinPath, // pin 下 map
+            PinPath: pinPath, // /sys/fs/bpf/xxx_dispatcher/
         },
     }
     spec, err := loadDispatcher()
-
+    if err != nil {
+        return nil, err
+    }
     var specs dispatcherSpecs
     err = spec.Assign(&specs)
-
+    if err != nil {
+        return nil, err
+    }
     // check max_entries of sockets/destinations/destination_metrics
     maxSockets := specs.Sockets.MaxEntries
     for _, m := range []*ebpf.MapSpec{
@@ -49,22 +91,27 @@ func CreateDispatcher() (*Dispatcher, error) {
     }
     // set key_size/value_size of destinations
     specs.Destinations.KeySize = uint32(binary.Size(destinationKey{}))
-    specs.Destinations.ValueSize = uint32(binary.Size(destinationAlloc{}))
-    err = spec.LoadAndAssign(objs, opts)
-    // pin program
-    if err = objs.dispatcherPrograms.Dispatcher.Pin(fmt.Sprintf("%s/dispatcher_program", pinPath)); err != nil {
-
+    specs.Destinations.ValueSize = uint32(binary.Size(destinationValue{}))
+    err = spec.LoadAndAssign(&objs, opts)
+    if err != nil {
+        return nil, err
+    }
+    defer objs.dispatcherPrograms.Close()
+    defer closeOnError(&objs.dispatcherMaps) // 只有 error 才 close bpf maps
+    // 因为 pin program，所以可以 close dispatcher program
+    if err = objs.dispatcherPrograms.Dispatcher.Pin(fmt.Sprintf("%s/program", pinPath)); err != nil {
+        return nil, err
     }
 
     // Attach
-    l, err := link.AttachNetNs(int(netns.Fd()), objs.dispatcherPrograms.Dispatcher)
+    l, err := link.AttachNetNs(int(netNs.Fd()), objs.dispatcherPrograms.Dispatcher)
     if err != nil {
-        return nil, fmt.Errorf("attach program to netns %s: %s", netns.Path(), err)
+        return nil, fmt.Errorf("attach program to netns %s: %s", netNs.Path(), err)
     }
     defer l.Close()
-    // pin link
-    if err = l.Pin(fmt.Sprintf("%s/dispatcher_link", pinPath)); err != nil {
-
+    // 因为 pin link，所以可以 close dispatcher link
+    if err = l.Pin(fmt.Sprintf("%s/link", pinPath)); err != nil {
+        return nil, err
     }
 
     return &Dispatcher{
@@ -73,20 +120,67 @@ func CreateDispatcher() (*Dispatcher, error) {
     }, nil
 }
 
-func (dispatcher *Dispatcher) RegisterSocket(label string, conn syscall.Conn) (dest *Destination, created bool, err error) {
-    dest, err := newDestinationFromConn(label, conn)
+func UnloadDispatcher() {
+    netNs, pinPath, err := openNetNS(NetnsPath, BPFFsPath)
     if err != nil {
-        return nil, false, err
+        logrus.Errorf("[UnloadDispatcher]err: %v", err)
+        return
     }
+    defer netNs.Close()
 
-    created, err = dispatcher.destinations.AddSocket(dest, conn)
-    if err != nil {
-        return nil, false, fmt.Errorf("add socket: %s", err)
+    if err = os.RemoveAll(pinPath); err != nil {
+        logrus.Errorf("[UnloadDispatcher]err: %v", err)
+        return
     }
-
-    return
 }
 
+// OpenDispatcher loads an existing dispatcher from a namespace.
+func OpenDispatcher() (*Dispatcher, error) {
+    netNs, pinPath, err := openNetNS(NetnsPath, BPFFsPath)
+    if err != nil {
+        return nil, err
+    }
+    defer netNs.Close()
+
+    objs := dispatcherObjects{}
+    spec, err := loadDispatcher()
+    if err != nil {
+        return nil, err
+    }
+    err = spec.LoadAndAssign(&objs, &ebpf.CollectionOptions{
+        Maps: ebpf.MapOptions{
+            PinPath: pinPath, // /sys/fs/bpf/xxx_dispatcher/
+            LoadPinOptions: ebpf.LoadPinOptions{
+                ReadOnly: true, // 注意这个参数
+            },
+        },
+    })
+    if err != nil {
+        return nil, err
+    }
+
+    return &Dispatcher{
+        bindings:     objs.dispatcherMaps.Bindings,
+        destinations: NewDestinations(objs.dispatcherMaps),
+    }, nil
+}
+
+// Close frees bpf maps
+//
+// It does not remove the dispatcher, see UnloadDispatcher.
+func (dispatcher *Dispatcher) Close() error {
+    // No need to lock the state, since we don't modify it here.
+    if err := dispatcher.bindings.Close(); err != nil {
+        return fmt.Errorf("can't close BPF objects: %s", err)
+    }
+    if err := dispatcher.destinations.Close(); err != nil {
+        return fmt.Errorf("can't close destination IDs: %x", err)
+    }
+
+    return nil
+}
+
+// /proc/self/ns/net, /sys/fs/bpf/xxx_dispatcher/
 func openNetNS(nsPath, bpfFsPath string) (ns.NetNS, string, error) {
     var fs unix.Statfs_t
     err := unix.Statfs(bpfFsPath, &fs)
@@ -106,8 +200,4 @@ func openNetNS(nsPath, bpfFsPath string) (ns.NetNS, string, error) {
 
     dir := fmt.Sprintf("%d_dispatcher", stat.Ino)
     return netNs, filepath.Join(bpfFsPath, dir), nil
-}
-
-func OpenDispatcher() (*Dispatcher, error) {
-
 }

@@ -12,16 +12,15 @@ import (
 // go generate .
 // CGO_ENABLED=0 go run .
 
-var (
-    logr   *logrus.Logger
-    logger *logrus.Entry
-)
+/**
+redirect: tcp://127.0.0.1:8080 > tcp://127.0.0.1:80
+
+1. sk-lookup bind foo tcp 127.0.0.1 8080
+2. sk-lookup register-pid 12345 foo tcp 127.0.0.1 80
+*/
 
 func init() {
     logrus.SetReportCaller(true)
-    logr = logrus.New()
-    //logger = logr.WithField("id", )
-    logr.SetFormatter(&logrus.JSONFormatter{})
 }
 
 var rootCmd = &cobra.Command{

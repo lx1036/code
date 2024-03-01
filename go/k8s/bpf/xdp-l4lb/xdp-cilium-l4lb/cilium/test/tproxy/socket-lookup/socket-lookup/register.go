@@ -39,16 +39,19 @@ func init() {
     viper.BindPFlag("port", flags.Lookup("port"))
 }
 
-// sk-lookup register 12345 foo tcp 127.0.0.1 80
+// sk-lookup register-pid 12345 foo tcp 127.0.0.1 80
 var registerCmd = &cobra.Command{
-    Use: "register",
+    Use: "register-pid",
     Run: func(cmd *cobra.Command, args []string) {
         if err := namespacesEqual(netns, fmt.Sprintf("/proc/%d/ns/net", pid)); err != nil {
-            logr.Errorf("%v", err)
+            logrus.Errorf("%v", err)
             return
         }
 
-        registerPid()
+        if err := registerPid(); err != nil {
+            logrus.Errorf("%v", err)
+            return
+        }
     },
 }
 
@@ -88,13 +91,13 @@ func registerFiles(label string, files []*os.File) error {
         return fmt.Errorf("no sockets")
     }
 
-    dispatcher, err := CreateDispatcher()
+    dispatcher, err := OpenDispatcher()
     if err != nil {
         return err
     }
-    defer dispatcher.Close()
+    defer dispatcher.Close() // free maps, 但是已经 pin
 
-    registered := make(map[Destinations]bool)
+    registered := make(map[Destination]bool)
     for _, file := range files {
         dst, created, err := dispatcher.RegisterSocket(label, file)
         if err != nil {
@@ -117,6 +120,20 @@ func registerFiles(label string, files []*os.File) error {
     }
 
     return nil
+}
+
+func (dispatcher *Dispatcher) RegisterSocket(label string, conn syscall.Conn) (dest *Destination, created bool, err error) {
+    dest, err = newDestinationFromConn(label, conn)
+    if err != nil {
+        return nil, false, err
+    }
+
+    created, err = dispatcher.destinations.AddSocket(dest, conn)
+    if err != nil {
+        return nil, false, fmt.Errorf("add socket: %s", err)
+    }
+
+    return
 }
 
 func socketCookie(conn syscall.Conn) (string, error) {
