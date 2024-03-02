@@ -36,6 +36,11 @@ const (
     ServerB
 )
 
+const (
+    Prog1 = iota
+    Prog2
+)
+
 // go generate .
 // CGO_ENABLED=0 go run .
 func main() {
@@ -77,11 +82,14 @@ func main() {
     defer l.Close()
 
     // 3.update map
-    serverFds := makeServer(unix.SOCK_DGRAM, nil, EXT_IP4, INT_PORT)
+    serverFd, err := makeServer(unix.SOCK_DGRAM, nil, EXT_IP4, INT_PORT)
+    if err != nil {
+        return
+    }
     //serverFds := makeServer(unix.SOCK_STREAM, nil)
-    defer unix.Close(serverFds[0])
+    defer unix.Close(serverFd)
     key := uint32(0)
-    value := uint64(serverFds[0])
+    value := uint64(serverFd)
     err = objs.bpfMaps.RedirMap.Put(key, value)
 
     //reuseportHasConns := false
@@ -94,23 +102,24 @@ func main() {
     //clientFd := makeClient(unix.SOCK_STREAM)
     defer unix.Close(clientFd)
     //tcpEcho(clientFd, serverFd)
-    udpEcho(clientFd, serverFds[0])
+    udpEcho(clientFd, serverFd, getEchoData(0))
 }
 
-func udpEcho(clientFd, serverFd int) {
-    echoData := []byte("a")
-
-    err := unix.Send(clientFd, echoData, 0)
+func udpEcho(clientFd, serverFd int, echoData string) {
+    err := unix.Send(clientFd, []byte(echoData), 0)
     if err != nil {
         logrus.Errorf("unix.Send err: %v", err)
         return
     }
     cbuf := make([]byte, 1024)
     n, _, _, from, err := unix.Recvmsg(serverFd, cbuf, nil, 0)
+    if err != nil {
+        logrus.Errorf("unix.Recvmsg err: %v", err)
+        return
+    }
     cbuf = cbuf[:n]
     logrus.Infof("server unix.Recvmsg from client: %s", string(cbuf))
 
-    // 127.0.0.1.7007 > 127.0.0.1.5432
     clientPort := from.(*unix.SockaddrInet4).Port
     logrus.Infof("client port %d", clientPort) // 58442
 
@@ -128,7 +137,14 @@ func udpEcho(clientFd, serverFd int) {
         logrus.Errorf("unix.Socket: %v", err)
         return
     }
+    defer unix.Close(clientServerFd)
     err = unix.SetsockoptInt(clientServerFd, unix.SOL_IP, unix.IP_RECVORIGDSTADDR, 1)
+    if err != nil {
+        logrus.Errorf("unix.IP_RECVORIGDSTADDR error: %v", err)
+        return
+    }
+    // udp 必须加上 unix.SO_REUSEADDR, 否则 socket bind 也会报错 "already in use"
+    err = unix.SetsockoptInt(clientServerFd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
     if err != nil {
         logrus.Errorf("unix.IP_RECVORIGDSTADDR error: %v", err)
         return
@@ -139,6 +155,7 @@ func udpEcho(clientFd, serverFd int) {
         return
     }
 
+    // 这里不使用 Sendto(fd int, p []byte, flags int, to Sockaddr) 原因是还没有 Connect(server)
     err = unix.Sendmsg(clientServerFd, cbuf, nil, from, 0)
     if err != nil {
         logrus.Errorf("unix.Send err: %v", err)
@@ -153,7 +170,7 @@ func udpEcho(clientFd, serverFd int) {
     cbuf2 = cbuf2[:n2]
     logrus.Infof("client unix.Recvmsg from server: %s", string(cbuf2))
 
-    if cbuf2[0] == echoData[0] {
+    if string(cbuf2) == echoData {
         logrus.Infof("udp echo successfully")
     } else {
         logrus.Errorf("fail to tcp echo")
@@ -161,11 +178,9 @@ func udpEcho(clientFd, serverFd int) {
 }
 
 // INFO: 目前验证，TCP 保持目的源端口，无需改造 server tproxy+IP_TRANSPARENT(https://powerdns.org/tproxydoc/tproxy.md.html) 就可以获得源端口
-func tcpEcho(clientFd, serverFd int) {
-    echoData := []byte("a")
-
+func tcpEcho(clientFd, serverFd int, echoData string) {
     // 这里不使用 Sendto(fd int, p []byte, flags int, to Sockaddr) 原因是已经调用 Connect(server)
-    err := unix.Send(clientFd, echoData, 0)
+    err := unix.Send(clientFd, []byte(echoData), 0)
     if err != nil {
         logrus.Errorf("unix.Send err: %v", err)
         return
@@ -203,10 +218,21 @@ func tcpEcho(clientFd, serverFd int) {
     cbuf2 = cbuf2[:n2]
     logrus.Infof("client recvmsg from server: %s", string(cbuf2))
 
-    if cbuf2[0] == echoData[0] {
+    if string(cbuf2) == echoData {
         logrus.Infof("tcp echo successfully")
     } else {
         logrus.Errorf("fail to tcp echo")
+    }
+}
+
+func getEchoData(server int) string {
+    switch server {
+    case ServerA:
+        return "ServerA"
+    case ServerB:
+        return "ServerB"
+    default:
+        return ""
     }
 }
 
@@ -221,24 +247,29 @@ func makeClient(socketType int, ip string, port int) int {
     }()
 
     sockfd, err = unix.Socket(unix.AF_INET, socketType, 0)
+    if err != nil {
+        logrus.Fatal(err)
+    }
+    err = unix.SetsockoptInt(sockfd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
+    if err != nil {
+        logrus.Errorf("unix.SO_REUSEADDR error: %v", err)
+        return 0
+    }
+
     // client bind ip:port
     // bind ip 单元测试时会报错 "address already in use"
-    //ip1 := net.ParseIP(EXT_IP4)
-    //sa1 := &unix.SockaddrInet4{
-    //    Port: 5432, // client 源端口
-    //    Addr: [4]byte{},
-    //}
-    //copy(sa1.Addr[:], ip1)
-    //err = unix.Bind(sockfd, sa1)
-    //if err != nil {
-    //    logrus.Fatal(err)
-    //}
+    ip1 := net.ParseIP(EXT_IP4)
+    sa1 := &unix.SockaddrInet4{
+        Port: 5432, // client 源端口
+        Addr: [4]byte{},
+    }
+    copy(sa1.Addr[:], ip1)
+    err = unix.Bind(sockfd, sa1)
+    if err != nil {
+        logrus.Fatal(err)
+    }
 
-    /*serverSockAddr, err := unix.Getsockname(serverFd)
-      if err != nil {
-          logrus.Fatal(err)
-      }*/
-
+    setSocketTimeout(sockfd, 1000)
     ipAddr := net.ParseIP(ip)
     sa := &unix.SockaddrInet4{
         Port: port,
@@ -248,85 +279,113 @@ func makeClient(socketType int, ip string, port int) int {
     // 非阻塞的, tcp/udp 都 connect()
     err = unix.Connect(sockfd, sa)
     if err != nil {
-        logrus.Fatal(err)
+        logrus.Errorf("unix.Connect error: %v", err)
+        return 0
     }
 
     return sockfd
 }
 
 // listen at 127.0.0.1:8008
-func makeServer(socketType int, reuseportProg *ebpf.Program, ip string, port int) []int {
-    sockfds := make([]int, MAX_SERVERS)
-    for i := 0; i < MAX_SERVERS; i++ {
-        var err error
-        var sockfd int
+func makeServer(socketType int, reuseportProg *ebpf.Program, ip string, port int) (int, error) {
+    var err error
+    var sockfd int
 
-        sockfd, err = unix.Socket(unix.AF_INET, socketType, 0)
+    sockfd, err = unix.Socket(unix.AF_INET, socketType, 0)
+    if err != nil {
+        logrus.Errorf("unix.Socket error: %v", err)
+        return 0, err
+    }
+    setSocketTimeout(sockfd, 1000)
+    // INFO: 注意 udp IP_RECVORIGDSTADDR 和 tcp SO_REUSEADDR
+    if socketType == unix.SOCK_DGRAM {
+        err = unix.SetsockoptInt(sockfd, unix.SOL_IP, unix.IP_RECVORIGDSTADDR, 1)
         if err != nil {
-            logrus.Errorf("unix.Socket error: %v", err)
-            continue
-        }
-        // INFO: 注意 udp IP_RECVORIGDSTADDR 和 tcp SO_REUSEADDR
-        if socketType == unix.SOCK_DGRAM {
-            err = unix.SetsockoptInt(sockfd, unix.SOL_IP, unix.IP_RECVORIGDSTADDR, 1)
-            if err != nil {
-                logrus.Errorf("unix.IP_RECVORIGDSTADDR error: %v", err)
-                continue
-            }
-        }
-        if socketType == unix.SOCK_STREAM {
-            // ignores TIME-WAIT state using SO_REUSEADDR option
-            // https://serverfault.com/questions/329845/how-to-forcibly-close-a-socket-in-time-wait
-            err = unix.SetsockoptInt(sockfd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
-            if err != nil {
-                logrus.Errorf("unix.SO_REUSEADDR error: %v", err)
-                continue
-            }
-        }
-        if reuseportProg != nil {
-            err = unix.SetsockoptInt(sockfd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
-            if err != nil {
-                logrus.Errorf("unix.SO_REUSEPORT error: %v", err)
-                continue
-            }
-        }
-
-        // bind 127.0.0.1:8008
-        ipAddr := net.ParseIP(ip)
-        sa := &unix.SockaddrInet4{
-            Port: port,
-            Addr: [4]byte{},
-        }
-        copy(sa.Addr[:], ipAddr)
-        err = unix.Bind(sockfd, sa)
-        if err != nil {
-            logrus.Errorf("unix.Bind error: %v", err)
-            continue
-        }
-        if socketType == unix.SOCK_STREAM {
-            err = unix.Listen(sockfd, SOMAXCONN)
-            if err != nil {
-                logrus.Errorf("unix.Listen error: %v", err)
-                continue
-            }
-        }
-
-        // INFO: 注意这里 2 个 socket_fd 都挂载了 reuseport_ebpf
-        if reuseportProg != nil {
-            err = unix.SetsockoptInt(sockfd, unix.SOL_SOCKET, unix.SO_ATTACH_REUSEPORT_EBPF, reuseportProg.FD())
-            if err != nil {
-                logrus.Errorf("unix.SO_ATTACH_REUSEPORT_EBPF error: %v", err)
-                continue
-            }
-        }
-
-        sockfds[i] = sockfd
-        if reuseportProg == nil {
-            break
+            logrus.Errorf("unix.IP_RECVORIGDSTADDR error: %v", err)
+            return 0, err
         }
     }
 
-    return sockfds
+    // ignores TIME-WAIT state using SO_REUSEADDR option
+    // https://serverfault.com/questions/329845/how-to-forcibly-close-a-socket-in-time-wait
+    err = unix.SetsockoptInt(sockfd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
+    if err != nil {
+        logrus.Errorf("unix.SO_REUSEADDR error: %v", err)
+        return 0, err
+    }
+
+    if reuseportProg != nil {
+        err = unix.SetsockoptInt(sockfd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
+        if err != nil {
+            logrus.Errorf("unix.SO_REUSEPORT error: %v", err)
+            return 0, err
+        }
+    }
+
+    // bind 127.0.0.1:8008
+    ipAddr := net.ParseIP(ip)
+    sa := &unix.SockaddrInet4{
+        Port: port,
+        Addr: [4]byte{},
+    }
+    copy(sa.Addr[:], ipAddr)
+    err = unix.Bind(sockfd, sa)
+    if err != nil {
+        logrus.Errorf("unix.Bind error: %v", err)
+        return 0, err
+    }
+    if socketType == unix.SOCK_STREAM {
+        err = unix.Listen(sockfd, SOMAXCONN)
+        if err != nil {
+            logrus.Errorf("unix.Listen error: %v", err)
+            return 0, err
+        }
+    }
+
+    // INFO: 注意这里 2 个 socket_fd 都挂载了 reuseport_ebpf
+    if reuseportProg != nil {
+        err = unix.SetsockoptInt(sockfd, unix.SOL_SOCKET, unix.SO_ATTACH_REUSEPORT_EBPF, reuseportProg.FD())
+        if err != nil {
+            logrus.Errorf("unix.SO_ATTACH_REUSEPORT_EBPF error: %v", err)
+            return 0, err
+        }
+    }
+
+    return sockfd, nil
+}
+
+func setSocketTimeout(fd, timeoutMs int) {
+    var timeVal *unix.Timeval
+    if timeoutMs > 0 {
+        timeVal = &unix.Timeval{
+            Sec:  int64(timeoutMs / 1000),
+            Usec: int64(timeoutMs % 1000 * 1000),
+        }
+    } else {
+        timeVal = &unix.Timeval{
+            Sec: 3,
+        }
+    }
+
+    err := unix.SetsockoptTimeval(fd, unix.SOL_SOCKET, unix.SO_RCVTIMEO, timeVal)
+    if err != nil {
+        logrus.Fatal(err)
+    }
+
+    err = unix.SetsockoptTimeval(fd, unix.SOL_SOCKET, unix.SO_SNDTIMEO, timeVal)
+    if err != nil {
+        logrus.Fatal(err)
+    }
+}
+
+func socketCookie(fd int) int {
+    cookie, err := unix.GetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_COOKIE)
+    if err != nil {
+        logrus.Errorf("unix.SO_COOKIE err: %v", err)
+        return 0
+    }
+
+    return cookie
 }
 
 func openNetNS(nsPath, bpfFsPath string) (ns.NetNS, string, error) {

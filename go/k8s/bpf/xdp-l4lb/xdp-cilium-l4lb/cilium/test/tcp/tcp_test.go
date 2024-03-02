@@ -123,3 +123,54 @@ func TestUdpEchoServer(test *testing.T) {
     cbuf2 = cbuf2[:n2]
     logrus.Infof("client unix.Recvmsg from server: %s", string(cbuf2))
 }
+
+// CGO_ENABLED=0 go test -v -run ^TestUdpBind$ .
+func TestUdpBind(test *testing.T) {
+    logrus.SetReportCaller(true)
+
+    for i := 0; i < 10; i++ {
+        sockfds := makeServer()
+        for i := 0; i < len(sockfds); i++ {
+            unix.Close(sockfds[i])
+        }
+    }
+}
+
+func makeServer() []int {
+    var err error
+    sockfds := make([]int, 10)
+    for i := 0; i < len(sockfds); i++ {
+        sockfds[i], err = unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, 0)
+        if err != nil {
+            logrus.Errorf("unix.Socket error: %v", err)
+            continue
+        }
+
+        err = unix.SetsockoptInt(sockfds[i], unix.SOL_IP, unix.IP_RECVORIGDSTADDR, 1)
+        if err != nil {
+            logrus.Errorf("unix.IP_RECVORIGDSTADDR error: %v", err)
+            continue
+        }
+
+        err = unix.SetsockoptInt(sockfds[i], unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
+        if err != nil {
+            logrus.Errorf("unix.SO_REUSEADDR error: %v", err)
+            continue
+        }
+
+        // unix.SO_REUSEADDR 可以 bind 多次
+        ipAddr := net.ParseIP("127.0.0.1")
+        sa := &unix.SockaddrInet4{
+            Port: 8081,
+            Addr: [4]byte{},
+        }
+        copy(sa.Addr[:], ipAddr)
+        err = unix.Bind(sockfds[i], sa)
+        if err != nil {
+            logrus.Errorf("unix.Bind error: %v", err)
+            continue
+        }
+    }
+
+    return sockfds
+}
