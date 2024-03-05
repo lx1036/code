@@ -301,7 +301,7 @@ func fastOpenConnectToFd(serverFd int, msg []byte) int {
     }
     setSocketTimeout(clientFd, 5000)
 
-    // INFO: 需要这个 socket option 么???
+    // INFO: 开启该 socket option 支持 client 可以发送 TFO syn
     err = unix.SetsockoptInt(clientFd, unix.SOL_TCP, unix.TCP_FASTOPEN, 256)
     if err != nil {
         logrus.Fatal(err)
