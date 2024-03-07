@@ -56,7 +56,7 @@ static __always_inline int handle_udp(struct __sk_buff *skb) {
     }
     tuple->ipv4.sport = udph->source;
     tuple->ipv4.dport = udph->dest;
-    if (udph->dest != bpf_htons(DST_PORT)) {
+    if (udph->dest != bpf_htons(DST_PORT)) { // host to network service, network 和 host 必须要有转换!!!
         // 2. 目标端口任意(不是 4321)，但是 socket 是 listen 状态，交给 netfilter 自己处理
         return TC_ACT_OK;
     }

@@ -1,12 +1,19 @@
 
-
-# socket assign
-
-
+# TProxy
+内核代码:
 ```md
-/root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_sk_assign.c
-/root/linux-5.10.142/tools/testing/selftests/bpf/prog_tests/sk_assign.c
+/root/linux-5.10.142/net/netfilter/xt_TPROXY.c
+/root/linux-5.10.142/net/netfilter/nft_tproxy.c
+https://www.kernel.org/doc/html/v5.8/networking/tproxy.html
+https://powerdns.org/tproxydoc/tproxy.md.html
 
+```
+
+
+## eBPF for TProxy
+内核代码：
+```md
+https://lore.kernel.org/bpf/20200329225342.16317-1-joe@wand.net.nz/
 
 bpf_sk_assign 合并内核 commits:
 summary: https://lore.kernel.org/bpf/20200329225342.16317-1-joe@wand.net.nz/
@@ -17,4 +24,6 @@ summary: https://lore.kernel.org/bpf/20200329225342.16317-1-joe@wand.net.nz/
 4/5 selftests: bpf: add test for sk_assign: https://lore.kernel.org/bpf/20200329225342.16317-5-joe@wand.net.nz/
 5/5 selftests: bpf: Extend sk_assign tests for UDP: https://lore.kernel.org/bpf/20200329225342.16317-6-joe@wand.net.nz/
 ```
+
+
 
