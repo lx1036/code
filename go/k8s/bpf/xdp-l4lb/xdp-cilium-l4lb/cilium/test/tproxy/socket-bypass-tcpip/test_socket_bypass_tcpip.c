@@ -5,40 +5,16 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
-#ifndef barrier
-# define barrier()		asm volatile("": : :"memory")
-#endif
-
-static __always_inline void bpf_barrier(void)
-{
-    /* Workaround to avoid verifier complaint:
-     * "dereference of modified ctx ptr R5 off=48+0, ctx+const is allowed,
-     *        ctx+const+const is not"
-     */
-    barrier();
-}
-
-#ifndef __READ_ONCE
-# define __READ_ONCE(X)		(*(volatile typeof(X) *)&X)
-#endif
-
-#ifndef READ_ONCE
-# define READ_ONCE(X)						\
-			({ typeof(X) __val = __READ_ONCE(X);	\
-			   bpf_barrier();			\
-			   __val; })
-#endif
-
 struct sock_key {
     __u32 sip4;
     __u32 dip4;
     __u8 family;
-    __u8  pad1;
-    __u16 pad2;
+//    __u8  pad1;
+//    __u16 pad2;
 //    // this padding required for 64bit alignment
 //    // else ebpf kernel verifier rejects loading
 //    // of the program
-    __u32 pad3;
+//    __u32 pad3;
     __u32 sport;
     __u32 dport;
 //};
@@ -75,7 +51,9 @@ int bpf_tcpip_bypass(struct sk_msg_md *msg)
     struct sock_key key = {};
     sk_msg_extract4_key(msg, &key);
     // bpf_msg_redirect_map()
-    bpf_printk("total size of sk_msg is %d, port %d --> %d", msg->size, bpf_ntohl(msg->remote_port), msg->local_port);
+    // total size of sk_msg is 7, port 5432 --> 7007
+    // total size of sk_msg is 7, port 7007 --> 5432
+    bpf_printk("total size of sk_msg is %d, port %d --> %d", msg->size, msg->local_port, bpf_ntohl(msg->remote_port));
     return (int)bpf_msg_redirect_hash(msg, &sock_ops_map, &key, BPF_F_INGRESS);
 //    return SK_PASS;
 }
@@ -90,11 +68,6 @@ static __always_inline void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops) {
 //    key.dip4 = skops->remote_ip4;
 //    // local_port is in host byte order, and remote_port is in network byte order
 //    key.sport = (bpf_htonl(skops->local_port) >> 16); // ???
-//    /* clang-7.1 or higher seems to think it can do a 16-bit read here
-//	 * which unfortunately most kernels (as of October 2019) do not
-//	 * support, which leads to verifier failures. Insert a READ_ONCE
-//	 * to make sure that a 32-bit read followed by shift is generated.
-//	 */
 //    key.dport = (skops->remote_port) >> 16;
 
 

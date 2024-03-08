@@ -29,7 +29,7 @@ const (
 )
 
 /**
-没有验证成功!!!
+貌似验证成功，sockops 和 sk_msg bpf 程序都运行了，但是怎么判断 bypass TCP/IP netfilter???
 */
 
 func init() {
@@ -312,14 +312,14 @@ func tcpEcho(clientFd, serverFd int, echoData string) {
 }
 
 type ProgAttachSkMsg struct {
-    mapId      ebpf.MapID
+    mapFd      int
     program    *ebpf.Program
     attachType ebpf.AttachType
 }
 
 func (skMsg *ProgAttachSkMsg) Close() error {
     err := link.RawDetachProgram(link.RawDetachProgramOptions{
-        Target:  int(skMsg.mapId),
+        Target:  skMsg.mapFd,
         Program: skMsg.program,
         Attach:  skMsg.attachType,
     })
@@ -329,29 +329,26 @@ func (skMsg *ProgAttachSkMsg) Close() error {
     return nil
 }
 
+// 直接使用 bpftool attach: https://github.com/cyralinc/os-eBPF/blob/develop/sockredir/load.sh
 func AttachSkMsg(prog *ebpf.Program, bpfMap *ebpf.Map) (*ProgAttachSkMsg, error) {
     if t := prog.Type(); t != ebpf.SkMsg {
         return nil, fmt.Errorf("invalid program type %s, expected SkMsg", t)
     }
 
-    info, err := bpfMap.Info()
-    if err != nil {
-        return nil, err
-    }
-    mapId, ok := info.ID()
-    if !ok {
-        return nil, fmt.Errorf("invalid map id: %d", mapId)
-    }
-
-    err = link.RawAttachProgram(link.RawAttachProgramOptions{
-        Target:  int(mapId),
+    err := link.RawAttachProgram(link.RawAttachProgramOptions{
+        // 是 mapFd 不是 mapId, @see /root/linux-5.10.142/tools/testing/selftests/bpf/test_sockmap.c::run_options()
+        Target:  bpfMap.FD(),
         Program: prog,
         Attach:  ebpf.AttachSkMsgVerdict,
         Flags:   0,
     })
+    if err != nil {
+        logrus.Errorf("AttachSkMsgVerdict err: %v", err)
+        return nil, err
+    }
 
     skMsg := &ProgAttachSkMsg{
-        mapId:      mapId,
+        mapFd:      bpfMap.FD(),
         program:    prog,
         attachType: ebpf.AttachSkMsgVerdict,
     }
