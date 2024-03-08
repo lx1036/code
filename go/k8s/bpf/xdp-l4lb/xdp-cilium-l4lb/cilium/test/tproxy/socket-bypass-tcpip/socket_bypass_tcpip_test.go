@@ -7,11 +7,11 @@ import (
     "github.com/sirupsen/logrus"
     "github.com/stretchr/testify/suite"
     "golang.org/x/sys/unix"
+    "net"
     "os"
     "os/signal"
     "syscall"
     "testing"
-    "net"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go bpf test_socket_bypass_tcpip.c -- -I.
@@ -28,6 +28,10 @@ const (
     EXT_PORT = 7007
 )
 
+/**
+没有验证成功!!!
+*/
+
 func init() {
     logrus.SetReportCaller(true)
 }
@@ -37,7 +41,7 @@ type SocketBypassTCPIPSuite struct {
 
     objs       *bpfObjects
     cgroupLink link.Link
-    skMsgLink  link.Link
+    skMsgLink  *ProgAttachSkMsg
 }
 
 func TestSocketBypassTCPIPSuite(t *testing.T) {
@@ -75,7 +79,8 @@ func (s *SocketBypassTCPIPSuite) SetupSuite() {
     }
     s.cgroupLink = l1
 
-    // bpftool prog attach id progID msg_verdict id mapID
+    // `bpftool prog attach id progID msg_verdict id mapID` attach a sockops map
+    // https://github.com/cilium/cilium/blob/1c466d26ff0edfb5021d024f755d4d00bc744792/pkg/sockops/sockops.go#L47-L60
     l2, err := AttachSkMsg(objs.bpfPrograms.BpfTcpipBypass, objs.bpfMaps.SockOpsMap)
     if err != nil {
         logrus.Errorf("AttachSkMsg err: %v", err)
@@ -101,8 +106,10 @@ func (s *SocketBypassTCPIPSuite) TearDownSuite() {
     }
 }
 
+// CGO_ENABLED=0 go test -v -testify.m ^TestSocketBypass$ .
+// `netstat -tulpn`
 func (s *SocketBypassTCPIPSuite) TestSocketBypass() {
-    // only TCP
+    // only TCP, listen at 127.0.0.1:7007
     serverFd, err := makeServer(unix.SOCK_STREAM, nil, EXT_IP4, EXT_PORT)
     if err != nil {
         return
@@ -115,7 +122,7 @@ func (s *SocketBypassTCPIPSuite) TestSocketBypass() {
     tcpEcho(clientFd, serverFd, "testing")
 }
 
-// 127.0.0.1:5432 connect 127.0.0.1:7007
+// 127.0.0.1:5432 > 127.0.0.1:7007
 func makeClient(socketType int, ip string, port int) int {
     var err error
     var sockfd int
@@ -201,7 +208,7 @@ func makeServer(socketType int, reuseportProg *ebpf.Program, ip string, port int
         }
     }
 
-    // bind 127.0.0.1:8008
+    // bind 127.0.0.1:7007
     ipAddr := net.ParseIP(ip)
     sa := &unix.SockaddrInet4{
         Port: port,
@@ -304,18 +311,52 @@ func tcpEcho(clientFd, serverFd int, echoData string) {
     }
 }
 
-func AttachSkMsg(prog *ebpf.Program, bpfMap *ebpf.Map) (link.Link, error) {
+type ProgAttachSkMsg struct {
+    mapId      ebpf.MapID
+    program    *ebpf.Program
+    attachType ebpf.AttachType
+}
+
+func (skMsg *ProgAttachSkMsg) Close() error {
+    err := link.RawDetachProgram(link.RawDetachProgramOptions{
+        Target:  int(skMsg.mapId),
+        Program: skMsg.program,
+        Attach:  skMsg.attachType,
+    })
+    if err != nil {
+        return fmt.Errorf("close cgroup: %s", err)
+    }
+    return nil
+}
+
+func AttachSkMsg(prog *ebpf.Program, bpfMap *ebpf.Map) (*ProgAttachSkMsg, error) {
     if t := prog.Type(); t != ebpf.SkMsg {
-        return nil, fmt.Errorf("invalid program type %s, expected XDP", t)
+        return nil, fmt.Errorf("invalid program type %s, expected SkMsg", t)
     }
 
-    rawLink, err := link.AttachRawLink(link.RawLinkOptions{
-        Target:  bpfMap.FD(),
+    info, err := bpfMap.Info()
+    if err != nil {
+        return nil, err
+    }
+    mapId, ok := info.ID()
+    if !ok {
+        return nil, fmt.Errorf("invalid map id: %d", mapId)
+    }
+
+    err = link.RawAttachProgram(link.RawAttachProgramOptions{
+        Target:  int(mapId),
         Program: prog,
         Attach:  ebpf.AttachSkMsgVerdict,
+        Flags:   0,
     })
 
-    return rawLink, err
+    skMsg := &ProgAttachSkMsg{
+        mapId:      mapId,
+        program:    prog,
+        attachType: ebpf.AttachSkMsgVerdict,
+    }
+
+    return skMsg, nil
 }
 
 func joinCgroup(path string) string {
