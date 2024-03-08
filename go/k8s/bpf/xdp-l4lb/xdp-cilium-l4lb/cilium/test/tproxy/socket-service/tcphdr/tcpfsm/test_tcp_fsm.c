@@ -79,21 +79,23 @@ int bpf_tcp_fsm(struct bpf_sock_ops *skops) {
     switch (op) {
         /* Called when TCP changes state. Arg1: old_state Arg2: new_state */
         case BPF_SOCK_OPS_STATE_CB:
-            // 表示关闭 tcp connection
+            // skops->args[0] == BPF_TCP_LAST_ACK/BPF_TCP_TIME_WAIT/BPF_TCP_LISTEN
+            // 统计链接建立以来，所有包 stats
             if (skops->args[1] == BPF_TCP_CLOSE) {
                 // INFO: 这里是不是可以不用两次 bpf_map_update_elem()
                 __u32 key = 0;
                 struct tcpbpf_globals g, *gp;
                 gp = bpf_map_lookup_elem(&global_map, &key);
-                if (!gp)
+                if (!gp) {
                     break;
-                g = *gp;
+                }
+                g = *gp; // 直接使用 gp 会修改原指针值，这里修改了很多字段值，参考这里使用 bpf_map_update_elem()
                 if (skops->args[0] == BPF_TCP_LISTEN) { // listen->close
                     g.num_listen++;
-                } else { // establish->close
+                } else { // establish(BPF_TCP_LAST_ACK/BPF_TCP_TIME_WAIT)->close
                     g.total_retrans = skops->total_retrans;
-                    g.data_segs_in = skops->data_segs_in;
-                    g.data_segs_out = skops->data_segs_out;
+                    g.data_segs_in = skops->data_segs_in; // ->segments
+                    g.data_segs_out = skops->data_segs_out; // segments->
                     g.bytes_received = skops->bytes_received;
                     g.bytes_acked = skops->bytes_acked;
                 }
@@ -109,8 +111,9 @@ int bpf_tcp_fsm(struct bpf_sock_ops *skops) {
             /**
             TCP_SAVE_SYN is a socket option that if saves SYN packet
             具体来说，当 TCP_SAVE_SYN 标志打开时，内核会在结构体 tcp_options_received 中存储发送端的 SYN 报文信息。
-            这个结构体中包括了源 IP 地址、源端口号、初始序列号等字段。在连接建立完成后，
-            应用程序可以通过套接字选项来获取这些信息。
+            这个结构体中包括了源 IP 地址、源端口号、初始序列号等字段。在连接建立完成后，应用程序可以通过套接字选项来获取这些信息。
+
+            这里在 bpf 里开启 TCP_SAVE_SYN，没有在 go userspace 里开启
             */
             // tcpSaveSyn, err := unix.GetsockoptInt(serverFd, unix.SOL_TCP, unix.TCP_SAVE_SYN)
             v = (int) bpf_setsockopt(skops, IPPROTO_TCP, TCP_SAVE_SYN, &save_syn, sizeof(save_syn));
@@ -132,8 +135,9 @@ int bpf_tcp_fsm(struct bpf_sock_ops *skops) {
             /* Update results */
             struct tcpbpf_globals g, *gp;
             gp = bpf_map_lookup_elem(&global_map, &key);
-            if (!gp)
+            if (!gp) {
                 break;
+            }
             g = *gp;
             g.bad_cb_test_rv = bad_call_rv;
             g.good_cb_test_rv = good_call_rv;
@@ -154,7 +158,7 @@ int bpf_tcp_fsm(struct bpf_sock_ops *skops) {
                  */
                 v = (int) bpf_getsockopt(skops, IPPROTO_TCP, TCP_SAVED_SYN, header,
                                          (sizeof(struct iphdr) + sizeof(struct tcphdr))); // IPPROTO_TCP=SOL_TCP
-                if (!v) {
+                if (!v) { // 0 on success
                     int offset = sizeof(struct iphdr);
                     thdr = (struct tcphdr *) (header + offset);
                     v = thdr->syn;

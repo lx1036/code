@@ -22,8 +22,12 @@ import (
 
 // go generate .
 
+/**
+验证通过!!!
+*/
+
 const (
-    CgroupPath = "/sys/fs/cgroup/tcp_fsm"
+    CgroupPath = "/sys/fs/cgroup"
 
     PinPath1 = "/sys/fs/bpf/socket_service/tcp_fsm"
 
@@ -54,14 +58,15 @@ const (
     BPF_SOCK_OPS_WRITE_HDR_OPT_CB
 )
 
-// CGO_ENABLED=0 go test -v -run ^TestTcpFsm$ .
+// CGO_ENABLED=0 go test -v -count=1 -run ^TestTcpFsm$ .
+// tcpdump -i lo -nneevv port 8080 -w tcp_fsm.pcap
 func TestTcpFsm(test *testing.T) {
     logrus.SetReportCaller(true)
 
     stopCh := make(chan os.Signal, 1)
     signal.Notify(stopCh, os.Interrupt, syscall.SIGTERM)
 
-    cgroupPath := joinCgroup("tcp_fsm")
+    cgroupPath := joinCgroup("tcp_fsm2")
     //defer cleanupCgroup()
 
     //1.Load pre-compiled programs and maps into the kernel.
@@ -169,7 +174,7 @@ func TestTcpFsm(test *testing.T) {
         DataSegsOut:    1,
         BadCbTestRv:    0x80,
         GoodCbTestRv:   0,
-        BytesReceived:  501, // 1001
+        BytesReceived:  1001,
         BytesAcked:     1002,
         NumListen:      1,
         NumCloseEvents: ExpectedCloseEvents,
@@ -213,7 +218,7 @@ func makeBytes() string {
     return bytes
 }
 
-// tcp listen 127.0.0.1:60123
+// tcp listen 127.0.0.1:8080
 // /root/linux-5.10.142/tools/testing/selftests/bpf/tcp_server.py
 func makeServer() int {
     serverFd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM, 0)
@@ -253,6 +258,17 @@ func connectToFd(serverFd int) int {
         logrus.Fatal(err)
     }
     setSocketTimeout(clientFd, 5000)
+
+    ip1 := net.ParseIP(InaddrLoopback)
+    sa1 := &unix.SockaddrInet4{
+        Port: 5432, // client 源端口
+        Addr: [4]byte{},
+    }
+    copy(sa1.Addr[:], ip1)
+    err = unix.Bind(clientFd, sa1)
+    if err != nil {
+        logrus.Fatal(err)
+    }
 
     serverSockAddr, err := unix.Getsockname(serverFd)
     if err != nil {
@@ -304,7 +320,7 @@ func joinCgroup(path string) string {
     }
     pid := os.Getpid()
     file := fmt.Sprintf("%s/cgroup.procs", cgroupPath)
-    if err := os.WriteFile(file, []byte(fmt.Sprintf("%d\n", pid)), 0644); err != nil {
+    if err := os.WriteFile(file, []byte(fmt.Sprintf("%d\n", pid)), os.ModeAppend); err != nil {
         logrus.Fatalf("os.WriteFile err: %v", err)
     }
 
