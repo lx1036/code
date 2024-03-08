@@ -14,6 +14,9 @@ https://cyral.com/blog/lessons-using-ebpf-accelerating-cloud-native/
 /root/linux-5.10.142/tools/testing/selftests/bpf/prog_tests/sockmap_basic.c
 /root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_sockmap_invalid_update.c
 /root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_sockmap_update.c
+
+/root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_sockmap_kern.h
+/root/linux-5.10.142/tools/testing/selftests/bpf/test_sockmap.c
 ```
 
 bpf program type:
