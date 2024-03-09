@@ -37,7 +37,9 @@ var (
 )
 
 // INFO: 多个 raft 组
-//  https://github.com/lni/dragonboat-example/blob/master/multigroup/README.CHS.md
+//
+//	https://github.com/lni/dragonboat-example/blob/master/multigroup/README.CHS.md
+//
 // go run . --nodeid=1
 // go run . --nodeid=2
 // go run . --nodeid=3

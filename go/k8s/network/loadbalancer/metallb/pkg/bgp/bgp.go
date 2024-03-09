@@ -115,11 +115,12 @@ func (s *Session) run() {
 
 // sendKeepalives sends BGP KEEPALIVE packets at the negotiated rate whenever the session is connected
 // INFO: 这里心跳时间必须小于 holdTime，一般取 1/3 (https://github.com/osrg/gobgp/blob/v2.33.0/pkg/server/fsm.go#L1336-L1340)
-//  这里非常重要，否则router server 会报错 holdTime expired，state 由 establish->active
-//  查看接收的路由：gobgp -p 50063 -d neighbor 127.0.0.1 adj-in
-//  router server 接收到心跳keepalive后，会在fsm establish state中重置holdTimer，变为 10s 之后才会过期:
-//  @see https://github.com/osrg/gobgp/blob/v2.33.0/pkg/server/fsm.go#L1080-L1090
-//  @see https://github.com/osrg/gobgp/blob/v2.33.0/pkg/server/fsm.go#L1826-L1850
+//
+//	这里非常重要，否则router server 会报错 holdTime expired，state 由 establish->active
+//	查看接收的路由：gobgp -p 50063 -d neighbor 127.0.0.1 adj-in
+//	router server 接收到心跳keepalive后，会在fsm establish state中重置holdTimer，变为 10s 之后才会过期:
+//	@see https://github.com/osrg/gobgp/blob/v2.33.0/pkg/server/fsm.go#L1080-L1090
+//	@see https://github.com/osrg/gobgp/blob/v2.33.0/pkg/server/fsm.go#L1826-L1850
 func (s *Session) sendKeepalives() {
 	var ch <-chan time.Time
 	for {
@@ -136,7 +137,8 @@ func (s *Session) sendKeepalives() {
 }
 
 // sendUpdates waits for changes to desired advertisements, and pushes them out to the peer.
-//  INFO: 这里使用了 Cond 来实现锁
+//
+//	INFO: 这里使用了 Cond 来实现锁
 func (s *Session) sendUpdates() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -93,7 +93,8 @@ func (t *batchTx) UnsafeDeleteBucket(bucket Bucket) {
 
 // UnsafeRange
 // INFO: range scan @see https://github.com/etcd-io/bbolt#range-scans
-//  写事务的 range san 没有先从 buffer 里读的逻辑，直接读取磁盘文件数据
+//
+//	写事务的 range san 没有先从 buffer 里读的逻辑，直接读取磁盘文件数据
 func (t *batchTx) UnsafeRange(bucketType Bucket, key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte) {
 	bucket := t.tx.Bucket(bucketType.Name())
 	if bucket == nil {
@@ -104,7 +105,8 @@ func (t *batchTx) UnsafeRange(bucketType Bucket, key, endKey []byte, limit int64
 }
 
 // INFO: range scan
-//  limit<=0就是没有限制; endKey=nil,就只查startKey;
+//
+//	limit<=0就是没有限制; endKey=nil,就只查startKey;
 func unsafeRange(cursor *bolt.Cursor, startKey, endKey []byte, limit int64) ([][]byte, [][]byte) {
 	if limit <= 0 {
 		limit = math.MaxInt64
@@ -204,7 +206,8 @@ func (t *batchTx) commit(stop bool) {
 }
 
 // INFO: batchTx 中所有写事务都会 t.pending++，会定期 100ms 批量提交事务
-//  UnsafeCreateBucket()/UnsafeDeleteBucket()/UnsafePut()/UnsafeDelete()
+//
+//	UnsafeCreateBucket()/UnsafeDeleteBucket()/UnsafePut()/UnsafeDelete()
 func (t *batchTx) safePending() int {
 	t.Mutex.Lock()
 	defer t.Mutex.Unlock()
@@ -453,7 +456,8 @@ func (t *batchTxBuffered) CommitAndStop() {
 }
 
 // Commit INFO: 提交事务，这里会设置 only-read transaction
-//  https://github.com/etcd-io/bbolt#managing-transactions-manually
+//
+//	https://github.com/etcd-io/bbolt#managing-transactions-manually
 func (t *batchTxBuffered) Commit() {
 	t.Lock()
 	t.commit(false)

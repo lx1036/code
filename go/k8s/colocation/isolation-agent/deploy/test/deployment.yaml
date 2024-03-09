@@ -18,7 +18,7 @@ spec:
       nodeName: docker04
       containers:
         - name: colocation
-          image: nginx:1.17.8
+          image: nginx:1.24.0
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - mountPath: /tmp/bin

@@ -73,7 +73,8 @@ func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.P
 }
 
 // INFO: 计算 pod request 时，如果 request.* 没有值则使用默认值
-//  podResoureRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
+//
+//	podResoureRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
 func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	var podRequest int64
 	for i := range pod.Spec.Containers {

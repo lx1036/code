@@ -42,10 +42,11 @@ type respPodInfo struct {
 // 返回 Pod 信息
 // 需要绑定全局 apikey 使用。
 //
-//     Responses:
-//       200: respPodInfoList
-//       401: responseState
-//       500: responseState
+//	Responses:
+//	  200: respPodInfoList
+//	  401: responseState
+//	  500: responseState
+//
 // @router /get_pod_list [get]
 func (controller *OpenAPIController) GetPodList() {
 	if !controller.CheckoutRoutePermission(GetPodListAction) {

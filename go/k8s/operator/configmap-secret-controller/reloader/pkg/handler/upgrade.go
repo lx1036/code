@@ -34,28 +34,28 @@ const (
 	EnvVarPrefix = "STAKATER_"
 )
 
-//ItemsFunc is a generic function to return a specific resource array in given namespace
+// ItemsFunc is a generic function to return a specific resource array in given namespace
 type ItemsFunc func(*kubernetes.Clientset, string) []interface{}
 
-//ContainersFunc is a generic func to return containers
+// ContainersFunc is a generic func to return containers
 type ContainersFunc func(interface{}) []corev1.Container
 
-//InitContainersFunc is a generic func to return containers
+// InitContainersFunc is a generic func to return containers
 type InitContainersFunc func(interface{}) []corev1.Container
 
-//VolumesFunc is a generic func to return volumes
+// VolumesFunc is a generic func to return volumes
 type VolumesFunc func(interface{}) []corev1.Volume
 
-//UpdateFunc performs the resource update
+// UpdateFunc performs the resource update
 type UpdateFunc func(*kubernetes.Clientset, string, interface{}) error
 
-//AnnotationsFunc is a generic func to return annotations
+// AnnotationsFunc is a generic func to return annotations
 type AnnotationsFunc func(interface{}) map[string]string
 
-//PodAnnotationsFunc is a generic func to return annotations
+// PodAnnotationsFunc is a generic func to return annotations
 type PodAnnotationsFunc func(interface{}) map[string]string
 
-//RollingUpgradeFuncs contains generic functions to perform rolling upgrade
+// RollingUpgradeFuncs contains generic functions to perform rolling upgrade
 type RollingUpgradeFuncs struct {
 	ItemsFunc          ItemsFunc
 	AnnotationsFunc    AnnotationsFunc
@@ -249,18 +249,20 @@ func updateEnvVar(containers []corev1.Container, envVar string, shaData string) 
 }
 
 // spec:
-//   containers:
-//     - name: test-container
-//       image: k8s.gcr.io/busybox
-//       env:
-//         - name:
-//           valueFrom:
-//             configMapKeyRef:
-//               name: special-config
-//               key: SPECIAL_LEVEL
-//       envFrom:
-//         - configMapRef:
-//             name: special-config
+//
+//	containers:
+//	  - name: test-container
+//	    image: k8s.gcr.io/busybox
+//	    env:
+//	      - name:
+//	        valueFrom:
+//	          configMapKeyRef:
+//	            name: special-config
+//	            key: SPECIAL_LEVEL
+//	    envFrom:
+//	      - configMapRef:
+//	          name: special-config
+//
 // 搜索resourceType/resourceName的第一个container
 func getContainerWithEnvReference(containers []corev1.Container, resourceName string, resourceType string) *corev1.Container {
 	for i := range containers {
@@ -289,18 +291,19 @@ func getContainerWithEnvReference(containers []corev1.Container, resourceName st
 }
 
 // spec:
-//   containers:
-//     - name: test-container
-//       image: k8s.gcr.io/busybox
-//   volumes:
-//     - name: config-volume
-//       configMap:
-//         name: special-config
-//     - name: all-in-one
-//       projected:
-//         sources:
-//           - secret:
-//               name: user
+//
+//	containers:
+//	  - name: test-container
+//	    image: k8s.gcr.io/busybox
+//	volumes:
+//	  - name: config-volume
+//	    configMap:
+//	      name: special-config
+//	  - name: all-in-one
+//	    projected:
+//	      sources:
+//	        - secret:
+//	            name: user
 func getVolumeMountName(volumes []corev1.Volume, mountType string, volumeName string) string {
 	for i := range volumes {
 		if mountType == ConfigmapEnvVarPostfix {

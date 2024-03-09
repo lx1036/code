@@ -94,7 +94,7 @@ func _assert(condition bool, msg string, v ...interface{}) {
 	}
 }
 
-//////////// DBWrapper for test ////////
+// ////////// DBWrapper for test ////////
 type DBWrapper struct {
 	*DB
 }

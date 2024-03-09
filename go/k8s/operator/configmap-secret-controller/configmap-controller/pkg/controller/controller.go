@@ -194,7 +194,7 @@ func (controller *Controller) onUpdate(configMap *ConfigMap) {
 	controller.rollingUpdateDeployment(configMap, Update)
 }
 
-//Run function for controller which handles the queue
+// Run function for controller which handles the queue
 func (controller *Controller) Run(threadiness int, stopCh chan struct{}) {
 	if err := controller.watcher.Start(threadiness); err != nil {
 		log.Errorf("unable to start watcher: %v", err)

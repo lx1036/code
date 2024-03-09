@@ -1,0 +1,5 @@
+{
+    "plantuml.includepaths": ["docs/imgs/include"],
+    "plantuml.diagramsRoot": "docs/imgs/src",
+    "plantuml.exportOutDir": "docs/imgs/out"
+}

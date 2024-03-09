@@ -289,8 +289,9 @@ func (scheduler *Scheduler) assume(assumed *corev1.Pod, host string) error {
 }
 
 // INFO: filter 预选 and score 优选
-//  (1) PreFilter/Filter
-//  (2) PreScore/Score
+//
+//	(1) PreFilter/Filter
+//	(2) PreScore/Score
 func (scheduler *Scheduler) schedulePod(ctx context.Context, fwk *frameworkruntime.Framework,
 	state *framework.CycleState, pod *corev1.Pod) (result ScheduleResult, err error) {
 	if err := scheduler.SchedulerCache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {

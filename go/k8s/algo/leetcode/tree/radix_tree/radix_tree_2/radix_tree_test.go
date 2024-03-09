@@ -6,7 +6,8 @@ import (
 	"testing"
 )
 
-/**
+/*
+*
 https://github.com/armon/go-radix/blob/master/radix_test.go
 */
 func TestRadix2(test *testing.T) {

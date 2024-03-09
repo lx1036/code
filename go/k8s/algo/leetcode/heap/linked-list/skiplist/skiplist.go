@@ -44,8 +44,8 @@ func (list *ConcurrentSkipList) Length() int32 {
 	return length
 }
 
-/**
-
+/*
+*
  */
 func (list *ConcurrentSkipList) Insert(index uint64, value interface{}) {
 	skipList := list.skipLists[index]
@@ -72,8 +72,8 @@ func (list *skipList) getLength() int32 {
 	return list.length
 }
 
-/**
-
+/*
+*
  */
 func (list *skipList) insert(index uint64, value interface{}) {
 	list.mutex.Lock()

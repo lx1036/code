@@ -1,0 +1,56 @@
+{
+    // https://code.visualstudio.com/docs/cpp/launch-json-reference
+    // 调试参考: https://zhuanlan.zhihu.com/p/47236996
+
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        // 调试 master 进程
+        {
+            "name": "master",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tengine/objs/nginx",
+            // "args": ["-c", "${workspaceFolder}/modules/ngx_http_echo_module/nginx.conf", "-p", "${workspaceFolder}"],
+            "args": ["-c", "${workspaceFolder}/tengine/nginx-tcp.conf", "-e", "stderr", "-p", "${workspaceFolder}"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            // 使用 vscode debugConsole https://code.visualstudio.com/docs/cpp/launch-json-reference#_externalconsole
+            "externalConsole": false, 
+            "MIMode": "lldb"
+        },
+
+        // 想要调试 worker 进程，先开启调试 master 进程，然后选择 worker process id
+        // 调试 worker 进程还比较麻烦，每次还得手动 kill -9 {worker process id}，所以只能先命令行启动，然后指定 processId
+        {
+            "name": "worker",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "${workspaceFolder}/tengine/objs/nginx",
+            // "args": ["-c", "${workspaceFolder}/modules/ngx_http_echo_module/nginx.conf", "-p", "${workspaceFolder}"],
+            "MIMode": "lldb",
+            // "processId": "41893" // 这里不写具体 pid，可以弹框选择 worker pid
+            "processId": "${command:pickProcess}" // 这里不写具体 pid，可以弹框选择 worker pid
+        },
+
+        // 自己的 nginx 程序
+        {
+            "name": "mynginx",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tengine/objs/nginx",
+            "args": ["-c", "${workspaceFolder}/tengine/nginx-tcp.conf", "-e", "stderr", "-p", "${workspaceFolder}/tengine"],
+            // "args": ["-c", "${workspaceFolder}/conf/nginx-tcp.conf", "-p", "${workspaceFolder}"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            // 使用 vscode debugConsole https://code.visualstudio.com/docs/cpp/launch-json-reference#_externalconsole
+            "externalConsole": false, 
+            "MIMode": "lldb"
+        },
+
+    ]
+}

@@ -150,21 +150,21 @@ type SimpleVolView struct {
 }
 
 /*
-{
-  "code": 0,
-  "msg": "success",
-  "data": {
-    "ID": 78,
-    "Name": "pvc-30e5e4f1-e04f-4d53-9c76-50a6bc35abb0",
-    "Owner": "fusefs",
-    "MpReplicaNum": 3,
-    "Status": 0,
-    "Capacity": 100,
-    "MpCnt": 3,
-    "S3Endpoint": "http://fusefs.s3.cn",
-    "BucketDeleted": false
-  }
-}
+	{
+	  "code": 0,
+	  "msg": "success",
+	  "data": {
+	    "ID": 78,
+	    "Name": "pvc-30e5e4f1-e04f-4d53-9c76-50a6bc35abb0",
+	    "Owner": "fusefs",
+	    "MpReplicaNum": 3,
+	    "Status": 0,
+	    "Capacity": 100,
+	    "MpCnt": 3,
+	    "S3Endpoint": "http://fusefs.s3.cn",
+	    "BucketDeleted": false
+	  }
+	}
 */
 func (metaClient *MetaClient) getS3Endpoint() error {
 	url := fmt.Sprintf("http://%s%s?name=%s", metaClient.masterLeader, "/admin/getVol", metaClient.volumeName)
@@ -196,16 +196,17 @@ func (metaClient *MetaClient) getS3Endpoint() error {
 
 /*
 pv: pvc-30e5e4f1-e04f-4d53-9c76-50a6bc35abb0 大小为 100G
-{
-  "code": 0,
-  "msg": "success",
-  "data": {
-    "Name": "pvc-30e5e4f1-e04f-4d53-9c76-50a6bc35abb0",
-    "TotalSize": 107374182400,
-    "UsedSize": 452,
-    "Status": 0
-  }
-}
+
+	{
+	  "code": 0,
+	  "msg": "success",
+	  "data": {
+	    "Name": "pvc-30e5e4f1-e04f-4d53-9c76-50a6bc35abb0",
+	    "TotalSize": 107374182400,
+	    "UsedSize": 452,
+	    "Status": 0
+	  }
+	}
 */
 func (metaClient *MetaClient) getVolStatInfo() error {
 	url := fmt.Sprintf("http://%s%s?name=%s", metaClient.masterLeader, "/client/volStat", metaClient.volumeName)

@@ -14,7 +14,7 @@ var (
 	nodeID     = flag.String("nodeid", "", "node id")
 )
 
-//debug: go run . --endpoint tcp://127.0.0.1:10000 --nodeid minikube
+// debug: go run . --endpoint tcp://127.0.0.1:10000 --nodeid minikube
 func main() {
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")

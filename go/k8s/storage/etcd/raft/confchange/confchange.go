@@ -220,6 +220,7 @@ func (c Changer) EnterJoint(autoLeave bool, ccs ...pb.ConfChangeSingle) (tracker
 	return checkAndReturn(cfg, prs)
 }
 
+//
 // [1]: https://github.com/ongardie/dissertation/blob/master/online-trim.pdf
 func (c Changer) LeaveJoint() (tracker.Config, tracker.ProgressMap, error) {
 	cfg, prs, err := c.checkAndCopy()

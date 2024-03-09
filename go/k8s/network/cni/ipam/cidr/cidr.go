@@ -9,10 +9,10 @@ import (
 )
 
 /*
-	https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
-	CIDR表示法:
-	IPv4   	网络号/前缀长度		192.168.1.0/24
-	IPv6	接口号/前缀长度		2001:db8::/64
+https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
+CIDR表示法:
+IPv4   	网络号/前缀长度		192.168.1.0/24
+IPv6	接口号/前缀长度		2001:db8::/64
 */
 type CIDR struct {
 	ip    net.IP

@@ -245,9 +245,10 @@ func (deleter *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVers
 
 // listCollection will list the items in the specified namespace
 // it returns the following:
-//  the list of items in the collection (if found)
-//  a boolean if the operation is supported
-//  an error if the operation is supported but could not be completed.
+//
+//	the list of items in the collection (if found)
+//	a boolean if the operation is supported
+//	an error if the operation is supported but could not be completed.
 func (deleter *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResource, namespace string) (*metav1.PartialObjectMetadataList, bool, error) {
 	log.Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
 

@@ -44,8 +44,9 @@ type StoreConfig struct {
 }
 
 // INFO: kvstore 是一个封装对象，具有事务功能，把读写分为 "读事务/写事务",主要包含了 treeIndex(keyIndex/revision) 和 Backend 对象
-//  (1)先从B+tree treeIndex 中查找出当前 key 的 revision
-//  (2)再从 Backend 中以 revision 为 key 查找出 value, 该 value 包含用户输入的 (key, value)
+//
+//	(1)先从B+tree treeIndex 中查找出当前 key 的 revision
+//	(2)再从 Backend 中以 revision 为 key 查找出 value, 该 value 包含用户输入的 (key, value)
 type store struct {
 	// mu read locks for txns and write locks for non-txn store changes.
 	mu sync.RWMutex

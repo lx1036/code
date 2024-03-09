@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: configmap-controller
-          image: nginx:1.17.8
+          image: nginx:1.24.0
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - mountPath: /var/www/html # k8s v1.17.3 cat /var/www/html == "APP_NAME=k8s APP_KEY=abc123"

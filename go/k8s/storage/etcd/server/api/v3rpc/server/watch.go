@@ -38,7 +38,8 @@ func NewWatchServer(watchableStore mvcc.WatchableKV) pb.WatchServer {
 }
 
 // INFO: 主要处理 watch client 的 create/cancel watcher 请求，并启动两个 goroutine loop，
-//  与 mvcc 模块交互，把来自于 mvcc 模块的 Watch 事件发给 client
+//
+//	与 mvcc 模块交互，把来自于 mvcc 模块的 Watch 事件发给 client
 type watchServerStream struct {
 	sync.WaitGroup
 	sync.RWMutex

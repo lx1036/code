@@ -421,7 +421,7 @@ func (s *Status) Message() string {
 // NodeToStatusMap declares map from node name to its status.
 type NodeToStatusMap map[string]*Status
 
-//////////////////// listers ///////////////////
+// ////////////////// listers ///////////////////
 // NodeInfoLister interface represents anything that can list/get NodeInfo objects from node name.
 type NodeInfoLister interface {
 	// Returns the list of NodeInfos.

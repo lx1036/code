@@ -9,7 +9,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-//DeleteBucketInfo defines bucket info
+// DeleteBucketInfo defines bucket info
 type DeleteBucketInfo struct {
 	ID         uint64
 	AccessKey  string

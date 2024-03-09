@@ -1,0 +1,38 @@
+[
+  {
+    "svcPort": 8080,
+    "endpointIP": "172.16.1.50",
+    "endpointPort": 8080,
+    "protocol": [
+      "tcp"
+    ],
+    "action": "deny"
+  },
+  {
+    "svcPort": 8081,
+    "endpointIP": "172.16.1.50",
+    "endpointPort": 8081,
+    "protocol": [
+      "udp"
+    ],
+    "action": "deny"
+  },
+  {
+    "svcPort": 8082,
+    "endpointIP": "172.16.1.51",
+    "endpointPort": 8080,
+    "protocol": [
+      "tcp"
+    ],
+    "action": "allow"
+  },
+  {
+    "svcPort": 8083,
+    "endpointIP": "172.16.1.51",
+    "endpointPort": 8081,
+    "protocol": [
+      "udp"
+    ],
+    "action": "allow"
+  }
+]

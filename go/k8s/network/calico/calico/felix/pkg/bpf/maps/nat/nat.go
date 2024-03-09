@@ -7,25 +7,25 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// struct calico_nat_v4_key {
-//    uint32_t prefixLen;
-//    uint32_t addr; // NBO
-//    uint16_t port; // HBO
-//    uint8_t protocol;
-//    uint32_t saddr;
-//    uint8_t pad;
-// };
+//	struct calico_nat_v4_key {
+//	   uint32_t prefixLen;
+//	   uint32_t addr; // NBO
+//	   uint16_t port; // HBO
+//	   uint8_t protocol;
+//	   uint32_t saddr;
+//	   uint8_t pad;
+//	};
 const frontendKeySize = 16
 
 type FrontendKey [frontendKeySize]byte // 4+4+2+1+4+1=16
 
-// struct calico_nat_v4_value {
-//    uint32_t id;
-//    uint32_t count;
-//    uint32_t local;
-//    uint32_t affinity_timeo;
-//    uint32_t flags;
-// };
+//	struct calico_nat_v4_value {
+//	   uint32_t id;
+//	   uint32_t count;
+//	   uint32_t local;
+//	   uint32_t affinity_timeo;
+//	   uint32_t flags;
+//	};
 const frontendValueSize = 20
 
 type FrontendValue [frontendValueSize]byte // 4+4+4+4+4=20
@@ -45,17 +45,17 @@ func FrontendMap(mc *bpf.MapContext) *bpf.Map {
 	return mc.NewPinnedMap(FrontendMapParameters)
 }
 
-// struct calico_nat_secondary_v4_key {
-//   uint32_t id;
-//   uint32_t ordinal;
-// };
+//	struct calico_nat_secondary_v4_key {
+//	  uint32_t id;
+//	  uint32_t ordinal;
+//	};
 const backendKeySize = 8
 
-// struct calico_nat_dest {
-//    uint32_t addr;
-//    uint16_t port;
-//    uint8_t pad[2];
-// };
+//	struct calico_nat_dest {
+//	   uint32_t addr;
+//	   uint16_t port;
+//	   uint8_t pad[2];
+//	};
 const backendValueSize = 8
 
 var BackendMapParameters = maps.MapParameters{
@@ -72,19 +72,19 @@ func BackendMap(mc *bpf.MapContext) *bpf.Map {
 	return mc.NewPinnedMap(BackendMapParameters)
 }
 
-// struct calico_nat {
-//	uint32_t addr;
-//	uint16_t port;
-//	uint8_t  protocol;
-//	uint8_t  pad;
-// };
+//	struct calico_nat {
+//		uint32_t addr;
+//		uint16_t port;
+//		uint8_t  protocol;
+//		uint8_t  pad;
+//	};
 const frontendAffKeySize = 8
 
-// struct calico_nat_v4_affinity_key {
-//    struct calico_nat_v4 nat_key;
-// 	  uint32_t client_ip;
-// 	  uint32_t padding;
-// };
+//	struct calico_nat_v4_affinity_key {
+//	   struct calico_nat_v4 nat_key;
+//		  uint32_t client_ip;
+//		  uint32_t padding;
+//	};
 const affinityKeySize = frontendAffKeySize + 8
 
 // struct calico_nat_v4_affinity_val {

@@ -486,11 +486,11 @@ func (controller *NetworkPolicyController) cleanupStaleIPSets(activePolicyIPSets
 
 // isPodUpdateNetPolRelevant checks the attributes that we care about for building NetworkPolicies on the host and if it
 // finds a relevant change, it returns true otherwise it returns false. The things we care about for NetworkPolicies:
-// 1) Is the phase of the pod changing? (matters for catching completed, succeeded, or failed jobs)
-// 2) Is the pod IP changing? (changes how the network policy is applied to the host)
-// 3) Is the pod's host IP changing? (should be caught in the above, with the CNI kube-router runs with but we check
+//  1. Is the phase of the pod changing? (matters for catching completed, succeeded, or failed jobs)
+//  2. Is the pod IP changing? (changes how the network policy is applied to the host)
+//  3. Is the pod's host IP changing? (should be caught in the above, with the CNI kube-router runs with but we check
 //     this as well for sanity)
-// 4) Is a pod's label changing? (potentially changes which NetworkPolicies select this pod)
+//  4. Is a pod's label changing? (potentially changes which NetworkPolicies select this pod)
 func isPodUpdateNetPolRelevant(oldPod, newPod *corev1.Pod) bool {
 	return newPod.Status.Phase != oldPod.Status.Phase ||
 		newPod.Status.PodIP != oldPod.Status.PodIP ||

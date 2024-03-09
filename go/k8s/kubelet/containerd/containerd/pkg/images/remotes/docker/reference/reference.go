@@ -49,7 +49,7 @@ type Spec struct {
 }
 
 // Parse parses the string into a structured ref.
-func Parse(ref string) (Spec, error) { // ref: "docker.io/library/nginx:1.17.8"
+func Parse(ref string) (Spec, error) { // ref: "docker.io/library/nginx:1.24.0"
 	if strings.Contains(ref, "://") {
 		return Spec{}, ErrInvalid
 	}

@@ -320,7 +320,8 @@ func (u *unstable) stableSnapTo(i uint64) {
 }
 
 // INFO: 其实就是压缩下 u.entries 空间避免浪费，减少内存，u.entries 值内容不动
-//  Avoid holding unneeded memory in unstable log's entries array
+//
+//	Avoid holding unneeded memory in unstable log's entries array
 func (u *unstable) shrinkEntriesArray() {
 	const lenMultiple = 2
 	if len(u.entries) == 0 {

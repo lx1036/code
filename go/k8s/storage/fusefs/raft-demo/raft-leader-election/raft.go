@@ -132,8 +132,9 @@ type RequestVoteReply struct {
 }
 
 // INFO: startElection starts a new election with this CM as a candidate.
-//   Expects cm.mu to be locked.
-//   发起选举，依次 rpc RequestVote 给 peers，
+//
+//	Expects cm.mu to be locked.
+//	发起选举，依次 rpc RequestVote 给 peers，
 func (cm *ConsensusModule) startElection() {
 	// INFO: 投票过程：
 	// 1. follower递增自己的term

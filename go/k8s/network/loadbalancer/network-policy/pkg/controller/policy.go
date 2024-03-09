@@ -318,25 +318,28 @@ func (controller *NetworkPolicyController) syncNetworkPolicyChains(networkPolici
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: test-network-policy
-  namespace: foo
+
+	name: test-network-policy
+	namespace: foo
+
 spec:
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          app: bar
-    - podSelector:
-        matchLabels:
-          app: bar2
-    - ipBlock:
-        cidr: 14.215.0.0/16
-    ports:
-    - protocol: TCP
-      port: 5978
-  podSelector: {}
-  policyTypes:
-    - Ingress
+
+	ingress:
+	- from:
+	  - namespaceSelector:
+	      matchLabels:
+	        app: bar
+	  - podSelector:
+	      matchLabels:
+	        app: bar2
+	  - ipBlock:
+	      cidr: 14.215.0.0/16
+	  ports:
+	  - protocol: TCP
+	    port: 5978
+	podSelector: {}
+	policyTypes:
+	  - Ingress
 */
 func (controller *NetworkPolicyController) processIngressRules(policy networkPolicyInfo, targetDstPodIPSetName string, activePolicyIPSets map[string]bool) error {
 	// From network policy spec: "If field 'Ingress' is empty then this NetworkPolicy does not allow any traffic "
@@ -425,25 +428,28 @@ func (controller *NetworkPolicyController) processIngressRules(policy networkPol
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: test-network-policy
-  namespace: foo
+
+	name: test-network-policy
+	namespace: foo
+
 spec:
-  egress:
-  - to:
-    - ipBlock:
-        cidr: 14.215.0.0/16
-    - namespaceSelector:
-        matchLabels:
-          app: bar
-    - podSelector:
-        matchLabels:
-          app: bar2
-    ports:
-    - protocol: TCP
-      port: 5978
-  podSelector: {}
-  policyTypes:
-    - Egress
+
+	egress:
+	- to:
+	  - ipBlock:
+	      cidr: 14.215.0.0/16
+	  - namespaceSelector:
+	      matchLabels:
+	        app: bar
+	  - podSelector:
+	      matchLabels:
+	        app: bar2
+	  ports:
+	  - protocol: TCP
+	    port: 5978
+	podSelector: {}
+	policyTypes:
+	  - Egress
 */
 func (controller *NetworkPolicyController) processEgressRules(policy networkPolicyInfo, targetSrcPodIPSetName string, activePolicyIPSets map[string]bool) error {
 	if policy.egressRules == nil {

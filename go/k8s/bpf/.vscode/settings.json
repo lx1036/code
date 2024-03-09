@@ -1,0 +1,21 @@
+{
+    "files.associations": {
+        "test_tcp_hdr_options.h": "c",
+        "bpf_helpers.h": "c",
+        "bpf_helper_defs.h": "c",
+        "ngx_core.h": "c",
+        "ngx_event.h": "c",
+        "ngx_stream_upstream.h": "c",
+        "ngx_config.h": "c",
+        "ngx_posix_config.h": "c",
+        "ngx_stream.h": "c",
+        "ngx_event_timer.h": "c",
+        "socket.h": "c",
+        "in.h": "c",
+        "complex": "c",
+        "ngx_errno.h": "c",
+        "pcre2.h": "c",
+        "xdp.h": "c",
+        "helpers_xdp.h": "c"
+    }
+}

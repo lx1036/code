@@ -26,8 +26,8 @@ docker network create -d ipvlan --subnet=10.209.35.0/24 -o parent=eth0 -o ipvlan
 # docker network create -d ipvlan --subnet=10.209.35.0/24 -o parent=eth5 -o ipvlan_mode=l2 ipvlan20
 # 只会稍微影响测试，不影响 CNI 开发
 
-docker run --net=ipvlan10 --ip=10.209.35.63 --name=test-eth5-1 -d nginx:1.17.8
-docker run --net=ipvlan10 --ip=10.209.35.194 --name=test-eth5-2 -d nginx:1.17.8
+docker run --net=ipvlan10 --ip=10.209.35.63 --name=test-eth5-1 -d nginx:1.24.0
+docker run --net=ipvlan10 --ip=10.209.35.194 --name=test-eth5-2 -d nginx:1.24.0
 
 curl -I 10.209.35.63
 curl -I 10.209.35.194

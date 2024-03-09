@@ -184,8 +184,9 @@ type stepFunc func(m pb.Message) error
 var ErrProposalDropped = errors.New("raft proposal dropped")
 
 // INFO: raft struct是raft算法的实现
-//  (1) Leader Election: campaign 竞选
-//    (1.1)
+//
+//	(1) Leader Election: campaign 竞选
+//	  (1.1)
 type raft struct {
 	id uint64 // INFO: 对于单 node, raft id 就是 node id
 
@@ -739,7 +740,8 @@ func (r *raft) sendTimeoutNow(to uint64) {
 }
 
 // INFO: leader 把 append log 发送给 follower, r.progress 会记录进度
-//  Follower的日志同步进度维护在Progress对象中
+//
+//	Follower的日志同步进度维护在Progress对象中
 func (r *raft) bcastAppend() {
 	r.progress.Visit(func(id uint64, _ *tracker.Progress) {
 		if id == r.id {
@@ -822,7 +824,8 @@ func (r *raft) pastElectionTimeout() bool {
 }
 
 // INFO: Raft 为了优化选票被瓜分导致选举失败的问题，引入了随机数，每个节点等待发起选举的时间点不一致，优雅的解决了潜在的竞选活锁，同时易于理解
-//  @see raft 3.4 论文中介绍，使用 random election timeout 来防止多个 follower 一起成为 candidate
+//
+//	@see raft 3.4 论文中介绍，使用 random election timeout 来防止多个 follower 一起成为 candidate
 func (r *raft) resetRandomizedElectionTimeout() {
 	r.randomizedElectionTimeout = r.electionTimeout + globalRand.Intn(r.electionTimeout) // [10, 20]
 }
@@ -1040,7 +1043,8 @@ func (r *raft) promotable() bool {
 }
 
 // INFO: 推动用户提交的 []pb.Message 在 ready 结构体中，然后要提交到 log 模块中，这里才是最终目标!!!
-//  调用 Node.Advance() 通知Node，之前调用 Node.Ready() 所接受的数据已经被异步应用到状态机了
+//
+//	调用 Node.Advance() 通知Node，之前调用 Node.Ready() 所接受的数据已经被异步应用到状态机了
 func (r *raft) advance(ready Ready) {
 	r.reduceUncommittedSize(ready.CommittedEntries)
 
@@ -1075,7 +1079,8 @@ func (r *raft) advance(ready Ready) {
 }
 
 // INFO: raft 没有去实现 transport 模块，交给用户去实现。所以只是把 []pb.Message 存储到 r.msgs，然后在 node.Ready() 中被 raft 外部调用
-//  参考 KVServer 中上层调用模块 raft 中, 获得 raftNode.Ready() 之后在使用 transport.Send() 发给各个 follower
+//
+//	参考 KVServer 中上层调用模块 raft 中, 获得 raftNode.Ready() 之后在使用 transport.Send() 发给各个 follower
 func (r *raft) send(message pb.Message) {
 	if message.From == None {
 		message.From = r.id

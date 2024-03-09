@@ -20,7 +20,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// INFO: https://cubefs.readthedocs.io/zh_CN/latest/design/client.html
+// INFO: https://cubefs.io/zh/docs/master/overview/introduction.html
 // go run . --config=./fuse.json
 // 检查：df -h globalmount
 // 调用 stat 接口：stat globalmount

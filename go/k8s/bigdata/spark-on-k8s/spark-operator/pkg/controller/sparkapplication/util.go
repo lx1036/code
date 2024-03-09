@@ -60,7 +60,8 @@ func podPhaseToDriverState(podStatus corev1.PodStatus) v1.DriverState {
 }
 
 // INFO: 如果 pod template name没设置，driver name 默认是 spark-kubernetes-driver, executor 默认是 spark-kubernetes-executor
-//  @see https://spark.apache.org/docs/latest/running-on-kubernetes.html#container-spec
+//
+//	@see https://spark.apache.org/docs/latest/running-on-kubernetes.html#container-spec
 func getDriverContainerTerminatedState(podStatus corev1.PodStatus) *corev1.ContainerStateTerminated {
 	for _, c := range podStatus.ContainerStatuses {
 		if c.Name == config.SparkDriverContainerName {

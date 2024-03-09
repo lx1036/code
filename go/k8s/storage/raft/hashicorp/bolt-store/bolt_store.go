@@ -24,7 +24,8 @@ var (
 )
 
 // BoltStore provides access to bbolt for Raft to store and retrieve log entries.
-//  INFO: 内存 store @see github.com/hashicorp/raft@v1.3.3/inmem_store.go
+//
+//	INFO: 内存 store @see github.com/hashicorp/raft@v1.3.3/inmem_store.go
 type BoltStore struct {
 	sync.Mutex
 

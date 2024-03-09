@@ -58,11 +58,12 @@ type DeploymentInfo struct {
 // cluster 字段可以选择单个机房也可以选择多个机房，对于创建模板并上线的用法，会根据指定的机房之前的模板进行分类（如果机房 a 和机房 b 使用同一个模板，那么调用以后仍然共用一个新模板）
 // 而对于指定 template_id 来上线的形式，则会忽略掉所有检查，直接使用特定模板上线到所有机房。
 //
-//     Responses:
-//       200: responseSuccess
-//       400: responseState
-//       401: responseState
-//       500: responseState
+//	Responses:
+//	  200: responseSuccess
+//	  400: responseState
+//	  401: responseState
+//	  500: responseState
+//
 // @router /upgrade_deployment [get]
 func (controller *OpenAPIController) UpgradeDeployment() {
 	var err error

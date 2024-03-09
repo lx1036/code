@@ -44,7 +44,6 @@ type At struct {
 	IsAtAll   bool     `json:"isAtAll"`   // @所有人时：true，否则为：false
 }
 
-//
 func NewDingTalkReceiver(receiver string) *DingTalk {
 	dingTalk := &DingTalk{
 		Level: WARNING,

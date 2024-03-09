@@ -26,7 +26,6 @@ type encoder struct {
 	uint64buf []byte
 }
 
-//
 func (e *encoder) encode(rec *walpb.Record) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()

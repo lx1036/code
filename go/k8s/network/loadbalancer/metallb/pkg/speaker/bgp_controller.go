@@ -116,7 +116,8 @@ func (controller *BGPController) PeerSessions() []*bgp.Session {
 
 // ShouldAnnounce
 // INFO: externalTrafficPolicy=Cluster && any healthy endpoint exists || externalTrafficPolicy=Local && there's a ready local endpoint
-//  如果是 Cluster，只需要检查有 healthy endpoint，不管在不在 speaker 生效的 node 上；如果是 Local，则必须 speaker 生效的 node 上有 healthy endpoint
+//
+//	如果是 Cluster，只需要检查有 healthy endpoint，不管在不在 speaker 生效的 node 上；如果是 Local，则必须 speaker 生效的 node 上有 healthy endpoint
 func (controller *BGPController) ShouldAnnounce(name string, policyType string, eps *Endpoints) (string, bool) {
 	switch corev1.ServiceExternalTrafficPolicyType(policyType) {
 	case corev1.ServiceExternalTrafficPolicyTypeLocal:

@@ -15,8 +15,8 @@ func init() {
 	}
 }
 
-/**
-
+/*
+*
  */
 func main() {
 	err := orm.RegisterDriver("mysql", orm.DRMySQL)

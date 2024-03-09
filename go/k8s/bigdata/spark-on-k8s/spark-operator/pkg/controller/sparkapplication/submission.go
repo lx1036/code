@@ -440,8 +440,10 @@ func addExecutorConfOptions(app *v1.SparkApplication, submissionID string) ([]st
 
 /*
 INFO: ` /opt/spark/bin/spark-submit --class xxx --master xxx --deploy-mode cluster
+
 	--conf spark.kubernetes.namespace=xxx --conf spark.app.name=xxx --conf spark.kubernetes.driver.pod.name=xxx
 	--conf ...
+
 `
 */
 func runSparkSubmit(submission *submission) (bool, error) {

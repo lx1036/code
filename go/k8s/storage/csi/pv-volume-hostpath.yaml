@@ -43,7 +43,7 @@ metadata:
 spec:
   containers:
     - name: task-pv-container
-      image: nginx:1.17.8
+      image: nginx:1.24.0
       imagePullPolicy: IfNotPresent
       ports:
         - containerPort: 80

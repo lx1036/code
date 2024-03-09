@@ -2,7 +2,8 @@ package radix_tree
 
 import "testing"
 
-/**
+/*
+*
 https://github.com/trustfeed/radix-tree-go
 */
 func TestTrie(test *testing.T) {

@@ -9,37 +9,39 @@ const (
 	TableNameDaemonSet = "daemon_sets"
 )
 
-/* 存储元数据
-{
-  "privileged":{"nginx",true},
-  "affinity": {
-    "podAntiAffinity": {
-      "requiredDuringSchedulingIgnoredDuringExecution": [
-        {
-          "labelSelector": {
-            "matchExpressions": [
-              {
-                "operator": "In",
-                "values": [
-                  "xxx"
-                ],
-                "key": "app"
-              }
-            ]
-          },
-          "topologyKey": "kubernetes.io/hostname"
-        }
-      ]
-    }
-  },
-  "resources":{
-		"cpuRequestLimitPercent": "50%", // cpu request和limit百分比，默认50%
-		"memoryRequestLimitPercent": "100%", // memory request和limit百分比，默认100%
-		"cpuLimit":"12",  // cpu限制，默认12个核
-		"memoryLimit":"64" // 内存限制，默认64G
-		"replicaLimit":"32" // 份数限制，默认32份
-  }
-}
+/*
+	存储元数据
+
+	{
+	  "privileged":{"nginx",true},
+	  "affinity": {
+	    "podAntiAffinity": {
+	      "requiredDuringSchedulingIgnoredDuringExecution": [
+	        {
+	          "labelSelector": {
+	            "matchExpressions": [
+	              {
+	                "operator": "In",
+	                "values": [
+	                  "xxx"
+	                ],
+	                "key": "app"
+	              }
+	            ]
+	          },
+	          "topologyKey": "kubernetes.io/hostname"
+	        }
+	      ]
+	    }
+	  },
+	  "resources":{
+			"cpuRequestLimitPercent": "50%", // cpu request和limit百分比，默认50%
+			"memoryRequestLimitPercent": "100%", // memory request和limit百分比，默认100%
+			"cpuLimit":"12",  // cpu限制，默认12个核
+			"memoryLimit":"64" // 内存限制，默认64G
+			"replicaLimit":"32" // 份数限制，默认32份
+	  }
+	}
 */
 type DaemonSetMetaData struct {
 	Resources map[string]string `json:"resources,omitempty"`

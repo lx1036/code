@@ -28,7 +28,8 @@ var (
 )
 
 // INFO: 这里已经是 ListAndWatch 机制了，服务端增量数据会被 push 到本地 cache，但是这里没有设置 event handler 去 **立即** 处理，
-//  而是周期处理，比如 BGP 宣告 pod cidr 或者 service clusterIP/loadbalancerIP ！！！
+//
+//	而是周期处理，比如 BGP 宣告 pod cidr 或者 service clusterIP/loadbalancerIP ！！！
 func TestK8sListAndWatch(test *testing.T) {
 	flag.Parse()
 

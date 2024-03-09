@@ -727,10 +727,11 @@ var (
 )
 
 // INFO: 可以直接在 mac 上运行
-//  mkdir -p /tmp/fuse/memoryfs
-//  go run . --mountpoint=/tmp/fuse/memoryfs
-//  `umount globalmount` in mac
-//  `fusermount -u globalmount` in linux
+//
+//	mkdir -p /tmp/fuse/memoryfs
+//	go run . --mountpoint=/tmp/fuse/memoryfs
+//	`umount globalmount` in mac
+//	`fusermount -u globalmount` in linux
 func main() {
 	flag.Parse()
 

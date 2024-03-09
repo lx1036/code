@@ -97,7 +97,7 @@ kubectl scale --current-replicas=1 --replicas=3 deployment/nginx
 
 (2)Pod: 创建一个pod，包含多个image，如 image=nginx,name=nginx; image=redis,name=redis ？
 ```shell
-kubectl create deployment test-deploy --image=nginx:1.17.8 --port=80
+kubectl create deployment test-deploy --image=nginx:1.24.0 --port=80
 kubectl edit deploy test-deploy # 手动添加多个容器
 ```
 
@@ -183,8 +183,8 @@ spec:
 (7)Deployment: 创建 deployment 名字为 nginx-app 容器采用 1.11.9 版本的 nginx  这个 deployment 包含 3 个副本,接下来通过滚动升级的方式更新镜像版本为 1.12.0，并记录这个更新，最后，回滚这个更新到之前的 1.11.9 版本
 创建 deployment 的 spec 文件: 使用 redis 镜像，7 个副本，label 为 app_enb_stage=dev deployment 名字为 kual00201 保存这个 spec 文件到/opt/KUAL00201/deploy_spec.yaml完成后，清理(删除)在此任务期间生成的任何新的 k8s API 对象
 ```shell
-kubectl run deployment nginx-app --image=nginx:1.11.9 --replicas=3
-kubectl set image deployment nginx-app nginx-app=nginx:1.12.0 --record  (nginx-app container名字)
+kubectl run deployment nginx-app --image=nginx:1.24.0 --replicas=3
+kubectl set image deployment nginx-app nginx-app=nginx:1.24.0 --record  (nginx-app container名字)
 kubectl rollout history deployment nginx-app
 kubectl rollout undo deployment nginx-app
 

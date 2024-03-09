@@ -264,7 +264,9 @@ func (c *Controller) processNextItem() bool {
 	return true
 }
 
-/* TODOs
+/*
+	TODOs
+
 - Enhance event creation using client-side cacheing machanisms - pending
 - Enhance the processItem to classify events - done
 - Send alerts correspoding to events - done

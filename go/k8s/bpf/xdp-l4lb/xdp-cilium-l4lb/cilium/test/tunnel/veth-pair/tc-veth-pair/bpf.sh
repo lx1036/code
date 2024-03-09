@@ -1,0 +1,11 @@
+#!/bin/bash
+
+
+apt-get update -y
+apt-get install -y gcc-multilib libbpf-dev clang linux-tools-`uname -r` jq
+
+# 这里安装 libbpf-dev 包后，代码里可以直接 include linux 头文件
+clang -O2 -Wall -target bpf -c test_tc_peer.c -o test_tc_peer.o
+clang -O2 -Wall -target bpf -c test_tc_neigh.c -o test_tc_neigh.o
+clang -O2 -Wall -target bpf -c test_tc_neigh_fib.c -o test_tc_neigh_fib.o
+

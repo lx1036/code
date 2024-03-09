@@ -11,7 +11,7 @@ import (
 	"k8s-lx1036/k8s/storage/fusefs/pkg/util"
 )
 
-//const
+// const
 const (
 	// the maximum number of tasks that can be handled each time
 	MaxTaskNum         = 30

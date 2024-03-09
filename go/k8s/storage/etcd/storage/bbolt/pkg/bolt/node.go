@@ -50,7 +50,8 @@ type node struct {
 }
 
 // INFO: page 是磁盘上数据结构，需要读取 disk page(一个page默认4KB)为一个node，inode 就是 kvs，存储key-value数据
-//  node.read page -> node
+//
+//	node.read page -> node
 func (n *node) read(p *page) {
 	// 初始化元信息
 	n.pgid = p.id
@@ -87,10 +88,11 @@ func (n *node) read(p *page) {
 }
 
 // INFO: 所有的数据新增都发生在叶子节点，如果新增数据后 B+ 树不平衡，之后会通过 node.spill 来进行拆分调整
-//  该函数签名很有意思，同时有 oldKey 和 newKey ，开始时感觉很奇怪
-//  1. 在叶子节点插入用户数据时，oldKey 等于 newKey，此时这两个参数是有冗余的。
-//  2. 在 spill 阶段调整 B+ 树时，oldKey 可能不等于 newKey，此时是有用的，但从代码上来看，用处仍然很隐晦
-//  为了避免在叶子节点最左侧插入一个很小的值时，引起祖先节点的 node.key 的链式更新，而将更新延迟到了最后 B+ 树调整阶段（spill 函数）进行统一处理
+//
+//	该函数签名很有意思，同时有 oldKey 和 newKey ，开始时感觉很奇怪
+//	1. 在叶子节点插入用户数据时，oldKey 等于 newKey，此时这两个参数是有冗余的。
+//	2. 在 spill 阶段调整 B+ 树时，oldKey 可能不等于 newKey，此时是有用的，但从代码上来看，用处仍然很隐晦
+//	为了避免在叶子节点最左侧插入一个很小的值时，引起祖先节点的 node.key 的链式更新，而将更新延迟到了最后 B+ 树调整阶段（spill 函数）进行统一处理
 func (n *node) put(oldKey, newKey, value []byte, pgid pgid, flags uint32) {
 	if pgid >= n.bucket.tx.meta.pgid { // pgid 不能大于 n.bucket.tx.meta.pgid
 		panic(fmt.Sprintf("pgid (%d) above high water mark (%d)", pgid, n.bucket.tx.meta.pgid))

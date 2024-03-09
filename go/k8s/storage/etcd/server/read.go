@@ -13,8 +13,8 @@ import (
 )
 
 // INFO: 线性一致性读
-//  https://time.geekbang.org/column/article/335932
 //
+//	https://time.geekbang.org/column/article/335932
 func (server *EtcdServer) linearizableReadLoop() {
 	for {
 		requestId := server.reqIDGen.Next()

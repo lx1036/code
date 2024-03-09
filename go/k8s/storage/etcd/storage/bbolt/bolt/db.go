@@ -152,9 +152,10 @@ const magic uint32 = 0xED0CDAED
 const version = 2
 
 // INFO: 初始化两个 meta page, freelist page, empty leaf page
-//  最开始两个 page 是 meta page, pageid={0,1}
-//  pageid=2 第三页是 freelist page
-//  pageid=3 第四页是 free leaf page
+//
+//	最开始两个 page 是 meta page, pageid={0,1}
+//	pageid=2 第三页是 freelist page
+//	pageid=3 第四页是 free leaf page
 func (db *DB) init() error {
 	// Create two meta pages on a buffer.
 	buf := make([]byte, db.pageSize*4) // 4个page

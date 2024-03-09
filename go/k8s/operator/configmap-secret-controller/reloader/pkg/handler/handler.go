@@ -17,7 +17,7 @@ const (
 	SecretEnvVarPostfix = "SECRET"
 )
 
-//Config contains rolling upgrade configuration parameters
+// Config contains rolling upgrade configuration parameters
 type Config struct {
 	Namespace           string
 	ResourceName        string

@@ -1,4 +1,5 @@
-/**
+/*
+*
 https://studygolang.gitbook.io/learn-go-with-tests/go-ji-chu/concurrency
 */
 package concurrency

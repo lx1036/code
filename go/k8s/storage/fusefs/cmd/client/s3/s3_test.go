@@ -16,7 +16,8 @@ var (
 )
 
 // INFO: aws s3api get-object --key=2 --bucket pvc-f73f7c99-0b5c-40ee-b57c-acdebcebed34 --endpoint-url ${endpoint-url} --range bytes=1-100 2.txt
-//  => "asdfadfasdfasdfasdf"
+//
+//	=> "asdfadfasdfasdfasdf"
 func TestReadFile(test *testing.T) {
 	flag.Parse()
 

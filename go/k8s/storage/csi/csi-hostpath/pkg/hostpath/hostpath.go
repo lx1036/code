@@ -138,6 +138,7 @@ func (hp *hostPath) Run() error {
 findmnt --json
 {
 "filesystems": [
+
 	{"target": "/", "source": "/dev/vda1", "fstype": "ext4", "options": "rw,relatime,errors=remount-ro,data=ordered",
 		"children": [
 		{"target": "/sys", "source": "sysfs", "fstype": "sysfs", "options": "rw,nosuid,nodev,noexec,relatime",
