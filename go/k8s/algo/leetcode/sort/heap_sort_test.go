@@ -1,4 +1,4 @@
-package heap
+package sort
 
 import (
     "container/heap"
@@ -190,16 +190,16 @@ func (h Heap) Init() {
     }
 }
 
-func TestHeap(test *testing.T) {
+func TestHeapSort(test *testing.T) {
     h := Heap{20, 7, 3, 10, 15, 25, 30, 17, 19}
     h.Init()
-    fmt.Println(h)
-
-    h.Push(6)
-    fmt.Println(h)
-
-    h.Remove(4)
-    fmt.Println(h)
+    //fmt.Println(h)
+    //
+    //h.Push(6)
+    //fmt.Println(h)
+    //
+    //h.Remove(4)
+    //fmt.Println(h)
 
     for len(h) > 0 {
         fmt.Println(h.Pop())
