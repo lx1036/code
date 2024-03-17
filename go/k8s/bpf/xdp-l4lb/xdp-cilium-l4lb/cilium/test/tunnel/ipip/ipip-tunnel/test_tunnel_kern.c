@@ -3,6 +3,8 @@
 /**
  * /root/linux-5.10.142/tools/testing/selftests/bpf/progs/test_tunnel_kern.c
  *
+ * rfc: https://datatracker.ietf.org/doc/html/rfc2003
+ *
  */
 
 /*
@@ -21,11 +23,8 @@
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <linux/ip.h>
-#include <linux/ipv6.h>
 #include <linux/types.h>
-#include <linux/socket.h>
 #include <linux/pkt_cls.h>
-#include <linux/erspan.h>
 // /root/linux-5.10.142/tools/lib/bpf/bpf_helpers.h
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
@@ -52,19 +51,18 @@ static __always_inline char* u32toIpStr(__u32 ip) {
     return str;
 }
 
-// ipip_tunnel1 会封包，这里修改了 outer meta key.remote_ipv4, 来转发包 -> ipip_ns0 里的 ipip_veth0
+// ipip_tunnel1 会修改 ipip outer hdr，这里修改了 outer meta key.remote_ipv4, 来转发包 -> ipip_ns0 里的 ipip_veth0
 SEC("ipip_set_tunnel")
 int _ipip_set_tunnel(struct __sk_buff *skb)
 {
 	struct bpf_tunnel_key key = {};
 	void *data = (void *)(long)skb->data;
-	struct iphdr *iph = data;
 	void *data_end = (void *)(long)skb->data_end;
+    struct iphdr *iph = data;
 	int ret;
 
 	/* single length check */
 	if (data + sizeof(*iph) > data_end) {
-		ERROR(1);
 		return TC_ACT_SHOT;
 	}
 
@@ -73,9 +71,8 @@ int _ipip_set_tunnel(struct __sk_buff *skb)
 		key.remote_ipv4 = 0xad100164; /* 173.16.1.100, ipip_veth0 网卡的 ip */
 	}
 
-	ret = bpf_skb_set_tunnel_key(skb, &key, sizeof(key), 0);
+	ret = (int)bpf_skb_set_tunnel_key(skb, &key, sizeof(key), 0);
 	if (ret < 0) {
-		ERROR(ret);
 		return TC_ACT_SHOT;
 	}
 
@@ -87,18 +84,15 @@ int _ipip_get_tunnel(struct __sk_buff *skb)
 {
 	int ret;
 	struct bpf_tunnel_key key;
-//	char fmt[] = "remote ip %s\n";
-	char fmt[] = "remote ip 0x%x\n";
-
-	ret = bpf_skb_get_tunnel_key(skb, &key, sizeof(key), 0);
+	ret = (int)bpf_skb_get_tunnel_key(skb, &key, sizeof(key), 0);
 	if (ret < 0) {
-		ERROR(ret);
 		return TC_ACT_SHOT;
 	}
 
     // tail -n 100 /sys/kernel/debug/tracing/trace
 //    char* ip_str = u32toIpStr(key.remote_ipv4);
-	bpf_trace_printk(fmt, sizeof(fmt), key.remote_ipv4); // remote ip 0xad100164(=173.16.1.100)，这里是回包的 outer ip 地址
+    // remote ip 0xad100164(=173.16.1.100)，这里是回包的 outer ip 地址
+    bpf_printk("remote_ipv4: 0x%x, tunnel_id: 0x%x", key.remote_ipv4, key.tunnel_id); // network order to host short
 	return TC_ACT_OK;
 }
 

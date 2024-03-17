@@ -157,6 +157,11 @@ xdp->tcpdump->tc_ingress->netfilter->tc_egress: https://arthurchiao.art/blog/fir
 # 参考文献
 
 https://www.spinics.net/lists/netdev/msg403578.html
+
 https://www.spinics.net/lists/netdev/msg403580.html
+https://lk.j-core.org/jeff/sh-linux/commit/4e3264d21b90984c2165e8fe5a7b64cf25bc2c2d
+
 https://www.spinics.net/lists/netdev/msg403579.html
 
+IP Encapsulation within IP: https://datatracker.ietf.org/doc/html/rfc2003
+IP in IP Tunneling: https://datatracker.ietf.org/doc/html/rfc1853
