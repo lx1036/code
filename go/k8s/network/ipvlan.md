@@ -12,8 +12,8 @@ ipvlan: 从一个网卡虚拟出多个网卡，这些网卡拥有相同的mac地
 并且 DHCP server 也要正确配置使用该字段作为机器标识，而不是使用 mac 地址
 
 ## 两种模式
-ipvlan 有两种不同的模式：L2(二层交换机)和 L3(三层交换机)。
-二层交换机 和 三层交换机 主要的区别就是：二层交换机通过 mac 地址(arp 协议)来决定下一跳；三层交换机通过 ip 决定下一跳，下一跳 ip 通过查询路由表路由。
+ipvlan 有两种不同的模式：L2(二层交换机)和 L3(三层路由器)。
+二层交换机 和 三层路由器 主要的区别就是：二层交换机通过 mac 地址(arp 协议)来决定下一跳；三层路由器 通过 ip 决定下一跳，下一跳 ip 通过查询路由表路由。
 **[二、三层交换机之间到底有什么区别](https://mp.weixin.qq.com/s/U_-fjMPvh1W4_c1ao34YAg)**
 
 ### L2 模式
@@ -77,6 +77,21 @@ ip netns exec net-ipvlan-l3-4 ping -c 3 210.0.1.10
 问题：但是在 host net namespace 下无法 ping/curl 通 200.0.2.10 等 ipvlan 网卡，以及 service ip？
 
 ```shell
+# terway 的解决方案：host 侧添加一个 slave 网卡，直接从 ipv4-l3 redirect > ipv2
+ip link add ipv4-l3 link dummy-ipvlan-l3 type ipvlan mode l3
+ip link set ipv4-l3 up
+ip addr add 200.0.3.10/32 dev ipv4-l3
+ip route add 200.0.2.0/24 dev ipv4-l3
+ip route add 200.0.1.0/24 dev ipv4-l3
+ip route add 210.0.1.10/32 dev ipv4-l3
+
+ping -c 3 200.0.1.10
+ping -c 3 200.0.2.10
+ping -c 3 210.0.1.10
+
+```
+
+```shell
 # veth pair 打通容器网络
 # 可以看这个，已经经过验证
 ip link add veth-test-2 type veth peer name veth-test-3
@@ -110,3 +125,5 @@ https://docs.cilium.io/en/stable/operations/upgrade/#deprecated-options
 **[Docker: Use macvlan networks](https://docs.docker.com/network/macvlan/)**
 **[书籍：Kubernetes 网络权威指南 1.8-1.9 小节]**
 **[Terway IPVlan in Cilium](https://github.com/cilium/cilium/pull/10251)**
+
+ipvlan+ebpf: https://help.aliyun.com/zh/ack/ack-managed-and-ack-dedicated/user-guide/ack-network-fabric-terway-ipvlan-ebpf

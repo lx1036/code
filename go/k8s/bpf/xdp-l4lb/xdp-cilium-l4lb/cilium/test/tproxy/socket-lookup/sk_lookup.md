@@ -14,5 +14,7 @@ https://github.com/jsitnicki/linux/commit/18a340195205e97f616bdacc9948cbf4811586
 ```
 
 
-
+# 参考文献
+Pidfd and Socket-lookup BPF (SK_LOOKUP) Illustrated: http://arthurchiao.art/blog/pidfd-and-socket-lookup-bpf-illustrated/
+https://ebpf.io/summit-2020-slides/eBPF_Summit_2020-Lightning-Jakub_Sitnicki-Steering_connections_to_sockets_with_BPF_socke_lookup_hook.pdf
 
