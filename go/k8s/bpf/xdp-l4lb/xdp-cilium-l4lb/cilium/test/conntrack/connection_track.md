@@ -24,6 +24,13 @@ netfilter 会在四个 hook 点调用 nf_conntrack_in() 从而存储 conntrack t
   * 离开 netfilter 之后的最后的 hook 点：外部包主动到达本机，LOCAL_IN 是被送到本机进程之前的最后一个 hook 点；本机包主动到外部，POST_ROUTING 是离开本机最后一个 hook 点；
 * 总结：外部主动到达本机：PRE_ROUTING > LOCAL_IN ；本机主动到达外部：LOCAL_OUT > POST_ROUTING
 
+## conntrack 的问题
+https://www.tigera.io/blog/when-linux-conntrack-is-no-longer-your-friend
+* conntrack table size 有限制的，默认有 128k 个 entries，容易被打爆
+* conntrack entry 过期时间有限制的，默认是 120s，超过这个时间就会被 GC，但是这样每秒只能支撑 128k / 120s = 1092 connections/s，如果有 1100(1.1k) connections/s 就扛不住
+
+可以通过 bypass conntrack 来解决。
+
 ## 查看/加载/卸载 nf_conntrack 模块
 ```shell
 # 查看

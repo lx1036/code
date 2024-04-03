@@ -8,7 +8,7 @@ sudo install minikube-linux-amd64 /usr/local/bin/minikube
 # 研究 flannel ipip/vxlan for ebpf
 minikube start --cni=flannel --driver=docker --image-mirror-country=cn --image-repository="registry.cn-hangzhou.aliyuncs.com/google_containers" --kubernetes-version=v1.28.3
 minikube start --cni=cilium --driver=docker --image-mirror-country=cn --image-repository="registry.cn-hangzhou.aliyuncs.com/google_containers" --kubernetes-version=v1.28.3
-# ecs
+# 同一台 ecs 安装 k8s
 minikube start --cni=cilium --driver=docker --kubernetes-version=v1.28.3 --force --listen-address=0.0.0.0
 minikube node add --worker=true
 

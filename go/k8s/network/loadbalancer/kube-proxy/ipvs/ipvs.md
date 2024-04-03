@@ -113,9 +113,30 @@ echo "1" >/proc/sys/net/ipv4/conf/all/arp_ignore
 echo "2" >/proc/sys/net/ipv4/conf/all/arp_announce
 ```
 
+```shell script
+# 使用 minikube 两个 vm 验证，minikube 192.168.49.2(lb) 和 minikube-m02 192.168.49.3(rs) 两个节点 
+sudo ipvsadm -C
+sudo ipvsadm -A -t 192.168.49.2:80 -s rr
+sudo ipvsadm -a -t 192.168.49.2:80 -r 192.168.49.3:80 -m # 使用 --masquerading
+# 在 192.168.49.2 机器上访问
+curl 192.168.49.2:80
 
-DR 模式：
-[DR mode](https://mmbiz.qpic.cn/mmbiz_png/d5patQGz8KdwBYwDyVuDdYUrJKvrPv2ibeicicGn15jcvdxQxwZYqJtm1Psq2J3khIUPDfsq8RlebVzTrEGZM2JdQ/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
+# 在 client 侧访问不行，因为 rs 侧抓包的是 192.168.49.1.39404 > 192.168.49.3.80, 无法回包。按理说应该可以访问的才对。
+# 可以推断：lb 上 ipvs 只做了 DNAT，没有 SNAT，无法回包，这样就必须在 rs 上指定网关地址是 lb ip， lb 和 rs 在一个子网，这样就不是 FULLNAT 模式。lb 和 rs 网络耦合。
+# lvs nat 模式缺点：RS 的 默认网关必须要指向 LVS
+
+# FULLNAT: https://www.haxi.cc/archives/LVS-FULLNAT%E5%AE%9E%E6%88%98.html: 
+#   为了使 RS 能获得客户端的真实 IP，LVS 团队采用了修改内核网络栈的实现，扩展了网络栈，加了一个 TOA 字段。把客户端真实 IP 写到了 TOA 字段中，这样，RS 就能取得客户端的真实 IP 了。
+curl 192.168.49.2:80
+```
+
+IPVS FullNAT 模式：[IPVS full NAT support + netfilter 'ipvs' match support](https://lwn.net/Articles/354771/)
+LVS+Iptables实现FULLNAT及原理分析: https://blog.dianduidian.com/post/lvs-snat%E5%8E%9F%E7%90%86%E5%88%86%E6%9E%90/
+LVS+Iptables实现FULLNAT及原理分析: https://blog.dianduidian.com/post/lvs-snat%E5%8E%9F%E7%90%86%E5%88%86%E6%9E%90/
+
+
+DSR 模式：
+[DSR mode](https://mmbiz.qpic.cn/mmbiz_png/d5patQGz8KdwBYwDyVuDdYUrJKvrPv2ibeicicGn15jcvdxQxwZYqJtm1Psq2J3khIUPDfsq8RlebVzTrEGZM2JdQ/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
 
 
 NAT 模式：
