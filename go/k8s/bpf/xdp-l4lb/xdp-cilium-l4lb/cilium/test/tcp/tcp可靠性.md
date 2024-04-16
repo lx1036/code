@@ -59,6 +59,11 @@ https://mp.weixin.qq.com/s/pJ2_w3QBTRZG4wK-VI7ZLQ
 https://mp.weixin.qq.com/s/6c0ZZ3ZZZ_ocIqH2iey1lw
 
 ## 收包流程
+网卡 > ring buffer > skb_buffer > xdp bpf hook > ip_recv() > prerouting netfilter > 
+route decision: 
+-> ip_forward()
+-> ip_local_deliver() > input netfilter > tcp_v4_recv() > lookup established socket > sk_lookup bpf > lookup listening socket > lookup any_addr listening socket
+
 * 1.到达网卡 NIC，通过 DMA(网卡可以不通过CPU访问系统内存) 把 数据帧 在系统内存中，分配环形缓冲区 ring buffer，并网卡验证 MAC 地址；
 
 * 2.触发硬中断，为数据包分配一个 skb_buffer 缓冲区；
@@ -74,7 +79,7 @@ https://mp.weixin.qq.com/s/6c0ZZ3ZZZ_ocIqH2iey1lw
 * 5.对于 TCP 协议数据包，调用 tcp_v4_rcv() 函数，进入四层协议栈。先 tcp hdr 检查和 checksum 检查。然后调用 netfilter
 INPUT hook 中的规则逻辑，是否需要丢弃或者修改数据包。对于 UDP 协议数据包，过程类似；
 
-* 6.数据包进入用户态查找对应的 socket，这里的 socket lookup 逻辑：先查找 established socket，然后查找 listening socket，最后 ANY_ADDR listening socket，
+* 6.数据包进入 用户态 查找对应的 socket，这里的 socket lookup 逻辑：先查找 established socket，然后查找 listening socket，最后 ANY_ADDR listening socket，
 同时第一步和第二步有 ebpf sk_lookup hook，最后找到对应的 socket；
 
 * 7.用户态程序调用 socket 相关 api，如 recvmsg() 或者 recvfrom() 函数获取数据报文；
