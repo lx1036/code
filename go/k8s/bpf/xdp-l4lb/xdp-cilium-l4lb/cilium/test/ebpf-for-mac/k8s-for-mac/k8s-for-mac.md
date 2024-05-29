@@ -37,15 +37,26 @@ minikube cp minikube-m02:/home/docker/worker-cni0-tcp.pcap worker-cni0-tcp.pcap
 minikube stop && minikube delete
 minikube start --cni=calico --driver=docker --kubernetes-version=v1.28.3 --force --listen-address=0.0.0.0
 minikube node add --worker=true
+
 2. ecs 上开启一个 proxy server, "172.16.3.161" 是 eth0 的 ip，还必须指定 --accept-hosts, 默认端口是 8001
 kubectl proxy --address="172.16.3.161" --accept-hosts='^.*' --port=7007
+
 3. 配置本地 kubeconfig
 ```markdown
-本机的 profiles/minikube/ca.crt -> ecs 上的 ~/.minikube/profiles/minikube/ca.crt
-本机的 profiles/minikube/client.crt -> ecs 上的 ~/.minikube/profiles/minikube/client.crt
-本机的 profiles/minikube/client.key -> ecs 上的 ~/.minikube/profiles/minikube/client.key
+本机的 ~/.kube/profiles/minikube/ca.crt -> ecs 上的 ~/.minikube/ca.crt
+本机的 ~/.kube/profiles/minikube/client.crt -> ecs 上的 ~/.minikube/profiles/minikube/client.crt
+本机的 ~/.kube/profiles/minikube/client.key -> ecs 上的 ~/.minikube/profiles/minikube/client.key
 server 写: http://${公网EIP}:7007
+
+kubectl get nodes -o wide
 ```
+
+4. minikube 关闭 kube-proxy(cilium kubeproxy-free)
+```
+1) 关闭 kube-proxy ds
+2) 修改 cilium configMap 的 "kube-proxy-replacement: strict"
+```
+
 
 ## 开启 calico bpf 模式
 修改 default FelixConfiguration 资源对象：

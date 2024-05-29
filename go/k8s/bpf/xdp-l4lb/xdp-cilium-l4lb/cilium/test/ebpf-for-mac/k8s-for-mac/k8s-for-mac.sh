@@ -10,11 +10,11 @@ minikube start --cni=flannel --driver=docker --image-mirror-country=cn --image-r
 minikube start --cni=cilium --driver=docker --image-mirror-country=cn --image-repository="registry.cn-hangzhou.aliyuncs.com/google_containers" --kubernetes-version=v1.28.3
 minikube start --cni=calico --driver=docker --image-mirror-country=cn --image-repository="registry.cn-hangzhou.aliyuncs.com/google_containers" --kubernetes-version=v1.28.3 --force
 # 同一台 ecs 安装 k8s
-minikube start --cni=cilium --driver=docker --kubernetes-version=v1.28.3 --force --listen-address=0.0.0.0
+minikube start --cni=cilium --driver=docker --kubernetes-version=v1.28.3 --force --listen-address=0.0.0.0 # cilium 1.12.3
 minikube start --cni=calico --driver=docker --kubernetes-version=v1.28.3 --force --listen-address=0.0.0.0
 minikube node add --worker=true
 kubectl create deploy my-nginx --image=nginx:1.24.0 --replicas=3
-kubectl expose deployment my-nginx --port=8080 --target-port=80
+kubectl expose deployment my-nginx --port=8080 --target-port=80 --type=NodePort
 # minukube node 里安装 tcpdump
 sudo apt update -y && sudo apt install -y tcpdump
 
