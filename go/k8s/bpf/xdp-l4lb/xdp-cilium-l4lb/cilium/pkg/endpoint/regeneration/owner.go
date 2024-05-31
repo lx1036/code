@@ -1,8 +1,16 @@
 package regeneration
 
-import "github.com/cilium/cilium/pkg/fqdn/restore"
+import (
+    "context"
+
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/fqdn/restore"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/lock"
+    monitorAPI "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/monitor/api"
+)
 
 // Owner is the interface defines the requirements for anybody owning policies.
+// cmd/Daemon 对象实现该接口
 type Owner interface {
     // QueueEndpointBuild puts the given endpoint in the processing queue
     QueueEndpointBuild(ctx context.Context, epID uint64) (func(), error)

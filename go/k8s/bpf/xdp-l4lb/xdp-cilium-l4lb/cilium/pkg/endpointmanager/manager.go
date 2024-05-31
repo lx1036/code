@@ -2,12 +2,12 @@ package endpointmanager
 
 import (
     "fmt"
-    "k8s-lx1036/k8s/network/cilium/cilium/pkg/metrics"
     "sync"
 
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/endpoint"
     endpointid "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/endpoint/id"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/endpoint/regeneration"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 
     "github.com/prometheus/client_golang/prometheus"
 )
@@ -169,5 +169,42 @@ func (mgr *EndpointManager) lookupContainerID(id string) *endpoint.Endpoint {
 
 // AddEndpoint takes the prepared endpoint object and starts managing it.
 func (mgr *EndpointManager) AddEndpoint(owner regeneration.Owner, ep *endpoint.Endpoint, reason string) (err error) {
+    ep.SetDefaultConfiguration(false)
+    if ep.ID != 0 {
+        return fmt.Errorf("Endpoint ID is already set to %d", ep.ID)
+    }
 
+    err = mgr.expose(ep)
+    if err != nil {
+        return err
+    }
+
+    mgr.mutex.RLock()
+    for s := range mgr.subscribers {
+        s.EndpointCreated(ep)
+    }
+    mgr.mutex.RUnlock()
+
+    return nil
+}
+
+//
+func (mgr *EndpointManager) expose(ep *endpoint.Endpoint) error {
+    newID, err := mgr.AllocateID(ep.ID)
+    if err != nil {
+        return err
+    }
+
+    mgr.mutex.Lock()
+    // Get a copy of the identifiers before exposing the endpoint
+    identifiers := ep.IdentifiersLocked()
+    ep.Start(newID)
+    //mgr.AddIPv6Address(ep.IPv6)
+    mgr.updateIDReferenceLocked(ep)
+    mgr.updateReferencesLocked(ep, identifiers)
+    mgr.mutex.Unlock()
+
+    mgr.RunK8sCiliumEndpointSync(ep, option.Config)
+
+    return nil
 }

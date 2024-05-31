@@ -3,6 +3,8 @@ package endpoint
 import (
     "context"
     "github.com/cilium/cilium/pkg/identity"
+    "github.com/cilium/cilium/pkg/identity/cache"
+    "github.com/cilium/cilium/pkg/logging"
     "github.com/cilium/cilium/pkg/metrics"
     "github.com/cilium/cilium/pkg/policy"
     "os"
@@ -10,11 +12,16 @@ import (
     "strconv"
     "strings"
     "sync"
+    "time"
+    "unsafe"
 
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/controller"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/endpoint/regeneration"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/eventqueue"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/fqdn"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/labels"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/mac"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 
     log "github.com/sirupsen/logrus"
@@ -46,6 +53,36 @@ type Endpoint struct {
 
     hasBPFProgram chan struct{}
 
+    // containerName is the name given to the endpoint by the container runtime
+    containerName string
+
+    // containerID is the container ID that docker has assigned to the endpoint
+    containerID string
+
+    // dockerNetworkID is the network ID of the libnetwork network if the
+    // endpoint is a docker managed container which uses libnetwork
+    dockerNetworkID string
+
+    // dockerEndpointID is the Docker network endpoint ID if managed by
+    // libnetwork
+    dockerEndpointID string
+
+    // ifName is the name of the host facing interface (veth pair) which
+    // connects into the endpoint
+    ifName string
+
+    // ifIndex is the interface index of the host face interface (veth pair)
+    ifIndex int
+
+    // K8sPodName is the Kubernetes pod name of the endpoint
+    K8sPodName string
+
+    // K8sNamespace is the Kubernetes namespace of the endpoint
+    K8sNamespace string
+
+    // mac is the MAC address of the endpoint
+    mac mac.MAC // Container MAC address.
+
     desiredPolicy  *policy.EndpointPolicy
     realizedPolicy *policy.EndpointPolicy
 
@@ -58,6 +95,19 @@ type Endpoint struct {
 
     aliveCtx    context.Context
     aliveCancel context.CancelFunc
+
+    eventQueue *eventqueue.EventQueue
+
+    // logger is a logrus object with fields set to report an endpoints information.
+    // This must only be accessed with atomic.LoadPointer/StorePointer.
+    // 'mutex' must be Lock()ed to synchronize stores. No lock needs to be held
+    // when loading this pointer.
+    logger unsafe.Pointer
+    // policyLogger is a logrus object with fields set to report an endpoints information.
+    // This must only be accessed with atomic LoadPointer/StorePointer.
+    // 'mutex' must be Lock()ed to synchronize stores. No lock needs to be held
+    // when loading this pointer.
+    policyLogger unsafe.Pointer
 
     isHost bool
 }
@@ -194,6 +244,43 @@ func (e *Endpoint) hasLabelsRLocked(l labels.Labels) bool {
     }
 
     return true
+}
+
+func createEndpoint(owner regeneration.Owner, policyGetter policyRepoGetter, namedPortsGetter namedPortsGetter, proxy EndpointProxy, allocator cache.IdentityAllocator, ID uint16, ifName string) *Endpoint {
+    ep := &Endpoint{
+        owner:            owner,
+        policyGetter:     policyGetter,
+        namedPortsGetter: namedPortsGetter,
+        ID:               ID,
+        createdAt:        time.Now(),
+        proxy:            proxy,
+        ifName:           ifName,
+        OpLabels:         labels.NewOpLabels(),
+        DNSRules:         nil,
+        DNSHistory:       fqdn.NewDNSCacheWithLimit(option.Config.ToFQDNsMinTTL, option.Config.ToFQDNsMaxIPsPerHost),
+        DNSZombies:       fqdn.NewDNSZombieMappings(option.Config.ToFQDNsMaxDeferredConnectionDeletes, option.Config.ToFQDNsMaxIPsPerHost),
+        state:            "",
+        status:           NewEndpointStatus(),
+        hasBPFProgram:    make(chan struct{}, 0),
+        desiredPolicy:    policy.NewEndpointPolicy(policyGetter.GetPolicyRepository()),
+        controllers:      controller.NewManager(),
+        regenFailedChan:  make(chan struct{}, 1),
+        allocator:        allocator,
+        logLimiter:       logging.NewLimiter(10*time.Second, 3), // 1 log / 10 secs, burst of 3
+        noTrackPort:      0,
+    }
+
+    ep.initDNSHistoryTrigger()
+
+    ctx, cancel := context.WithCancel(context.Background())
+    ep.aliveCancel = cancel
+    ep.aliveCtx = ctx
+
+    ep.realizedPolicy = ep.desiredPolicy
+
+    ep.SetDefaultOpts(option.Config.Opts)
+
+    return ep
 }
 
 // FilterEPDir returns a list of directories' names that possible belong to an endpoint.

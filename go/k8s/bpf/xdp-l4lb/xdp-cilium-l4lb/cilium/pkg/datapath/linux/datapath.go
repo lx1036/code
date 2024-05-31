@@ -1,57 +1,61 @@
 package linux
 
 import (
-	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath"
-	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/linux/config"
-	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/loader"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/linux/config"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/loader"
 
-	"github.com/cilium/cilium/pkg/versioncheck"
+    "github.com/cilium/cilium/pkg/versioncheck"
 )
 
 const (
-	minKernelVer = "4.8.0"
-	minClangVer  = "3.8.0"
-	recKernelVer = "4.9.0"
-	recClangVer  = "3.9.0"
+    minKernelVer = "4.8.0"
+    minClangVer  = "3.8.0"
+    recKernelVer = "4.9.0"
+    recClangVer  = "3.9.0"
 )
 
 var (
-	isMinKernelVer = versioncheck.MustCompile(">=" + minKernelVer)
-	isMinClangVer  = versioncheck.MustCompile(">=" + minClangVer)
+    isMinKernelVer = versioncheck.MustCompile(">=" + minKernelVer)
+    isMinClangVer  = versioncheck.MustCompile(">=" + minClangVer)
 
-	isRecKernelVer = versioncheck.MustCompile(">=" + recKernelVer)
-	isRecClangVer  = versioncheck.MustCompile(">=" + recClangVer)
+    isRecKernelVer = versioncheck.MustCompile(">=" + recKernelVer)
+    isRecClangVer  = versioncheck.MustCompile(">=" + recClangVer)
 
-	// LLVM/clang version which supports `-mattr=dwarfris`
-	isDwarfrisClangVer         = versioncheck.MustCompile(">=7.0.0")
-	canDisableDwarfRelocations bool
+    // LLVM/clang version which supports `-mattr=dwarfris`
+    isDwarfrisClangVer         = versioncheck.MustCompile(">=7.0.0")
+    canDisableDwarfRelocations bool
 )
 
 type DatapathConfiguration struct {
-	// HostDevice is the name of the device to be used to access the host.
-	HostDevice string
+    // HostDevice is the name of the device to be used to access the host.
+    HostDevice string
 }
 
 type linuxDatapath struct {
-	datapath.ConfigWriter
-	datapath.IptablesManager
-	node           datapath.NodeHandler
-	nodeAddressing datapath.NodeAddressing
-	config         DatapathConfiguration
-	loader         *loader.Loader
-	wgAgent        datapath.WireguardAgent
+    datapath.ConfigWriter
+    datapath.IptablesManager
+    node           datapath.NodeHandler
+    nodeAddressing datapath.NodeAddressing
+    config         DatapathConfiguration
+    loader         *loader.Loader
+    wgAgent        datapath.WireguardAgent
+}
+
+func (l *linuxDatapath) Loader() datapath.Loader {
+    return l.loader
 }
 
 func NewDatapath(cfg DatapathConfiguration, ruleManager datapath.IptablesManager, wgAgent datapath.WireguardAgent) datapath.Datapath {
-	dp := &linuxDatapath{
-		ConfigWriter:    &config.HeaderfileWriter{},
-		IptablesManager: ruleManager,
-		nodeAddressing:  NewNodeAddressing(),
-		config:          cfg,
-		loader:          loader.NewLoader(canDisableDwarfRelocations),
-		wgAgent:         wgAgent,
-	}
+    dp := &linuxDatapath{
+        ConfigWriter:    &config.HeaderfileWriter{},
+        IptablesManager: ruleManager,
+        nodeAddressing:  NewNodeAddressing(),
+        config:          cfg,
+        loader:          loader.NewLoader(canDisableDwarfRelocations),
+        wgAgent:         wgAgent,
+    }
 
-	dp.node = NewNodeHandler(cfg, dp.nodeAddressing, wgAgent)
-	return dp
+    dp.node = NewNodeHandler(cfg, dp.nodeAddressing, wgAgent)
+    return dp
 }
