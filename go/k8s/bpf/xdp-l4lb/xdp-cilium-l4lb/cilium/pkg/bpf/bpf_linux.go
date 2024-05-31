@@ -2,12 +2,13 @@ package bpf
 
 import (
 	"fmt"
-	"github.com/cilium/cilium/pkg/metrics"
-	"golang.org/x/sys/unix"
 	"io"
 	"os"
 	"runtime"
 	"unsafe"
+
+	"github.com/cilium/cilium/pkg/metrics"
+	"golang.org/x/sys/unix"
 
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/spanstat"

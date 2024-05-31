@@ -1,8 +1,9 @@
 package bpf
 
 import (
-	"github.com/cilium/cilium/pkg/datapath/linux/probes"
 	"time"
+
+	"github.com/cilium/cilium/pkg/datapath/linux/probes"
 
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/controller"
 )

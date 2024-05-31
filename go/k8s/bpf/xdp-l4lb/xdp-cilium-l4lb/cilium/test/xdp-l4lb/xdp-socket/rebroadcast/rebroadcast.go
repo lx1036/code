@@ -12,8 +12,9 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"github.com/google/gopacket/layers"
 	"net"
+
+	"github.com/google/gopacket/layers"
 
 	xdp_socket "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp/xdp-socket"
 

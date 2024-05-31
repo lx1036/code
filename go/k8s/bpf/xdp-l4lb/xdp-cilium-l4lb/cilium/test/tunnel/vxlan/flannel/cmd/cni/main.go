@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
+
 	"github.com/containernetworking/cni/pkg/invoke"
 	"k8s.io/klog/v2"
-	"runtime"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"

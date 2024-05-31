@@ -1,10 +1,11 @@
 package main
 
 import (
-	"golang.org/x/sys/unix"
 	"log"
 	"net"
 	"testing"
+
+	"golang.org/x/sys/unix"
 )
 
 // go test -v -run ^TestTCP$ .

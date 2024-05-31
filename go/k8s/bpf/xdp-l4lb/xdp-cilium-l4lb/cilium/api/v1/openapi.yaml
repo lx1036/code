@@ -1,0 +1,834 @@
+
+---
+swagger: '2.0'
+info:
+  title: Cilium API
+  description: Cilium
+  version: v1beta
+x-schemes:
+  - unix
+basePath: "/v1"
+produces:
+  - application/json
+consumes:
+  - application/json
+
+paths:
+  "/endpoint":
+    get:
+      summary: Retrieves a list of endpoints that have metadata matching the provided parameters.
+      description: |
+        Retrieves a list of endpoints that have metadata matching the provided parameters, or all endpoints if no parameters provided.
+      tags:
+        - endpoint
+      parameters:
+        - "$ref": "#/parameters/labels"
+      responses:
+        '200':
+          description: Success
+          schema:
+            type: array
+            items:
+              "$ref": "#/definitions/Endpoint"
+        '404':
+          description: Endpoints with provided parameters not found
+        '429':
+          description: Rate-limiting too many requests in the given time frame
+  "/endpoint/{id}":
+    get:
+      summary: Get endpoint by endpoint ID
+      description: |
+        Returns endpoint information
+      tags:
+        - endpoint
+      parameters:
+        - "$ref": "#/parameters/endpoint-id"
+      responses:
+        '200':
+          description: Success
+          schema:
+            "$ref": "#/definitions/Endpoint"
+        '400':
+          description: Invalid endpoint ID format for specified type
+          x-go-name: Invalid
+          schema:
+            "$ref": "#/definitions/Error"
+        '404':
+          description: Endpoint not found
+        '429':
+          description: Rate-limiting too many requests in the given time frame
+    put:
+      summary: Create endpoint
+      description: |
+        Creates a new endpoint
+      tags:
+        - endpoint
+      parameters:
+        - "$ref": "#/parameters/endpoint-id"
+        - "$ref": "#/parameters/endpoint-change-request"
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Invalid endpoint in request
+          x-go-name: Invalid
+          schema:
+            "$ref": "#/definitions/Error"
+        '409':
+          description: Endpoint already exists
+          x-go-name: Exists
+        '500':
+          description: Endpoint creation failed
+          x-go-name: Failed
+          schema:
+            "$ref": "#/definitions/Error"
+        '429':
+          description: Rate-limiting too many requests in the given time frame
+    patch:
+      summary: Modify existing endpoint
+      deprecated: true
+      description: |
+        Applies the endpoint change request to an existing endpoint
+      tags:
+        - endpoint
+      parameters:
+        - "$ref": "#/parameters/endpoint-id"
+        - "$ref": "#/parameters/endpoint-change-request"
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Invalid modify endpoint request
+          x-go-name: Invalid
+          schema:
+            "$ref": "#/definitions/Error"
+        '404':
+          description: Endpoint does not exist
+        '500':
+          description: Endpoint update failed
+          x-go-name: Failed
+          schema:
+            "$ref": "#/definitions/Error"
+        '429':
+          description: Rate-limiting too many requests in the given time frame
+    delete:
+      summary: Delete endpoint
+      description: |
+        Deletes the endpoint specified by the ID. Deletion is imminent and
+        atomic, if the deletion request is valid and the endpoint exists,
+        deletion will occur even if errors are encountered in the process. If
+        errors have been encountered, the code 202 will be returned, otherwise
+        200 on success.
+
+        All resources associated with the endpoint will be freed and the
+        workload represented by the endpoint will be disconnected.It will no
+        longer be able to initiate or receive communications of any sort.
+      tags:
+        - endpoint
+      parameters:
+        - "$ref": "#/parameters/endpoint-id"
+      responses:
+        '200':
+          description: Success
+        '206':
+          description: Deleted with a number of errors encountered
+          x-go-name: Errors
+          schema:
+            type: integer
+        '400':
+          description: |
+            Invalid endpoint ID format for specified type. Details in error
+            message
+          x-go-name: Invalid
+          schema:
+            "$ref": "#/definitions/Error"
+        '404':
+          description: Endpoint not found
+        '429':
+          description: Rate-limiting too many requests in the given time frame
+
+parameters:
+  labels:
+    name: labels
+    description: |
+      List of labels
+    in: body
+    required: false
+    schema:
+      "$ref": "#/definitions/Labels"
+  endpoint-id:
+    name: id
+    description: |
+      String describing an endpoint with the format ``[prefix:]id``. If no prefix
+      is specified, a prefix of ``cilium-local:`` is assumed. Not all endpoints
+      will be addressable by all endpoint ID prefixes with the exception of the
+      local Cilium UUID which is assigned to all endpoints.
+
+      Supported endpoint id prefixes:
+        - cilium-local: Local Cilium endpoint UUID, e.g. cilium-local:3389595
+        - cilium-global: Global Cilium endpoint UUID, e.g. cilium-global:cluster1:nodeX:452343
+        - container-id: Container runtime ID, e.g. container-id:22222
+        - container-name: Container name, e.g. container-name:foobar
+        - pod-name: pod name for this container if K8s is enabled, e.g. pod-name:default:foobar
+        - docker-endpoint: Docker libnetwork endpoint ID, e.g. docker-endpoint:4444
+    in: path
+    required: true
+    type: string
+  endpoint-change-request:
+    name: endpoint
+    in: body
+    required: true
+    schema:
+      "$ref": "#/definitions/EndpointChangeRequest"
+
+
+definitions:
+  Endpoint:
+    description: An endpoint is a namespaced network interface to which cilium applies policies
+    type: object
+    properties:
+      id:
+        description: The cilium-agent-local ID of the endpoint
+        type: integer
+      spec:
+        description: The desired configuration state of the endpoint
+        "$ref": "#/definitions/EndpointConfigurationSpec"
+      status:
+        description: The desired and realized configuration state of the endpoint
+        "$ref": "#/definitions/EndpointStatus"
+  EndpointConfigurationSpec:
+    description: An endpoint's configuration
+    type: object
+    properties:
+      options:
+        description: Changeable configuration
+        "$ref": "#/definitions/ConfigurationMap"
+      label-configuration:
+        description: the endpoint's labels
+        "$ref": "#/definitions/LabelConfigurationSpec"
+  EndpointStatus:
+    description: The current state and configuration of the endpoint, its policy & datapath, and subcomponents
+    type: object
+    required:
+      - state
+    properties:
+      external-identifiers:
+        description: Unique identifiers for this endpoint from outside cilium
+        "$ref": "#/definitions/EndpointIdentifiers"
+      identity:
+        description: The security identity for this endpoint
+        "$ref": "#/definitions/Identity"
+      labels:
+        description: Labels applied to this endpoint
+        "$ref": "#/definitions/LabelConfigurationStatus"
+      realized:
+        description: The configuration in effect on this endpoint
+        "$ref": "#/definitions/EndpointConfigurationSpec"
+      networking:
+        description: Networking properties of the endpoint
+        "$ref": "#/definitions/EndpointNetworking"
+      policy:
+        description: The policy applied to this endpoint from the policy repository
+        "$ref": "#/definitions/EndpointPolicyStatus"
+      log:
+        description: Most recent status log. See endpoint/{id}/log for the complete log.
+        "$ref": "#/definitions/EndpointStatusLog"
+      controllers:
+        description: Status of internal controllers attached to this endpoint
+        "$ref": "#/definitions/ControllerStatuses"
+      state:
+        description: Current state of endpoint
+        "$ref": "#/definitions/EndpointState"
+      health:
+        description: Summary overall endpoint & subcomponent health
+        "$ref": "#/definitions/EndpointHealth"
+      namedPorts:
+        description: List of named ports that can be used in Network Policy
+        "$ref": "#/definitions/NamedPorts"
+  Labels:
+    description: Set of labels
+    type: array
+    items:
+      type: string
+  ConfigurationMap:
+    description: |
+      Map of configuration key/value pairs.
+    type: object
+    additionalProperties:
+      type: string
+  LabelConfigurationSpec:
+    description: User desired Label configuration of an endpoint
+    type: object
+    properties:
+      user:
+        description: "Custom labels in addition to orchestration system labels."
+        "$ref": "#/definitions/Labels"
+  EndpointIdentifiers:
+    description: |-
+      Unique identifiers for this endpoint from outside cilium
+
+      +deepequal-gen=true
+    type: object
+    properties:
+      container-id:
+        description: ID assigned by container runtime
+        type: string
+      container-name:
+        description: Name assigned to container
+        type: string
+      docker-endpoint-id:
+        description: Docker endpoint ID
+        type: string
+      docker-network-id:
+        description: Docker network ID
+        type: string
+      pod-name:
+        description: K8s pod for this endpoint(Deprecated, use K8sPodName and K8sNamespace instead)
+        type: string
+      k8s-pod-name:
+        description: K8s pod name for this endpoint
+        type: string
+      k8s-namespace:
+        description: K8s namespace for this endpoint
+        type: string
+  Identity:
+    description: Security identity
+    type: object
+    properties:
+      id:
+        description: Unique identifier
+        type: integer
+      labels:
+        description: Labels describing the identity
+        "$ref": "#/definitions/Labels"
+      labelsSHA256:
+        description: SHA256 of labels
+        type: string
+  LabelConfigurationStatus:
+    description: Labels and label configuration of an endpoint
+    type: object
+    properties:
+      realized:
+        description: The current configuration
+        "$ref": "#/definitions/LabelConfigurationSpec"
+      security-relevant:
+        description: "Labels derived from orchestration system that are used in computing a security identity"
+        "$ref": "#/definitions/Labels"
+      derived:
+        description: "All labels derived from the orchestration system"
+        "$ref": "#/definitions/Labels"
+      disabled:
+        description: "Labels derived from orchestration system which have been disabled."
+        "$ref": "#/definitions/Labels"
+  EndpointNetworking:
+    description: Unique identifiers for this endpoint from outside cilium
+    type: object
+    properties:
+      addressing:
+        description: IP4/6 addresses assigned to this Endpoint
+        type: array
+        items:
+          "$ref": "#/definitions/AddressPair"
+      host-addressing:
+        "$ref": "#/definitions/NodeAddressing"
+      host-mac:
+        description: MAC address
+        type: string
+      mac:
+        description: MAC address
+        type: string
+      interface-name:
+        description: Name of network device
+        type: string
+      interface-index:
+        description: Index of network device
+        type: integer
+  AddressPair:
+    description: Addressing information of an endpoint
+    type: object
+    properties:
+      ipv4:
+        description: IPv4 address
+        type: string
+      ipv4-expiration-uuid:
+        description: UUID of IPv4 expiration timer
+        type: string
+      ipv6:
+        description: IPv6 address
+        type: string
+      ipv6-expiration-uuid:
+        description: UUID of IPv6 expiration timer
+        type: string
+  NodeAddressing:
+    description: |-
+      Addressing information of a node for all address families
+
+      +k8s:deepcopy-gen=true
+    type: object
+    properties:
+      ipv6:
+        "$ref": "#/definitions/NodeAddressingElement"
+      ipv4:
+        "$ref": "#/definitions/NodeAddressingElement"
+  NodeAddressingElement:
+    description: Addressing information
+    type: object
+    properties:
+      enabled:
+        description: True if address family is enabled
+        type: boolean
+      ip:
+        description: IP address of node
+        type: string
+      alloc-range:
+        description: Address pool to be used for local endpoints
+        type: string
+      address-type:
+        description: Node address type, one of HostName, ExternalIP or InternalIP
+        type: string
+  EndpointPolicyEnabled:
+    description: Whether policy enforcement is enabled (ingress, egress, both or none)
+    type: string
+    enum:
+      - none
+      - ingress
+      - egress
+      - both
+      - audit-ingress
+      - audit-egress
+      - audit-both
+  EndpointPolicy:
+    description: |-
+      Policy information of an endpoint
+
+      +k8s:deepcopy-gen=true
+    type: object
+    properties:
+      policy-revision:
+        description: The agent-local policy revision
+        type: integer
+      id:
+        description: Own identity of endpoint
+        type: integer
+      policy-enabled:
+        description: Whether policy enforcement is enabled (ingress, egress, both or none)
+        "$ref": "#/definitions/EndpointPolicyEnabled"
+      build:
+        description: Build number of calculated policy in use
+        type: integer
+      allowed-ingress-identities:
+        description: |
+          List of identities allowed to communicate to this endpoint
+        type: array
+        items:
+          type: integer
+      denied-ingress-identities:
+        description: |
+          List of identities not allowed to communicate to this endpoint
+        type: array
+        items:
+          type: integer
+      allowed-egress-identities:
+        description: |
+          List of identities to which this endpoint is allowed to communicate
+        type: array
+        items:
+          type: integer
+      denied-egress-identities:
+        description: |
+          List of identities to which this endpoint is not allowed to communicate
+        type: array
+        items:
+          type: integer
+      l4:
+        "$ref": "#/definitions/L4Policy"
+      cidr-policy:
+        "$ref": "#/definitions/CIDRPolicy"
+  EndpointPolicyStatus:
+    description: Policy information of an endpoint
+    type: object
+    properties:
+      spec:
+        description: The policy that should apply to this endpoint
+        "$ref": "#/definitions/EndpointPolicy"
+      realized:
+        description: The policy in the datapath for this endpoint
+        "$ref": "#/definitions/EndpointPolicy"
+      proxy-policy-revision:
+        description: The policy revision currently enforced in the proxy for this endpoint
+        type: integer
+      proxy-statistics:
+        description: Statistics of the proxy redirects configured for this endpoint
+        type: array
+        items:
+          "$ref": "#/definitions/ProxyStatistics"
+  EndpointStatusLog:
+    description: Status log of endpoint
+    type: array
+    items:
+      "$ref": "#/definitions/EndpointStatusChange"
+  EndpointStatusChange:
+    description: |-
+      Indication of a change of status
+
+      +deepequal-gen=true
+    type: object
+    properties:
+      timestamp:
+        description: Timestamp when status change occurred
+        type: string
+      code:
+        description: Code indicate type of status change
+        type: string
+        enum:
+          - ok
+          - failed
+      message:
+        description: Status message
+        type: string
+      state:
+        "$ref": "#/definitions/EndpointState"
+  EndpointState:
+    description: State of endpoint
+    type: string
+    enum:
+      - waiting-for-identity
+      - not-ready
+      - waiting-to-regenerate
+      - regenerating
+      - restoring
+      - ready
+      - disconnecting
+      - disconnected
+      - invalid
+  EndpointHealth:
+    description: |-
+      Health of the endpoint
+
+      +deepequal-gen=true
+    type: object
+    properties:
+      overallHealth:
+        "$ref": "#/definitions/EndpointHealthStatus"
+      bpf:
+        "$ref": "#/definitions/EndpointHealthStatus"
+      policy:
+        "$ref": "#/definitions/EndpointHealthStatus"
+      connected:
+        description: Is this endpoint reachable
+        type: boolean
+  EndpointHealthStatus:
+    description: >
+      A common set of statuses for endpoint health
+      * ``OK`` = All components operational
+      * ``Bootstrap`` = This component is being created
+      * ``Pending`` = A change is being processed to be applied
+      * ``Warning`` = This component is not applying up-to-date policies (but is still applying the previous version)
+      * ``Failure`` = An error has occurred and no policy is being applied
+      * ``Disabled`` = This endpoint is disabled and will not handle traffic
+    type: string
+    enum:
+      - OK
+      - Bootstrap
+      - Pending
+      - Warning
+      - Failure
+      - Disabled
+  NamedPorts:
+    description: |-
+      List of named Layer 4 port and protocol pairs which will be used in Network
+      Policy specs.
+
+      +deepequal-gen=true
+      +k8s:deepcopy-gen=true
+    type: array
+    items:
+      "$ref": "#/definitions/Port"
+  Port:
+    description: |-
+      Layer 4 port / protocol pair
+
+      +deepequal-gen=true
+    type: object
+    properties:
+      protocol:
+        description: Layer 4 protocol
+        type: string
+        enum:
+          - TCP
+          - UDP
+          - ICMP
+          - ICMPV6
+          - ANY
+      port:
+        description: Layer 4 port number
+        type: integer
+        format: uint16
+      name:
+        description: Optional layer 4 port name
+        type: string
+  ProxyStatistics:
+    description: |-
+      Statistics of a set of proxy redirects for an endpoint
+
+      +k8s:deepcopy-gen=true
+    type: object
+    properties:
+      protocol:
+        description: Name of the L7 protocol
+        type: string
+      port:
+        description: The port subject to the redirect
+        type: integer
+      allocated-proxy-port:
+        description: The port the proxy is listening on
+        type: integer
+      location:
+        description: Location of where the redirect is installed
+        type: string
+        enum:
+          - ingress
+          - egress
+      statistics:
+        description: Statistics of this set of proxy redirect
+        "$ref": "#/definitions/RequestResponseStatistics"
+  RequestResponseStatistics:
+    description: |-
+      Statistics of a proxy redirect
+
+      +k8s:deepcopy-gen=true
+    type: object
+    properties:
+      requests:
+        "$ref": "#/definitions/MessageForwardingStatistics"
+      responses:
+        "$ref": "#/definitions/MessageForwardingStatistics"
+  MessageForwardingStatistics:
+    description: Statistics of a message forwarding entity
+    type: object
+    properties:
+      received:
+        description: Number of messages received
+        type: integer
+      denied:
+        description: Number of messages denied
+        type: integer
+      error:
+        description: Number of errors while parsing messages
+        type: integer
+      forwarded:
+        description: Number of messages forwarded
+        type: integer
+  L4Policy:
+    description: |-
+      L4 endpoint policy
+
+      +k8s:deepcopy-gen=true
+    type: object
+    properties:
+      ingress:
+        description: List of L4 ingress rules
+        type: array
+        items:
+          "$ref": "#/definitions/PolicyRule"
+      egress:
+        description: List of L4 egress rules
+        type: array
+        items:
+          "$ref": "#/definitions/PolicyRule"
+  CIDRPolicy:
+    description: |-
+      CIDR endpoint policy
+
+      +k8s:deepcopy-gen=true
+    type: object
+    properties:
+      ingress:
+        description: List of CIDR ingress rules
+        type: array
+        items:
+          "$ref": "#/definitions/PolicyRule"
+      egress:
+        description: List of CIDR egress rules
+        type: array
+        items:
+          "$ref": "#/definitions/PolicyRule"
+  PolicyRule:
+    description: |-
+      A policy rule including the rule labels it derives from
+
+      +k8s:deepcopy-gen=true
+    properties:
+      rule:
+        description: The policy rule as json
+        type: string
+      derived-from-rules:
+        description: The policy rule labels identifying the policy rules this rule derives from
+        type: array
+        items:
+          type: array
+          items:
+            type: string
+  ControllerStatuses:
+    description: Collection of controller statuses
+    type: array
+    items:
+      "$ref": "#/definitions/ControllerStatus"
+  ControllerStatus:
+    description: |-
+      Status of a controller
+
+      +k8s:deepcopy-gen=true
+    type: object
+    properties:
+      name:
+        description: Name of controller
+        type: string
+      uuid:
+        description: UUID of controller
+        type: string
+        format: uuid
+      configuration:
+        description: |-
+          Configuration of controller
+
+          +deepequal-gen=true
+          +k8s:deepcopy-gen=true
+        type: object
+        properties:
+          interval:
+            description: Regular synchronization interval
+            type: string
+            format: duration
+          error-retry-base:
+            description: Base error retry back-off time
+            type: string
+            format: duration
+          error-retry:
+            description: Retry on error
+            type: boolean
+      status:
+        description: |-
+          Current status of controller
+
+          +k8s:deepcopy-gen=true
+        type: object
+        properties:
+          success-count:
+            description: Total number of successful runs
+            type: integer
+          last-success-timestamp:
+            description: Timestamp of last success
+            type: string
+            format: date-time
+          failure-count:
+            description: Total number of failed runs
+            type: integer
+          last-failure-timestamp:
+            description: Timestamp of last error
+            type: string
+            format: date-time
+          consecutive-failure-count:
+            description: Number of consecutive errors since last success
+            type: integer
+          last-failure-msg:
+            description: Error message of last failed run
+            type: string
+  Error:
+    type: string
+  EndpointChangeRequest:
+    description: |
+      Structure which contains the mutable elements of an Endpoint.
+    type: object
+    required:
+      - state
+    properties:
+      id:
+        description: Local endpoint ID
+        type: integer
+      container-id:
+        description: ID assigned by container runtime
+        type: string
+      container-name:
+        description: Name assigned to container
+        type: string
+      docker-endpoint-id:
+        description: Docker endpoint ID
+        type: string
+      labels:
+        description: Labels describing the identity
+        "$ref": "#/definitions/Labels"
+      docker-network-id:
+        description: Docker network ID
+        type: string
+      interface-name:
+        description: Name of network device
+        type: string
+      interface-index:
+        description: Index of network device
+        type: integer
+      state:
+        description: Current state of endpoint
+        "$ref": "#/definitions/EndpointState"
+      mac:
+        description: MAC address
+        type: string
+      host-mac:
+        description: MAC address
+        type: string
+      addressing:
+        "$ref": "#/definitions/AddressPair"
+      k8s-pod-name:
+        description: Kubernetes pod name
+        type: string
+      k8s-namespace:
+        description: Kubernetes namespace name
+        type: string
+      datapath-map-id:
+        description: ID of datapath tail call map
+        type: integer
+      policy-enabled:
+        description: Whether policy enforcement is enabled or not
+        type: boolean
+      pid:
+        description: Process ID of the workload belonging to this endpoint
+        type: integer
+      sync-build-endpoint:
+        description: |
+          Whether to build an endpoint synchronously
+        type: boolean
+      datapath-configuration:
+        "$ref": "#/definitions/EndpointDatapathConfiguration"
+  EndpointDatapathConfiguration:
+    description: Datapath configuration to be used for the endpoint
+    type: object
+    properties:
+      require-arp-passthrough:
+        description: Enable ARP passthrough mode
+        type: boolean
+      require-egress-prog:
+        description: >
+          Endpoint requires a host-facing egress program to be attached to
+          implement ingress policy and reverse NAT.
+        type: boolean
+      external-ipam:
+        description: >
+          Indicates that IPAM is done external to Cilium. This will prevent the
+          IP from being released and re-allocation of the IP address is skipped
+          on restore.
+        type: boolean
+      require-routing:
+        description: >
+          Endpoint requires BPF routing to be enabled, when disabled, routing
+          is delegated to Linux routing.
+        type: boolean
+        default: true
+      install-endpoint-route:
+        description: >
+          Installs a route in the Linux routing table pointing to the device of
+          the endpoint's interface.
+        type: boolean
+      disable-sip-verification:
+        description: >
+          Disable source IP verification for the endpoint.
+        type: boolean

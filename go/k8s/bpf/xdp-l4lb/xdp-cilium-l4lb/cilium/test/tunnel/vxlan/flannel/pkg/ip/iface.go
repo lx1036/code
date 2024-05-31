@@ -2,9 +2,10 @@ package ip
 
 import (
 	"errors"
-	"github.com/vishvananda/netlink"
 	"net"
 	"syscall"
+
+	"github.com/vishvananda/netlink"
 )
 
 func getIfaceAddrs(iface *net.Interface) ([]netlink.Addr, error) {

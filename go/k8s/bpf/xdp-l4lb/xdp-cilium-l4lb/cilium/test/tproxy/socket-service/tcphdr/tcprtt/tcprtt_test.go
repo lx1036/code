@@ -4,12 +4,13 @@ package tcprtt
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
 	"log"
 	"net"
 	"syscall"
 	"testing"
+
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 // go test -v -run ^TestTCPRtt$ .

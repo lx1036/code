@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/sirupsen/logrus"
 	"os/exec"
 	"strconv"
 	"testing"
+
+	"github.com/sirupsen/logrus"
 )
 
 // go test -v -run ^TestTcpNotify$ .

@@ -1,9 +1,10 @@
 package ctmap
 
 import (
-	"github.com/cilium/cilium/pkg/metrics"
 	"math"
 	"unsafe"
+
+	"github.com/cilium/cilium/pkg/metrics"
 
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/lock"

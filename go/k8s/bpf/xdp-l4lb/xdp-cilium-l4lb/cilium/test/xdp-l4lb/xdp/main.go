@@ -2,11 +2,12 @@ package main
 
 import (
 	"flag"
+	"net"
+
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
-	"net"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -tags "linux" -type iptnl_info -type vip bpf xdp.c -- -I.

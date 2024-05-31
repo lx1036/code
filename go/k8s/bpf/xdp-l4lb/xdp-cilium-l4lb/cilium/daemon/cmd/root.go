@@ -3,9 +3,12 @@ package cmd
 import (
     "context"
     "fmt"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/api/v1/server/restapi"
     datapathOption "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/option"
     "os"
     "time"
+
+    "github.com/go-openapi/loads"
 
     "github.com/cilium/cilium/pkg/datapath/maps"
     "github.com/cilium/cilium/pkg/endpoint"
@@ -18,12 +21,17 @@ import (
     "github.com/spf13/cobra"
     "github.com/spf13/viper"
 
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/api/v1/server"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
     "k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath/iptables"
     linuxdatapath "k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath/linux"
     nodeTypes "k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/node/types"
+)
+
+const (
+    apiTimeout = 60 * time.Second
 )
 
 var (
@@ -184,18 +192,16 @@ func runDaemon() {
     }
 
     if option.Config.EnableHealthChecking {
-        d.initHealth()
+        //d.initHealth()
     }
 
     d.startStatusCollector()
 
-    metricsErrs := initMetrics()
-
     d.startAgentHealthHTTPService()
 
-    srv := server.NewServer(d.instantiateAPI())
+    srv := server.NewServer(d.instantiateAPI()) // instantiateAPI() 里定义每一个 restapi 的具体 handler
     srv.EnabledListeners = []string{"unix"}
-    srv.SocketPath = option.Config.SocketPath
+    srv.SocketPath = option.Config.SocketPath // /var/run/cilium/cilium.sock
     srv.ReadTimeout = apiTimeout
     srv.WriteTimeout = apiTimeout
     defer srv.Shutdown()
@@ -226,26 +232,48 @@ func runDaemon() {
         errs <- srv.Serve()
     }()
 
-    err = option.Config.StoreInFile(option.Config.StateDir)
-    if err != nil {
-        log.WithError(err).Error("Unable to store Cilium's configuration")
-    }
-
-    err = option.StoreViperInFile(option.Config.StateDir)
-    if err != nil {
-        log.WithError(err).Error("Unable to store Viper's configuration")
-    }
+    //err = option.Config.StoreInFile(option.Config.StateDir)
+    //if err != nil {
+    //    log.WithError(err).Error("Unable to store Cilium's configuration")
+    //}
+    //
+    //err = option.StoreViperInFile(option.Config.StateDir)
+    //if err != nil {
+    //    log.WithError(err).Error("Unable to store Viper's configuration")
+    //}
 
     select {
-    case err := <-metricsErrs:
-        if err != nil {
-            log.WithError(err).Fatal("Cannot start metrics server")
-        }
     case err := <-errs:
         if err != nil {
             log.WithError(err).Fatal("Error returned from non-returning Serve() call")
         }
     }
+}
+
+// instantiateAPI() 里定义每一个 restapi 的具体 handler
+func (d *Daemon) instantiateAPI() *restapi.CiliumAPIAPI {
+    swaggerSpec, err := loads.Analyzed(server.SwaggerJSON, "")
+    if err != nil {
+        log.WithError(err).Fatal("Cannot load swagger spec")
+    }
+
+    log.Info("Initializing Cilium API")
+    restAPI := restapi.NewCiliumAPIAPI(swaggerSpec)
+    restAPI.Logger = log.Infof
+
+    if option.Config.DatapathMode != datapathOption.DatapathModeLBOnly {
+        // /endpoint/
+        restAPI.EndpointGetEndpointHandler = NewGetEndpointHandler(d)
+
+        // /endpoint/{id}
+        restAPI.EndpointGetEndpointIDHandler = NewGetEndpointIDHandler(d)
+        restAPI.EndpointPutEndpointIDHandler = NewPutEndpointIDHandler(d)
+        restAPI.EndpointPatchEndpointIDHandler = NewPatchEndpointIDHandler(d)
+        restAPI.EndpointDeleteEndpointIDHandler = NewDeleteEndpointIDHandler(d)
+
+    }
+
+    return restAPI
 }
 
 func Execute() {

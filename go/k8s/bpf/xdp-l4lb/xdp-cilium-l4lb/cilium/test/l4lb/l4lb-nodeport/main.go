@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/binary"
+	"net"
+
 	"github.com/cilium/ebpf"
 	"github.com/sirupsen/logrus"
-	"net"
 )
 
 const (

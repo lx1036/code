@@ -3,10 +3,11 @@ package tests
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"net"
 	"os/exec"
 	"testing"
+
+	"github.com/sirupsen/logrus"
 )
 
 func TestIPToInt(test *testing.T) {

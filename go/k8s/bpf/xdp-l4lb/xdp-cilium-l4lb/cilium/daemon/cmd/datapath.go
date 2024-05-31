@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"os"
+	"time"
+
 	"github.com/cilium/cilium/pkg/controller"
 	"github.com/cilium/cilium/pkg/datapath/linux/probes"
 	"github.com/cilium/cilium/pkg/ipcache"
@@ -10,8 +13,6 @@ import (
 	"github.com/cilium/cilium/pkg/maps/metricsmap"
 	"github.com/cilium/cilium/pkg/maps/signalmap"
 	"github.com/cilium/cilium/pkg/maps/tunnel"
-	"os"
-	"time"
 
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath"
@@ -23,6 +24,9 @@ import (
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/nat"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/neighborsmap"
 	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/ctmap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/policymap"
+	"k8s-lx1036/k8s/network/cilium/cilium/pkg/common"
 )
 
 // /var/run/cilium/state/globals/node_config.h

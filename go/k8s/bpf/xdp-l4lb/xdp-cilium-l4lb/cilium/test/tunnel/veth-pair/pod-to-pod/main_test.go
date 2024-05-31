@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/binary"
+	"net"
+	"testing"
+
 	"github.com/cilium/ebpf"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/sirupsen/logrus"
-	"net"
-	"testing"
 )
 
 // CGO_ENABLED="0" go test -v -run ^TestNS$ .
