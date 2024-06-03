@@ -2,30 +2,39 @@ package endpoint
 
 import (
     "context"
-    "github.com/cilium/cilium/pkg/identity"
-    "github.com/cilium/cilium/pkg/identity/cache"
-    "github.com/cilium/cilium/pkg/logging"
-    "github.com/cilium/cilium/pkg/metrics"
-    "github.com/cilium/cilium/pkg/policy"
-    "os"
     "runtime"
-    "strconv"
-    "strings"
     "sync"
     "time"
     "unsafe"
 
+    "github.com/sirupsen/logrus"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/controller"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/link"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/defaults"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/endpoint/regeneration"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/eventqueue"
-    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/fqdn"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/identity"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/identity/cache"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/labels"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/mac"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/metrics"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
-
-    log "github.com/sirupsen/logrus"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/policy"
 )
+
+var (
+    EndpointMutableOptionLibrary = option.GetEndpointMutableOptionLibrary()
+)
+
+type policyRepoGetter interface {
+    GetPolicyRepository() *policy.Repository
+}
+
+type namedPortsGetter interface {
+    GetNamedPorts() (npm policy.NamedPortMultiMap)
+}
 
 // Endpoint represents a container or similar which can be individually
 // addresses on L3 with its own IP addresses.
@@ -82,9 +91,25 @@ type Endpoint struct {
 
     // mac is the MAC address of the endpoint
     mac mac.MAC // Container MAC address.
+    // nodeMAC is the MAC of the node (agent). The MAC is different for every endpoint.
+    nodeMAC mac.MAC
+
+    // DatapathConfiguration is the endpoint's datapath configuration as
+    // passed in via the plugin that created the endpoint, e.g. the CNI
+    // plugin which performed the plumbing will enable certain datapath
+    // features according to the mode selected.
+    //DatapathConfiguration models.EndpointDatapathConfiguration
 
     desiredPolicy  *policy.EndpointPolicy
     realizedPolicy *policy.EndpointPolicy
+
+    // policyGetter can get the policy.Repository object.
+    policyGetter policyRepoGetter
+
+    // namedPortsGetter can get the ipcache.IPCache object.
+    namedPortsGetter namedPortsGetter
+
+    proxy EndpointProxy
 
     // controllers is the list of async controllers syncing the endpoint to
     // other resources
@@ -110,6 +135,19 @@ type Endpoint struct {
     policyLogger unsafe.Pointer
 
     isHost bool
+
+    regenFailedChan chan struct{}
+
+    allocator cache.IdentityAllocator
+
+    // logLimiter rate limits potentially repeating warning logs
+    logLimiter logging.Limiter
+
+    noTrackPort uint16
+
+    // createdAt stores the time the endpoint was created. This value is
+    // recalculated on endpoint restore.
+    createdAt time.Time
 }
 
 // SetState modifies the endpoint's state. Returns true only if endpoints state
@@ -185,7 +223,7 @@ func (e *Endpoint) setState(toState, reason string) bool {
 
     if toState != fromState {
         _, fileName, fileLine, _ := runtime.Caller(1)
-        log.WithFields(log.Fields{
+        e.getLogger().WithFields(logrus.Fields{
             logfields.EndpointState + ".from": fromState,
             logfields.EndpointState + ".to":   toState,
             "file":                            fileName,
@@ -246,7 +284,34 @@ func (e *Endpoint) hasLabelsRLocked(l labels.Labels) bool {
     return true
 }
 
-func createEndpoint(owner regeneration.Owner, policyGetter policyRepoGetter, namedPortsGetter namedPortsGetter, proxy EndpointProxy, allocator cache.IdentityAllocator, ID uint16, ifName string) *Endpoint {
+// SetDefaultOpts initializes the endpoint Options and configures the specified
+// options.
+func (e *Endpoint) SetDefaultOpts(opts *option.IntOptions) {
+    if e.Options == nil {
+        e.Options = option.NewIntOptions(&EndpointMutableOptionLibrary)
+    }
+    if e.Options.Library == nil {
+        e.Options.Library = &EndpointMutableOptionLibrary
+    }
+    if e.Options.Opts == nil {
+        e.Options.Opts = option.OptionMap{}
+    }
+
+    if opts != nil {
+        epOptLib := option.GetEndpointMutableOptionLibrary()
+        for k := range epOptLib {
+            e.Options.SetValidated(k, opts.GetValue(k))
+        }
+    }
+    if option.Config.Debug {
+        e.Options.SetValidated(option.DebugPolicy, option.OptionEnabled)
+    }
+
+    e.UpdateLogger(nil)
+}
+
+func createEndpoint(owner regeneration.Owner, policyGetter policyRepoGetter, namedPortsGetter namedPortsGetter,
+    proxy EndpointProxy, allocator cache.IdentityAllocator, ID uint16, ifName string) *Endpoint {
     ep := &Endpoint{
         owner:            owner,
         policyGetter:     policyGetter,
@@ -256,21 +321,21 @@ func createEndpoint(owner regeneration.Owner, policyGetter policyRepoGetter, nam
         proxy:            proxy,
         ifName:           ifName,
         OpLabels:         labels.NewOpLabels(),
-        DNSRules:         nil,
-        DNSHistory:       fqdn.NewDNSCacheWithLimit(option.Config.ToFQDNsMinTTL, option.Config.ToFQDNsMaxIPsPerHost),
-        DNSZombies:       fqdn.NewDNSZombieMappings(option.Config.ToFQDNsMaxDeferredConnectionDeletes, option.Config.ToFQDNsMaxIPsPerHost),
-        state:            "",
-        status:           NewEndpointStatus(),
-        hasBPFProgram:    make(chan struct{}, 0),
-        desiredPolicy:    policy.NewEndpointPolicy(policyGetter.GetPolicyRepository()),
-        controllers:      controller.NewManager(),
-        regenFailedChan:  make(chan struct{}, 1),
-        allocator:        allocator,
-        logLimiter:       logging.NewLimiter(10*time.Second, 3), // 1 log / 10 secs, burst of 3
-        noTrackPort:      0,
+        //DNSRules:         nil,
+        //DNSHistory:       fqdn.NewDNSCacheWithLimit(option.Config.ToFQDNsMinTTL, option.Config.ToFQDNsMaxIPsPerHost),
+        //DNSZombies:       fqdn.NewDNSZombieMappings(option.Config.ToFQDNsMaxDeferredConnectionDeletes, option.Config.ToFQDNsMaxIPsPerHost),
+        state:           "",
+        status:          NewEndpointStatus(),
+        hasBPFProgram:   make(chan struct{}, 0),
+        desiredPolicy:   policy.NewEndpointPolicy(policyGetter.GetPolicyRepository()),
+        controllers:     controller.NewManager(),
+        regenFailedChan: make(chan struct{}, 1),
+        allocator:       allocator,
+        logLimiter:      logging.NewLimiter(10*time.Second, 3), // 1 log / 10 secs, burst of 3
+        noTrackPort:     0,
     }
 
-    ep.initDNSHistoryTrigger()
+    //ep.initDNSHistoryTrigger()
 
     ctx, cancel := context.WithCancel(context.Background())
     ep.aliveCancel = cancel
@@ -283,17 +348,22 @@ func createEndpoint(owner regeneration.Owner, policyGetter policyRepoGetter, nam
     return ep
 }
 
-// FilterEPDir returns a list of directories' names that possible belong to an endpoint.
-func FilterEPDir(dirFiles []os.FileInfo) []string {
-    var eptsID []string
-    for _, file := range dirFiles {
-        if file.IsDir() {
-            _, err := strconv.ParseUint(file.Name(), 10, 16)
-            if err == nil || strings.HasSuffix(file.Name(), nextDirectorySuffix) || strings.HasSuffix(file.Name(), nextFailedDirectorySuffix) {
-                eptsID = append(eptsID, file.Name())
-            }
-        }
+// CreateHostEndpoint creates the endpoint corresponding to the host.
+// bpf_host.c
+func CreateHostEndpoint(owner regeneration.Owner, policyGetter policyRepoGetter, namedPortsGetter namedPortsGetter, proxy EndpointProxy, allocator cache.IdentityAllocator) (*Endpoint, error) {
+    // cilium_host device
+    hostDeviceMac, err := link.GetHardwareAddr(defaults.HostDevice)
+    if err != nil {
+        return nil, err
     }
 
-    return eptsID
+    ep := createEndpoint(owner, policyGetter, namedPortsGetter, proxy, allocator, 0, defaults.HostDevice)
+    ep.isHost = true
+    ep.mac = hostDeviceMac
+    ep.nodeMAC = hostDeviceMac
+    //ep.DatapathConfiguration = NewDatapathConfiguration()
+
+    ep.setState(StateWaitingForIdentity, "Endpoint creation")
+
+    return ep, nil
 }

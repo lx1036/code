@@ -4,7 +4,11 @@ import (
     "context"
     "errors"
     "fmt"
+    "github.com/cilium/cilium/pkg/annotation"
+    "github.com/cilium/cilium/pkg/bandwidth"
+    "github.com/cilium/cilium/pkg/k8s"
     "github.com/sirupsen/logrus"
+    "net"
     "net/http"
     "runtime"
     "sync"
@@ -216,6 +220,75 @@ func (d *Daemon) createEndpoint(ctx context.Context, owner regeneration.Owner, e
     err = d.endpointManager.AddEndpoint(owner, ep, "Create endpoint from API PUT")
     if err != nil {
         return d.errorDuringCreation(ep, fmt.Errorf("unable to insert endpoint into manager: %s", err))
+    }
+
+    // We need to update the the visibility policy after adding the endpoint in
+    // the endpoint manager because the endpoint manager create the endpoint
+    // queue of the endpoint. If we execute this function before the endpoint
+    // manager creates the endpoint queue the operation will fail.
+    if ep.K8sNamespaceAndPodNameIsSet() && k8s.IsEnabled() && k8sLabelsConfigured {
+        ep.UpdateVisibilityPolicy(func(ns, podName string) (proxyVisibility string, err error) {
+            p, err := d.k8sWatcher.GetCachedPod(ns, podName)
+            if err != nil {
+                return "", err
+            }
+            return p.Annotations[annotation.ProxyVisibility], nil
+        })
+        ep.UpdateBandwidthPolicy(func(ns, podName string) (bandwidthEgress string, err error) {
+            p, err := d.k8sWatcher.GetCachedPod(ns, podName)
+            if err != nil {
+                return "", err
+            }
+            return p.Annotations[bandwidth.EgressBandwidth], nil
+        })
+        ep.UpdateNoTrackRules(func(ns, podName string) (noTrackPort string, err error) {
+            p, err := d.k8sWatcher.GetCachedPod(ns, podName)
+            if err != nil {
+                return "", err
+            }
+            return p.Annotations[annotation.NoTrack], nil
+        })
+    }
+
+    regenTriggered := ep.UpdateLabels(ctx, addLabels, infoLabels, true)
+
+    select {
+    case <-ctx.Done():
+        return d.errorDuringCreation(ep, fmt.Errorf("request cancelled while resolving identity"))
+    default:
+    }
+
+    if !regenTriggered {
+        regenMetadata := &regeneration.ExternalRegenerationMetadata{
+            Reason:            "Initial build on endpoint creation",
+            ParentContext:     ctx,
+            RegenerationLevel: regeneration.RegenerateWithDatapathRewrite,
+        }
+        build, err := ep.SetRegenerateStateIfAlive(regenMetadata)
+        if err != nil {
+            return d.errorDuringCreation(ep, err)
+        }
+        if build {
+            ep.Regenerate(regenMetadata)
+        }
+    }
+
+    if epTemplate.SyncBuildEndpoint {
+        if err := ep.WaitForFirstRegeneration(ctx); err != nil {
+            return d.errorDuringCreation(ep, err)
+        }
+    }
+
+    // The endpoint has been successfully created, stop the expiration
+    // timers of all attached IPs
+    if addressing := epTemplate.Addressing; addressing != nil {
+        if uuid := addressing.IPV4ExpirationUUID; uuid != "" {
+            if ip := net.ParseIP(addressing.IPV4); ip != nil {
+                if err := d.ipam.StopExpirationTimer(ip, uuid); err != nil {
+                    return d.errorDuringCreation(ep, err)
+                }
+            }
+        }
     }
 
     return ep, 0, nil

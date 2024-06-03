@@ -1,5 +1,7 @@
 package labels
 
+import "strings"
+
 const (
     // LabelSourceUnspec is a label with unspecified source
     LabelSourceUnspec = "unspec"
@@ -37,6 +39,53 @@ const (
     LabelSourceCiliumGenerated = "cilium-generated"
 )
 
+const (
+    // PathDelimiter is the delimiter used in the labels paths.
+    PathDelimiter = "."
+
+    // IDNameHost is the label used for the hostname ID.
+    IDNameHost = "host"
+
+    // IDNameRemoteNode is the label used to describe the
+    // ReservedIdentityRemoteNode
+    IDNameRemoteNode = "remote-node"
+
+    // IDNameWorld is the label used for the world ID.
+    IDNameWorld = "world"
+
+    // IDNameCluster is the label used to identify an unspecified endpoint
+    // inside the cluster
+    IDNameCluster = "cluster"
+
+    // IDNameHealth is the label used for the local cilium-health endpoint
+    IDNameHealth = "health"
+
+    // IDNameInit is the label used to identify any endpoint that has not
+    // received any labels yet.
+    IDNameInit = "init"
+
+    // IDNameKubeAPIServer is the label used to identify the kube-apiserver. It
+    // is part of the reserved identity 7 and it is also used in conjunction
+    // with IDNameHost if the kube-apiserver is running on the local host.
+    IDNameKubeAPIServer = "kube-apiserver"
+
+    // IDNameIngress is the label used to identify Ingress proxies. It is part
+    // of the reserved identity 8.
+    IDNameIngress = "ingress"
+
+    // IDNameNone is the label used to identify no endpoint or other L3 entity.
+    // It will never be assigned and this "label" is here for consistency with
+    // other Entities.
+    IDNameNone = "none"
+
+    // IDNameUnmanaged is the label used to identify unmanaged endpoints
+    IDNameUnmanaged = "unmanaged"
+
+    // IDNameUnknown is the label used to to identify an endpoint with an
+    // unknown identity.
+    IDNameUnknown = "unknown"
+)
+
 // Label is the Cilium's representation of a container label.
 type Label struct {
     Key   string `json:"key"`
@@ -60,5 +109,79 @@ func (l *Label) IsAnySource() bool {
     return l.Source == LabelSourceAny
 }
 
+// NewLabel returns a new label from the given key, value and source. If source is empty,
+// the default value will be LabelSourceUnspec. If key starts with '$', the source
+// will be overwritten with LabelSourceReserved. If key contains ':', the value
+// before ':' will be used as source if given source is empty, otherwise the value before
+// ':' will be deleted and unused.
+func NewLabel(key string, value string, source string) Label {
+    var src string
+    src, key = parseSource(key, ':')
+    if source == "" {
+        if src == "" {
+            source = LabelSourceUnspec
+        } else {
+            source = src
+        }
+    }
+    if src == LabelSourceReserved && key == "" {
+        key = value
+        value = ""
+    }
+
+    return Label{
+        Key:    key,
+        Value:  value,
+        Source: source,
+    }
+}
+
 // Labels is a map of labels where the map's key is the same as the label's key.
 type Labels map[string]Label
+
+var (
+    // LabelHealth is the label used for health.
+    LabelHealth = Labels{IDNameHealth: NewLabel(IDNameHealth, "", LabelSourceReserved)}
+
+    // LabelHost is the label used for the host endpoint.
+    LabelHost = Labels{IDNameHost: NewLabel(IDNameHost, "", LabelSourceReserved)}
+
+    // LabelWorld is the label used for world.
+    LabelWorld = Labels{IDNameWorld: NewLabel(IDNameWorld, "", LabelSourceReserved)}
+
+    // LabelRemoteNode is the label used for remote nodes.
+    LabelRemoteNode = Labels{IDNameRemoteNode: NewLabel(IDNameRemoteNode, "", LabelSourceReserved)}
+
+    // LabelKubeAPIServer is the label used for the kube-apiserver. See comment
+    // on IDNameKubeAPIServer.
+    LabelKubeAPIServer = Labels{IDNameKubeAPIServer: NewLabel(IDNameKubeAPIServer, "", LabelSourceReserved)}
+
+    // LabelIngress is the label used for Ingress proxies. See comment
+    // on IDNameIngress.
+    LabelIngress = Labels{IDNameIngress: NewLabel(IDNameIngress, "", LabelSourceReserved)}
+)
+
+// parseSource returns the parsed source of the given str. It also returns the next piece
+// of text that is after the source.
+// Example:
+//  src, next := parseSource("foo:bar==value")
+// Println(src) // foo
+// Println(next) // bar==value
+// For Cilium format 'delim' must be passed in as ':'
+// For k8s format 'delim' must be passed in as '.'
+func parseSource(str string, delim byte) (src, next string) {
+    if str == "" {
+        return "", ""
+    }
+    if str[0] == '$' {
+        return LabelSourceReserved, str[1:]
+    }
+    i := strings.IndexByte(str, delim)
+    if i < 0 {
+        if delim != '.' && strings.HasPrefix(str, LabelSourceReservedKeyPrefix) {
+            return LabelSourceReserved, strings.TrimPrefix(str, LabelSourceReservedKeyPrefix)
+        }
+        return "", str
+    }
+    return str[:i], str[i+1:]
+}

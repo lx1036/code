@@ -58,3 +58,37 @@ type IntOptions struct {
 type OptionMap map[string]OptionSetting
 
 type OptionLibrary map[string]*Option
+
+func (o *IntOptions) getValue(key string) OptionSetting {
+    value, exists := o.Opts[key]
+    if !exists {
+        return OptionDisabled
+    }
+    return value
+}
+
+func (o *IntOptions) GetValue(key string) OptionSetting {
+    o.optsMU.RLock()
+    v := o.getValue(key)
+    o.optsMU.RUnlock()
+    return v
+}
+
+// SetValidated sets the option `key` to the specified value. The caller is
+// expected to have validated the input to this function.
+func (o *IntOptions) SetValidated(key string, value OptionSetting) {
+    o.optsMU.Lock()
+    o.Opts[key] = value
+    o.optsMU.Unlock()
+}
+
+func (o *IntOptions) IsEnabled(key string) bool {
+    return o.GetValue(key) != OptionDisabled
+}
+
+func NewIntOptions(lib *OptionLibrary) *IntOptions {
+    return &IntOptions{
+        Opts:    OptionMap{},
+        Library: lib,
+    }
+}

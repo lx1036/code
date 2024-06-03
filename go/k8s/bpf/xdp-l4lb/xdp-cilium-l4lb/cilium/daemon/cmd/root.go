@@ -3,12 +3,8 @@ package cmd
 import (
     "context"
     "fmt"
-    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/api/v1/server/restapi"
-    datapathOption "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/option"
     "os"
     "time"
-
-    "github.com/go-openapi/loads"
 
     "github.com/cilium/cilium/pkg/datapath/maps"
     "github.com/cilium/cilium/pkg/endpoint"
@@ -16,18 +12,21 @@ import (
     "github.com/cilium/cilium/pkg/ipmasq"
     "github.com/cilium/cilium/pkg/maps/ctmap/gc"
     "github.com/cilium/cilium/pkg/node"
+    "github.com/go-openapi/loads"
     gops "github.com/google/gops/agent"
     "github.com/sirupsen/logrus"
     "github.com/spf13/cobra"
     "github.com/spf13/viper"
 
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/api/v1/server"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/api/v1/server/restapi"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/iptables"
+    linuxdatapath "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/linux"
+    datapathOption "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/option"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
+    nodeTypes "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/node/types"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
-    "k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath/iptables"
-    linuxdatapath "k8s-lx1036/k8s/network/cilium/cilium/pkg/datapath/linux"
-    nodeTypes "k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/node/types"
 )
 
 const (
@@ -139,11 +138,12 @@ func runDaemon() {
 
     restoreComplete := d.initRestore(restoredEndpoints)
 
+    // INFO: add a new host endpoint for bpf_host.c
     if d.endpointManager.HostEndpointExists() {
         d.endpointManager.InitHostEndpointLabels(d.ctx)
     } else {
         log.Info("Creating host endpoint")
-        if err := d.endpointManager.AddHostEndpoint(d.ctx, d, d.l7Proxy, d.identityAllocator,
+        if err := d.endpointManager.AddHostEndpoint(d.ctx, d, d, d.ipcache, d.l7Proxy, d.identityAllocator,
             "Create host endpoint", nodeTypes.GetName()); err != nil {
             log.WithError(err).Fatal("Unable to create host endpoint")
         }

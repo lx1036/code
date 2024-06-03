@@ -11,8 +11,11 @@ import (
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/linux/route"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/loader/metrics"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/defaults"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/node"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 )
 
 var (
@@ -156,7 +159,7 @@ func (l *Loader) CompileOrLoad(ctx context.Context, ep datapath.Endpoint, stats 
     panic("implement me")
 }
 
-func (l *Loader) ReloadDatapath(ctx context.Context, ep datapath.Endpoint, stats *metrics.SpanStat) error {
+func (l *Loader) ReloadDatapath(ctx context.Context, ep datapath.Endpoint, stats *metrics.SpanStat) (err error) {
     dirs := directoryInfo{
         Library: option.Config.BpfDir,
         Runtime: option.Config.StateDir,
@@ -182,6 +185,111 @@ func (l *Loader) Unload(ep datapath.Endpoint) {
 func (l *Loader) Reinitialize(ctx context.Context, o interface{}, deviceMTU int, iptMgr datapath.IptablesManager, p interface{}) error {
     //TODO implement me
     panic("implement me")
+}
+
+// reloadHostDatapath loads bpf_host programs attached to the host device
+// (usually cilium_host) and the native devices if any. To that end, it
+// uses a single object file, pointed to by objPath, compiled for the host
+// device and patches it with values for native devices if needed.
+// Symbols in objPath have already been substituted with the appropriate values
+// for the host device. Thus, when packing the object file again for the native
+// devices, we don't need to substitute most values (see
+// nullifyStringSubstitutions above).
+// reloadHostDatapath skips native devices that do not exist just before
+// loading. If loading+attaching fails later on however, reloadHostDatapath
+// will return with an error. Failing to load or to attach the host device
+// always results in reloadHostDatapath returning with an error.
+
+// root@minikube:/var/run/cilium/state# tc filter show dev cilium_host ingress
+// filter protocol all pref 1 bpf chain 0
+// filter protocol all pref 1 bpf chain 0 handle 0x1 bpf_host.o:[to-host] direct-action not_in_hw id 8210 tag 6b89d4d09c799b6f jited
+// root@minikube:/var/run/cilium/state# tc filter show dev cilium_host egress
+// filter protocol all pref 1 bpf chain 0
+// filter protocol all pref 1 bpf chain 0 handle 0x1 bpf_host.o:[from-host] direct-action not_in_hw id 8220 tag 1c9907f1d5ea3240 jited
+// root@minikube:/var/run/cilium/state# tc filter show dev cilium_net ingress
+// filter protocol all pref 1 bpf chain 0
+// filter protocol all pref 1 bpf chain 0 handle 0x1 bpf_host_cilium_net.o:[to-host] direct-action not_in_hw id 8230 tag 6b89d4d09c799b6f jited
+// root@minikube:/var/run/cilium/state# tc filter show dev cilium_net egress
+// root@minikube:/var/run/cilium/state#
+func (l *Loader) reloadHostDatapath(ctx context.Context, ep datapath.Endpoint, objPath string) error {
+    nbInterfaces := len(option.Config.GetDevices()) + 2
+    symbols := make([]string, 2, nbInterfaces)
+    directions := make([]string, 2, nbInterfaces)
+    objPaths := make([]string, 2, nbInterfaces)
+    interfaceNames := make([]string, 2, nbInterfaces)
+    symbols[0], symbols[1] = symbolToHostEp, symbolFromHostEp
+    directions[0], directions[1] = dirIngress, dirEgress
+    objPaths[0], objPaths[1] = objPath, objPath
+    interfaceNames[0], interfaceNames[1] = ep.InterfaceName(), ep.InterfaceName()
+
+    if _, err := netlink.LinkByName(defaults.SecondHostDevice); err != nil {
+        log.WithError(err).WithField("device", defaults.SecondHostDevice).Error("Link does not exist")
+        return err
+    } else {
+        interfaceNames = append(interfaceNames, defaults.SecondHostDevice)
+        symbols = append(symbols, symbolToHostEp)
+        directions = append(directions, dirIngress)
+        secondDevObjPath := path.Join(ep.StateDir(), hostEndpointPrefix+"_"+defaults.SecondHostDevice+".o")
+        if err := patchHostNetdevDatapath(ep, objPath, secondDevObjPath, defaults.SecondHostDevice, nil); err != nil {
+            return err
+        }
+        objPaths = append(objPaths, secondDevObjPath)
+    }
+
+    bpfMasqIPv4Addrs := node.GetMasqIPv4AddrsWithDevices()
+
+    for _, device := range option.Config.GetDevices() {
+        if _, err := netlink.LinkByName(device); err != nil {
+            log.WithError(err).WithField("device", device).Warn("Link does not exist")
+            continue
+        }
+
+        netdevObjPath := path.Join(ep.StateDir(), hostEndpointNetdevPrefix+device+".o")
+        if err := patchHostNetdevDatapath(ep, objPath, netdevObjPath, device, bpfMasqIPv4Addrs); err != nil {
+            return err
+        }
+        objPaths = append(objPaths, netdevObjPath)
+
+        interfaceNames = append(interfaceNames, device)
+        symbols = append(symbols, symbolFromHostNetdevEp)
+        directions = append(directions, dirIngress)
+        if option.Config.EnableNodePort || option.Config.EnableHostFirewall ||
+            option.Config.EnableBandwidthManager {
+            interfaceNames = append(interfaceNames, device)
+            symbols = append(symbols, symbolToHostNetdevEp)
+            directions = append(directions, dirEgress)
+            objPaths = append(objPaths, netdevObjPath)
+        } else {
+            // Remove any previously attached device from egress path if BPF
+            // NodePort and host firewall are disabled.
+            err := RemoveTCFilters(device, netlink.HANDLE_MIN_EGRESS)
+            if err != nil {
+                log.WithField("device", device).Error(err)
+            }
+        }
+    }
+
+    for i, interfaceName := range interfaceNames {
+        symbol := symbols[i]
+        finalize, err := replaceDatapath(ctx, interfaceName, objPaths[i], symbol, directions[i], false, "")
+        if err != nil {
+            scopedLog := ep.Logger(Subsystem).WithFields(logrus.Fields{
+                logfields.Path: objPath,
+                logfields.Veth: interfaceName,
+            })
+            // Don't log an error here if the context was canceled or timed out;
+            // this log message should only represent failures with respect to
+            // loading the program.
+            if ctx.Err() == nil {
+                scopedLog.WithError(err).Warningf("JoinEP: Failed to load program for host endpoint (%s)", symbol)
+            }
+            return err
+        }
+        // Defer map removal until all interfaces' progs have been replaced.
+        defer finalize()
+    }
+
+    return nil
 }
 
 // NewLoader returns a new loader.

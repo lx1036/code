@@ -1,12 +1,15 @@
 package endpointmanager
 
 import (
+    "context"
     "fmt"
+    "github.com/cilium/cilium/pkg/identity/cache"
     "sync"
 
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/endpoint"
     endpointid "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/endpoint/id"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/endpoint/regeneration"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/node"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 
     "github.com/prometheus/client_golang/prometheus"
@@ -52,18 +55,6 @@ func (mgr *EndpointManager) InitMetrics() {
 
         metrics.MustRegister(metrics.EndpointCount)
     })
-}
-
-// GetHostEndpoint returns the host endpoint.
-func (mgr *EndpointManager) GetHostEndpoint() *endpoint.Endpoint {
-    mgr.mutex.RLock()
-    defer mgr.mutex.RUnlock()
-    for _, ep := range mgr.endpoints {
-        if ep.IsHost() {
-            return ep
-        }
-    }
-    return nil
 }
 
 // GetEndpoints returns a slice of all endpoints present in endpoint manager.
@@ -184,6 +175,31 @@ func (mgr *EndpointManager) AddEndpoint(owner regeneration.Owner, ep *endpoint.E
         s.EndpointCreated(ep)
     }
     mgr.mutex.RUnlock()
+
+    return nil
+}
+
+func (mgr *EndpointManager) AddHostEndpoint(
+    ctx context.Context,
+    owner regeneration.Owner,
+    policyGetter policyRepoGetter,
+    ipcache *ipcache.IPCache,
+    proxy endpoint.EndpointProxy,
+    allocator cache.IdentityAllocator,
+    reason, nodeName string,
+) error {
+    ep, err := endpoint.CreateHostEndpoint(owner, policyGetter, ipcache, proxy, allocator)
+    if err != nil {
+        return err
+    }
+
+    if err := mgr.AddEndpoint(owner, ep, reason); err != nil {
+        return err
+    }
+
+    node.SetEndpointID(ep.GetID())
+
+    ep.InitWithNodeLabels(ctx, launchTime)
 
     return nil
 }

@@ -31,6 +31,14 @@ func (c *Cmd) CombinedOutput(scopedLog *logrus.Entry, verbose bool) ([]byte, err
     return out, err
 }
 
+// WithFilters modifies the specified command to filter any output lines from
+// logs if they contain any of the substrings specified as arguments to this
+// function.
+func (c *Cmd) WithFilters(filters ...string) *Cmd {
+    c.filters = append(c.filters, filters...)
+    return c
+}
+
 func warnToLog(cmd *exec.Cmd, filters []string, out []byte, scopedLog *logrus.Entry, err error) {
     scopedLog.WithError(err).WithField("cmd", cmd.Args).Error("Command execution failed")
     scanner := bufio.NewScanner(bytes.NewReader(out))

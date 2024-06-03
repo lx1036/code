@@ -3,9 +3,48 @@ package loader
 import (
     "context"
     "fmt"
-    "github.com/cilium/cilium/pkg/bpf"
+    "github.com/vishvananda/netlink"
     "strconv"
+
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/command/exec"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 )
+
+type baseDeviceMode string
+
+const (
+    directMode = baseDeviceMode("direct")
+    tunnelMode = baseDeviceMode("tunnel")
+
+    libbpfFixupMsg = "struct bpf_elf_map fixup performed due to size mismatch!"
+)
+
+// `tc qdisc add dev $ifName clsact [handle 0xffff0000]`
+func replaceQdisc(ifName string) error {
+    link, err := netlink.LinkByName(ifName)
+    if err != nil {
+        return err
+    }
+    attrs := netlink.QdiscAttrs{
+        LinkIndex: link.Attrs().Index,
+        Handle:    netlink.MakeHandle(0xffff, 0),
+        Parent:    netlink.HANDLE_CLSACT,
+    }
+
+    qdisc := &netlink.GenericQdisc{
+        QdiscAttrs: attrs,
+        QdiscType:  "clsact",
+    }
+
+    if err = netlink.QdiscReplace(qdisc); err != nil {
+        return fmt.Errorf("netlink: Replacing qdisc for %s failed: %s", ifName, err)
+    } else {
+        log.Debugf("netlink: Replacing qdisc for %s succeeded", ifName)
+    }
+
+    return nil
+}
 
 // replaceDatapath replaces the qdisc and BPF program for an endpoint or XDP program.
 //
@@ -27,6 +66,7 @@ func replaceDatapath(ctx context.Context, ifName, objPath, progSec, progDirectio
     )
 
     if !xdp {
+        // `tc qdisc add dev $ifName clsact [handle 0xffff0000]`
         if err := replaceQdisc(ifName); err != nil {
             return nil, fmt.Errorf("Failed to replace Qdisc for %s: %s", ifName, err)
         }

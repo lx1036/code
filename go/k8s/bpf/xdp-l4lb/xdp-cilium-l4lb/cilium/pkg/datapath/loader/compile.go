@@ -29,6 +29,12 @@ const (
     endpointObjDebug = endpointPrefix + ".dbg.o"
     endpointAsm      = endpointPrefix + "." + string(outputAssembly)
     endpointObj      = endpointPrefix + ".o"
+
+    hostEndpointPrefix   = "bpf_host"
+    hostEndpointProg     = hostEndpointPrefix + "." + string(outputSource)
+    hostEndpointObj      = hostEndpointPrefix + ".o"
+    hostEndpointObjDebug = hostEndpointPrefix + ".dbg.o"
+    hostEndpointAsm      = hostEndpointPrefix + "." + string(outputAssembly)
 )
 
 // progInfo describes a program to be compiled with the expected output format
@@ -41,6 +47,18 @@ type progInfo struct {
     OutputType OutputType
     // Options are passed directly to LLVM as individual parameters
     Options []string
+}
+
+// directoryInfo includes relevant directories for compilation and linking
+type directoryInfo struct {
+    // Library contains the library code to be used for compilation
+    Library string
+    // Runtime contains headers for compilation
+    Runtime string
+    // State contains node, lxc, and features headers for templatization
+    State string
+    // Output is the directory where the files will be stored
+    Output string
 }
 
 var (
@@ -61,10 +79,32 @@ var (
             OutputType: outputSource,
         },
     }
+    debugHostProgs = []*progInfo{
+        {
+            Source:     hostEndpointProg,
+            Output:     hostEndpointObjDebug,
+            OutputType: outputObject,
+        },
+        {
+            Source:     hostEndpointProg,
+            Output:     hostEndpointAsm,
+            OutputType: outputAssembly,
+        },
+        {
+            Source:     hostEndpointProg,
+            Output:     hostEndpointProg,
+            OutputType: outputSource,
+        },
+    }
 
     epProg = &progInfo{
         Source:     endpointProg,
         Output:     endpointObj, // bpf_lxc.o
+        OutputType: outputObject,
+    }
+    hostEpProg = &progInfo{
+        Source:     hostEndpointProg,
+        Output:     hostEndpointObj,
         OutputType: outputObject,
     }
 )
@@ -122,7 +162,7 @@ func compileDatapath(ctx context.Context, dirs *directoryInfo, isHost bool, logg
         // out; this log message should only represent failures with respect to
         // compiling the program.
         if ctx.Err() == nil {
-            scopedLog.WithField(logfields.Params, logfields.Repr(prog)).
+            scopedLog.WithField(logfields.Params, fmt.Sprintf("%+v", *prog)).
                 WithError(err).Warn("JoinEP: Failed to compile")
         }
         return err
