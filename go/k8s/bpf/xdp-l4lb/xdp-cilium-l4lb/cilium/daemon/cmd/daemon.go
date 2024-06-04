@@ -18,28 +18,30 @@ import (
     "k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/watchers"
     "k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/speaker"
 
-    "github.com/cilium/cilium/api/v1/models"
-    "github.com/cilium/cilium/pkg/clustermesh"
-    "github.com/cilium/cilium/pkg/counter"
-    linuxrouting "github.com/cilium/cilium/pkg/datapath/linux/routing"
-    "github.com/cilium/cilium/pkg/egressgateway"
-    "github.com/cilium/cilium/pkg/eventqueue"
-    "github.com/cilium/cilium/pkg/fqdn"
-    "github.com/cilium/cilium/pkg/hubble/observer"
-    "github.com/cilium/cilium/pkg/ipam"
-    "github.com/cilium/cilium/pkg/ipcache"
-    "github.com/cilium/cilium/pkg/lock"
-    "github.com/cilium/cilium/pkg/logging/logfields"
-    "github.com/cilium/cilium/pkg/maps/ctmap"
-    "github.com/cilium/cilium/pkg/maps/eppolicymap"
-    "github.com/cilium/cilium/pkg/maps/policymap"
-    "github.com/cilium/cilium/pkg/mtu"
-    "github.com/cilium/cilium/pkg/policy"
-    "github.com/cilium/cilium/pkg/rate"
-    "github.com/cilium/cilium/pkg/recorder"
-    "github.com/cilium/cilium/pkg/redirectpolicy"
-    "github.com/cilium/cilium/pkg/status"
-    "github.com/cilium/cilium/pkg/trigger"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/api/v1/models"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/clustermesh"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/counter"
+    linuxrouting "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath/linux/routing"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/egressgateway"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/eventqueue"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/fqdn"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/hubble/observer"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/ipam"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/ipcache"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/lock"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/ctmap"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/eppolicymap"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/policymap"
+    monitoragent "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/monitor/agent"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/mtu"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/policy"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/rate"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/recorder"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/redirectpolicy"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/status"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/trigger"
+
     cnitypes "github.com/containernetworking/cni/pkg/types"
     "golang.org/x/sync/semaphore"
 )
@@ -153,6 +155,10 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
         nodeDiscovery:     nd,
         endpointCreations: newEndpointCreationManager(),
         apiLimiterSet:     apiLimiterSet,
+    }
+
+    if option.Config.RunMonitorAgent {
+        d.monitorAgent = monitoragent.NewAgent(ctx)
     }
 
     d.svc = service.NewService(&d)
