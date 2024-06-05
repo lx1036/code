@@ -89,6 +89,7 @@ int xdp_mimtest0(struct xdp_md *ctx) {
         return XDP_DROP;
 
     bpf_map_update_elem(inner_map, &key, &value, 0);
+    bpf_perf_event_output();
 
     return XDP_PASS;
 }

@@ -213,6 +213,16 @@ enum {
     CT_REOPENED,
 };
 
+enum {
+    CILIUM_NOTIFY_UNSPEC,
+    CILIUM_NOTIFY_DROP,
+    CILIUM_NOTIFY_DBG_MSG,
+    CILIUM_NOTIFY_DBG_CAPTURE,
+    CILIUM_NOTIFY_TRACE,
+    CILIUM_NOTIFY_POLICY_VERDICT,
+    CILIUM_NOTIFY_CAPTURE,
+};
+
 /* ctx_{load,store}_meta() usage: */
 enum {
     CB_SRC_LABEL,

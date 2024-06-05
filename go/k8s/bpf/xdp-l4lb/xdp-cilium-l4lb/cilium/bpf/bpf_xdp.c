@@ -115,16 +115,9 @@ static __always_inline int check_filters(struct xdp_md* ctx) {
 	bpf_skip_nodeport_clear(ctx);
 
     switch (proto) {
-//#ifdef ENABLE_IPV4
 	case bpf_htons(ETH_P_IP): // ip 包, 0x0800->__u16
 		ret = check_v4(ctx);
 		break;
-//#endif /* ENABLE_IPV4 */
-#ifdef ENABLE_IPV6
-	// case bpf_htons(ETH_P_IPV6):
-		// ret = check_v6(ctx);
-		break;
-#endif /* ENABLE_IPV6 */
 	default:
 		break;
 	}

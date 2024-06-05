@@ -124,64 +124,43 @@ enum {
 #define EVENT_SOURCE 0
 #endif
 
-#ifdef DEBUG
-#include "events.h"
+//#include "events.h"
 #include "common.h"
-#include "utils.h"
+//#include "utils.h"
+
+// /root/linux-5.10.142/tools/lib/bpf/bpf_helpers.h
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_helper_defs.h>
+#include <stddef.h>
+#include <linux/bpf.h>
+#include <linux/types.h>
 
 
 struct debug_msg {
-    NOTIFY_COMMON_HDR
-            __u32		arg1;
-    __u32		arg2;
-    __u32		arg3;
+    __u8	type;
+	__u8	subtype;
+	__u16	source;
+	__u32	hash;
+    __u32	arg1;
+    __u32	arg2;
+    __u32	arg3;
 };
 
-static __always_inline void cilium_dbg(struct __ctx_buff *ctx, __u8 type,
-                                       __u32 arg1, __u32 arg2)
-{
+static __always_inline void cilium_dbg(struct __sk_buff *ctx, __u8 type, __u32 arg1, __u32 arg2) {
     struct debug_msg msg = {
-            __notify_common_hdr(CILIUM_NOTIFY_DBG_MSG, type),
-            .arg1	= arg1,
-            .arg2	= arg2,
+        .type = CILIUM_NOTIFY_DBG_MSG,
+        .subtype = type,
+        .source = EVENT_SOURCE,
+        .hash = ctx->hash,
+        .arg1 = arg1,
+        .arg2 = arg2,
     };
 
-    ctx_event_output(ctx, &EVENTS_MAP, BPF_F_CURRENT_CPU,
-                     &msg, sizeof(msg));
+    bpf_perf_event_output(ctx, &EVENTS_MAP, BPF_F_CURRENT_CPU, &msg, sizeof(msg));
 }
 
 
 
-#else
-# define printk(fmt, ...)					\
-		do { } while (0)
 
-static __always_inline
-void cilium_dbg(struct __ctx_buff *ctx __maybe_unused, __u8 type __maybe_unused,
-                __u32 arg1 __maybe_unused, __u32 arg2 __maybe_unused)
-{
-}
-
-static __always_inline
-void cilium_dbg3(struct __ctx_buff *ctx __maybe_unused,
-                 __u8 type __maybe_unused, __u32 arg1 __maybe_unused,
-                 __u32 arg2 __maybe_unused, __u32 arg3 __maybe_unused)
-{
-}
-
-static __always_inline
-void cilium_dbg_capture(struct __ctx_buff *ctx __maybe_unused,
-                        __u8 type __maybe_unused, __u32 arg1 __maybe_unused)
-{
-}
-
-static __always_inline
-void cilium_dbg_capture2(struct __ctx_buff *ctx __maybe_unused,
-                         __u8 type __maybe_unused, __u32 arg1 __maybe_unused,
-                         __u32 arg2 __maybe_unused)
-{
-}
-
-#endif
 
 #endif //XDP_CILIUM_L4LB_DBG_H

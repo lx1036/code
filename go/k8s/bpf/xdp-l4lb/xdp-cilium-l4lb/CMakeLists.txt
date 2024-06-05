@@ -7,7 +7,6 @@ include_directories(cilium/bpf)
 include_directories(cilium/bpf/include)
 include_directories(cilium/bpf/include/bpf)
 include_directories(cilium/bpf/include/bpf/ctx)
-include_directories(cilium/bpf/include/linux)
 include_directories(cilium/bpf/lib)
 include_directories(cilium/test/linux)
 
@@ -27,19 +26,6 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/include/bpf/stddef.h
         cilium/bpf/include/bpf/tailcall.h
         cilium/bpf/include/bpf/types_mapper.h
-        cilium/bpf/include/linux/bpf.h
-        cilium/bpf/include/linux/bpf_common.h
-        cilium/bpf/include/linux/icmp.h
-        cilium/bpf/include/linux/icmpv6.h
-        cilium/bpf/include/linux/if_ether.h
-        cilium/bpf/include/linux/in.h
-        cilium/bpf/include/linux/in6.h
-        cilium/bpf/include/linux/ip.h
-        cilium/bpf/include/linux/ipv6.h
-        cilium/bpf/include/linux/jhash.h
-        cilium/bpf/include/linux/tcp.h
-        cilium/bpf/include/linux/types.h
-        cilium/bpf/include/linux/udp.h
         cilium/bpf/lib/common.h
         cilium/bpf/lib/encap.h
         cilium/bpf/lib/endian.h
@@ -60,10 +46,6 @@ add_executable(xdp_cilium_l4lb
         cilium/test/l4lb/l4lb-tc-tunnel-cilium/bpf_xdp_veth_host.c
         cilium/test/l4lb/l4lb-tc-tunnel-cilium/test_tc_tunnel.c
         cilium/test/tunnel/test_tunnel_kern.c
-        cilium/bpf/include/linux/byteorder/little_endian.h
-        cilium/bpf/include/linux/byteorder/big_endian.h
-        cilium/bpf/include/linux/byteorder.h
-        cilium/bpf/include/linux/swab.h
         cilium/bpf/lib/ipv4.h
         cilium/bpf/lib/static_data.h
         cilium/bpf/lib/csum.h
@@ -101,7 +83,6 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tproxy/socket-service/tcphdr/tcprtt/demo2/tcprtt_sockops.c
         cilium/test/tunnel/vxlan/pod-to-pod/vxlan.c
         cilium/test/l4lb/l4lb-tc/test_l4lb.c
-        cilium/test/l4lb/l4lb-xdp/test_xdp_l4lb.c
         cilium/test/l4lb/l4lb-nodeport/tc_nodeport.c
         cilium/test/l4lb/slb-xdp/slb.bpf.c
         cilium/test/tproxy/socket-service/tcphdr/test_tcp_hdr_options.c
@@ -125,4 +106,7 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tproxy/socket-lookup/socket-lookup-cgroup/linux_tcp.h
         cilium/test/tproxy/socket-lookup/socket-lookup/test_sk_lookup.c
         cilium/test/tproxy/socket-bypass-tcpip/test_socket_bypass_tcpip.c
-        cilium/test/tproxy/socket-filter/test_socket_filter.c)
+        cilium/test/tproxy/socket-filter/test_socket_filter.c
+        cilium/test/linux/linux/if_ether.h
+        cilium/bpf/bpf_host.c
+        cilium/bpf/lib/host_firewall.h)

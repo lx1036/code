@@ -157,18 +157,14 @@
  *	This is an Ethernet frame header.
  */
 
-/* allow libcs like musl to deactivate this, glibc does not implement this. */
-#ifndef __UAPI_DEF_ETHHDR
-#define __UAPI_DEF_ETHHDR		1
-#endif
-
-#if __UAPI_DEF_ETHHDR
+// Ethernet header
+// #include <linux/if_ether.h>
 struct ethhdr {
-    unsigned char	h_dest[ETH_ALEN];	/* destination eth addr	*/
-    unsigned char	h_source[ETH_ALEN];	/* source ether addr	*/
-    __be16		h_proto;		/* packet type ID field	*/
+    __u8 h_dest[6];
+    __u8 h_source[6];
+    __u16 h_proto; // 二层头里包含协议字段
 } __attribute__((packed));
-#endif
+
 
 
 #endif /* _UAPI_LINUX_IF_ETHER_H */

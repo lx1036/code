@@ -881,6 +881,31 @@ func init() {
         }
       }
     },
+    "MonitorStatus": {
+      "description": "Status of the node monitor",
+      "properties": {
+        "cpus": {
+          "description": "Number of CPUs to listen on for events.",
+          "type": "integer"
+        },
+        "lost": {
+          "description": "Number of samples lost by perf.",
+          "type": "integer"
+        },
+        "npages": {
+          "description": "Number of pages used for the perf ring buffer.",
+          "type": "integer"
+        },
+        "pagesize": {
+          "description": "Pages size used for the perf ring buffer.",
+          "type": "integer"
+        },
+        "unknown": {
+          "description": "Number of unknown samples.",
+          "type": "integer"
+        }
+      }
+    },
     "NamedPorts": {
       "description": "List of named Layer 4 port and protocol pairs which will be used in Network\nPolicy specs.\n\n+deepequal-gen=true\n+k8s:deepcopy-gen=true",
       "type": "array",
@@ -1982,6 +2007,31 @@ func init() {
         },
         "received": {
           "description": "Number of messages received",
+          "type": "integer"
+        }
+      }
+    },
+    "MonitorStatus": {
+      "description": "Status of the node monitor",
+      "properties": {
+        "cpus": {
+          "description": "Number of CPUs to listen on for events.",
+          "type": "integer"
+        },
+        "lost": {
+          "description": "Number of samples lost by perf.",
+          "type": "integer"
+        },
+        "npages": {
+          "description": "Number of pages used for the perf ring buffer.",
+          "type": "integer"
+        },
+        "pagesize": {
+          "description": "Pages size used for the perf ring buffer.",
+          "type": "integer"
+        },
+        "unknown": {
+          "description": "Number of unknown samples.",
           "type": "integer"
         }
       }

@@ -188,7 +188,7 @@ static __always_inline __u8 __ct_lookup(const void *map, struct __ctx_buff *ctx,
 /* Offset must point to IPv4 header */
 static __always_inline int ct_lookup4(const void *map,
                                       struct ipv4_ct_tuple *tuple,
-                                      struct __ctx_buff *ctx, int off, int dir,
+                                      struct __sk_buff *ctx, int off, int dir,
                                       struct ct_state *ct_state, __u32 *monitor)
 {
     int err, ret = CT_NEW, action = ACTION_UNSPEC;
@@ -281,11 +281,6 @@ static __always_inline int ct_lookup4(const void *map,
      *
      * This will find an existing flow in the reverse direction.
      */
-#ifndef QUIET_CT
-    cilium_dbg3(ctx, DBG_CT_LOOKUP4_1, tuple->saddr, tuple->daddr,
-                (bpf_ntohs(tuple->sport) << 16) | bpf_ntohs(tuple->dport));
-    cilium_dbg3(ctx, DBG_CT_LOOKUP4_2, (tuple->nexthdr << 8) | tuple->flags, 0, 0);
-#endif
     ret = __ct_lookup(map, ctx, tuple, action, dir, ct_state, is_tcp, tcp_flags, monitor);
     if (ret != CT_NEW) {
         if (likely(ret == CT_ESTABLISHED || ret == CT_REOPENED)) {

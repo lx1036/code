@@ -1,7 +1,10 @@
 package listener
 
 import (
+    "golang.org/x/sys/unix"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/monitor/payload"
+    "net"
+    "os"
 )
 
 // Version is the version of a node-monitor listener client. There are
@@ -33,4 +36,26 @@ type MonitorListener interface {
 
     // Close closes the listener.
     Close()
+}
+
+// IsDisconnected is a convenience function that wraps the absurdly long set of
+// checks for a disconnect.
+// 判断 unix socket 是否 disconnected
+func IsDisconnected(err error) bool {
+    if err == nil {
+        return false
+    }
+
+    op, ok := err.(*net.OpError)
+    if !ok {
+        return false
+    }
+
+    syscerr, ok := op.Err.(*os.SyscallError)
+    if !ok {
+        return false
+    }
+
+    errn := syscerr.Err.(unix.Errno)
+    return errn == unix.EPIPE
 }

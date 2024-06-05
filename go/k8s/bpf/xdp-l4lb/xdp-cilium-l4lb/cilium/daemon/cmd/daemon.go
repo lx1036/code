@@ -2,20 +2,21 @@ package cmd
 
 import (
     "context"
+    "fmt"
     "net"
     "os"
 
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium-ipam/pkg/nodediscovery"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf/maps/sockmap"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf/sockops"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/datapath"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/defaults"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/endpointmanager"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/k8s/watchers"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/lbmap"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/service"
     proxy "k8s-lx1036/k8s/network/calico/calico/felix/pkg/bpf/kube-proxy"
-    "k8s-lx1036/k8s/network/cilium/cilium-ipam/pkg/nodediscovery"
-    "k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/maps/sockmap"
-    "k8s-lx1036/k8s/network/cilium/cilium/pkg/bpf/sockops"
-    "k8s-lx1036/k8s/network/cilium/cilium/pkg/config/defaults"
-    "k8s-lx1036/k8s/network/cilium/cilium/pkg/k8s/watchers"
     "k8s-lx1036/k8s/network/loadbalancer/metallb/pkg/speaker"
 
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/api/v1/models"
@@ -131,6 +132,9 @@ type Daemon struct {
 
 func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointmanager.EndpointManager,
     dp datapath.Datapath) (*Daemon, *endpointRestoreState, error) {
+    var (
+        err error
+    )
 
     ctmap.InitMapInfo(option.Config.CTMapEntriesGlobalTCP, option.Config.CTMapEntriesGlobalAny,
         option.Config.EnableIPv4, option.Config.EnableIPv6, option.Config.EnableNodePort)
@@ -183,6 +187,24 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
         bootstrapStats.restore.End(true)
     }
 
+    // INFO: bpf debug. We can only attach the monitor agent once cilium_event has been set up.
+    if option.Config.RunMonitorAgent {
+        err = d.monitorAgent.AttachToEventsMap(defaults.MonitorBufferPages)
+        if err != nil {
+            log.WithError(err).Error("encountered error configuring run monitor agent")
+            return nil, nil, fmt.Errorf("encountered error configuring run monitor agent: %w", err)
+        }
+
+        if option.Config.EnableMonitor {
+            err = monitoragent.ServeMonitorAPI(d.monitorAgent)
+            if err != nil {
+                log.WithError(err).Error("encountered error configuring run monitor agent")
+                return nil, nil, fmt.Errorf("encountered error configuring run monitor agent: %w", err)
+            }
+        }
+    }
+
+    return &d, restoredEndpoints, nil
 }
 
 func (d *Daemon) init() error {

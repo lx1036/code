@@ -39,18 +39,5 @@ static __always_inline bool ctx_no_room(const void *needed, const void *limit)
 
 
 
-/////////////////////补充定义///////////////////////////
-
-/*
- * Helper macro to place programs, maps, license in
- * different sections in elf_bpf file. Section names
- * are interpreted by elf_bpf loader
- */
-#define SEC(NAME) __attribute__((section(NAME), used))
-
-
-
-/////////////////////补充定义///////////////////////////
-
 
 #endif /* __BPF_CTX_COMMON_H_ */

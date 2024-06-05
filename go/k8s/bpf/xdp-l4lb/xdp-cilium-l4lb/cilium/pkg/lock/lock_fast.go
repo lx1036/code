@@ -3,5 +3,9 @@ package lock
 import "sync"
 
 type internalRWMutex struct {
-	sync.RWMutex
+    sync.RWMutex
+}
+
+type internalMutex struct {
+    sync.Mutex
 }
