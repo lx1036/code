@@ -46,6 +46,11 @@ handle_ipv4(struct __sk_buff *ctx, const bool from_host) {
         return TC_ACT_SHOT;
     }
 
+    __u32 ipcache_srcid = 0;
+//#if defined(ENABLE_HOST_FIREWALL) && !defined(ENABLE_MASQUERADE)
+    ipcache_srcid = skb_load_meta(ctx, CB_IPCACHE_SRC_LABEL);
+    skb_store_meta(ctx, CB_IPCACHE_SRC_LABEL, 0);
+//#endif
 
     __u32 proxy_identity = skb_load_meta(ctx, CB_SRC_IDENTITY);
 
@@ -67,13 +72,17 @@ handle_ipv4(struct __sk_buff *ctx, const bool from_host) {
         skip_redirect = true;
     }
 
-
+    // INFO: network policy
     if (from_host) {
-        // INFO: network policy
         /* We're on the egress path of cilium_host. */
-//        ret = ipv4_host_policy_egress(ctx, proxy_identity, ipcache_srcid, &trace);
-//        if (IS_ERR(ret))
-//            return ret;
+        ret = ipv4_host_policy_egress(ctx, proxy_identity, ipcache_srcid, &trace);
+        if (IS_ERR(ret))
+            return ret;
+    } else if (!ctx_skip_host_fw(ctx)) {
+        /* We're on the ingress path of the native device. */
+        ret = ipv4_host_policy_ingress(ctx, &remote_id, &trace);
+        if (IS_ERR(ret))
+            return ret;
     }
 
     if (skip_redirect) {

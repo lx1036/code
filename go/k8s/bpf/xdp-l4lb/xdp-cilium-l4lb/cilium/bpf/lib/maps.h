@@ -12,6 +12,7 @@
 
 #define ENDPOINT_KEY_IPV4 1
 #define ENDPOINT_KEY_IPV6 2
+
 #define ENDPOINT_F_HOST		1 /* Special endpoint representing local host */
 
 /* Subset of kernel's include/linux/kconfig.h */
@@ -66,7 +67,94 @@
  */
 #define MARK_MAGIC_HEALTH		MARK_MAGIC_DECRYPT
 
+/*
+ * ctx->tc_index uses
+ *
+ * cilium_host @egress
+ *   bpf_host -> bpf_lxc
+ */
+#define TC_INDEX_F_SKIP_INGRESS_PROXY	1
+#define TC_INDEX_F_SKIP_EGRESS_PROXY	2
+#define TC_INDEX_F_SKIP_NODEPORT	4
+#define TC_INDEX_F_SKIP_RECIRCULATION	8
+#define TC_INDEX_F_SKIP_HOST_FIREWALL	16
+
+/* ctx_{load,store}_meta() usage: */
+enum {
+    CB_SRC_LABEL,
+#define	CB_PORT			CB_SRC_LABEL	/* Alias, non-overlapping */
+#define	CB_HINT			CB_SRC_LABEL	/* Alias, non-overlapping */
+#define	CB_PROXY_MAGIC		CB_SRC_LABEL	/* Alias, non-overlapping */
+#define	CB_ENCRYPT_MAGIC	CB_SRC_LABEL	/* Alias, non-overlapping */
+#define	CB_DST_ENDPOINT_ID	CB_SRC_LABEL    /* Alias, non-overlapping */
+    CB_IFINDEX,
+#define	CB_ADDR_V4		CB_IFINDEX	/* Alias, non-overlapping */
+#define	CB_ADDR_V6_1		CB_IFINDEX	/* Alias, non-overlapping */
+#define	CB_ENCRYPT_IDENTITY	CB_IFINDEX	/* Alias, non-overlapping */
+#define	CB_IPCACHE_SRC_LABEL	CB_IFINDEX	/* Alias, non-overlapping */
+    CB_POLICY,
+#define	CB_ADDR_V6_2		CB_POLICY	/* Alias, non-overlapping */
+    CB_NAT46_STATE,
+#define CB_NAT			CB_NAT46_STATE	/* Alias, non-overlapping */
+#define	CB_ADDR_V6_3		CB_NAT46_STATE	/* Alias, non-overlapping */
+#define	CB_FROM_HOST		CB_NAT46_STATE	/* Alias, non-overlapping */
+    CB_CT_STATE,
+#define	CB_ADDR_V6_4		CB_CT_STATE	/* Alias, non-overlapping */
+#define	CB_ENCRYPT_DST		CB_CT_STATE	/* Alias, non-overlapping,
+						 * Not used by xfrm.
+						 */
+#define	CB_CUSTOM_CALLS		CB_CT_STATE	/* Alias, non-overlapping */
+};
+
+#define CILIUM_MAP_POLICY	1
+#define CILIUM_MAP_CALLS	2
+#define CILIUM_MAP_CUSTOM_CALLS	3
+#define CILIUM_MAP_EGRESSPOLICY	4
+
+#define PIN_NONE		0
+#define PIN_OBJECT_NS		1
+#define PIN_GLOBAL_NS		2
+
+/* These are shared with test/bpf/check-complexity.sh, when modifying any of
+ * the below, that script should also be updated.
+ */
+#define CILIUM_CALL_DROP_NOTIFY			1
+#define CILIUM_CALL_ERROR_NOTIFY		2
+#define CILIUM_CALL_SEND_ICMP6_ECHO_REPLY	3
+#define CILIUM_CALL_HANDLE_ICMP6_NS		4
+#define CILIUM_CALL_SEND_ICMP6_TIME_EXCEEDED	5
+#define CILIUM_CALL_ARP				6
+#define CILIUM_CALL_IPV4_FROM_LXC		7
+#define CILIUM_CALL_NAT64			8
+#define CILIUM_CALL_NAT46			9
+#define CILIUM_CALL_IPV6_FROM_LXC		10
+#define CILIUM_CALL_IPV4_TO_LXC_POLICY_ONLY	11
+#define CILIUM_CALL_IPV4_TO_HOST_POLICY_ONLY	CILIUM_CALL_IPV4_TO_LXC_POLICY_ONLY
+#define CILIUM_CALL_IPV6_TO_LXC_POLICY_ONLY	12
+#define CILIUM_CALL_IPV6_TO_HOST_POLICY_ONLY	CILIUM_CALL_IPV6_TO_LXC_POLICY_ONLY
+#define CILIUM_CALL_IPV4_TO_ENDPOINT		13
+#define CILIUM_CALL_IPV6_TO_ENDPOINT		14
+#define CILIUM_CALL_IPV4_NODEPORT_NAT		15
+#define CILIUM_CALL_IPV6_NODEPORT_NAT		16
+#define CILIUM_CALL_IPV4_NODEPORT_REVNAT	17
+#define CILIUM_CALL_IPV6_NODEPORT_REVNAT	18
+#define CILIUM_CALL_IPV4_ENCAP_NODEPORT_NAT	19
+#define CILIUM_CALL_IPV4_NODEPORT_DSR		20
+#define CILIUM_CALL_IPV6_NODEPORT_DSR		21
+#define CILIUM_CALL_IPV4_FROM_HOST		22
+#define CILIUM_CALL_IPV6_FROM_HOST		23
+#define CILIUM_CALL_IPV6_ENCAP_NODEPORT_NAT	24
+#define CILIUM_CALL_SIZE			25
+
 #define IS_ERR(x) (unlikely((x < 0) || (x == TC_ACT_SHOT)))
+
+enum {
+    POLICY_MATCH_NONE = 0,
+    POLICY_MATCH_L3_ONLY = 1,
+    POLICY_MATCH_L3_L4 = 2,
+    POLICY_MATCH_L4_ONLY = 3,
+    POLICY_MATCH_ALL = 4,
+};
 
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
@@ -165,19 +253,95 @@ struct endpoint_info {
     __u16		unused; /* used to be sec_label, no longer used */
     __u16       lxc_id;
     __u32		flags;
-    mac_t		mac;
-    mac_t		node_mac;
+    mac_t		mac; // 容器侧 eth0 网卡 mac
+    mac_t		node_mac; // host 侧 lxc 网卡 mac
     __u32		pad[4];
 };
 
+// `cilium bpf endpoint list`
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(key_size, sizeof(struct endpoint_key));
     __uint(value_size, sizeof(struct endpoint_info));
     __uint(pinning, LIBBPF_PIN_BY_NAME);
     __uint(max_entries, 65536);
-    __uint(map_flags, CONDITIONAL_PREALLOC);
-} endpoints SEC(".maps");
+    __uint(map_flags, BPF_F_NO_PREALLOC);
+} cilium_lxc SEC(".maps");
+
+struct ipcache_key {
+    struct bpf_lpm_trie_key lpm_key;
+    __u16 pad1;
+    __u8 pad2;
+    __u8 family;
+    union {
+        struct {
+            __u32		ip4;
+            __u32		pad4;
+            __u32		pad5;
+            __u32		pad6;
+        };
+        union v6addr	ip6;
+    };
+} __packed;
+
+struct remote_endpoint_info {
+    __u32		sec_label;
+    __u32		tunnel_endpoint;
+    __u8		key;
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_LPM_TRIE);
+    __uint(key_size, sizeof(struct ipcache_key));
+    __uint(value_size, sizeof(struct remote_endpoint_info));
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    __uint(max_entries, 512000);
+    __uint(map_flags, BPF_F_NO_PREALLOC);
+} cilium_ipcache SEC(".maps");
+
+struct policy_key {
+    __u32		sec_label;
+    __u16		dport;
+    __u8		protocol;
+    __u8		egress:1,
+            pad:7;
+};
+
+struct policy_entry {
+    __be16		proxy_port;
+    __u8		deny:1,
+            pad:7;
+    __u8		pad0;
+    __u16		pad1;
+    __u16		pad2;
+    __u64		packets;
+    __u64		bytes;
+};
+
+/* Private per EP map for internal tail calls */
+#define POLICY_MAP_SIZE 16384
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(key_size, sizeof(struct policy_key));
+    __uint(value_size, sizeof(struct policy_entry));
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    __uint(max_entries, POLICY_MAP_SIZE);
+    __uint(map_flags, BPF_F_NO_PREALLOC);
+} cilium_policy SEC(".maps");
+
+struct ct_state {
+    __u16 rev_nat_index;
+    __u16 loopback:1,
+            node_port:1,
+            proxy_redirect:1, /* Connection is redirected to a proxy */
+    dsr:1,
+            reserved:12;
+    __be32 addr;
+    __be32 svc_addr;
+    __u32 src_sec_id;
+    __u16 ifindex;
+    __u16 backend_id;	/* Backend ID in lb4_backends */
+};
 
 
 static __always_inline int redirect_ep(struct __sk_buff *ctx __maybe_unused,
@@ -227,50 +391,12 @@ skb_load_meta(const struct __sk_buff *ctx, const __u32 off)
     return ctx->cb[off];
 }
 
-//
-//
-//#ifndef SKIP_CALLS_MAP
-//
-//// CALLS_MAP 在 xdp.go 里定义为 "cilium_calls_xdp" map
-//
-///* Private per EP map for internal tail calls */
-//struct bpf_elf_map __section_maps CALLS_MAP = {
-//	.type		= BPF_MAP_TYPE_PROG_ARRAY,
-//	.id		= CILIUM_MAP_CALLS,
-//	.size_key	= sizeof(__u32),
-//	.size_value	= sizeof(__u32),
-//	.pinning	= PIN_GLOBAL_NS,
-//	.max_elem	= CILIUM_CALL_SIZE,
-//};
-//#endif /* SKIP_CALLS_MAP */
-//
-//
-//struct ipcache_key {
-//	struct bpf_lpm_trie_key lpm_key;
-//	__u16 pad1;
-//	__u8 pad2;
-//	__u8 family;
-//	union {
-//		struct {
-//			__u32		ip4;
-//			__u32		pad4;
-//			__u32		pad5;
-//			__u32		pad6;
-//		};
-//		union v6addr	ip6;
-//	};
-//} __packed;
-//
-///* Global IP -> Identity map for applying egress label-based policy */
-//// 实际上在用户态里定义为 "cilium_ipcache" bpf map
-//struct bpf_elf_map __section_maps IPCACHE_MAP = {
-//	.type		= LPM_MAP_TYPE,
-//	.size_key	= sizeof(struct ipcache_key),
-//	.size_value	= sizeof(struct remote_endpoint_info),
-//	.pinning	= PIN_GLOBAL_NS,
-//	.max_elem	= IPCACHE_MAP_SIZE,
-//	.flags		= BPF_F_NO_PREALLOC,
-//};
+static __always_inline bool ctx_skip_host_fw(struct __sk_buff *ctx) {
+    volatile __u32 tc_index = ctx->tc_index;
+    ctx->tc_index &= ~TC_INDEX_F_SKIP_HOST_FIREWALL;
+    return tc_index & TC_INDEX_F_SKIP_HOST_FIREWALL;
+}
+
 
 
 

@@ -17,6 +17,8 @@
 #define IPCACHE_STATIC_PREFIX   (8 * (sizeof(struct ipcache_key) - sizeof(struct bpf_lpm_trie_key) - sizeof(union v6addr)))
 #define IPCACHE_PREFIX_LEN(PREFIX) (IPCACHE_STATIC_PREFIX + (PREFIX))
 
+#define lookup_ip4_remote_endpoint(addr) ipcache_lookup4(&IPCACHE_MAP, addr, V4_CACHE_KEY_LEN)
+
 static __always_inline __maybe_unused
 struct endpoint_info * __lookup_ip4_endpoint(__u32 ip) {
     struct endpoint_key key = {};
@@ -24,7 +26,7 @@ struct endpoint_info * __lookup_ip4_endpoint(__u32 ip) {
     key.ip4 = ip;
     key.family = ENDPOINT_KEY_IPV4;
 
-    return bpf_map_lookup_elem(&endpoints, &key);
+    return bpf_map_lookup_elem(&cilium_lxc, &key);
 }
 
 static __always_inline __maybe_unused
@@ -33,14 +35,15 @@ struct endpoint_info * lookup_ip4_endpoint(const struct iphdr *ip4) {
 }
 
 static __always_inline __maybe_unused
-struct remote_endpoint_info * ipcache_lookup4(struct bpf_elf_map *map, __be32 addr, __u32 prefix) {
+struct remote_endpoint_info * ipcache_lookup4(__be32 addr) {
+    __u32 prefix = V4_CACHE_KEY_LEN;
     struct ipcache_key key = {
             .lpm_key = { IPCACHE_PREFIX_LEN(prefix), {} },
             .family = ENDPOINT_KEY_IPV4,
             .ip4 = addr,
     };
     key.ip4 &= GET_PREFIX(prefix);
-    return map_lookup_elem(map, &key);
+    return bpf_map_lookup_elem(&cilium_ipcache, &key);
 }
 
 

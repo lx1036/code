@@ -18,6 +18,7 @@
 #include "nat46.h"
 #include "signal.h"
 #include "config.h"
+#include "maps.h"
 
 
 
@@ -42,36 +43,36 @@ union tcp_flags {
 #define CT_MAP_TYPE BPF_MAP_TYPE_HASH
 #endif
 
-struct bpf_elf_map __section_maps CT_MAP_TCP4 = {
-        .type		= CT_MAP_TYPE,
-        .size_key	= sizeof(struct ipv4_ct_tuple),
-        .size_value	= sizeof(struct ct_entry),
-        .pinning	= PIN_GLOBAL_NS,
-        .max_elem	= CT_MAP_SIZE_TCP,
-#ifndef HAVE_LRU_HASH_MAP_TYPE
-        .flags		= CONDITIONAL_PREALLOC,
-#endif
-};
+//struct bpf_elf_map __section_maps CT_MAP_TCP4 = {
+//        .type		= CT_MAP_TYPE,
+//        .size_key	= sizeof(struct ipv4_ct_tuple),
+//        .size_value	= sizeof(struct ct_entry),
+//        .pinning	= PIN_GLOBAL_NS,
+//        .max_elem	= CT_MAP_SIZE_TCP,
+//#ifndef HAVE_LRU_HASH_MAP_TYPE
+//        .flags		= CONDITIONAL_PREALLOC,
+//#endif
+//};
+//
+//struct bpf_elf_map __section_maps CT_MAP_ANY4 = {
+//        .type		= CT_MAP_TYPE,
+//        .size_key	= sizeof(struct ipv4_ct_tuple),
+//        .size_value	= sizeof(struct ct_entry),
+//        .pinning	= PIN_GLOBAL_NS,
+//        .max_elem	= CT_MAP_SIZE_ANY,
+//#ifndef HAVE_LRU_HASH_MAP_TYPE
+//        .flags		= CONDITIONAL_PREALLOC,
+//#endif
+//};
 
-struct bpf_elf_map __section_maps CT_MAP_ANY4 = {
-        .type		= CT_MAP_TYPE,
-        .size_key	= sizeof(struct ipv4_ct_tuple),
-        .size_value	= sizeof(struct ct_entry),
-        .pinning	= PIN_GLOBAL_NS,
-        .max_elem	= CT_MAP_SIZE_ANY,
-#ifndef HAVE_LRU_HASH_MAP_TYPE
-        .flags		= CONDITIONAL_PREALLOC,
-#endif
-};
-
-static __always_inline struct bpf_elf_map *
-get_ct_map4(const struct ipv4_ct_tuple *tuple)
-{
-    if (tuple->nexthdr == IPPROTO_TCP)
-        return &CT_MAP_TCP4;
-
-    return &CT_MAP_ANY4;
-}
+//static __always_inline struct bpf_elf_map *
+//get_ct_map4(const struct ipv4_ct_tuple *tuple)
+//{
+//    if (tuple->nexthdr == IPPROTO_TCP)
+//        return &cilium_ct_tcp4;
+//
+//    return &CT_MAP_ANY4;
+//}
 
 // 从 xdp_md 字节数组里获取 dport 字段值
 static __always_inline int ipv4_ct_extract_l4_ports(struct __ctx_buff *ctx, int off, int dir __maybe_unused,
@@ -310,9 +311,9 @@ out:
 static __always_inline int ct_create4(const void *map_main,
                                       const void *map_related,
                                       struct ipv4_ct_tuple *tuple,
-                                      struct __ctx_buff *ctx, const int dir,
+                                      struct __sk_buff *ctx, const int dir,
                                       const struct ct_state *ct_state,
-                                      bool proxy_redirect)
+                                      bool proxy_redirect, bool from_l7lb)
 {
     /* Create entry in original direction */
     struct ct_entry entry = { };
@@ -394,25 +395,26 @@ static __always_inline int ct_create4(const void *map_main,
 
     if (map_related != NULL) {
         /* Create an ICMP entry to relate errors */
-        struct ipv4_ct_tuple icmp_tuple = {
-                .daddr = tuple->daddr,
-                .saddr = tuple->saddr,
-                .nexthdr = IPPROTO_ICMP,
-                .sport = 0,
-                .dport = 0,
-                .flags = tuple->flags | TUPLE_F_RELATED,
-        };
-
-        entry.seen_non_syn = true; /* For ICMP, there is no SYN. */
-        /* Previous map update succeeded, we could delete it in case
-         * the below throws an error, but we might as well just let
-         * it time out.
-         */
-        if (map_update_elem(map_related, &icmp_tuple, &entry, 0) < 0) {
-            send_signal_ct_fill_up(ctx, SIGNAL_PROTO_V4);
-            return DROP_CT_CREATE_FAILED;
-        }
+//        struct ipv4_ct_tuple icmp_tuple = {
+//                .daddr = tuple->daddr,
+//                .saddr = tuple->saddr,
+//                .nexthdr = IPPROTO_ICMP,
+//                .sport = 0,
+//                .dport = 0,
+//                .flags = tuple->flags | TUPLE_F_RELATED,
+//        };
+//
+//        entry.seen_non_syn = true; /* For ICMP, there is no SYN. */
+//        /* Previous map update succeeded, we could delete it in case
+//         * the below throws an error, but we might as well just let
+//         * it time out.
+//         */
+//        if (map_update_elem(map_related, &icmp_tuple, &entry, 0) < 0) {
+//            send_signal_ct_fill_up(ctx, SIGNAL_PROTO_V4);
+//            return DROP_CT_CREATE_FAILED;
+//        }
     }
+
     return 0;
 }
 

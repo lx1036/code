@@ -156,7 +156,7 @@ static __always_inline void cilium_dbg(struct __sk_buff *ctx, __u8 type, __u32 a
         .arg2 = arg2,
     };
 
-    bpf_perf_event_output(ctx, &EVENTS_MAP, BPF_F_CURRENT_CPU, &msg, sizeof(msg));
+    bpf_perf_event_output(ctx, &cilium_events, BPF_F_CURRENT_CPU, &msg, sizeof(msg));
 }
 
 

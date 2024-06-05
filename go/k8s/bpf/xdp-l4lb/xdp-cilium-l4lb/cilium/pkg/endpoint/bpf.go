@@ -1,10 +1,14 @@
 package endpoint
 
 import (
-    "github.com/cilium/cilium/pkg/option"
+    "fmt"
+
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf"
-    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf/maps/policymap"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/endpoint/regeneration"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/eppolicymap"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/lxcmap"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/policymap"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 )
 
 // policyMapPath returns the path to the policy map of endpoint.
@@ -21,10 +25,27 @@ func (e *Endpoint) InitPolicyMap() error {
 // regenerateBPF rewrites all headers and updates all BPF maps to reflect the
 // specified endpoint.
 func (e *Endpoint) regenerateBPF(regenContext *regenerationContext) (revnum uint64, stateDirComplete bool, reterr error) {
+    datapathRegenCtxt := regenContext.datapathRegenerationContext
+
+    headerfileChanged, err = e.runPreCompilationSteps(regenContext)
 
     compilationExecuted, err = e.realizeBPFState(regenContext)
     if err != nil {
         return datapathRegenCtxt.epInfoCache.revision, compilationExecuted, err
+    }
+
+    if !datapathRegenCtxt.epInfoCache.IsHost() || option.Config.EnableHostFirewall {
+        // Hook the endpoint into the endpoint and endpoint to policy tables then expose it
+        stats.mapSync.Start()
+        epErr := eppolicymap.WriteEndpoint(datapathRegenCtxt.epInfoCache, e.policyMap)
+        err = lxcmap.WriteEndpoint(datapathRegenCtxt.epInfoCache)
+        stats.mapSync.End(err == nil)
+        if epErr != nil {
+            e.logStatusLocked(BPF, Warning, fmt.Sprintf("Unable to sync EpToPolicy Map continue with Sockmap support: %s", epErr))
+        }
+        if err != nil {
+            return 0, compilationExecuted, fmt.Errorf("Exposing new BPF failed: %s", err)
+        }
     }
 
 }
@@ -79,5 +100,34 @@ func (e *Endpoint) realizeBPFState(regenContext *regenerationContext) (compilati
 //
 // e.mutex must be write-locked.
 func (e *Endpoint) writeHeaderfile(prefix string) error {
+
+}
+
+// runPreCompilationSteps runs all of the regeneration steps that are necessary
+// right before compiling the BPF for the given endpoint.
+// The endpoint mutex must not be held.
+//
+// Returns whether the headerfile changed and/or an error.
+func (e *Endpoint) runPreCompilationSteps(regenContext *regenerationContext) (headerfileChanged bool, preCompilationError error) {
+    stats := &regenContext.Stats
+    datapathRegenCtxt := regenContext.datapathRegenerationContext
+
+    // policy map
+    if e.policyMap == nil {
+        e.policyMap, _, err = policymap.OpenOrCreate(e.policyMapPath())
+        if err != nil {
+            return false, err
+        }
+
+        // Synchronize the in-memory realized state with BPF map entries,
+        // so that any potential discrepancy between desired and realized
+        // state would be dealt with by the following e.syncPolicyMap.
+        e.realizedPolicy.PolicyMapState, err = e.dumpPolicyMapToMapState()
+        if err != nil {
+            return false, err
+        }
+        //e.initPolicyMapPressureMetric()
+        //e.updatePolicyMapPressureMetric()
+    }
 
 }

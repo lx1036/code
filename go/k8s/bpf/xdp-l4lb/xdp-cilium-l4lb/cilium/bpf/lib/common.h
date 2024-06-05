@@ -38,36 +38,7 @@
 #endif
 
 
-/* These are shared with test/bpf/check-complexity.sh, when modifying any of
- * the below, that script should also be updated.
- */
-#define CILIUM_CALL_DROP_NOTIFY			1
-#define CILIUM_CALL_ERROR_NOTIFY		2
-#define CILIUM_CALL_SEND_ICMP6_ECHO_REPLY	3
-#define CILIUM_CALL_HANDLE_ICMP6_NS		4
-#define CILIUM_CALL_SEND_ICMP6_TIME_EXCEEDED	5
-#define CILIUM_CALL_ARP				6
-#define CILIUM_CALL_IPV4_FROM_LXC		7
-#define CILIUM_CALL_NAT64			8
-#define CILIUM_CALL_NAT46			9
-#define CILIUM_CALL_IPV6_FROM_LXC		10
-#define CILIUM_CALL_IPV4_TO_LXC_POLICY_ONLY	11
-#define CILIUM_CALL_IPV4_TO_HOST_POLICY_ONLY	CILIUM_CALL_IPV4_TO_LXC_POLICY_ONLY
-#define CILIUM_CALL_IPV6_TO_LXC_POLICY_ONLY	12
-#define CILIUM_CALL_IPV6_TO_HOST_POLICY_ONLY	CILIUM_CALL_IPV6_TO_LXC_POLICY_ONLY
-#define CILIUM_CALL_IPV4_TO_ENDPOINT		13
-#define CILIUM_CALL_IPV6_TO_ENDPOINT		14
-#define CILIUM_CALL_IPV4_NODEPORT_NAT		15
-#define CILIUM_CALL_IPV6_NODEPORT_NAT		16
-#define CILIUM_CALL_IPV4_NODEPORT_REVNAT	17
-#define CILIUM_CALL_IPV6_NODEPORT_REVNAT	18
-#define CILIUM_CALL_IPV4_ENCAP_NODEPORT_NAT	19
-#define CILIUM_CALL_IPV4_NODEPORT_DSR		20
-#define CILIUM_CALL_IPV6_NODEPORT_DSR		21
-#define CILIUM_CALL_IPV4_FROM_HOST		22
-#define CILIUM_CALL_IPV6_FROM_HOST		23
-#define CILIUM_CALL_IPV6_ENCAP_NODEPORT_NAT	24
-#define CILIUM_CALL_SIZE			25
+
 
 /* Cilium error codes, must NOT overlap with TC return codes.
  * These also serve as drop reasons for metrics,
@@ -226,32 +197,7 @@ enum {
     CILIUM_NOTIFY_CAPTURE,
 };
 
-/* ctx_{load,store}_meta() usage: */
-enum {
-    CB_SRC_LABEL,
-#define	CB_PORT			CB_SRC_LABEL	/* Alias, non-overlapping */
-#define	CB_HINT			CB_SRC_LABEL	/* Alias, non-overlapping */
-#define	CB_PROXY_MAGIC		CB_SRC_LABEL	/* Alias, non-overlapping */
-#define	CB_ENCRYPT_MAGIC	CB_SRC_LABEL	/* Alias, non-overlapping */
-#define	CB_DST_ENDPOINT_ID	CB_SRC_LABEL    /* Alias, non-overlapping */
-    CB_IFINDEX,
-#define	CB_ADDR_V4		CB_IFINDEX	/* Alias, non-overlapping */
-#define	CB_ADDR_V6_1		CB_IFINDEX	/* Alias, non-overlapping */
-#define	CB_ENCRYPT_IDENTITY	CB_IFINDEX	/* Alias, non-overlapping */
-#define	CB_IPCACHE_SRC_LABEL	CB_IFINDEX	/* Alias, non-overlapping */
-    CB_POLICY,
-#define	CB_ADDR_V6_2		CB_POLICY	/* Alias, non-overlapping */
-    CB_NAT46_STATE,
-#define CB_NAT			CB_NAT46_STATE	/* Alias, non-overlapping */
-#define	CB_ADDR_V6_3		CB_NAT46_STATE	/* Alias, non-overlapping */
-#define	CB_FROM_HOST		CB_NAT46_STATE	/* Alias, non-overlapping */
-    CB_CT_STATE,
-#define	CB_ADDR_V6_4		CB_CT_STATE	/* Alias, non-overlapping */
-#define	CB_ENCRYPT_DST		CB_CT_STATE	/* Alias, non-overlapping,
-						 * Not used by xfrm.
-						 */
-#define	CB_CUSTOM_CALLS		CB_CT_STATE	/* Alias, non-overlapping */
-};
+
 
 
 union v6addr {
@@ -318,19 +264,7 @@ struct lb_affinity_match {
 	__u16 pad;
 } __packed;
 
-struct ct_state {
-    __u16 rev_nat_index;
-    __u16 loopback:1,
-            node_port:1,
-            proxy_redirect:1, /* Connection is redirected to a proxy */
-    dsr:1,
-            reserved:12;
-    __be32 addr;
-    __be32 svc_addr;
-    __u32 src_sec_id;
-    __u16 ifindex;
-    __u16 backend_id;	/* Backend ID in lb4_backends */
-};
+
 
 struct lb4_backend {
     __be32 address;		/* Service endpoint IPv4 address */
@@ -349,11 +283,7 @@ struct lb4_src_range_key {
 	__u32 addr;
 };
 
-struct remote_endpoint_info {
-	__u32		sec_label;
-	__u32		tunnel_endpoint;
-	__u8		key;
-};
+
 
 
 

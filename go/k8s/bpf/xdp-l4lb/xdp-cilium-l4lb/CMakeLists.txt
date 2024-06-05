@@ -12,7 +12,6 @@ include_directories(cilium/test/linux)
 
 add_executable(xdp_cilium_l4lb
         cilium/bpf/include/bpf/ctx/common.h
-        cilium/bpf/include/bpf/ctx/ctx.h
         cilium/bpf/include/bpf/ctx/xdp.h
         cilium/bpf/include/bpf/api.h
         cilium/bpf/include/bpf/builtins.h
@@ -106,4 +105,5 @@ add_executable(xdp_cilium_l4lb
         cilium/test/linux/linux/if_ether.h
         cilium/bpf/bpf_host.c
         cilium/bpf/lib/host_firewall.h
-        cilium/bpf/lib/l3.h)
+        cilium/bpf/lib/l3.h
+        cilium/bpf/lib/policy.h)

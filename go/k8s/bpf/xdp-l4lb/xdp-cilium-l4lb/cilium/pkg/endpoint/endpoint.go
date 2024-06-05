@@ -19,6 +19,7 @@ import (
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/mac"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/policymap"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/metrics"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/policy"
@@ -144,6 +145,10 @@ type Endpoint struct {
     logLimiter logging.Limiter
 
     noTrackPort uint16
+
+    // policyMap is the policy related state of the datapath including
+    // reference to all policy related BPF
+    policyMap *policymap.PolicyMap
 
     // createdAt stores the time the endpoint was created. This value is
     // recalculated on endpoint restore.
