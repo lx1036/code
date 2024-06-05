@@ -46,7 +46,7 @@ kubectl proxy --address="172.16.3.161" --accept-hosts='^.*' --port=7007
 本机的 ~/.kube/profiles/minikube/ca.crt -> ecs 上的 ~/.minikube/ca.crt
 本机的 ~/.kube/profiles/minikube/client.crt -> ecs 上的 ~/.minikube/profiles/minikube/client.crt
 本机的 ~/.kube/profiles/minikube/client.key -> ecs 上的 ~/.minikube/profiles/minikube/client.key
-server 写: http://${公网EIP}:7007
+~/.kube/config server 写: http://${公网EIP}:7007
 
 kubectl get nodes -o wide
 ```

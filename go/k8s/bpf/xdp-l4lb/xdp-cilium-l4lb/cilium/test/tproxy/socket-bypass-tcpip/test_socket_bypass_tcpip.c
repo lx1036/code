@@ -8,7 +8,7 @@
 struct sock_key {
     __u32 sip4;
     __u32 dip4;
-    __u8 family;
+    __u8 family; // ipv4/ipv6
 //    __u8  pad1;
 //    __u16 pad2;
 //    // this padding required for 64bit alignment

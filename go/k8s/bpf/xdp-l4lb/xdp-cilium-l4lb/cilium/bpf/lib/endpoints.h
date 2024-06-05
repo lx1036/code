@@ -24,7 +24,7 @@ struct endpoint_info * __lookup_ip4_endpoint(__u32 ip) {
     key.ip4 = ip;
     key.family = ENDPOINT_KEY_IPV4;
 
-    return map_lookup_elem(&ENDPOINTS_MAP, &key);
+    return bpf_map_lookup_elem(&endpoints, &key);
 }
 
 static __always_inline __maybe_unused

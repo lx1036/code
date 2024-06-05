@@ -43,8 +43,7 @@ ipv4_host_policy_ingress(struct __sk_buff *ctx, __u32 *src_id,
     tuple.nexthdr = ip4->protocol;
     tuple.daddr = ip4->daddr;
     tuple.saddr = ip4->saddr;
-    ret = ct_lookup4(&cilium_ct_tcp4, &tuple, ctx, l4_off, CT_INGRESS,
-                     &ct_state, &trace->monitor);
+    ret = ct_lookup4(&cilium_ct_tcp4, &tuple, ctx, l4_off, CT_INGRESS, &ct_state, &trace->monitor);
     if (ret < 0)
         return ret;
 

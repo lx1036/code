@@ -5,7 +5,6 @@
 #include <linux/ip.h>
 
 #include "dbg.h"
-#include "metrics.h"
 
 
 struct ipv4_frag_l4ports {
@@ -21,15 +20,24 @@ struct ipv4_frag_id {
     __u8	pad;
 } __packed;
 
-//#ifdef ENABLE_IPV4_FRAGMENTS
-struct bpf_elf_map __section_maps IPV4_FRAG_DATAGRAMS_MAP = {
-        .type           = BPF_MAP_TYPE_LRU_HASH,
-        .size_key	= sizeof(struct ipv4_frag_id),
-        .size_value	= sizeof(struct ipv4_frag_l4ports),
-        .pinning	= PIN_GLOBAL_NS,
-        .max_elem	= CILIUM_IPV4_FRAG_MAP_MAX_ENTRIES,
-};
-//#endif
+
+static __always_inline int ipv4_dec_ttl(struct __sk_buff *ctx, int off, const struct iphdr *ip4)
+{
+    __u8 new_ttl, ttl = ip4->ttl;
+    if (ttl <= 1) {
+        return 1;
+    }
+
+    new_ttl = ttl - 1;
+    /* l3_csum_replace() takes at min 2 bytes, zero extended. */
+    bpf_l3_csum_replace(ctx, off + offsetof(struct iphdr, check), ttl, new_ttl, 2);
+    bpf_skb_store_bytes(ctx, off + offsetof(struct iphdr, ttl), &new_ttl, sizeof(new_ttl), 0);
+
+    return 0;
+}
+
+
+
 
 // 这个函数意思是计算 ipv4 header 字节大小
 // https://en.wikipedia.org/wiki/Internet_Protocol_version_4#IHL
@@ -116,8 +124,8 @@ ipv4_handle_fragmentation(struct __ctx_buff *ctx, const struct iphdr *ip4, int l
         /* First logical fragment for this datagram (not necessarily the first
          * we receive). Fragment has L4 header, create an entry in datagrams map.
          */
-        if (map_update_elem(&IPV4_FRAG_DATAGRAMS_MAP, &frag_id, ports, BPF_ANY))
-            update_metrics(ctx_full_len(ctx), dir, REASON_FRAG_PACKET_UPDATE);
+//        if (map_update_elem(&IPV4_FRAG_DATAGRAMS_MAP, &frag_id, ports, BPF_ANY))
+//            update_metrics(ctx_full_len(ctx), dir, REASON_FRAG_PACKET_UPDATE);
 
         /* Do not return an error if map update failed, as nothing prevents us
          * to process the current packet normally.

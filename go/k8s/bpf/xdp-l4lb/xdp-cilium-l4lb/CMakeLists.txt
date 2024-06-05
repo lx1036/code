@@ -23,7 +23,6 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/include/bpf/helpers_xdp.h
         cilium/bpf/include/bpf/loader.h
         cilium/bpf/include/bpf/section.h
-        cilium/bpf/include/bpf/stddef.h
         cilium/bpf/include/bpf/tailcall.h
         cilium/bpf/include/bpf/types_mapper.h
         cilium/bpf/lib/common.h
@@ -36,9 +35,6 @@ add_executable(xdp_cilium_l4lb
         cilium/bpf/lib/maps.h
         cilium/bpf/lib/nat.h
         cilium/bpf/lib/nodeport.h
-        cilium/bpf/lib/overloadable.h
-        cilium/bpf/lib/overloadable_skb.h
-        cilium/bpf/lib/overloadable_xdp.h
         cilium/bpf/lib/utils.h
         cilium/bpf/bpf_features.h
         cilium/bpf/bpf_xdp.c
@@ -109,4 +105,5 @@ add_executable(xdp_cilium_l4lb
         cilium/test/tproxy/socket-filter/test_socket_filter.c
         cilium/test/linux/linux/if_ether.h
         cilium/bpf/bpf_host.c
-        cilium/bpf/lib/host_firewall.h)
+        cilium/bpf/lib/host_firewall.h
+        cilium/bpf/lib/l3.h)

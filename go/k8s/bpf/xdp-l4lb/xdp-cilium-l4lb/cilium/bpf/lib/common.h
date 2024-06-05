@@ -12,11 +12,11 @@
 #include <linux/if_ether.h>
 #include <linux/ipv6.h>
 #include <linux/in.h>
-#include <linux/socket.h>
+//#include <linux/socket.h>
 
 #include "eth.h"
 #include "endian.h"
-#include "mono.h"
+//#include "mono.h"
 #include "config.h"
 
 
@@ -151,9 +151,12 @@
 #define METRIC_EGRESS   2
 #define METRIC_SERVICE  3
 
+typedef __u64 mac_t;
+
+
 
 static __always_inline __maybe_unused bool
-____revalidate_data_pull(struct __ctx_buff *ctx, void **data_, void **data_end_,
+____revalidate_data_pull(struct __sk_buff *ctx, void **data_, void **data_end_,
                          void **l3, const __u32 l3_len, const bool pull,
                          __u8 eth_hlen)
 {
@@ -178,7 +181,7 @@ ____revalidate_data_pull(struct __ctx_buff *ctx, void **data_, void **data_end_,
 }
 
 static __always_inline __maybe_unused bool
-__revalidate_data_pull(struct __ctx_buff *ctx, void **data, void **data_end,
+__revalidate_data_pull(struct __sk_buff *ctx, void **data, void **data_end,
                        void **l3, const __u32 l3_len, const bool pull)
 {
     return ____revalidate_data_pull(ctx, data, data_end, l3, l3_len, pull, ETH_HLEN);
@@ -336,39 +339,8 @@ struct lb4_backend {
     __u8 pad;
 };
 
-#define ENDPOINT_KEY_IPV4 1
-#define ENDPOINT_KEY_IPV6 2
 
-/* Structure representing an IPv4 or IPv6 address, being used for:
- *  - key as endpoints map
- *  - key for tunnel endpoint map
- *  - value for tunnel endpoint map
- */
-struct endpoint_key {
-    union {
-        struct {
-            __u32		ip4;
-            __u32		pad1;
-            __u32		pad2;
-            __u32		pad3;
-        };
-        union v6addr	ip6;
-    };
-    __u8 family;
-    __u8 key;
-    __u16 pad5;
-} __packed;
 
-/* Value of endpoint map */
-struct endpoint_info {
-	__u32		ifindex;
-	__u16		unused; /* used to be sec_label, no longer used */
-	__u16       lxc_id;
-	__u32		flags;
-	mac_t		mac;
-	mac_t		node_mac;
-	__u32		pad[4];
-};
 
 struct lb4_src_range_key {
 	struct bpf_lpm_trie_key lpm_key;
@@ -383,56 +355,7 @@ struct remote_endpoint_info {
 	__u8		key;
 };
 
-struct ipv4_ct_tuple {
-    /* Address fields are reversed, i.e.,
-     * these field names are correct for reply direction traffic.
-     */
-    __be32		daddr;
-    __be32		saddr;
-    /* The order of dport+sport must not be changed!
-     * These field names are correct for original direction traffic.
-     */
-    __be16		dport;
-    __be16		sport;
-    __u8		nexthdr;
-    __u8		flags;
-} __packed;
 
-struct ct_entry {
-    __u64 rx_packets;
-    __u64 rx_bytes;
-    __u64 tx_packets;
-    __u64 tx_bytes;
-    __u32 lifetime;
-    __u16 rx_closing:1,
-            tx_closing:1,
-            nat46:1,
-            lb_loopback:1,
-            seen_non_syn:1,
-            node_port:1,
-            proxy_redirect:1, /* Connection is redirected to a proxy */
-    dsr:1,
-            reserved:8;
-    __u16 rev_nat_index;
-    /* In the kernel ifindex is u32, so we need to check in cilium-agent
-     * that ifindex of a NodePort device is <= MAX(u16).
-     */
-    __u16 ifindex;
-
-    /* *x_flags_seen represents the OR of all TCP flags seen for the
-     * transmit/receive direction of this entry.
-     */
-    __u8  tx_flags_seen;
-    __u8  rx_flags_seen;
-
-    __u32 src_sec_id; /* Used from userspace proxies, do not change offset! */
-
-    /* last_*x_report is a timestamp of the last time a monitor
-     * notification was sent for the transmit/receive direction.
-     */
-    __u32 last_tx_report;
-    __u32 last_rx_report;
-};
 
 // 从二层头 ethernet header 中获取 __u16 *protocol，并验证符合二层头协议的包
 static __always_inline bool 
