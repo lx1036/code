@@ -182,11 +182,6 @@ func (l *Loader) Unload(ep datapath.Endpoint) {
     panic("implement me")
 }
 
-func (l *Loader) Reinitialize(ctx context.Context, o interface{}, deviceMTU int, iptMgr datapath.IptablesManager, p interface{}) error {
-    //TODO implement me
-    panic("implement me")
-}
-
 // reloadHostDatapath loads bpf_host programs attached to the host device
 // (usually cilium_host) and the native devices if any. To that end, it
 // uses a single object file, pointed to by objPath, compiled for the host

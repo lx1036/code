@@ -146,6 +146,67 @@ enum {
 #define CILIUM_CALL_IPV6_ENCAP_NODEPORT_NAT	24
 #define CILIUM_CALL_SIZE			25
 
+/* Cilium error codes, must NOT overlap with TC return codes.
+ * These also serve as drop reasons for metrics,
+ * where reason > 0 corresponds to -(DROP_*)
+ *
+ * These are shared with pkg/monitor/api/drop.go and api/v1/flow/flow.proto.
+ * When modifying any of the below, those files should also be updated.
+ */
+#define DROP_UNUSED1		-130 /* unused */
+#define DROP_UNUSED2		-131 /* unused */
+#define DROP_INVALID_SIP	-132
+#define DROP_POLICY		-133
+#define DROP_INVALID		-134
+#define DROP_CT_INVALID_HDR	-135
+#define DROP_FRAG_NEEDED	-136
+#define DROP_CT_UNKNOWN_PROTO	-137
+#define DROP_UNUSED4		-138 /* unused */
+#define DROP_UNKNOWN_L3		-139
+#define DROP_MISSED_TAIL_CALL	-140
+#define DROP_WRITE_ERROR	-141
+#define DROP_UNKNOWN_L4		-142
+#define DROP_UNKNOWN_ICMP_CODE	-143
+#define DROP_UNKNOWN_ICMP_TYPE	-144
+#define DROP_UNKNOWN_ICMP6_CODE	-145
+#define DROP_UNKNOWN_ICMP6_TYPE	-146
+#define DROP_NO_TUNNEL_KEY	-147
+#define DROP_UNUSED5		-148 /* unused */
+#define DROP_UNUSED6		-149 /* unused */
+#define DROP_UNKNOWN_TARGET	-150
+#define DROP_UNROUTABLE		-151
+#define DROP_UNUSED7		-152 /* unused */
+#define DROP_CSUM_L3		-153
+#define DROP_CSUM_L4		-154
+#define DROP_CT_CREATE_FAILED	-155
+#define DROP_INVALID_EXTHDR	-156
+#define DROP_FRAG_NOSUPPORT	-157
+#define DROP_NO_SERVICE		-158
+#define DROP_UNUSED8		-159 /* unused */
+#define DROP_NO_TUNNEL_ENDPOINT -160
+#define DROP_UNUSED9		-161 /* unused */
+#define DROP_EDT_HORIZON	-162
+#define DROP_UNKNOWN_CT		-163
+#define DROP_HOST_UNREACHABLE	-164
+#define DROP_NO_CONFIG		-165
+#define DROP_UNSUPPORTED_L2	-166
+#define DROP_NAT_NO_MAPPING	-167
+#define DROP_NAT_UNSUPP_PROTO	-168
+#define DROP_NO_FIB		-169
+#define DROP_ENCAP_PROHIBITED	-170
+#define DROP_INVALID_IDENTITY	-171
+#define DROP_UNKNOWN_SENDER	-172
+#define DROP_NAT_NOT_NEEDED	-173 /* Mapped as drop code, though drop not necessary. */
+#define DROP_IS_CLUSTER_IP	-174
+#define DROP_FRAG_NOT_FOUND	-175
+#define DROP_FORBIDDEN_ICMP6	-176
+#define DROP_NOT_IN_SRC_RANGE	-177
+#define DROP_PROXY_LOOKUP_FAILED	-178
+#define DROP_PROXY_SET_FAILED	-179
+#define DROP_PROXY_UNKNOWN_PROTO	-180
+#define DROP_POLICY_DENY	-181
+
+
 #define IS_ERR(x) (unlikely((x < 0) || (x == TC_ACT_SHOT)))
 
 enum {
@@ -342,6 +403,18 @@ struct ct_state {
     __u16 ifindex;
     __u16 backend_id;	/* Backend ID in lb4_backends */
 };
+
+//#ifdef ENCAP_IFINDEX
+#define TUNNEL_ENDPOINT_MAP_SIZE 65536
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(key_size, sizeof(struct endpoint_key));
+    __uint(value_size, sizeof(struct endpoint_key));
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    __uint(max_entries, TUNNEL_ENDPOINT_MAP_SIZE);
+    __uint(map_flags, BPF_F_NO_PREALLOC);
+} cilium_tunnel_map SEC(".maps");
+//#endif
 
 
 static __always_inline int redirect_ep(struct __sk_buff *ctx __maybe_unused,

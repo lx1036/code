@@ -12,13 +12,14 @@ import (
     "time"
     "unsafe"
 
-    "github.com/cilium/cilium/pkg/byteorder"
-    "github.com/cilium/cilium/pkg/lock"
-    "github.com/cilium/cilium/pkg/metrics"
-    "golang.org/x/sys/unix"
-
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf/binary"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/byteorder"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/controller"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/lock"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/metrics"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
+
+    "golang.org/x/sys/unix"
 )
 
 type DumpParser func(key []byte, value []byte, mapKey MapKey, mapValue MapValue) (MapKey, MapValue, error)
@@ -351,6 +352,160 @@ func (m *Map) Update(key MapKey, value MapValue) error {
     }
 
     return err
+}
+
+func (m *Map) Lookup(key MapKey) (MapValue, error) {
+    if err := m.Open(); err != nil {
+        return nil, err
+    }
+
+    value := key.NewValue()
+
+    m.lock.RLock()
+    defer m.lock.RUnlock()
+
+    err := LookupElement(m.fd, key.GetKeyPtr(), value.GetValuePtr())
+    if err != nil {
+        return nil, err
+    }
+    return value, nil
+}
+
+// Delete deletes the map entry corresponding to the given key.
+func (m *Map) Delete(key MapKey) error {
+    _, err := m.deleteMapEntry(key, false)
+    return err
+}
+
+// SilentDelete deletes the map entry corresponding to the given key.
+// If a map entry is not found this returns (true, nil).
+func (m *Map) SilentDelete(key MapKey) (deleted bool, err error) {
+    return m.deleteMapEntry(key, true)
+}
+
+// deleteMapEntry deletes the map entry corresponding to the given key.
+// If ignoreMissing is set to true and the entry is not found, then
+// the error metric is not incremented for missing entries and nil error is returned.
+func (m *Map) deleteMapEntry(key MapKey, ignoreMissing bool) (deleted bool, err error) {
+    m.lock.Lock()
+    defer m.lock.Unlock()
+
+    defer func() {
+        m.deleteCacheEntry(key, err)
+        if err != nil {
+            m.updatePressureMetric()
+        }
+    }()
+
+    if err = m.open(); err != nil {
+        return false, err
+    }
+
+    _, errno := deleteElement(m.fd, key.GetKeyPtr())
+    deleted = errno == 0
+    // Error handling is skipped in the case ignoreMissing is set and the
+    // error is ENOENT. This removes false positives in the delete metrics
+    // and skips the deferred cleanup of non-existing entries. This situation
+    // occurs at least in the context of cleanup of NAT mappings from CT GC.
+    handleError := errno != unix.ENOENT || !ignoreMissing
+    if option.Config.MetricsConfig.BPFMapOps && handleError {
+        metrics.BPFMapOps.WithLabelValues(m.commonName(), metricOpDelete, metrics.Errno2Outcome(errno)).Inc()
+    }
+    if errno != 0 && handleError {
+        err = fmt.Errorf("unable to delete element %s from map %s: %w", key, m.name, errno)
+    }
+
+    return
+}
+
+// deleteCacheEntry evaluates the specified error, if nil the map key is
+// removed from the cache to indicate successful deletion. If non-nil, the map
+// key entry in the cache is updated to indicate deletion failure with the
+// specified error.
+//
+// Caller must hold m.lock for writing
+func (m *Map) deleteCacheEntry(key MapKey, err error) {
+    if m.cache == nil {
+        return
+    }
+
+    k := key.String()
+    if err == nil {
+        delete(m.cache, k)
+    } else if !m.withValueCache {
+        return
+    } else {
+        entry, ok := m.cache[k]
+        if !ok {
+            m.cache[k] = &cacheEntry{
+                Key: key,
+            }
+            entry = m.cache[k]
+        }
+
+        entry.DesiredAction = Delete
+        entry.LastError = err
+        m.scheduleErrorResolver()
+    }
+}
+
+// scheduleErrorResolver schedules a periodic resolver controller that scans
+// all BPF map caches for unresolved errors and attempts to resolve them. On
+// error of resolution, the controller is-rescheduled in an expedited manner
+// with an exponential back-off.
+//
+// m.lock must be held for writing
+func (m *Map) scheduleErrorResolver() {
+    m.outstandingErrors++
+
+    if time.Since(m.errorResolverLastScheduled) <= errorResolverSchedulerMinInterval {
+        return
+    }
+
+    m.errorResolverLastScheduled = time.Now()
+    go func() {
+        time.Sleep(errorResolverSchedulerDelay)
+        mapControllers.UpdateController(m.controllerName(),
+            controller.ControllerParams{
+                DoFunc:      m.resolveErrors,
+                RunInterval: errorResolverSchedulerMinInterval,
+            },
+        )
+    }()
+}
+
+func (m *Map) updatePressureMetric() {
+    if m.pressureGauge == nil {
+        return
+    }
+
+    // Do a lazy check of MetricsConfig as it is not available at map static
+    // initialization.
+    if !option.Config.MetricsConfig.BPFMapPressure {
+        if !m.withValueCache {
+            m.cache = nil
+        }
+        m.pressureGauge = nil
+        return
+    }
+
+    pvalue := float64(len(m.cache)) / float64(m.MaxEntries)
+    m.pressureGauge.Set(pvalue)
+}
+
+// WithNonPersistent turns the map non-persistent and returns the map
+func (m *Map) WithNonPersistent() *Map {
+    m.NonPersistent = true
+    return m
+}
+
+func (m *Map) commonName() string {
+    if m.cachedCommonName != "" {
+        return m.cachedCommonName
+    }
+
+    m.cachedCommonName = extractCommonName(m.name)
+    return m.cachedCommonName
 }
 
 // Reopen attempts to close and re-open the received map.

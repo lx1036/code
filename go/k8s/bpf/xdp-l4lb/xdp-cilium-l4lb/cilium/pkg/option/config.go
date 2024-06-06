@@ -1,24 +1,29 @@
 package option
 
 import (
-	"fmt"
-	"net"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
-	"time"
+    "fmt"
+    "google.golang.org/appengine/log"
+    "net"
+    "os"
+    "path/filepath"
+    "runtime"
+    "strconv"
+    "strings"
+    "time"
 
-	"github.com/cilium/cilium/pkg/metrics"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/api/v1/models"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/cidr"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/command"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/common"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/defaults"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/ip"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/lock"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/metrics"
 
-	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/api/v1/models"
-	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/cidr"
-	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/defaults"
-	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/lock"
-	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
+    "github.com/sirupsen/logrus"
+    "github.com/spf13/cobra"
+    "github.com/spf13/viper"
 )
 
 const (
@@ -95,6 +100,8 @@ const (
     TunnelDisabled = "disabled"
 )
 
+const nodeConfigFile = "node_config.h"
+
 var (
     // Config represents the daemon configuration
     Config = &DaemonConfig{
@@ -164,6 +171,9 @@ type DaemonConfig struct {
     HostV6Addr          net.IP     // Host v6 address of the snooping device
     EncryptInterface    []string   // Set of network facing interface to encrypt over
     EncryptNode         bool       // Set to true for encrypting node IP traffic
+
+    devicesMu lock.RWMutex // Protects devices
+    devices   []string     // bpf_host device
 
     Ipvlan IpvlanConfig // Ipvlan related configuration
 
@@ -258,6 +268,27 @@ type DaemonConfig struct {
     CTMapEntriesTimeoutSVCAny time.Duration
     CTMapEntriesTimeoutSYN    time.Duration
     CTMapEntriesTimeoutFIN    time.Duration
+
+    // LBMapEntries is the maximum number of entries allowed in BPF lbmap.
+    LBMapEntries int
+
+    // LBServiceMapEntries is the maximum number of entries allowed in BPF lbmap for services.
+    LBServiceMapEntries int
+
+    // LBBackendMapEntries is the maximum number of entries allowed in BPF lbmap for service backends.
+    LBBackendMapEntries int
+
+    // LBRevNatEntries is the maximum number of entries allowed in BPF lbmap for reverse NAT.
+    LBRevNatEntries int
+
+    // LBAffinityMapEntries is the maximum number of entries allowed in BPF lbmap for session affinities.
+    LBAffinityMapEntries int
+
+    // LBSourceRangeMapEntries is the maximum number of entries allowed in BPF lbmap for source ranges.
+    LBSourceRangeMapEntries int
+
+    // LBMaglevMapEntries is the maximum number of entries allowed in BPF lbmap for maglev.
+    LBMaglevMapEntries int
 
     // EnableMonitor enables the monitor unix domain socket server
     EnableMonitor bool
@@ -952,9 +983,6 @@ type DaemonConfig struct {
     // This is only enabled for cilium-operator
     k8sEnableLeasesFallbackDiscovery bool
 
-    // LBMapEntries is the maximum number of entries allowed in BPF lbmap.
-    LBMapEntries int
-
     // k8sServiceProxyName is the value of service.kubernetes.io/service-proxy-name label,
     // that identifies the service objects Cilium should handle.
     // If the provided value is an empty string, Cilium will manage service objects when
@@ -1009,7 +1037,515 @@ type DaemonConfig struct {
     BypassIPAvailabilityUponRestore bool
 }
 
-const nodeConfigFile = "node_config.h"
+// Populate sets all options with the values from viper
+func (c *DaemonConfig) Populate() {
+    var err error
+
+    c.AgentHealthPort = viper.GetInt(AgentHealthPort)
+    c.ClusterHealthPort = viper.GetInt(ClusterHealthPort)
+    c.ClusterMeshHealthPort = viper.GetInt(ClusterMeshHealthPort)
+    c.AgentLabels = viper.GetStringSlice(AgentLabels)
+    c.AllowICMPFragNeeded = viper.GetBool(AllowICMPFragNeeded)
+    c.AllowLocalhost = viper.GetString(AllowLocalhost)
+    c.AnnotateK8sNode = viper.GetBool(AnnotateK8sNode)
+    c.ARPPingRefreshPeriod = viper.GetDuration(ARPPingRefreshPeriod)
+    c.EnableL2NeighDiscovery = viper.GetBool(EnableL2NeighDiscovery)
+    c.AutoCreateCiliumNodeResource = viper.GetBool(AutoCreateCiliumNodeResource)
+    c.BPFRoot = viper.GetString(BPFRoot)
+    c.CertDirectory = viper.GetString(CertsDirectory)
+    c.CGroupRoot = viper.GetString(CGroupRoot)
+    c.ClusterID = viper.GetInt(ClusterIDName)
+    c.ClusterName = viper.GetString(ClusterName)
+    c.ClusterMeshConfig = viper.GetString(ClusterMeshConfigName)
+    c.CNIChainingMode = viper.GetString(CNIChainingMode)
+    c.DatapathMode = viper.GetString(DatapathMode)
+    c.Debug = viper.GetBool(DebugArg)
+    c.DebugVerbose = viper.GetStringSlice(DebugVerbose)
+    c.DirectRoutingDevice = viper.GetString(DirectRoutingDevice)
+    c.LBDevInheritIPAddr = viper.GetString(LBDevInheritIPAddr)
+    c.EnableIPv4 = viper.GetBool(EnableIPv4Name)
+    c.EnableIPv6 = viper.GetBool(EnableIPv6Name)
+    c.EnableIPv6NDP = viper.GetBool(EnableIPv6NDPName)
+    c.IPv6MCastDevice = viper.GetString(IPv6MCastDevice)
+    c.EnableIPSec = viper.GetBool(EnableIPSecName)
+    c.EnableWireguard = viper.GetBool(EnableWireguard)
+    c.EnableWireguardUserspaceFallback = viper.GetBool(EnableWireguardUserspaceFallback)
+    c.EnableWellKnownIdentities = viper.GetBool(EnableWellKnownIdentities)
+    c.EnableXDPPrefilter = viper.GetBool(EnableXDPPrefilter)
+    c.DisableCiliumEndpointCRD = viper.GetBool(DisableCiliumEndpointCRDName)
+    c.EgressMasqueradeInterfaces = viper.GetString(EgressMasqueradeInterfaces)
+    c.BPFSocketLBHostnsOnly = viper.GetBool(BPFSocketLBHostnsOnly)
+    c.EnableSocketLB = viper.GetBool(EnableHostReachableServices) || viper.GetBool(EnableSocketLB)
+    c.EnableRemoteNodeIdentity = viper.GetBool(EnableRemoteNodeIdentity)
+    c.K8sHeartbeatTimeout = viper.GetDuration(K8sHeartbeatTimeout)
+    c.EnableBPFTProxy = viper.GetBool(EnableBPFTProxy)
+    c.EnableXTSocketFallback = viper.GetBool(EnableXTSocketFallbackName)
+    c.EnableAutoDirectRouting = viper.GetBool(EnableAutoDirectRoutingName)
+    c.EnableEndpointRoutes = viper.GetBool(EnableEndpointRoutes)
+    c.EnableHealthChecking = viper.GetBool(EnableHealthChecking)
+    c.EnableEndpointHealthChecking = viper.GetBool(EnableEndpointHealthChecking)
+    c.EnableHealthCheckNodePort = viper.GetBool(EnableHealthCheckNodePort)
+    c.EnableLocalNodeRoute = viper.GetBool(EnableLocalNodeRoute)
+    c.EnablePolicy = strings.ToLower(viper.GetString(EnablePolicy))
+    c.EnableExternalIPs = viper.GetBool(EnableExternalIPs)
+    c.EnableL7Proxy = viper.GetBool(EnableL7Proxy)
+    c.EnableTracing = viper.GetBool(EnableTracing)
+    c.EnableUnreachableRoutes = viper.GetBool(EnableUnreachableRoutes)
+    c.EnableNodePort = viper.GetBool(EnableNodePort)
+    c.EnableSVCSourceRangeCheck = viper.GetBool(EnableSVCSourceRangeCheck)
+    c.EnableHostPort = viper.GetBool(EnableHostPort)
+    c.EnableHostLegacyRouting = viper.GetBool(EnableHostLegacyRouting)
+    c.MaglevTableSize = viper.GetInt(MaglevTableSize)
+    c.MaglevHashSeed = viper.GetString(MaglevHashSeed)
+    c.NodePortBindProtection = viper.GetBool(NodePortBindProtection)
+    c.EnableAutoProtectNodePortRange = viper.GetBool(EnableAutoProtectNodePortRange)
+    c.KubeProxyReplacement = viper.GetString(KubeProxyReplacement)
+    c.EnableSessionAffinity = viper.GetBool(EnableSessionAffinity)
+    c.EnableServiceTopology = viper.GetBool(EnableServiceTopology)
+    c.EnableBandwidthManager = viper.GetBool(EnableBandwidthManager)
+    c.EnableBBR = viper.GetBool(EnableBBR)
+    c.EnableRecorder = viper.GetBool(EnableRecorder)
+    c.EnableMKE = viper.GetBool(EnableMKE)
+    c.CgroupPathMKE = viper.GetString(CgroupPathMKE)
+    c.EnableHostFirewall = viper.GetBool(EnableHostFirewall)
+    c.EnableLocalRedirectPolicy = viper.GetBool(EnableLocalRedirectPolicy)
+    c.EncryptInterface = viper.GetStringSlice(EncryptInterface)
+    c.EncryptNode = viper.GetBool(EncryptNode)
+    c.EnvoyLogPath = viper.GetString(EnvoyLog)
+    c.ForceLocalPolicyEvalAtSource = viper.GetBool(ForceLocalPolicyEvalAtSource)
+    c.HTTPNormalizePath = viper.GetBool(HTTPNormalizePath)
+    c.HTTPIdleTimeout = viper.GetInt(HTTPIdleTimeout)
+    c.HTTPMaxGRPCTimeout = viper.GetInt(HTTPMaxGRPCTimeout)
+    c.HTTPRequestTimeout = viper.GetInt(HTTPRequestTimeout)
+    c.HTTPRetryCount = viper.GetInt(HTTPRetryCount)
+    c.HTTPRetryTimeout = viper.GetInt(HTTPRetryTimeout)
+    c.IdentityChangeGracePeriod = viper.GetDuration(IdentityChangeGracePeriod)
+    c.IdentityRestoreGracePeriod = viper.GetDuration(IdentityRestoreGracePeriod)
+    c.IPAM = viper.GetString(IPAM)
+    c.IPv4Range = viper.GetString(IPv4Range)
+    c.IPv4NodeAddr = viper.GetString(IPv4NodeAddr)
+    c.IPv4ServiceRange = viper.GetString(IPv4ServiceRange)
+    c.IPv6ClusterAllocCIDR = viper.GetString(IPv6ClusterAllocCIDRName)
+    c.IPv6NodeAddr = viper.GetString(IPv6NodeAddr)
+    c.IPv6Range = viper.GetString(IPv6Range)
+    c.IPv6ServiceRange = viper.GetString(IPv6ServiceRange)
+    c.JoinCluster = viper.GetBool(JoinClusterName)
+    c.K8sAPIServer = viper.GetString(K8sAPIServer)
+    c.K8sClientBurst = viper.GetInt(K8sClientBurst)
+    c.K8sClientQPSLimit = viper.GetFloat64(K8sClientQPSLimit)
+    c.K8sEnableK8sEndpointSlice = viper.GetBool(K8sEnableEndpointSlice)
+    c.K8sEnableAPIDiscovery = viper.GetBool(K8sEnableAPIDiscovery)
+    c.K8sKubeConfigPath = viper.GetString(K8sKubeConfigPath)
+    c.K8sRequireIPv4PodCIDR = viper.GetBool(K8sRequireIPv4PodCIDRName)
+    c.K8sRequireIPv6PodCIDR = viper.GetBool(K8sRequireIPv6PodCIDRName)
+    c.K8sServiceCacheSize = uint(viper.GetInt(K8sServiceCacheSize))
+    c.K8sEventHandover = viper.GetBool(K8sEventHandover)
+    c.K8sSyncTimeout = viper.GetDuration(K8sSyncTimeoutName)
+    c.AllocatorListTimeout = viper.GetDuration(AllocatorListTimeoutName)
+    c.K8sWatcherEndpointSelector = viper.GetString(K8sWatcherEndpointSelector)
+    c.KeepConfig = viper.GetBool(KeepConfig)
+    c.KVStore = viper.GetString(KVStore)
+    c.KVstoreLeaseTTL = viper.GetDuration(KVstoreLeaseTTL)
+    c.KVstoreKeepAliveInterval = c.KVstoreLeaseTTL / defaults.KVstoreKeepAliveIntervalFactor
+    c.KVstorePeriodicSync = viper.GetDuration(KVstorePeriodicSync)
+    c.KVstoreConnectivityTimeout = viper.GetDuration(KVstoreConnectivityTimeout)
+    c.KVstoreMaxConsecutiveQuorumErrors = viper.GetInt(KVstoreMaxConsecutiveQuorumErrorsName)
+    c.IPAllocationTimeout = viper.GetDuration(IPAllocationTimeout)
+    c.LabelPrefixFile = viper.GetString(LabelPrefixFile)
+    c.Labels = viper.GetStringSlice(Labels)
+    c.LibDir = viper.GetString(LibDir)
+    c.LogDriver = viper.GetStringSlice(LogDriver)
+    c.LogSystemLoadConfig = viper.GetBool(LogSystemLoadConfigName)
+    c.Logstash = viper.GetBool(Logstash)
+    c.LoopbackIPv4 = viper.GetString(LoopbackIPv4)
+    c.LocalRouterIPv4 = viper.GetString(LocalRouterIPv4)
+    c.LocalRouterIPv6 = viper.GetString(LocalRouterIPv6)
+    c.EnableBPFClockProbe = viper.GetBool(EnableBPFClockProbe)
+    c.EnableIPMasqAgent = viper.GetBool(EnableIPMasqAgent)
+    c.EnableIPv4EgressGateway = viper.GetBool(EnableIPv4EgressGateway)
+    c.InstallEgressGatewayRoutes = viper.GetBool(InstallEgressGatewayRoutes)
+    c.EnableEnvoyConfig = viper.GetBool(EnableEnvoyConfig)
+    c.EnableIngressController = viper.GetBool(EnableIngressController)
+    c.EnvoyConfigTimeout = viper.GetDuration(EnvoyConfigTimeout)
+    c.IPMasqAgentConfigPath = viper.GetString(IPMasqAgentConfigPath)
+    c.InstallIptRules = viper.GetBool(InstallIptRules)
+    c.IPTablesLockTimeout = viper.GetDuration(IPTablesLockTimeout)
+    c.IPTablesRandomFully = viper.GetBool(IPTablesRandomFully)
+    c.IPSecKeyFile = viper.GetString(IPSecKeyFileName)
+    c.EnableMonitor = viper.GetBool(EnableMonitorName)
+    c.MonitorAggregation = viper.GetString(MonitorAggregationName)
+    c.MonitorAggregationInterval = viper.GetDuration(MonitorAggregationInterval)
+    c.MonitorQueueSize = viper.GetInt(MonitorQueueSizeName)
+    c.MTU = viper.GetInt(MTUName)
+    c.PProf = viper.GetBool(PProf)
+    c.PProfPort = viper.GetInt(PProfPort)
+    c.PreAllocateMaps = viper.GetBool(PreAllocateMapsName)
+    c.PrependIptablesChains = viper.GetBool(PrependIptablesChainsName)
+    c.ProcFs = viper.GetString(ProcFs)
+    c.PrometheusServeAddr = viper.GetString(PrometheusServeAddr)
+    c.ProxyConnectTimeout = viper.GetInt(ProxyConnectTimeout)
+    c.ProxyGID = viper.GetInt(ProxyGID)
+    c.ProxyPrometheusPort = viper.GetInt(ProxyPrometheusPort)
+    c.ProxyMaxRequestsPerConnection = viper.GetInt(ProxyMaxRequestsPerConnection)
+    c.ProxyMaxConnectionDuration = time.Duration(viper.GetInt64(ProxyMaxConnectionDuration))
+    c.ReadCNIConfiguration = viper.GetString(ReadCNIConfiguration)
+    c.RestoreState = viper.GetBool(Restore)
+    c.RouteMetric = viper.GetInt(RouteMetric)
+    c.RunDir = viper.GetString(StateDir)
+    c.SidecarIstioProxyImage = viper.GetString(SidecarIstioProxyImage)
+    c.UseSingleClusterRoute = viper.GetBool(SingleClusterRouteName)
+    c.SocketPath = viper.GetString(SocketPath)
+    c.SockopsEnable = viper.GetBool(SockopsEnableName)
+    c.TracePayloadlen = viper.GetInt(TracePayloadlen)
+    c.Version = viper.GetString(Version)
+    c.WriteCNIConfigurationWhenReady = viper.GetString(WriteCNIConfigurationWhenReady)
+    c.PolicyTriggerInterval = viper.GetDuration(PolicyTriggerInterval)
+    c.CTMapEntriesTimeoutTCP = viper.GetDuration(CTMapEntriesTimeoutTCPName)
+    c.CTMapEntriesTimeoutAny = viper.GetDuration(CTMapEntriesTimeoutAnyName)
+    c.CTMapEntriesTimeoutSVCTCP = viper.GetDuration(CTMapEntriesTimeoutSVCTCPName)
+    c.CTMapEntriesTimeoutSVCTCPGrace = viper.GetDuration(CTMapEntriesTimeoutSVCTCPGraceName)
+    c.CTMapEntriesTimeoutSVCAny = viper.GetDuration(CTMapEntriesTimeoutSVCAnyName)
+    c.CTMapEntriesTimeoutSYN = viper.GetDuration(CTMapEntriesTimeoutSYNName)
+    c.CTMapEntriesTimeoutFIN = viper.GetDuration(CTMapEntriesTimeoutFINName)
+    c.PolicyAuditMode = viper.GetBool(PolicyAuditModeArg)
+    c.EnableIPv4FragmentsTracking = viper.GetBool(EnableIPv4FragmentsTrackingName)
+    c.FragmentsMapEntries = viper.GetInt(FragmentsMapEntriesName)
+    c.K8sServiceProxyName = viper.GetString(K8sServiceProxyName)
+    c.CRDWaitTimeout = viper.GetDuration(CRDWaitTimeout)
+    c.LoadBalancerDSRDispatch = viper.GetString(LoadBalancerDSRDispatch)
+    c.LoadBalancerDSRL4Xlate = viper.GetString(LoadBalancerDSRL4Xlate)
+    c.LoadBalancerRSSv4CIDR = viper.GetString(LoadBalancerRSSv4CIDR)
+    c.LoadBalancerRSSv6CIDR = viper.GetString(LoadBalancerRSSv6CIDR)
+    c.InstallNoConntrackIptRules = viper.GetBool(InstallNoConntrackIptRules)
+    c.EnableCustomCalls = viper.GetBool(EnableCustomCallsName)
+    c.BGPAnnounceLBIP = viper.GetBool(BGPAnnounceLBIP)
+    c.BGPAnnouncePodCIDR = viper.GetBool(BGPAnnouncePodCIDR)
+    c.BGPConfigPath = viper.GetString(BGPConfigPath)
+    c.ExternalClusterIP = viper.GetBool(ExternalClusterIPName)
+    c.TCFilterPriority = viper.GetInt(TCFilterPriority)
+
+    c.EnableIPv4Masquerade = viper.GetBool(EnableIPv4Masquerade) && c.EnableIPv4
+    c.EnableIPv6Masquerade = viper.GetBool(EnableIPv6Masquerade) && c.EnableIPv6
+    c.EnableBPFMasquerade = viper.GetBool(EnableBPFMasquerade)
+    c.DeriveMasqIPAddrFromDevice = viper.GetString(DeriveMasqIPAddrFromDevice)
+
+    c.populateLoadBalancerSettings()
+    c.populateDevices()
+    c.EnableRuntimeDeviceDetection = viper.GetBool(EnableRuntimeDeviceDetection)
+    c.EgressMultiHomeIPRuleCompat = viper.GetBool(EgressMultiHomeIPRuleCompat)
+
+    vlanBPFBypassIDs := viper.GetStringSlice(VLANBPFBypass)
+    c.VLANBPFBypass = make([]int, 0, len(vlanBPFBypassIDs))
+    for _, vlanIDStr := range vlanBPFBypassIDs {
+        vlanID, err := strconv.Atoi(vlanIDStr)
+        if err != nil {
+            log.WithError(err).Fatalf("Cannot parse vlan ID integer from --%s option", VLANBPFBypass)
+        }
+        c.VLANBPFBypass = append(c.VLANBPFBypass, vlanID)
+    }
+
+    c.Tunnel = viper.GetString(TunnelName)
+    c.TunnelPort = viper.GetInt(TunnelPortName)
+
+    if c.TunnelPort == 0 {
+        switch c.Tunnel {
+        case TunnelDisabled:
+            // tunnel might still be used by eg. EgressGW
+            c.TunnelPort = defaults.TunnelPortVXLAN
+        case TunnelVXLAN:
+            c.TunnelPort = defaults.TunnelPortVXLAN
+        case TunnelGeneve:
+            c.TunnelPort = defaults.TunnelPortGeneve
+        }
+    }
+
+    if viper.IsSet(AddressScopeMax) {
+        c.AddressScopeMax, err = ip.ParseScope(viper.GetString(AddressScopeMax))
+        if err != nil {
+            log.WithError(err).Fatalf("Cannot parse scope integer from --%s option", AddressScopeMax)
+        }
+    } else {
+        c.AddressScopeMax = defaults.AddressScopeMax
+    }
+
+    ipv4NativeRoutingCIDR := viper.GetString(IPv4NativeRoutingCIDR)
+
+    if ipv4NativeRoutingCIDR != "" {
+        c.IPv4NativeRoutingCIDR = cidr.MustParseCIDR(ipv4NativeRoutingCIDR)
+
+        if len(c.IPv4NativeRoutingCIDR.IP) != net.IPv4len {
+            log.Fatalf("%s must be an IPv4 CIDR", IPv4NativeRoutingCIDR)
+        }
+    }
+
+    if c.EnableIPv4 && ipv4NativeRoutingCIDR == "" && c.EnableAutoDirectRouting {
+        log.Warnf("If %s is enabled, then you are recommended to also configure %s. If %s is not configured, this may lead to pod to pod traffic being masqueraded, "+
+            "which can cause problems with performance, observability and policy", EnableAutoDirectRoutingName, IPv4NativeRoutingCIDR, IPv4NativeRoutingCIDR)
+    }
+
+    ipv6NativeRoutingCIDR := viper.GetString(IPv6NativeRoutingCIDR)
+
+    if ipv6NativeRoutingCIDR != "" {
+        c.IPv6NativeRoutingCIDR = cidr.MustParseCIDR(ipv6NativeRoutingCIDR)
+
+        if len(c.IPv6NativeRoutingCIDR.IP) != net.IPv6len {
+            log.Fatalf("%s must be an IPv6 CIDR", IPv6NativeRoutingCIDR)
+        }
+    }
+
+    if c.EnableIPv6 && ipv6NativeRoutingCIDR == "" && c.EnableAutoDirectRouting {
+        log.Warnf("If %s is enabled, then you are recommended to also configure %s. If %s is not configured, this may lead to pod to pod traffic being masqueraded, "+
+            "which can cause problems with performance, observability and policy", EnableAutoDirectRoutingName, IPv6NativeRoutingCIDR, IPv6NativeRoutingCIDR)
+    }
+
+    if err := c.calculateBPFMapSizes(); err != nil {
+        log.Fatal(err)
+    }
+
+    c.ClockSource = ClockSourceKtime
+    c.EnableIdentityMark = viper.GetBool(EnableIdentityMark)
+
+    // toFQDNs options
+    c.DNSMaxIPsPerRestoredRule = viper.GetInt(DNSMaxIPsPerRestoredRule)
+    c.DNSPolicyUnloadOnShutdown = viper.GetBool(DNSPolicyUnloadOnShutdown)
+    c.FQDNRegexCompileLRUSize = viper.GetInt(FQDNRegexCompileLRUSize)
+    c.ToFQDNsMaxIPsPerHost = viper.GetInt(ToFQDNsMaxIPsPerHost)
+    if maxZombies := viper.GetInt(ToFQDNsMaxDeferredConnectionDeletes); maxZombies >= 0 {
+        c.ToFQDNsMaxDeferredConnectionDeletes = viper.GetInt(ToFQDNsMaxDeferredConnectionDeletes)
+    } else {
+        log.Fatalf("%s must be positive, or 0 to disable deferred connection deletion",
+            ToFQDNsMaxDeferredConnectionDeletes)
+    }
+    switch {
+    case viper.IsSet(ToFQDNsMinTTL): // set by user
+        c.ToFQDNsMinTTL = viper.GetInt(ToFQDNsMinTTL)
+    default:
+        c.ToFQDNsMinTTL = defaults.ToFQDNsMinTTL
+    }
+    c.ToFQDNsProxyPort = viper.GetInt(ToFQDNsProxyPort)
+    c.ToFQDNsPreCache = viper.GetString(ToFQDNsPreCache)
+    c.ToFQDNsEnableDNSCompression = viper.GetBool(ToFQDNsEnableDNSCompression)
+    c.DNSProxyConcurrencyLimit = viper.GetInt(DNSProxyConcurrencyLimit)
+    c.DNSProxyConcurrencyProcessingGracePeriod = viper.GetDuration(DNSProxyConcurrencyProcessingGracePeriod)
+
+    // Convert IP strings into net.IPNet types
+    subnets, invalid := ip.ParseCIDRs(viper.GetStringSlice(IPv4PodSubnets))
+    if len(invalid) > 0 {
+        log.WithFields(
+            logrus.Fields{
+                "Subnets": invalid,
+            }).Warning("IPv4PodSubnets parameter can not be parsed.")
+    }
+    c.IPv4PodSubnets = subnets
+
+    subnets, invalid = ip.ParseCIDRs(viper.GetStringSlice(IPv6PodSubnets))
+    if len(invalid) > 0 {
+        log.WithFields(
+            logrus.Fields{
+                "Subnets": invalid,
+            }).Warning("IPv6PodSubnets parameter can not be parsed.")
+    }
+    c.IPv6PodSubnets = subnets
+
+    c.XDPMode = XDPModeLinkNone
+
+    err = c.populateNodePortRange()
+    if err != nil {
+        log.WithError(err).Fatal("Failed to populate NodePortRange")
+    }
+
+    err = c.populateHostServicesProtos()
+    if err != nil {
+        log.WithError(err).Fatal("Failed to populate HostReachableServicesProtos")
+    }
+
+    monitorAggregationFlags := viper.GetStringSlice(MonitorAggregationFlags)
+    var ctMonitorReportFlags uint16
+    for i := 0; i < len(monitorAggregationFlags); i++ {
+        value := strings.ToLower(monitorAggregationFlags[i])
+        flag, exists := TCPFlags[value]
+        if !exists {
+            log.Fatalf("Unable to parse TCP flag %q for %s!",
+                value, MonitorAggregationFlags)
+        }
+        ctMonitorReportFlags |= flag
+    }
+    c.MonitorAggregationFlags = ctMonitorReportFlags
+
+    // Map options
+    if m := command.GetStringMapString(viper.GetViper(), FixedIdentityMapping); err != nil {
+        log.Fatalf("unable to parse %s: %s", FixedIdentityMapping, err)
+    } else if len(m) != 0 {
+        c.FixedIdentityMapping = m
+    }
+
+    c.ConntrackGCInterval = viper.GetDuration(ConntrackGCInterval)
+
+    if m, err := command.GetStringMapStringE(viper.GetViper(), KVStoreOpt); err != nil {
+        log.Fatalf("unable to parse %s: %s", KVStoreOpt, err)
+    } else {
+        c.KVStoreOpt = m
+    }
+
+    if m, err := command.GetStringMapStringE(viper.GetViper(), LogOpt); err != nil {
+        log.Fatalf("unable to parse %s: %s", LogOpt, err)
+    } else {
+        c.LogOpt = m
+    }
+
+    if m, err := command.GetStringMapStringE(viper.GetViper(), APIRateLimitName); err != nil {
+        log.Fatalf("unable to parse %s: %s", APIRateLimitName, err)
+    } else {
+        c.APIRateLimit = m
+    }
+
+    for _, option := range viper.GetStringSlice(EndpointStatus) {
+        c.EndpointStatus[option] = struct{}{}
+    }
+
+    if c.MonitorQueueSize == 0 {
+        c.MonitorQueueSize = getDefaultMonitorQueueSize(runtime.NumCPU())
+    }
+
+    // Metrics Setup
+    defaultMetrics := metrics.DefaultMetrics()
+    flagMetrics := append(viper.GetStringSlice(Metrics), c.additionalMetrics()...)
+    for _, metric := range flagMetrics {
+        switch metric[0] {
+        case '+':
+            defaultMetrics[metric[1:]] = struct{}{}
+        case '-':
+            delete(defaultMetrics, metric[1:])
+        }
+    }
+    var collectors []prometheus.Collector
+    metricsSlice := common.MapStringStructToSlice(defaultMetrics)
+    c.MetricsConfig, collectors = metrics.CreateConfiguration(metricsSlice)
+    metrics.MustRegister(collectors...)
+
+    if err := c.parseExcludedLocalAddresses(viper.GetStringSlice(ExcludeLocalAddress)); err != nil {
+        log.WithError(err).Fatalf("Unable to parse excluded local addresses")
+    }
+
+    c.IdentityAllocationMode = viper.GetString(IdentityAllocationMode)
+    switch c.IdentityAllocationMode {
+    // This is here for tests. Some call Populate without the normal init
+    case "":
+        c.IdentityAllocationMode = IdentityAllocationModeKVstore
+
+    case IdentityAllocationModeKVstore, IdentityAllocationModeCRD:
+        // c.IdentityAllocationMode is set above
+
+    default:
+        log.Fatalf("Invalid identity allocation mode %q. It must be one of %s or %s", c.IdentityAllocationMode, IdentityAllocationModeKVstore, IdentityAllocationModeCRD)
+    }
+    if c.KVStore == "" {
+        if c.IdentityAllocationMode != IdentityAllocationModeCRD {
+            log.Warningf("Running Cilium with %q=%q requires identity allocation via CRDs. Changing %s to %q", KVStore, c.KVStore, IdentityAllocationMode, IdentityAllocationModeCRD)
+            c.IdentityAllocationMode = IdentityAllocationModeCRD
+        }
+        if c.DisableCiliumEndpointCRD {
+            log.Warningf("Running Cilium with %q=%q requires endpoint CRDs. Changing %s to %t", KVStore, c.KVStore, DisableCiliumEndpointCRDName, false)
+            c.DisableCiliumEndpointCRD = false
+        }
+        if c.K8sEventHandover {
+            log.Warningf("Running Cilium with %q=%q requires KVStore capability. Changing %s to %t", KVStore, c.KVStore, K8sEventHandover, false)
+            c.K8sEventHandover = false
+        }
+    }
+
+    switch c.IPAM {
+    case ipamOption.IPAMKubernetes, ipamOption.IPAMClusterPool, ipamOption.IPAMClusterPoolV2:
+        if c.EnableIPv4 {
+            c.K8sRequireIPv4PodCIDR = true
+        }
+
+        if c.EnableIPv6 {
+            c.K8sRequireIPv6PodCIDR = true
+        }
+    }
+
+    c.KubeProxyReplacementHealthzBindAddr = viper.GetString(KubeProxyReplacementHealthzBindAddr)
+
+    // Hubble options.
+    c.EnableHubble = viper.GetBool(EnableHubble)
+    c.HubbleSocketPath = viper.GetString(HubbleSocketPath)
+    c.HubbleListenAddress = viper.GetString(HubbleListenAddress)
+    c.HubbleTLSDisabled = viper.GetBool(HubbleTLSDisabled)
+    c.HubbleTLSCertFile = viper.GetString(HubbleTLSCertFile)
+    c.HubbleTLSKeyFile = viper.GetString(HubbleTLSKeyFile)
+    c.HubbleTLSClientCAFiles = viper.GetStringSlice(HubbleTLSClientCAFiles)
+    c.HubbleEventBufferCapacity = viper.GetInt(HubbleEventBufferCapacity)
+    c.HubbleEventQueueSize = viper.GetInt(HubbleEventQueueSize)
+    if c.HubbleEventQueueSize == 0 {
+        c.HubbleEventQueueSize = getDefaultMonitorQueueSize(runtime.NumCPU())
+    }
+    c.HubbleMetricsServer = viper.GetString(HubbleMetricsServer)
+    c.HubbleMetrics = viper.GetStringSlice(HubbleMetrics)
+    c.HubbleExportFilePath = viper.GetString(HubbleExportFilePath)
+    c.HubbleExportFileMaxSizeMB = viper.GetInt(HubbleExportFileMaxSizeMB)
+    c.HubbleExportFileMaxBackups = viper.GetInt(HubbleExportFileMaxBackups)
+    c.HubbleExportFileCompress = viper.GetBool(HubbleExportFileCompress)
+    c.EnableHubbleRecorderAPI = viper.GetBool(EnableHubbleRecorderAPI)
+    c.HubbleRecorderStoragePath = viper.GetString(HubbleRecorderStoragePath)
+    c.HubbleRecorderSinkQueueSize = viper.GetInt(HubbleRecorderSinkQueueSize)
+    c.DisableIptablesFeederRules = viper.GetStringSlice(DisableIptablesFeederRules)
+    c.EnableCiliumEndpointSlice = viper.GetBool(EnableCiliumEndpointSlice)
+
+    // Hidden options
+    c.CompilerFlags = viper.GetStringSlice(CompilerFlags)
+    c.ConfigFile = viper.GetString(ConfigFile)
+    c.HTTP403Message = viper.GetString(HTTP403Message)
+    c.K8sNamespace = viper.GetString(K8sNamespaceName)
+    c.AgentNotReadyNodeTaintKey = viper.GetString(AgentNotReadyNodeTaintKeyName)
+    c.MaxControllerInterval = viper.GetInt(MaxCtrlIntervalName)
+    c.PolicyQueueSize = sanitizeIntParam(PolicyQueueSize, defaults.PolicyQueueSize)
+    c.EndpointQueueSize = sanitizeIntParam(EndpointQueueSize, defaults.EndpointQueueSize)
+    c.EndpointGCInterval = viper.GetDuration(EndpointGCInterval)
+    c.SelectiveRegeneration = viper.GetBool(SelectiveRegeneration)
+    c.DisableCNPStatusUpdates = viper.GetBool(DisableCNPStatusUpdates)
+    c.EnableICMPRules = viper.GetBool(EnableICMPRules)
+    c.BypassIPAvailabilityUponRestore = viper.GetBool(BypassIPAvailabilityUponRestore)
+    c.EnableK8sTerminatingEndpoint = viper.GetBool(EnableK8sTerminatingEndpoint)
+
+    // Disable Envoy version check if L7 proxy is disabled.
+    c.DisableEnvoyVersionCheck = viper.GetBool(DisableEnvoyVersionCheck)
+    if !c.EnableL7Proxy {
+        c.DisableEnvoyVersionCheck = true
+    }
+
+    // VTEP integration enable option
+    c.EnableVTEP = viper.GetBool(EnableVTEP)
+
+    // Enable BGP control plane features
+    c.EnableBGPControlPlane = viper.GetBool(EnableBGPControlPlane)
+
+    // Envoy secrets namespace to watch
+    c.EnvoySecretNamespace = viper.GetString(IngressSecretsNamespace)
+}
+
+func (c *DaemonConfig) Validate() error {
+
+    return nil
+}
+
+func (c *DaemonConfig) SetDevices(devices []string) {
+    c.devicesMu.Lock()
+    c.devices = devices
+    c.devicesMu.Unlock()
+}
+
+func (c *DaemonConfig) AppendDevice(dev string) {
+    c.devicesMu.Lock()
+    c.devices = append(c.devices, dev)
+    c.devicesMu.Unlock()
+}
+
+func (c *DaemonConfig) GetDevices() []string {
+    c.devicesMu.RLock()
+    defer c.devicesMu.RUnlock()
+    return c.devices
+}
 
 // GetNodeConfigPath /var/run/cilium/state/globals/node_config.h
 func (c *DaemonConfig) GetNodeConfigPath() string {

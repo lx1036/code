@@ -10,10 +10,12 @@
 #include <lib/host_firewall.h>
 #include <lib/endpoints.h>
 #include <lib/l3.h>
+#include <lib/encap.h>
 
 
 #define CB_SRC_IDENTITY	0
 #define CILIUM_NET_MAC  { .addr = { 0xce, 0x72, 0xa7, 0x03, 0x88, 0x57 } }
+#define IPV4_MASK 0xffff
 
 static __always_inline int rewrite_dmac_to_host(struct __sk_buff *ctx, __u32 src_identity) {
     /* When attached to cilium_host, we rewrite the DMAC to the mac of
@@ -40,6 +42,7 @@ handle_ipv4(struct __sk_buff *ctx, const bool from_host) {
     void *data = (void *)(long)(ctx->data);
     struct ethhdr *eth = data;
     struct iphdr *ip4;
+    struct remote_endpoint_info *info = NULL;
 
     ip4 = data + sizeof(*eth);
     if (data + sizeof(*eth) + sizeof(*ip4) > data_end) {
@@ -103,7 +106,7 @@ handle_ipv4(struct __sk_buff *ctx, const bool from_host) {
     }
 
     /* Lookup IPv4 address in list of local endpoints and host IPs */
-    // INFO: 这里的 endpoint 是用户态写入的，代码逻辑为：
+    // INFO: 这里的 endpoint 是用户态写入的，访问当前 node 的 pod ip
     ep = lookup_ip4_endpoint(ip4);
     if (ep) {
         /* Let through packets to the node-ip so they are processed by
@@ -123,6 +126,36 @@ handle_ipv4(struct __sk_buff *ctx, const bool from_host) {
         return TC_ACT_OK;
     }
 
+    // INFO: 访问跨 node 的 pod ip
+    /**
+     * 10.244.1.251 nginx pod 在 minikube-m02 node 上, 10.244.0.148 在 minikube node 上
+     * root@minikube:/home/cilium# cilium bpf ipcache get 10.244.1.251 -D
+     * 10.244.1.251 maps to identity identity=120746 encryptkey=0 tunnelendpoint=192.168.49.3
+     * root@minikube:/home/cilium# cilium bpf ipcache get 10.244.0.148 -D
+     * 10.244.0.148 maps to identity identity=120746 encryptkey=0 tunnelendpoint=0.0.0.0
+     */
+//#ifdef TUNNEL_MODE
+    info = ipcache_lookup4(ip4->daddr);
+    if (info != NULL && info->tunnel_endpoint != 0) {
+        ret = encap_and_redirect_with_nodeid(ctx, info->tunnel_endpoint, info->key, secctx, &trace);
+        if (ret == IPSEC_ENDPOINT)
+            return TC_ACT_OK;
+        else
+            return ret;
+    } else {
+        /* IPv4 lookup key: daddr & IPV4_MASK */
+        struct endpoint_key key = {};
+
+        key.ip4 = ip4->daddr & IPV4_MASK;
+        key.family = ENDPOINT_KEY_IPV4;
+        cilium_dbg(ctx, DBG_NETDEV_ENCAP4, key.ip4, secctx);
+        ret = encap_and_redirect_netdev(ctx, &key, secctx, &trace);
+        if (ret == IPSEC_ENDPOINT)
+            return TC_ACT_OK;
+        else if (ret != DROP_NO_TUNNEL_ENDPOINT)
+            return ret;
+    }
+//#endif
 
 
     return TC_ACT_OK;
