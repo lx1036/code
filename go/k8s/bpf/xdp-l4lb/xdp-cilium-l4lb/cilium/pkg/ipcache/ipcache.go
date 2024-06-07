@@ -1,9 +1,16 @@
 package ipcache
 
 import (
-    "github.com/cilium/cilium/pkg/identity"
-    "github.com/cilium/cilium/pkg/lock"
     "net"
+    "time"
+
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/controller"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/identity"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/identity/cache"
+    ipcacheTypes "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/ipcache/types"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/lock"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/policy"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/source"
 )
 
 // INFO: ipcache BPF map 主要是用来？？？
@@ -14,6 +21,14 @@ var (
     // Cilium is running.
     IPIdentityCache = NewIPCache()
 )
+
+// Configuration is init-time configuration for the IPCache.
+type Configuration struct {
+    // Accessors to other subsystems, provided by the daemon
+    cache.IdentityAllocator
+    ipcacheTypes.PolicyHandler
+    ipcacheTypes.DatapathHandler
+}
 
 // Identity is the identity representation of an IP<->Identity cache.
 type Identity struct {
@@ -76,12 +91,6 @@ type IPCache struct {
     deferredPrefixRelease *asyncPrefixReleaser
 }
 
-// NewIPCache returns a new IPCache with the mappings of endpoint IP to security
-// identity (and vice-versa) initialized.
-func NewIPCache() *IPCache {
-    return &IPCache{}
-}
-
 // UpdateOrInsert adds / updates the provided IP (endpoint or CIDR prefix) and identity
 // into the IPCache.
 //
@@ -94,4 +103,22 @@ func NewIPCache() *IPCache {
 func (ipc *IPCache) UpdateOrInsert(ip string, hostIP net.IP, hostKey uint8, k8sMeta *K8sMetadata,
     newIdentity Identity) (updated bool, namedPortsChanged bool) {
 
+}
+
+// NewIPCache returns a new IPCache with the mappings of endpoint IP to security
+// identity (and vice-versa) initialized.
+func NewIPCache(c *Configuration) *IPCache {
+    ipc := &IPCache{
+        mutex:             lock.NewSemaphoredMutex(),
+        ipToIdentityCache: map[string]Identity{},
+        identityToIPCache: map[identity.NumericIdentity]map[string]struct{}{},
+        ipToHostIPCache:   map[string]IPKeyPair{},
+        ipToK8sMetadata:   map[string]K8sMetadata{},
+        controllers:       controller.NewManager(),
+        namedPorts:        nil,
+        metadata:          newMetadata(),
+        Configuration:     c,
+    }
+    ipc.deferredPrefixRelease = newAsyncPrefixReleaser(ipc, 1*time.Millisecond)
+    return ipc
 }

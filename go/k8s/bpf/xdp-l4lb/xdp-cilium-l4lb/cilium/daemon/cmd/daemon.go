@@ -3,11 +3,11 @@ package cmd
 import (
     "context"
     "fmt"
-    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/identity"
-    ipcachemap "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/ipcache"
-    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/metrics"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/k8s"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/source"
     "net"
     "os"
+    "sync"
 
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/api/v1/models"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf"
@@ -25,15 +25,19 @@ import (
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/eventqueue"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/fqdn"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/hubble/observer"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/identity"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/ipam"
+    ipamOption "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/ipam/option"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/ipcache"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/k8s/watchers"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/lock"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/logging/logfields"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/ctmap"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/eppolicymap"
+    ipcachemap "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/ipcache"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/lbmap"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/maps/policymap"
+    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/metrics"
     monitoragent "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/monitor/agent"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/mtu"
     "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/node"
@@ -162,6 +166,7 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
         configuredMTU = option.Config.MTU
     )
 
+    // INFO: 1. bootstrap daemon
     bootstrapStats.daemonInit.Start()
 
     // Validate the daemon-specific global options.
@@ -262,7 +267,7 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
         num := identity.InitWellKnownIdentities(option.Config)
         metrics.Identity.WithLabelValues(identity.WellKnownIdentityType).Add(float64(num))
     }
-    nd := nodediscovery.NewNodeDiscovery(nodeMgr, mtuConfig, netConf)
+    nodeDiscovery := nodediscovery.NewNodeDiscovery(nodeMgr, mtuConfig, netConf)
 
     devMgr, err := linuxdatapath.NewDeviceManager()
     if err != nil {
@@ -279,7 +284,7 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
         mtuConfig:         mtuConfig,
         datapath:          dp,
         deviceManager:     devMgr,
-        nodeDiscovery:     nd,
+        nodeDiscovery:     nodeDiscovery,
         endpointCreations: newEndpointCreationManager(),
         apiLimiterSet:     apiLimiterSet,
         controllers:       controller.NewManager(),
@@ -293,7 +298,7 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
     d.configModifyQueue.Run()
 
     /**
-     * 2.Restore
+     * INFO: 1.1 Restore
      */
     // Collect old CIDR identities
     var oldNumericIdentities []identity.NumericIdentity
@@ -353,7 +358,7 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
     restoredCIDRidentities := make(map[string]*identity.Identity)
     if len(d.restoredCIDRs) > 0 {
         log.Infof("Restoring %d old CIDR identities", len(d.restoredCIDRs))
-        _, err = d.ipcache.AllocateCIDRs(d.restoredCIDRs, oldNIDs, restoredCIDRidentities)
+        _, err = d.ipcache.AllocateCIDRs(d.restoredCIDRs, oldNumericIdentities, restoredCIDRidentities)
         if err != nil {
             log.WithError(err).Error("Error allocating old CIDR identities")
         }
@@ -362,20 +367,70 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
         // re-introduced bugs into this agent bootstrap order, so we want to surface this.
         for i, prefix := range d.restoredCIDRs {
             id, exists := restoredCIDRidentities[prefix.String()]
-            if !exists || id.ID != oldNIDs[i] {
-                log.WithField(logfields.Identity, oldNIDs[i]).Warn("Could not restore all CIDR identities")
+            if !exists || id.ID != oldNumericIdentities[i] {
+                log.WithField(logfields.Identity, oldNumericIdentities[i]).Warn("Could not restore all CIDR identities")
                 break
             }
         }
     }
-
     nodeMgr = nodeMgr.WithIPCache(d.ipcache)
     nodeMgr = nodeMgr.WithSelectorCacheUpdater(d.policy.GetSelectorCache()) // must be after initPolicy
     nodeMgr = nodeMgr.WithPolicyTriggerer(epMgr)                            // must be after initPolicy
+    d.endpointManager = epMgr
+    d.endpointManager.InitMetrics()
 
     d.svc = service.NewService(&d)
+    if option.Config.EnableIPv4EgressGateway {
+        d.egressGatewayManager = egressgateway.NewEgressGatewayManager(&d, d.identityAllocator)
+    }
 
-    // Open or create BPF maps.
+    d.k8sWatcher = watchers.NewK8sWatcher(
+        d.endpointManager,
+        d.nodeDiscovery,
+        &d,
+        d.policy,
+        d.svc,
+        d.datapath,
+        d.redirectPolicyManager,
+        d.bgpSpeaker,
+        d.egressGatewayManager,
+        d.l7Proxy,
+        option.Config,
+        d.ipcache,
+    )
+    nodeDiscovery.RegisterK8sNodeGetter(d.k8sWatcher)
+    d.ipcache.RegisterK8sSyncedChecker(&d)
+    d.k8sWatcher.RegisterNodeSubscriber(d.endpointManager)
+    if option.Config.EnableServiceTopology {
+        d.k8sWatcher.RegisterNodeSubscriber(&d.k8sWatcher.K8sSvcCache)
+    }
+    // watchers.NewCiliumNodeUpdater needs to be registered *after* d.endpointManager
+    d.k8sWatcher.RegisterNodeSubscriber(watchers.NewCiliumNodeUpdater(d.nodeDiscovery))
+    d.redirectPolicyManager.RegisterSvcCache(&d.k8sWatcher.K8sSvcCache)
+    d.redirectPolicyManager.RegisterGetStores(d.k8sWatcher)
+
+    bootstrapStats.daemonInit.End(true)
+
+    // Stop all endpoints (its goroutines) on exit.
+    cleaner.cleanupFuncs.Add(func() {
+        log.Info("Waiting for all endpoints' go routines to be stopped.")
+        var wg sync.WaitGroup
+
+        eps := d.endpointManager.GetEndpoints()
+        wg.Add(len(eps))
+
+        for _, ep := range eps {
+            go func(ep *endpoint.Endpoint) {
+                ep.Stop()
+                wg.Done()
+            }(ep)
+        }
+
+        wg.Wait()
+        log.Info("All endpoints' goroutines stopped.")
+    })
+
+    // INFO: 1.2 Open or create BPF maps
     bootstrapStats.mapsInit.Start()
     err = d.initMaps()
     bootstrapStats.mapsInit.EndError(err)
@@ -385,14 +440,103 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
     }
     // Upsert restored CIDRs after the new ipcache has been opened above
     if len(restoredCIDRidentities) > 0 {
-        ipcache.UpsertGeneratedIdentities(restoredCIDRidentities, nil)
+        d.ipcache.UpsertGeneratedIdentities(restoredCIDRidentities, nil)
     }
-
-    // option.Config.RestoreState=true, restore from 从已有的 bpf maps
+    // Upsert restored local Ingress IPs
+    restoredIngressIPs := []string{}
+    for _, ingressIP := range oldIngressIPs {
+        _, err := d.ipcache.Upsert(ingressIP.String(), nil, 0, nil, ipcache.Identity{
+            ID:     identity.ReservedIdentityIngress,
+            Source: source.Restored,
+        })
+        if err == nil {
+            restoredIngressIPs = append(restoredIngressIPs, ingressIP.String())
+        } else {
+            log.WithError(err).Warning("could not restore Ingress IP, a new one will be allocated")
+        }
+    }
+    if len(restoredIngressIPs) > 0 {
+        log.WithField(logfields.Ingress, restoredIngressIPs).Info("Restored ingress IPs")
+    }
+    // Read the service IDs of existing services from the BPF map and
+    // reserve them. This must be done *before* connecting to the
+    // Kubernetes apiserver and serving the API to ensure service IDs are
+    // not changing across restarts or that a new service could accidentally
+    // use an existing service ID.
+    // Also, create missing v2 services from the corresponding legacy ones.
     if option.Config.RestoreState && !option.Config.DryMode {
         bootstrapStats.restore.Start()
-        d.svc.RestoreServices()
+        if err := d.svc.RestoreServices(); err != nil {
+            log.WithError(err).Warn("Failed to restore services from BPF maps")
+        }
         bootstrapStats.restore.End(true)
+    }
+
+    d.k8sWatcher.RunK8sServiceHandler()
+
+    // fetch old endpoints before k8s is configured.
+    bootstrapStats.restore.Start()
+    restoredEndpoints, err := d.fetchOldEndpoints(option.Config.StateDir)
+    if err != nil {
+        log.WithError(err).Error("Unable to read existing endpoints")
+    }
+    bootstrapStats.restore.End(true)
+
+    // bootstrap k8s init
+    if k8s.IsEnabled() {
+        bootstrapStats.k8sInit.Start()
+        // Errors are handled inside WaitForCRDsToRegister. It will fatal on a
+        // context deadline or if the context has been cancelled, the context's
+        // error will be returned. Otherwise, it succeeded.
+        if err := d.k8sWatcher.WaitForCRDsToRegister(d.ctx); err != nil {
+            return nil, restoredEndpoints, err
+        }
+
+        // Launch the K8s node watcher so we can start receiving node events.
+        // Launching the k8s node watcher at this stage will prevent all agents
+        // from performing Gets directly into kube-apiserver to get the most up
+        // to date version of the k8s node. This allows for better scalability
+        // in large clusters.
+        d.k8sWatcher.NodesInit(k8s.Client())
+
+        if option.Config.IPAM == ipamOption.IPAMClusterPool || option.Config.IPAM == ipamOption.IPAMClusterPoolV2 {
+            // Create the CiliumNode custom resource. This call will block until
+            // the custom resource has been created
+            d.nodeDiscovery.UpdateCiliumNodeResource()
+        }
+
+        if err := k8s.WaitForNodeInformation(d.ctx, d.k8sWatcher); err != nil {
+            log.WithError(err).Error("unable to connect to get node spec from apiserver")
+            return nil, nil, fmt.Errorf("unable to connect to get node spec from apiserver: %w", err)
+        }
+
+        // Kubernetes demands that the localhost can always reach local
+        // pods. Therefore unless the AllowLocalhost policy is set to a
+        // specific mode, always allow localhost to reach local
+        // endpoints.
+        if option.Config.AllowLocalhost == option.AllowLocalhostAuto {
+            option.Config.AllowLocalhost = option.AllowLocalhostAlways
+            log.Info("k8s mode: Allowing localhost to reach local endpoints")
+        }
+
+        bootstrapStats.k8sInit.End(true)
+    }
+    // The kube-proxy replacement and host-fw devices detection should happen after
+    // establishing a connection to kube-apiserver, but before starting a k8s watcher.
+    // This is because the device detection requires self (Cilium)Node object,
+    // and the k8s service watcher depends on option.Config.EnableNodePort flag
+    // which can be modified after the device detection.
+    if _, err := d.deviceManager.Detect(); err != nil {
+        if d.deviceManager.AreDevicesRequired() {
+            // Fail hard if devices are required to function.
+            return nil, nil, fmt.Errorf("failed to detect devices: %w", err)
+        }
+        log.WithError(err).Warn("failed to detect devices, disabling BPF NodePort")
+        disableNodePort()
+    }
+    if err := finishKubeProxyReplacementInit(isKubeProxyReplacementStrict); err != nil {
+        log.WithError(err).Error("failed to finalise LB initialization")
+        return nil, nil, fmt.Errorf("failed to finalise LB initialization: %w", err)
     }
 
     // INFO: bpf debug. We can only attach the monitor agent once cilium_event has been set up.
