@@ -12,7 +12,7 @@ const (
 type statefulsetModel struct{}
 
 /*
-	存储元数据
+存储元数据
 
 	{
 	  "replicas": {

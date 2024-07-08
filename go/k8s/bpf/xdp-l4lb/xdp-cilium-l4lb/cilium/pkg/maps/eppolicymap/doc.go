@@ -1,5 +1,3 @@
-package eppolicymap
-
 // Package eppolicymap represents the map from an endpoint ID to its policy map.
 // This map is of type bpf.MapTypeHashOfMaps where the key is the endpoint ID.
 // It is used to lookup the policy from the socket context where unlike in the
@@ -8,4 +6,3 @@ package eppolicymap
 // regardless of endpoint.
 // +groupName=maps
 package eppolicymap
-

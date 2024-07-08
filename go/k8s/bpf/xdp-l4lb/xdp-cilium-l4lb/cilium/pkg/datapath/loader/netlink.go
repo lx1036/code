@@ -1,49 +1,49 @@
 package loader
 
 import (
-    "context"
-    "fmt"
-    "github.com/vishvananda/netlink"
-    "strconv"
+	"context"
+	"fmt"
+	"github.com/vishvananda/netlink"
+	"strconv"
 
-    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf"
-    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/command/exec"
-    "k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/bpf"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/command/exec"
+	"k8s-lx1036/k8s/bpf/xdp-l4lb/xdp-cilium-l4lb/cilium/pkg/option"
 )
 
 type baseDeviceMode string
 
 const (
-    directMode = baseDeviceMode("direct")
-    tunnelMode = baseDeviceMode("tunnel")
+	directMode = baseDeviceMode("direct")
+	tunnelMode = baseDeviceMode("tunnel")
 
-    libbpfFixupMsg = "struct bpf_elf_map fixup performed due to size mismatch!"
+	libbpfFixupMsg = "struct bpf_elf_map fixup performed due to size mismatch!"
 )
 
 // `tc qdisc add dev $ifName clsact [handle 0xffff0000]`
 func replaceQdisc(ifName string) error {
-    link, err := netlink.LinkByName(ifName)
-    if err != nil {
-        return err
-    }
-    attrs := netlink.QdiscAttrs{
-        LinkIndex: link.Attrs().Index,
-        Handle:    netlink.MakeHandle(0xffff, 0),
-        Parent:    netlink.HANDLE_CLSACT,
-    }
+	link, err := netlink.LinkByName(ifName)
+	if err != nil {
+		return err
+	}
+	attrs := netlink.QdiscAttrs{
+		LinkIndex: link.Attrs().Index,
+		Handle:    netlink.MakeHandle(0xffff, 0),
+		Parent:    netlink.HANDLE_CLSACT,
+	}
 
-    qdisc := &netlink.GenericQdisc{
-        QdiscAttrs: attrs,
-        QdiscType:  "clsact",
-    }
+	qdisc := &netlink.GenericQdisc{
+		QdiscAttrs: attrs,
+		QdiscType:  "clsact",
+	}
 
-    if err = netlink.QdiscReplace(qdisc); err != nil {
-        return fmt.Errorf("netlink: Replacing qdisc for %s failed: %s", ifName, err)
-    } else {
-        log.Debugf("netlink: Replacing qdisc for %s succeeded", ifName)
-    }
+	if err = netlink.QdiscReplace(qdisc); err != nil {
+		return fmt.Errorf("netlink: Replacing qdisc for %s failed: %s", ifName, err)
+	} else {
+		log.Debugf("netlink: Replacing qdisc for %s succeeded", ifName)
+	}
 
-    return nil
+	return nil
 }
 
 // replaceDatapath replaces the qdisc and BPF program for an endpoint or XDP program.
@@ -60,58 +60,58 @@ func replaceQdisc(ifName string) error {
 // gets its program and maps replaced and unpinned, its eth0:from-netdev counterpart
 // will miss tail calls (and drop packets) until it has been replaced as well.
 func replaceDatapath(ctx context.Context, ifName, objPath, progSec, progDirection string, xdp bool, xdpMode string) (func(), error) {
-    var (
-        loaderProg string
-        args       []string
-    )
+	var (
+		loaderProg string
+		args       []string
+	)
 
-    if !xdp {
-        // `tc qdisc add dev $ifName clsact [handle 0xffff0000]`
-        if err := replaceQdisc(ifName); err != nil {
-            return nil, fmt.Errorf("Failed to replace Qdisc for %s: %s", ifName, err)
-        }
-    }
+	if !xdp {
+		// `tc qdisc add dev $ifName clsact [handle 0xffff0000]`
+		if err := replaceQdisc(ifName); err != nil {
+			return nil, fmt.Errorf("Failed to replace Qdisc for %s: %s", ifName, err)
+		}
+	}
 
-    // Temporarily rename bpffs pins of maps whose definitions have changed in
-    // a new version of a datapath ELF.
-    if err := bpf.StartBPFFSMigration(bpf.MapPrefixPath(), objPath); err != nil {
-        return nil, fmt.Errorf("Failed to start bpffs map migration: %w", err)
-    }
+	// Temporarily rename bpffs pins of maps whose definitions have changed in
+	// a new version of a datapath ELF.
+	if err := bpf.StartBPFFSMigration(bpf.MapPrefixPath(), objPath); err != nil {
+		return nil, fmt.Errorf("Failed to start bpffs map migration: %w", err)
+	}
 
-    // FIXME: replace exec with native call
-    if xdp {
-        loaderProg = "ip"
-        args = []string{"-force", "link", "set", "dev", ifName, xdpMode,
-            "obj", objPath, "sec", progSec}
-    } else {
-        loaderProg = "tc"
+	// FIXME: replace exec with native call
+	if xdp {
+		loaderProg = "ip"
+		args = []string{"-force", "link", "set", "dev", ifName, xdpMode,
+			"obj", objPath, "sec", progSec}
+	} else {
+		loaderProg = "tc"
 
-        tcPrio := strconv.Itoa(option.Config.TCFilterPriority)
-        log.Debugf("tc filter using priority %s for interface %s", tcPrio, ifName)
-        args = []string{"filter", "replace", "dev", ifName, progDirection,
-            "prio", tcPrio, "handle", "1", "bpf", "da", "obj", objPath,
-            "sec", progSec,
-        }
-    }
+		tcPrio := strconv.Itoa(option.Config.TCFilterPriority)
+		log.Debugf("tc filter using priority %s for interface %s", tcPrio, ifName)
+		args = []string{"filter", "replace", "dev", ifName, progDirection,
+			"prio", tcPrio, "handle", "1", "bpf", "da", "obj", objPath,
+			"sec", progSec,
+		}
+	}
 
-    // If the iproute2 call below is successful, any 'pending' map pins will be removed.
-    // If not, any pending maps will be re-pinned back to their initial paths.
-    cmd := exec.CommandContext(ctx, loaderProg, args...).WithFilters(libbpfFixupMsg)
-    if _, err := cmd.CombinedOutput(log, true); err != nil {
-        // Program/object replacement unsuccessful, revert bpffs migration.
-        if err := bpf.FinalizeBPFFSMigration(bpf.MapPrefixPath(), objPath, true); err != nil {
-            return nil, fmt.Errorf("Failed to revert bpffs map migration: %w", err)
-        }
-        return nil, fmt.Errorf("Failed to load prog with %s: %w", loaderProg, err)
-    }
+	// If the iproute2 call below is successful, any 'pending' map pins will be removed.
+	// If not, any pending maps will be re-pinned back to their initial paths.
+	cmd := exec.CommandContext(ctx, loaderProg, args...).WithFilters(libbpfFixupMsg)
+	if _, err := cmd.CombinedOutput(log, true); err != nil {
+		// Program/object replacement unsuccessful, revert bpffs migration.
+		if err := bpf.FinalizeBPFFSMigration(bpf.MapPrefixPath(), objPath, true); err != nil {
+			return nil, fmt.Errorf("Failed to revert bpffs map migration: %w", err)
+		}
+		return nil, fmt.Errorf("Failed to load prog with %s: %w", loaderProg, err)
+	}
 
-    finalize := func() {
-        l := log.WithField("device", ifName).WithField("objPath", objPath)
-        l.Debug("Finalizing bpffs map migration")
-        if err := bpf.FinalizeBPFFSMigration(bpf.MapPrefixPath(), objPath, false); err != nil {
-            l.WithError(err).Error("Could not finalize bpffs map migration")
-        }
-    }
+	finalize := func() {
+		l := log.WithField("device", ifName).WithField("objPath", objPath)
+		l.Debug("Finalizing bpffs map migration")
+		if err := bpf.FinalizeBPFFSMigration(bpf.MapPrefixPath(), objPath, false); err != nil {
+			l.WithError(err).Error("Could not finalize bpffs map migration")
+		}
+	}
 
-    return finalize, nil
+	return finalize, nil
 }

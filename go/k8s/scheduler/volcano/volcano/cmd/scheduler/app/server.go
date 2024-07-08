@@ -2,9 +2,9 @@ package app
 
 import (
 	"k8s-lx1036/k8s/scheduler/volcano/volcano/cmd/scheduler/app/options"
-	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/version"
-	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/scheduler"
 	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/kube"
+	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/scheduler"
+	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/version"
 	"k8s.io/klog/v2"
 	"net/http"
 )

@@ -3,8 +3,8 @@
 package byteorder
 
 import (
-    "encoding/binary"
-    "math/bits"
+	"encoding/binary"
+	"math/bits"
 )
 
 var Native binary.ByteOrder = binary.LittleEndian
