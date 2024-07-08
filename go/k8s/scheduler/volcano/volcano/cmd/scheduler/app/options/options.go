@@ -40,7 +40,7 @@ type ServerOption struct {
 	SchedulePeriod time.Duration
 
 	DefaultQueue      string
-	NodeSelector      []string
+	NodeSelector      []string // 可以配置 volcano 只工作于指定的 nodes
 	NodeWorkerThreads uint32
 
 	CacheDumpFileDir  string
@@ -61,6 +61,8 @@ func (s *ServerOption) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableLeaderElection, "leader-elect", false,
 		"Start a leader election client and gain leadership before "+
 			"executing the main loop. Enable this when running replicated vc-scheduler for high availability; it is enabled by default")
+
+	fs.StringSliceVar(&s.NodeSelector, "node-selector", nil, "volcano only work with the labeled node, like: --node-selector=volcano.sh/role:train --node-selector=volcano.sh/role:serving")
 
 }
 
