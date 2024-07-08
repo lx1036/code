@@ -3,6 +3,7 @@ package options
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/kube"
 
@@ -33,6 +34,22 @@ type ServerOption struct {
 
 	EnableMetrics bool
 	ListenAddress string
+
+	SchedulerNames []string
+	SchedulerConf  string
+	SchedulePeriod time.Duration
+
+	DefaultQueue      string
+	NodeSelector      []string
+	NodeWorkerThreads uint32
+
+	CacheDumpFileDir  string
+	EnableCacheDumper bool
+
+	// IgnoredCSIProvisioners contains a list of provisioners, and pod request pvc with these provisioners will
+	// not be counted in pod pvc resource request and node.Allocatable, because the spec.drivers of csinode resource
+	// is always null, these provisioners usually are host path csi controllers like rancher.io/local-path and hostpath.csi.k8s.io.
+	IgnoredCSIProvisioners []string
 }
 
 func (s *ServerOption) AddFlags(fs *pflag.FlagSet) {
@@ -40,6 +57,10 @@ func (s *ServerOption) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.KubeClientOptions.KubeConfig, "kubeconfig", s.KubeClientOptions.KubeConfig, "Path to kubeconfig file with authorization and master location information")
 	fs.Float32Var(&s.KubeClientOptions.QPS, "kube-api-qps", defaultQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&s.KubeClientOptions.Burst, "kube-api-burst", defaultBurst, "Burst to use while talking with kubernetes apiserver")
+
+	fs.BoolVar(&s.EnableLeaderElection, "leader-elect", false,
+		"Start a leader election client and gain leadership before "+
+			"executing the main loop. Enable this when running replicated vc-scheduler for high availability; it is enabled by default")
 
 }
 
