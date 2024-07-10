@@ -1,5 +1,7 @@
 package conf
 
+var EnabledActionMap map[string]bool
+
 // SchedulerConfiguration defines the configuration of scheduler.
 type SchedulerConfiguration struct {
 	// Actions defines the actions list of scheduler in order

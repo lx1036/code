@@ -16,6 +16,7 @@ import (
 	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/scheduler/cache"
 	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/scheduler/conf"
 	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/scheduler/framework"
+	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/scheduler/metrics"
 	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/scheduler/plugins"
 
 	"gopkg.in/yaml.v2"
@@ -67,10 +68,43 @@ func (scheduler *Scheduler) Run(stopCh <-chan struct{}) {
 	scheduler.cache.WaitForCacheSync(stopCh)
 	klog.V(2).Infof("Scheduler completes Initialization and start to run")
 
-	go wait.Until(scheduler.runOnce, scheduler.schedulePeriod, stopCh)
+	go wait.Until(scheduler.runOnce, scheduler.schedulePeriod, stopCh) // 1s
 
 	if options.ServerOpts.EnableCacheDumper {
 		scheduler.dumper.ListenForSignal(stopCh)
+	}
+}
+
+// runOnce executes a single scheduling cycle. This function is called periodically
+// as defined by the Scheduler's schedule period.
+func (scheduler *Scheduler) runOnce() {
+	klog.V(4).Infof("Start scheduling ...")
+	scheduleStartTime := time.Now()
+	defer klog.V(4).Infof("End scheduling ...")
+
+	scheduler.mutex.Lock()
+	actions := scheduler.actions
+	tiers := scheduler.plugins
+	configurations := scheduler.configurations
+	scheduler.mutex.Unlock()
+
+	// TODO: 在 allocate action 里使用。有些鸡肋，需要重构!!!
+	// Load ConfigMap to check which action is enabled.
+	conf.EnabledActionMap = make(map[string]bool)
+	for _, action := range actions {
+		conf.EnabledActionMap[action.Name()] = true
+	}
+
+	ssn := framework.OpenSession(scheduler.cache, tiers, configurations)
+	defer func() {
+		framework.CloseSession(ssn)
+		metrics.UpdateE2eDuration(metrics.Duration(scheduleStartTime))
+	}()
+
+	for _, action := range actions {
+		actionStartTime := time.Now()
+		action.Execute(ssn)
+		metrics.UpdateActionDuration(action.Name(), metrics.Duration(actionStartTime))
 	}
 }
 

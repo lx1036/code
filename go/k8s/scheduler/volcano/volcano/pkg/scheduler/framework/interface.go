@@ -9,6 +9,6 @@ type Action interface {
 	// Execute allocates the cluster's resources into each queue.
 	Execute(ssn *Session)
 
-	// UnIntialize the allocator plugins.
+	// UnInitialize the allocator plugins.
 	UnInitialize()
 }
