@@ -26,6 +26,11 @@ type Session struct {
 	// be used in k8s compatable api scenarios such as in predicates and nodeorder plugins.
 	NodeMap   map[string]*k8sframework.NodeInfo
 	PodLister *PodLister
+
+	taskOrderFns   map[string]api.CompareFn
+	jobOrderFns    map[string]api.CompareFn
+	preemptableFns map[string]api.EvictableFn
+	jobStarvingFns map[string]api.ValidateFn
 }
 
 func OpenSession(cache cache.Cache, tiers []conf.Tier, configurations []conf.Configuration) *Session {

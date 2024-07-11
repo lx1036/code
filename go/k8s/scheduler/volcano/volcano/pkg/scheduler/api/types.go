@@ -19,3 +19,12 @@ func (np NodePhase) String() string {
 
 	return "Unknown"
 }
+
+// CompareFn is the func declaration used by sort or priority queue.
+type CompareFn func(interface{}, interface{}) int
+
+// EvictableFn is the func declaration used to evict tasks.
+type EvictableFn func(*TaskInfo, []*TaskInfo) ([]*TaskInfo, int)
+
+// ValidateFn is the func declaration used to check object's status.
+type ValidateFn func(interface{}) bool
