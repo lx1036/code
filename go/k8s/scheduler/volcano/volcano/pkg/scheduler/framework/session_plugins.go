@@ -18,3 +18,25 @@ func (ssn *Session) AddPreemptableFn(name string, cf api.EvictableFn) {
 func (ssn *Session) AddJobStarvingFns(name string, fn api.ValidateFn) {
 	ssn.jobStarvingFns[name] = fn
 }
+
+func (ssn *Session) AddJobValidFn(name string, fn api.ValidateExFn) {
+	ssn.jobValidFns[name] = fn
+}
+
+// JobValid invoke jobvalid function of the plugins
+func (ssn *Session) JobValid(obj interface{}) *api.ValidateResult {
+	for _, tier := range ssn.Tiers {
+		for _, plugin := range tier.Plugins {
+			validFn, found := ssn.jobValidFns[plugin.Name]
+			if !found {
+				continue
+			}
+
+			if result := validFn(obj); result != nil && !result.Pass {
+				return result
+			}
+		}
+	}
+
+	return nil
+}

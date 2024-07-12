@@ -28,3 +28,13 @@ type EvictableFn func(*TaskInfo, []*TaskInfo) ([]*TaskInfo, int)
 
 // ValidateFn is the func declaration used to check object's status.
 type ValidateFn func(interface{}) bool
+
+// ValidateExFn is the func declaration used to validate the result.
+type ValidateExFn func(interface{}) *ValidateResult
+
+// ValidateResult is struct to which can used to determine the result
+type ValidateResult struct {
+	Pass    bool
+	Reason  string
+	Message string
+}
