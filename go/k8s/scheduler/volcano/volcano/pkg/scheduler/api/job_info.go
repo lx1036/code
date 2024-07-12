@@ -2,7 +2,9 @@ package api
 
 import (
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"volcano.sh/apis/pkg/apis/scheduling"
 )
 
 // TaskStatus defines the status of a task/pod.
@@ -93,6 +95,9 @@ type JobInfo struct {
 	// * value means workload can use all the revocable node for during node active revocable time.
 	RevocableZone string
 	Budget        *DisruptionBudget
+
+	ScheduleStartTimestamp metav1.Time
+	CreationTimestamp      metav1.Time
 }
 
 // ReadyTaskNum returns the number of tasks that are ready or that is best-effort.
@@ -110,6 +115,12 @@ func (ji *JobInfo) ReadyTaskNum() int32 {
 // WaitingTaskNum returns the number of tasks that are pipelined.
 func (ji *JobInfo) WaitingTaskNum() int32 {
 	return int32(len(ji.TaskStatusIndex[Pipelined]))
+}
+
+func (ji *JobInfo) IsPending() bool {
+	return ji.PodGroup == nil ||
+		ji.PodGroup.Status.Phase == scheduling.PodGroupPending ||
+		ji.PodGroup.Status.Phase == ""
 }
 
 func (ji JobInfo) String() string {

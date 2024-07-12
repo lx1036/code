@@ -38,3 +38,12 @@ type ValidateResult struct {
 	Reason  string
 	Message string
 }
+
+// LessFn is the func declaration used by sort or priority queue.
+type LessFn func(interface{}, interface{}) bool
+
+// VoteFn is the func declaration used to check object's complicated status.
+type VoteFn func(interface{}) int
+
+// JobEnqueuedFn is the func declaration used to call after job enqueued.
+type JobEnqueuedFn func(interface{})

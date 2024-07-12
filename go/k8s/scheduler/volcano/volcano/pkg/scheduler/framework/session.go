@@ -41,11 +41,14 @@ type Session struct {
 	// This should not be mutated after initiated
 	podGroupStatus map[api.JobID]scheduling.PodGroupStatus
 
-	taskOrderFns   map[string]api.CompareFn
-	jobOrderFns    map[string]api.CompareFn
-	preemptableFns map[string]api.EvictableFn
-	jobStarvingFns map[string]api.ValidateFn
-	jobValidFns    map[string]api.ValidateExFn
+	taskOrderFns      map[string]api.CompareFn
+	jobOrderFns       map[string]api.CompareFn
+	queueOrderFns     map[string]api.CompareFn
+	preemptableFns    map[string]api.EvictableFn
+	jobStarvingFns    map[string]api.ValidateFn
+	jobValidFns       map[string]api.ValidateExFn
+	jobEnqueueableFns map[string]api.VoteFn
+	jobEnqueuedFns    map[string]api.JobEnqueuedFn
 }
 
 func OpenSession(cache cache.Cache, tiers []conf.Tier, configurations []conf.Configuration) *Session {

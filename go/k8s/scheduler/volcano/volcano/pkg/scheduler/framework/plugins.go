@@ -34,6 +34,13 @@ func GetPluginBuilder(name string) (PluginBuilder, bool) {
 
 var actionMap = map[string]Action{}
 
+func RegisterAction(act Action) {
+	pluginMutex.Lock()
+	defer pluginMutex.Unlock()
+
+	actionMap[act.Name()] = act
+}
+
 func GetAction(name string) (Action, bool) {
 	pluginMutex.RLock()
 	defer pluginMutex.RUnlock()
