@@ -14,3 +14,7 @@ type Resource struct {
 	// be accounted in other operators, e.g. Add.
 	MaxTaskNum int
 }
+
+func EmptyResource() *Resource {
+	return &Resource{}
+}

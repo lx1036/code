@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	defaultQPS   = 50.0
-	defaultBurst = 100
+	defaultQPS         = 50.0
+	defaultBurst       = 100
+	defaultNodeWorkers = 20
 )
 
 type DecryptFunc func(c *ServerOption) error
@@ -63,6 +64,7 @@ func (s *ServerOption) AddFlags(fs *pflag.FlagSet) {
 			"executing the main loop. Enable this when running replicated vc-scheduler for high availability; it is enabled by default")
 
 	fs.StringSliceVar(&s.NodeSelector, "node-selector", nil, "volcano only work with the labeled node, like: --node-selector=volcano.sh/role:train --node-selector=volcano.sh/role:serving")
+	fs.Uint32Var(&s.NodeWorkerThreads, "node-worker-threads", defaultNodeWorkers, "The number of threads syncing node operations.")
 
 }
 

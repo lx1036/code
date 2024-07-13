@@ -65,7 +65,6 @@ func (scheduler *Scheduler) Run(stopCh <-chan struct{}) {
 
 	scheduler.cache.SetMetricsConf(scheduler.metricsConf)
 	scheduler.cache.Run(stopCh)
-	scheduler.cache.WaitForCacheSync(stopCh)
 	klog.V(2).Infof("Scheduler completes Initialization and start to run")
 
 	go wait.Until(scheduler.runOnce, scheduler.schedulePeriod, stopCh) // 1s

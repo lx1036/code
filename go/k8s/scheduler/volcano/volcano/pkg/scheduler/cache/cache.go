@@ -1,12 +1,18 @@
 package cache
 
 import (
-	"k8s-lx1036/k8s/scheduler/volcano/volcano/cmd/scheduler/app/options"
-	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/features"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	"strings"
+	"sync"
+	"time"
+
+	"k8s-lx1036/k8s/scheduler/volcano/volcano/cmd/scheduler/app/options"
+	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/features"
+	schedulingapi "k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/scheduler/api"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -20,9 +26,17 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	// default interval for sync data from metrics server, the value is 30s
+	defaultMetricsInternal = 30 * time.Second
+)
+
 type SchedulerCache struct {
+	sync.Mutex
+
 	kubeClient                 kubernetes.Interface
 	informerFactory            informers.SharedInformerFactory
+	vcInformerFactory          vcinformer.SharedInformerFactory
 	podInformer                infov1.PodInformer
 	nodeInformer               infov1.NodeInformer
 	podGroupInformerV1beta1    vcinformerv1.PodGroupInformer
@@ -36,11 +50,44 @@ type SchedulerCache struct {
 	csiDriverInformer          storagev1.CSIDriverInformer
 	csiStorageCapacityInformer storagev1beta1.CSIStorageCapacityInformer
 
+	nodeQueue workqueue.RateLimitingInterface
+	Nodes     map[string]*schedulingapi.NodeInfo
+
 	nodeSelectorLabels map[string]string
+	nodeWorkers        uint32
+	metricsConf        map[string]string
 }
 
 func (sc *SchedulerCache) Run(stopCh <-chan struct{}) {
+	sc.informerFactory.Start(stopCh)
+	sc.vcInformerFactory.Start(stopCh)
+	sc.WaitForCacheSync(stopCh)
 
+	for i := 0; i < int(sc.nodeWorkers); i++ {
+		go wait.Until(sc.runNodeWorker, 0, stopCh)
+	}
+
+	// Re-sync error tasks.
+	go wait.Until(sc.processResyncTask, 0, stopCh)
+
+	// Cleanup jobs.
+	go wait.Until(sc.processCleanupJob, 0, stopCh)
+
+	go wait.Until(sc.processBindTask, time.Millisecond*20, stopCh)
+
+	// Get metrics data
+	klog.V(3).Infof("Start metrics collection, metricsConf is %v", sc.metricsConf)
+	interval, err := time.ParseDuration(sc.metricsConf["interval"])
+	if err != nil || interval <= 0 {
+		interval = defaultMetricsInternal
+	}
+	klog.V(3).Infof("The interval for querying metrics data is %v", interval)
+	go wait.Until(sc.GetMetricsData, interval, stopCh)
+}
+
+func (sc *SchedulerCache) WaitForCacheSync(stopCh <-chan struct{}) {
+	sc.informerFactory.WaitForCacheSync(stopCh)
+	sc.vcInformerFactory.WaitForCacheSync(stopCh)
 }
 
 func (sc *SchedulerCache) addEventHandler() {
@@ -223,6 +270,36 @@ func (sc *SchedulerCache) addEventHandler() {
 	}
 }
 
+func (sc *SchedulerCache) runNodeWorker() {
+	for sc.processSyncNode() {
+	}
+}
+
+func (sc *SchedulerCache) processSyncNode() bool {
+	obj, shutdown := sc.nodeQueue.Get()
+	if shutdown {
+		return false
+	}
+	defer sc.nodeQueue.Done(obj)
+
+	nodeName, ok := obj.(string)
+	if !ok {
+		klog.Errorf("failed to convert %v to string", obj)
+		return true
+	}
+
+	klog.V(5).Infof("started sync node %s", nodeName)
+	err := sc.SyncNode(nodeName)
+	if err == nil {
+		sc.nodeQueue.Forget(nodeName)
+		return true
+	}
+
+	klog.Errorf("Failed to sync node <%s>, retry it.", nodeName)
+	sc.nodeQueue.AddRateLimited(nodeName)
+	return true
+}
+
 // --node-selector=volcano.sh/role:train --node-selector=volcano.sh/role:serving
 func (sc *SchedulerCache) updateNodeSelectors(nodeSelectors []string) {
 	for _, nodeSelectorLabel := range nodeSelectors {
@@ -251,7 +328,9 @@ func New(config *rest.Config, schedulerNames []string, defaultQueue string, node
 func newSchedulerCache(config *rest.Config, schedulerNames []string, defaultQueue string, nodeSelectors []string,
 	nodeWorkers uint32, ignoredProvisioners []string) *SchedulerCache {
 
-	sc := &SchedulerCache{}
+	sc := &SchedulerCache{
+		nodeWorkers: nodeWorkers,
+	}
 
 	if len(nodeSelectors) > 0 {
 		sc.updateNodeSelectors(nodeSelectors)

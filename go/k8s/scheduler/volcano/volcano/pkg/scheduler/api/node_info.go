@@ -41,6 +41,9 @@ type NodeInfo struct {
 	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
 	// state information.
 	ImageStates map[string]*k8sframework.ImageStateSummary
+
+	// Used to store custom information
+	Others map[string]interface{}
 }
 
 func (ni NodeInfo) String() string {
@@ -73,4 +76,38 @@ type NodeUsage struct {
 type CSINodeStatusInfo struct {
 	CSINodeName  string
 	DriverStatus map[string]bool
+}
+
+func NewNodeInfo(node *v1.Node) *NodeInfo {
+	nodeInfo := &NodeInfo{
+		Releasing: EmptyResource(),
+		Pipelined: EmptyResource(),
+		Idle:      EmptyResource(),
+		Used:      EmptyResource(),
+
+		Allocatable:   EmptyResource(),
+		Capacity:      EmptyResource(),
+		ResourceUsage: &NodeUsage{},
+
+		OversubscriptionResource: EmptyResource(),
+		Tasks:                    make(map[TaskID]*TaskInfo),
+
+		Others:      make(map[string]interface{}),
+		ImageStates: make(map[string]*k8sframework.ImageStateSummary),
+	}
+
+	nodeInfo.setOversubscription(node)
+
+	if node != nil {
+		nodeInfo.Name = node.Name
+		nodeInfo.Node = node
+		nodeInfo.Idle = NewResource(node.Status.Allocatable).Add(nodeInfo.OversubscriptionResource)
+		nodeInfo.Allocatable = NewResource(node.Status.Allocatable).Add(nodeInfo.OversubscriptionResource)
+		nodeInfo.Capacity = NewResource(node.Status.Capacity).Add(nodeInfo.OversubscriptionResource)
+	}
+	nodeInfo.setNodeOthersResource(node)
+	nodeInfo.setNodeState(node)
+	nodeInfo.setRevocableZone(node)
+
+	return nodeInfo
 }
