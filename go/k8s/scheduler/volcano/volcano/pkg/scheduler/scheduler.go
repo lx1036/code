@@ -240,3 +240,15 @@ func UnmarshalSchedulerConf(confStr string) ([]framework.Action, []conf.Tier, []
 
 	return actions, schedulerConf.Tiers, schedulerConf.Configurations, schedulerConf.MetricsConfiguration, nil
 }
+
+func (scheduler *Scheduler) getSchedulerConf() (actions []string, plugins []string) {
+	for _, action := range scheduler.actions {
+		actions = append(actions, action.Name())
+	}
+	for _, tier := range scheduler.plugins {
+		for _, plugin := range tier.Plugins {
+			plugins = append(plugins, plugin.Name)
+		}
+	}
+	return
+}

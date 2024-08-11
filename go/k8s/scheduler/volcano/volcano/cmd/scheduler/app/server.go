@@ -3,8 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"k8s.io/client-go/tools/leaderelection"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"net/http"
 	"os"
 	"time"
@@ -16,13 +14,19 @@ import (
 	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/util"
 	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/version"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 )
 
@@ -105,4 +109,14 @@ func Run(opt *options.ServerOption) error {
 	})
 
 	return fmt.Errorf("lost lease")
+}
+
+func promHandler() http.Handler {
+	// Unregister go and process related collector because it's duplicated and `legacyregistry.DefaultGatherer` also has registered them.
+	prometheus.DefaultRegisterer.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	prometheus.DefaultRegisterer.Unregister(collectors.NewGoCollector())
+	return promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(prometheus.Gatherers{
+		prometheus.DefaultGatherer,
+		legacyregistry.DefaultGatherer,
+	}, promhttp.HandlerOpts{}))
 }

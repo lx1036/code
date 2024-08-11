@@ -1,11 +1,8 @@
 package cache
 
 import (
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
+	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -13,17 +10,30 @@ import (
 	"k8s-lx1036/k8s/scheduler/volcano/volcano/cmd/scheduler/app/options"
 	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/features"
 	schedulingapi "k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/scheduler/api"
+	"k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/scheduler/metrics"
+	commonutil "k8s-lx1036/k8s/scheduler/volcano/volcano/pkg/util"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	infov1 "k8s.io/client-go/informers/core/v1"
 	schedv1 "k8s.io/client-go/informers/scheduling/v1"
 	storagev1 "k8s.io/client-go/informers/storage/v1"
 	storagev1beta1 "k8s.io/client-go/informers/storage/v1beta1"
+	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	vcv1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
+	vcclient "volcano.sh/apis/pkg/client/clientset/versioned"
+	"volcano.sh/apis/pkg/client/clientset/versioned/scheme"
+	vcinformer "volcano.sh/apis/pkg/client/informers/externalversions"
+	vcinformerv1 "volcano.sh/apis/pkg/client/informers/externalversions/scheduling/v1beta1"
 )
 
 const (
@@ -33,6 +43,9 @@ const (
 
 type SchedulerCache struct {
 	sync.Mutex
+
+	// schedulerName is the name for volcano scheduler
+	schedulerNames []string
 
 	kubeClient                 kubernetes.Interface
 	informerFactory            informers.SharedInformerFactory
@@ -49,13 +62,76 @@ type SchedulerCache struct {
 	csiNodeInformer            storagev1.CSINodeInformer
 	csiDriverInformer          storagev1.CSIDriverInformer
 	csiStorageCapacityInformer storagev1beta1.CSIStorageCapacityInformer
+	Recorder                   record.EventRecorder
 
 	nodeQueue workqueue.RateLimitingInterface
 	Nodes     map[string]*schedulingapi.NodeInfo
+	NodeList  []string
+	Jobs      map[schedulingapi.JobID]*schedulingapi.JobInfo
 
 	nodeSelectorLabels map[string]string
 	nodeWorkers        uint32
 	metricsConf        map[string]string
+
+	Binder         Binder
+	StatusUpdater  StatusUpdater
+	PodGroupBinder BatchBinder
+}
+
+func New(config *rest.Config, schedulerNames []string, defaultQueue string, nodeSelectors []string,
+	nodeWorkers uint32, ignoredProvisioners []string) Cache {
+	return newSchedulerCache(config, schedulerNames, defaultQueue, nodeSelectors, nodeWorkers, ignoredProvisioners)
+}
+
+func newSchedulerCache(config *rest.Config, schedulerNames []string, defaultQueue string, nodeSelectors []string,
+	nodeWorkers uint32, ignoredProvisioners []string) *SchedulerCache {
+	kubeClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(fmt.Sprintf("failed init kubeClient, with err: %v", err))
+	}
+
+	sc := &SchedulerCache{
+		nodeWorkers: nodeWorkers,
+	}
+
+	if len(nodeSelectors) > 0 {
+		sc.updateNodeSelectors(nodeSelectors)
+	}
+
+	// Prepare event clients.
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	sc.Recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{
+		Component: commonutil.GenerateComponentName(sc.schedulerNames),
+	})
+
+	// set concurrency configuration when binding
+	//sc.setBatchBindParallel()
+	/*if bindMethodMap == nil {
+		klog.V(3).Info("no registered bind method, new a default one")
+		bindMethodMap = NewDefaultBinder(sc.kubeClient, sc.Recorder)
+	}*/
+	sc.Binder = NewDefaultBinder(sc.kubeClient, sc.Recorder)
+
+	//sc.Evictor = &defaultEvictor{
+	//	kubeclient: sc.kubeClient,
+	//	recorder:   sc.Recorder,
+	//}
+
+	sc.StatusUpdater = &defaultStatusUpdater{
+		kubeclient: sc.kubeClient,
+		vcclient:   sc.vcClient,
+	}
+
+	sc.PodGroupBinder = &podgroupBinder{
+		kubeclient: sc.kubeClient,
+		vcclient:   sc.vcClient,
+	}
+
+	sc.addEventHandler()
+	// finally, init default volume binder which has dependencies on other informers
+	//sc.setDefaultVolumeBinder()
+	return sc
 }
 
 func (sc *SchedulerCache) Run(stopCh <-chan struct{}) {
@@ -320,52 +396,60 @@ func (sc *SchedulerCache) updateNodeSelectors(nodeSelectors []string) {
 	}
 }
 
-func New(config *rest.Config, schedulerNames []string, defaultQueue string, nodeSelectors []string,
-	nodeWorkers uint32, ignoredProvisioners []string) Cache {
-	return newSchedulerCache(config, schedulerNames, defaultQueue, nodeSelectors, nodeWorkers, ignoredProvisioners)
+// DefaultBinder with kube client and event recorder
+type DefaultBinder struct {
+	kubeclient kubernetes.Interface
+	recorder   record.EventRecorder
 }
 
-func newSchedulerCache(config *rest.Config, schedulerNames []string, defaultQueue string, nodeSelectors []string,
-	nodeWorkers uint32, ignoredProvisioners []string) *SchedulerCache {
+// NewDefaultBinder create binder with kube client and event recorder, support fake binder if passed fake client and fake event recorder
+func NewDefaultBinder(kbclient kubernetes.Interface, record record.EventRecorder) *DefaultBinder {
+	return &DefaultBinder{
+		kubeclient: kbclient,
+		recorder:   record,
+	}
+}
 
-	sc := &SchedulerCache{
-		nodeWorkers: nodeWorkers,
+// Bind will send bind request to api server
+func (db *DefaultBinder) Bind(kubeClient kubernetes.Interface,
+	tasks []*schedulingapi.TaskInfo) ([]*schedulingapi.TaskInfo, []error) {
+	var errTasks []*schedulingapi.TaskInfo
+	var errs []error
+	for _, task := range tasks {
+		p := task.Pod
+		err := db.kubeclient.CoreV1().Pods(p.Namespace).Bind(context.TODO(),
+			&v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   p.Namespace,
+					Name:        p.Name,
+					UID:         p.UID,
+					Annotations: p.Annotations,
+				},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: task.NodeName,
+				},
+			}, metav1.CreateOptions{})
+		if err != nil {
+			klog.Errorf("Failed to bind pod <%v/%v> to node %s : %#v", p.Namespace, p.Name, task.NodeName, err)
+			errTasks = append(errTasks, task)
+			errs = append(errs, err)
+		} else {
+			db.recorder.Eventf(task.Pod, v1.EventTypeNormal, "Scheduled",
+				"Successfully assigned %v/%v to %v", task.Namespace, task.Name, task.NodeName)
+			metrics.UpdateTaskScheduleDuration(metrics.Duration(p.CreationTimestamp.Time)) // update metrics as soon as pod is bind
+		}
 	}
 
-	if len(nodeSelectors) > 0 {
-		sc.updateNodeSelectors(nodeSelectors)
+	if len(errTasks) > 0 {
+		return errTasks, errs
 	}
 
-	// Prepare event clients.
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: eventClient.CoreV1().Events("")})
-	sc.Recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: commonutil.GenerateComponentName(sc.schedulerNames)})
+	return nil, nil
+}
 
-	// set concurrency configuration when binding
-	sc.setBatchBindParallel()
-	if bindMethodMap == nil {
-		klog.V(3).Info("no registered bind method, new a default one")
-		bindMethodMap = NewDefaultBinder(sc.kubeClient, sc.Recorder)
-	}
-	sc.Binder = GetBindMethod()
-
-	sc.Evictor = &defaultEvictor{
-		kubeclient: sc.kubeClient,
-		recorder:   sc.Recorder,
-	}
-
-	sc.StatusUpdater = &defaultStatusUpdater{
-		kubeclient: sc.kubeClient,
-		vcclient:   sc.vcClient,
-	}
-
-	sc.PodGroupBinder = &podgroupBinder{
-		kubeclient: sc.kubeClient,
-		vcclient:   sc.vcClient,
-	}
-
-	sc.addEventHandler()
-	// finally, init default volume binder which has dependencies on other informers
-	sc.setDefaultVolumeBinder()
-	return sc
+// defaultStatusUpdater is the default implementation of the StatusUpdater interface
+type defaultStatusUpdater struct {
+	kubeclient kubernetes.Interface
+	vcclient   vcclient.Interface
 }

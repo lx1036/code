@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -44,6 +45,30 @@ type NodeInfo struct {
 
 	// Used to store custom information
 	Others map[string]interface{}
+}
+
+// SetNode sets kubernetes node object to nodeInfo object
+func (ni *NodeInfo) SetNode(node *v1.Node) {
+	ni.setNodeState(node)
+	if !ni.Ready() {
+		klog.Warningf("Failed to set node info for %s, phase: %s, reason: %s",
+			ni.Name, ni.State.Phase, ni.State.Reason)
+		return
+	}
+
+	// Dry run, make sure all fields other than `State` are in the original state.
+	c := ni.Clone()
+	c.setNode(node)
+	c.setNodeState(node)
+	if !c.Ready() {
+		klog.Warningf("SetNode makes node %s not ready, phase: %s, reason: %s",
+			c.Name, c.State.Phase, c.State.Reason)
+		// Set state of node to !Ready, left other fields untouched
+		ni.State = c.State
+		return
+	}
+
+	ni.setNode(node)
 }
 
 func (ni NodeInfo) String() string {
